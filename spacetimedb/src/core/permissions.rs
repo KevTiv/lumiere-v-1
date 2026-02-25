@@ -13,7 +13,7 @@ use crate::helpers::check_permission;
 #[spacetimedb::table(
     accessor = role,
     public,
-    index(name = "role_by_org", btree(columns = [organization_id]))
+    index(accessor = role_by_org, btree(columns = [organization_id]))
 )]
 pub struct Role {
     #[primary_key]
@@ -35,7 +35,7 @@ pub struct Role {
 #[spacetimedb::table(
     accessor = casbin_rule,
     public,
-    index(name = "casbin_by_ptype", btree(columns = [ptype]))
+    index(accessor = casbin_by_ptype, btree(columns = [ptype]))
 )]
 pub struct CasbinRule {
     #[primary_key]
@@ -56,8 +56,8 @@ pub struct CasbinRule {
 #[spacetimedb::table(
     accessor = user_role_assignment,
     public,
-    index(name = "role_assign_by_user", btree(columns = [user_identity])),
-    index(name = "role_assign_by_org",  btree(columns = [organization_id]))
+    index(accessor = role_assign_by_user, btree(columns = [user_identity])),
+    index(accessor = role_assign_by_org,  btree(columns = [organization_id]))
 )]
 pub struct UserRoleAssignment {
     #[primary_key]
@@ -225,7 +225,7 @@ pub fn assign_role(
     }
 
     let expires_at = expires_at_micros
-        .map(Timestamp::from_micros_since_unix_epoch);
+        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
     ctx.db.user_role_assignment().insert(UserRoleAssignment {
         id: 0,

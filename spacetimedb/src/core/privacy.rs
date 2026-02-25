@@ -13,7 +13,7 @@ use crate::helpers::check_permission;
 #[spacetimedb::table(
     accessor = data_classification,
     public,
-    index(name = "data_class_by_org", btree(columns = [organization_id]))
+    index(accessor = data_class_by_org, btree(columns = [organization_id]))
 )]
 pub struct DataClassification {
     #[primary_key]
@@ -32,7 +32,7 @@ pub struct DataClassification {
 #[spacetimedb::table(
     accessor = data_classification_rule,
     public,
-    index(name = "class_rule_by_org", btree(columns = [organization_id]))
+    index(accessor = class_rule_by_org, btree(columns = [organization_id]))
 )]
 pub struct DataClassificationRule {
     #[primary_key]
@@ -50,8 +50,8 @@ pub struct DataClassificationRule {
 #[spacetimedb::table(
     accessor = privacy_consent,
     public,
-    index(name = "consent_by_org",     btree(columns = [organization_id])),
-    index(name = "consent_by_contact", btree(columns = [contact_id]))
+    index(accessor = consent_by_org,     btree(columns = [organization_id])),
+    index(accessor = consent_by_contact, btree(columns = [contact_id]))
 )]
 pub struct PrivacyConsent {
     #[primary_key]

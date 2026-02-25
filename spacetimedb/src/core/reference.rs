@@ -6,6 +6,7 @@
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::helpers::check_permission;
+use crate::core::users::user_profile;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ pub struct Currency {
 #[spacetimedb::table(
     accessor = currency_rate,
     public,
-    index(name = "rate_by_org", btree(columns = [organization_id]))
+    index(accessor = rate_by_org, btree(columns = [organization_id]))
 )]
 pub struct CurrencyRate {
     #[primary_key]
@@ -60,9 +61,9 @@ pub struct CurrencyRate {
 }
 
 #[spacetimedb::table(
-    accessor = uom_category,
+    accessor = uom_cat,
     public,
-    index(name = "uom_cat_by_org", btree(columns = [organization_id]))
+    index(accessor = uom_cat_by_org, btree(columns = [organization_id]))
 )]
 pub struct UOMCategory {
     #[primary_key]
@@ -79,8 +80,8 @@ pub struct UOMCategory {
 #[spacetimedb::table(
     accessor = uom,
     public,
-    index(name = "uom_by_org",      btree(columns = [organization_id])),
-    index(name = "uom_by_category", btree(columns = [category_id]))
+    index(accessor = uom_by_org,      btree(columns = [organization_id])),
+    index(accessor = uom_by_category, btree(columns = [category_id]))
 )]
 pub struct UOM {
     #[primary_key]
@@ -103,7 +104,7 @@ pub struct UOM {
 #[spacetimedb::table(
     accessor = uom_conversion,
     public,
-    index(name = "uom_conv_by_org", btree(columns = [organization_id]))
+    index(accessor = uom_conv_by_org, btree(columns = [organization_id]))
 )]
 pub struct UOMConversion {
     #[primary_key]
@@ -249,7 +250,7 @@ pub fn create_uom_category(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_category", "create")?;
 
-    ctx.db.uom_category().insert(UOMCategory {
+    ctx.db.uom_cat().insert(UOMCategory {
         id: 0,
         organization_id,
         name,
@@ -278,7 +279,7 @@ pub fn create_uom(
 
     let category = ctx
         .db
-        .uom_category()
+        .uom_cat()
         .id()
         .find(&category_id)
         .ok_or("UOM category not found")?;

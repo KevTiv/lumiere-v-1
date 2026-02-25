@@ -7,6 +7,8 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::check_permission;
+use crate::core::organization::organization;
+use crate::core::permissions::role;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -38,8 +40,8 @@ pub struct UserProfile {
 #[spacetimedb::table(
     accessor = user_organization,
     public,
-    index(name = "user_org_by_user", btree(columns = [user_identity])),
-    index(name = "user_org_by_org",  btree(columns = [organization_id]))
+    index(accessor = user_org_by_user, btree(columns = [user_identity])),
+    index(accessor = user_org_by_org,  btree(columns = [organization_id]))
 )]
 pub struct UserOrganization {
     #[primary_key]
@@ -61,8 +63,8 @@ pub struct UserOrganization {
 #[spacetimedb::table(
     accessor = user_session,
     public,
-    index(name = "session_by_user", btree(columns = [user_identity])),
-    index(name = "session_by_org",  btree(columns = [organization_id]))
+    index(accessor = session_by_user, btree(columns = [user_identity])),
+    index(accessor = session_by_org,  btree(columns = [organization_id]))
 )]
 pub struct UserSession {
     #[primary_key]
@@ -242,7 +244,7 @@ pub fn create_user_session(
         return Err("User account is inactive".to_string());
     }
 
-    let expires_at = Timestamp::from_micros_since_unix_epoch(expires_at_micros);
+    let expires_at = Timestamp::from_micros_since_unix_epoch(expires_at_micros as i64);
 
     ctx.db.user_session().insert(UserSession {
         id: 0,

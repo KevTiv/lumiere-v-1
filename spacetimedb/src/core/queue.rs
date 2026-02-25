@@ -14,8 +14,8 @@ use crate::types::JobStatus;
 #[spacetimedb::table(
     accessor = queue_job,
     public,
-    index(name = "queue_job_by_org",   btree(columns = [organization_id])),
-    index(name = "queue_job_by_queue", btree(columns = [queue_name]))
+    index(accessor = queue_job_by_org,   btree(columns = [organization_id])),
+    index(accessor = queue_job_by_queue, btree(columns = [queue_name]))
 )]
 pub struct QueueJob {
     #[primary_key]
@@ -41,7 +41,7 @@ pub struct QueueJob {
 #[spacetimedb::table(
     accessor = queue_worker,
     public,
-    index(name = "worker_by_org", btree(columns = [organization_id]))
+    index(accessor = worker_by_org, btree(columns = [organization_id]))
 )]
 pub struct QueueWorker {
     #[primary_key]
@@ -73,7 +73,7 @@ pub fn enqueue_job(
     check_permission(ctx, organization_id, "queue_job", "create")?;
 
     let scheduled_at = scheduled_at_micros
-        .map(Timestamp::from_micros_since_unix_epoch);
+        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
     let status = if scheduled_at.is_some() {
         JobStatus::Scheduled

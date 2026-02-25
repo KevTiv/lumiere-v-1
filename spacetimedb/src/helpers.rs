@@ -7,9 +7,9 @@
 /// in the domain module that needs it.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::audit::AuditLog;
-use crate::core::permissions::{CasbinRule, Role};
-use crate::core::users::{UserOrganization, UserProfile};
+use crate::core::audit::{AuditLog, audit_log};
+use crate::core::permissions::{casbin_rule, role};
+use crate::core::users::{user_organization, user_profile};
 
 /// Returns `Ok(())` when the calling identity holds `resource:action`
 /// in `organization_id`, `Err(reason)` otherwise.
@@ -70,7 +70,7 @@ pub fn check_permission(
     let has_casbin = ctx
         .db
         .casbin_rule()
-        .ptype()
+        .casbin_by_ptype()
         .filter(&"p".to_string())
         .any(|r| {
             r.v0.as_deref() == Some(&role_str)

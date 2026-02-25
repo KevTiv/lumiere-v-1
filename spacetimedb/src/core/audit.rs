@@ -8,14 +8,15 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::check_permission;
+use crate::core::users::{user_organization, user_profile};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = audit_log,
     public,
-    index(name = "audit_by_org",   btree(columns = [organization_id])),
-    index(name = "audit_by_table", btree(columns = [table_name]))
+    index(accessor = audit_by_org,   btree(columns = [organization_id])),
+    index(accessor = audit_by_table, btree(columns = [table_name]))
 )]
 pub struct AuditLog {
     #[primary_key]
@@ -41,7 +42,7 @@ pub struct AuditLog {
 #[spacetimedb::table(
     accessor = audit_rule,
     public,
-    index(name = "audit_rule_by_org", btree(columns = [organization_id]))
+    index(accessor = audit_rule_by_org, btree(columns = [organization_id]))
 )]
 pub struct AuditRule {
     #[primary_key]

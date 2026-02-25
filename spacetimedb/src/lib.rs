@@ -63,7 +63,7 @@ pub mod core;
 // pub mod data_ops;     // Phase 15
 // pub mod analytics;    // Phase 16
 
-use core::users::{UserProfile, UserSession};
+use crate::core::users::{UserProfile, UserSession, user_profile, user_session};
 
 // ── Lifecycle reducers ────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
     let sessions: Vec<_> = ctx
         .db
         .user_session()
-        .user_identity()
+        .session_by_user()
         .filter(&ctx.sender())
         .filter(|s| s.is_active)
         .collect();

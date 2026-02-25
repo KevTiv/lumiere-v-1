@@ -45,7 +45,7 @@ pub struct OrganizationSettings {
 #[spacetimedb::table(
     accessor = company,
     public,
-    index(name = "company_by_org", btree(columns = [organization_id]))
+    index(accessor = company_by_org, btree(columns = [organization_id]))
 )]
 pub struct Company {
     #[primary_key]
