@@ -1,34 +1,131 @@
+/// Lumiere ERP — SpacetimeDB Module
+///
+/// # Directory Structure
+///
+/// ```
+/// src/
+/// ├── lib.rs          ← crate root: lifecycle reducers + module map (this file)
+/// ├── types.rs        ← shared SpacetimeType enums used across domains
+/// ├── helpers.rs      ← check_permission, write_audit_log
+/// │
+/// ├── core/           ← Foundation & Infrastructure  [Phase 1]
+/// │   ├── mod.rs
+/// │   ├── organization.rs   Organization · OrganizationSettings · Company
+/// │   ├── users.rs          UserProfile · UserOrganization · UserSession
+/// │   ├── permissions.rs    Role · CasbinRule · UserRoleAssignment
+/// │   ├── reference.rs      Country · Currency · CurrencyRate · UOM*
+/// │   ├── audit.rs          AuditLog · AuditRule
+/// │   ├── queue.rs          QueueJob · QueueWorker
+/// │   └── privacy.rs        DataClassification* · PrivacyConsent
+/// │
+/// ├── crm/            ← CRM & Contacts              [Phase 2]  (add next)
+/// ├── inventory/      ← Products & Stock             [Phase 3–4]
+/// ├── sales/          ← Quotations, POS, Delivery    [Phase 5]
+/// ├── purchasing/     ← Purchase Orders & Vendors    [Phase 6]
+/// ├── accounting/     ← COA, Journals, Tax, Bank     [Phase 7–8]
+/// ├── subscriptions/  ← Plans & Deferred Revenue     [Phase 9]
+/// ├── manufacturing/  ← BOM, Work Orders             [Phase 10]
+/// ├── projects/       ← Projects, Tasks, Timesheets  [Phase 11]
+/// ├── documents/      ← Docs & Knowledge Base        [Phase 12]
+/// ├── workflow/       ← Workflow Engine              [Phase 13]
+/// ├── ai/             ← AI Agents & Embeddings       [Phase 14]
+/// ├── data_ops/       ← Import/Export                [Phase 15]
+/// └── analytics/      ← Dashboards & Metrics         [Phase 16]
+/// ```
+///
+/// # Adding a new domain
+/// 1. `mkdir src/<domain>/`
+/// 2. Create `src/<domain>/mod.rs` declaring sub-modules
+/// 3. In each sub-module file: define `#[spacetimedb::table]` structs and
+///    `#[spacetimedb::reducer]` fns — tables and reducers co-located
+/// 4. Add `pub mod <domain>;` below in this file
+/// 5. Use `crate::helpers::check_permission` and `crate::helpers::write_audit_log`
+///    for multi-tenancy and auditing
 use spacetimedb::{ReducerContext, Table};
 
-#[spacetimedb::table(accessor = person, public)]
-pub struct Person {
-    name: String,
-}
+// ── Shared utilities ─────────────────────────────────────────────────────────
+pub mod helpers;
+pub mod types;
 
+// ── Domain modules ────────────────────────────────────────────────────────────
+pub mod core;
+// pub mod crm;          // Phase 2 — uncomment when implemented
+// pub mod inventory;    // Phase 3–4
+// pub mod sales;        // Phase 5
+// pub mod purchasing;   // Phase 6
+// pub mod accounting;   // Phase 7–8
+// pub mod subscriptions;// Phase 9
+// pub mod manufacturing;// Phase 10
+// pub mod projects;     // Phase 11
+// pub mod documents;    // Phase 12
+// pub mod workflow;     // Phase 13
+// pub mod ai;           // Phase 14
+// pub mod data_ops;     // Phase 15
+// pub mod analytics;    // Phase 16
+
+use core::users::{UserProfile, UserSession};
+
+// ── Lifecycle reducers ────────────────────────────────────────────────────────
+
+/// Called once when the module is first published.
+/// Use this to seed system roles, default currencies, etc.
 #[spacetimedb::reducer(init)]
 pub fn init(_ctx: &ReducerContext) {
-    // Called when the module is initially published
+    log::info!("Lumiere ERP module initialised");
 }
 
+/// Called every time a client connects.
+/// Creates a minimal UserProfile on first connection; updates `last_login` otherwise.
 #[spacetimedb::reducer(client_connected)]
-pub fn identity_connected(_ctx: &ReducerContext) {
-    // Called everytime a new client connects
-}
-
-#[spacetimedb::reducer(client_disconnected)]
-pub fn identity_disconnected(_ctx: &ReducerContext) {
-    // Called everytime a client disconnects
-}
-
-#[spacetimedb::reducer]
-pub fn add(ctx: &ReducerContext, name: String) {
-    ctx.db.person().insert(Person { name });
-}
-
-#[spacetimedb::reducer]
-pub fn say_hello(ctx: &ReducerContext) {
-    for person in ctx.db.person().iter() {
-        log::info!("Hello, {}!", person.name);
+pub fn identity_connected(ctx: &ReducerContext) {
+    if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
+        ctx.db.user_profile().identity().update(UserProfile {
+            last_login: Some(ctx.timestamp),
+            updated_at: ctx.timestamp,
+            ..profile
+        });
+    } else {
+        ctx.db.user_profile().insert(UserProfile {
+            identity: ctx.sender(),
+            email: String::new(),
+            email_verified: false,
+            name: String::new(),
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: "UTC".to_string(),
+            language: "en".to_string(),
+            signature: None,
+            notification_preferences: None,
+            ui_preferences: None,
+            is_active: true,
+            is_superuser: false,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            last_login: Some(ctx.timestamp),
+            metadata: None,
+        });
     }
-    log::info!("Hello, World!");
+}
+
+/// Called every time a client disconnects.
+/// Marks all active sessions for this identity as inactive.
+#[spacetimedb::reducer(client_disconnected)]
+pub fn identity_disconnected(ctx: &ReducerContext) {
+    let sessions: Vec<_> = ctx
+        .db
+        .user_session()
+        .user_identity()
+        .filter(&ctx.sender())
+        .filter(|s| s.is_active)
+        .collect();
+
+    for session in sessions {
+        ctx.db.user_session().id().update(UserSession {
+            is_active: false,
+            ..session
+        });
+    }
 }
