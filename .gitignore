@@ -1,0 +1,5 @@
+supabase copy
+*.md
+.cursor
+.windsurfrules
+.DS_Store
