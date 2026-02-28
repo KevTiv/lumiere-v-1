@@ -18,6 +18,11 @@
 /// │   ├── queue.rs          QueueJob · QueueWorker
 /// │   └── privacy.rs        DataClassification* · PrivacyConsent
 /// │
+/// ├── integrations/   ← External Service Integrations
+/// │   ├── mod.rs            Shared integration utilities
+/// │   ├── google_drive.rs   Google Drive connections
+/// │   └── whatsapp_business.rs  WhatsApp Business accounts
+/// │
 /// ├── crm/            ← CRM & Contacts              [Phase 2]  (add next)
 /// ├── inventory/      ← Products & Stock             [Phase 3–4]
 /// ├── sales/          ← Quotations, POS, Delivery    [Phase 5]
@@ -49,21 +54,22 @@ pub mod types;
 
 // ── Domain modules ────────────────────────────────────────────────────────────
 pub mod core;
-// pub mod crm;          // Phase 2 — uncomment when implemented
-// pub mod inventory;    // Phase 3–4
-// pub mod sales;        // Phase 5
-// pub mod purchasing;   // Phase 6
-// pub mod accounting;   // Phase 7–8
-// pub mod subscriptions;// Phase 9
-// pub mod manufacturing;// Phase 10
-// pub mod projects;     // Phase 11
-// pub mod documents;    // Phase 12
-// pub mod workflow;     // Phase 13
-// pub mod ai;           // Phase 14
-// pub mod data_ops;     // Phase 15
-// pub mod analytics;    // Phase 16
+pub mod crm;
+pub mod integrations; // Phase 2 — CRM & Contacts
+pub mod inventory; // Phase 3–4 — Products & Inventory
+                   // pub mod sales;        // Phase 5
+                   // pub mod purchasing;   // Phase 6
+                   // pub mod accounting;   // Phase 7–8
+                   // pub mod subscriptions;// Phase 9
+                   // pub mod manufacturing;// Phase 10
+                   // pub mod projects;     // Phase 11
+                   // pub mod documents;    // Phase 12
+                   // pub mod workflow;     // Phase 13
+                   // pub mod ai;           // Phase 14
+                   // pub mod data_ops;     // Phase 15
+                   // pub mod analytics;    // Phase 16
 
-use crate::core::users::{UserProfile, UserSession, user_profile, user_session};
+use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 
 // ── Lifecycle reducers ────────────────────────────────────────────────────────
 

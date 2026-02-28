@@ -7,7 +7,7 @@
 /// in the domain module that needs it.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::audit::{AuditLog, audit_log};
+use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{casbin_rule, role};
 use crate::core::users::{user_organization, user_profile};
 
