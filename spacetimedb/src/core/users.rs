@@ -6,9 +6,9 @@
 ///          UserSession tracks active client connections.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::helpers::check_permission;
 use crate::core::organization::organization;
 use crate::core::permissions::role;
+use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -119,8 +119,7 @@ pub fn update_user_profile(
         timezone: timezone.unwrap_or(profile.timezone),
         language: language.unwrap_or(profile.language),
         signature: signature.or(profile.signature),
-        notification_preferences: notification_preferences
-            .or(profile.notification_preferences),
+        notification_preferences: notification_preferences.or(profile.notification_preferences),
         ui_preferences: ui_preferences.or(profile.ui_preferences),
         updated_at: ctx.timestamp,
         ..profile
@@ -139,6 +138,9 @@ pub fn add_user_to_organization(
     role_id: u64,
     company_id: Option<u64>,
     job_title: Option<String>,
+    // Additional fields
+    department_id: Option<u64>,
+    employee_id: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -148,26 +150,15 @@ pub fn add_user_to_organization(
         .find(&organization_id)
         .ok_or("Organization not found")?;
 
-    let role = ctx
-        .db
-        .role()
-        .id()
-        .find(&role_id)
-        .ok_or("Role not found")?;
+    let role = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
     if role.organization_id != organization_id {
         return Err("Role does not belong to this organization".to_string());
     }
 
-    let already_member = ctx
-        .db
-        .user_organization()
-        .iter()
-        .any(|uo| {
-            uo.user_identity == user_identity
-                && uo.organization_id == organization_id
-                && uo.is_active
-        });
+    let already_member = ctx.db.user_organization().iter().any(|uo| {
+        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
+    });
 
     if already_member {
         return Err("User is already an active member of this organization".to_string());
@@ -179,13 +170,75 @@ pub fn add_user_to_organization(
         organization_id,
         company_id,
         role_id,
-        department_id: None,
+        department_id,
         job_title,
-        employee_id: None,
+        employee_id,
         date_joined: ctx.timestamp,
         is_active: true,
         is_default: false,
         metadata: None,
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_user_organization_details(
+    ctx: &ReducerContext,
+    user_org_id: u64,
+    department_id: Option<u64>,
+    job_title: Option<String>,
+    employee_id: Option<String>,
+) -> Result<(), String> {
+    let membership = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&user_org_id)
+        .ok_or("User organization membership not found")?;
+
+    check_permission(
+        ctx,
+        membership.organization_id,
+        "user_organization",
+        "write",
+    )?;
+
+    ctx.db.user_organization().id().update(UserOrganization {
+        department_id,
+        job_title,
+        employee_id,
+        ..membership
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_user_organization_status(
+    ctx: &ReducerContext,
+    user_org_id: u64,
+    is_active: bool,
+    is_default: bool,
+) -> Result<(), String> {
+    let membership = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&user_org_id)
+        .ok_or("User organization membership not found")?;
+
+    check_permission(
+        ctx,
+        membership.organization_id,
+        "user_organization",
+        "write",
+    )?;
+
+    ctx.db.user_organization().id().update(UserOrganization {
+        is_active,
+        is_default,
+        ..membership
     });
 
     Ok(())
@@ -211,13 +264,10 @@ pub fn remove_user_from_organization(
         })
         .ok_or("User is not an active member of this organization")?;
 
-    ctx.db
-        .user_organization()
-        .id()
-        .update(UserOrganization {
-            is_active: false,
-            ..membership
-        });
+    ctx.db.user_organization().id().update(UserOrganization {
+        is_active: false,
+        ..membership
+    });
 
     Ok(())
 }

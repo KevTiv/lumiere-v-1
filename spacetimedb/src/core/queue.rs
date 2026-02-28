@@ -69,11 +69,12 @@ pub fn enqueue_job(
     priority: i32,
     max_attempts: u32,
     scheduled_at_micros: Option<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "queue_job", "create")?;
 
-    let scheduled_at = scheduled_at_micros
-        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
+    let scheduled_at =
+        scheduled_at_micros.map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
     let status = if scheduled_at.is_some() {
         JobStatus::Scheduled
@@ -97,7 +98,7 @@ pub fn enqueue_job(
         error_message: None,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -176,6 +177,7 @@ pub fn register_queue_worker(
     organization_id: u64,
     name: String,
     queues: Vec<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "queue_worker", "create")?;
 
@@ -187,7 +189,7 @@ pub fn register_queue_worker(
         is_active: true,
         last_heartbeat: ctx.timestamp,
         started_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

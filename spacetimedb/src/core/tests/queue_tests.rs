@@ -3,12 +3,11 @@
 /// Test reducers for QueueJob and QueueWorker tables.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{create_organization, organization};
 use crate::core::queue::{
-    queue_job, queue_worker,
-    enqueue_job, claim_queue_job, complete_queue_job, register_queue_worker,
-    worker_heartbeat,
+    claim_queue_job, complete_queue_job, enqueue_job, queue_job, queue_worker,
+    register_queue_worker, worker_heartbeat,
 };
-use crate::core::organization::{organization, create_organization};
 use crate::types::JobStatus;
 
 /// Test queue system lifecycle
@@ -23,9 +22,18 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "QUEUEORG")
         .ok_or("Test organization not found")?;
@@ -40,9 +48,12 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         "worker-001".to_string(),
         vec!["default".to_string(), "priority".to_string()],
+        None,
     )?;
 
-    let worker = ctx.db.queue_worker()
+    let worker = ctx
+        .db
+        .queue_worker()
         .iter()
         .find(|w| w.name == "worker-001" && w.organization_id == org_id)
         .ok_or("Worker not registered")?;
@@ -58,12 +69,19 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Worker heartbeat...");
     worker_heartbeat(ctx, org_id, worker_id)?;
 
-    let worker_after_beat = ctx.db.queue_worker()
+    let worker_after_beat = ctx
+        .db
+        .queue_worker()
         .id()
         .find(&worker_id)
         .ok_or("Worker not found after heartbeat")?;
 
-    assert!(worker_after_beat.last_heartbeat.to_micros_since_unix_epoch() > 0);
+    assert!(
+        worker_after_beat
+            .last_heartbeat
+            .to_micros_since_unix_epoch()
+            > 0
+    );
     log::info!("✓ Worker heartbeat updated");
 
     // Test 4: Enqueue immediate job
@@ -74,19 +92,23 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         "default".to_string(),
         "process_data".to_string(),
         r#"{"file": "data.csv", "format": "csv"}"#.to_string(),
-        5, // priority
-        3, // max_attempts
+        5,    // priority
+        3,    // max_attempts
         None, // immediate
+        None,
     )?;
 
-    let jobs: Vec<_> = ctx.db.queue_job()
+    let jobs: Vec<_> = ctx
+        .db
+        .queue_job()
         .iter()
         .filter(|j| j.organization_id == org_id && j.queue_name == "default")
         .collect();
 
     assert!(!jobs.is_empty());
 
-    let job = jobs.iter()
+    let job = jobs
+        .iter()
         .find(|j| j.job_type == "process_data")
         .ok_or("Job not found")?;
 
@@ -113,9 +135,12 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         10,
         5,
         Some(future_micros),
+        None,
     )?;
 
-    let scheduled_jobs: Vec<_> = ctx.db.queue_job()
+    let scheduled_jobs: Vec<_> = ctx
+        .db
+        .queue_job()
         .iter()
         .filter(|j| j.job_type == "send_report")
         .collect();
@@ -131,7 +156,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Claiming pending job...");
     claim_queue_job(ctx, org_id, job_id)?;
 
-    let claimed_job = ctx.db.queue_job()
+    let claimed_job = ctx
+        .db
+        .queue_job()
         .id()
         .find(&job_id)
         .ok_or("Job not found after claim")?;
@@ -145,7 +172,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Completing job successfully...");
     complete_queue_job(ctx, org_id, job_id, None)?;
 
-    let completed_job = ctx.db.queue_job()
+    let completed_job = ctx
+        .db
+        .queue_job()
         .id()
         .find(&job_id)
         .ok_or("Job not found after completion")?;
@@ -166,9 +195,12 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         1,
         3, // max_attempts = 3
         None,
+        None,
     )?;
 
-    let fail_job = ctx.db.queue_job()
+    let fail_job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "failing_job")
         .ok_or("Failing job not found")?;
@@ -178,9 +210,16 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     // First attempt - claim
     claim_queue_job(ctx, org_id, fail_job_id)?;
     // First failure
-    complete_queue_job(ctx, org_id, fail_job_id, Some("Temporary error".to_string()))?;
+    complete_queue_job(
+        ctx,
+        org_id,
+        fail_job_id,
+        Some("Temporary error".to_string()),
+    )?;
 
-    let after_fail = ctx.db.queue_job()
+    let after_fail = ctx
+        .db
+        .queue_job()
         .id()
         .find(&fail_job_id)
         .ok_or("Job not found after first failure")?;
@@ -194,7 +233,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     // Second failure
     complete_queue_job(ctx, org_id, fail_job_id, Some("Another error".to_string()))?;
 
-    let after_second_fail = ctx.db.queue_job()
+    let after_second_fail = ctx
+        .db
+        .queue_job()
         .id()
         .find(&fail_job_id)
         .ok_or("Job not found after second failure")?;
@@ -207,7 +248,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     // Third failure - should mark as failed (max_attempts = 3)
     complete_queue_job(ctx, org_id, fail_job_id, Some("Final error".to_string()))?;
 
-    let final_fail = ctx.db.queue_job()
+    let final_fail = ctx
+        .db
+        .queue_job()
         .id()
         .find(&fail_job_id)
         .ok_or("Job not found after final failure")?;
@@ -218,7 +261,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 9: Verify job lookup by organization
     log::info!("TEST: Verifying job lookup by organization...");
-    let org_jobs: Vec<_> = ctx.db.queue_job()
+    let org_jobs: Vec<_> = ctx
+        .db
+        .queue_job()
         .queue_job_by_org()
         .filter(&org_id)
         .collect();
@@ -228,7 +273,9 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 10: Verify job lookup by queue
     log::info!("TEST: Verifying job lookup by queue...");
-    let default_jobs: Vec<_> = ctx.db.queue_job()
+    let default_jobs: Vec<_> = ctx
+        .db
+        .queue_job()
         .queue_job_by_queue()
         .filter(&"default".to_string())
         .collect();
@@ -247,9 +294,12 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         1,
         1,
         None,
+        None,
     )?;
 
-    let proc_job = ctx.db.queue_job()
+    let proc_job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "processing_job")
         .ok_or("Processing job not found")?;
@@ -271,9 +321,18 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let other_org = ctx.db.organization()
+    let other_org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "OTHERQORG")
         .ok_or("Other org not found")?;
@@ -297,9 +356,18 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "QEDGEORG")
         .ok_or("Test org not found")?;
@@ -309,6 +377,7 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         org.id,
         "edge-worker".to_string(),
         vec!["edge-queue".to_string()],
+        None,
     )?;
 
     // Test 1: Job with negative priority
@@ -322,9 +391,12 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         -10, // Negative priority
         1,
         None,
+        None,
     )?;
 
-    let low_priority = ctx.db.queue_job()
+    let low_priority = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "low_priority")
         .ok_or("Low priority job not found")?;
@@ -345,9 +417,12 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         1000,
         1,
         None,
+        None,
     )?;
 
-    let high_priority = ctx.db.queue_job()
+    let high_priority = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "high_priority")
         .ok_or("High priority job not found")?;
@@ -370,9 +445,12 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         5,
         1,
         None,
+        None,
     )?;
 
-    let large_job = ctx.db.queue_job()
+    let large_job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "large_payload")
         .ok_or("Large payload job not found")?;
@@ -393,9 +471,12 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         5,
         1,
         None,
+        None,
     )?;
 
-    let empty_job = ctx.db.queue_job()
+    let empty_job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "empty_payload")
         .ok_or("Empty payload job not found")?;
@@ -419,9 +500,12 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         5,
         1,
         Some(past_micros),
+        None,
     )?;
 
-    let past_job = ctx.db.queue_job()
+    let past_job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "past_scheduled")
         .ok_or("Past scheduled job not found")?;
@@ -433,7 +517,9 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 6: Verify timestamps
     log::info!("TEST: Verify timestamps...");
-    let job = ctx.db.queue_job()
+    let job = ctx
+        .db
+        .queue_job()
         .iter()
         .find(|j| j.job_type == "empty_payload")
         .ok_or("Job not found")?;
@@ -458,9 +544,18 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "WEDGEORG")
         .ok_or("Test org not found")?;
@@ -472,9 +567,12 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         org.id,
         "no-queue-worker".to_string(),
         vec![], // Empty queues
+        None,
     )?;
 
-    let no_queue_worker = ctx.db.queue_worker()
+    let no_queue_worker = ctx
+        .db
+        .queue_worker()
         .iter()
         .find(|w| w.name == "no-queue-worker")
         .ok_or("No-queue worker not found")?;
@@ -493,15 +591,21 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         org.id,
         "many-queue-worker".to_string(),
         many_queues.clone(),
+        None,
     )?;
 
-    let many_worker = ctx.db.queue_worker()
+    let many_worker = ctx
+        .db
+        .queue_worker()
         .iter()
         .find(|w| w.name == "many-queue-worker")
         .ok_or("Many-queue worker not found")?;
 
     if many_worker.queues.len() != 10 {
-        return Err(format!("Expected 10 queues, found {}", many_worker.queues.len()));
+        return Err(format!(
+            "Expected 10 queues, found {}",
+            many_worker.queues.len()
+        ));
     }
     log::info!("✓ Worker with many queues created");
 
@@ -522,7 +626,9 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         worker_heartbeat(ctx, org.id, many_worker.id)?;
     }
 
-    let worker_after = ctx.db.queue_worker()
+    let worker_after = ctx
+        .db
+        .queue_worker()
         .id()
         .find(&many_worker.id)
         .ok_or("Worker not found after heartbeats")?;
@@ -534,7 +640,9 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 5: Worker lookup by organization
     log::info!("TEST: Worker lookup by organization...");
-    let org_workers: Vec<_> = ctx.db.queue_worker()
+    let org_workers: Vec<_> = ctx
+        .db
+        .queue_worker()
         .worker_by_org()
         .filter(&org.id)
         .collect();

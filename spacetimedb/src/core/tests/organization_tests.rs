@@ -4,9 +4,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{
-    organization, organization_settings, company,
-    create_organization, update_organization, upsert_organization_settings,
-    create_company, update_company, delete_company,
+    company, create_company, create_organization, delete_company, organization,
+    organization_settings, update_company_address, update_company_business, update_organization,
+    upsert_organization_settings,
 };
 
 /// Test reducer for organization lifecycle operations
@@ -23,16 +23,28 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None, // description
+        None, // logo_url
+        None, // website
+        None, // email
+        None, // phone
+        None, // currency_id
+        None, // metadata
     )?;
 
     // Verify organization was created
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == org_code)
         .ok_or("Organization not found after creation")?;
 
     if org.name != org_name {
-        return Err(format!("Organization name mismatch: expected {}, got {}", org_name, org.name));
+        return Err(format!(
+            "Organization name mismatch: expected {}, got {}",
+            org_name, org.name
+        ));
     }
 
     if !org.is_active {
@@ -57,7 +69,9 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         None,
     )?;
 
-    let updated_org = ctx.db.organization()
+    let updated_org = ctx
+        .db
+        .organization()
         .id()
         .find(&org_id)
         .ok_or("Organization not found after update")?;
@@ -75,7 +89,9 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         Some(r#"{"api_key": "secret123"}"#.to_string()),
     )?;
 
-    let settings = ctx.db.organization_settings()
+    let settings = ctx
+        .db
+        .organization_settings()
         .organization_id()
         .find(&org_id)
         .ok_or("Organization settings not created")?;
@@ -90,12 +106,23 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         "Test Company".to_string(),
         "COMP001".to_string(),
-        1, // currency_id
-        12, // fiscal_year_end_month
-        31, // fiscal_year_end_day
+        1,     // currency_id
+        12,    // fiscal_year_end_month
+        31,    // fiscal_year_end_day
+        false, // is_parent
+        None,  // parent_id
+        None,  // tax_id
+        None,  // company_registry
+        None,  // address_street
+        None,  // address_city
+        None,  // address_zip
+        None,  // address_country_code
+        None,  // metadata
     )?;
 
-    let company = ctx.db.company()
+    let company = ctx
+        .db
+        .company()
         .iter()
         .find(|c| c.code == "COMP001")
         .ok_or("Company not found after creation")?;
@@ -106,19 +133,27 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
 
     let company_id = company.id;
 
-    // Test 5: Update company
-    update_company(
+    // Test 5: Update company address
+    update_company_address(
         ctx,
         company_id,
-        Some("Updated Test Company".to_string()),
-        Some("TAX123456".to_string()),
         Some("123 Test St".to_string()),
         Some("Test City".to_string()),
         Some("12345".to_string()),
         Some("US".to_string()),
     )?;
 
-    let updated_company = ctx.db.company()
+    // Test 6: Update company business info
+    update_company_business(
+        ctx,
+        company_id,
+        Some("TAX123456".to_string()),
+        Some("REG789".to_string()),
+    )?;
+
+    let updated_company = ctx
+        .db
+        .company()
         .id()
         .find(&company_id)
         .ok_or("Company not found after update")?;
@@ -127,10 +162,12 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Company tax_id not updated".to_string());
     }
 
-    // Test 6: Soft delete company
+    // Test 7: Soft delete company
     delete_company(ctx, company_id)?;
 
-    let deleted_company = ctx.db.company()
+    let deleted_company = ctx
+        .db
+        .company()
         .id()
         .find(&company_id)
         .ok_or("Company not found after delete")?;
@@ -139,7 +176,7 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Company should have deleted_at timestamp".to_string());
     }
 
-    // Test 7: Error cases
+    // Test 8: Error cases
     // Empty organization name should fail
     match create_organization(
         ctx,
@@ -148,6 +185,13 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     ) {
         Ok(_) => return Err("Should reject empty organization name".to_string()),
         Err(_) => {} // Expected
@@ -161,6 +205,13 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     ) {
         Ok(_) => return Err("Should reject empty organization code".to_string()),
         Err(_) => {} // Expected
@@ -171,10 +222,19 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         "".to_string(),
-        "CODE".to_string(),
+        "COMP001".to_string(),
         1,
         12,
         31,
+        false,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     ) {
         Ok(_) => return Err("Should reject empty company name".to_string()),
         Err(_) => {} // Expected
@@ -213,6 +273,13 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
     create_organization(
@@ -222,6 +289,13 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
     // Verify both exist
@@ -231,12 +305,16 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
     }
 
     // Create companies in each org
-    let org_a = ctx.db.organization()
+    let org_a = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "ORGA")
         .ok_or("Org A not found")?;
 
-    let org_b = ctx.db.organization()
+    let org_b = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "ORGB")
         .ok_or("Org B not found")?;
@@ -249,6 +327,15 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
         1,
         12,
         31,
+        false,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
     create_company(
@@ -259,6 +346,15 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
         1,
         12,
         31,
+        false,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
     // Verify isolation - companies should belong to correct orgs
@@ -287,9 +383,18 @@ pub fn test_organization_settings_edge_cases(ctx: &ReducerContext) -> Result<(),
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "SETTINGS")
         .ok_or("Organization not found")?;
@@ -311,13 +416,19 @@ pub fn test_organization_settings_edge_cases(ctx: &ReducerContext) -> Result<(),
         Some(r#"{"key": "value"}"#.to_string()),
     )?;
 
-    let settings = ctx.db.organization_settings()
+    let settings = ctx
+        .db
+        .organization_settings()
         .organization_id()
         .find(&org.id)
         .ok_or("Settings not found after upsert")?;
 
     // Verify the merge behavior - new fields should override
-    let config_str = settings.module_config.as_ref().unwrap_or(&"{}".to_string()).clone();
+    let config_str = settings
+        .module_config
+        .as_ref()
+        .unwrap_or(&"{}".to_string())
+        .clone();
 
     if !config_str.contains("\"updated\"") {
         return Err("Settings config should have 'updated' field".to_string());

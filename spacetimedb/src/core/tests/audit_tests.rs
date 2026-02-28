@@ -4,10 +4,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::audit::{
-    audit_log, audit_rule,
-    log_audit_event, create_audit_rule, update_audit_rule,
+    audit_log, audit_rule, create_audit_rule, log_audit_event, update_audit_rule,
 };
-use crate::core::organization::{organization, create_organization};
+use crate::core::organization::{create_organization, organization};
 
 /// Test audit logging lifecycle
 #[spacetimedb::reducer]
@@ -21,9 +20,18 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "AUDITORG")
         .ok_or("Test organization not found")?;
@@ -41,6 +49,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         true,
         true,
         true,
+        None,
     )?;
 
     create_audit_rule(
@@ -51,9 +60,12 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         true,
         true,
         false,
+        None,
     )?;
 
-    let rules: Vec<_> = ctx.db.audit_rule()
+    let rules: Vec<_> = ctx
+        .db
+        .audit_rule()
         .audit_rule_by_org()
         .filter(&org_id)
         .collect();
@@ -62,7 +74,8 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         return Err(format!("Expected 2 audit rules, found {}", rules.len()));
     }
 
-    let user_rule = rules.iter()
+    let user_rule = rules
+        .iter()
         .find(|r| r.table_name == "user_profile")
         .ok_or("User profile audit rule not found")?;
 
@@ -95,6 +108,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         None,
         Some("192.168.1.1".to_string()),
         Some("Mozilla/5.0".to_string()),
+        None,
     )?;
 
     log_audit_event(
@@ -110,6 +124,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         Some(1),
         Some("192.168.1.1".to_string()),
         Some("Mozilla/5.0".to_string()),
+        None,
     )?;
 
     log_audit_event(
@@ -125,6 +140,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         Some(1),
         Some("192.168.1.2".to_string()),
         Some("Mozilla/5.0".to_string()),
+        None,
     )?;
 
     let logs: Vec<_> = ctx.db.audit_log().iter().collect();
@@ -133,7 +149,8 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         return Err(format!("Expected 3 audit logs, found {}", logs.len()));
     }
 
-    let create_log = logs.iter()
+    let create_log = logs
+        .iter()
         .find(|l| l.action == "CREATE")
         .ok_or("CREATE log not found")?;
 
@@ -141,7 +158,8 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         return Err("CREATE log should have new_values".to_string());
     }
 
-    let update_log = logs.iter()
+    let update_log = logs
+        .iter()
         .find(|l| l.action == "UPDATE")
         .ok_or("UPDATE log not found")?;
 
@@ -149,7 +167,8 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         return Err("UPDATE log should have old and new values".to_string());
     }
 
-    let delete_log = logs.iter()
+    let delete_log = logs
+        .iter()
         .find(|l| l.action == "DELETE")
         .ok_or("DELETE log not found")?;
 
@@ -161,10 +180,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 4: Query audit logs by organization
     log::info!("TEST: Querying audit logs by organization...");
-    let org_logs: Vec<_> = ctx.db.audit_log()
-        .audit_by_org()
-        .filter(&org_id)
-        .collect();
+    let org_logs: Vec<_> = ctx.db.audit_log().audit_by_org().filter(&org_id).collect();
 
     if org_logs.len() != 3 {
         return Err("Audit by org index not working".to_string());
@@ -174,7 +190,9 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 5: Query audit logs by table
     log::info!("TEST: Querying audit logs by table...");
-    let user_logs: Vec<_> = ctx.db.audit_log()
+    let user_logs: Vec<_> = ctx
+        .db
+        .audit_log()
         .audit_by_table()
         .filter(&"user_profile".to_string())
         .collect();
@@ -199,7 +217,9 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
         Some(false),
     )?;
 
-    let updated_rule = ctx.db.audit_rule()
+    let updated_rule = ctx
+        .db
+        .audit_rule()
         .id()
         .find(&rule_id)
         .ok_or("Rule not found after update")?;
@@ -244,15 +264,7 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 9: Error - non-existent rule update
     log::info!("TEST: Non-existent rule update...");
-    let result = update_audit_rule(
-        ctx,
-        99999,
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let result = update_audit_rule(ctx, 99999, None, None, None, None, None);
 
     if result.is_ok() {
         return Err("Should fail for non-existent rule".to_string());
@@ -275,9 +287,18 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "AUDITEDGE")
         .ok_or("Test org not found")?;
@@ -292,15 +313,21 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         false,
         false,
         false,
+        None,
     )?;
 
-    let disabled_rule = ctx.db.audit_rule()
+    let disabled_rule = ctx
+        .db
+        .audit_rule()
         .iter()
         .find(|r| r.table_name == "disabled_table")
         .ok_or("Disabled rule not found")?;
 
-    if disabled_rule.log_reads || disabled_rule.log_writes ||
-       disabled_rule.log_deletes || disabled_rule.log_logins {
+    if disabled_rule.log_reads
+        || disabled_rule.log_writes
+        || disabled_rule.log_deletes
+        || disabled_rule.log_logins
+    {
         return Err("All logging should be disabled".to_string());
     }
 
@@ -316,15 +343,21 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         true,
         true,
         true,
+        None,
     )?;
 
-    let verbose_rule = ctx.db.audit_rule()
+    let verbose_rule = ctx
+        .db
+        .audit_rule()
         .iter()
         .find(|r| r.table_name == "verbose_table")
         .ok_or("Verbose rule not found")?;
 
-    if !verbose_rule.log_reads || !verbose_rule.log_writes ||
-       !verbose_rule.log_deletes || !verbose_rule.log_logins {
+    if !verbose_rule.log_reads
+        || !verbose_rule.log_writes
+        || !verbose_rule.log_deletes
+        || !verbose_rule.log_logins
+    {
         return Err("All logging should be enabled".to_string());
     }
 
@@ -341,9 +374,18 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org2 = ctx.db.organization()
+    let org2 = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "AUDIT2")
         .ok_or("Test org 2 not found")?;
@@ -356,33 +398,32 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         true,
         false,
         false,
+        None,
     )?;
 
-    let rules_for_table: Vec<_> = ctx.db.audit_rule()
+    let rules_for_table: Vec<_> = ctx
+        .db
+        .audit_rule()
         .iter()
         .filter(|r| r.table_name == "verbose_table")
         .collect();
 
     if rules_for_table.len() != 2 {
-        return Err(format!("Expected 2 rules for verbose_table, found {}",
-            rules_for_table.len()));
+        return Err(format!(
+            "Expected 2 rules for verbose_table, found {}",
+            rules_for_table.len()
+        ));
     }
 
     log::info!("✓ Multiple rules for same table created");
 
     // Test 4: Partial update of audit rule
     log::info!("TEST: Partial update of audit rule...");
-    update_audit_rule(
-        ctx,
-        verbose_rule.id,
-        None,
-        Some(false),
-        None,
-        None,
-        None,
-    )?;
+    update_audit_rule(ctx, verbose_rule.id, None, Some(false), None, None, None)?;
 
-    let partial_update = ctx.db.audit_rule()
+    let partial_update = ctx
+        .db
+        .audit_rule()
         .id()
         .find(&verbose_rule.id)
         .ok_or("Rule not found")?;
@@ -414,9 +455,18 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "AUDITINT")
         .ok_or("Test org not found")?;
@@ -436,9 +486,12 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
         None,
         None,
         None,
+        None,
     )?;
 
-    let minimal_log = ctx.db.audit_log()
+    let minimal_log = ctx
+        .db
+        .audit_log()
         .iter()
         .find(|l| l.table_name == "minimal_table")
         .ok_or("Minimal log not found")?;
@@ -468,9 +521,12 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
         Some(123),
         Some("10.0.0.1".to_string()),
         Some("Chrome/120".to_string()),
+        None,
     )?;
 
-    let session_log = ctx.db.audit_log()
+    let session_log = ctx
+        .db
+        .audit_log()
         .iter()
         .find(|l| l.table_name == "session_table")
         .ok_or("Session log not found")?;
@@ -504,16 +560,21 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
         None,
         None,
         None,
+        None,
     )?;
 
-    let fields_log = ctx.db.audit_log()
+    let fields_log = ctx
+        .db
+        .audit_log()
         .iter()
         .find(|l| l.table_name == "fields_table")
         .ok_or("Fields log not found")?;
 
     if fields_log.changed_fields.len() != 2 {
-        return Err(format!("Expected 2 changed fields, found {}",
-            fields_log.changed_fields.len()));
+        return Err(format!(
+            "Expected 2 changed fields, found {}",
+            fields_log.changed_fields.len()
+        ));
     }
 
     if !fields_log.changed_fields.contains(&"b".to_string()) {
@@ -553,9 +614,18 @@ pub fn test_audit_authorization(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "AUTHORG")
         .ok_or("Test org not found")?;
@@ -574,6 +644,7 @@ pub fn test_audit_authorization(ctx: &ReducerContext) -> Result<(), String> {
         None,
         None,
         vec![],
+        None,
         None,
         None,
         None,

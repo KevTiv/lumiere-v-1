@@ -3,12 +3,12 @@
 /// Test reducers for Country, Currency, CurrencyRate, UOMCategory, UOM, UOMConversion tables.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{create_organization, organization};
 use crate::core::reference::{
-    country, currency, currency_rate, uom_cat, uom, uom_conversion,
-    create_country, create_currency, create_currency_rate,
-    create_uom_category, create_uom, create_uom_conversion,
+    country, create_country, create_currency, create_currency_rate, create_uom,
+    create_uom_category, create_uom_conversion, currency, currency_rate, uom, uom_cat,
+    uom_conversion,
 };
-use crate::core::organization::{organization, create_organization};
 
 /// Test reference data lifecycle
 #[spacetimedb::reducer]
@@ -25,6 +25,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         Some("United States of America".to_string()),
         Some("USD".to_string()),
         vec!["en".to_string(), "es".to_string()],
+        None,
     )?;
 
     create_country(
@@ -37,6 +38,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         None,
         Some("CAD".to_string()),
         vec!["en".to_string(), "fr".to_string()],
+        None,
     )?;
 
     create_country(
@@ -49,9 +51,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         None,
         Some("GBP".to_string()),
         vec!["en".to_string()],
+        None,
     )?;
 
-    let us = ctx.db.country()
+    let us = ctx
+        .db
+        .country()
         .code()
         .find(&"US".to_string())
         .ok_or("US country not created")?;
@@ -76,6 +81,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         2,
         0.01,
         "before".to_string(),
+        None,
     )?;
 
     create_currency(
@@ -86,6 +92,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         2,
         0.01,
         "after".to_string(),
+        None,
     )?;
 
     create_currency(
@@ -96,9 +103,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         2,
         0.01,
         "before".to_string(),
+        None,
     )?;
 
-    let usd = ctx.db.currency()
+    let usd = ctx
+        .db
+        .currency()
         .code()
         .find(&"USD".to_string())
         .ok_or("USD currency not created")?;
@@ -125,6 +135,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         None,
         None,
         vec![],
+        None,
     );
 
     if duplicate.is_ok() {
@@ -142,6 +153,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         0,
         0.0,
         "before".to_string(),
+        None,
     );
 
     if duplicate_curr.is_ok() {
@@ -159,6 +171,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         2,
         0.01,
         "invalid".to_string(),
+        None,
     );
 
     if invalid_pos.is_ok() {
@@ -175,9 +188,18 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "REFORG")
         .ok_or("Test organization not found")?;
@@ -193,6 +215,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "EUR".to_string(),
         0.85,
         Some(1),
+        None,
     )?;
 
     create_currency_rate(
@@ -202,9 +225,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "GBP".to_string(),
         0.73,
         None,
+        None,
     )?;
 
-    let rates: Vec<_> = ctx.db.currency_rate()
+    let rates: Vec<_> = ctx
+        .db
+        .currency_rate()
         .iter()
         .filter(|r| r.organization_id == org_id)
         .collect();
@@ -213,7 +239,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         return Err(format!("Expected 2 rates, found {}", rates.len()));
     }
 
-    let eur_rate = rates.iter()
+    let eur_rate = rates
+        .iter()
         .find(|r| r.to_currency == "EUR")
         .ok_or("EUR rate not found")?;
 
@@ -236,6 +263,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "JPY".to_string(),
         -1.0,
         None,
+        None,
     );
 
     if invalid_rate.is_ok() {
@@ -248,6 +276,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "USD".to_string(),
         "JPY".to_string(),
         0.0,
+        None,
         None,
     );
 
@@ -264,6 +293,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "Weight".to_string(),
         Some("Units of weight".to_string()),
         1,
+        None,
     )?;
 
     create_uom_category(
@@ -272,9 +302,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         "Length".to_string(),
         Some("Units of length".to_string()),
         2,
+        None,
     )?;
 
-    let weight_cat = ctx.db.uom_cat()
+    let weight_cat = ctx
+        .db
+        .uom_cat()
         .iter()
         .find(|c| c.name == "Weight" && c.organization_id == org_id)
         .ok_or("Weight category not found")?;
@@ -297,6 +330,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         0.001,
         1.0,
         true,
+        None,
     )?;
 
     create_uom(
@@ -309,6 +343,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         0.0001,
         0.001,
         false,
+        None,
     )?;
 
     create_uom(
@@ -321,9 +356,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         0.001,
         0.453592,
         false,
+        None,
     )?;
 
-    let kg = ctx.db.uom()
+    let kg = ctx
+        .db
+        .uom()
         .iter()
         .find(|u| u.name == "Kilogram" && u.organization_id == org_id)
         .ok_or("Kilogram UOM not found")?;
@@ -340,12 +378,16 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 10: Create UOM conversions
     log::info!("TEST: Creating UOM conversions...");
-    let gram = ctx.db.uom()
+    let gram = ctx
+        .db
+        .uom()
         .iter()
         .find(|u| u.name == "Gram" && u.organization_id == org_id)
         .ok_or("Gram UOM not found")?;
 
-    let pound = ctx.db.uom()
+    let pound = ctx
+        .db
+        .uom()
         .iter()
         .find(|u| u.name == "Pound" && u.organization_id == org_id)
         .ok_or("Pound UOM not found")?;
@@ -358,6 +400,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         gram.id,
         1000.0,
         None,
+        None,
     )?;
 
     create_uom_conversion(
@@ -368,44 +411,36 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         pound.id,
         2.20462,
         None,
+        None,
     )?;
 
-    let conversions: Vec<_> = ctx.db.uom_conversion()
+    let conversions: Vec<_> = ctx
+        .db
+        .uom_conversion()
         .iter()
         .filter(|c| c.organization_id == org_id)
         .collect();
 
     if conversions.len() != 2 {
-        return Err(format!("Expected 2 conversions, found {}", conversions.len()));
+        return Err(format!(
+            "Expected 2 conversions, found {}",
+            conversions.len()
+        ));
     }
 
     log::info!("✓ UOM conversions created");
 
     // Test 11: Invalid conversion factor
     log::info!("TEST: Invalid conversion factor validation...");
-    let invalid_conv = create_uom_conversion(
-        ctx,
-        org_id,
-        weight_cat.id,
-        kg.id,
-        gram.id,
-        -1.0,
-        None,
-    );
+    let invalid_conv =
+        create_uom_conversion(ctx, org_id, weight_cat.id, kg.id, gram.id, -1.0, None, None);
 
     if invalid_conv.is_ok() {
         return Err("Should reject negative conversion factor".to_string());
     }
 
-    let zero_conv = create_uom_conversion(
-        ctx,
-        org_id,
-        weight_cat.id,
-        kg.id,
-        gram.id,
-        0.0,
-        None,
-    );
+    let zero_conv =
+        create_uom_conversion(ctx, org_id, weight_cat.id, kg.id, gram.id, 0.0, None, None);
 
     if zero_conv.is_ok() {
         return Err("Should reject zero conversion factor".to_string());
@@ -420,7 +455,9 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 13: Verify indexing
     log::info!("TEST: Verifying indexes...");
-    let rates_by_org: Vec<_> = ctx.db.currency_rate()
+    let rates_by_org: Vec<_> = ctx
+        .db
+        .currency_rate()
         .rate_by_org()
         .filter(&org_id)
         .collect();
@@ -429,16 +466,15 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Currency rate by org index not working".to_string());
     }
 
-    let uom_by_org: Vec<_> = ctx.db.uom()
-        .uom_by_org()
-        .filter(&org_id)
-        .collect();
+    let uom_by_org: Vec<_> = ctx.db.uom().uom_by_org().filter(&org_id).collect();
 
     if uom_by_org.len() != 3 {
         return Err("UOM by org index not working".to_string());
     }
 
-    let uom_by_cat: Vec<_> = ctx.db.uom()
+    let uom_by_cat: Vec<_> = ctx
+        .db
+        .uom()
         .uom_by_category()
         .filter(&weight_cat.id)
         .collect();
@@ -447,7 +483,9 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         return Err("UOM by category index not working".to_string());
     }
 
-    let conv_by_org: Vec<_> = ctx.db.uom_conversion()
+    let conv_by_org: Vec<_> = ctx
+        .db
+        .uom_conversion()
         .uom_conv_by_org()
         .filter(&org_id)
         .collect();
@@ -476,9 +514,12 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
         None,
         Some("EUR".to_string()),
         vec!["fr".to_string()],
+        None,
     )?;
 
-    let france = ctx.db.country()
+    let france = ctx
+        .db
+        .country()
         .code()
         .find(&"FR".to_string())
         .ok_or("France not found")?;
@@ -522,9 +563,12 @@ pub fn test_currency_data_integrity(ctx: &ReducerContext) -> Result<(), String> 
         0,
         1.0,
         "before".to_string(),
+        None,
     )?;
 
-    let yen = ctx.db.currency()
+    let yen = ctx
+        .db
+        .currency()
         .code()
         .find(&"JPY".to_string())
         .ok_or("JPY not found")?;
@@ -559,23 +603,28 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "UOMEDGE")
         .ok_or("Test org not found")?;
 
     // Create category
-    create_uom_category(
-        ctx,
-        org.id,
-        "Volume".to_string(),
-        None,
-        1,
-    )?;
+    create_uom_category(ctx, org.id, "Volume".to_string(), None, 1, None)?;
 
-    let vol_cat = ctx.db.uom_cat()
+    let vol_cat = ctx
+        .db
+        .uom_cat()
         .iter()
         .find(|c| c.name == "Volume" && c.organization_id == org.id)
         .ok_or("Volume category not found")?;
@@ -592,6 +641,7 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         0.001,
         1.0,
         true,
+        None,
     )?;
 
     // Try to create another reference unit
@@ -605,15 +655,21 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         0.0001,
         0.001,
         true,
+        None,
     )?;
 
-    let ref_units: Vec<_> = ctx.db.uom()
+    let ref_units: Vec<_> = ctx
+        .db
+        .uom()
         .iter()
         .filter(|u| u.organization_id == org.id && u.is_reference_unit)
         .collect();
 
     if ref_units.len() != 2 {
-        return Err(format!("Expected 2 reference units, found {}", ref_units.len()));
+        return Err(format!(
+            "Expected 2 reference units, found {}",
+            ref_units.len()
+        ));
     }
 
     log::info!("✓ Multiple reference units allowed");
@@ -630,9 +686,12 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         0.0000001,
         0.000001,
         false,
+        None,
     )?;
 
-    let micro = ctx.db.uom()
+    let micro = ctx
+        .db
+        .uom()
         .iter()
         .find(|u| u.name == "Microliter")
         .ok_or("Microliter not found")?;
@@ -655,9 +714,12 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         0.001,
         1000.0,
         false,
+        None,
     )?;
 
-    let kilo = ctx.db.uom()
+    let kilo = ctx
+        .db
+        .uom()
         .iter()
         .find(|u| u.name == "Kiloliter")
         .ok_or("Kiloliter not found")?;
@@ -670,10 +732,7 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test: Verify all UOMs in category
     log::info!("TEST: UOMs in category...");
-    let vol_uoms: Vec<_> = ctx.db.uom()
-        .uom_by_category()
-        .filter(&vol_cat.id)
-        .collect();
+    let vol_uoms: Vec<_> = ctx.db.uom().uom_by_category().filter(&vol_cat.id).collect();
 
     if vol_uoms.len() != 4 {
         return Err(format!("Expected 4 volume UOMs, found {}", vol_uoms.len()));
@@ -696,9 +755,18 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "RATEEDGE")
         .ok_or("Test org not found")?;
@@ -712,6 +780,7 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         2,
         0.05,
         "before".to_string(),
+        None,
     )?;
 
     create_currency(
@@ -722,6 +791,7 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         2,
         0.01,
         "after".to_string(),
+        None,
     )?;
 
     // Test: Very small exchange rate
@@ -733,9 +803,12 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         "SEK".to_string(),
         0.0001,
         None,
+        None,
     )?;
 
-    let small_rate = ctx.db.currency_rate()
+    let small_rate = ctx
+        .db
+        .currency_rate()
         .iter()
         .find(|r| r.from_currency == "CHF" && r.to_currency == "SEK")
         .ok_or("Small rate not found")?;
@@ -759,9 +832,12 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         "CHF".to_string(),
         10000.0,
         None,
+        None,
     )?;
 
-    let large_rate = ctx.db.currency_rate()
+    let large_rate = ctx
+        .db
+        .currency_rate()
         .iter()
         .find(|r| r.from_currency == "SEK" && r.to_currency == "CHF")
         .ok_or("Large rate not found")?;
@@ -781,9 +857,12 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         "SEK".to_string(),
         11.5,
         Some(999), // Non-existent company ID
+        None,
     )?;
 
-    let rate_with_company = ctx.db.currency_rate()
+    let rate_with_company = ctx
+        .db
+        .currency_rate()
         .iter()
         .find(|r| r.from_currency == "CHF" && r.rate == 11.5)
         .ok_or("Rate with company not found")?;

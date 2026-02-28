@@ -79,6 +79,7 @@ pub fn create_data_classification(
     description: Option<String>,
     retention_days: Option<u32>,
     encryption_required: bool,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "data_classification", "create")?;
 
@@ -97,7 +98,7 @@ pub fn create_data_classification(
         description,
         retention_days,
         encryption_required,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -111,6 +112,7 @@ pub fn create_data_classification_rule(
     column_name: Option<String>,
     classification_id: u64,
     applies_to: String,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "data_classification_rule", "create")?;
 
@@ -130,7 +132,7 @@ pub fn create_data_classification_rule(
             classification_id,
             applies_to,
             created_at: ctx.timestamp,
-            metadata: None,
+            metadata,
         });
 
     Ok(())
@@ -147,6 +149,7 @@ pub fn record_privacy_consent(
     granted: bool,
     ip_address: Option<String>,
     user_agent: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "privacy_consent", "create")?;
 
@@ -160,7 +163,7 @@ pub fn record_privacy_consent(
         revoked_at: if !granted { Some(ctx.timestamp) } else { None },
         ip_address,
         user_agent,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

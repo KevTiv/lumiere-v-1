@@ -83,6 +83,7 @@ pub fn create_role(
     description: Option<String>,
     parent_id: Option<u64>,
     permissions: Vec<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "role", "create")?;
 
@@ -101,7 +102,7 @@ pub fn create_role(
         is_active: true,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -116,12 +117,7 @@ pub fn update_role(
     permissions: Option<Vec<String>>,
     is_active: Option<bool>,
 ) -> Result<(), String> {
-    let role = ctx
-        .db
-        .role()
-        .id()
-        .find(&role_id)
-        .ok_or("Role not found")?;
+    let role = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
     if role.is_system {
         return Err("Cannot modify system roles".to_string());
@@ -154,6 +150,7 @@ pub fn add_casbin_rule(
     v3: Option<String>,
     v4: Option<String>,
     v5: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "casbin_rule", "create")?;
 
@@ -171,7 +168,7 @@ pub fn add_casbin_rule(
         v4,
         v5,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -195,37 +192,28 @@ pub fn assign_role(
     role_id: u64,
     organization_id: u64,
     expires_at_micros: Option<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_role_assignment", "create")?;
 
-    let role = ctx
-        .db
-        .role()
-        .id()
-        .find(&role_id)
-        .ok_or("Role not found")?;
+    let role = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
     if role.organization_id != organization_id {
         return Err("Role does not belong to this organization".to_string());
     }
 
-    let already_assigned = ctx
-        .db
-        .user_role_assignment()
-        .iter()
-        .any(|a| {
-            a.user_identity == user_identity
-                && a.role_id == role_id
-                && a.organization_id == organization_id
-                && a.is_active
-        });
+    let already_assigned = ctx.db.user_role_assignment().iter().any(|a| {
+        a.user_identity == user_identity
+            && a.role_id == role_id
+            && a.organization_id == organization_id
+            && a.is_active
+    });
 
     if already_assigned {
         return Err("User already has this role in this organization".to_string());
     }
 
-    let expires_at = expires_at_micros
-        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
+    let expires_at = expires_at_micros.map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
     ctx.db.user_role_assignment().insert(UserRoleAssignment {
         id: 0,
@@ -236,7 +224,7 @@ pub fn assign_role(
         assigned_at: ctx.timestamp,
         expires_at,
         is_active: true,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

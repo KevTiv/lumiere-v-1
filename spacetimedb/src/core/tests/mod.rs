@@ -1,18 +1,17 @@
+pub mod audit_tests;
 /// Core Module Test Suite
 ///
 /// Test reducers for Phase 1 Foundation & Infrastructure features.
 /// These reducers verify the functionality of all core modules.
-
 pub mod organization_tests;
-pub mod users_tests;
 pub mod permissions_tests;
-pub mod reference_tests;
-pub mod audit_tests;
-pub mod queue_tests;
 pub mod privacy_tests;
+pub mod queue_tests;
+pub mod reference_tests;
+pub mod users_tests;
 
-use spacetimedb::ReducerContext;
 use crate::core::users::user_profile;
+use spacetimedb::ReducerContext;
 
 /// Test initialization reducer - creates test data for all modules
 #[spacetimedb::reducer]
@@ -26,10 +25,13 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("Test caller has no UserProfile — connect with a client first")?;
 
     let was_superuser = profile.is_superuser;
-    ctx.db.user_profile().identity().update(crate::core::users::UserProfile {
-        is_superuser: true,
-        ..profile
-    });
+    ctx.db
+        .user_profile()
+        .identity()
+        .update(crate::core::users::UserProfile {
+            is_superuser: true,
+            ..profile
+        });
 
     // Run organization tests
     match organization_tests::test_organization_lifecycle(ctx) {
@@ -75,10 +77,13 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
 
     // Restore original superuser flag
     if let Some(p) = ctx.db.user_profile().identity().find(ctx.sender()) {
-        ctx.db.user_profile().identity().update(crate::core::users::UserProfile {
-            is_superuser: was_superuser,
-            ..p
-        });
+        ctx.db
+            .user_profile()
+            .identity()
+            .update(crate::core::users::UserProfile {
+                is_superuser: was_superuser,
+                ..p
+            });
     }
 
     log::info!("✅ run_all_core_tests complete");

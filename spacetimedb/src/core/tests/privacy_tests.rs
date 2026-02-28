@@ -3,11 +3,11 @@
 /// Test reducers for DataClassification, DataClassificationRule, and PrivacyConsent tables.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{create_organization, organization};
 use crate::core::privacy::{
-    data_classification, data_classification_rule, privacy_consent,
-    create_data_classification, create_data_classification_rule, record_privacy_consent,
+    create_data_classification, create_data_classification_rule, data_classification,
+    data_classification_rule, privacy_consent, record_privacy_consent,
 };
-use crate::core::organization::{organization, create_organization};
 
 /// Test privacy system lifecycle
 #[spacetimedb::reducer]
@@ -21,9 +21,18 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "PRIVORG")
         .ok_or("Test org not found")?;
@@ -41,6 +50,7 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         Some("Data that can be freely shared".to_string()),
         None,
         false,
+        None,
     )?;
 
     create_data_classification(
@@ -49,8 +59,9 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         "Internal".to_string(),
         2,
         Some("Data for internal use only".to_string()),
-        Some(365), // 1 year retention
+        Some(365),
         false,
+        None,
     )?;
 
     create_data_classification(
@@ -59,8 +70,9 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         "Confidential".to_string(),
         3,
         Some("Sensitive data requiring protection".to_string()),
-        Some(90), // 90 days retention
-        true, // encryption required
+        Some(90),
+        true,
+        None,
     )?;
 
     create_data_classification(
@@ -69,24 +81,29 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         "Restricted".to_string(),
         4,
         Some("Highly sensitive data".to_string()),
-        Some(30), // 30 days retention
+        Some(30),
         true,
+        None,
     )?;
 
-    let classifications: Vec<_> = ctx.db.data_classification()
+    let classifications: Vec<_> = ctx
+        .db
+        .data_classification()
         .data_class_by_org()
         .filter(&org_id)
         .collect();
 
     assert_eq!(classifications.len(), 4);
 
-    let public = classifications.iter()
+    let public = classifications
+        .iter()
         .find(|c| c.name == "Public")
         .ok_or("Public classification not found")?;
     assert_eq!(public.level, 1);
     assert!(!public.encryption_required);
 
-    let restricted = classifications.iter()
+    let restricted = classifications
+        .iter()
         .find(|c| c.name == "Restricted")
         .ok_or("Restricted classification not found")?;
     assert_eq!(restricted.level, 4);
@@ -95,7 +112,8 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 3: Create data classification rules
     log::info!("TEST: Creating data classification rules...");
-    let conf_id = classifications.iter()
+    let conf_id = classifications
+        .iter()
         .find(|c| c.name == "Confidential")
         .ok_or("Confidential not found")?
         .id;
@@ -107,6 +125,7 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         Some("ssn".to_string()),
         conf_id,
         "all".to_string(),
+        None,
     )?;
 
     create_data_classification_rule(
@@ -116,25 +135,34 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         Some("salary".to_string()),
         conf_id,
         "all".to_string(),
+        None,
     )?;
 
     create_data_classification_rule(
         ctx,
         org_id,
         "contact".to_string(),
-        None, // applies to whole table
-        classifications.iter().find(|c| c.name == "Internal").ok_or("Internal not found")?.id,
+        None,
+        classifications
+            .iter()
+            .find(|c| c.name == "Internal")
+            .ok_or("Internal not found")?
+            .id,
         "all".to_string(),
+        None,
     )?;
 
-    let rules: Vec<_> = ctx.db.data_classification_rule()
+    let rules: Vec<_> = ctx
+        .db
+        .data_classification_rule()
         .class_rule_by_org()
         .filter(&org_id)
         .collect();
 
     assert_eq!(rules.len(), 3);
 
-    let ssn_rule = rules.iter()
+    let ssn_rule = rules
+        .iter()
         .find(|r| r.table_name == "user_profile" && r.column_name == Some("ssn".to_string()))
         .ok_or("SSN rule not found")?;
     assert_eq!(ssn_rule.classification_id, conf_id);
@@ -145,21 +173,25 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     record_privacy_consent(
         ctx,
         org_id,
-        1, // contact_id
+        1,
         "email_marketing".to_string(),
-        true, // granted
+        true,
         Some("192.168.1.1".to_string()),
         Some("Mozilla/5.0".to_string()),
+        None,
     )?;
 
-    let consents: Vec<_> = ctx.db.privacy_consent()
+    let consents: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .consent_by_contact()
         .filter(&1u64)
         .collect();
 
     assert!(!consents.is_empty());
 
-    let email_consent = consents.iter()
+    let email_consent = consents
+        .iter()
         .find(|c| c.consent_type == "email_marketing")
         .ok_or("Email marketing consent not found")?;
     assert!(email_consent.granted);
@@ -172,21 +204,25 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     record_privacy_consent(
         ctx,
         org_id,
-        1, // same contact
+        1,
         "email_marketing".to_string(),
-        false, // revoked
+        false,
         Some("192.168.1.1".to_string()),
         Some("Mozilla/5.0".to_string()),
+        None,
     )?;
 
-    let revoked_consents: Vec<_> = ctx.db.privacy_consent()
+    let revoked_consents: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .consent_by_contact()
         .filter(&1u64)
         .collect();
 
-    assert_eq!(revoked_consents.len(), 2); // Two records: grant and revoke
+    assert_eq!(revoked_consents.len(), 2);
 
-    let revoke_record = revoked_consents.iter()
+    let revoke_record = revoked_consents
+        .iter()
         .find(|c| !c.granted)
         .ok_or("Revoke record not found")?;
     assert!(!revoke_record.granted);
@@ -204,6 +240,7 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         true,
         None,
         None,
+        None,
     )?;
 
     record_privacy_consent(
@@ -214,19 +251,23 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
         true,
         None,
         None,
+        None,
     )?;
 
     record_privacy_consent(
         ctx,
         org_id,
-        2, // different contact
+        2,
         "email_marketing".to_string(),
         true,
         None,
         None,
+        None,
     )?;
 
-    let all_consents: Vec<_> = ctx.db.privacy_consent()
+    let all_consents: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .consent_by_org()
         .filter(&org_id)
         .collect();
@@ -236,7 +277,9 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 7: Query consents by contact
     log::info!("TEST: Querying consents by contact...");
-    let contact1_consents: Vec<_> = ctx.db.privacy_consent()
+    let contact1_consents: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .consent_by_contact()
         .filter(&1u64)
         .collect();
@@ -246,7 +289,9 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 8: Query consents by organization
     log::info!("TEST: Querying consents by organization...");
-    let org_consents: Vec<_> = ctx.db.privacy_consent()
+    let org_consents: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .consent_by_org()
         .filter(&org_id)
         .collect();
@@ -275,9 +320,18 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "CVALORG")
         .ok_or("Test org not found")?;
@@ -292,6 +346,7 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
         None,
         None,
         false,
+        None,
     );
     assert!(result.is_err());
     log::info!("✓ Level 0 rejected");
@@ -306,6 +361,7 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
         None,
         None,
         false,
+        None,
     );
     assert!(result.is_err());
     log::info!("✓ Level 5 rejected");
@@ -321,10 +377,13 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
             None,
             None,
             false,
+            None,
         )?;
     }
 
-    let classifications: Vec<_> = ctx.db.data_classification()
+    let classifications: Vec<_> = ctx
+        .db
+        .data_classification()
         .data_class_by_org()
         .filter(&org.id)
         .collect();
@@ -355,9 +414,18 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "CONEDGEORG")
         .ok_or("Test org not found")?;
@@ -372,9 +440,12 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         true,
         None,
         None,
+        None,
     )?;
 
-    let minimal = ctx.db.privacy_consent()
+    let minimal = ctx
+        .db
+        .privacy_consent()
         .iter()
         .find(|c| c.consent_type == "minimal_consent")
         .ok_or("Minimal consent not found")?;
@@ -387,17 +458,11 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     // Test 2: Long consent type name
     log::info!("TEST: Long consent type name...");
     let long_type = "a".repeat(100);
-    record_privacy_consent(
-        ctx,
-        org.id,
-        1,
-        long_type.clone(),
-        true,
-        None,
-        None,
-    )?;
+    record_privacy_consent(ctx, org.id, 1, long_type.clone(), true, None, None, None)?;
 
-    let long_consent = ctx.db.privacy_consent()
+    let long_consent = ctx
+        .db
+        .privacy_consent()
         .iter()
         .find(|c| c.consent_type == long_type)
         .ok_or("Long consent not found")?;
@@ -415,9 +480,12 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         true,
         None,
         None,
+        None,
     )?;
 
-    let special = ctx.db.privacy_consent()
+    let special = ctx
+        .db
+        .privacy_consent()
         .iter()
         .find(|c| c.consent_type == "consent-with_underscore.and.dot")
         .ok_or("Special consent not found")?;
@@ -436,10 +504,13 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
             true,
             Some(format!("192.168.1.{}", i)),
             None,
+            None,
         )?;
     }
 
-    let repeated: Vec<_> = ctx.db.privacy_consent()
+    let repeated: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .iter()
         .filter(|c| c.contact_id == 2 && c.consent_type == "repeated_consent")
         .collect();
@@ -459,6 +530,7 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         true,
         None,
         None,
+        None,
     )?;
 
     // Revoke
@@ -468,6 +540,7 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         3,
         "cyclic_consent".to_string(),
         false,
+        None,
         None,
         None,
     )?;
@@ -481,9 +554,12 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         true,
         None,
         None,
+        None,
     )?;
 
-    let cyclic: Vec<_> = ctx.db.privacy_consent()
+    let cyclic: Vec<_> = ctx
+        .db
+        .privacy_consent()
         .iter()
         .filter(|c| c.contact_id == 3 && c.consent_type == "cyclic_consent")
         .collect();
@@ -510,9 +586,18 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "RULEEDGEORG")
         .ok_or("Test org not found")?;
@@ -526,9 +611,12 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         None,
         None,
         false,
+        None,
     )?;
 
-    let class = ctx.db.data_classification()
+    let class = ctx
+        .db
+        .data_classification()
         .iter()
         .find(|c| c.name == "Test Class")
         .ok_or("Classification not found")?;
@@ -539,12 +627,15 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         ctx,
         org.id,
         "whole_table".to_string(),
-        None, // No column = whole table
+        None,
         class.id,
         "all".to_string(),
+        None,
     )?;
 
-    let whole_rule = ctx.db.data_classification_rule()
+    let whole_rule = ctx
+        .db
+        .data_classification_rule()
         .iter()
         .find(|r| r.table_name == "whole_table")
         .ok_or("Whole table rule not found")?;
@@ -560,10 +651,13 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         "filtered_table".to_string(),
         Some("notes".to_string()),
         class.id,
-        "department == 'hr'".to_string(), // Filter expression
+        "department == 'hr'".to_string(),
+        None,
     )?;
 
-    let filtered = ctx.db.data_classification_rule()
+    let filtered = ctx
+        .db
+        .data_classification_rule()
         .iter()
         .find(|r| r.table_name == "filtered_table")
         .ok_or("Filtered rule not found")?;
@@ -580,6 +674,7 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         Some("col1".to_string()),
         class.id,
         "all".to_string(),
+        None,
     )?;
 
     create_data_classification_rule(
@@ -589,6 +684,7 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         Some("col2".to_string()),
         class.id,
         "all".to_string(),
+        None,
     )?;
 
     create_data_classification_rule(
@@ -598,9 +694,12 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         Some("col3".to_string()),
         class.id,
         "all".to_string(),
+        None,
     )?;
 
-    let multi_rules: Vec<_> = ctx.db.data_classification_rule()
+    let multi_rules: Vec<_> = ctx
+        .db
+        .data_classification_rule()
         .iter()
         .filter(|r| r.table_name == "multi_column")
         .collect();
@@ -620,9 +719,12 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
         Some(long_column.clone()),
         class.id,
         "all".to_string(),
+        None,
     )?;
 
-    let long_rule = ctx.db.data_classification_rule()
+    let long_rule = ctx
+        .db
+        .data_classification_rule()
         .iter()
         .find(|r| r.table_name == long_table)
         .ok_or("Long name rule not found")?;
@@ -633,7 +735,9 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
 
     // Test 5: Verify timestamps
     log::info!("TEST: Verify timestamps...");
-    let rule = ctx.db.data_classification_rule()
+    let rule = ctx
+        .db
+        .data_classification_rule()
         .iter()
         .find(|r| r.table_name == "multi_column")
         .ok_or("Rule not found")?;
@@ -656,9 +760,18 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "PROTORG")
         .ok_or("Test org not found")?;
@@ -671,11 +784,14 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         "No Retention".to_string(),
         1,
         None,
-        None, // No retention limit
+        None,
         false,
+        None,
     )?;
 
-    let no_ret = ctx.db.data_classification()
+    let no_ret = ctx
+        .db
+        .data_classification()
         .iter()
         .find(|c| c.name == "No Retention")
         .ok_or("No retention class not found")?;
@@ -689,7 +805,7 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         (30, "30 Days"),
         (90, "90 Days"),
         (365, "1 Year"),
-        (2555, "7 Years"), // Long retention for compliance
+        (2555, "7 Years"),
     ];
 
     for (days, name) in retention_periods {
@@ -701,10 +817,13 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
             None,
             Some(days),
             false,
+            None,
         )?;
     }
 
-    let with_retention: Vec<_> = ctx.db.data_classification()
+    let with_retention: Vec<_> = ctx
+        .db
+        .data_classification()
         .iter()
         .filter(|c| c.retention_days.is_some())
         .collect();
@@ -721,7 +840,8 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         3,
         None,
         None,
-        true, // Encryption required
+        true,
+        None,
     )?;
 
     create_data_classification(
@@ -731,15 +851,20 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         2,
         None,
         None,
-        false, // No encryption
+        false,
+        None,
     )?;
 
-    let encrypted = ctx.db.data_classification()
+    let encrypted = ctx
+        .db
+        .data_classification()
         .iter()
         .find(|c| c.name == "Encrypted")
         .ok_or("Encrypted class not found")?;
 
-    let not_encrypted = ctx.db.data_classification()
+    let not_encrypted = ctx
+        .db
+        .data_classification()
         .iter()
         .find(|c| c.name == "Not Encrypted")
         .ok_or("Not encrypted class not found")?;
@@ -756,11 +881,14 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         "Critical".to_string(),
         4,
         None,
-        Some(7), // Short retention
-        true, // Must be encrypted
+        Some(7),
+        true,
+        None,
     )?;
 
-    let critical = ctx.db.data_classification()
+    let critical = ctx
+        .db
+        .data_classification()
         .iter()
         .find(|c| c.name == "Critical")
         .ok_or("Critical class not found")?;

@@ -3,12 +3,11 @@
 /// Test reducers for UserProfile, UserOrganization, and UserSession tables.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{create_organization, organization};
 use crate::core::users::{
-    user_profile, user_organization, user_session,
-    update_user_profile,
-    create_user_session, end_user_session,
+    create_user_session, end_user_session, update_user_profile, user_organization, user_profile,
+    user_session,
 };
-use crate::core::organization::{organization, create_organization};
 
 /// Test user profile and organization membership lifecycle
 #[spacetimedb::reducer]
@@ -22,9 +21,18 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "USERORG")
         .ok_or("Test organization not found")?;
@@ -48,13 +56,18 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         Some(r#"{"theme": "dark"}"#.to_string()),
     )?;
 
-    let profile = ctx.db.user_profile()
+    let profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("User profile not found after update")?;
 
     if profile.name != "Test User" {
-        return Err(format!("Profile name mismatch: expected 'Test User', got '{}'", profile.name));
+        return Err(format!(
+            "Profile name mismatch: expected 'Test User', got '{}'",
+            profile.name
+        ));
     }
 
     if profile.first_name != Some("Test".to_string()) {
@@ -108,7 +121,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         None,
     )?;
 
-    let updated_profile = ctx.db.user_profile()
+    let updated_profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("Profile not found after partial update")?;
@@ -141,9 +156,15 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         expires_at,
     )?;
 
-    let sessions: Vec<_> = ctx.db.user_session()
+    let sessions: Vec<_> = ctx
+        .db
+        .user_session()
         .iter()
-        .filter(|s| s.user_identity == ctx.sender() && s.session_token == "test_session_token_123" && s.is_active)
+        .filter(|s| {
+            s.user_identity == ctx.sender()
+                && s.session_token == "test_session_token_123"
+                && s.is_active
+        })
         .collect();
 
     if sessions.is_empty() {
@@ -166,7 +187,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Ending user session...");
     end_user_session(ctx, session_id)?;
 
-    let ended_session = ctx.db.user_session()
+    let ended_session = ctx
+        .db
+        .user_session()
         .id()
         .find(&session_id)
         .ok_or("Session not found after ending")?;
@@ -193,7 +216,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
 
     // Try to end it as a different user would fail, but we can't test that easily
     // So we just verify the session exists
-    let session2 = ctx.db.user_session()
+    let session2 = ctx
+        .db
+        .user_session()
         .iter()
         .find(|s| s.session_token == "test_session_token_456" && s.is_active)
         .ok_or("Second session not created")?;
@@ -204,7 +229,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 8: Verify session indexing
     log::info!("TEST: Session query by user index...");
-    let user_sessions: Vec<_> = ctx.db.user_session()
+    let user_sessions: Vec<_> = ctx
+        .db
+        .user_session()
         .session_by_user()
         .filter(&ctx.sender())
         .collect();
@@ -217,7 +244,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 9: Verify session query by organization
     log::info!("TEST: Session query by organization...");
-    let org_sessions: Vec<_> = ctx.db.user_session()
+    let org_sessions: Vec<_> = ctx
+        .db
+        .user_session()
         .session_by_org()
         .filter(&org.id)
         .collect();
@@ -246,9 +275,18 @@ pub fn test_user_organization_membership(ctx: &ReducerContext) -> Result<(), Str
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "MEMBERORG")
         .ok_or("Test organization not found")?;
@@ -258,7 +296,9 @@ pub fn test_user_organization_membership(ctx: &ReducerContext) -> Result<(), Str
 
     // Test 1: Verify the calling user has a profile
     log::info!("TEST: Verifying user profile exists...");
-    let _profile = ctx.db.user_profile()
+    let _profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("User profile should exist")?;
@@ -282,22 +322,32 @@ pub fn test_user_organization_membership(ctx: &ReducerContext) -> Result<(), Str
     let memberships: Vec<_> = ctx.db.user_organization().iter().collect();
 
     // The table should exist and be queryable
-    log::info!("✓ UserOrganization table accessible ({} rows)", memberships.len());
+    log::info!(
+        "✓ UserOrganization table accessible ({} rows)",
+        memberships.len()
+    );
 
     // Test 4: Verify indexes exist
     log::info!("TEST: Verifying UserOrganization indexes...");
-    let by_user: Vec<_> = ctx.db.user_organization()
+    let by_user: Vec<_> = ctx
+        .db
+        .user_organization()
         .user_org_by_user()
         .filter(&ctx.sender())
         .collect();
 
-    let by_org: Vec<_> = ctx.db.user_organization()
+    let by_org: Vec<_> = ctx
+        .db
+        .user_organization()
         .user_org_by_org()
         .filter(&org.id)
         .collect();
 
-    log::info!("✓ UserOrganization indexes working (by_user: {}, by_org: {})",
-        by_user.len(), by_org.len());
+    log::info!(
+        "✓ UserOrganization indexes working (by_user: {}, by_org: {})",
+        by_user.len(),
+        by_org.len()
+    );
 
     log::info!("✅ User organization membership tests passed!");
     Ok(())
@@ -315,9 +365,18 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "SESSORG")
         .ok_or("Test organization not found")?;
@@ -336,14 +395,17 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         expires_at,
     )?;
 
-    let minimal_session = ctx.db.user_session()
+    let minimal_session = ctx
+        .db
+        .user_session()
         .iter()
         .find(|s| s.session_token == "minimal_token" && s.is_active)
         .ok_or("Minimal session not created")?;
 
     if minimal_session.ip_address.is_some()
         || minimal_session.user_agent.is_some()
-        || minimal_session.device_info.is_some() {
+        || minimal_session.device_info.is_some()
+    {
         return Err("Optional fields should be None when not provided".to_string());
     }
 
@@ -361,7 +423,9 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         expires_at,
     )?;
 
-    let full_session = ctx.db.user_session()
+    let full_session = ctx
+        .db
+        .user_session()
         .iter()
         .find(|s| s.session_token == "full_token" && s.is_active)
         .ok_or("Full session not created")?;
@@ -390,21 +454,28 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         )?;
     }
 
-    let user_sessions: Vec<_> = ctx.db.user_session()
+    let user_sessions: Vec<_> = ctx
+        .db
+        .user_session()
         .session_by_user()
         .filter(&ctx.sender())
         .filter(|s| s.session_token.starts_with("multi_token_") && s.is_active)
         .collect();
 
     if user_sessions.len() != 3 {
-        return Err(format!("Expected 3 sessions, found {}", user_sessions.len()));
+        return Err(format!(
+            "Expected 3 sessions, found {}",
+            user_sessions.len()
+        ));
     }
 
     log::info!("✓ Multiple sessions created successfully");
 
     // Test 4: Session timestamps
     log::info!("TEST: Verifying session timestamps...");
-    let session = ctx.db.user_session()
+    let session = ctx
+        .db
+        .user_session()
         .iter()
         .find(|s| s.session_token == "multi_token_0" && s.is_active)
         .ok_or("Session not found")?;
@@ -454,7 +525,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         None,
     )?;
 
-    let profile = ctx.db.user_profile()
+    let profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("Profile not found")?;
@@ -482,7 +555,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         None,
     )?;
 
-    let profile = ctx.db.user_profile()
+    let profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("Profile not found")?;
@@ -510,7 +585,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         Some(r#"{"theme": "dark", "sidebar": "collapsed", "density": "compact"}"#.to_string()),
     )?;
 
-    let profile = ctx.db.user_profile()
+    let profile = ctx
+        .db
+        .user_profile()
         .identity()
         .find(ctx.sender())
         .ok_or("Profile not found")?;
@@ -523,9 +600,7 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
 
     // Test 4: Profile lookup by identity
     log::info!("TEST: Profile lookup by identity...");
-    let found_profile = ctx.db.user_profile()
-        .identity()
-        .find(ctx.sender());
+    let found_profile = ctx.db.user_profile().identity().find(ctx.sender());
 
     if found_profile.is_none() {
         return Err("Should find profile by identity".to_string());

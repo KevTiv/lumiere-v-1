@@ -7,8 +7,8 @@
 ///          calling `log_audit_event` directly.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::helpers::check_permission;
 use crate::core::users::{user_organization, user_profile};
+use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -75,17 +75,12 @@ pub fn log_audit_event(
     session_id: Option<u64>,
     ip_address: Option<String>,
     user_agent: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     // Either a member of the org or a superuser may log events
-    let is_member = ctx
-        .db
-        .user_organization()
-        .iter()
-        .any(|uo| {
-            uo.user_identity == ctx.sender()
-                && uo.organization_id == organization_id
-                && uo.is_active
-        });
+    let is_member = ctx.db.user_organization().iter().any(|uo| {
+        uo.user_identity == ctx.sender() && uo.organization_id == organization_id && uo.is_active
+    });
 
     let is_su = ctx
         .db
@@ -114,7 +109,7 @@ pub fn log_audit_event(
         ip_address,
         user_agent,
         timestamp: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -129,6 +124,7 @@ pub fn create_audit_rule(
     log_writes: bool,
     log_deletes: bool,
     log_logins: bool,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "audit_rule", "create")?;
 
@@ -141,7 +137,7 @@ pub fn create_audit_rule(
         log_deletes,
         log_logins,
         is_active: true,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

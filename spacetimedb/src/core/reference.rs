@@ -5,8 +5,8 @@
 ///          is scoped to an organization. Only superusers may manage global tables.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
-use crate::helpers::check_permission;
 use crate::core::users::user_profile;
+use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -151,6 +151,7 @@ pub fn create_country(
     official_name: Option<String>,
     currency_code: Option<String>,
     language_codes: Vec<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
@@ -168,7 +169,7 @@ pub fn create_country(
         currency_code,
         language_codes,
         is_active: true,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -183,6 +184,7 @@ pub fn create_currency(
     decimal_places: u8,
     rounding_factor: f64,
     position: String,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
@@ -203,7 +205,7 @@ pub fn create_currency(
         active: true,
         position,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -217,6 +219,7 @@ pub fn create_currency_rate(
     to_currency: String,
     rate: f64,
     company_id: Option<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "currency_rate", "create")?;
 
@@ -234,7 +237,7 @@ pub fn create_currency_rate(
         date: ctx.timestamp,
         company_id,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -247,6 +250,7 @@ pub fn create_uom_category(
     name: String,
     description: Option<String>,
     sequence: u32,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_category", "create")?;
 
@@ -257,7 +261,7 @@ pub fn create_uom_category(
         description,
         sequence,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -274,6 +278,7 @@ pub fn create_uom(
     rounding: f64,
     times_bigger: f64,
     is_reference_unit: bool,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom", "create")?;
 
@@ -300,7 +305,7 @@ pub fn create_uom(
         is_reference_unit,
         is_active: true,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -315,6 +320,7 @@ pub fn create_uom_conversion(
     to_uom_id: u64,
     factor: f64,
     product_id: Option<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_conversion", "create")?;
 
@@ -331,7 +337,7 @@ pub fn create_uom_conversion(
         factor,
         product_id,
         is_active: true,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

@@ -34,9 +34,13 @@ pub struct Organization {
 #[spacetimedb::table(accessor = organization_settings, public)]
 pub struct OrganizationSettings {
     #[primary_key]
+    #[auto_inc]
     pub organization_id: u64,
-    pub module_config: Option<String>,  // JSON
+    pub module_config: Option<String>, // JSON
     pub feature_flags: Vec<String>,
+    /// DEPRECATED: Use the integrations module instead for managing external service connections.
+    /// This field will be removed in a future version.
+    /// See: integrations::GoogleDriveConnection, integrations::WhatsAppBusinessAccount
     pub integration_keys: Option<String>, // JSON (store references, not raw secrets)
     pub updated_at: Timestamp,
     pub metadata: Option<String>,
@@ -83,6 +87,14 @@ pub fn create_organization(
     timezone: String,
     date_format: String,
     language: String,
+    // Optional details
+    description: Option<String>,
+    logo_url: Option<String>,
+    website: Option<String>,
+    email: Option<String>,
+    phone: Option<String>,
+    currency_id: Option<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     if name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
@@ -95,19 +107,19 @@ pub fn create_organization(
         id: 0,
         name,
         code,
-        description: None,
-        logo_url: None,
-        website: None,
-        email: None,
-        phone: None,
-        currency_id: None,
+        description,
+        logo_url,
+        website,
+        email,
+        phone,
+        currency_id,
         timezone,
         date_format,
         language,
         is_active: true,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -207,6 +219,18 @@ pub fn create_company(
     currency_id: u64,
     fiscal_year_end_month: u8,
     fiscal_year_end_day: u8,
+    // Hierarchy fields
+    is_parent: bool,
+    parent_id: Option<u64>,
+    // Business fields
+    tax_id: Option<String>,
+    company_registry: Option<String>,
+    // Address fields
+    address_street: Option<String>,
+    address_city: Option<String>,
+    address_zip: Option<String>,
+    address_country_code: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "company", "create")?;
 
@@ -219,21 +243,21 @@ pub fn create_company(
         organization_id,
         name,
         code,
-        is_parent: false,
-        parent_id: None,
+        is_parent,
+        parent_id,
         currency_id,
         fiscal_year_end_month,
         fiscal_year_end_day,
-        tax_id: None,
-        company_registry: None,
-        address_street: None,
-        address_city: None,
-        address_zip: None,
-        address_country_code: None,
+        tax_id,
+        company_registry,
+        address_street,
+        address_city,
+        address_zip,
+        address_country_code,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -266,6 +290,88 @@ pub fn update_company(
         address_city: address_city.or(company.address_city),
         address_zip: address_zip.or(company.address_zip),
         address_country_code: address_country_code.or(company.address_country_code),
+        updated_at: ctx.timestamp,
+        ..company
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_company_address(
+    ctx: &ReducerContext,
+    company_id: u64,
+    address_street: Option<String>,
+    address_city: Option<String>,
+    address_zip: Option<String>,
+    address_country_code: Option<String>,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    check_permission(ctx, company.organization_id, "company", "write")?;
+
+    ctx.db.company().id().update(Company {
+        address_street,
+        address_city,
+        address_zip,
+        address_country_code,
+        updated_at: ctx.timestamp,
+        ..company
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_company_business(
+    ctx: &ReducerContext,
+    company_id: u64,
+    tax_id: Option<String>,
+    company_registry: Option<String>,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    check_permission(ctx, company.organization_id, "company", "write")?;
+
+    ctx.db.company().id().update(Company {
+        tax_id,
+        company_registry,
+        updated_at: ctx.timestamp,
+        ..company
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_company_hierarchy(
+    ctx: &ReducerContext,
+    company_id: u64,
+    is_parent: bool,
+    parent_id: Option<u64>,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    check_permission(ctx, company.organization_id, "company", "write")?;
+
+    ctx.db.company().id().update(Company {
+        is_parent,
+        parent_id,
         updated_at: ctx.timestamp,
         ..company
     });

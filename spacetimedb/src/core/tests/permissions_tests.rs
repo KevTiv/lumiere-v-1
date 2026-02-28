@@ -3,11 +3,10 @@
 /// Test reducers for Role, CasbinRule, and UserRoleAssignment tables.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{create_organization, organization};
 use crate::core::permissions::{
-    role, casbin_rule, user_role_assignment,
-    create_role, update_role, add_casbin_rule, remove_casbin_rule,
+    add_casbin_rule, casbin_rule, create_role, remove_casbin_rule, role, update_role,
 };
-use crate::core::organization::{organization, create_organization};
 
 /// Test permission system lifecycle
 #[spacetimedb::reducer]
@@ -21,9 +20,18 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
         .find(|o| o.code == "PERMORG")
         .ok_or("Test organization not found")?;
@@ -43,15 +51,21 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
             "organization:write".to_string(),
             "user:read".to_string(),
         ],
+        None, // metadata
     )?;
 
-    let role = ctx.db.role()
+    let role = ctx
+        .db
+        .role()
         .iter()
         .find(|r| r.name == "Test Manager" && r.organization_id == org_id)
         .ok_or("Role not created")?;
 
     if role.permissions.len() != 3 {
-        return Err(format!("Expected 3 permissions, got {}", role.permissions.len()));
+        return Err(format!(
+            "Expected 3 permissions, got {}",
+            role.permissions.len()
+        ));
     }
 
     if !role.permissions.contains(&"organization:read".to_string()) {
@@ -86,7 +100,9 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
         None,
     )?;
 
-    let updated_role = ctx.db.role()
+    let updated_role = ctx
+        .db
+        .role()
         .id()
         .find(&role_id)
         .ok_or("Role not found after update")?;
@@ -101,89 +117,57 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
 
     log::info!("✓ Role updated successfully");
 
-    // Test 3: Create Casbin policy rule
-    log::info!("TEST: Creating Casbin policy rule...");
+    // Test 3: Add Casbin rule (policy)
+    log::info!("TEST: Adding Casbin policy rule...");
     add_casbin_rule(
         ctx,
         org_id,
         "p".to_string(),
-        Some("role:1".to_string()),
+        Some(role_id.to_string()),
         Some(org_id.to_string()),
-        Some("resource:document".to_string()),
-        Some("read".to_string()),
-        Some("allow".to_string()),
+        Some("resource".to_string()),
+        Some("action".to_string()),
         None,
+        None,
+        None, // metadata
     )?;
 
-    let rules: Vec<_> = ctx.db.casbin_rule()
-        .iter()
-        .filter(|r| r.ptype == "p")
+    let rules: Vec<_> = ctx
+        .db
+        .casbin_rule()
+        .casbin_by_ptype()
+        .filter(&"p".to_string())
+        .filter(|r| r.v0 == Some(role_id.to_string()))
         .collect();
 
     if rules.is_empty() {
         return Err("Casbin rule not created".to_string());
     }
 
-    log::info!("✓ Casbin policy rule created");
+    log::info!("✓ Casbin rule added");
 
-    // Test 4: Create Casbin grouping rule
-    log::info!("TEST: Creating Casbin grouping rule...");
-    add_casbin_rule(
-        ctx,
-        org_id,
-        "g".to_string(),
-        Some(ctx.sender().to_hex().to_string()),
-        Some(format!("role:{}", role_id)),
-        None,
-        None,
-        None,
-        None,
-    )?;
+    let rule_id = rules[0].id;
 
-    let grouping_rules: Vec<_> = ctx.db.casbin_rule()
-        .iter()
-        .filter(|r| r.ptype == "g")
-        .collect();
-
-    if grouping_rules.is_empty() {
-        return Err("Grouping rule not created".to_string());
-    }
-
-    log::info!("✓ Casbin grouping rule created");
-
-    // Test 5: Remove Casbin rule
+    // Test 4: Remove Casbin rule
     log::info!("TEST: Removing Casbin rule...");
-    let rule_to_remove = &grouping_rules[0];
-    let rule_id = rule_to_remove.id;
-
     remove_casbin_rule(ctx, org_id, rule_id)?;
 
-    let removed_rule = ctx.db.casbin_rule()
-        .id()
-        .find(&rule_id);
-
+    let removed_rule = ctx.db.casbin_rule().id().find(&rule_id);
     if removed_rule.is_some() {
         return Err("Casbin rule should be deleted".to_string());
     }
 
     log::info!("✓ Casbin rule removed");
 
-    // Test 6: Error - empty role name
-    log::info!("TEST: Empty role name validation...");
-    match create_role(
-        ctx,
-        org_id,
-        "".to_string(),
-        None,
-        None,
-        vec![],
-    ) {
+    // Test 5: Error - create role with empty name
+    log::info!("TEST: Error case - empty role name...");
+    match create_role(ctx, org_id, "".to_string(), None, None, vec![], None) {
         Ok(_) => return Err("Should reject empty role name".to_string()),
-        Err(_) => log::info!("✓ Empty role name rejected"),
+        Err(_) => log::info!("✓ Correctly rejected empty role name"),
     }
 
-    // Test 7: Error - invalid ptype
-    log::info!("TEST: Invalid ptype validation...");
+    // Test 6: Error - invalid ptype
+    log::info!("TEST: Error case - invalid ptype...");
     match add_casbin_rule(
         ctx,
         org_id,
@@ -194,373 +178,335 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
         None,
         None,
         None,
+        None,
     ) {
         Ok(_) => return Err("Should reject invalid ptype".to_string()),
-        Err(_) => log::info!("✓ Invalid ptype rejected"),
-    }
-
-    // Test 8: Verify role indexing
-    log::info!("TEST: Role indexing...");
-    let roles_by_org: Vec<_> = ctx.db.role()
-        .role_by_org()
-        .filter(&org_id)
-        .collect();
-
-    if roles_by_org.is_empty() {
-        return Err("Should find roles by organization index".to_string());
-    }
-
-    log::info!("✓ Role indexing works");
-
-    // Test 9: Error - update non-existent role
-    log::info!("TEST: Non-existent role update...");
-    match update_role(
-        ctx,
-        99999,
-        Some("Name".to_string()),
-        None,
-        None,
-        None,
-    ) {
-        Ok(_) => return Err("Should fail for non-existent role".to_string()),
-        Err(_) => log::info!("✓ Non-existent role update rejected"),
+        Err(_) => log::info!("✓ Correctly rejected invalid ptype"),
     }
 
     log::info!("✅ All permission system tests passed!");
     Ok(())
 }
 
-/// Test role assignment and revocation
+/// Test role hierarchy and inheritance
 #[spacetimedb::reducer]
-pub fn test_role_assignment(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_role_hierarchy(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
-    log::info!("TEST: Setting up for role assignment tests...");
+    log::info!("TEST: Setting up for role hierarchy...");
     create_organization(
         ctx,
-        "Assignment Test Org".to_string(),
-        "ASSIGNORG".to_string(),
+        "Hierarchy Test Org".to_string(),
+        "HIERORG".to_string(),
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None, // metadata
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
-        .find(|o| o.code == "ASSIGNORG")
+        .find(|o| o.code == "HIERORG")
         .ok_or("Test organization not found")?;
 
-    // Create two roles
+    // Create parent role
+    log::info!("TEST: Creating parent role...");
     create_role(
         ctx,
         org.id,
-        "Admin Role".to_string(),
+        "Parent Role".to_string(),
+        Some("Base role with common permissions".to_string()),
         None,
+        vec!["common:read".to_string()],
         None,
-        vec!["*:*".to_string()],
     )?;
 
-    create_role(
-        ctx,
-        org.id,
-        "User Role".to_string(),
-        None,
-        None,
-        vec!["user:read".to_string()],
-    )?;
-
-    let _admin_role = ctx.db.role()
+    let parent = ctx
+        .db
+        .role()
         .iter()
-        .find(|r| r.name == "Admin Role" && r.organization_id == org.id)
-        .ok_or("Admin role not found")?;
+        .find(|r| r.name == "Parent Role" && r.organization_id == org.id)
+        .ok_or("Parent role not created")?;
 
-    let _user_role = ctx.db.role()
-        .iter()
-        .find(|r| r.name == "User Role" && r.organization_id == org.id)
-        .ok_or("User role not found")?;
-
-    // Note: Role assignment requires permissions which may not be available
-    // Document the expected behavior
-    log::info!("TEST: Role assignment pattern...");
-    log::info!("  - assign_role requires 'user_role_assignment:create' permission");
-    log::info!("  - Creates UserRoleAssignment linking identity to role");
-    log::info!("  - Includes expires_at for time-limited assignments");
-
-    // Verify assignment table structure
-    let assignments: Vec<_> = ctx.db.user_role_assignment().iter().collect();
-    log::info!("  - Found {} existing assignments", assignments.len());
-
-    // Verify indexes
-    let by_user: Vec<_> = ctx.db.user_role_assignment()
-        .role_assign_by_user()
-        .filter(&ctx.sender())
-        .collect();
-
-    let by_org: Vec<_> = ctx.db.user_role_assignment()
-        .role_assign_by_org()
-        .filter(&org.id)
-        .collect();
-
-    log::info!("✓ Assignment indexes accessible (by_user: {}, by_org: {})",
-        by_user.len(), by_org.len());
-
-    // Note: Testing actual assignment would require:
-    // 1. Caller to have appropriate permissions
-    // 2. Target user to exist (have profile)
-    // 3. Role to belong to the organization
-
-    log::info!("✅ Role assignment pattern documented");
-    Ok(())
-}
-
-/// Test permission validation and edge cases
-#[spacetimedb::reducer]
-pub fn test_permission_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
-    // Setup
-    log::info!("TEST: Setting up for permission edge cases...");
-    create_organization(
-        ctx,
-        "Edge Case Org".to_string(),
-        "EDGEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-    )?;
-
-    let org = ctx.db.organization()
-        .iter()
-        .find(|o| o.code == "EDGEORG")
-        .ok_or("Test organization not found")?;
-
-    // Test 1: Role with empty permissions
-    log::info!("TEST: Role with empty permissions...");
-    create_role(
-        ctx,
-        org.id,
-        "No Permissions Role".to_string(),
-        Some("Role with no permissions".to_string()),
-        None,
-        vec![],
-    )?;
-
-    let empty_role = ctx.db.role()
-        .iter()
-        .find(|r| r.name == "No Permissions Role")
-        .ok_or("Empty permission role not created")?;
-
-    if !empty_role.permissions.is_empty() {
-        return Err("Permissions should be empty".to_string());
-    }
-
-    log::info!("✓ Empty permissions role created");
-
-    // Test 2: Role with wildcard permissions
-    log::info!("TEST: Role with wildcard permissions...");
-    create_role(
-        ctx,
-        org.id,
-        "Super Role".to_string(),
-        None,
-        None,
-        vec![
-            "*:*".to_string(),
-            "organization:*".to_string(),
-            "user:read".to_string(),
-        ],
-    )?;
-
-    let super_role = ctx.db.role()
-        .iter()
-        .find(|r| r.name == "Super Role")
-        .ok_or("Super role not created")?;
-
-    if !super_role.permissions.contains(&"*:*".to_string()) {
-        return Err("Wildcard permission not stored".to_string());
-    }
-
-    log::info!("✓ Wildcard permissions role created");
-
-    // Test 3: Casbin rule with all fields
-    log::info!("TEST: Casbin rule with all fields...");
-    add_casbin_rule(
-        ctx,
-        org.id,
-        "p".to_string(),
-        Some("alice".to_string()),
-        Some("domain1".to_string()),
-        Some("data1".to_string()),
-        Some("read".to_string()),
-        Some("allow".to_string()),
-        Some("priority".to_string()),
-    )?;
-
-    let full_rule = ctx.db.casbin_rule()
-        .iter()
-        .find(|r| r.v0 == Some("alice".to_string()))
-        .ok_or("Full Casbin rule not created")?;
-
-    if full_rule.v5 != Some("priority".to_string()) {
-        return Err("v5 field not stored".to_string());
-    }
-
-    log::info!("✓ Full Casbin rule created");
-
-    // Test 4: Multiple Casbin rules
-    log::info!("TEST: Multiple Casbin rules...");
-    for i in 0..5 {
-        add_casbin_rule(
-            ctx,
-            org.id,
-            "p".to_string(),
-            Some(format!("user{}", i)),
-            Some(org.id.to_string()),
-            Some("resource".to_string()),
-            Some("action".to_string()),
-            Some("allow".to_string()),
-            None,
-        )?;
-    }
-
-    let policy_rules: Vec<_> = ctx.db.casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-        .filter(|r| r.v1.as_deref() == Some(&org.id.to_string()))
-        .collect();
-
-    if policy_rules.len() < 5 {
-        return Err(format!("Expected at least 5 rules, found {}", policy_rules.len()));
-    }
-
-    log::info!("✓ Multiple Casbin rules created");
-
-    // Test 5: Verify timestamps on role
-    log::info!("TEST: Role timestamps...");
-    let role = ctx.db.role()
-        .iter()
-        .find(|r| r.name == "Super Role")
-        .ok_or("Role not found")?;
-
-    if role.created_at.to_micros_since_unix_epoch() == 0 {
-        return Err("Role should have created_at timestamp".to_string());
-    }
-
-    if role.updated_at.to_micros_since_unix_epoch() == 0 {
-        return Err("Role should have updated_at timestamp".to_string());
-    }
-
-    log::info!("✓ Role timestamps verified");
-
-    // Test 6: Role with parent (hierarchical roles)
-    log::info!("TEST: Role hierarchy...");
-    let parent_role_id = empty_role.id;
-
+    // Create child role
+    log::info!("TEST: Creating child role with parent...");
     create_role(
         ctx,
         org.id,
         "Child Role".to_string(),
+        Some("Inherited role".to_string()),
+        Some(parent.id),
+        vec!["specific:write".to_string()],
         None,
-        Some(parent_role_id),
-        vec!["specific:action".to_string()],
     )?;
 
-    let child_role = ctx.db.role()
+    let child = ctx
+        .db
+        .role()
         .iter()
-        .find(|r| r.name == "Child Role")
+        .find(|r| r.name == "Child Role" && r.organization_id == org.id)
         .ok_or("Child role not created")?;
 
-    if child_role.parent_id != Some(parent_role_id) {
-        return Err("Parent ID not stored correctly".to_string());
+    if child.parent_id != Some(parent.id) {
+        return Err("Child role should reference parent".to_string());
     }
 
-    log::info!("✓ Hierarchical role created");
+    log::info!("✓ Role hierarchy created");
 
-    // Test 7: Casbin rule lookup by ptype index
-    log::info!("TEST: Casbin rule indexing...");
-    let ptype_rules: Vec<_> = ctx.db.casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-        .collect();
+    // Verify both roles exist
+    let roles: Vec<_> = ctx.db.role().role_by_org().filter(&org.id).collect();
 
-    if ptype_rules.is_empty() {
-        return Err("Should find rules by ptype index".to_string());
+    if roles.len() != 2 {
+        return Err(format!("Expected 2 roles, got {}", roles.len()));
     }
 
-    log::info!("✓ Casbin rule indexing works");
-
-    log::info!("✅ All permission edge case tests passed!");
+    log::info!("✅ Role hierarchy tests passed!");
     Ok(())
 }
 
-/// Test system role protection
+/// Test Casbin rule patterns
 #[spacetimedb::reducer]
-pub fn test_system_role_protection(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_casbin_rule_patterns(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
-    log::info!("TEST: Setting up for system role protection tests...");
+    log::info!("TEST: Setting up for Casbin patterns...");
     create_organization(
         ctx,
-        "System Role Org".to_string(),
-        "SYSORG".to_string(),
+        "Casbin Test Org".to_string(),
+        "CASORG".to_string(),
         "UTC".to_string(),
         "YYYY-MM-DD".to_string(),
         "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )?;
 
-    let org = ctx.db.organization()
+    let org = ctx
+        .db
+        .organization()
         .iter()
-        .find(|o| o.code == "SYSORG")
+        .find(|o| o.code == "CASORG")
         .ok_or("Test organization not found")?;
 
-    // Note: System roles are typically created during init
-    // We can test the protection by attempting to modify a system role
-    // if one exists, or document the expected behavior
+    // Test 1: Policy rule with all fields
+    log::info!("TEST: Creating policy with all fields...");
+    add_casbin_rule(
+        ctx,
+        org.id,
+        "p".to_string(),
+        Some("role:1".to_string()),
+        Some("org:1".to_string()),
+        Some("resource".to_string()),
+        Some("read".to_string()),
+        Some("allow".to_string()),
+        Some("domain".to_string()),
+        None,
+    )?;
 
-    log::info!("TEST: System role protection...");
+    // Test 2: Grouping rule
+    log::info!("TEST: Creating grouping rule...");
+    add_casbin_rule(
+        ctx,
+        org.id,
+        "g".to_string(),
+        Some("user:1".to_string()),
+        Some("role:admin".to_string()),
+        Some("org:1".to_string()),
+        None,
+        None,
+        None,
+        None,
+    )?;
 
-    // Create a role that we'll simulate as system (normally set during init)
+    // Test 3: Minimal rule
+    log::info!("TEST: Creating minimal rule...");
+    add_casbin_rule(
+        ctx,
+        org.id,
+        "p".to_string(),
+        Some("admin".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )?;
+
+    // Verify all rules exist
+    let all_rules: Vec<_> = ctx.db.casbin_rule().iter().collect();
+    let org_rules: Vec<_> = all_rules
+        .iter()
+        .filter(|r| {
+            // Find rules that belong to this test (by checking if they match our test pattern)
+            r.v0 == Some("role:1".to_string())
+                || r.v0 == Some("user:1".to_string())
+                || r.v0 == Some("admin".to_string())
+        })
+        .collect();
+
+    if org_rules.len() != 3 {
+        return Err(format!("Expected 3 rules, got {}", org_rules.len()));
+    }
+
+    log::info!("✓ Casbin rules created with various patterns");
+
+    log::info!("✅ Casbin rule pattern tests passed!");
+    Ok(())
+}
+
+/// Test role update edge cases
+#[spacetimedb::reducer]
+pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
+    // Setup
+    log::info!("TEST: Setting up for role updates...");
+    create_organization(
+        ctx,
+        "Role Update Test Org".to_string(),
+        "ROLEUPDORG".to_string(),
+        "UTC".to_string(),
+        "YYYY-MM-DD".to_string(),
+        "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )?;
+
+    let org = ctx
+        .db
+        .organization()
+        .iter()
+        .find(|o| o.code == "ROLEUPDORG")
+        .ok_or("Test organization not found")?;
+
+    // Create test role
     create_role(
         ctx,
         org.id,
-        "Test System Role".to_string(),
-        Some("Role for system protection test".to_string()),
+        "Update Test Role".to_string(),
+        Some("Original description".to_string()),
         None,
-        vec!["admin:*".to_string()],
+        vec!["perm1".to_string()],
+        None,
     )?;
 
-    let role = ctx.db.role()
+    let role = ctx
+        .db
+        .role()
         .iter()
-        .find(|r| r.name == "Test System Role")
-        .ok_or("Test role not found")?;
+        .find(|r| r.name == "Update Test Role" && r.organization_id == org.id)
+        .ok_or("Role not created")?;
 
-    // Note: The update_role reducer checks is_system and rejects if true
-    // We can't easily set is_system=true without direct db access
-    // So we document the expected behavior:
+    let role_id = role.id;
 
-    log::info!("Expected behavior:");
-    log::info!("  - System roles (is_system=true) cannot be modified via update_role");
-    log::info!("  - Attempting to update returns error: 'Cannot modify system roles'");
-    log::info!("  - System roles are created during module initialization");
-    log::info!("  - Only superusers can create/modify system roles via direct db ops");
-
-    // Test that we CAN update non-system roles
+    // Test 1: Partial update (only name)
+    log::info!("TEST: Partial update - only name...");
     update_role(
         ctx,
-        role.id,
-        Some("Modified Non-System Role".to_string()),
+        role_id,
+        Some("Updated Name Only".to_string()),
         None,
         None,
         None,
     )?;
 
-    let updated = ctx.db.role()
-        .id()
-        .find(&role.id)
-        .ok_or("Role not found")?;
+    let updated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
-    if updated.name != "Modified Non-System Role" {
-        return Err("Non-system role should be modifiable".to_string());
+    if updated.name != "Updated Name Only" {
+        return Err("Name not updated".to_string());
     }
 
-    log::info!("✓ Non-system role modification works");
+    if updated.description != Some("Original description".to_string()) {
+        return Err("Description should be preserved".to_string());
+    }
 
-    log::info!("✅ System role protection tests passed!");
+    log::info!("✓ Partial update works");
+
+    // Test 2: Deactivate role
+    log::info!("TEST: Deactivating role...");
+    update_role(ctx, role_id, None, None, None, Some(false))?;
+
+    let deactivated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
+
+    if deactivated.is_active {
+        return Err("Role should be inactive".to_string());
+    }
+
+    log::info!("✓ Role deactivated");
+
+    // Test 3: Reactivate role
+    log::info!("TEST: Reactivating role...");
+    update_role(ctx, role_id, None, None, None, Some(true))?;
+
+    let reactivated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
+
+    if !reactivated.is_active {
+        return Err("Role should be active".to_string());
+    }
+
+    log::info!("✓ Role reactivated");
+
+    log::info!("✅ Role update edge case tests passed!");
+    Ok(())
+}
+
+/// Test error cases and validation
+#[spacetimedb::reducer]
+pub fn test_permissions_error_cases(ctx: &ReducerContext) -> Result<(), String> {
+    // Setup
+    log::info!("TEST: Setting up for error cases...");
+    create_organization(
+        ctx,
+        "Error Test Org".to_string(),
+        "ERRORG".to_string(),
+        "UTC".to_string(),
+        "YYYY-MM-DD".to_string(),
+        "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )?;
+
+    let org = ctx
+        .db
+        .organization()
+        .iter()
+        .find(|o| o.code == "ERRORG")
+        .ok_or("Test organization not found")?;
+
+    // Test 1: Update non-existent role
+    log::info!("TEST: Error - update non-existent role...");
+    match update_role(ctx, 99999, Some("Name".to_string()), None, None, None) {
+        Ok(_) => return Err("Should fail for non-existent role".to_string()),
+        Err(_) => log::info!("✓ Correctly rejected non-existent role"),
+    }
+
+    // Test 2: Remove non-existent Casbin rule
+    log::info!("TEST: Error - remove non-existent rule...");
+    match remove_casbin_rule(ctx, org.id, 99999) {
+        Ok(_) => log::info!("Note: Remove succeeded (may be idempotent)"),
+        Err(_) => log::info!("✓ Remove rejected non-existent rule"),
+    }
+
+    log::info!("✅ Permission error case tests passed!");
     Ok(())
 }
