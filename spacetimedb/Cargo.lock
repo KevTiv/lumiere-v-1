@@ -390,6 +390,8 @@ name = "lumiere_v1"
 version = "0.1.0"
 dependencies = [
  "log",
+ "serde",
+ "serde_json",
  "spacetimedb",
 ]
 

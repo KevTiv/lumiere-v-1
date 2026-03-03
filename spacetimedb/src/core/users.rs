@@ -141,6 +141,7 @@ pub fn add_user_to_organization(
     // Additional fields
     department_id: Option<u64>,
     employee_id: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -176,7 +177,7 @@ pub fn add_user_to_organization(
         date_joined: ctx.timestamp,
         is_active: true,
         is_default: false,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -205,9 +206,9 @@ pub fn update_user_organization_details(
     )?;
 
     ctx.db.user_organization().id().update(UserOrganization {
-        department_id,
-        job_title,
-        employee_id,
+        department_id: department_id.or(membership.department_id),
+        job_title: job_title.or(membership.job_title),
+        employee_id: employee_id.or(membership.employee_id),
         ..membership
     });
 
@@ -282,6 +283,7 @@ pub fn create_user_session(
     user_agent: Option<String>,
     device_info: Option<String>,
     expires_at_micros: u64,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     let user = ctx
         .db
@@ -308,7 +310,7 @@ pub fn create_user_session(
         last_activity: ctx.timestamp,
         expires_at,
         is_active: true,
-        metadata: None,
+        metadata,
     });
 
     Ok(())

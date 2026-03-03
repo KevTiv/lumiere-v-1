@@ -8,6 +8,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.15: STOCK PRODUCTION LOT
@@ -217,10 +218,7 @@ pub fn create_stock_production_lot(
         lot.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","product_id":{}}}"#,
-            name, product_id
-        )),
+        Some(serde_json::json!({ "name": name, "product_id": product_id }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -291,7 +289,7 @@ pub fn delete_stock_production_lot(ctx: &ReducerContext, lot_id: u64) -> Result<
         "stock_production_lot",
         lot_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, lot_name)),
+        Some(serde_json::json!({ "name": lot_name }).to_string()),
         None,
         vec!["deleted".to_string()],
     );
@@ -370,10 +368,7 @@ pub fn create_stock_production_serial(
         serial.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","product_id":{}}}"#,
-            name, product_id
-        )),
+        Some(serde_json::json!({ "name": name, "product_id": product_id }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -573,7 +568,7 @@ pub fn delete_stock_production_serial(ctx: &ReducerContext, serial_id: u64) -> R
         "stock_production_serial",
         serial_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, serial_name)),
+        Some(serde_json::json!({ "name": serial_name }).to_string()),
         None,
         vec!["deleted".to_string()],
     );
@@ -640,10 +635,7 @@ pub fn create_traceability_record(
         trace.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"product_id":{},"document_type":"{}","document_id":{}}}"#,
-            product_id, doc_type, document_id
-        )),
+        Some(serde_json::json!({ "product_id": product_id, "document_type": doc_type, "document_id": document_id }).to_string()),
         vec!["product_id".to_string(), "document_type".to_string()],
     );
 
@@ -705,7 +697,7 @@ pub fn create_traceability_report(
         report.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 

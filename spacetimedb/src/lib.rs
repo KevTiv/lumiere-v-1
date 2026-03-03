@@ -26,7 +26,7 @@
 /// ├── crm/            ← CRM & Contacts              [Phase 2]  (add next)
 /// ├── inventory/      ← Products & Stock             [Phase 3–4]
 /// ├── sales/          ← Quotations, POS, Delivery    [Phase 5]
-/// ├── purchasing/     ← Purchase Orders & Vendors    [Phase 6]
+/// ├── purchasing/     ← Purchase Orders & Vendors    [Phase 6] ✓
 /// ├── accounting/     ← COA, Journals, Tax, Bank     [Phase 7–8]
 /// ├── subscriptions/  ← Plans & Deferred Revenue     [Phase 9]
 /// ├── manufacturing/  ← BOM, Work Orders             [Phase 10]
@@ -53,21 +53,21 @@ pub mod helpers;
 pub mod types;
 
 // ── Domain modules ────────────────────────────────────────────────────────────
+pub mod accounting; // Phase 7–8 — Chart of Accounts, Journal Entries, Tax, Bank
 pub mod core;
 pub mod crm;
 pub mod integrations; // Phase 2 — CRM & Contacts
 pub mod inventory; // Phase 3–4 — Products & Inventory
-                   // pub mod sales;        // Phase 5
-                   // pub mod purchasing;   // Phase 6
-                   // pub mod accounting;   // Phase 7–8
-                   // pub mod subscriptions;// Phase 9
-                   // pub mod manufacturing;// Phase 10
-                   // pub mod projects;     // Phase 11
-                   // pub mod documents;    // Phase 12
-                   // pub mod workflow;     // Phase 13
-                   // pub mod ai;           // Phase 14
-                   // pub mod data_ops;     // Phase 15
-                   // pub mod analytics;    // Phase 16
+pub mod purchasing; // Phase 6 — Purchase Orders & Supply Chain
+pub mod sales; // Phase 5 — Quotations, POS, Delivery
+pub mod manufacturing; // Phase 10 — BOM, Work Orders
+pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
+                       // pub mod projects;     // Phase 11
+                       // pub mod documents;    // Phase 12
+                       // pub mod workflow;     // Phase 13
+                       // pub mod ai;           // Phase 14
+                       // pub mod data_ops;     // Phase 15
+                       // pub mod analytics;    // Phase 16
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 

@@ -27,8 +27,12 @@ pub struct ContactInput {
     pub company_id: Option<u64>,
     pub is_customer: bool,
     pub is_vendor: bool,
+    pub is_employee: Option<bool>,
     pub is_prospect: bool,
     pub is_partner: bool,
+    pub customer_rank: Option<i32>,
+    pub supplier_rank: Option<i32>,
+    pub display_name: Option<String>,
     // Personal details
     pub first_name: Option<String>,
     pub last_name: Option<String>,
@@ -56,6 +60,7 @@ pub struct ContactInput {
     pub parent_id: Option<u64>,
     pub user_id: Option<Identity>,
     pub color: Option<String>,
+    pub metadata: Option<String>,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -208,7 +213,10 @@ pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), S
         return Err("Contact name cannot be empty".to_string());
     }
 
-    let display_name = input.name.clone();
+    let display_name = input
+        .display_name
+        .clone()
+        .unwrap_or_else(|| input.name.clone());
 
     let contact = ctx.db.contact().insert(Contact {
         id: 0,
@@ -240,11 +248,11 @@ pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), S
         description: input.description,
         is_customer: input.is_customer,
         is_vendor: input.is_vendor,
-        is_employee: false,
+        is_employee: input.is_employee.unwrap_or(false),
         is_prospect: input.is_prospect,
         is_partner: input.is_partner,
-        customer_rank: 0,
-        supplier_rank: 0,
+        customer_rank: input.customer_rank.unwrap_or(0),
+        supplier_rank: input.supplier_rank.unwrap_or(0),
         salesperson_id: input.salesperson_id,
         assigned_user_id: input.assigned_user_id,
         parent_id: input.parent_id,
@@ -254,7 +262,7 @@ pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), S
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
-        metadata: None,
+        metadata: input.metadata,
     });
 
     write_audit_log(
@@ -265,10 +273,7 @@ pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), S
         contact.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","email":{:?} }}"#,
-            input.name, input.email
-        )),
+        Some(serde_json::json!({ "name": input.name, "email": input.email }).to_string()),
         vec!["name".to_string(), "email".to_string()],
     );
 
@@ -428,7 +433,7 @@ pub fn update_contact(
         contact_id,
         "update",
         None,
-        Some(format!(r#"{{"name":{:?},"email":{:?} }}"#, name, email)),
+        Some(serde_json::json!({ "name": name, "email": email }).to_string()),
         vec!["name".to_string(), "email".to_string()],
     );
 
@@ -461,7 +466,7 @@ pub fn delete_contact(ctx: &ReducerContext, contact_id: u64) -> Result<(), Strin
         "contact",
         contact_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, contact_name)),
+        Some(serde_json::json!({ "name": contact_name }).to_string()),
         None,
         vec!["deleted_at".to_string()],
     );
@@ -475,6 +480,8 @@ pub fn create_contact_tag(
     organization_id: u64,
     name: String,
     color: Option<String>,
+    description: Option<String>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_tag", "create")?;
 
@@ -487,9 +494,9 @@ pub fn create_contact_tag(
         organization_id,
         name,
         color,
-        description: None,
+        description,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -501,6 +508,7 @@ pub fn assign_tag_to_contact(
     organization_id: u64,
     contact_id: u64,
     tag_id: u64,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_tag", "write")?;
 
@@ -534,7 +542,7 @@ pub fn assign_tag_to_contact(
             contact_id,
             tag_id,
             assigned_at: ctx.timestamp,
-            metadata: None,
+            metadata,
         });
 
     Ok(())

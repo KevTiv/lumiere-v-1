@@ -102,3 +102,381 @@ pub enum SerialState {
     Blocked,
     Expired,
 }
+
+// Sales & POS related enums used across multiple modules
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum SaleState {
+    Draft,
+    Sent,
+    Sale,
+    Done,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum LineState {
+    Draft,
+    Confirmed,
+    Done,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum InvoiceStatus {
+    NoInvoice,
+    ToInvoice,
+    Invoiced,
+    UpsellingOpportunity,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum LineInvoiceStatus {
+    ToInvoice,
+    Invoiced,
+    No,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum SessionState {
+    NewSession,
+    OpeningControl,
+    Opened,
+    ClosingControl,
+    Closed,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PosOrderState {
+    Draft,
+    Paid,
+    Done,
+    Invoiced,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentStatus {
+    Pending,
+    Done,
+    Reversed,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentMethodType {
+    Cash,
+    Bank,
+    Card,
+    DigitalWallet,
+    LoyaltyPoints,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum CardState {
+    New,
+    Active,
+    Expired,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum BatchState {
+    Draft,
+    InProgress,
+    Done,
+    Cancelled,
+}
+
+// Purchasing & Supply Chain enums
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PoState {
+    Draft,
+    Sent,
+    ToApprove,
+    Purchase,
+    Done,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PoInvoiceStatus {
+    No,
+    Invoiced,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum RequisitionState {
+    Draft,
+    Sent,
+    InProgress,
+    Approved,
+    Cancelled,
+    Closed,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IntakeState {
+    Draft,
+    Submitted,
+    UnderReview,
+    Approved,
+    Rejected,
+    OnHold,
+    Onboarded,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum LandedCostState {
+    Draft,
+    Posted,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum SplitMethod {
+    Equal,
+    ByQuantity,
+    ByCurrentCost,
+    ByWeight,
+    ByVolume,
+}
+
+// Accounting-related enums
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AccountTypeInternal {
+    Receivable,
+    Payable,
+    Liquidity,
+    Asset,
+    Equity,
+    Liability,
+    Income,
+    Expense,
+    Other,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AccountInternalGroup {
+    Asset,
+    Liability,
+    Equity,
+    Income,
+    Expense,
+    Other,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum JournalType {
+    Sale,
+    Purchase,
+    Cash,
+    Bank,
+    General,
+    Inventory,
+    Manufacturing,
+    PointOfSale,
+    Check,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MoveType {
+    Entry,
+    OutInvoice,
+    OutRefund,
+    InInvoice,
+    InRefund,
+    InternalTransfer,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AccountMoveState {
+    Draft,
+    Posted,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentState {
+    NotPaid,
+    Paid,
+    Partial,
+    Reversed,
+    InvoicingLegacy,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TaxTypeUse {
+    Sale,
+    Purchase,
+    None,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TaxAmountType {
+    Percent,
+    Fixed,
+    Division,
+    PythonCode,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum BankStatementState {
+    Open,
+    Posted,
+    Cancelled,
+    Processing,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum FiscalYearState {
+    Draft,
+    Running,
+    Closed,
+    Locked,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum FiscalYearType {
+    Standard,
+    Adjustment,
+    Opening,
+    Closing,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AutoPost {
+    No,
+    AtDate,
+    Monthly,
+    Quarterly,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ReconciliationMode {
+    Edit,
+    Readonly,
+    Hidden,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PeriodState {
+    Draft,
+    Open,
+    Closed,
+}
+
+// Phase 8: Advanced Accounting & Financials
+
+// Fixed Assets
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AssetState {
+    Draft,
+    Running,
+    Close,
+    Removed,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AssetType {
+    Purchase,
+    Sale,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum DepreciationMethod {
+    Linear,
+    Degressive,
+    DegressiveThenLinear,
+}
+
+// Budgeting
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum BudgetState {
+    Draft,
+    Confirm,
+    Validate,
+    Done,
+    Cancel,
+}
+
+// Intercompany Transactions
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IntercompanyState {
+    Draft,
+    Pending,
+    Approved,
+    Processing,
+    Completed,
+    Cancelled,
+    Error,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum RuleType {
+    Invoice,
+    Bill,
+    Payment,
+    Transfer,
+}
+
+// Consolidation
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ConsolidationState {
+    Draft,
+    InProgress,
+    Completed,
+    Cancelled,
+}
+
+// Financial Statements
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ReportType {
+    BalanceSheet,
+    ProfitAndLoss,
+    CashFlow,
+    TrialBalance,
+    GeneralLedger,
+    AgedReceivable,
+    AgedPayable,
+    PartnerBalance,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ReportState {
+    Draft,
+    Generated,
+    Exported,
+    Archived,
+}
+
+// Phase 10: Manufacturing
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum BomType {
+    Manufacture,
+    Kit,
+    Subcontract,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MoState {
+    Draft,
+    Confirmed,
+    Planned,
+    Progress,
+    ToClose,
+    Done,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum WorkorderState {
+    Pending,
+    Ready,
+    Progress,
+    Done,
+    Cancel,
+}

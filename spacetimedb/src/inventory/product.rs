@@ -9,9 +9,94 @@
 ///   - ProductVariant
 ///   - ProductSupplierInfo
 ///   - ProductPackaging
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use serde_json;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUT TYPES
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Input data for creating a product
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ProductInput {
+    // Required fields
+    pub organization_id: u64,
+    pub name: String,
+    pub categ_id: u64,
+    pub type_: String,
+    pub uom_id: u64,
+    pub uom_po_id: u64,
+    pub standard_price: f64,
+    pub list_price: f64,
+    pub currency_id: u64,
+
+    // Basic optional fields
+    pub default_code: Option<String>,
+    pub barcode: Option<String>,
+    pub description: Option<String>,
+    pub sale_ok: Option<bool>,
+    pub purchase_ok: Option<bool>,
+
+    // Product configuration
+    pub display_name: Option<String>,
+    pub cost_method: Option<String>,
+    pub valuation: Option<String>,
+    pub volume: Option<f64>,
+    pub weight: Option<f64>,
+    pub can_be_expensed: Option<bool>,
+    pub available_in_pos: Option<bool>,
+    pub invoicing_policy: Option<String>,
+    pub expense_policy: Option<String>,
+    pub priority: Option<String>,
+    pub is_published: Option<bool>,
+
+    // Descriptions
+    pub description_purchase: Option<String>,
+    pub description_sale: Option<String>,
+    pub service_type: Option<String>,
+    pub service_tracking: Option<String>,
+
+    // Images
+    pub image_1920_url: Option<String>,
+    pub image_128_url: Option<String>,
+    pub color: Option<String>,
+
+    // Responsibility
+    pub responsible_id: Option<Identity>,
+    pub pricelist_id: Option<u64>,
+
+    // Inventory
+    pub description_picking: Option<String>,
+    pub description_pickingout: Option<String>,
+    pub description_pickingin: Option<String>,
+    pub location_id: Option<u64>,
+    pub warehouse_id: Option<u64>,
+
+    // Inventory configuration
+    pub tracking: Option<String>,
+    pub has_configurable_attributes: Option<bool>,
+
+    // Tax configuration
+    pub taxes_id: Option<Vec<u64>>,
+    pub supplier_taxes_id: Option<Vec<u64>>,
+
+    // Route configuration
+    pub route_ids: Option<Vec<u64>>,
+    pub route_from_categ_ids: Option<Vec<u64>>,
+
+    // Accounting
+    pub property_account_income_id: Option<u64>,
+    pub property_account_expense_id: Option<u64>,
+
+    // Variants
+    pub variant_attribute_ids: Option<Vec<u64>>,
+    pub attribute_line_ids: Option<Vec<u64>>,
+
+    // Metadata
+    pub metadata: Option<String>,
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.1: PRODUCT CATEGORY
@@ -368,7 +453,7 @@ pub fn create_product_category(
         category.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -415,45 +500,10 @@ pub fn update_product_category(
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[spacetimedb::reducer]
-pub fn create_product(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    name: String,
-    categ_id: u64,
-    type_: String,
-    uom_id: u64,
-    uom_po_id: u64,
-    standard_price: f64,
-    list_price: f64,
-    currency_id: u64,
-    default_code: Option<String>,
-    barcode: Option<String>,
-    description: Option<String>,
-    sale_ok: bool,
-    purchase_ok: bool,
-    // Additional product details
-    description_purchase: Option<String>,
-    description_sale: Option<String>,
-    service_type: Option<String>,
-    service_tracking: Option<String>,
-    image_1920_url: Option<String>,
-    image_128_url: Option<String>,
-    color: Option<String>,
-    responsible_id: Option<Identity>,
-    pricelist_id: Option<u64>,
-    // Inventory details
-    description_picking: Option<String>,
-    description_pickingout: Option<String>,
-    description_pickingin: Option<String>,
-    location_id: Option<u64>,
-    warehouse_id: Option<u64>,
-    // Accounting details
-    property_account_income_id: Option<u64>,
-    property_account_expense_id: Option<u64>,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "product", "create")?;
+pub fn create_product(ctx: &ReducerContext, input: ProductInput) -> Result<(), String> {
+    check_permission(ctx, input.organization_id, "product", "create")?;
 
-    if name.is_empty() {
+    if input.name.is_empty() {
         return Err("Product name cannot be empty".to_string());
     }
 
@@ -461,93 +511,94 @@ pub fn create_product(
         .db
         .product_category()
         .id()
-        .find(&categ_id)
+        .find(&input.categ_id)
         .ok_or("Category not found")?;
 
     let product = ctx.db.product().insert(Product {
         id: 0,
-        organization_id,
-        name: name.clone(),
-        display_name: Some(name.clone()),
-        code: default_code.clone(),
-        default_code: default_code.clone(),
-        barcode: barcode.clone(),
-        categ_id,
-        type_: type_.clone(),
-        uom_id,
-        uom_po_id,
-        description,
-        description_purchase,
-        description_sale,
-        cost_method: "standard".to_string(),
-        valuation: "manual_periodic".to_string(),
-        standard_price,
-        volume: 0.0,
-        weight: 0.0,
-        sale_ok,
-        purchase_ok,
-        can_be_expensed: false,
-        available_in_pos: false,
-        invoicing_policy: "order".to_string(),
-        expense_policy: "no".to_string(),
-        service_type,
-        service_tracking,
-        image_1920_url,
-        image_128_url,
-        color,
-        priority: "normal".to_string(),
-        is_published: false,
+        organization_id: input.organization_id,
+        name: input.name.clone(),
+        display_name: input.display_name.or(Some(input.name.clone())),
+        code: input.default_code.clone(),
+        default_code: input.default_code.clone(),
+        barcode: input.barcode.clone(),
+        categ_id: input.categ_id,
+        type_: input.type_.clone(),
+        uom_id: input.uom_id,
+        uom_po_id: input.uom_po_id,
+        description: input.description,
+        description_purchase: input.description_purchase,
+        description_sale: input.description_sale,
+        cost_method: input.cost_method.unwrap_or_else(|| "standard".to_string()),
+        valuation: input
+            .valuation
+            .unwrap_or_else(|| "manual_periodic".to_string()),
+        standard_price: input.standard_price,
+        volume: input.volume.unwrap_or(0.0),
+        weight: input.weight.unwrap_or(0.0),
+        sale_ok: input.sale_ok.unwrap_or(true),
+        purchase_ok: input.purchase_ok.unwrap_or(true),
+        can_be_expensed: input.can_be_expensed.unwrap_or(false),
+        available_in_pos: input.available_in_pos.unwrap_or(false),
+        invoicing_policy: input
+            .invoicing_policy
+            .unwrap_or_else(|| "order".to_string()),
+        expense_policy: input.expense_policy.unwrap_or_else(|| "no".to_string()),
+        service_type: input.service_type,
+        service_tracking: input.service_tracking,
+        image_1920_url: input.image_1920_url,
+        image_128_url: input.image_128_url,
+        color: input.color,
+        priority: input.priority.unwrap_or_else(|| "normal".to_string()),
+        is_published: input.is_published.unwrap_or(false),
         active: true,
-        responsible_id,
+        responsible_id: input.responsible_id,
         seller_ids: vec![],
         variant_count: 0,
-        variant_attribute_ids: vec![],
-        attribute_line_ids: vec![],
+        variant_attribute_ids: input.variant_attribute_ids.unwrap_or_default(),
+        attribute_line_ids: input.attribute_line_ids.unwrap_or_default(),
         value_extra_price_ids: vec![],
         product_variant_count: 0,
         product_variant_ids: vec![],
-        currency_id,
-        public_price: list_price,
-        list_price,
-        lst_price: list_price,
-        price: list_price,
-        pricelist_id,
-        taxes_id: vec![],
-        supplier_taxes_id: vec![],
-        route_from_categ_ids: vec![],
-        route_ids: vec![],
-        tracking: "none".to_string(),
-        description_picking,
-        description_pickingout,
-        description_pickingin,
+        currency_id: input.currency_id,
+        public_price: input.list_price,
+        list_price: input.list_price,
+        lst_price: input.list_price,
+        price: input.list_price,
+        pricelist_id: input.pricelist_id,
+        taxes_id: input.taxes_id.unwrap_or_default(),
+        supplier_taxes_id: input.supplier_taxes_id.unwrap_or_default(),
+        route_from_categ_ids: input.route_from_categ_ids.unwrap_or_default(),
+        route_ids: input.route_ids.unwrap_or_default(),
+        tracking: input.tracking.unwrap_or_else(|| "none".to_string()),
+        description_picking: input.description_picking,
+        description_pickingout: input.description_pickingout,
+        description_pickingin: input.description_pickingin,
         qty_available: 0.0,
         virtual_available: 0.0,
         incoming_qty: 0.0,
         outgoing_qty: 0.0,
-        location_id,
-        warehouse_id,
-        has_configurable_attributes: false,
-        property_account_income_id,
-        property_account_expense_id,
+        location_id: input.location_id,
+        warehouse_id: input.warehouse_id,
+        has_configurable_attributes: input.has_configurable_attributes.unwrap_or(false),
+        property_account_income_id: input.property_account_income_id,
+        property_account_expense_id: input.property_account_expense_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: input.metadata,
     });
 
     write_audit_log(
         ctx,
-        organization_id,
+        input.organization_id,
         None,
         "product",
         product.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","categ_id":{},"type":"{}"}}"#,
-            name, categ_id, type_
-        )),
+        Some(serde_json::json!({ "name": input.name, "categ_id": input.categ_id, "type": input.type_ }).to_string()),
         vec!["name".to_string(), "categ_id".to_string()],
     );
 
@@ -694,7 +745,7 @@ pub fn delete_product(ctx: &ReducerContext, product_id: u64) -> Result<(), Strin
         "product",
         product_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, product_name)),
+        Some(serde_json::json!({ "name": product_name }).to_string()),
         None,
         vec!["active".to_string()],
     );
@@ -776,10 +827,7 @@ pub fn create_product_variant(
         variant.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","product_tmpl_id":{}}}"#,
-            name, product_tmpl_id
-        )),
+        Some(serde_json::json!({ "name": name, "product_tmpl_id": product_tmpl_id }).to_string()),
         vec!["name".to_string()],
     );
 

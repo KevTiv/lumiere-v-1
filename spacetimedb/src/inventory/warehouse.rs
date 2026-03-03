@@ -1,3 +1,4 @@
+use serde_json;
 /// Warehouses & Locations — Tables and Reducers
 ///
 /// Tables:
@@ -5,7 +6,7 @@
 ///   - StockLocation
 ///   - StockRoute
 ///   - StockRule
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
 
@@ -259,7 +260,7 @@ pub fn create_warehouse(
         warehouse.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}","code":"{}"}}"#, name, code)),
+        Some(serde_json::json!({ "name": name, "code": code }).to_string()),
         vec!["name".to_string(), "code".to_string()],
     );
 
@@ -330,7 +331,7 @@ pub fn delete_warehouse(ctx: &ReducerContext, warehouse_id: u64) -> Result<(), S
         "warehouse",
         warehouse_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, warehouse_name)),
+        Some(serde_json::json!({ "name": warehouse_name }).to_string()),
         None,
         vec!["active".to_string()],
     );
@@ -420,10 +421,7 @@ pub fn create_stock_location(
         location.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","usage":"{}"}}"#,
-            name, location.usage
-        )),
+        Some(serde_json::json!({ "name": name, "usage": location.usage }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -561,7 +559,7 @@ pub fn create_stock_route(
         route.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -698,10 +696,7 @@ pub fn create_stock_rule(
         rule.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","action":"{}"}}"#,
-            name, rule.action
-        )),
+        Some(serde_json::json!({ "name": name, "action": rule.action }).to_string()),
         vec!["name".to_string()],
     );
 

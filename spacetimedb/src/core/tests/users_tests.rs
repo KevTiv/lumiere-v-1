@@ -154,6 +154,7 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         Some("Mozilla/5.0 Test".to_string()),
         Some("Desktop Chrome".to_string()),
         expires_at,
+        None,
     )?;
 
     let sessions: Vec<_> = ctx
@@ -212,6 +213,7 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
         None,
         None,
         expires_at,
+        None,
     )?;
 
     // Try to end it as a different user would fail, but we can't test that easily
@@ -393,6 +395,7 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         None,
         None,
         expires_at,
+        None,
     )?;
 
     let minimal_session = ctx
@@ -421,6 +424,7 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         Some("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()),
         Some("Windows Desktop, Chrome 120".to_string()),
         expires_at,
+        None,
     )?;
 
     let full_session = ctx
@@ -451,6 +455,7 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
             None,
             None,
             expires_at + (i as u64 * 1000_000),
+            None,
         )?;
     }
 

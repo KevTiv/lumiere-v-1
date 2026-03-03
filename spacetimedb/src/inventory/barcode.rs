@@ -10,6 +10,7 @@ use crate::helpers::{check_permission, write_audit_log};
 use crate::inventory::product::{product, product_packaging, product_variant};
 use crate::inventory::tracking::stock_production_lot;
 use crate::inventory::warehouse::stock_location;
+use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.19: BARCODE RULE
@@ -151,7 +152,7 @@ pub fn create_barcode_rule(
         rule.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}","type":"{}"}}"#, name, rule.type_)),
+        Some(serde_json::json!({ "name": name, "type": rule.type_ }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -217,7 +218,7 @@ pub fn delete_barcode_rule(ctx: &ReducerContext, rule_id: u64) -> Result<(), Str
         "barcode_rule",
         rule_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, rule_name)),
+        Some(serde_json::json!({ "name": rule_name }).to_string()),
         None,
         vec!["deleted".to_string()],
     );
@@ -286,7 +287,7 @@ pub fn record_barcode_scan(
         scan.id,
         "create",
         None,
-        Some(format!(r#"{{"barcode":"{}"}}"#, barcode)),
+        Some(serde_json::json!({ "barcode": barcode }).to_string()),
         vec!["barcode".to_string()],
     );
 
@@ -444,7 +445,7 @@ pub fn create_barcode_nomenclature(
         nomenclature.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -620,7 +621,7 @@ pub fn delete_barcode_nomenclature(
         "barcode_nomenclature",
         nomenclature_id,
         "delete",
-        Some(format!(r#"{{"name":"{}"}}"#, nom_name)),
+        Some(serde_json::json!({ "name": nom_name }).to_string()),
         None,
         vec!["deleted".to_string()],
     );

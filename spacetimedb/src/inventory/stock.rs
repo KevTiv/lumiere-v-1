@@ -8,6 +8,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.11: STOCK QUANT
@@ -298,6 +299,7 @@ pub struct StockPicking {
     pub has_entire_package_src: bool,
     pub has_entire_package_dest: bool,
     pub package_level_ids: Vec<u64>,
+    pub batch_id: Option<u64>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub metadata: Option<String>,
@@ -362,10 +364,7 @@ pub fn create_stock_quant(
         quant.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"product_id":{},"location_id":{},"quantity":{}}}"#,
-            product_id, location_id, quantity
-        )),
+        Some(serde_json::json!({ "product_id": product_id, "location_id": location_id, "quantity": quantity }).to_string()),
         vec!["quantity".to_string()],
     );
 
@@ -605,10 +604,10 @@ pub fn create_stock_move(
         move_record.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","product_id":{},"qty":{}}}"#,
-            name, product_id, product_uom_qty
-        )),
+        Some(
+            serde_json::json!({ "name": name, "product_id": product_id, "qty": product_uom_qty })
+                .to_string(),
+        ),
         vec!["name".to_string(), "product_uom_qty".to_string()],
     );
 
@@ -704,11 +703,8 @@ pub fn done_stock_move(
         "stock_move",
         move_id,
         "done",
-        Some(format!(r#"{{"state":"{}"}}"#, move_record.state)),
-        Some(format!(
-            r#"{{"state":"done","quantity_done":{}}}"#,
-            quantity_done
-        )),
+        Some(serde_json::json!({ "state": move_record.state }).to_string()),
+        Some(serde_json::json!({ "state": "done", "quantity_done": quantity_done }).to_string()),
         vec!["state".to_string(), "quantity_done".to_string()],
     );
 
@@ -833,6 +829,7 @@ pub fn create_stock_picking(
         has_entire_package_src: false,
         has_entire_package_dest: false,
         package_level_ids: vec![],
+        batch_id: None,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata: None,
@@ -846,7 +843,7 @@ pub fn create_stock_picking(
         picking.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -986,8 +983,8 @@ pub fn validate_stock_picking(ctx: &ReducerContext, picking_id: u64) -> Result<(
         "stock_picking",
         picking_id,
         "validate",
-        Some(format!(r#"{{"state":"{}"}}"#, picking.state)),
-        Some(r#"{"state":"done"}"#.to_string()),
+        Some(serde_json::json!({ "state": picking.state }).to_string()),
+        Some(serde_json::json!({ "state": "done" }).to_string()),
         vec!["state".to_string()],
     );
 

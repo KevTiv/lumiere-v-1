@@ -9,6 +9,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.22: QUALITY CHECK
@@ -273,11 +274,7 @@ pub fn create_quality_check(
         quality_check.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","test_type":"{}"}}"#,
-            name,
-            test_type.clone()
-        )),
+        Some(serde_json::json!({ "name": name, "test_type": test_type }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -363,10 +360,10 @@ pub fn pass_quality_check(
         check_id,
         "pass",
         None,
-        Some(format!(
-            r#"{{"quality_state":"{}"}}"#,
-            if is_failed { "fail" } else { "pass" }
-        )),
+        Some(
+            serde_json::json!({ "quality_state": if is_failed { "fail" } else { "pass" } })
+                .to_string(),
+        ),
         vec!["quality_state".to_string()],
     );
 
@@ -416,10 +413,7 @@ pub fn fail_quality_check(
         check_id,
         "fail",
         None,
-        Some(format!(
-            r#"{{"quality_state":"fail","qty_failed":{}}}"#,
-            qty_failed
-        )),
+        Some(serde_json::json!({ "quality_state": "fail", "qty_failed": qty_failed }).to_string()),
         vec!["quality_state".to_string(), "qty_failed".to_string()],
     );
 
@@ -484,10 +478,7 @@ pub fn create_quality_alert(
         alert.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"title":"{}","priority":"{}"}}"#,
-            title, alert.priority
-        )),
+        Some(serde_json::json!({ "title": title, "priority": alert.priority }).to_string()),
         vec!["title".to_string()],
     );
 
@@ -579,7 +570,7 @@ pub fn solve_quality_alert(
         alert_id,
         "solve",
         None,
-        Some(r#"{"state":"solved"}"#.to_string()),
+        Some(serde_json::json!({ "state": "solved" }).to_string()),
         vec!["state".to_string()],
     );
 
@@ -651,7 +642,7 @@ pub fn create_quality_alert_reason(
         reason.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -773,10 +764,7 @@ pub fn create_quality_point(
         point.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","test_type":"{}"}}"#,
-            name, test_type
-        )),
+        Some(serde_json::json!({ "name": name, "test_type": test_type }).to_string()),
         vec!["name".to_string()],
     );
 
@@ -887,7 +875,7 @@ pub fn create_quality_team(
         team.id,
         "create",
         None,
-        Some(format!(r#"{{"name":"{}"}}"#, name)),
+        Some(serde_json::json!({ "name": name }).to_string()),
         vec!["name".to_string()],
     );
 

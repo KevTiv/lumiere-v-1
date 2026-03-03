@@ -194,10 +194,10 @@ pub fn create_opportunity(
         opp.id,
         "create",
         None,
-        Some(format!(
-            r#"{{"name":"{}","expected_revenue":{} }}"#,
-            opp.name, expected_revenue
-        )),
+        Some(
+            serde_json::json!({ "name": opp.name, "expected_revenue": expected_revenue })
+                .to_string(),
+        ),
         vec!["name".to_string(), "expected_revenue".to_string()],
     );
 

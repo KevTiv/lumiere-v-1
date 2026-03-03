@@ -136,6 +136,7 @@ pub fn create_activity(
     // Status fields
     date_done: Option<Timestamp>,
     is_done: bool,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "activity", "create")?;
 
@@ -167,7 +168,7 @@ pub fn create_activity(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
@@ -219,6 +220,7 @@ pub fn create_calendar_event(
     rrule_type: Option<String>,
     final_date: Option<Timestamp>,
     alarm_ids: Vec<u64>,
+    metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "calendar_event", "create")?;
 
@@ -264,7 +266,7 @@ pub fn create_calendar_event(
         state,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata,
     });
 
     Ok(())
