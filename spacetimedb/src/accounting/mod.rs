@@ -46,12 +46,15 @@ pub mod tax_management;
 
 // Re-export Phase 7 types
 pub use bank_reconciliation::{
-    AccountBankStatement, AccountBankStatementLine, AccountReconciliationWidget,
+    AccountBankStatement, AccountBankStatementLine, AccountReconciliationWidget, BankMatchCandidate,
 };
 pub use chart_of_accounts::{AccountAccount, AccountAccountType, AccountGroup, AccountJournal};
 pub use fiscal_periods::{AccountFiscalYear, AccountPeriod};
 pub use journal_entries::{AccountMove, AccountMoveLine};
-pub use tax_management::{AccountTax, AccountTaxGroup, TaxJurisdiction, TaxSchedule};
+pub use tax_management::{
+    AccountTax, AccountTaxGroup, TaxDeadline, TaxDeadlineReminder, TaxDeadlineStatusJob,
+    TaxJurisdiction, TaxSchedule,
+};
 
 // Re-export Phase 8 types
 pub use analytic_accounting::{

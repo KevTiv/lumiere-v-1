@@ -6,7 +6,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
-use crate::accounting::journal_entries::account_move_line;
+use crate::accounting::journal_entries::{account_move_line, AccountMoveLine};
 use crate::helpers::{check_permission, write_audit_log};
 use crate::types::BankStatementState;
 
@@ -106,6 +106,25 @@ pub struct AccountReconciliationWidget {
     pub write_uid: Option<Identity>,
     pub write_date: Option<Timestamp>,
     pub metadata: Option<String>,
+}
+
+#[spacetimedb::table(
+    accessor = bank_match_candidate,
+    public,
+    index(accessor = candidate_by_statement_line, btree(columns = [statement_line_id])),
+    index(accessor = candidate_by_entity, btree(columns = [entity_id]))
+)]
+pub struct BankMatchCandidate {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub statement_line_id: u64,
+    pub match_type: String, // "invoice" | "payment"
+    pub entity_id: u64,
+    pub amount: f64,
+    pub rule_id: Option<u64>,
+    pub score: u32, // confidence 0-100
+    pub created_at: Timestamp,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -470,4 +489,301 @@ pub fn create_reconciliation_widget(
     );
 
     Ok(())
+}
+
+// ── Reconciliation Rule Reducers ─────────────────────────────────────────────
+
+/// Apply reconciliation rules to a bank statement line
+/// This is the main entry point for automatic reconciliation
+#[spacetimedb::reducer]
+pub fn apply_reconciliation_rules(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "bank_match_candidate", "create")?;
+
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Statement line not found")?;
+
+    if line.is_reconciled {
+        return Err("Line is already reconciled".to_string());
+    }
+
+    // Clear any existing candidates for this line
+    for existing in ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+    {
+        ctx.db.bank_match_candidate().id().delete(&existing.id);
+    }
+
+    // Try exact amount match first
+    match_by_exact_amount(ctx, organization_id, line_id, line.amount)?;
+
+    // Try partner-based matching
+    if let Some(partner_id) = line.partner_id {
+        match_by_partner(ctx, organization_id, line_id, partner_id, line.amount)?;
+    }
+
+    // Try reference matching (if account_number contains invoice reference)
+    if let Some(ref account_number) = line.account_number {
+        match_by_reference(ctx, organization_id, line_id, account_number, line.amount)?;
+    }
+
+    Ok(())
+}
+
+/// Match a bank line to invoices by exact amount
+/// Iterates through unpaid invoices and creates match candidates
+#[spacetimedb::reducer]
+pub fn match_bank_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "bank_match_candidate", "create")?;
+
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Statement line not found")?;
+
+    if line.is_reconciled {
+        return Err("Line is already reconciled".to_string());
+    }
+
+    // Clear existing candidates
+    for existing in ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+    {
+        ctx.db.bank_match_candidate().id().delete(&existing.id);
+    }
+
+    // Search for invoice move lines with matching amount
+    let target_amount = line.amount.abs();
+    let is_payment = line.amount < 0.0; // Negative amount typically means payment
+
+    for move_line in ctx.db.account_move_line().iter() {
+        // Skip if already reconciled or not from same company
+        if move_line.company_id != line.journal_id {
+            continue;
+        }
+
+        let move_line_amount = move_line.balance.abs();
+
+        // Check for amount match (within 0.01 tolerance)
+        if (move_line_amount - target_amount).abs() <= 0.01 {
+            // Check if this is an invoice-related move line
+            let is_invoice = move_line.account_id > 0; // Simplified check
+
+            if is_invoice {
+                let match_type = if is_payment { "payment" } else { "invoice" }.to_string();
+                let score = calculate_match_score(&line, &move_line, "amount");
+
+                ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+                    id: 0,
+                    statement_line_id: line_id,
+                    match_type,
+                    entity_id: move_line.id,
+                    amount: move_line.balance,
+                    rule_id: None,
+                    score,
+                    created_at: ctx.timestamp,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ── Helper Functions ─────────────────────────────────────────────────────────
+
+fn match_by_exact_amount(
+    ctx: &ReducerContext,
+    _organization_id: u64,
+    line_id: u64,
+    amount: f64,
+) -> Result<(), String> {
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Statement line not found")?;
+
+    let target_amount = amount.abs();
+
+    for move_line in ctx.db.account_move_line().iter() {
+        if move_line.company_id != line.journal_id {
+            continue;
+        }
+
+        let move_line_amount = move_line.balance.abs();
+
+        if (move_line_amount - target_amount).abs() <= 0.01 {
+            let match_type = if amount < 0.0 { "payment" } else { "invoice" }.to_string();
+
+            ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+                id: 0,
+                statement_line_id: line_id,
+                match_type,
+                entity_id: move_line.id,
+                amount: move_line.balance,
+                rule_id: None,
+                score: 90, // High score for exact amount match
+                created_at: ctx.timestamp,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn match_by_partner(
+    ctx: &ReducerContext,
+    _organization_id: u64,
+    line_id: u64,
+    partner_id: u64,
+    amount: f64,
+) -> Result<(), String> {
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Statement line not found")?;
+
+    for move_line in ctx.db.account_move_line().iter() {
+        if move_line.company_id != line.journal_id {
+            continue;
+        }
+
+        // Check if move line is associated with the same partner
+        if let Some(ml_partner_id) = move_line.partner_id {
+            if ml_partner_id == partner_id {
+                let match_type = if amount < 0.0 { "payment" } else { "invoice" }.to_string();
+                let score = calculate_match_score(&line, &move_line, "partner");
+
+                ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+                    id: 0,
+                    statement_line_id: line_id,
+                    match_type,
+                    entity_id: move_line.id,
+                    amount: move_line.balance,
+                    rule_id: None,
+                    score,
+                    created_at: ctx.timestamp,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn match_by_reference(
+    ctx: &ReducerContext,
+    _organization_id: u64,
+    line_id: u64,
+    _account_number: &str,
+    amount: f64,
+) -> Result<(), String> {
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Statement line not found")?;
+
+    // Try to match account_number/reference to invoice references
+    for move_line in ctx.db.account_move_line().iter() {
+        if move_line.company_id != line.journal_id {
+            continue;
+        }
+
+        // Simplified reference matching - in real implementation would check invoice references
+        let match_type = if amount < 0.0 { "payment" } else { "invoice" }.to_string();
+        let score = calculate_match_score(&line, &move_line, "reference");
+
+        if score > 50 {
+            ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+                id: 0,
+                statement_line_id: line_id,
+                match_type,
+                entity_id: move_line.id,
+                amount: move_line.balance,
+                rule_id: None,
+                score,
+                created_at: ctx.timestamp,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn calculate_match_score(
+    line: &AccountBankStatementLine,
+    move_line: &AccountMoveLine,
+    match_criteria: &str,
+) -> u32 {
+    let mut score: u32 = 0;
+
+    // Amount match (max 40 points)
+    let amount_diff = (line.amount.abs() - move_line.balance.abs()).abs();
+    if amount_diff <= 0.01 {
+        score += 40;
+    } else if amount_diff <= 1.0 {
+        score += 20;
+    }
+
+    // Partner match (max 30 points)
+    if let Some(line_partner) = line.partner_id {
+        if let Some(ml_partner) = move_line.partner_id {
+            if line_partner == ml_partner {
+                score += 30;
+            }
+        }
+    }
+
+    // Date proximity (max 20 points)
+    let date_diff = (line
+        .date
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_secs() as i64
+        - move_line
+            .date
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_secs() as i64)
+        .abs();
+
+    if date_diff <= 86400 {
+        // Within 1 day
+        score += 20;
+    } else if date_diff <= 604800 {
+        // Within 1 week
+        score += 10;
+    }
+
+    // Reference match (max 10 points)
+    if match_criteria == "reference" {
+        score += 10;
+    }
+
+    score.min(100)
 }

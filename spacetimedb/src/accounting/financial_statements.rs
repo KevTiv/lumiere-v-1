@@ -11,8 +11,10 @@
 /// - `TrialBalance` — Trial balance entries per account
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
+use crate::accounting::chart_of_accounts::account_account;
+use crate::accounting::journal_entries::account_move_line;
 use crate::helpers::{check_permission, write_audit_log};
-use crate::types::{ReportState, ReportType};
+use crate::types::{AccountMoveState, ReportState, ReportType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -515,24 +517,179 @@ pub fn generate_financial_report(
         return Err("Report must be in Draft state to generate".to_string());
     }
 
-    // In a real implementation, this would:
-    // 1. Query account_move_line for the date range
-    // 2. Aggregate by account hierarchy
-    // 3. Calculate comparisons if needed
-    // 4. Generate the report_data JSON
+    // Remove existing trial balance rows for this report before regenerating
+    let existing_entries: Vec<_> = ctx
+        .db
+        .trial_balance()
+        .trial_balance_by_report()
+        .filter(&report_id)
+        .collect();
+    for entry in existing_entries {
+        ctx.db.trial_balance().id().delete(&entry.id);
+    }
 
-    // For now, create placeholder report data
+    // Aggregate posted/all move lines into trial balance buckets
+    #[derive(Clone)]
+    struct TrialBalanceBucket {
+        account_id: u64,
+        account_code: String,
+        account_name: String,
+        opening_debit: f64,
+        opening_credit: f64,
+        period_debit: f64,
+        period_credit: f64,
+    }
+
+    let mut buckets: std::collections::BTreeMap<u64, TrialBalanceBucket> =
+        std::collections::BTreeMap::new();
+
+    for line in ctx.db.account_move_line().iter() {
+        if line.company_id != company_id {
+            continue;
+        }
+
+        // target_move filter
+        if report.target_move == "posted" && line.parent_state != AccountMoveState::Posted {
+            continue;
+        }
+
+        // account filter
+        if !report.filter_account_ids.is_empty()
+            && !report.filter_account_ids.contains(&line.account_id)
+        {
+            continue;
+        }
+
+        // partner filter
+        if !report.filter_partner_ids.is_empty() {
+            match line.partner_id {
+                Some(pid) if report.filter_partner_ids.contains(&pid) => {}
+                _ => continue,
+            }
+        }
+
+        // journal filter
+        if !report.filter_journal_ids.is_empty()
+            && !report.filter_journal_ids.contains(&line.journal_id)
+        {
+            continue;
+        }
+
+        let account = match ctx.db.account_account().id().find(&line.account_id) {
+            Some(acc) => acc,
+            None => continue,
+        };
+
+        let bucket = buckets
+            .entry(line.account_id)
+            .or_insert_with(|| TrialBalanceBucket {
+                account_id: line.account_id,
+                account_code: account.code.clone(),
+                account_name: account.name.clone(),
+                opening_debit: 0.0,
+                opening_credit: 0.0,
+                period_debit: 0.0,
+                period_credit: 0.0,
+            });
+
+        if line.date < report.date_from {
+            bucket.opening_debit += line.debit;
+            bucket.opening_credit += line.credit;
+        } else if line.date <= report.date_to {
+            bucket.period_debit += line.debit;
+            bucket.period_credit += line.credit;
+        }
+    }
+
+    // Persist trial balance entries and compute report summary totals
+    let mut summary_opening_debit = 0.0f64;
+    let mut summary_opening_credit = 0.0f64;
+    let mut summary_period_debit = 0.0f64;
+    let mut summary_period_credit = 0.0f64;
+    let mut summary_closing_debit = 0.0f64;
+    let mut summary_closing_credit = 0.0f64;
+
+    for bucket in buckets.values() {
+        let closing_debit = if bucket.opening_debit + bucket.period_debit
+            > bucket.opening_credit + bucket.period_credit
+        {
+            bucket.opening_debit + bucket.period_debit
+                - bucket.opening_credit
+                - bucket.period_credit
+        } else {
+            0.0
+        };
+
+        let closing_credit = if bucket.opening_credit + bucket.period_credit
+            > bucket.opening_debit + bucket.period_debit
+        {
+            bucket.opening_credit + bucket.period_credit
+                - bucket.opening_debit
+                - bucket.period_debit
+        } else {
+            0.0
+        };
+
+        // hide all-zero rows when requested
+        if !report.show_zero_lines
+            && bucket.opening_debit.abs() < 0.000_001
+            && bucket.opening_credit.abs() < 0.000_001
+            && bucket.period_debit.abs() < 0.000_001
+            && bucket.period_credit.abs() < 0.000_001
+            && closing_debit.abs() < 0.000_001
+            && closing_credit.abs() < 0.000_001
+        {
+            continue;
+        }
+
+        ctx.db.trial_balance().insert(TrialBalance {
+            id: 0,
+            report_id,
+            account_id: bucket.account_id,
+            account_code: bucket.account_code.clone(),
+            account_name: bucket.account_name.clone(),
+            opening_debit: bucket.opening_debit,
+            opening_credit: bucket.opening_credit,
+            period_debit: bucket.period_debit,
+            period_credit: bucket.period_credit,
+            closing_debit,
+            closing_credit,
+            currency_id: report.result_currency_id,
+            parent_id: None,
+            level: 0,
+            is_leaf: true,
+            company_id,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: None,
+        });
+
+        summary_opening_debit += bucket.opening_debit;
+        summary_opening_credit += bucket.opening_credit;
+        summary_period_debit += bucket.period_debit;
+        summary_period_credit += bucket.period_credit;
+        summary_closing_debit += closing_debit;
+        summary_closing_credit += closing_credit;
+    }
+
     let report_data = serde_json::json!({
         "report_type": format!("{:?}", report.report_type),
         "period": {
             "from": report.date_from.to_string(),
             "to": report.date_to.to_string()
         },
+        "target_move": report.target_move,
         "summary": {
-            "total_debit": 0.0,
-            "total_credit": 0.0
+            "opening_debit": summary_opening_debit,
+            "opening_credit": summary_opening_credit,
+            "period_debit": summary_period_debit,
+            "period_credit": summary_period_credit,
+            "closing_debit": summary_closing_debit,
+            "closing_credit": summary_closing_credit
         },
-        "lines": []
+        "line_count": ctx.db.trial_balance().trial_balance_by_report().filter(&report_id).count()
     })
     .to_string();
 
