@@ -62,12 +62,12 @@ pub mod purchasing; // Phase 6 — Purchase Orders & Supply Chain
 pub mod sales; // Phase 5 — Quotations, POS, Delivery
 pub mod manufacturing; // Phase 10 — BOM, Work Orders
 pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
-                       // pub mod projects;     // Phase 11
-                       // pub mod documents;    // Phase 12
-                       // pub mod workflow;     // Phase 13
-                       // pub mod ai;           // Phase 14
-                       // pub mod data_ops;     // Phase 15
-                       // pub mod analytics;    // Phase 16
+pub mod projects;   // Phase 11 — Projects, Tasks, Timesheets
+pub mod documents;  // Phase 12 — Docs & Knowledge Base
+pub mod workflow;   // Phase 13 — Workflow Engine
+pub mod ai;         // Phase 14 — AI Agents & Embeddings
+pub mod data_ops;   // Phase 15 — CSV Import/Export
+pub mod analytics;  // Phase 16 — Dashboards & Metrics
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 

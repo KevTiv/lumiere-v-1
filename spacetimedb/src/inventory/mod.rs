@@ -23,7 +23,11 @@ pub mod barcode;
 pub mod cycle_count;
 pub mod inventory_adjustments;
 pub mod product;
+pub mod product_category;
 pub mod quality;
+
+pub use cycle_count::*;
+pub use product_category::*;
 pub mod replenishment;
 pub mod stock;
 pub mod tracking;

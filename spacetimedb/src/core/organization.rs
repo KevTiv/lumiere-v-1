@@ -5,6 +5,8 @@
 ///          Companies are sub-units within an Organization.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
+use crate::core::permissions::{role, Role};
+use crate::core::users::{user_organization, UserOrganization};
 use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -103,10 +105,10 @@ pub fn create_organization(
         return Err("Organization code cannot be empty".to_string());
     }
 
-    ctx.db.organization().insert(Organization {
+    let org = ctx.db.organization().insert(Organization {
         id: 0,
         name,
-        code,
+        code: code.clone(),
         description,
         logo_url,
         website,
@@ -120,6 +122,37 @@ pub fn create_organization(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata,
+    });
+
+    // Bootstrap default owner role for this organization
+    let owner_role = ctx.db.role().insert(Role {
+        id: 0,
+        organization_id: org.id,
+        name: "owner".to_string(),
+        description: Some("Organization owner with full permissions".to_string()),
+        parent_id: None,
+        permissions: vec!["*:*".to_string()],
+        is_system: true,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some(format!("{{\"bootstrap\":true,\"org_code\":\"{}\"}}", code)),
+    });
+
+    // Bootstrap creator membership as owner
+    ctx.db.user_organization().insert(UserOrganization {
+        id: 0,
+        user_identity: ctx.sender(),
+        organization_id: org.id,
+        company_id: None,
+        role_id: owner_role.id,
+        department_id: None,
+        job_title: Some("Owner".to_string()),
+        employee_id: None,
+        date_joined: ctx.timestamp,
+        is_active: true,
+        is_default: true,
+        metadata: Some("{\"bootstrap\":true}".to_string()),
     });
 
     Ok(())

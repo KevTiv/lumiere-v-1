@@ -59,8 +59,12 @@ pub fn check_permission(
 
     let permission = format!("{}:{}", resource, action);
     let wildcard = format!("{}:*", resource);
+    let global_wildcard = "*:*".to_string();
 
-    if role.permissions.contains(&permission) || role.permissions.contains(&wildcard) {
+    if role.permissions.contains(&permission)
+        || role.permissions.contains(&wildcard)
+        || role.permissions.contains(&global_wildcard)
+    {
         return Ok(());
     }
 

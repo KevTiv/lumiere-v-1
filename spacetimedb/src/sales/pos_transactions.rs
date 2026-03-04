@@ -14,6 +14,7 @@
 ///   - Loyalty point tracking
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company;
 use crate::helpers::{check_permission, write_audit_log};
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig, PosLoyaltyProgram};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
@@ -282,6 +283,24 @@ pub struct PosLoyaltyCard {
 // REDUCERS: POS TRANSACTIONS
 // ══════════════════════════════════════════════════════════════════════════════
 
+fn resolve_organization_id_from_company(
+    ctx: &ReducerContext,
+    company_id: u64,
+) -> Result<u64, String> {
+    let comp = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    if comp.deleted_at.is_some() {
+        return Err("Company is archived".to_string());
+    }
+
+    Ok(comp.organization_id)
+}
+
 #[spacetimedb::reducer]
 pub fn open_pos_session(
     ctx: &ReducerContext,
@@ -295,7 +314,8 @@ pub fn open_pos_session(
         .find(&config_id)
         .ok_or("POS config not found")?;
 
-    check_permission(ctx, config.company_id, "pos_session", "create")?;
+    let organization_id = resolve_organization_id_from_company(ctx, config.company_id)?;
+    check_permission(ctx, organization_id, "pos_session", "create")?;
 
     // Check if there's already an open session for this user/config
     let existing_session: Vec<_> = ctx
@@ -371,6 +391,42 @@ pub fn open_pos_session(
 }
 
 #[spacetimedb::reducer]
+pub fn compute_pos_session_totals(ctx: &ReducerContext, session_id: u64) -> Result<(), String> {
+    let session = ctx
+        .db
+        .pos_session()
+        .id()
+        .find(&session_id)
+        .ok_or("Session not found")?;
+
+    let config = ctx
+        .db
+        .pos_config()
+        .id()
+        .find(&session.config_id)
+        .ok_or("POS config not found")?;
+
+    let organization_id = resolve_organization_id_from_company(ctx, config.company_id)?;
+    check_permission(ctx, organization_id, "pos_session", "write")?;
+
+    let mut total_entry_encoding: f64 = 0.0;
+    for order_id in &session.order_ids {
+        if let Some(order) = ctx.db.pos_order().id().find(order_id) {
+            total_entry_encoding += order.amount_total;
+        }
+    }
+
+    ctx.db.pos_session().id().update(PosSession {
+        cash_register_total_entry_encoding: total_entry_encoding,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..session
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn close_pos_session(
     ctx: &ReducerContext,
     session_id: u64,
@@ -390,7 +446,8 @@ pub fn close_pos_session(
         .find(&session.config_id)
         .ok_or("POS config not found")?;
 
-    check_permission(ctx, config.company_id, "pos_session", "close")?;
+    let organization_id = resolve_organization_id_from_company(ctx, config.company_id)?;
+    check_permission(ctx, organization_id, "pos_session", "close")?;
 
     if session.user_id != ctx.sender() {
         return Err("Only the session opener can close the session".to_string());
@@ -400,23 +457,24 @@ pub fn close_pos_session(
         return Err("Session must be in Opened or Closing Control state".to_string());
     }
 
-    // Calculate totals from orders
-    let mut total_entry_encoding: f64 = 0.0;
-    for order_id in &session.order_ids {
-        if let Some(order) = ctx.db.pos_order().id().find(order_id) {
-            total_entry_encoding += order.amount_total;
-        }
-    }
+    // Recompute totals to keep session aggregates consistent
+    compute_pos_session_totals(ctx, session_id)?;
+
+    let refreshed_session = ctx
+        .db
+        .pos_session()
+        .id()
+        .find(&session_id)
+        .ok_or("Session not found after totals recompute")?;
 
     // Update session
     ctx.db.pos_session().id().update(PosSession {
         state: SessionState::Closed,
         stop_at: Some(ctx.timestamp),
         cash_register_balance_end_real,
-        cash_register_total_entry_encoding: total_entry_encoding,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        ..session
+        ..refreshed_session
     });
 
     // Update config
@@ -454,7 +512,8 @@ pub fn create_pos_order(ctx: &ReducerContext, input: PosOrderInput) -> Result<()
         .find(&session.config_id)
         .ok_or("POS config not found")?;
 
-    check_permission(ctx, config.company_id, "pos_order", "create")?;
+    let organization_id = resolve_organization_id_from_company(ctx, config.company_id)?;
+    check_permission(ctx, organization_id, "pos_order", "create")?;
 
     // Generate unique order ID
     let uid = format!("{}-{}-{}", config.id, session.id, session.sequence_number);
@@ -668,7 +727,7 @@ pub fn create_pos_order(ctx: &ReducerContext, input: PosOrderInput) -> Result<()
 
     write_audit_log(
         ctx,
-        config.company_id,
+        organization_id,
         Some(config.company_id),
         "pos_order",
         order.id,

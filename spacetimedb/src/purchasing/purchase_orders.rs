@@ -8,6 +8,7 @@
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::core::organization::company;
 use crate::helpers::{check_permission, write_audit_log};
 use crate::types::{LineState, PoInvoiceStatus, PoState, RequisitionState};
 
@@ -47,6 +48,10 @@ pub struct PurchaseOrder {
     pub picking_count: u32,
     pub picking_ids: Vec<u64>,
     pub effective_date: Option<Timestamp>,
+    pub amount_untaxed: f64,
+    pub amount_tax: f64,
+    pub amount_total: f64,
+    pub receipt_status: String,
     pub notes: Option<String>,
     pub message_main_attachment_id: Option<u64>,
     pub message_follower_ids: Vec<u64>,
@@ -189,6 +194,45 @@ pub struct OrderLineInput {
 // PURCHASE ORDER REDUCERS
 // ============================================================================
 
+fn validate_company_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<(), String> {
+    let comp = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    if comp.organization_id != organization_id {
+        return Err("Company does not belong to this organization".to_string());
+    }
+
+    if comp.deleted_at.is_some() {
+        return Err("Company is archived".to_string());
+    }
+
+    Ok(())
+}
+
+fn validate_order_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<PurchaseOrder, String> {
+    let order = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Purchase order not found")?;
+
+    validate_company_in_organization(ctx, organization_id, order.company_id)?;
+    Ok(order)
+}
+
 /// Create a new purchase order (quotation)
 #[reducer]
 pub fn create_purchase_order(
@@ -213,6 +257,8 @@ pub fn create_purchase_order(
     metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
+
+    validate_company_in_organization(ctx, organization_id, company_id)?;
 
     // Calculate all derived values before moving the vectors
     let invoice_count = invoice_ids.len() as u32;
@@ -242,6 +288,10 @@ pub fn create_purchase_order(
         picking_count,
         picking_ids,
         effective_date: None,
+        amount_untaxed: 0.0,
+        amount_tax: 0.0,
+        amount_total: 0.0,
+        receipt_status: "nothing".to_string(),
         notes,
         message_main_attachment_id: None,
         message_follower_ids,
@@ -292,12 +342,7 @@ pub fn send_purchase_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&order_id)
-        .ok_or("Purchase order not found")?;
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     if !matches!(order.state, PoState::Draft) {
         return Err("Purchase order must be in Draft state to send".to_string());
@@ -335,12 +380,7 @@ pub fn confirm_purchase_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&order_id)
-        .ok_or("Purchase order not found")?;
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     if !matches!(
         order.state,
@@ -384,12 +424,7 @@ pub fn cancel_purchase_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&order_id)
-        .ok_or("Purchase order not found")?;
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     if matches!(order.state, PoState::Done | PoState::Cancelled) {
         return Err("Cannot cancel a completed or already cancelled purchase order".to_string());
@@ -428,18 +463,13 @@ pub fn add_purchase_order_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "create")?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&order_id)
-        .ok_or("Purchase order not found")?;
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     if order.state != PoState::Draft {
         return Err("Can only add lines to draft purchase orders".to_string());
     }
 
-    let subtotal = line.quantity * line.price_unit * (1.0 - line.discount / 100.0);
+    let subtotal = line.quantity * line.price_unit;
 
     ctx.db.purchase_order_line().insert(PurchaseOrderLine {
         id: 0,
@@ -492,6 +522,11 @@ pub fn add_purchase_order_line(
         ..order
     });
 
+    compute_purchase_order_line_totals(ctx, organization_id, order_id)?;
+    compute_purchase_order_totals(ctx, organization_id, order_id)?;
+    update_po_receipt_status(ctx, organization_id, order_id)?;
+    update_po_invoice_status(ctx, organization_id, order_id)?;
+
     log::info!("Line added to purchase order {}", order_id);
     Ok(())
 }
@@ -512,18 +547,18 @@ pub fn remove_purchase_order_line(
         .find(&line_id)
         .ok_or("Purchase order line not found")?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&line.order_id)
-        .ok_or("Purchase order not found")?;
+    let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
 
     if order.state != PoState::Draft {
         return Err("Can only remove lines from draft purchase orders".to_string());
     }
 
+    let order_id = line.order_id;
     ctx.db.purchase_order_line().id().delete(&line_id);
+
+    compute_purchase_order_totals(ctx, organization_id, order_id)?;
+    update_po_receipt_status(ctx, organization_id, order_id)?;
+    update_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log(
         ctx,
@@ -538,6 +573,291 @@ pub fn remove_purchase_order_line(
     );
 
     log::info!("Line {} removed from purchase order {}", line_id, order.id);
+    Ok(())
+}
+
+/// Recompute line-level totals for all lines in a purchase order.
+#[reducer]
+pub fn compute_purchase_order_line_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+
+    let lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order_id)
+        .collect();
+
+    for line in lines {
+        let subtotal = line.product_qty * line.price_unit;
+        let tax = 0.0;
+        let total = subtotal + tax;
+
+        ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+            price_subtotal: subtotal,
+            price_tax: tax,
+            price_total: total,
+            qty_to_invoice: (line.product_qty - line.qty_invoiced).max(0.0),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..line
+        });
+    }
+
+    Ok(())
+}
+
+/// Recompute purchase order totals from all order lines.
+#[reducer]
+pub fn compute_purchase_order_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    let lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order_id)
+        .collect();
+
+    let amount_untaxed: f64 = lines.iter().map(|l| l.price_subtotal).sum();
+    let amount_tax: f64 = lines.iter().map(|l| l.price_tax).sum();
+    let amount_total = amount_untaxed + amount_tax;
+
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
+/// Update purchase order receipt status based on received quantities.
+#[reducer]
+pub fn update_po_receipt_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    let lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order_id)
+        .collect();
+
+    let total_ordered: f64 = lines.iter().map(|l| l.product_qty).sum();
+    let total_received: f64 = lines.iter().map(|l| l.qty_received).sum();
+
+    let receipt_status = if lines.is_empty() || total_received <= 0.0 {
+        "nothing".to_string()
+    } else if total_received >= total_ordered && total_ordered > 0.0 {
+        "full".to_string()
+    } else {
+        "partial".to_string()
+    };
+
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        receipt_status,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
+/// Update purchase order invoice status based on invoiced quantities.
+#[reducer]
+pub fn update_po_invoice_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    let lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order_id)
+        .collect();
+
+    let total_ordered: f64 = lines.iter().map(|l| l.product_qty).sum();
+    let total_invoiced: f64 = lines.iter().map(|l| l.qty_invoiced).sum();
+
+    let invoice_status = if lines.is_empty() || total_invoiced <= 0.0 {
+        PoInvoiceStatus::No
+    } else if total_invoiced >= total_ordered && total_ordered > 0.0 {
+        PoInvoiceStatus::Invoiced
+    } else {
+        PoInvoiceStatus::Partial
+    };
+
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        invoice_status,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
+/// Increment received quantity on a purchase order line and refresh statuses/totals.
+#[reducer]
+pub fn receive_po_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+
+    if qty <= 0.0 {
+        return Err("Received quantity must be greater than zero".to_string());
+    }
+
+    let line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Purchase order line not found")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+    let new_qty_received = line.qty_received + qty;
+    if new_qty_received > line.product_qty {
+        return Err(format!(
+            "Cannot receive {:.4}. Line {} would exceed ordered quantity {:.4} (current received: {:.4})",
+            qty, line_id, line.product_qty, line.qty_received
+        ));
+    }
+    let order_id = order.id;
+
+    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        qty_received: new_qty_received,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..line
+    });
+
+    update_po_receipt_status(ctx, organization_id, order_id)?;
+    compute_purchase_order_totals(ctx, organization_id, order_id)?;
+
+    write_audit_log(
+        ctx,
+        organization_id,
+        Some(line.company_id),
+        "purchase_order_line",
+        line_id,
+        "receive",
+        Some(
+            serde_json::json!({
+                "qty_received_before": line.qty_received
+            })
+            .to_string(),
+        ),
+        Some(
+            serde_json::json!({
+                "qty_received_after": new_qty_received,
+                "qty_delta": qty
+            })
+            .to_string(),
+        ),
+        vec!["qty_received".to_string()],
+    );
+
+    Ok(())
+}
+
+/// Increment invoiced quantity on a purchase order line and refresh statuses/totals.
+#[reducer]
+pub fn invoice_po_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+
+    if qty <= 0.0 {
+        return Err("Invoiced quantity must be greater than zero".to_string());
+    }
+
+    let line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Purchase order line not found")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+    let new_qty_invoiced = line.qty_invoiced + qty;
+    if new_qty_invoiced > line.product_qty {
+        return Err(format!(
+            "Cannot invoice {:.4}. Line {} would exceed ordered quantity {:.4} (current invoiced: {:.4})",
+            qty, line_id, line.product_qty, line.qty_invoiced
+        ));
+    }
+    let qty_to_invoice = line.product_qty - new_qty_invoiced;
+    let order_id = order.id;
+
+    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        qty_invoiced: new_qty_invoiced,
+        qty_to_invoice,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..line
+    });
+
+    update_po_invoice_status(ctx, organization_id, order_id)?;
+    compute_purchase_order_totals(ctx, organization_id, order_id)?;
+
+    write_audit_log(
+        ctx,
+        organization_id,
+        Some(line.company_id),
+        "purchase_order_line",
+        line_id,
+        "invoice",
+        Some(
+            serde_json::json!({
+                "qty_invoiced_before": line.qty_invoiced,
+                "qty_to_invoice_before": line.qty_to_invoice
+            })
+            .to_string(),
+        ),
+        Some(
+            serde_json::json!({
+                "qty_invoiced_after": new_qty_invoiced,
+                "qty_to_invoice_after": qty_to_invoice,
+                "qty_delta": qty
+            })
+            .to_string(),
+        ),
+        vec!["qty_invoiced".to_string(), "qty_to_invoice".to_string()],
+    );
+
     Ok(())
 }
 
@@ -567,6 +887,8 @@ pub fn create_purchase_requisition(
     metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "create")?;
+
+    validate_company_in_organization(ctx, organization_id, company_id)?;
 
     let order_count = purchase_ids.len() as u32;
 

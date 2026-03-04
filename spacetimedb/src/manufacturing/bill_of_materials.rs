@@ -48,6 +48,7 @@ pub struct MrpBom {
     pub message_follower_ids: Vec<u64>,
     pub activity_ids: Vec<u64>,
     pub message_ids: Vec<u64>,
+    pub estimated_cost: f64,
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -119,6 +120,41 @@ pub struct MrpRoutingWorkcenter {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Debug, Clone)]
+pub struct BomExplosionRow {
+    pub root_bom_id: u64,
+    pub parent_bom_id: u64,
+    pub bom_id: u64,
+    pub line_id: Option<u64>,
+    pub product_id: u64,
+    pub level: u32,
+    pub qty: f64,
+}
+
+/// Cached exploded BOM output for client-side querying/reporting.
+#[spacetimedb::table(
+    accessor = bom_explosion_result,
+    public,
+    index(name = "by_root_bom", accessor = bom_explosion_by_root_bom, btree(columns = [root_bom_id])),
+    index(name = "by_bom", accessor = bom_explosion_by_bom, btree(columns = [bom_id]))
+)]
+pub struct BomExplosionResult {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub company_id: u64,
+    pub root_bom_id: u64,
+    pub parent_bom_id: u64,
+    pub bom_id: u64,
+    pub line_id: Option<u64>,
+    pub product_id: u64,
+    pub level: u32,
+    pub qty: f64,
+    pub created_at: Timestamp,
+    pub metadata: Option<String>,
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
@@ -178,6 +214,7 @@ pub fn create_bom(
         message_follower_ids: Vec::new(),
         activity_ids: Vec::new(),
         message_ids: Vec::new(),
+        estimated_cost: 0.0,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -229,6 +266,9 @@ pub fn create_bom(
         ..bom
     });
 
+    // Compute initial cached BOM cost
+    compute_bom_cost(ctx, company_id, bom.id)?;
+
     write_audit_log(
         ctx,
         company_id,
@@ -272,6 +312,8 @@ pub fn update_bom(
         ..bom
     });
 
+    compute_bom_cost(ctx, company_id, bom_id)?;
+
     write_audit_log(
         ctx,
         company_id,
@@ -302,6 +344,18 @@ pub fn delete_bom(ctx: &ReducerContext, company_id: u64, bom_id: u64) -> Result<
     // Delete associated BOM lines
     for line_id in &bom.bom_line_ids {
         ctx.db.mrp_bom_line().id().delete(line_id);
+    }
+
+    // Delete cached explosion rows for this root BOM
+    let explosion_ids: Vec<u64> = ctx
+        .db
+        .bom_explosion_result()
+        .bom_explosion_by_root_bom()
+        .filter(&bom_id)
+        .map(|r| r.id)
+        .collect();
+    for row_id in explosion_ids {
+        ctx.db.bom_explosion_result().id().delete(&row_id);
     }
 
     ctx.db.mrp_bom().id().delete(&bom_id);
@@ -376,5 +430,186 @@ pub fn create_routing_workcenter(
     );
 
     log::info!("Routing workcenter created: id={}", routing.id);
+    Ok(())
+}
+
+fn clear_bom_explosion_cache(ctx: &ReducerContext, root_bom_id: u64) {
+    let ids: Vec<u64> = ctx
+        .db
+        .bom_explosion_result()
+        .bom_explosion_by_root_bom()
+        .filter(&root_bom_id)
+        .map(|r| r.id)
+        .collect();
+
+    for id in ids {
+        ctx.db.bom_explosion_result().id().delete(&id);
+    }
+}
+
+fn explode_bom_recursive(
+    ctx: &ReducerContext,
+    company_id: u64,
+    root_bom_id: u64,
+    parent_bom_id: u64,
+    bom_id: u64,
+    level: u32,
+    qty_factor: f64,
+    visited: &mut Vec<u64>,
+) -> Result<(), String> {
+    if visited.contains(&bom_id) {
+        return Err("Circular BOM dependency detected".to_string());
+    }
+
+    let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
+    if bom.company_id != company_id {
+        return Err("BOM does not belong to this company".to_string());
+    }
+
+    visited.push(bom_id);
+
+    // Emit header row
+    ctx.db.bom_explosion_result().insert(BomExplosionResult {
+        id: 0,
+        company_id,
+        root_bom_id,
+        parent_bom_id,
+        bom_id,
+        line_id: None,
+        product_id: bom.product_id,
+        level,
+        qty: bom.product_qty * qty_factor,
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
+    let component_lines: Vec<MrpBomLine> = ctx
+        .db
+        .mrp_bom_line()
+        .mrp_bom_line_by_bom()
+        .filter(&bom_id)
+        .collect();
+
+    for line in component_lines {
+        let line_qty = line.product_qty * qty_factor;
+
+        ctx.db.bom_explosion_result().insert(BomExplosionResult {
+            id: 0,
+            company_id,
+            root_bom_id,
+            parent_bom_id: bom_id,
+            bom_id,
+            line_id: Some(line.id),
+            product_id: line.product_id,
+            level: level + 1,
+            qty: line_qty,
+            created_at: ctx.timestamp,
+            metadata: None,
+        });
+
+        if let Some(child_bom_id) = line.child_bom_id {
+            explode_bom_recursive(
+                ctx,
+                company_id,
+                root_bom_id,
+                bom_id,
+                child_bom_id,
+                level + 1,
+                line_qty,
+                visited,
+            )?;
+        }
+    }
+
+    visited.pop();
+    Ok(())
+}
+
+/// Compute and cache estimated BOM cost using component standard costs.
+#[reducer]
+pub fn compute_bom_cost(ctx: &ReducerContext, company_id: u64, bom_id: u64) -> Result<(), String> {
+    check_permission(ctx, company_id, "mrp_bom", "write")?;
+
+    let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
+    if bom.company_id != company_id {
+        return Err("BOM does not belong to this company".to_string());
+    }
+
+    let lines: Vec<MrpBomLine> = ctx
+        .db
+        .mrp_bom_line()
+        .mrp_bom_line_by_bom()
+        .filter(&bom_id)
+        .collect();
+
+    let mut estimated_cost = 0.0;
+    for line in lines {
+        let product = ctx
+            .db
+            .product()
+            .id()
+            .find(&line.product_id)
+            .ok_or("Component product not found")?;
+        estimated_cost += line.product_qty * product.standard_price;
+    }
+
+    ctx.db.mrp_bom().id().update(MrpBom {
+        estimated_cost,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..bom
+    });
+
+    write_audit_log(
+        ctx,
+        company_id,
+        None,
+        "mrp_bom",
+        bom_id,
+        "write",
+        None,
+        None,
+        vec!["estimated_cost".to_string()],
+    );
+
+    Ok(())
+}
+
+/// Rebuild cached BOM explosion rows for a root BOM.
+#[reducer]
+pub fn explode_bom(ctx: &ReducerContext, company_id: u64, bom_id: u64) -> Result<(), String> {
+    check_permission(ctx, company_id, "mrp_bom", "read")?;
+
+    let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
+    if bom.company_id != company_id {
+        return Err("BOM does not belong to this company".to_string());
+    }
+
+    clear_bom_explosion_cache(ctx, bom_id);
+
+    let mut visited = Vec::new();
+    explode_bom_recursive(
+        ctx,
+        company_id,
+        bom_id,
+        bom_id,
+        bom_id,
+        0,
+        1.0,
+        &mut visited,
+    )?;
+
+    write_audit_log(
+        ctx,
+        company_id,
+        None,
+        "bom_explosion_result",
+        bom_id,
+        "create",
+        None,
+        None,
+        vec!["exploded".to_string()],
+    );
+
     Ok(())
 }

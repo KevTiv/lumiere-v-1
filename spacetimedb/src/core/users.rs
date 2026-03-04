@@ -7,7 +7,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::organization::organization;
-use crate::core::permissions::role;
+use crate::core::permissions::{role, Role};
 use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -183,8 +183,117 @@ pub fn add_user_to_organization(
     Ok(())
 }
 
+/// Add a user to an organization by role name (owner/admin/manager/user/viewer, etc.).
+/// This is onboarding-friendly for clients that don't have role IDs yet.
 #[spacetimedb::reducer]
-pub fn update_user_organization_details(
+pub fn add_org_member(
+    ctx: &ReducerContext,
+    user_identity: Identity,
+    organization_id: u64,
+    role_name: String,
+    company_id: Option<u64>,
+    job_title: Option<String>,
+    department_id: Option<u64>,
+    employee_id: Option<String>,
+    metadata: Option<String>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "user_organization", "create")?;
+
+    ctx.db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization not found")?;
+
+    let normalized_role = role_name.trim().to_lowercase();
+    if normalized_role.is_empty() {
+        return Err("Role name cannot be empty".to_string());
+    }
+
+    let selected_role: Role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| {
+            r.organization_id == organization_id
+                && r.is_active
+                && r.name.trim().to_lowercase() == normalized_role
+        })
+        .ok_or("Role not found in organization")?;
+
+    let already_member = ctx.db.user_organization().iter().any(|uo| {
+        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
+    });
+
+    if already_member {
+        return Err("User is already an active member of this organization".to_string());
+    }
+
+    ctx.db.user_organization().insert(UserOrganization {
+        id: 0,
+        user_identity,
+        organization_id,
+        company_id,
+        role_id: selected_role.id,
+        department_id,
+        job_title,
+        employee_id,
+        date_joined: ctx.timestamp,
+        is_active: true,
+        is_default: false,
+        metadata,
+    });
+
+    Ok(())
+}
+
+/// Update an existing org membership's role using role name.
+#[spacetimedb::reducer]
+pub fn update_org_member_role(
+    ctx: &ReducerContext,
+    user_org_id: u64,
+    role_name: String,
+) -> Result<(), String> {
+    let membership = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&user_org_id)
+        .ok_or("User organization membership not found")?;
+
+    check_permission(
+        ctx,
+        membership.organization_id,
+        "user_organization",
+        "write",
+    )?;
+
+    let normalized_role = role_name.trim().to_lowercase();
+    if normalized_role.is_empty() {
+        return Err("Role name cannot be empty".to_string());
+    }
+
+    let selected_role: Role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| {
+            r.organization_id == membership.organization_id
+                && r.is_active
+                && r.name.trim().to_lowercase() == normalized_role
+        })
+        .ok_or("Role not found in organization")?;
+
+    ctx.db.user_organization().id().update(UserOrganization {
+        role_id: selected_role.id,
+        ..membership
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_org_member_details(
     ctx: &ReducerContext,
     user_org_id: u64,
     department_id: Option<u64>,

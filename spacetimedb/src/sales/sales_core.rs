@@ -12,6 +12,7 @@
 ///   - Audit logging for all mutations
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log};
 use crate::inventory::product::product;
@@ -307,9 +308,35 @@ pub struct SaleOrderOption {
 // REDUCERS: SALES ORDER MANAGEMENT
 // ══════════════════════════════════════════════════════════════════════════════
 
+fn resolve_organization_id_from_company(
+    ctx: &ReducerContext,
+    company_id: u64,
+) -> Result<u64, String> {
+    let comp = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    if comp.deleted_at.is_some() {
+        return Err("Company is archived".to_string());
+    }
+
+    Ok(comp.organization_id)
+}
+
+fn validate_order_org_scope(order: &SaleOrder, organization_id: u64) -> Result<(), String> {
+    if order.organization_id != organization_id {
+        return Err("Sale order does not belong to this organization".to_string());
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn create_sale_order(ctx: &ReducerContext, input: SaleOrderInput) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "sale_order", "create")?;
+    let organization_id = resolve_organization_id_from_company(ctx, input.company_id)?;
+    check_permission(ctx, organization_id, "sale_order", "create")?;
 
     // Validate partner exists and is a customer
     let partner = ctx
@@ -331,7 +358,7 @@ pub fn create_sale_order(ctx: &ReducerContext, input: SaleOrderInput) -> Result<
     // Insert order
     let order = ctx.db.sale_order().insert(SaleOrder {
         id: 0,
-        organization_id: input.company_id, // Using company_id as organization_id for now
+        organization_id,
         company_id: input.company_id,
         origin: input.origin,
         client_order_ref: input.client_order_ref,
@@ -469,7 +496,7 @@ pub fn create_sale_order(ctx: &ReducerContext, input: SaleOrderInput) -> Result<
 
     write_audit_log(
         ctx,
-        input.company_id,
+        organization_id,
         Some(input.company_id),
         "sale_order",
         order.id,
@@ -489,7 +516,7 @@ pub fn create_sale_order(ctx: &ReducerContext, input: SaleOrderInput) -> Result<
 }
 
 #[spacetimedb::reducer]
-pub fn confirm_sale_order(ctx: &ReducerContext, order_id: u64) -> Result<(), String> {
+pub fn confirm_sales_order(ctx: &ReducerContext, order_id: u64) -> Result<(), String> {
     let order = ctx
         .db
         .sale_order()
@@ -497,7 +524,9 @@ pub fn confirm_sale_order(ctx: &ReducerContext, order_id: u64) -> Result<(), Str
         .find(&order_id)
         .ok_or("Sale order not found")?;
 
-    check_permission(ctx, order.company_id, "sale_order", "confirm")?;
+    let organization_id = resolve_organization_id_from_company(ctx, order.company_id)?;
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "confirm")?;
 
     if order.state != SaleState::Draft && order.state != SaleState::Sent {
         return Err("Order must be in Draft or Sent state to confirm".to_string());
@@ -521,7 +550,7 @@ pub fn confirm_sale_order(ctx: &ReducerContext, order_id: u64) -> Result<(), Str
 
     write_audit_log(
         ctx,
-        order.company_id,
+        organization_id,
         Some(order.company_id),
         "sale_order",
         order_id,
@@ -547,7 +576,9 @@ pub fn cancel_sale_order(
         .find(&order_id)
         .ok_or("Sale order not found")?;
 
-    check_permission(ctx, order.company_id, "sale_order", "cancel")?;
+    let organization_id = resolve_organization_id_from_company(ctx, order.company_id)?;
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "cancel")?;
 
     if order.state == SaleState::Done {
         return Err("Cannot cancel a done order".to_string());
@@ -563,7 +594,7 @@ pub fn cancel_sale_order(
 
     write_audit_log(
         ctx,
-        order.company_id,
+        organization_id,
         Some(order.company_id),
         "sale_order",
         order_id,
@@ -577,7 +608,7 @@ pub fn cancel_sale_order(
 }
 
 #[spacetimedb::reducer]
-pub fn update_sale_order_totals(ctx: &ReducerContext, order_id: u64) -> Result<(), String> {
+pub fn compute_so_totals(ctx: &ReducerContext, order_id: u64) -> Result<(), String> {
     let order = ctx
         .db
         .sale_order()
@@ -585,7 +616,9 @@ pub fn update_sale_order_totals(ctx: &ReducerContext, order_id: u64) -> Result<(
         .find(&order_id)
         .ok_or("Sale order not found")?;
 
-    check_permission(ctx, order.company_id, "sale_order", "write")?;
+    let organization_id = resolve_organization_id_from_company(ctx, order.company_id)?;
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "write")?;
 
     // Recalculate totals from order lines
     let mut amount_untaxed: f64 = 0.0;

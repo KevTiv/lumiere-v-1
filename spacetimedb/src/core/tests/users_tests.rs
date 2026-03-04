@@ -4,9 +4,11 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{create_organization, organization};
+use crate::core::permissions::{assign_role, role, user_role_assignment};
 use crate::core::users::{
-    create_user_session, end_user_session, update_user_profile, user_organization, user_profile,
-    user_session,
+    add_org_member, add_user_to_organization, create_user_session, end_user_session,
+    remove_user_from_organization, update_org_member_details, update_org_member_role,
+    update_user_profile, user_organization, user_profile, user_session,
 };
 
 /// Test user profile and organization membership lifecycle
@@ -629,5 +631,300 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("✓ Profile default values correct");
 
     log::info!("✅ All user profile edge case tests passed!");
+    Ok(())
+}
+
+/// Test onboarding + RBAC membership flows:
+/// - bootstrap owner membership from organization creation
+/// - add member by role_id
+/// - add member by role name
+/// - update membership role/details
+/// - assign role record
+/// - remove membership (soft deactivate)
+#[spacetimedb::reducer]
+pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("TEST: Setting up onboarding + RBAC membership flow...");
+
+    // 1) Create org (bootstraps owner role + owner membership for caller)
+    create_organization(
+        ctx,
+        "Onboarding RBAC Org".to_string(),
+        "ONBRBAC".to_string(),
+        "UTC".to_string(),
+        "YYYY-MM-DD".to_string(),
+        "en".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )?;
+
+    let org = ctx
+        .db
+        .organization()
+        .iter()
+        .find(|o| o.code == "ONBRBAC")
+        .ok_or("Organization not found")?;
+
+    let owner_role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| r.organization_id == org.id && r.name == "owner")
+        .ok_or("Owner role not created during bootstrap")?;
+
+    let caller_membership = ctx
+        .db
+        .user_organization()
+        .iter()
+        .find(|m| m.organization_id == org.id && m.user_identity == ctx.sender() && m.is_active)
+        .ok_or("Caller owner membership not created during bootstrap")?;
+
+    if caller_membership.role_id != owner_role.id {
+        return Err("Bootstrap membership should use owner role".to_string());
+    }
+    if !caller_membership.is_default {
+        return Err("Bootstrap membership should be default membership".to_string());
+    }
+
+    log::info!("✓ Bootstrap owner role and owner membership created");
+
+    // 2) Create extra roles
+    crate::core::permissions::create_role(
+        ctx,
+        org.id,
+        "manager".to_string(),
+        Some("Manager role".to_string()),
+        None,
+        vec![
+            "user_organization:write".to_string(),
+            "user_organization:create".to_string(),
+            "user_organization:delete".to_string(),
+            "user_role_assignment:create".to_string(),
+        ],
+        None,
+    )?;
+    crate::core::permissions::create_role(
+        ctx,
+        org.id,
+        "viewer".to_string(),
+        Some("Viewer role".to_string()),
+        None,
+        vec!["organization:read".to_string()],
+        None,
+    )?;
+
+    let manager_role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| r.organization_id == org.id && r.name == "manager")
+        .ok_or("Manager role not found")?;
+    let viewer_role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| r.organization_id == org.id && r.name == "viewer")
+        .ok_or("Viewer role not found")?;
+
+    log::info!("✓ Organization roles created");
+
+    // We'll use synthetic identities for target users
+    let member_a = spacetimedb::Identity::__dummy();
+    let member_b = spacetimedb::Identity::__dummy();
+
+    // 3) Add member by explicit role_id
+    add_user_to_organization(
+        ctx,
+        member_a,
+        org.id,
+        viewer_role.id,
+        None,
+        Some("Analyst".to_string()),
+        None,
+        Some("EMP-001".to_string()),
+        Some("{\"source\":\"test\"}".to_string()),
+    )?;
+
+    let membership_a = ctx
+        .db
+        .user_organization()
+        .iter()
+        .find(|m| m.organization_id == org.id && m.user_identity == member_a && m.is_active)
+        .ok_or("member_a membership not found")?;
+
+    if membership_a.role_id != viewer_role.id {
+        return Err("member_a role should be viewer".to_string());
+    }
+
+    log::info!("✓ add_user_to_organization works");
+
+    // 4) Duplicate active membership should fail
+    match add_user_to_organization(
+        ctx,
+        member_a,
+        org.id,
+        viewer_role.id,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ) {
+        Ok(_) => return Err("Duplicate active membership should fail".to_string()),
+        Err(_) => log::info!("✓ Duplicate active membership correctly rejected"),
+    }
+
+    // 5) Add member by role name
+    add_org_member(
+        ctx,
+        member_b,
+        org.id,
+        "viewer".to_string(),
+        None,
+        Some("Intern".to_string()),
+        None,
+        None,
+        None,
+    )?;
+
+    let membership_b = ctx
+        .db
+        .user_organization()
+        .iter()
+        .find(|m| m.organization_id == org.id && m.user_identity == member_b && m.is_active)
+        .ok_or("member_b membership not found")?;
+
+    if membership_b.role_id != viewer_role.id {
+        return Err("member_b role should resolve from role name = viewer".to_string());
+    }
+
+    log::info!("✓ add_org_member works");
+
+    // 6) Update member role by role name
+    update_org_member_role(ctx, membership_b.id, "manager".to_string())?;
+
+    let membership_b_after_role = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&membership_b.id)
+        .ok_or("member_b membership missing after role update")?;
+
+    if membership_b_after_role.role_id != manager_role.id {
+        return Err("member_b role should be updated to manager".to_string());
+    }
+
+    log::info!("✓ update_org_member_role works");
+
+    // 7) Update member details
+    update_org_member_details(
+        ctx,
+        membership_b.id,
+        Some(42),
+        Some("Operations".to_string()),
+        Some("EMP-042".to_string()),
+    )?;
+
+    let membership_b_after_details = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&membership_b.id)
+        .ok_or("member_b membership missing after details update")?;
+
+    if membership_b_after_details.department_id != Some(42) {
+        return Err("department_id not updated".to_string());
+    }
+    if membership_b_after_details.job_title != Some("Operations".to_string()) {
+        return Err("job_title not updated".to_string());
+    }
+    if membership_b_after_details.employee_id != Some("EMP-042".to_string()) {
+        return Err("employee_id not updated".to_string());
+    }
+
+    log::info!("✓ update_org_member_details works");
+
+    // 8) Create explicit role assignment
+    assign_role(
+        ctx,
+        member_b,
+        manager_role.id,
+        org.id,
+        None,
+        Some("{\"source\":\"test_assign\"}".to_string()),
+    )?;
+
+    let assignments_for_b: Vec<_> = ctx
+        .db
+        .user_role_assignment()
+        .iter()
+        .filter(|a| {
+            a.user_identity == member_b
+                && a.role_id == manager_role.id
+                && a.organization_id == org.id
+                && a.is_active
+        })
+        .collect();
+
+    if assignments_for_b.is_empty() {
+        return Err("Role assignment not created".to_string());
+    }
+
+    log::info!("✓ assign_role works");
+
+    // 9) Duplicate assignment should fail
+    match assign_role(ctx, member_b, manager_role.id, org.id, None, None) {
+        Ok(_) => return Err("Duplicate role assignment should fail".to_string()),
+        Err(_) => log::info!("✓ Duplicate role assignment correctly rejected"),
+    }
+
+    // 10) Remove membership (soft deactivate)
+    remove_user_from_organization(ctx, member_a, org.id)?;
+
+    let membership_a_after_remove = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&membership_a.id)
+        .ok_or("member_a membership missing after remove")?;
+
+    if membership_a_after_remove.is_active {
+        return Err("Membership should be inactive after remove".to_string());
+    }
+
+    log::info!("✓ remove_user_from_organization works");
+
+    // 11) Re-adding after soft-deactivate should succeed
+    add_user_to_organization(
+        ctx,
+        member_a,
+        org.id,
+        viewer_role.id,
+        None,
+        Some("Re-added Analyst".to_string()),
+        None,
+        Some("EMP-001-R".to_string()),
+        None,
+    )?;
+
+    let active_membership_a_count = ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|m| m.organization_id == org.id && m.user_identity == member_a && m.is_active)
+        .count();
+
+    if active_membership_a_count != 1 {
+        return Err(format!(
+            "Expected exactly one active membership for member_a after re-add, found {}",
+            active_membership_a_count
+        ));
+    }
+
+    log::info!("✅ Onboarding + RBAC membership flow tests passed");
     Ok(())
 }

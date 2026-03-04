@@ -203,6 +203,7 @@ pub enum PoState {
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum PoInvoiceStatus {
     No,
+    Partial,
     Invoiced,
 }
 
@@ -320,6 +321,24 @@ pub enum TaxAmountType {
     Fixed,
     Division,
     PythonCode,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TaxDeadlineType {
+    Filing,
+    Payment,
+    Registration,
+    Report,
+    Renewal,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TaxDeadlineStatus {
+    Upcoming,
+    DueSoon,
+    Overdue,
+    Completed,
+    Waived,
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -479,4 +498,53 @@ pub enum WorkorderState {
     Progress,
     Done,
     Cancel,
+}
+
+// Phase 11: Projects
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TaskState {
+    InProgress,
+    ChangesRequested,
+    Approved,
+    Cancelled,
+    Done,
+}
+
+// Phase 16: Analytics & Reporting
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum WidgetType {
+    Chart,
+    Table,
+    Kpi,
+    List,
+}
+
+// Phase 14: AI & Business Intelligence
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum InsightSeverity {
+    Info,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+// Phase 13: Workflow Engine
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum InstanceState {
+    Active,
+    Complete,
+    Exception,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum WorkitemState {
+    Active,
+    Complete,
+    Exception,
+    Dummy,
 }
