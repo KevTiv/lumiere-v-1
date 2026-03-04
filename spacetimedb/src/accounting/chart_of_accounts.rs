@@ -3,9 +3,9 @@
 /// # 7.1 Chart of Accounts
 ///
 /// Tables for managing the chart of accounts, account types, groups, and journals.
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -143,49 +143,179 @@ pub struct AccountJournal {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAccountAccountTypeParams {
+    pub name: String,
+    pub type_: String,
+    pub internal_group: AccountInternalGroup,
+    pub include_initial_balance: bool,
+    pub company_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAccountAccountTypeParams {
+    pub name: Option<String>,
+    pub type_: Option<String>,
+    pub internal_group: Option<AccountInternalGroup>,
+    pub include_initial_balance: Option<bool>,
+    pub is_deprecated: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAccountGroupParams {
+    pub name: String,
+    pub code_prefix_start: Option<String>,
+    pub code_prefix_end: Option<String>,
+    pub level: u32,
+    pub parent_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAccountGroupParams {
+    pub name: Option<String>,
+    pub code_prefix_start: Option<String>,
+    pub code_prefix_end: Option<String>,
+    pub level: Option<u32>,
+    pub parent_id: Option<Option<u64>>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAccountAccountParams {
+    pub code: String,
+    pub name: String,
+    pub user_type_id: u64,
+    pub currency_id: Option<u64>,
+    pub internal_type: Option<AccountTypeInternal>,
+    pub internal_group: Option<AccountInternalGroup>,
+    pub group_id: Option<u64>,
+    pub reconcile: bool,
+    pub tax_ids: Vec<u64>,
+    pub note: Option<String>,
+    pub opening_debit: f64,
+    pub opening_credit: f64,
+    pub allowed_journal_ids: Vec<u64>,
+    pub non_trade: bool,
+    pub is_off_balance: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAccountAccountParams {
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub deprecated: Option<bool>,
+    pub currency_id: Option<u64>,
+    pub internal_type: Option<AccountTypeInternal>,
+    pub internal_group: Option<AccountInternalGroup>,
+    pub group_id: Option<Option<u64>>,
+    pub reconcile: Option<bool>,
+    pub tax_ids: Option<Vec<u64>>,
+    pub note: Option<Option<String>>,
+    pub allowed_journal_ids: Option<Vec<u64>>,
+    pub non_trade: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAccountJournalParams {
+    pub name: String,
+    pub code: String,
+    pub type_: JournalType,
+    pub currency_id: Option<u64>,
+    pub default_account_id: Option<u64>,
+    pub suspense_account_id: Option<u64>,
+    pub loss_account_id: Option<u64>,
+    pub profit_account_id: Option<u64>,
+    pub bank_account_id: Option<u64>,
+    pub payment_credit_account_id: Option<u64>,
+    pub payment_debit_account_id: Option<u64>,
+    pub invoice_reference_type: Option<String>,
+    pub invoice_reference_model: Option<String>,
+    pub sequence_id: Option<u64>,
+    pub refund_sequence_id: Option<u64>,
+    pub sequence_override_regex: Option<String>,
+    pub secure_sequence_id: Option<u64>,
+    pub alias_name: Option<String>,
+    pub alias_domain: Option<String>,
+    pub sale_activity_type_id: Option<u64>,
+    pub sale_activity_user_id: Option<u64>,
+    pub sale_activity_note: Option<String>,
+    pub sale_activity_date_deadline: Option<Timestamp>,
+    pub restrict_mode_hash_table: bool,
+    pub active: bool,
+    pub at_least_one_inbound: bool,
+    pub at_least_one_outbound: bool,
+    pub dedicated_payment_method_ids: Vec<u64>,
+    pub sale_activity_done: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAccountJournalParams {
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub active: Option<bool>,
+    pub currency_id: Option<u64>,
+    pub default_account_id: Option<Option<u64>>,
+    pub suspense_account_id: Option<Option<u64>>,
+    pub loss_account_id: Option<Option<u64>>,
+    pub profit_account_id: Option<Option<u64>>,
+    pub bank_account_id: Option<Option<u64>>,
+    pub payment_credit_account_id: Option<Option<u64>>,
+    pub payment_debit_account_id: Option<Option<u64>>,
+    pub alias_name: Option<Option<String>>,
+    pub alias_domain: Option<Option<String>>,
+    pub restrict_mode_hash_table: Option<bool>,
+    pub metadata: Option<String>,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
 pub fn create_account_account_type(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    type_: String,
-    internal_group: AccountInternalGroup,
-    include_initial_balance: bool,
     company_id: Option<u64>,
-    metadata: Option<String>,
+    params: CreateAccountAccountTypeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "create")?;
 
-    let name_clone = name.clone();
-    let type_clone = type_.clone();
-
     let account_type = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
-        name,
-        type_,
-        internal_group,
-        include_initial_balance,
+        name: params.name.clone(),
+        type_: params.type_.clone(),
+        internal_group: params.internal_group,
+        include_initial_balance: params.include_initial_balance,
         is_deprecated: false,
         company_id,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        company_id,
-        "account_account_type",
-        account_type.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "name": name_clone, "type_": type_clone }).to_string()),
-        vec![],
+        AuditLogParams {
+            company_id,
+            table_name: "account_account_type",
+            record_id: account_type.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "type_": params.type_ }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "type_".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -197,12 +327,7 @@ pub fn update_account_account_type(
     organization_id: u64,
     company_id: Option<u64>,
     type_id: u64,
-    name: Option<String>,
-    type_: Option<String>,
-    internal_group: Option<AccountInternalGroup>,
-    include_initial_balance: Option<bool>,
-    is_deprecated: Option<bool>,
-    metadata: Option<String>,
+    params: UpdateAccountAccountTypeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "write")?;
 
@@ -213,10 +338,9 @@ pub fn update_account_account_type(
         .find(&type_id)
         .ok_or("Account type not found")?;
 
-    // Validate company access if account type is company-specific
     if let Some(cid) = account_type.company_id {
         if Some(cid) != company_id {
-            return Err("Cannot modify account type from another company".to_string());
+            return Err("Account type does not belong to this company".to_string());
         }
     }
 
@@ -224,28 +348,32 @@ pub fn update_account_account_type(
         .account_account_type()
         .id()
         .update(AccountAccountType {
-            name: name.unwrap_or(account_type.name),
-            type_: type_.unwrap_or(account_type.type_),
-            internal_group: internal_group.unwrap_or(account_type.internal_group),
-            include_initial_balance: include_initial_balance
+            name: params.name.unwrap_or(account_type.name),
+            type_: params.type_.unwrap_or(account_type.type_),
+            internal_group: params.internal_group.unwrap_or(account_type.internal_group),
+            include_initial_balance: params
+                .include_initial_balance
                 .unwrap_or(account_type.include_initial_balance),
-            is_deprecated: is_deprecated.unwrap_or(account_type.is_deprecated),
+            is_deprecated: params.is_deprecated.unwrap_or(account_type.is_deprecated),
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
-            metadata: metadata.or(account_type.metadata),
+            metadata: params.metadata.or(account_type.metadata),
             ..account_type
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        account_type.company_id,
-        "account_account_type",
-        type_id,
-        "UPDATE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: account_type.company_id,
+            table_name: "account_account_type",
+            record_id: type_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -255,18 +383,12 @@ pub fn update_account_account_type(
 pub fn create_account_group(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    code_prefix_start: Option<String>,
-    code_prefix_end: Option<String>,
-    level: u32,
-    parent_id: Option<u64>,
     company_id: u64,
-    metadata: Option<String>,
+    params: CreateAccountGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "create")?;
 
-    // Validate parent exists if provided
-    if let Some(pid) = parent_id {
+    if let Some(pid) = params.parent_id {
         ctx.db
             .account_group()
             .id()
@@ -274,33 +396,36 @@ pub fn create_account_group(
             .ok_or("Parent group not found")?;
     }
 
-    let name_clone = name.clone();
-
     let group = ctx.db.account_group().insert(AccountGroup {
         id: 0,
-        name,
-        code_prefix_start,
-        code_prefix_end,
-        level,
-        parent_id,
+        name: params.name.clone(),
+        code_prefix_start: params.code_prefix_start,
+        code_prefix_end: params.code_prefix_end,
+        level: params.level,
+        parent_id: params.parent_id,
         company_id,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(group.company_id),
-        "account_group",
-        group.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "name": name_clone, "level": level }).to_string()),
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_group",
+            record_id: group.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "level": params.level }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "level".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -310,13 +435,9 @@ pub fn create_account_group(
 pub fn update_account_group(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     group_id: u64,
-    name: Option<String>,
-    code_prefix_start: Option<String>,
-    code_prefix_end: Option<String>,
-    level: Option<u32>,
-    parent_id: Option<Option<u64>>,
-    metadata: Option<String>,
+    params: UpdateAccountGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "write")?;
 
@@ -327,7 +448,11 @@ pub fn update_account_group(
         .find(&group_id)
         .ok_or("Account group not found")?;
 
-    if let Some(pid) = parent_id.flatten() {
+    if group.company_id != company_id {
+        return Err("Account group does not belong to this company".to_string());
+    }
+
+    if let Some(pid) = params.parent_id.flatten() {
         ctx.db
             .account_group()
             .id()
@@ -336,27 +461,30 @@ pub fn update_account_group(
     }
 
     ctx.db.account_group().id().update(AccountGroup {
-        name: name.unwrap_or(group.name),
-        code_prefix_start: code_prefix_start.or(group.code_prefix_start),
-        code_prefix_end: code_prefix_end.or(group.code_prefix_end),
-        level: level.unwrap_or(group.level),
-        parent_id: parent_id.unwrap_or(group.parent_id),
+        name: params.name.unwrap_or(group.name),
+        code_prefix_start: params.code_prefix_start.or(group.code_prefix_start),
+        code_prefix_end: params.code_prefix_end.or(group.code_prefix_end),
+        level: params.level.unwrap_or(group.level),
+        parent_id: params.parent_id.unwrap_or(group.parent_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: metadata.or(group.metadata),
+        metadata: params.metadata.or(group.metadata),
         ..group
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(group.company_id),
-        "account_group",
-        group_id,
-        "UPDATE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(group.company_id),
+            table_name: "account_group",
+            record_id: group_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -366,75 +494,67 @@ pub fn update_account_group(
 pub fn create_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    code: String,
-    name: String,
-    user_type_id: u64,
     company_id: u64,
-    currency_id: Option<u64>,
-    internal_type: Option<AccountTypeInternal>,
-    internal_group: Option<AccountInternalGroup>,
-    group_id: Option<u64>,
-    reconcile: bool,
-    tax_ids: Vec<u64>,
-    note: Option<String>,
-    opening_debit: f64,
-    opening_credit: f64,
-    metadata: Option<String>,
+    params: CreateAccountAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "create")?;
 
-    // Validate account type exists
     ctx.db
         .account_account_type()
         .id()
-        .find(&user_type_id)
+        .find(&params.user_type_id)
         .ok_or("Account type not found")?;
 
-    let opening_balance = opening_debit - opening_credit;
+    let opening_balance = params.opening_debit - params.opening_credit;
 
-    let is_bank_account = internal_type == Some(AccountTypeInternal::Liquidity);
+    let is_bank_account = params.internal_type == Some(AccountTypeInternal::Liquidity);
 
     let account = ctx.db.account_account().insert(AccountAccount {
         id: 0,
-        code: code.clone(),
-        name: name.clone(),
+        code: params.code.clone(),
+        name: params.name.clone(),
         deprecated: false,
         used: false,
-        user_type_id,
+        user_type_id: params.user_type_id,
         company_id,
-        currency_id,
-        internal_type,
-        internal_group,
-        is_off_balance: false,
+        currency_id: params.currency_id,
+        internal_type: params.internal_type,
+        internal_group: params.internal_group,
+        is_off_balance: params.is_off_balance,
         last_time_entries_checked: None,
-        group_id,
+        group_id: params.group_id,
         root_id: None,
-        allowed_journal_ids: Vec::new(),
-        non_trade: false,
+        allowed_journal_ids: params.allowed_journal_ids,
+        non_trade: params.non_trade,
         is_bank_account,
-        reconcile,
-        tax_ids,
-        note,
-        opening_debit,
-        opening_credit,
+        reconcile: params.reconcile,
+        tax_ids: params.tax_ids,
+        note: params.note,
+        opening_debit: params.opening_debit,
+        opening_credit: params.opening_credit,
         opening_balance,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "account_account",
-        account.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "code": code.clone(), "name": name.clone() }).to_string()),
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_account",
+            record_id: account.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "code": params.code, "name": params.name }).to_string(),
+            ),
+            changed_fields: vec!["code".to_string(), "name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -444,19 +564,9 @@ pub fn create_account_account(
 pub fn update_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     account_id: u64,
-    name: Option<String>,
-    deprecated: Option<bool>,
-    currency_id: Option<u64>,
-    internal_type: Option<AccountTypeInternal>,
-    internal_group: Option<AccountInternalGroup>,
-    group_id: Option<Option<u64>>,
-    reconcile: Option<bool>,
-    tax_ids: Option<Vec<u64>>,
-    note: Option<Option<String>>,
-    allowed_journal_ids: Option<Vec<u64>>,
-    non_trade: Option<bool>,
-    metadata: Option<String>,
+    params: UpdateAccountAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "write")?;
 
@@ -467,41 +577,51 @@ pub fn update_account_account(
         .find(&account_id)
         .ok_or("Account not found")?;
 
-    let is_bank_account = if let Some(ref it) = internal_type {
+    if account.company_id != company_id {
+        return Err("Account does not belong to this company".to_string());
+    }
+
+    let is_bank_account = if let Some(ref it) = params.internal_type {
         *it == AccountTypeInternal::Liquidity
     } else {
         account.is_bank_account
     };
 
     ctx.db.account_account().id().update(AccountAccount {
-        name: name.unwrap_or(account.name),
-        deprecated: deprecated.unwrap_or(account.deprecated),
-        currency_id: currency_id.or(account.currency_id),
-        internal_type: internal_type.or(account.internal_type),
-        internal_group: internal_group.or(account.internal_group),
-        group_id: group_id.unwrap_or(account.group_id),
-        reconcile: reconcile.unwrap_or(account.reconcile),
-        tax_ids: tax_ids.unwrap_or(account.tax_ids),
-        note: note.unwrap_or(account.note),
-        allowed_journal_ids: allowed_journal_ids.unwrap_or(account.allowed_journal_ids),
-        non_trade: non_trade.unwrap_or(account.non_trade),
+        name: params.name.unwrap_or(account.name),
+        code: params.code.unwrap_or(account.code),
+        deprecated: params.deprecated.unwrap_or(account.deprecated),
+        currency_id: params.currency_id.or(account.currency_id),
+        internal_type: params.internal_type.or(account.internal_type),
+        internal_group: params.internal_group.or(account.internal_group),
+        group_id: params.group_id.unwrap_or(account.group_id),
+        reconcile: params.reconcile.unwrap_or(account.reconcile),
+        tax_ids: params.tax_ids.unwrap_or(account.tax_ids),
+        note: params.note.unwrap_or(account.note),
+        allowed_journal_ids: params
+            .allowed_journal_ids
+            .unwrap_or(account.allowed_journal_ids),
+        non_trade: params.non_trade.unwrap_or(account.non_trade),
         is_bank_account,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: metadata.or(account.metadata),
+        metadata: params.metadata.or(account.metadata),
         ..account
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(account.company_id),
-        "account_account",
-        account_id,
-        "UPDATE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(account.company_id),
+            table_name: "account_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -511,42 +631,17 @@ pub fn update_account_account(
 pub fn create_account_journal(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    code: String,
-    type_: JournalType,
     company_id: u64,
-    currency_id: Option<u64>,
-    default_account_id: Option<u64>,
-    suspense_account_id: Option<u64>,
-    loss_account_id: Option<u64>,
-    profit_account_id: Option<u64>,
-    bank_account_id: Option<u64>,
-    payment_credit_account_id: Option<u64>,
-    payment_debit_account_id: Option<u64>,
-    invoice_reference_type: Option<String>,
-    invoice_reference_model: Option<String>,
-    sequence_id: Option<u64>,
-    refund_sequence_id: Option<u64>,
-    sequence_override_regex: Option<String>,
-    secure_sequence_id: Option<u64>,
-    alias_name: Option<String>,
-    alias_domain: Option<String>,
-    sale_activity_type_id: Option<u64>,
-    sale_activity_user_id: Option<u64>,
-    sale_activity_note: Option<String>,
-    sale_activity_date_deadline: Option<Timestamp>,
-    restrict_mode_hash_table: bool,
-    metadata: Option<String>,
+    params: CreateAccountJournalParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "create")?;
 
-    // Validate accounts if provided
     for maybe_id in [
-        default_account_id,
-        suspense_account_id,
-        loss_account_id,
-        profit_account_id,
-        bank_account_id,
+        params.default_account_id,
+        params.suspense_account_id,
+        params.loss_account_id,
+        params.profit_account_id,
+        params.bank_account_id,
     ] {
         if let Some(id) = maybe_id {
             ctx.db
@@ -559,53 +654,58 @@ pub fn create_account_journal(
 
     let journal = ctx.db.account_journal().insert(AccountJournal {
         id: 0,
-        name: name.clone(),
-        code: code.clone(),
-        active: true,
-        type_,
+        name: params.name.clone(),
+        code: params.code.clone(),
+        active: params.active,
+        type_: params.type_,
         company_id,
-        currency_id,
-        default_account_id,
-        suspense_account_id,
-        loss_account_id,
-        profit_account_id,
-        bank_account_id,
-        invoice_reference_type,
-        invoice_reference_model,
-        payment_credit_account_id,
-        payment_debit_account_id,
-        sequence_id,
-        refund_sequence_id,
-        sequence_override_regex,
-        secure_sequence_id,
-        alias_name,
-        alias_domain,
-        at_least_one_inbound: false,
-        at_least_one_outbound: false,
-        dedicated_payment_method_ids: Vec::new(),
-        sale_activity_type_id,
-        sale_activity_user_id,
-        sale_activity_note,
-        sale_activity_date_deadline,
-        sale_activity_done: false,
-        restrict_mode_hash_table,
+        currency_id: params.currency_id,
+        default_account_id: params.default_account_id,
+        suspense_account_id: params.suspense_account_id,
+        loss_account_id: params.loss_account_id,
+        profit_account_id: params.profit_account_id,
+        bank_account_id: params.bank_account_id,
+        invoice_reference_type: params.invoice_reference_type,
+        invoice_reference_model: params.invoice_reference_model,
+        payment_credit_account_id: params.payment_credit_account_id,
+        payment_debit_account_id: params.payment_debit_account_id,
+        sequence_id: params.sequence_id,
+        refund_sequence_id: params.refund_sequence_id,
+        sequence_override_regex: params.sequence_override_regex,
+        secure_sequence_id: params.secure_sequence_id,
+        alias_name: params.alias_name,
+        alias_domain: params.alias_domain,
+        at_least_one_inbound: params.at_least_one_inbound,
+        at_least_one_outbound: params.at_least_one_outbound,
+        dedicated_payment_method_ids: params.dedicated_payment_method_ids,
+        sale_activity_type_id: params.sale_activity_type_id,
+        sale_activity_user_id: params.sale_activity_user_id,
+        sale_activity_note: params.sale_activity_note,
+        sale_activity_date_deadline: params.sale_activity_date_deadline,
+        sale_activity_done: params.sale_activity_done,
+        restrict_mode_hash_table: params.restrict_mode_hash_table,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "account_journal",
-        journal.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "name": name, "code": code }).to_string()),
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_journal",
+            record_id: journal.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "code": params.code }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "code".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -615,22 +715,9 @@ pub fn create_account_journal(
 pub fn update_account_journal(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     journal_id: u64,
-    name: Option<String>,
-    code: Option<String>,
-    active: Option<bool>,
-    currency_id: Option<u64>,
-    default_account_id: Option<Option<u64>>,
-    suspense_account_id: Option<Option<u64>>,
-    loss_account_id: Option<Option<u64>>,
-    profit_account_id: Option<Option<u64>>,
-    bank_account_id: Option<Option<u64>>,
-    payment_credit_account_id: Option<Option<u64>>,
-    payment_debit_account_id: Option<Option<u64>>,
-    alias_name: Option<Option<String>>,
-    alias_domain: Option<Option<String>>,
-    restrict_mode_hash_table: Option<bool>,
-    metadata: Option<String>,
+    params: UpdateAccountJournalParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "write")?;
 
@@ -641,13 +728,16 @@ pub fn update_account_journal(
         .find(&journal_id)
         .ok_or("Journal not found")?;
 
-    // Validate accounts if provided
+    if journal.company_id != company_id {
+        return Err("Journal does not belong to this company".to_string());
+    }
+
     for maybe_id in [
-        default_account_id.flatten(),
-        suspense_account_id.flatten(),
-        loss_account_id.flatten(),
-        profit_account_id.flatten(),
-        bank_account_id.flatten(),
+        params.default_account_id.flatten(),
+        params.suspense_account_id.flatten(),
+        params.loss_account_id.flatten(),
+        params.profit_account_id.flatten(),
+        params.bank_account_id.flatten(),
     ] {
         if let Some(id) = maybe_id {
             ctx.db
@@ -659,39 +749,51 @@ pub fn update_account_journal(
     }
 
     ctx.db.account_journal().id().update(AccountJournal {
-        name: name.unwrap_or(journal.name),
-        code: code.unwrap_or(journal.code),
-        active: active.unwrap_or(journal.active),
-        currency_id: currency_id.or(journal.currency_id),
-        default_account_id: default_account_id.unwrap_or(journal.default_account_id),
-        suspense_account_id: suspense_account_id.unwrap_or(journal.suspense_account_id),
-        loss_account_id: loss_account_id.unwrap_or(journal.loss_account_id),
-        profit_account_id: profit_account_id.unwrap_or(journal.profit_account_id),
-        bank_account_id: bank_account_id.unwrap_or(journal.bank_account_id),
-        payment_credit_account_id: payment_credit_account_id
+        name: params.name.unwrap_or(journal.name),
+        code: params.code.unwrap_or(journal.code),
+        active: params.active.unwrap_or(journal.active),
+        currency_id: params.currency_id.or(journal.currency_id),
+        default_account_id: params
+            .default_account_id
+            .unwrap_or(journal.default_account_id),
+        suspense_account_id: params
+            .suspense_account_id
+            .unwrap_or(journal.suspense_account_id),
+        loss_account_id: params.loss_account_id.unwrap_or(journal.loss_account_id),
+        profit_account_id: params
+            .profit_account_id
+            .unwrap_or(journal.profit_account_id),
+        bank_account_id: params.bank_account_id.unwrap_or(journal.bank_account_id),
+        payment_credit_account_id: params
+            .payment_credit_account_id
             .unwrap_or(journal.payment_credit_account_id),
-        payment_debit_account_id: payment_debit_account_id
+        payment_debit_account_id: params
+            .payment_debit_account_id
             .unwrap_or(journal.payment_debit_account_id),
-        alias_name: alias_name.unwrap_or(journal.alias_name),
-        alias_domain: alias_domain.unwrap_or(journal.alias_domain),
-        restrict_mode_hash_table: restrict_mode_hash_table
+        alias_name: params.alias_name.unwrap_or(journal.alias_name),
+        alias_domain: params.alias_domain.unwrap_or(journal.alias_domain),
+        restrict_mode_hash_table: params
+            .restrict_mode_hash_table
             .unwrap_or(journal.restrict_mode_hash_table),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: metadata.or(journal.metadata),
+        metadata: params.metadata.or(journal.metadata),
         ..journal
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(journal.company_id),
-        "account_journal",
-        journal_id,
-        "UPDATE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(journal.company_id),
+            table_name: "account_journal",
+            record_id: journal_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -701,6 +803,7 @@ pub fn update_account_journal(
 pub fn deprecate_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     account_id: u64,
     deprecated: bool,
 ) -> Result<(), String> {
@@ -713,6 +816,10 @@ pub fn deprecate_account_account(
         .find(&account_id)
         .ok_or("Account not found")?;
 
+    if account.company_id != company_id {
+        return Err("Account does not belong to this company".to_string());
+    }
+
     ctx.db.account_account().id().update(AccountAccount {
         deprecated,
         write_uid: Some(ctx.sender()),
@@ -720,20 +827,23 @@ pub fn deprecate_account_account(
         ..account
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(account.company_id),
-        "account_account",
-        account_id,
-        if deprecated {
-            "DEPRECATE"
-        } else {
-            "UNDEPRECATE"
+        AuditLogParams {
+            company_id: Some(account.company_id),
+            table_name: "account_account",
+            record_id: account_id,
+            action: if deprecated {
+                "SET_ACTIVE"
+            } else {
+                "SET_ACTIVE"
+            },
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["deprecated".to_string()],
+            metadata: None,
         },
-        None,
-        None,
-        vec![],
     );
 
     Ok(())

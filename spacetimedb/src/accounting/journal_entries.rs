@@ -3,11 +3,11 @@
 /// # 7.2 Journal Entries
 ///
 /// Tables for accounting journal entries and move lines.
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::core::organization::company;
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
 use crate::types::{AccountMoveState, MoveType, PaymentState};
@@ -24,6 +24,7 @@ use crate::types::{AccountMoveState, MoveType, PaymentState};
     index(accessor = move_by_date, btree(columns = [date])),
     index(accessor = move_by_name, btree(columns = [name]))
 )]
+#[derive(Clone)]
 pub struct AccountMove {
     #[primary_key]
     #[auto_inc]
@@ -89,6 +90,7 @@ pub struct AccountMove {
     index(accessor = move_line_by_partner, btree(columns = [partner_id])),
     index(accessor = move_line_by_date, btree(columns = [date]))
 )]
+#[derive(Clone)]
 pub struct AccountMoveLine {
     #[primary_key]
     #[auto_inc]
@@ -156,6 +158,99 @@ pub struct AccountMoveLine {
     pub create_date: Option<Timestamp>,
     pub write_uid: Option<Identity>,
     pub write_date: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+/// Parameters for creating a new journal entry (account move).
+/// All user-settable fields are required; system-managed fields
+/// (state, payment_state, amounts, posted_before) are initialized by the reducer.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAccountMoveParams {
+    pub journal_id: u64,
+    pub move_type: MoveType,
+    pub date: Timestamp,
+    /// Pre-set name; leave empty to auto-generate on post.
+    pub name: String,
+    pub ref_: Option<String>,
+    pub auto_post: bool,
+    pub to_check: bool,
+    pub is_storno: bool,
+    pub partner_id: Option<u64>,
+    pub partner_bank_id: Option<u64>,
+    pub fiscal_position_id: Option<u64>,
+    pub invoice_date: Option<Timestamp>,
+    pub invoice_date_due: Option<Timestamp>,
+    pub invoice_payment_term_id: Option<u64>,
+    pub payment_reference: Option<String>,
+    pub invoice_origin: Option<String>,
+    pub invoice_partner_display_name: Option<String>,
+    pub invoice_cash_rounding_id: Option<u64>,
+    pub partner_shipping_id: Option<u64>,
+    pub sale_order_id: Option<u64>,
+    pub invoice_incoterm_id: Option<u64>,
+    pub incoterm_location: Option<String>,
+    pub campaign_id: Option<u64>,
+    pub source_id: Option<u64>,
+    pub medium_id: Option<u64>,
+    pub secure_sequence_number: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+/// Parameters for adding a move line to a draft journal entry.
+/// System-derived fields (move_name, date, parent_state, journal_id, company_id,
+/// company_currency_id, currency_id_field, balance, amount_currency, amount_residual,
+/// debit_currency, credit_currency, price, price_subtotal, price_total,
+/// tax_base_amount, account_internal_type/group/root, commercial_partner_id,
+/// is_matching, cogs_amount) are computed by the reducer.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddAccountMoveLineParams {
+    pub account_id: u64,
+    pub name: String,
+    pub debit: f64,
+    pub credit: f64,
+    pub sequence: u32,
+    pub quantity: f64,
+    pub price_unit: f64,
+    pub discount: f64,
+    pub tax_ids: Vec<u64>,
+    pub partner_id: Option<u64>,
+    pub product_id: Option<u64>,
+    pub product_uom_id: Option<u64>,
+    pub product_category_id: Option<u64>,
+    pub analytic_account_id: Option<u64>,
+    pub analytic_tag_ids: Vec<u64>,
+    pub display_type: Option<String>,
+    pub is_downpayment: bool,
+    pub exclude_from_invoice_tab: bool,
+    pub blocked: bool,
+    pub group_tax_id: Option<u64>,
+    pub tax_line_id: Option<u64>,
+    pub tax_group_id: Option<u64>,
+    pub tax_repartition_line_id: Option<u64>,
+    pub tax_audit: Option<String>,
+    pub reconcile_model_id: Option<u64>,
+    pub payment_id: Option<u64>,
+    pub statement_line_id: Option<u64>,
+    pub matching_number: Option<String>,
+    pub matching_label: Option<String>,
+    pub expected_pay_date: Option<Timestamp>,
+    pub expected_pay_date_currency_id: Option<u64>,
+    pub expected_pay_date_amount: f64,
+    pub expected_pay_date_residual: f64,
+    pub metadata: Option<String>,
+}
+
+/// Parameters for updating an existing draft move line.
+/// `None` means "no change"; `Some(None)` clears a nullable field.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAccountMoveLineParams {
+    pub name: Option<String>,
+    pub debit: Option<f64>,
+    pub credit: Option<f64>,
+    pub partner_id: Option<Option<u64>>,
+    pub analytic_account_id: Option<Option<u64>>,
     pub metadata: Option<String>,
 }
 
@@ -550,6 +645,8 @@ fn post_cogs_entries(
     Ok(())
 }
 
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
 #[spacetimedb::reducer]
 pub fn compute_invoice_totals(
     ctx: &ReducerContext,
@@ -574,20 +671,23 @@ pub fn compute_invoice_totals(
 
     compute_invoice_totals_internal(ctx, move_id)?;
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move",
-        move_id,
-        "COMPUTE_TOTALS",
-        None,
-        None,
-        vec![
-            "amount_untaxed".to_string(),
-            "amount_tax".to_string(),
-            "amount_total".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "COMPUTE_TOTALS",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "amount_untaxed".to_string(),
+                "amount_tax".to_string(),
+                "amount_total".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -675,51 +775,30 @@ pub fn post_invoice(
         ..refreshed
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move",
-        move_id,
-        "POST_INVOICE",
-        Some(serde_json::json!({ "state": "Draft" }).to_string()),
-        Some(serde_json::json!({ "state": "Posted" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "POST_INVOICE",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Posted" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
-
-// ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
 pub fn create_account_move(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    journal_id: u64,
-    move_type: MoveType,
-    date: Timestamp,
-    ref_: Option<String>,
-    partner_id: Option<u64>,
-    partner_bank_id: Option<u64>,
-    fiscal_position_id: Option<u64>,
-    invoice_date: Option<Timestamp>,
-    invoice_date_due: Option<Timestamp>,
-    invoice_payment_term_id: Option<u64>,
-    payment_reference: Option<String>,
-    invoice_origin: Option<String>,
-    invoice_partner_display_name: Option<String>,
-    invoice_cash_rounding_id: Option<u64>,
-    partner_shipping_id: Option<u64>,
-    sale_order_id: Option<u64>,
-    invoice_incoterm_id: Option<u64>,
-    incoterm_location: Option<String>,
-    campaign_id: Option<u64>,
-    source_id: Option<u64>,
-    medium_id: Option<u64>,
-    secure_sequence_number: Option<u64>,
-    metadata: Option<String>,
+    params: CreateAccountMoveParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
 
@@ -728,7 +807,7 @@ pub fn create_account_move(
         .db
         .account_journal()
         .id()
-        .find(&journal_id)
+        .find(&params.journal_id)
         .ok_or("Journal not found")?;
 
     if journal.company_id != company_id {
@@ -743,41 +822,44 @@ pub fn create_account_move(
         .find(&company_id)
         .ok_or("Company not found")?;
 
-    // Clone values for audit log before insert
-    let move_type_str = format!("{:?}", move_type);
-    let date_str = date.to_string();
+    let move_type_str = format!("{:?}", params.move_type);
+    let date_str = params.date.to_string();
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
-        name: String::new(), // Will be generated on post
-        ref_,
-        move_type,
-        auto_post: false,
+        name: params.name.clone(),
+        ref_: params.ref_,
+        move_type: params.move_type,
+        auto_post: params.auto_post,
+        // System-managed: always starts as Draft
         state: AccountMoveState::Draft,
-        date,
-        invoice_date,
-        invoice_date_due,
-        invoice_payment_term_id,
-        invoice_origin,
-        invoice_partner_display_name,
-        invoice_cash_rounding_id,
-        payment_reference,
-        partner_shipping_id,
-        sale_order_id,
-        partner_id,
-        commercial_partner_id: partner_id,
-        partner_bank_id,
-        fiscal_position_id,
+        date: params.date,
+        invoice_date: params.invoice_date,
+        invoice_date_due: params.invoice_date_due,
+        invoice_payment_term_id: params.invoice_payment_term_id,
+        invoice_origin: params.invoice_origin,
+        invoice_partner_display_name: params.invoice_partner_display_name,
+        invoice_cash_rounding_id: params.invoice_cash_rounding_id,
+        payment_reference: params.payment_reference,
+        partner_shipping_id: params.partner_shipping_id,
+        sale_order_id: params.sale_order_id,
+        partner_id: params.partner_id,
+        // Derived: commercial partner mirrors billing partner on create
+        commercial_partner_id: params.partner_id,
+        partner_bank_id: params.partner_bank_id,
+        fiscal_position_id: params.fiscal_position_id,
         invoice_user_id: Some(ctx.sender()),
-        invoice_incoterm_id,
-        incoterm_location,
-        campaign_id,
-        source_id,
-        medium_id,
+        invoice_incoterm_id: params.invoice_incoterm_id,
+        incoterm_location: params.incoterm_location,
+        campaign_id: params.campaign_id,
+        source_id: params.source_id,
+        medium_id: params.medium_id,
         company_id,
-        journal_id,
+        journal_id: params.journal_id,
+        // Derived from journal/company lookup
         currency_id: journal.currency_id.unwrap_or(company.currency_id),
         company_currency_id: company.currency_id,
+        // System-managed: amounts start at 0, computed on post
         amount_untaxed: 0.0,
         amount_tax: 0.0,
         amount_total: 0.0,
@@ -787,31 +869,41 @@ pub fn create_account_move(
         amount_total_signed: 0.0,
         amount_total_in_currency_signed: 0.0,
         amount_residual_signed: 0.0,
-        to_check: false,
+        to_check: params.to_check,
+        // System-managed: set to true on first post
         posted_before: false,
-        is_storno: false,
+        is_storno: params.is_storno,
+        // System-managed: set when move is sent
         is_move_sent: false,
-        secure_sequence_number,
+        secure_sequence_number: params.secure_sequence_number,
+        // System-managed: set during reconciliation
         invoice_has_outstanding: false,
+        // System-managed: starts as not paid
         payment_state: PaymentState::NotPaid,
+        // Derived from journal configuration
         restrict_mode_hash_table: journal.restrict_mode_hash_table,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "account_move",
-        move_record.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "move_type": move_type_str, "date": date_str }).to_string()),
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_record.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "move_type": move_type_str, "date": date_str }).to_string(),
+            ),
+            changed_fields: vec!["move_type".to_string(), "date".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -822,19 +914,7 @@ pub fn add_account_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
     move_id: u64,
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    partner_id: Option<u64>,
-    product_id: Option<u64>,
-    quantity: Option<f64>,
-    price_unit: Option<f64>,
-    discount: Option<f64>,
-    tax_ids: Vec<u64>,
-    analytic_account_id: Option<u64>,
-    analytic_tag_ids: Vec<u64>,
-    metadata: Option<String>,
+    params: AddAccountMoveLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "create")?;
 
@@ -849,25 +929,21 @@ pub fn add_account_move_line(
         return Err("Cannot add lines to a posted move".to_string());
     }
 
-    // Validate account exists
+    // Validate account exists and derive account metadata
     let account = ctx
         .db
         .account_account()
         .id()
-        .find(&account_id)
+        .find(&params.account_id)
         .ok_or("Account not found")?;
 
-    let balance = debit - credit;
-
-    let qty = quantity.unwrap_or(1.0);
-    let unit_price = price_unit.unwrap_or(0.0);
-    let discount_pct = discount.unwrap_or(0.0);
-    let subtotal = qty * unit_price * (1.0 - discount_pct / 100.0);
-    let total = subtotal; // Tax would be added separately
+    let balance = params.debit - params.credit;
+    let subtotal = params.quantity * params.price_unit * (1.0 - params.discount / 100.0);
 
     let line = ctx.db.account_move_line().insert(AccountMoveLine {
         id: 0,
         move_id,
+        // Derived from parent move
         move_name: Some(move_record.name.clone()),
         date: move_record.date,
         ref_: move_record.ref_.clone(),
@@ -875,77 +951,96 @@ pub fn add_account_move_line(
         journal_id: move_record.journal_id,
         company_id: move_record.company_id,
         company_currency_id: move_record.company_currency_id,
-        sequence: 0,
-        name: name.clone(),
-        quantity: qty,
-        price_unit: unit_price,
+        sequence: params.sequence,
+        name: params.name.clone(),
+        quantity: params.quantity,
+        price_unit: params.price_unit,
+        // Derived: price computed from qty/unit_price/discount
         price: subtotal,
         price_subtotal: subtotal,
-        price_total: total,
-        discount: discount_pct,
+        price_total: subtotal, // Tax added separately
+        discount: params.discount,
+        // Derived: balance = debit - credit
         balance,
         currency_id: move_record.currency_id,
         amount_currency: balance,
         amount_residual: balance,
         amount_residual_currency: balance,
-        debit,
-        credit,
-        debit_currency: debit,
-        credit_currency: credit,
+        debit: params.debit,
+        credit: params.credit,
+        debit_currency: params.debit,
+        credit_currency: params.credit,
+        // System-managed: computed during tax application
         tax_base_amount: 0.0,
-        account_id,
+        account_id: params.account_id,
+        // Derived from account lookup
         account_internal_type: account.internal_type.as_ref().map(|t| format!("{:?}", t)),
         account_internal_group: account.internal_group.as_ref().map(|g| format!("{:?}", g)),
         account_root_id: account.root_id,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_ids,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        partner_id,
-        commercial_partner_id: partner_id,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
+        group_tax_id: params.group_tax_id,
+        tax_line_id: params.tax_line_id,
+        tax_group_id: params.tax_group_id,
+        tax_ids: params.tax_ids,
+        tax_repartition_line_id: params.tax_repartition_line_id,
+        tax_audit: params.tax_audit,
+        partner_id: params.partner_id,
+        // Derived: commercial partner mirrors billing partner
+        commercial_partner_id: params.partner_id,
+        reconcile_model_id: params.reconcile_model_id,
+        payment_id: params.payment_id,
+        statement_line_id: params.statement_line_id,
+        // Derived from parent move currency
         currency_id_field: Some(move_record.currency_id),
-        blocked: false,
-        matching_number: None,
-        matching_label: None,
+        blocked: params.blocked,
+        matching_number: params.matching_number,
+        matching_label: params.matching_label,
+        // System-managed: set by matching process
         is_matching: false,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        analytic_account_id,
-        analytic_tag_ids,
-        product_id,
-        product_uom_id: None,
-        product_category_id: None,
+        expected_pay_date: params.expected_pay_date,
+        expected_pay_date_currency_id: params.expected_pay_date_currency_id,
+        expected_pay_date_amount: params.expected_pay_date_amount,
+        expected_pay_date_residual: params.expected_pay_date_residual,
+        display_type: params.display_type,
+        is_downpayment: params.is_downpayment,
+        exclude_from_invoice_tab: params.exclude_from_invoice_tab,
+        analytic_account_id: params.analytic_account_id,
+        analytic_tag_ids: params.analytic_tag_ids,
+        product_id: params.product_id,
+        product_uom_id: params.product_uom_id,
+        product_category_id: params.product_category_id,
+        // System-managed: computed during COGS posting
         cogs_amount: 0.0,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move_line",
-        line.id,
-        "CREATE",
-        None,
-        Some(format!(
-            "{{ \"name\": \"{}\", \"debit\": {}, \"credit\": {} }}",
-            name, debit, credit
-        )),
-        vec![],
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_move_line",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": params.name,
+                    "debit": params.debit,
+                    "credit": params.credit,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "debit".to_string(),
+                "credit".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -985,7 +1080,6 @@ pub fn post_account_move(
         return Err("Move is not balanced".to_string());
     }
 
-    // Check that there are lines
     if lines.is_empty() {
         return Err("Cannot post a move without lines".to_string());
     }
@@ -1016,16 +1110,19 @@ pub fn post_account_move(
         ..move_record
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move",
-        move_id,
-        "POST",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "POST",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Posted" }).to_string()),
+            changed_fields: vec!["state".to_string(), "posted_before".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -1051,6 +1148,8 @@ pub fn cancel_account_move(
         return Err("Only draft or posted moves can be cancelled".to_string());
     }
 
+    let old_state = format!("{:?}", move_record.state);
+
     // Update all lines
     let lines: Vec<_> = ctx
         .db
@@ -1073,16 +1172,19 @@ pub fn cancel_account_move(
         ..move_record
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move",
-        move_id,
-        "CANCEL",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "CANCEL",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Cancelled" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -1092,13 +1194,9 @@ pub fn cancel_account_move(
 pub fn update_account_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     line_id: u64,
-    name: Option<String>,
-    debit: Option<f64>,
-    credit: Option<f64>,
-    partner_id: Option<Option<u64>>,
-    analytic_account_id: Option<Option<u64>>,
-    metadata: Option<String>,
+    params: UpdateAccountMoveLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "write")?;
 
@@ -1117,16 +1215,46 @@ pub fn update_account_move_line(
         .find(&line.move_id)
         .ok_or("Parent move not found")?;
 
+    if move_record.company_id != company_id {
+        return Err("Move does not belong to this company".to_string());
+    }
+
     if move_record.state != AccountMoveState::Draft {
         return Err("Cannot edit lines of a posted move".to_string());
     }
 
-    let new_debit = debit.unwrap_or(line.debit);
-    let new_credit = credit.unwrap_or(line.credit);
+    let new_debit = params.debit.unwrap_or(line.debit);
+    let new_credit = params.credit.unwrap_or(line.credit);
     let new_balance = new_debit - new_credit;
 
+    let old_values = serde_json::json!({
+        "name": line.name,
+        "debit": line.debit,
+        "credit": line.credit,
+    });
+
+    let mut changed_fields = Vec::new();
+    if params.name.is_some() {
+        changed_fields.push("name".to_string());
+    }
+    if params.debit.is_some() {
+        changed_fields.push("debit".to_string());
+    }
+    if params.credit.is_some() {
+        changed_fields.push("credit".to_string());
+    }
+    if params.partner_id.is_some() {
+        changed_fields.push("partner_id".to_string());
+    }
+    if params.analytic_account_id.is_some() {
+        changed_fields.push("analytic_account_id".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+
     ctx.db.account_move_line().id().update(AccountMoveLine {
-        name: name.unwrap_or(line.name),
+        name: params.name.unwrap_or(line.name),
         debit: new_debit,
         credit: new_credit,
         balance: new_balance,
@@ -1135,24 +1263,33 @@ pub fn update_account_move_line(
         amount_residual_currency: new_balance,
         debit_currency: new_debit,
         credit_currency: new_credit,
-        partner_id: partner_id.unwrap_or(line.partner_id),
-        analytic_account_id: analytic_account_id.unwrap_or(line.analytic_account_id),
+        partner_id: params.partner_id.unwrap_or(line.partner_id),
+        analytic_account_id: params.analytic_account_id.unwrap_or(line.analytic_account_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: metadata.or(line.metadata),
+        metadata: params.metadata.map(Some).unwrap_or(line.metadata),
         ..line
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move_line",
-        line_id,
-        "UPDATE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(old_values.to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "debit": new_debit,
+                    "credit": new_credit,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -1162,6 +1299,7 @@ pub fn update_account_move_line(
 pub fn delete_account_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     line_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "delete")?;
@@ -1181,22 +1319,36 @@ pub fn delete_account_move_line(
         .find(&line.move_id)
         .ok_or("Parent move not found")?;
 
+    if move_record.company_id != company_id {
+        return Err("Move does not belong to this company".to_string());
+    }
+
     if move_record.state != AccountMoveState::Draft {
         return Err("Cannot delete lines from a posted move".to_string());
     }
 
     ctx.db.account_move_line().id().delete(&line_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(move_record.company_id),
-        "account_move_line",
-        line_id,
-        "DELETE",
-        None,
-        None,
-        vec![],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move_line",
+            record_id: line_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": line.name,
+                    "debit": line.debit,
+                    "credit": line.credit,
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

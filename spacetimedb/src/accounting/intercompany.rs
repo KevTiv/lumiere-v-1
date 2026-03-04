@@ -9,9 +9,9 @@
 /// ## Tables
 /// - `IntercompanyTransaction` — Records of intercompany transactions
 /// - `IntercompanyRule` — Configuration rules for intercompany processing
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntercompanyState, RuleType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ pub struct IntercompanyTransaction {
     pub origin_company_id: u64,
     pub destination_company_id: u64,
     pub origin_document_id: u64,
-    pub origin_document_model: String, // "sale_order", "purchase_order", "account_move", etc.
+    pub origin_document_model: String,
     pub destination_document_id: Option<u64>,
     pub destination_document_model: Option<String>,
     pub amount: f64,
@@ -85,30 +85,82 @@ pub struct IntercompanyRule {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateIntercompanyRuleParams {
+    pub name: String,
+    pub rule_type: RuleType,
+    pub auto_validation: bool,
+    pub auto_generate_invoice: bool,
+    pub auto_generate_bill: bool,
+    pub is_active: bool,
+    pub journal_id: Option<u64>,
+    pub account_id: Option<u64>,
+    pub pricelist_id: Option<u64>,
+    pub sequence: u32,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateIntercompanyRuleParams {
+    pub name: Option<String>,
+    pub auto_validation: Option<bool>,
+    pub auto_generate_invoice: Option<bool>,
+    pub auto_generate_bill: Option<bool>,
+    pub journal_id: Option<Option<u64>>,
+    pub account_id: Option<Option<u64>>,
+    pub pricelist_id: Option<Option<u64>>,
+    pub sequence: Option<u32>,
+    pub is_active: Option<bool>,
+    pub notes: Option<Option<String>>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateIntercompanyTransactionParams {
+    pub origin_document_id: u64,
+    pub origin_document_model: String,
+    pub destination_company_id: u64,
+    pub amount: f64,
+    pub currency_id: u64,
+    pub transaction_type: RuleType,
+    pub auto_process: bool,
+    pub requires_approval: bool,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ProcessIntercompanyTransactionParams {
+    pub destination_document_id: u64,
+    pub destination_document_model: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ErrorIntercompanyTransactionParams {
+    pub error_message: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CancelIntercompanyTransactionParams {
+    pub reason: String,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-/// Create a new intercompany rule
 #[spacetimedb::reducer]
 pub fn create_intercompany_rule(
     ctx: &ReducerContext,
     organization_id: u64,
     source_company_id: u64,
     destination_company_id: u64,
-    name: String,
-    rule_type: RuleType,
-    auto_validation: bool,
-    auto_generate_invoice: bool,
-    auto_generate_bill: bool,
-    journal_id: Option<u64>,
-    account_id: Option<u64>,
-    pricelist_id: Option<u64>,
-    sequence: u32,
-    notes: Option<String>,
-    metadata: Option<String>,
+    params: CreateIntercompanyRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Rule name is required".to_string());
     }
 
@@ -118,76 +170,68 @@ pub fn create_intercompany_rule(
 
     let rule = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
-        name: name.clone(),
-        rule_type: rule_type.clone(),
+        name: params.name.clone(),
+        rule_type: params.rule_type.clone(),
         source_company_id,
         destination_company_id,
-        auto_validation,
-        auto_generate_invoice,
-        auto_generate_bill,
-        journal_id,
-        account_id,
-        pricelist_id,
-        is_active: true,
-        sequence,
-        notes,
+        auto_validation: params.auto_validation,
+        auto_generate_invoice: params.auto_generate_invoice,
+        auto_generate_bill: params.auto_generate_bill,
+        journal_id: params.journal_id,
+        account_id: params.account_id,
+        pricelist_id: params.pricelist_id,
+        is_active: params.is_active,
+        sequence: params.sequence,
+        notes: params.notes,
         created_by: Some(ctx.sender()),
         created_at: ctx.timestamp,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(source_company_id),
-        "intercompany_rule",
-        rule.id,
-        "CREATE",
-        None,
-        Some(
-            serde_json::json!({
-                "name": name,
-                "rule_type": format!("{:?}", rule_type.clone()),
-                "source_company_id": source_company_id,
-                "destination_company_id": destination_company_id
-            })
-            .to_string(),
-        ),
-        vec![
-            "name".to_string(),
-            "rule_type".to_string(),
-            "source_company_id".to_string(),
-            "destination_company_id".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(source_company_id),
+            table_name: "intercompany_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": rule.name,
+                    "rule_type": format!("{:?}", rule.rule_type),
+                    "source_company_id": source_company_id,
+                    "destination_company_id": destination_company_id
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "rule_type".to_string(),
+                "source_company_id".to_string(),
+                "destination_company_id".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Update an intercompany rule
 #[spacetimedb::reducer]
 pub fn update_intercompany_rule(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     rule_id: u64,
-    name: Option<String>,
-    auto_validation: Option<bool>,
-    auto_generate_invoice: Option<bool>,
-    auto_generate_bill: Option<bool>,
-    journal_id: Option<u64>,
-    account_id: Option<u64>,
-    pricelist_id: Option<u64>,
-    sequence: Option<u32>,
-    is_active: Option<bool>,
-    notes: Option<String>,
-    metadata: Option<String>,
+    params: UpdateIntercompanyRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "write")?;
 
-    let mut rule = ctx
+    let rule = ctx
         .db
         .intercompany_rule()
         .id()
@@ -198,200 +242,266 @@ pub fn update_intercompany_rule(
         return Err("Rule does not belong to this company".to_string());
     }
 
+    let old_values = serde_json::json!({
+        "name": rule.name,
+        "auto_validation": rule.auto_validation,
+        "is_active": rule.is_active
+    });
+
     let mut changed_fields = Vec::new();
 
-    if let Some(n) = name {
+    let mut new_name = rule.name.clone();
+    let mut new_auto_validation = rule.auto_validation;
+    let mut new_auto_generate_invoice = rule.auto_generate_invoice;
+    let mut new_auto_generate_bill = rule.auto_generate_bill;
+    let mut new_journal_id = rule.journal_id;
+    let mut new_account_id = rule.account_id;
+    let mut new_pricelist_id = rule.pricelist_id;
+    let mut new_sequence = rule.sequence;
+    let mut new_is_active = rule.is_active;
+    let mut new_notes = rule.notes.clone();
+    let mut new_metadata = rule.metadata.clone();
+
+    if let Some(n) = params.name {
         if n.is_empty() {
             return Err("Rule name cannot be empty".to_string());
         }
-        rule.name = n;
+        new_name = n;
         changed_fields.push("name".to_string());
     }
 
-    if let Some(av) = auto_validation {
-        rule.auto_validation = av;
+    if let Some(av) = params.auto_validation {
+        new_auto_validation = av;
         changed_fields.push("auto_validation".to_string());
     }
 
-    if let Some(agi) = auto_generate_invoice {
-        rule.auto_generate_invoice = agi;
+    if let Some(agi) = params.auto_generate_invoice {
+        new_auto_generate_invoice = agi;
         changed_fields.push("auto_generate_invoice".to_string());
     }
 
-    if let Some(agb) = auto_generate_bill {
-        rule.auto_generate_bill = agb;
+    if let Some(agb) = params.auto_generate_bill {
+        new_auto_generate_bill = agb;
         changed_fields.push("auto_generate_bill".to_string());
     }
 
-    if journal_id.is_some() {
-        rule.journal_id = journal_id;
+    if params.journal_id.is_some() {
+        new_journal_id = params.journal_id.unwrap();
         changed_fields.push("journal_id".to_string());
     }
 
-    if account_id.is_some() {
-        rule.account_id = account_id;
+    if params.account_id.is_some() {
+        new_account_id = params.account_id.unwrap();
         changed_fields.push("account_id".to_string());
     }
 
-    if pricelist_id.is_some() {
-        rule.pricelist_id = pricelist_id;
+    if params.pricelist_id.is_some() {
+        new_pricelist_id = params.pricelist_id.unwrap();
         changed_fields.push("pricelist_id".to_string());
     }
 
-    if let Some(seq) = sequence {
-        rule.sequence = seq;
+    if let Some(seq) = params.sequence {
+        new_sequence = seq;
         changed_fields.push("sequence".to_string());
     }
 
-    if let Some(active) = is_active {
-        rule.is_active = active;
+    if let Some(active) = params.is_active {
+        new_is_active = active;
         changed_fields.push("is_active".to_string());
     }
 
-    if notes.is_some() {
-        rule.notes = notes;
+    if params.notes.is_some() {
+        new_notes = params.notes.unwrap();
         changed_fields.push("notes".to_string());
     }
 
-    if let Some(m) = metadata {
-        rule.metadata = Some(m);
+    if let Some(m) = params.metadata {
+        new_metadata = Some(m);
         changed_fields.push("metadata".to_string());
     }
 
-    rule.write_uid = Some(ctx.sender());
-    rule.write_date = Some(ctx.timestamp);
+    ctx.db.intercompany_rule().id().update(IntercompanyRule {
+        name: new_name,
+        auto_validation: new_auto_validation,
+        auto_generate_invoice: new_auto_generate_invoice,
+        auto_generate_bill: new_auto_generate_bill,
+        journal_id: new_journal_id,
+        account_id: new_account_id,
+        pricelist_id: new_pricelist_id,
+        sequence: new_sequence,
+        is_active: new_is_active,
+        notes: new_notes,
+        metadata: new_metadata,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..rule
+    });
 
-    ctx.db.intercompany_rule().id().update(rule.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_rule",
-        rule_id,
-        "UPDATE",
-        None,
-        Some(serde_json::json!({ "name": rule.name }).to_string()),
-        changed_fields,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: Some(old_values.to_string()),
+            new_values: None,
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Create an intercompany transaction
+#[spacetimedb::reducer]
+pub fn delete_intercompany_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    rule_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "intercompany_rule", "delete")?;
+
+    let rule = ctx
+        .db
+        .intercompany_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Intercompany rule not found")?;
+
+    if rule.source_company_id != company_id && rule.destination_company_id != company_id {
+        return Err("Rule does not belong to this company".to_string());
+    }
+
+    ctx.db.intercompany_rule().id().delete(&rule_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_rule",
+            record_id: rule_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": rule.name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn create_intercompany_transaction(
     ctx: &ReducerContext,
     organization_id: u64,
     origin_company_id: u64,
-    destination_company_id: u64,
-    origin_document_id: u64,
-    origin_document_model: String,
-    amount: f64,
-    currency_id: u64,
-    transaction_type: RuleType,
-    auto_process: bool,
-    requires_approval: bool,
-    notes: Option<String>,
-    metadata: Option<String>,
+    params: CreateIntercompanyTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "create")?;
 
-    if origin_company_id == destination_company_id {
+    if origin_company_id == params.destination_company_id {
         return Err("Origin and destination companies must be different".to_string());
     }
 
-    if origin_document_model.is_empty() {
+    if params.origin_document_model.is_empty() {
         return Err("Document model is required".to_string());
     }
 
-    // Find applicable rule
     let rule = ctx
         .db
         .intercompany_rule()
         .intercompany_rule_by_source()
         .filter(&origin_company_id)
         .filter(|r| {
-            r.destination_company_id == destination_company_id
-                && r.rule_type == transaction_type
+            r.destination_company_id == params.destination_company_id
+                && r.rule_type == params.transaction_type
                 && r.is_active
         })
         .min_by_key(|r| r.sequence);
 
-    if rule.is_none() && requires_approval {
+    if rule.is_none() && params.requires_approval {
         return Err(
             "No active intercompany rule found for this transaction type between companies"
                 .to_string(),
         );
     }
 
-    let initial_state = if auto_process && !requires_approval {
+    let initial_state = if params.auto_process && !params.requires_approval {
         IntercompanyState::Processing
     } else {
         IntercompanyState::Draft
     };
+
+    let transaction_name = format!(
+        "{}-{}-{}",
+        params.origin_document_model, params.origin_document_id, ctx.timestamp
+    );
 
     let transaction = ctx
         .db
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
             id: 0,
-            name: format!(
-                "{}-{}-{}",
-                origin_document_model, origin_document_id, ctx.timestamp
-            ),
+            name: transaction_name,
             origin_company_id,
-            destination_company_id,
-            origin_document_id,
-            origin_document_model,
+            destination_company_id: params.destination_company_id,
+            origin_document_id: params.origin_document_id,
+            origin_document_model: params.origin_document_model,
             destination_document_id: None,
             destination_document_model: None,
-            amount,
-            currency_id,
+            amount: params.amount,
+            currency_id: params.currency_id,
             state: initial_state,
-            transaction_type,
-            notes,
+            transaction_type: params.transaction_type,
+            notes: params.notes,
             created_by: Some(ctx.sender()),
             created_at: ctx.timestamp,
             processed_at: None,
             processed_by: None,
             error_message: None,
-            auto_process,
-            requires_approval,
+            auto_process: params.auto_process,
+            requires_approval: params.requires_approval,
             approved_by: None,
             approved_at: None,
-            metadata,
+            metadata: params.metadata,
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(origin_company_id),
-        "intercompany_transaction",
-        transaction.id,
-        "CREATE",
-        None,
-        Some(
-            serde_json::json!({
-                "origin_company_id": origin_company_id,
-                "destination_company_id": destination_company_id,
-                "origin_document_id": origin_document_id,
-                "amount": amount
-            })
-            .to_string(),
-        ),
-        vec![
-            "origin_company_id".to_string(),
-            "destination_company_id".to_string(),
-            "origin_document_id".to_string(),
-            "amount".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(origin_company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "origin_company_id": origin_company_id,
+                    "destination_company_id": params.destination_company_id,
+                    "origin_document_id": params.origin_document_id,
+                    "amount": params.amount
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "origin_company_id".to_string(),
+                "destination_company_id".to_string(),
+                "origin_document_id".to_string(),
+                "amount".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Approve an intercompany transaction
 #[spacetimedb::reducer]
 pub fn approve_intercompany_transaction(
     ctx: &ReducerContext,
@@ -401,7 +511,7 @@ pub fn approve_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -422,44 +532,46 @@ pub fn approve_intercompany_transaction(
         return Err("This transaction does not require approval".to_string());
     }
 
-    transaction.state = IntercompanyState::Approved;
-    transaction.approved_by = Some(ctx.sender());
-    transaction.approved_at = Some(ctx.timestamp);
-    transaction.processed_by = Some(ctx.sender());
-
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Approved,
+            approved_by: Some(ctx.sender()),
+            approved_at: Some(ctx.timestamp),
+            processed_by: Some(ctx.sender()),
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "APPROVE",
-        Some(serde_json::json!({ "state": "Draft" }).to_string()),
-        Some(serde_json::json!({ "state": "Approved" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "APPROVE",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Approved" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Process an intercompany transaction
 #[spacetimedb::reducer]
 pub fn process_intercompany_transaction(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     transaction_id: u64,
-    destination_document_id: u64,
-    destination_document_model: String,
+    params: ProcessIntercompanyTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -479,41 +591,44 @@ pub fn process_intercompany_transaction(
         );
     }
 
-    transaction.state = IntercompanyState::Processing;
-    transaction.destination_document_id = Some(destination_document_id);
-    transaction.destination_document_model = Some(destination_document_model.clone());
-    transaction.processed_by = Some(ctx.sender());
-
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Processing,
+            destination_document_id: Some(params.destination_document_id),
+            destination_document_model: Some(params.destination_document_model.clone()),
+            processed_by: Some(ctx.sender()),
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "PROCESS",
-        None,
-        Some(
-            serde_json::json!({
-                "destination_document_id": destination_document_id,
-                "destination_document_model": destination_document_model
-            })
-            .to_string(),
-        ),
-        vec![
-            "destination_document_id".to_string(),
-            "destination_document_model".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "PROCESS",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "destination_document_id": params.destination_document_id,
+                    "destination_document_model": params.destination_document_model
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "destination_document_id".to_string(),
+                "destination_document_model".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Complete an intercompany transaction
 #[spacetimedb::reducer]
 pub fn complete_intercompany_transaction(
     ctx: &ReducerContext,
@@ -523,7 +638,7 @@ pub fn complete_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -544,41 +659,44 @@ pub fn complete_intercompany_transaction(
         return Err("Transaction must have a destination document to complete".to_string());
     }
 
-    transaction.state = IntercompanyState::Completed;
-    transaction.processed_at = Some(ctx.timestamp);
-
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Completed,
+            processed_at: Some(ctx.timestamp),
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "COMPLETE",
-        Some(serde_json::json!({ "state": "Processing" }).to_string()),
-        Some(serde_json::json!({ "state": "Completed" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "COMPLETE",
+            old_values: Some(serde_json::json!({ "state": "Processing" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Completed" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Mark transaction as error
 #[spacetimedb::reducer]
 pub fn error_intercompany_transaction(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     transaction_id: u64,
-    error_message: String,
+    params: ErrorIntercompanyTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -591,41 +709,46 @@ pub fn error_intercompany_transaction(
         return Err("Transaction does not involve this company".to_string());
     }
 
-    transaction.state = IntercompanyState::Error;
-    transaction.error_message = Some(error_message.clone());
-
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Error,
+            error_message: Some(params.error_message.clone()),
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "ERROR",
-        None,
-        Some(serde_json::json!({ "error_message": error_message }).to_string()),
-        vec!["state".to_string(), "error_message".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "ERROR",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "error_message": params.error_message }).to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "error_message".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Cancel an intercompany transaction
 #[spacetimedb::reducer]
 pub fn cancel_intercompany_transaction(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     transaction_id: u64,
-    reason: String,
+    params: CancelIntercompanyTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -640,34 +763,39 @@ pub fn cancel_intercompany_transaction(
         return Err("Cannot cancel a completed transaction".to_string());
     }
 
-    transaction.state = IntercompanyState::Cancelled;
-    transaction.notes = Some(format!(
+    let updated_notes = Some(format!(
         "{}\nCancellation reason: {}",
         transaction.notes.unwrap_or_default(),
-        reason
+        params.reason
     ));
 
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Cancelled,
+            notes: updated_notes,
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "CANCEL",
-        None,
-        Some(serde_json::json!({ "reason": reason }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "CANCEL",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "reason": params.reason }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Retry a failed transaction
 #[spacetimedb::reducer]
 pub fn retry_intercompany_transaction(
     ctx: &ReducerContext,
@@ -677,7 +805,7 @@ pub fn retry_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let mut transaction = ctx
+    let transaction = ctx
         .db
         .intercompany_transaction()
         .id()
@@ -692,31 +820,34 @@ pub fn retry_intercompany_transaction(
         return Err("Only transactions in Error state can be retried".to_string());
     }
 
-    transaction.state = IntercompanyState::Pending;
-    transaction.error_message = None;
-    transaction.processed_by = Some(ctx.sender());
-
     ctx.db
         .intercompany_transaction()
         .id()
-        .update(transaction.clone());
+        .update(IntercompanyTransaction {
+            state: IntercompanyState::Pending,
+            error_message: None,
+            processed_by: Some(ctx.sender()),
+            ..transaction
+        });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_transaction",
-        transaction_id,
-        "RETRY",
-        Some(serde_json::json!({ "state": "Error" }).to_string()),
-        Some(serde_json::json!({ "state": "Pending" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_transaction",
+            record_id: transaction_id,
+            action: "RETRY",
+            old_values: Some(serde_json::json!({ "state": "Error" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Pending" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Set rule active/inactive
 #[spacetimedb::reducer]
 pub fn set_intercompany_rule_active(
     ctx: &ReducerContext,
@@ -727,7 +858,7 @@ pub fn set_intercompany_rule_active(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "write")?;
 
-    let mut rule = ctx
+    let rule = ctx
         .db
         .intercompany_rule()
         .id()
@@ -738,22 +869,26 @@ pub fn set_intercompany_rule_active(
         return Err("Rule does not belong to this company".to_string());
     }
 
-    rule.is_active = is_active;
-    rule.write_uid = Some(ctx.sender());
-    rule.write_date = Some(ctx.timestamp);
+    ctx.db.intercompany_rule().id().update(IntercompanyRule {
+        is_active,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..rule
+    });
 
-    ctx.db.intercompany_rule().id().update(rule.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "intercompany_rule",
-        rule_id,
-        "SET_ACTIVE",
-        None,
-        Some(serde_json::json!({ "is_active": is_active }).to_string()),
-        vec!["is_active".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "intercompany_rule",
+            record_id: rule_id,
+            action: "SET_ACTIVE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "is_active": is_active }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

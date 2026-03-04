@@ -9,9 +9,9 @@
 /// - `CrossoveredBudget` — Budget header with date range and state
 /// - `CrossoveredBudgetLines` — Budget line items with planned vs actual amounts
 /// - `BudgetPost` — Budget positions for categorization
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::BudgetState;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -101,6 +101,83 @@ pub struct BudgetPost {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCrossoveredBudgetParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub date_from: Timestamp,
+    pub date_to: Timestamp,
+    pub state: BudgetState,
+    pub crossovered_budget_line: Vec<u64>,
+    pub total_planned: f64,
+    pub total_practical: f64,
+    pub total_theoretical: f64,
+    pub variance_percentage: f64,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCrossoveredBudgetParams {
+    pub name: Option<String>,
+    pub description: Option<Option<String>>,
+    pub date_from: Option<Timestamp>,
+    pub date_to: Option<Timestamp>,
+    pub metadata: Option<Option<String>>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCrossoveredBudgetLineParams {
+    pub analytic_account_id: Option<u64>,
+    pub date_from: Timestamp,
+    pub date_to: Timestamp,
+    pub paid_date: Option<Timestamp>,
+    pub planned_amount: f64,
+    pub practical_amount: f64,
+    pub theoretical_amount: f64,
+    pub achieve_percentage: f64,
+    pub is_above_budget: bool,
+    pub variance: f64,
+    pub variance_percentage: f64,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCrossoveredBudgetLineParams {
+    pub planned_amount: Option<f64>,
+    pub analytic_account_id: Option<Option<u64>>,
+    pub date_from: Option<Timestamp>,
+    pub date_to: Option<Timestamp>,
+    pub metadata: Option<Option<String>>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateBudgetLineActualsParams {
+    pub practical_amount: f64,
+    pub theoretical_amount: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateBudgetPostParams {
+    pub name: String,
+    pub code: Option<String>,
+    pub description: Option<String>,
+    pub account_ids: Vec<u64>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateBudgetPostParams {
+    pub name: Option<String>,
+    pub code: Option<Option<String>>,
+    pub description: Option<Option<String>>,
+    pub account_ids: Option<Vec<u64>>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<Option<String>>,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Create a new budget
@@ -109,59 +186,62 @@ pub fn create_crossovered_budget(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    name: String,
-    description: Option<String>,
-    date_from: Timestamp,
-    date_to: Timestamp,
-    metadata: Option<String>,
+    params: CreateCrossoveredBudgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Budget name is required".to_string());
     }
 
-    if date_to <= date_from {
+    if params.date_to <= params.date_from {
         return Err("End date must be after start date".to_string());
     }
 
     let budget = ctx.db.crossovered_budget().insert(CrossoveredBudget {
         id: 0,
-        name: name.clone(),
-        description,
-        date_from,
-        date_to,
-        state: BudgetState::Draft,
+        name: params.name.clone(),
+        description: params.description,
+        date_from: params.date_from,
+        date_to: params.date_to,
+        state: params.state,
         company_id,
-        crossovered_budget_line: Vec::new(),
-        total_planned: 0.0,
-        total_practical: 0.0,
-        total_theoretical: 0.0,
-        variance_percentage: 0.0,
+        crossovered_budget_line: params.crossovered_budget_line,
+        total_planned: params.total_planned,
+        total_practical: params.total_practical,
+        total_theoretical: params.total_theoretical,
+        variance_percentage: params.variance_percentage,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget.id,
-        "CREATE",
-        None,
-        Some(
-            serde_json::json!({ "name": name, "date_from": date_from.to_string(), "date_to": date_to.to_string() })
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": params.name,
+                    "date_from": params.date_from.to_string(),
+                    "date_to": params.date_to.to_string()
+                })
                 .to_string(),
-        ),
-        vec![
-            "name".to_string(),
-            "date_from".to_string(),
-            "date_to".to_string(),
-        ],
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "date_from".to_string(),
+                "date_to".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -174,11 +254,7 @@ pub fn update_crossovered_budget(
     organization_id: u64,
     company_id: u64,
     budget_id: u64,
-    name: Option<String>,
-    description: Option<String>,
-    date_from: Option<Timestamp>,
-    date_to: Option<Timestamp>,
-    metadata: Option<String>,
+    params: UpdateCrossoveredBudgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
@@ -193,7 +269,6 @@ pub fn update_crossovered_budget(
         return Err("Budget does not belong to this company".to_string());
     }
 
-    // Only allow updates in Draft state
     if budget.state != BudgetState::Draft {
         return Err("Can only modify budgets in Draft state".to_string());
     }
@@ -205,7 +280,7 @@ pub fn update_crossovered_budget(
 
     let mut changed_fields = Vec::new();
 
-    if let Some(n) = name {
+    if let Some(n) = params.name {
         if n.is_empty() {
             return Err("Budget name cannot be empty".to_string());
         }
@@ -213,13 +288,13 @@ pub fn update_crossovered_budget(
         changed_fields.push("name".to_string());
     }
 
-    if description.is_some() {
-        budget.description = description;
+    if let Some(desc) = params.description {
+        budget.description = desc;
         changed_fields.push("description".to_string());
     }
 
-    if let Some(df) = date_from {
-        if let Some(dt) = date_to {
+    if let Some(df) = params.date_from {
+        if let Some(dt) = params.date_to {
             if dt <= df {
                 return Err("End date must be after start date".to_string());
             }
@@ -230,10 +305,10 @@ pub fn update_crossovered_budget(
         }
         budget.date_from = df;
         changed_fields.push("date_from".to_string());
-        if date_to.is_some() {
+        if params.date_to.is_some() {
             changed_fields.push("date_to".to_string());
         }
-    } else if let Some(dt) = date_to {
+    } else if let Some(dt) = params.date_to {
         if dt <= budget.date_from {
             return Err("End date must be after start date".to_string());
         }
@@ -241,8 +316,8 @@ pub fn update_crossovered_budget(
         changed_fields.push("date_to".to_string());
     }
 
-    if let Some(m) = metadata {
-        budget.metadata = Some(m);
+    if let Some(meta) = params.metadata {
+        budget.metadata = meta;
         changed_fields.push("metadata".to_string());
     }
 
@@ -251,16 +326,19 @@ pub fn update_crossovered_budget(
 
     ctx.db.crossovered_budget().id().update(budget.clone());
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget.id,
-        "UPDATE",
-        Some(old_values.to_string()),
-        Some(serde_json::json!({ "name": budget.name }).to_string()),
-        changed_fields,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget.id,
+            action: "UPDATE",
+            old_values: Some(old_values.to_string()),
+            new_values: Some(serde_json::json!({ "name": budget.name }).to_string()),
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -273,11 +351,7 @@ pub fn create_budget_line(
     organization_id: u64,
     company_id: u64,
     budget_id: u64,
-    analytic_account_id: Option<u64>,
-    date_from: Timestamp,
-    date_to: Timestamp,
-    planned_amount: f64,
-    metadata: Option<String>,
+    params: CreateCrossoveredBudgetLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "create")?;
 
@@ -296,16 +370,15 @@ pub fn create_budget_line(
         return Err("Can only add lines to budgets in Draft state".to_string());
     }
 
-    if date_to <= date_from {
+    if params.date_to <= params.date_from {
         return Err("Line end date must be after start date".to_string());
     }
 
-    // Validate date range is within budget date range
-    if date_from < budget.date_from || date_to > budget.date_to {
+    if params.date_from < budget.date_from || params.date_to > budget.date_to {
         return Err("Line dates must be within budget date range".to_string());
     }
 
-    if planned_amount < 0.0 {
+    if params.planned_amount < 0.0 {
         return Err("Planned amount cannot be negative".to_string());
     }
 
@@ -315,46 +388,48 @@ pub fn create_budget_line(
         .insert(CrossoveredBudgetLines {
             id: 0,
             general_budget_id: budget_id,
-            analytic_account_id,
-            date_from,
-            date_to,
-            paid_date: None,
-            planned_amount,
-            practical_amount: 0.0,
-            theoretical_amount: 0.0,
-            achieve_percentage: 0.0,
+            analytic_account_id: params.analytic_account_id,
+            date_from: params.date_from,
+            date_to: params.date_to,
+            paid_date: params.paid_date,
+            planned_amount: params.planned_amount,
+            practical_amount: params.practical_amount,
+            theoretical_amount: params.theoretical_amount,
+            achieve_percentage: params.achieve_percentage,
             company_id,
-            is_above_budget: false,
-            variance: 0.0,
-            variance_percentage: 0.0,
+            is_above_budget: params.is_above_budget,
+            variance: params.variance,
+            variance_percentage: params.variance_percentage,
             create_uid: Some(ctx.sender()),
             create_date: Some(ctx.timestamp),
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
-            metadata,
+            metadata: params.metadata,
         });
 
-    // Update budget totals
     budget.crossovered_budget_line.push(line.id);
-    budget.total_planned += planned_amount;
+    budget.total_planned += params.planned_amount;
     budget.write_uid = Some(ctx.sender());
     budget.write_date = Some(ctx.timestamp);
 
     ctx.db.crossovered_budget().id().update(budget);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget_lines",
-        line.id,
-        "CREATE",
-        None,
-        Some(
-            serde_json::json!({ "budget_id": budget_id, "planned_amount": planned_amount })
-                .to_string(),
-        ),
-        vec!["budget_id".to_string(), "planned_amount".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget_lines",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "budget_id": budget_id, "planned_amount": params.planned_amount })
+                    .to_string(),
+            ),
+            changed_fields: vec!["budget_id".to_string(), "planned_amount".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -367,11 +442,7 @@ pub fn update_budget_line(
     organization_id: u64,
     company_id: u64,
     line_id: u64,
-    planned_amount: Option<f64>,
-    analytic_account_id: Option<u64>,
-    date_from: Option<Timestamp>,
-    date_to: Option<Timestamp>,
-    metadata: Option<String>,
+    params: UpdateCrossoveredBudgetLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
@@ -400,7 +471,7 @@ pub fn update_budget_line(
     let old_planned = line.planned_amount;
     let mut changed_fields = Vec::new();
 
-    if let Some(pa) = planned_amount {
+    if let Some(pa) = params.planned_amount {
         if pa < 0.0 {
             return Err("Planned amount cannot be negative".to_string());
         }
@@ -408,13 +479,13 @@ pub fn update_budget_line(
         changed_fields.push("planned_amount".to_string());
     }
 
-    if analytic_account_id.is_some() {
-        line.analytic_account_id = analytic_account_id;
+    if let Some(aid) = params.analytic_account_id {
+        line.analytic_account_id = aid;
         changed_fields.push("analytic_account_id".to_string());
     }
 
-    if let Some(df) = date_from {
-        if let Some(dt) = date_to {
+    if let Some(df) = params.date_from {
+        if let Some(dt) = params.date_to {
             if dt <= df {
                 return Err("End date must be after start date".to_string());
             }
@@ -428,10 +499,10 @@ pub fn update_budget_line(
         }
         line.date_from = df;
         changed_fields.push("date_from".to_string());
-        if date_to.is_some() {
+        if params.date_to.is_some() {
             changed_fields.push("date_to".to_string());
         }
-    } else if let Some(dt) = date_to {
+    } else if let Some(dt) = params.date_to {
         if dt <= line.date_from {
             return Err("End date must be after start date".to_string());
         }
@@ -442,8 +513,8 @@ pub fn update_budget_line(
         changed_fields.push("date_to".to_string());
     }
 
-    if let Some(m) = metadata {
-        line.metadata = Some(m);
+    if let Some(meta) = params.metadata {
+        line.metadata = meta;
         changed_fields.push("metadata".to_string());
     }
 
@@ -452,23 +523,27 @@ pub fn update_budget_line(
 
     ctx.db.crossovered_budget_lines().id().update(line.clone());
 
-    // Update budget totals
     budget.total_planned = budget.total_planned - old_planned + line.planned_amount;
     budget.write_uid = Some(ctx.sender());
     budget.write_date = Some(ctx.timestamp);
 
     ctx.db.crossovered_budget().id().update(budget);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget_lines",
-        line_id,
-        "UPDATE",
-        Some(serde_json::json!({ "planned_amount": old_planned }).to_string()),
-        Some(serde_json::json!({ "planned_amount": line.planned_amount }).to_string()),
-        changed_fields,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget_lines",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "planned_amount": old_planned }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "planned_amount": line.planned_amount }).to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -481,8 +556,7 @@ pub fn update_budget_line_actuals(
     organization_id: u64,
     company_id: u64,
     line_id: u64,
-    practical_amount: f64,
-    theoretical_amount: f64,
+    params: UpdateBudgetLineActualsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
@@ -510,36 +584,28 @@ pub fn update_budget_line_actuals(
 
     let old_practical = line.practical_amount;
 
-    line.practical_amount = practical_amount;
-    line.theoretical_amount = theoretical_amount;
-
-    // Calculate variance
-    line.variance = practical_amount - line.planned_amount;
+    line.practical_amount = params.practical_amount;
+    line.theoretical_amount = params.theoretical_amount;
+    line.variance = params.practical_amount - line.planned_amount;
     line.variance_percentage = if line.planned_amount > 0.0 {
         (line.variance / line.planned_amount) * 100.0
     } else {
         0.0
     };
-
-    // Calculate achievement percentage
     line.achieve_percentage = if line.planned_amount > 0.0 {
-        (practical_amount / line.planned_amount) * 100.0
+        (params.practical_amount / line.planned_amount) * 100.0
     } else {
         0.0
     };
-
-    // Check if above budget
-    line.is_above_budget = practical_amount > line.planned_amount;
+    line.is_above_budget = params.practical_amount > line.planned_amount;
 
     line.write_uid = Some(ctx.sender());
     line.write_date = Some(ctx.timestamp);
 
     ctx.db.crossovered_budget_lines().id().update(line.clone());
 
-    // Update budget totals
     let mut budget = budget;
-    budget.total_practical = budget.total_practical - old_practical + practical_amount;
-    budget.total_theoretical = budget.total_theoretical;
+    budget.total_practical = budget.total_practical - old_practical + params.practical_amount;
     budget.variance_percentage = if budget.total_planned > 0.0 {
         ((budget.total_practical - budget.total_planned) / budget.total_planned) * 100.0
     } else {
@@ -563,7 +629,7 @@ pub fn confirm_budget(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
-    let mut budget = ctx
+    let budget = ctx
         .db
         .crossovered_budget()
         .id()
@@ -582,22 +648,26 @@ pub fn confirm_budget(
         return Err("Budget must have at least one line to confirm".to_string());
     }
 
-    budget.state = BudgetState::Confirm;
-    budget.write_uid = Some(ctx.sender());
-    budget.write_date = Some(ctx.timestamp);
+    ctx.db.crossovered_budget().id().update(CrossoveredBudget {
+        state: BudgetState::Confirm,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..budget.clone()
+    });
 
-    ctx.db.crossovered_budget().id().update(budget.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget_id,
-        "CONFIRM",
-        Some(serde_json::json!({ "state": "Draft" }).to_string()),
-        Some(serde_json::json!({ "state": "Confirm" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget_id,
+            action: "CONFIRM",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Confirm" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -613,7 +683,7 @@ pub fn validate_budget(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
-    let mut budget = ctx
+    let budget = ctx
         .db
         .crossovered_budget()
         .id()
@@ -628,22 +698,26 @@ pub fn validate_budget(
         return Err("Budget must be confirmed before validation".to_string());
     }
 
-    budget.state = BudgetState::Validate;
-    budget.write_uid = Some(ctx.sender());
-    budget.write_date = Some(ctx.timestamp);
+    ctx.db.crossovered_budget().id().update(CrossoveredBudget {
+        state: BudgetState::Validate,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..budget.clone()
+    });
 
-    ctx.db.crossovered_budget().id().update(budget.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget_id,
-        "VALIDATE",
-        Some(serde_json::json!({ "state": "Confirm" }).to_string()),
-        Some(serde_json::json!({ "state": "Validate" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget_id,
+            action: "VALIDATE",
+            old_values: Some(serde_json::json!({ "state": "Confirm" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Validate" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -659,7 +733,7 @@ pub fn done_budget(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
-    let mut budget = ctx
+    let budget = ctx
         .db
         .crossovered_budget()
         .id()
@@ -674,22 +748,26 @@ pub fn done_budget(
         return Err("Budget must be validated before marking as done".to_string());
     }
 
-    budget.state = BudgetState::Done;
-    budget.write_uid = Some(ctx.sender());
-    budget.write_date = Some(ctx.timestamp);
+    ctx.db.crossovered_budget().id().update(CrossoveredBudget {
+        state: BudgetState::Done,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..budget.clone()
+    });
 
-    ctx.db.crossovered_budget().id().update(budget.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget_id,
-        "DONE",
-        Some(serde_json::json!({ "state": "Validate" }).to_string()),
-        Some(serde_json::json!({ "state": "Done" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget_id,
+            action: "DONE",
+            old_values: Some(serde_json::json!({ "state": "Validate" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Done" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -705,7 +783,7 @@ pub fn cancel_budget(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
 
-    let mut budget = ctx
+    let budget = ctx
         .db
         .crossovered_budget()
         .id()
@@ -720,22 +798,26 @@ pub fn cancel_budget(
         return Err("Cannot cancel a completed budget".to_string());
     }
 
-    budget.state = BudgetState::Cancel;
-    budget.write_uid = Some(ctx.sender());
-    budget.write_date = Some(ctx.timestamp);
+    ctx.db.crossovered_budget().id().update(CrossoveredBudget {
+        state: BudgetState::Cancel,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..budget.clone()
+    });
 
-    ctx.db.crossovered_budget().id().update(budget.clone());
-
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget",
-        budget_id,
-        "CANCEL",
-        None,
-        Some(serde_json::json!({ "state": "Cancel" }).to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget",
+            record_id: budget_id,
+            action: "CANCEL",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "state": "Cancel" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -747,43 +829,42 @@ pub fn create_budget_post(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    name: String,
-    code: Option<String>,
-    description: Option<String>,
-    account_ids: Vec<u64>,
-    metadata: Option<String>,
+    params: CreateBudgetPostParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "budget_post", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Budget post name is required".to_string());
     }
 
     let post = ctx.db.budget_post().insert(BudgetPost {
         id: 0,
-        name: name.clone(),
-        code,
-        description,
-        account_ids,
+        name: params.name.clone(),
+        code: params.code,
+        description: params.description,
+        account_ids: params.account_ids,
         company_id,
-        is_active: true,
+        is_active: params.is_active,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "budget_post",
-        post.id,
-        "CREATE",
-        None,
-        Some(serde_json::json!({ "name": name }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "budget_post",
+            record_id: post.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -796,12 +877,7 @@ pub fn update_budget_post(
     organization_id: u64,
     company_id: u64,
     post_id: u64,
-    name: Option<String>,
-    code: Option<String>,
-    description: Option<String>,
-    account_ids: Option<Vec<u64>>,
-    is_active: Option<bool>,
-    metadata: Option<String>,
+    params: UpdateBudgetPostParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "budget_post", "write")?;
 
@@ -818,7 +894,7 @@ pub fn update_budget_post(
 
     let mut changed_fields = Vec::new();
 
-    if let Some(n) = name {
+    if let Some(n) = params.name {
         if n.is_empty() {
             return Err("Budget post name cannot be empty".to_string());
         }
@@ -826,28 +902,28 @@ pub fn update_budget_post(
         changed_fields.push("name".to_string());
     }
 
-    if code.is_some() {
-        post.code = code;
+    if let Some(c) = params.code {
+        post.code = c;
         changed_fields.push("code".to_string());
     }
 
-    if description.is_some() {
-        post.description = description;
+    if let Some(desc) = params.description {
+        post.description = desc;
         changed_fields.push("description".to_string());
     }
 
-    if let Some(accs) = account_ids {
+    if let Some(accs) = params.account_ids {
         post.account_ids = accs;
         changed_fields.push("account_ids".to_string());
     }
 
-    if let Some(active) = is_active {
+    if let Some(active) = params.is_active {
         post.is_active = active;
         changed_fields.push("is_active".to_string());
     }
 
-    if let Some(m) = metadata {
-        post.metadata = Some(m);
+    if let Some(meta) = params.metadata {
+        post.metadata = meta;
         changed_fields.push("metadata".to_string());
     }
 
@@ -856,16 +932,19 @@ pub fn update_budget_post(
 
     ctx.db.budget_post().id().update(post.clone());
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "budget_post",
-        post_id,
-        "UPDATE",
-        None,
-        Some(serde_json::json!({ "name": post.name }).to_string()),
-        changed_fields,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "budget_post",
+            record_id: post_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": post.name }).to_string()),
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -903,7 +982,6 @@ pub fn delete_budget_line(
         return Err("Can only delete lines from budgets in Draft state".to_string());
     }
 
-    // Update budget totals
     budget.total_planned -= line.planned_amount;
     budget.total_practical -= line.practical_amount;
     budget.total_theoretical -= line.theoretical_amount;
@@ -914,16 +992,21 @@ pub fn delete_budget_line(
     ctx.db.crossovered_budget().id().update(budget);
     ctx.db.crossovered_budget_lines().id().delete(&line_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "crossovered_budget_lines",
-        line_id,
-        "DELETE",
-        Some(serde_json::json!({ "planned_amount": line.planned_amount }).to_string()),
-        None,
-        vec!["id".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "crossovered_budget_lines",
+            record_id: line_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({ "planned_amount": line.planned_amount }).to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
