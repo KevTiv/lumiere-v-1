@@ -8,6 +8,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use crate::types::ProcureMethod;
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -499,6 +500,10 @@ pub fn create_stock_move(
     package_id: Option<u64>,
     result_package_id: Option<u64>,
     owner_id: Option<u64>,
+    // Procurement method: "make_to_stock" or "make_to_order"
+    procure_method: Option<String>,
+    // Sequence within the picking (defaults to 10)
+    sequence: Option<i32>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_move", "create")?;
 
@@ -506,12 +511,17 @@ pub fn create_stock_move(
         return Err("Move name cannot be empty".to_string());
     }
 
+    // Validate procure_method if provided
+    if let Some(ref pm) = procure_method {
+        ProcureMethod::from_str(pm)?;
+    }
+
     let move_record = ctx.db.stock_move().insert(StockMove {
         id: 0,
         organization_id,
         name: Some(name.clone()),
         reference,
-        sequence: 10,
+        sequence: sequence.unwrap_or(10),
         origin,
         note,
         move_type,
@@ -533,7 +543,7 @@ pub fn create_stock_move(
         picking_id,
         picking_type_id,
         origin_returned_move_id: None,
-        procure_method: "make_to_stock".to_string(),
+        procure_method: procure_method.unwrap_or_else(|| "make_to_stock".to_string()),
         created_purchase_line_id: None,
         price_unit: 0.0,
         scrapped: false,

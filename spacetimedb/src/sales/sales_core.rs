@@ -16,7 +16,9 @@ use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log};
 use crate::inventory::product::product;
-use crate::types::{InvoiceStatus, LineInvoiceStatus, LineState, SaleState};
+use crate::types::{
+    InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INPUT TYPES
@@ -348,6 +350,14 @@ pub fn create_sale_order(ctx: &ReducerContext, input: SaleOrderInput) -> Result<
 
     if !partner.is_customer {
         return Err("Partner is not a customer".to_string());
+    }
+
+    // Validate policy strings if provided
+    if let Some(ref sp) = input.shipping_policy {
+        ShippingPolicy::from_str(sp)?;
+    }
+    if let Some(ref pp) = input.picking_policy {
+        PickingPolicy::from_str(pp)?;
     }
 
     // Calculate validity date

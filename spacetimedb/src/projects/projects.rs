@@ -7,6 +7,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use crate::types::{BillType, PricingType};
 
 // ============================================================================
 // PROJECT TABLE
@@ -124,9 +125,19 @@ pub fn create_project(
     allow_subtasks: bool,
     allow_timesheets: bool,
     privacy_visibility: String,
+    bill_type: Option<String>,
+    pricing_type: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "project_project", "create")?;
     validate_project_name_unique(ctx, company_id, &name, None)?;
+
+    // Validate billing configuration if provided
+    if let Some(ref bt) = bill_type {
+        BillType::from_str(bt)?;
+    }
+    if let Some(ref pt) = pricing_type {
+        PricingType::from_str(pt)?;
+    }
 
     let project = ctx.db.project_project().insert(ProjectProject {
         id: 0,
@@ -152,8 +163,8 @@ pub fn create_project(
         allow_material: false,
         allow_worksheets: false,
         allow_forecast: false,
-        bill_type: "customer_task".to_string(),
-        pricing_type: "task_rate".to_string(),
+        bill_type: bill_type.unwrap_or_else(|| "customer_task".to_string()),
+        pricing_type: pricing_type.unwrap_or_else(|| "task_rate".to_string()),
         rating_status: "no".to_string(),
         rating_status_period: "monthly".to_string(),
         privacy_visibility,

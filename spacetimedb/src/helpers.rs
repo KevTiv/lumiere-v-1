@@ -90,11 +90,53 @@ pub fn check_permission(
     Err(format!("Permission denied: {} on {}", action, resource))
 }
 
+/// Params for `write_audit_log_v2`. All fields are named — no positional `None` ambiguity.
+/// Use this for all new reducer code. Prefer over `write_audit_log`.
+#[derive(Clone, Debug)]
+pub struct AuditLogParams {
+    pub company_id: Option<u64>,
+    pub table_name: &'static str,
+    pub record_id: u64,
+    pub action: &'static str,
+    pub old_values: Option<String>,
+    pub new_values: Option<String>,
+    pub changed_fields: Vec<String>,
+    pub metadata: Option<String>,
+}
+
+/// Struct-based audit log writer. Preferred over `write_audit_log` for new code.
+///
+/// Context-derived fields (never passed by callers):
+/// - `session_id`  — lower 64 bits of `ctx.connection_id()` (128-bit session token)
+/// - `ip_address`  — not available in SpacetimeDB 2.0.1 WASM sandbox; always None
+/// - `user_agent`  — not available in SpacetimeDB 2.0.1 WASM sandbox; always None
+pub fn write_audit_log_v2(ctx: &ReducerContext, organization_id: u64, params: AuditLogParams) {
+    let session_id = ctx.connection_id().map(|c| c.to_u128() as u64);
+    ctx.db.audit_log().insert(AuditLog {
+        id: 0,
+        organization_id,
+        company_id: params.company_id,
+        table_name: params.table_name.to_string(),
+        record_id: params.record_id,
+        action: params.action.to_string(),
+        old_values: params.old_values,
+        new_values: params.new_values,
+        changed_fields: params.changed_fields,
+        user_identity: ctx.sender(),
+        session_id,
+        ip_address: None,
+        user_agent: None,
+        timestamp: ctx.timestamp,
+        metadata: params.metadata,
+    });
+}
+
 /// Insert a structured audit log entry.
 ///
 /// Call this inside any reducer that mutates important data.
 /// `old_values` / `new_values` should be JSON-serialised representations
 /// of the before/after state (use `serde_json::to_string` or build manually).
+/// @deprecated — use `write_audit_log_v2` with `AuditLogParams` for new code.
 pub fn write_audit_log(
     ctx: &ReducerContext,
     organization_id: u64,

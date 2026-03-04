@@ -69,7 +69,6 @@ pub fn import_workcenter_csv(
             performance: 0.0,
             blocked_time: 0.0,
             productive_time: 0.0,
-            workingstate: "normal".to_string(),
             productivity_ids: vec![],
             order_ids: vec![],
             workorder_count: 0,

@@ -101,12 +101,31 @@ pub fn create_ai_agent(
     monthly_budget: Option<f64>,
     rate_limit_per_minute: u32,
     cost_per_1k_tokens: f64,
+    context_window: Option<u32>,
+    top_p: Option<f64>,
+    frequency_penalty: Option<f64>,
+    presence_penalty: Option<f64>,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_agent", "create")?;
 
     if temperature < 0.0 || temperature > 2.0 {
         return Err("Temperature must be between 0.0 and 2.0".to_string());
+    }
+    if let Some(tp) = top_p {
+        if !(0.0..=1.0).contains(&tp) {
+            return Err("top_p must be between 0.0 and 1.0".to_string());
+        }
+    }
+    if let Some(fp) = frequency_penalty {
+        if !(-2.0..=2.0).contains(&fp) {
+            return Err("frequency_penalty must be between -2.0 and 2.0".to_string());
+        }
+    }
+    if let Some(pp) = presence_penalty {
+        if !(-2.0..=2.0).contains(&pp) {
+            return Err("presence_penalty must be between -2.0 and 2.0".to_string());
+        }
     }
 
     let agent = ctx.db.ai_agent().insert(AiAgent {
@@ -118,11 +137,11 @@ pub fn create_ai_agent(
         api_key_reference: None,
         temperature,
         max_tokens,
-        top_p: 1.0,
-        frequency_penalty: 0.0,
-        presence_penalty: 0.0,
+        top_p: top_p.unwrap_or(1.0),
+        frequency_penalty: frequency_penalty.unwrap_or(0.0),
+        presence_penalty: presence_penalty.unwrap_or(0.0),
         system_prompt,
-        context_window: 128_000,
+        context_window: context_window.unwrap_or(128_000),
         is_active: true,
         is_default: false,
         allowed_models: Vec::new(),
@@ -166,9 +185,32 @@ pub fn update_ai_agent(
     system_prompt: Option<String>,
     monthly_budget: Option<f64>,
     rate_limit_per_minute: u32,
+    context_window: Option<u32>,
+    top_p: Option<f64>,
+    frequency_penalty: Option<f64>,
+    presence_penalty: Option<f64>,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_agent", "write")?;
+
+    if temperature < 0.0 || temperature > 2.0 {
+        return Err("Temperature must be between 0.0 and 2.0".to_string());
+    }
+    if let Some(tp) = top_p {
+        if !(0.0..=1.0).contains(&tp) {
+            return Err("top_p must be between 0.0 and 1.0".to_string());
+        }
+    }
+    if let Some(fp) = frequency_penalty {
+        if !(-2.0..=2.0).contains(&fp) {
+            return Err("frequency_penalty must be between -2.0 and 2.0".to_string());
+        }
+    }
+    if let Some(pp) = presence_penalty {
+        if !(-2.0..=2.0).contains(&pp) {
+            return Err("presence_penalty must be between -2.0 and 2.0".to_string());
+        }
+    }
 
     let agent = ctx
         .db
@@ -183,6 +225,10 @@ pub fn update_ai_agent(
         system_prompt,
         monthly_budget,
         rate_limit_per_minute,
+        context_window: context_window.unwrap_or(agent.context_window),
+        top_p: top_p.unwrap_or(agent.top_p),
+        frequency_penalty: frequency_penalty.unwrap_or(agent.frequency_penalty),
+        presence_penalty: presence_penalty.unwrap_or(agent.presence_penalty),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..agent

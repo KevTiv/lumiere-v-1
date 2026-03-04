@@ -14,7 +14,8 @@ use crate::inventory::stock::{
     create_stock_move, done_stock_move, stock_move, stock_quant, StockMove, StockQuant,
 };
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
-use crate::types::{MoState, WorkorderState};
+use crate::manufacturing::work_centers::{mrp_workcenter, MrpWorkcenter};
+use crate::types::{ConsumptionMode, MoState, WorkorderState};
 
 // ============================================================================
 // MANUFACTURING ORDER TABLES
@@ -270,8 +271,14 @@ pub fn create_manufacturing_order(
     picking_type_id: u64,
     date_planned_start: Timestamp,
     date_planned_finished: Timestamp,
+    consumption: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "mrp_production", "create")?;
+
+    // Validate consumption mode if provided
+    if let Some(ref c) = consumption {
+        ConsumptionMode::from_str(c)?;
+    }
 
     // Get product info
     let product = ctx
@@ -338,7 +345,7 @@ pub fn create_manufacturing_order(
         check_to_done: false,
         unreserve_visible: false,
         post_visible: false,
-        consumption: "flexible".to_string(),
+        consumption: consumption.unwrap_or_else(|| "flexible".to_string()),
         picking_ids: Vec::new(),
         delivery_count: 0,
         confirm_cancel_backorder: false,
@@ -649,6 +656,8 @@ pub fn consume_mo_materials(
                 None,
                 None,
                 None,
+                None, // procure_method — use default make_to_stock
+                None, // sequence — use default
             )?;
 
             let move_id = ctx
@@ -774,6 +783,8 @@ pub fn finish_manufacturing_order(
                 None,
                 None,
                 None,
+                None, // procure_method — use default make_to_stock
+                None, // sequence — use default
             )?;
 
             let finished_move_id = ctx
@@ -905,6 +916,7 @@ pub fn create_workorder(
     _name: String,
     _sequence: u32,
     duration_expected: f64,
+    capacity: Option<f64>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "mrp_workorder", "create")?;
 
@@ -918,6 +930,16 @@ pub fn create_workorder(
     if mo.company_id != company_id {
         return Err("MO does not belong to this company".to_string());
     }
+
+    // Resolve capacity: use supplied value, fall back to work center's capacity, then 1.0
+    let resolved_capacity = capacity.unwrap_or_else(|| {
+        ctx.db
+            .mrp_workcenter()
+            .id()
+            .find(&workcenter_id)
+            .map(|wc| wc.capacity)
+            .unwrap_or(1.0)
+    });
 
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
@@ -941,7 +963,7 @@ pub fn create_workorder(
         worksheet_url: None,
         operation_note: None,
         leave_ids: Vec::new(),
-        capacity: 1.0,
+        capacity: resolved_capacity,
         production_availability: "not_available".to_string(),
         quality_check_todo: false,
         quality_check_fail: false,

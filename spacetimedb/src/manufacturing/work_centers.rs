@@ -7,6 +7,8 @@
 /// | **MrpWorkcenterProductivity** | Work center productivity tracking |
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::types::WorkingState;
+
 use crate::helpers::{check_permission, write_audit_log};
 
 // ============================================================================
@@ -37,7 +39,6 @@ pub struct MrpWorkcenter {
     pub performance: f64,
     pub blocked_time: f64,
     pub productive_time: f64,
-    pub workingstate: String,
     pub productivity_ids: Vec<u64>,
     pub order_ids: Vec<u64>,
     pub workorder_count: u32,
@@ -102,8 +103,14 @@ pub fn create_workcenter(
     capacity: f64,
     time_efficiency: f64,
     oee_target: f64,
+    working_state: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "mrp_workcenter", "create")?;
+
+    // Validate working_state if provided
+    if let Some(ref ws) = working_state {
+        WorkingState::from_str(ws)?;
+    }
 
     let wc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
@@ -111,7 +118,7 @@ pub fn create_workcenter(
         active: true,
         code,
         company_id,
-        working_state: "normal".to_string(),
+        working_state: working_state.unwrap_or_else(|| "normal".to_string()),
         oee_target,
         time_efficiency,
         capacity,
@@ -120,7 +127,6 @@ pub fn create_workcenter(
         performance: 0.0,
         blocked_time: 0.0,
         productive_time: 0.0,
-        workingstate: "normal".to_string(),
         productivity_ids: Vec::new(),
         order_ids: Vec::new(),
         workorder_count: 0,
@@ -232,7 +238,6 @@ pub fn block_workcenter(
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         working_state: "blocked".to_string(),
-        workingstate: "blocked".to_string(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..wc
@@ -276,7 +281,6 @@ pub fn unblock_workcenter(
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         working_state: "normal".to_string(),
-        workingstate: "normal".to_string(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..wc

@@ -4,6 +4,267 @@
 /// Types used exclusively within one domain live in that domain's file.
 use spacetimedb::SpacetimeType;
 
+// ============================================================================
+// POLICY ENUMS (1.1 — Eliminating Hardcoded Policy Strings)
+// ============================================================================
+
+/// Sale order shipping policy — when to trigger delivery
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ShippingPolicy {
+    /// Ship each product individually as soon as available
+    Direct,
+    /// Ship only when all products are ready
+    OneMove,
+    /// Ship products as they become available (same as Direct)
+    ShipOnly,
+    /// Send invoice then ship
+    InvoiceAndShip,
+}
+
+impl ShippingPolicy {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "direct" => Ok(Self::Direct),
+            "one_move" => Ok(Self::OneMove),
+            "ship_only" => Ok(Self::ShipOnly),
+            "invoice_and_ship" => Ok(Self::InvoiceAndShip),
+            other => Err(format!(
+                "Invalid shipping_policy '{}'. Valid values: direct, one_move, ship_only, invoice_and_ship",
+                other
+            )),
+        }
+    }
+}
+
+/// Sale order picking policy — how stock moves are grouped
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PickingPolicy {
+    /// Create one move per order line
+    Direct,
+    /// Group all lines into one picking
+    OneMove,
+}
+
+impl PickingPolicy {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "direct" => Ok(Self::Direct),
+            "one_move" => Ok(Self::OneMove),
+            other => Err(format!(
+                "Invalid picking_policy '{}'. Valid values: direct, one_move",
+                other
+            )),
+        }
+    }
+}
+
+/// Purchase order quantity copy behavior
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IsQuantityCopy {
+    /// Do not copy quantities
+    None,
+    /// Copy quantities from reference document
+    Copy,
+}
+
+impl IsQuantityCopy {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "none" => Ok(Self::None),
+            "copy" => Ok(Self::Copy),
+            other => Err(format!(
+                "Invalid is_quantity_copy '{}'. Valid values: none, copy",
+                other
+            )),
+        }
+    }
+}
+
+/// Purchase requisition award mode
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExclusiveMode {
+    /// Only one vendor wins the requisition
+    Exclusive,
+    /// Multiple vendors can be awarded
+    Multiple,
+}
+
+impl ExclusiveMode {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "exclusive" => Ok(Self::Exclusive),
+            "multiple" => Ok(Self::Multiple),
+            other => Err(format!(
+                "Invalid exclusive mode '{}'. Valid values: exclusive, multiple",
+                other
+            )),
+        }
+    }
+}
+
+/// Stock move procurement method
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ProcureMethod {
+    /// Take from existing stock
+    MakeToStock,
+    /// Trigger procurement only when needed
+    MakeToOrder,
+}
+
+impl ProcureMethod {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "make_to_stock" => Ok(Self::MakeToStock),
+            "make_to_order" => Ok(Self::MakeToOrder),
+            other => Err(format!(
+                "Invalid procure_method '{}'. Valid values: make_to_stock, make_to_order",
+                other
+            )),
+        }
+    }
+}
+
+/// Manufacturing order component consumption strictness
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ConsumptionMode {
+    /// Accept any consumed quantity
+    Flexible,
+    /// Warn when consumed quantity differs from expected
+    Warning,
+    /// Error when consumed quantity differs from expected
+    Strict,
+}
+
+impl ConsumptionMode {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "flexible" => Ok(Self::Flexible),
+            "warning" => Ok(Self::Warning),
+            "strict" => Ok(Self::Strict),
+            other => Err(format!(
+                "Invalid consumption '{}'. Valid values: flexible, warning, strict",
+                other
+            )),
+        }
+    }
+}
+
+/// Project billing type
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum BillType {
+    /// Bill based on project milestones
+    CustomerProject,
+    /// Bill based on tasks completed
+    CustomerTask,
+    /// Project is not billable
+    No,
+}
+
+impl BillType {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "customer_project" => Ok(Self::CustomerProject),
+            "customer_task" => Ok(Self::CustomerTask),
+            "no" => Ok(Self::No),
+            other => Err(format!(
+                "Invalid bill_type '{}'. Valid values: customer_project, customer_task, no",
+                other
+            )),
+        }
+    }
+}
+
+/// Project pricing type
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PricingType {
+    /// Rate per task
+    TaskRate,
+    /// Fixed rate for the whole project
+    FixedRate,
+    /// Rate per employee
+    EmployeeRate,
+}
+
+impl PricingType {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "task_rate" => Ok(Self::TaskRate),
+            "fixed_rate" => Ok(Self::FixedRate),
+            "employee_rate" => Ok(Self::EmployeeRate),
+            other => Err(format!(
+                "Invalid pricing_type '{}'. Valid values: task_rate, fixed_rate, employee_rate",
+                other
+            )),
+        }
+    }
+}
+
+/// Timesheet entry invoice type
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TimesheetInvoiceType {
+    /// Hours will be invoiced to the customer
+    Billable,
+    /// Hours are not invoiced
+    NonBillable,
+    /// Hours generate revenue via subscription/recurring
+    TimesheetRevenues,
+}
+
+impl TimesheetInvoiceType {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "billable" => Ok(Self::Billable),
+            "non_billable" => Ok(Self::NonBillable),
+            "timesheet_revenues" => Ok(Self::TimesheetRevenues),
+            other => Err(format!(
+                "Invalid timesheet_invoice_type '{}'. Valid values: billable, non_billable, timesheet_revenues",
+                other
+            )),
+        }
+    }
+
+    /// Derive the default from a project's bill_type string
+    pub fn default_for_bill_type(bill_type: &str) -> Self {
+        match bill_type {
+            "customer_task" | "customer_project" => Self::Billable,
+            _ => Self::NonBillable,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Billable => "billable",
+            Self::NonBillable => "non_billable",
+            Self::TimesheetRevenues => "timesheet_revenues",
+        }
+    }
+}
+
+/// Work center operational state
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum WorkingState {
+    /// Work center is running normally
+    Normal,
+    /// Work center is blocked / in maintenance
+    Blocked,
+    /// Work center has completed its current job
+    Done,
+}
+
+impl WorkingState {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "normal" => Ok(Self::Normal),
+            "blocked" => Ok(Self::Blocked),
+            "done" => Ok(Self::Done),
+            other => Err(format!(
+                "Invalid working_state '{}'. Valid values: normal, blocked, done",
+                other
+            )),
+        }
+    }
+}
+
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum JobStatus {
     Pending,

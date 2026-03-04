@@ -7,7 +7,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log};
+use crate::projects::projects::project_project;
 use crate::projects::tasks::{project_task, ProjectTask};
+use crate::types::TimesheetInvoiceType;
 
 // ============================================================================
 // TIMESHEET TABLE
@@ -78,12 +80,34 @@ pub fn log_timesheet(
     unit_amount: f64,
     currency_id: u64,
     employee_cost: f64,
+    timesheet_invoice_type: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "project_timesheet", "create")?;
 
     if unit_amount <= 0.0 {
         return Err("Hours must be greater than 0".to_string());
     }
+
+    // Validate or derive timesheet_invoice_type
+    let resolved_invoice_type = match timesheet_invoice_type {
+        Some(ref t) => {
+            TimesheetInvoiceType::from_str(t)?;
+            t.clone()
+        }
+        None => {
+            // Derive from parent project's bill_type
+            let bill_type = ctx
+                .db
+                .project_project()
+                .id()
+                .find(&project_id)
+                .map(|p| p.bill_type)
+                .unwrap_or_else(|| "no".to_string());
+            TimesheetInvoiceType::default_for_bill_type(&bill_type)
+                .as_str()
+                .to_string()
+        }
+    };
 
     // Validate task belongs to project
     if let Some(tid) = task_id {
@@ -120,7 +144,7 @@ pub fn log_timesheet(
         timer_start: None,
         timer_pause: None,
         employee_cost,
-        timesheet_invoice_type: "non_billable".to_string(),
+        timesheet_invoice_type: resolved_invoice_type,
         timesheet_invoice_id: None,
         timesheet_revenue: revenue,
         so_line: None,
@@ -193,8 +217,29 @@ pub fn start_timesheet_timer(
     name: String,
     currency_id: u64,
     employee_cost: f64,
+    timesheet_invoice_type: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "project_timesheet", "create")?;
+
+    // Validate or derive timesheet_invoice_type
+    let resolved_invoice_type = match timesheet_invoice_type {
+        Some(ref t) => {
+            TimesheetInvoiceType::from_str(t)?;
+            t.clone()
+        }
+        None => {
+            let bill_type = ctx
+                .db
+                .project_project()
+                .id()
+                .find(&project_id)
+                .map(|p| p.bill_type)
+                .unwrap_or_else(|| "no".to_string());
+            TimesheetInvoiceType::default_for_bill_type(&bill_type)
+                .as_str()
+                .to_string()
+        }
+    };
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
@@ -215,7 +260,7 @@ pub fn start_timesheet_timer(
         timer_start: Some(ctx.timestamp),
         timer_pause: None,
         employee_cost,
-        timesheet_invoice_type: "non_billable".to_string(),
+        timesheet_invoice_type: resolved_invoice_type,
         timesheet_invoice_id: None,
         timesheet_revenue: 0.0,
         so_line: None,

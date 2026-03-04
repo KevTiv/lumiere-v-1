@@ -10,7 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::organization::company;
 use crate::helpers::{check_permission, write_audit_log};
-use crate::types::{LineState, PoInvoiceStatus, PoState, RequisitionState};
+use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState};
 
 // ============================================================================
 // PURCHASE ORDER TABLES
@@ -254,9 +254,15 @@ pub fn create_purchase_order(
     message_follower_ids: Vec<u64>,
     message_ids: Vec<u64>,
     activity_ids: Vec<u64>,
+    is_quantity_copy: Option<String>,
     metadata: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
+
+    // Validate is_quantity_copy if provided
+    if let Some(ref iqc) = is_quantity_copy {
+        IsQuantityCopy::from_str(iqc)?;
+    }
 
     validate_company_in_organization(ctx, organization_id, company_id)?;
 
@@ -307,7 +313,7 @@ pub fn create_purchase_order(
         access_token: None,
         access_warning: None,
         is_locked: false,
-        is_quantity_copy: "none".to_string(),
+        is_quantity_copy: is_quantity_copy.unwrap_or_else(|| "none".to_string()),
         incoterm_id,
         incoterm_location,
         create_uid: ctx.sender(),
@@ -889,6 +895,11 @@ pub fn create_purchase_requisition(
     check_permission(ctx, organization_id, "purchase_requisition", "create")?;
 
     validate_company_in_organization(ctx, organization_id, company_id)?;
+
+    // Validate exclusive mode if provided
+    if let Some(ref excl) = exclusive {
+        ExclusiveMode::from_str(excl)?;
+    }
 
     let order_count = purchase_ids.len() as u32;
 
