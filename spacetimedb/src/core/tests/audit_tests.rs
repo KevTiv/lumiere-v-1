@@ -5,8 +5,9 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::audit::{
     audit_log, audit_rule, create_audit_rule, log_audit_event, update_audit_rule,
+    CreateAuditRuleParams, LogAuditEventParams, UpdateAuditRuleParams,
 };
-use crate::core::organization::{create_organization, organization};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
 
 /// Test audit logging lifecycle
 #[spacetimedb::reducer]
@@ -15,18 +16,21 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Creating test organization...");
     create_organization(
         ctx,
-        "Audit Test Org".to_string(),
-        "AUDITORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Audit Test Org".to_string(),
+            code: "AUDITORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -44,23 +48,29 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
     create_audit_rule(
         ctx,
         org_id,
-        "user_profile".to_string(),
-        false,
-        true,
-        true,
-        true,
-        None,
+        CreateAuditRuleParams {
+            table_name: "user_profile".to_string(),
+            log_reads: false,
+            log_writes: true,
+            log_deletes: true,
+            log_logins: true,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_audit_rule(
         ctx,
         org_id,
-        "organization".to_string(),
-        true,
-        true,
-        true,
-        false,
-        None,
+        CreateAuditRuleParams {
+            table_name: "organization".to_string(),
+            log_reads: true,
+            log_writes: true,
+            log_deletes: true,
+            log_logins: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let rules: Vec<_> = ctx
@@ -98,49 +108,55 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
     log_audit_event(
         ctx,
         org_id,
-        None,
-        "user_profile".to_string(),
-        1,
-        "CREATE".to_string(),
-        None,
-        Some(r#"{"name": "John", "email": "john@example.com"}"#.to_string()),
-        vec!["name".to_string(), "email".to_string()],
-        None,
-        Some("192.168.1.1".to_string()),
-        Some("Mozilla/5.0".to_string()),
-        None,
+        LogAuditEventParams {
+            company_id: None,
+            table_name: "user_profile".to_string(),
+            record_id: 1,
+            action: "CREATE".to_string(),
+            old_values: None,
+            new_values: Some(r#"{"name": "John", "email": "john@example.com"}"#.to_string()),
+            changed_fields: vec!["name".to_string(), "email".to_string()],
+            session_id: None,
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+            metadata: None,
+        },
     )?;
 
     log_audit_event(
         ctx,
         org_id,
-        None,
-        "user_profile".to_string(),
-        1,
-        "UPDATE".to_string(),
-        Some(r#"{"name": "John"}"#.to_string()),
-        Some(r#"{"name": "John Doe"}"#.to_string()),
-        vec!["name".to_string()],
-        Some(1),
-        Some("192.168.1.1".to_string()),
-        Some("Mozilla/5.0".to_string()),
-        None,
+        LogAuditEventParams {
+            company_id: None,
+            table_name: "user_profile".to_string(),
+            record_id: 1,
+            action: "UPDATE".to_string(),
+            old_values: Some(r#"{"name": "John"}"#.to_string()),
+            new_values: Some(r#"{"name": "John Doe"}"#.to_string()),
+            changed_fields: vec!["name".to_string()],
+            session_id: Some(1),
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+            metadata: None,
+        },
     )?;
 
     log_audit_event(
         ctx,
         org_id,
-        Some(1),
-        "company".to_string(),
-        1,
-        "DELETE".to_string(),
-        Some(r#"{"name": "Old Company"}"#.to_string()),
-        None,
-        vec!["name".to_string()],
-        Some(1),
-        Some("192.168.1.2".to_string()),
-        Some("Mozilla/5.0".to_string()),
-        None,
+        LogAuditEventParams {
+            company_id: Some(1),
+            table_name: "company".to_string(),
+            record_id: 1,
+            action: "DELETE".to_string(),
+            old_values: Some(r#"{"name": "Old Company"}"#.to_string()),
+            new_values: None,
+            changed_fields: vec!["name".to_string()],
+            session_id: Some(1),
+            ip_address: Some("192.168.1.2".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+            metadata: None,
+        },
     )?;
 
     let logs: Vec<_> = ctx.db.audit_log().iter().collect();
@@ -210,11 +226,13 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
     update_audit_rule(
         ctx,
         rule_id,
-        Some(true),
-        Some(false),
-        Some(true),
-        Some(false),
-        Some(false),
+        UpdateAuditRuleParams {
+            log_reads: Some(true),
+            log_writes: Some(false),
+            log_deletes: Some(true),
+            log_logins: Some(false),
+            is_active: Some(false),
+        },
     )?;
 
     let updated_rule = ctx
@@ -264,7 +282,17 @@ pub fn test_audit_logging(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 9: Error - non-existent rule update
     log::info!("TEST: Non-existent rule update...");
-    let result = update_audit_rule(ctx, 99999, None, None, None, None, None);
+    let result = update_audit_rule(
+        ctx,
+        99999,
+        UpdateAuditRuleParams {
+            log_reads: None,
+            log_writes: None,
+            log_deletes: None,
+            log_logins: None,
+            is_active: None,
+        },
+    );
 
     if result.is_ok() {
         return Err("Should fail for non-existent rule".to_string());
@@ -282,18 +310,21 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
     create_organization(
         ctx,
-        "Audit Edge Org".to_string(),
-        "AUDITEDGE".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Audit Edge Org".to_string(),
+            code: "AUDITEDGE".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -308,12 +339,15 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_audit_rule(
         ctx,
         org.id,
-        "disabled_table".to_string(),
-        false,
-        false,
-        false,
-        false,
-        None,
+        CreateAuditRuleParams {
+            table_name: "disabled_table".to_string(),
+            log_reads: false,
+            log_writes: false,
+            log_deletes: false,
+            log_logins: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let disabled_rule = ctx
@@ -338,12 +372,15 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_audit_rule(
         ctx,
         org.id,
-        "verbose_table".to_string(),
-        true,
-        true,
-        true,
-        true,
-        None,
+        CreateAuditRuleParams {
+            table_name: "verbose_table".to_string(),
+            log_reads: true,
+            log_writes: true,
+            log_deletes: true,
+            log_logins: true,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let verbose_rule = ctx
@@ -369,18 +406,21 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     // Create another organization
     create_organization(
         ctx,
-        "Audit Org 2".to_string(),
-        "AUDIT2".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Audit Org 2".to_string(),
+            code: "AUDIT2".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org2 = ctx
@@ -393,12 +433,15 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_audit_rule(
         ctx,
         org2.id,
-        "verbose_table".to_string(),
-        false,
-        true,
-        false,
-        false,
-        None,
+        CreateAuditRuleParams {
+            table_name: "verbose_table".to_string(),
+            log_reads: false,
+            log_writes: true,
+            log_deletes: false,
+            log_logins: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let rules_for_table: Vec<_> = ctx
@@ -419,7 +462,17 @@ pub fn test_audit_rule_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 4: Partial update of audit rule
     log::info!("TEST: Partial update of audit rule...");
-    update_audit_rule(ctx, verbose_rule.id, None, Some(false), None, None, None)?;
+    update_audit_rule(
+        ctx,
+        verbose_rule.id,
+        UpdateAuditRuleParams {
+            log_reads: None,
+            log_writes: Some(false),
+            log_deletes: None,
+            log_logins: None,
+            is_active: None,
+        },
+    )?;
 
     let partial_update = ctx
         .db
@@ -450,18 +503,21 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
     // Setup
     create_organization(
         ctx,
-        "Audit Integrity Org".to_string(),
-        "AUDITINT".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Audit Integrity Org".to_string(),
+            code: "AUDITINT".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -476,17 +532,19 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
     log_audit_event(
         ctx,
         org.id,
-        None,
-        "minimal_table".to_string(),
-        1,
-        "LOGIN".to_string(),
-        None,
-        None,
-        vec![],
-        None,
-        None,
-        None,
-        None,
+        LogAuditEventParams {
+            company_id: None,
+            table_name: "minimal_table".to_string(),
+            record_id: 1,
+            action: "LOGIN".to_string(),
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            session_id: None,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let minimal_log = ctx
@@ -511,17 +569,19 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
     log_audit_event(
         ctx,
         org.id,
-        Some(1),
-        "session_table".to_string(),
-        2,
-        "LOGOUT".to_string(),
-        None,
-        None,
-        vec![],
-        Some(123),
-        Some("10.0.0.1".to_string()),
-        Some("Chrome/120".to_string()),
-        None,
+        LogAuditEventParams {
+            company_id: Some(1),
+            table_name: "session_table".to_string(),
+            record_id: 2,
+            action: "LOGOUT".to_string(),
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            session_id: Some(123),
+            ip_address: Some("10.0.0.1".to_string()),
+            user_agent: Some("Chrome/120".to_string()),
+            metadata: None,
+        },
     )?;
 
     let session_log = ctx
@@ -550,17 +610,19 @@ pub fn test_audit_log_data_integrity(ctx: &ReducerContext) -> Result<(), String>
     log_audit_event(
         ctx,
         org.id,
-        None,
-        "fields_table".to_string(),
-        3,
-        "UPDATE".to_string(),
-        Some(r#"{"a": 1, "b": 2, "c": 3}"#.to_string()),
-        Some(r#"{"a": 1, "b": 22, "c": 3, "d": 4}"#.to_string()),
-        vec!["b".to_string(), "d".to_string()],
-        None,
-        None,
-        None,
-        None,
+        LogAuditEventParams {
+            company_id: None,
+            table_name: "fields_table".to_string(),
+            record_id: 3,
+            action: "UPDATE".to_string(),
+            old_values: Some(r#"{"a": 1, "b": 2, "c": 3}"#.to_string()),
+            new_values: Some(r#"{"a": 1, "b": 22, "c": 3, "d": 4}"#.to_string()),
+            changed_fields: vec!["b".to_string(), "d".to_string()],
+            session_id: None,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let fields_log = ctx
@@ -609,18 +671,21 @@ pub fn test_audit_authorization(ctx: &ReducerContext) -> Result<(), String> {
     // Setup - create organization where user is a member
     create_organization(
         ctx,
-        "Audit Auth Org".to_string(),
-        "AUTHORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Audit Auth Org".to_string(),
+            code: "AUTHORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -637,17 +702,19 @@ pub fn test_audit_authorization(ctx: &ReducerContext) -> Result<(), String> {
     log_audit_event(
         ctx,
         org.id,
-        None,
-        "auth_table".to_string(),
-        1,
-        "CREATE".to_string(),
-        None,
-        None,
-        vec![],
-        None,
-        None,
-        None,
-        None,
+        LogAuditEventParams {
+            company_id: None,
+            table_name: "auth_table".to_string(),
+            record_id: 1,
+            action: "CREATE".to_string(),
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            session_id: None,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     log::info!("✓ Event logged by authorized user");

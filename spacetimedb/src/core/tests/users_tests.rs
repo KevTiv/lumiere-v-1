@@ -3,12 +3,16 @@
 /// Test reducers for UserProfile, UserOrganization, and UserSession tables.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization};
-use crate::core::permissions::{assign_role, role, user_role_assignment};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
+use crate::core::permissions::{
+    assign_role, role, user_role_assignment, AssignRoleParams, CreateRoleParams,
+};
 use crate::core::users::{
     add_org_member, add_user_to_organization, create_user_session, end_user_session,
     remove_user_from_organization, update_org_member_details, update_org_member_role,
-    update_user_profile, user_organization, user_profile, user_session,
+    update_user_profile, user_organization, user_profile, user_session, AddOrgMemberParams,
+    AddUserToOrganizationParams, CreateUserSessionParams, UpdateOrgMemberDetailsParams,
+    UpdateUserProfileParams,
 };
 
 /// Test user profile and organization membership lifecycle
@@ -18,18 +22,21 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Setting up test organization...");
     create_organization(
         ctx,
-        "User Test Org".to_string(),
-        "USERORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "User Test Org".to_string(),
+            code: "USERORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -45,17 +52,19 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Updating user profile...");
     update_user_profile(
         ctx,
-        Some("Test User".to_string()),
-        Some("Test".to_string()),
-        Some("User".to_string()),
-        Some("https://avatar.example.com/test.png".to_string()),
-        Some("+1234567890".to_string()),
-        Some("+1987654321".to_string()),
-        Some("America/New_York".to_string()),
-        Some("en".to_string()),
-        Some("Best regards,\nTest User".to_string()),
-        Some(r#"{"email": true, "sms": false}"#.to_string()),
-        Some(r#"{"theme": "dark"}"#.to_string()),
+        UpdateUserProfileParams {
+            name: Some("Test User".to_string()),
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
+            avatar_url: Some("https://avatar.example.com/test.png".to_string()),
+            phone: Some("+1234567890".to_string()),
+            mobile: Some("+1987654321".to_string()),
+            timezone: Some("America/New_York".to_string()),
+            language: Some("en".to_string()),
+            signature: Some("Best regards,\nTest User".to_string()),
+            notification_preferences: Some(r#"{"email": true, "sms": false}"#.to_string()),
+            ui_preferences: Some(r#"{"theme": "dark"}"#.to_string()),
+        },
     )?;
 
     let profile = ctx
@@ -110,17 +119,19 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Partial profile update...");
     update_user_profile(
         ctx,
-        Some("Updated Test User".to_string()),
-        None, // Keep existing first_name
-        None, // Keep existing last_name
-        None,
-        None,
-        None,
-        Some("Europe/London".to_string()), // Only update timezone
-        None,
-        None,
-        None,
-        None,
+        UpdateUserProfileParams {
+            name: Some("Updated Test User".to_string()),
+            first_name: None, // Keep existing first_name
+            last_name: None,  // Keep existing last_name
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: Some("Europe/London".to_string()), // Only update timezone
+            language: None,
+            signature: None,
+            notification_preferences: None,
+            ui_preferences: None,
+        },
     )?;
 
     let updated_profile = ctx
@@ -151,12 +162,14 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     create_user_session(
         ctx,
         org.id,
-        "test_session_token_123".to_string(),
-        Some("192.168.1.1".to_string()),
-        Some("Mozilla/5.0 Test".to_string()),
-        Some("Desktop Chrome".to_string()),
-        expires_at,
-        None,
+        CreateUserSessionParams {
+            session_token: "test_session_token_123".to_string(),
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0 Test".to_string()),
+            device_info: Some("Desktop Chrome".to_string()),
+            expires_at_micros: expires_at,
+            metadata: None,
+        },
     )?;
 
     let sessions: Vec<_> = ctx
@@ -210,12 +223,14 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     create_user_session(
         ctx,
         org.id,
-        "test_session_token_456".to_string(),
-        None,
-        None,
-        None,
-        expires_at,
-        None,
+        CreateUserSessionParams {
+            session_token: "test_session_token_456".to_string(),
+            ip_address: None,
+            user_agent: None,
+            device_info: None,
+            expires_at_micros: expires_at,
+            metadata: None,
+        },
     )?;
 
     // Try to end it as a different user would fail, but we can't test that easily
@@ -274,18 +289,21 @@ pub fn test_user_organization_membership(ctx: &ReducerContext) -> Result<(), Str
     log::info!("TEST: Creating test organization for membership...");
     create_organization(
         ctx,
-        "Membership Test Org".to_string(),
-        "MEMBERORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Membership Test Org".to_string(),
+            code: "MEMBERORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -364,18 +382,21 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("TEST: Setting up for session edge cases...");
     create_organization(
         ctx,
-        "Session Edge Case Org".to_string(),
-        "SESSORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Session Edge Case Org".to_string(),
+            code: "SESSORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -392,12 +413,14 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     create_user_session(
         ctx,
         org.id,
-        "minimal_token".to_string(),
-        None,
-        None,
-        None,
-        expires_at,
-        None,
+        CreateUserSessionParams {
+            session_token: "minimal_token".to_string(),
+            ip_address: None,
+            user_agent: None,
+            device_info: None,
+            expires_at_micros: expires_at,
+            metadata: None,
+        },
     )?;
 
     let minimal_session = ctx
@@ -421,12 +444,16 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     create_user_session(
         ctx,
         org.id,
-        "full_token".to_string(),
-        Some("203.0.113.42".to_string()),
-        Some("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()),
-        Some("Windows Desktop, Chrome 120".to_string()),
-        expires_at,
-        None,
+        CreateUserSessionParams {
+            session_token: "full_token".to_string(),
+            ip_address: Some("203.0.113.42".to_string()),
+            user_agent: Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string(),
+            ),
+            device_info: Some("Windows Desktop, Chrome 120".to_string()),
+            expires_at_micros: expires_at,
+            metadata: None,
+        },
     )?;
 
     let full_session = ctx
@@ -452,12 +479,14 @@ pub fn test_user_session_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
         create_user_session(
             ctx,
             org.id,
-            format!("multi_token_{}", i),
-            None,
-            None,
-            None,
-            expires_at + (i as u64 * 1000_000),
-            None,
+            CreateUserSessionParams {
+                session_token: format!("multi_token_{}", i),
+                ip_address: None,
+                user_agent: None,
+                device_info: None,
+                expires_at_micros: expires_at + (i as u64 * 1000_000),
+                metadata: None,
+            },
         )?;
     }
 
@@ -519,17 +548,19 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("TEST: Profile update with data...");
     update_user_profile(
         ctx,
-        Some("Valid Name".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some("UTC".to_string()),
-        Some("en".to_string()),
-        None,
-        None,
-        None,
+        UpdateUserProfileParams {
+            name: Some("Valid Name".to_string()),
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: Some("UTC".to_string()),
+            language: Some("en".to_string()),
+            signature: None,
+            notification_preferences: None,
+            ui_preferences: None,
+        },
     )?;
 
     let profile = ctx
@@ -549,17 +580,21 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("TEST: Notification preferences JSON...");
     update_user_profile(
         ctx,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some(r#"{"email": true, "push": false, "sms": true, "frequency": "daily"}"#.to_string()),
-        None,
+        UpdateUserProfileParams {
+            name: None,
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: None,
+            language: None,
+            signature: None,
+            notification_preferences: Some(
+                r#"{"email": true, "push": false, "sms": true, "frequency": "daily"}"#.to_string(),
+            ),
+            ui_preferences: None,
+        },
     )?;
 
     let profile = ctx
@@ -579,17 +614,21 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("TEST: UI preferences JSON...");
     update_user_profile(
         ctx,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some("Complex signature with\nmultiple lines".to_string()),
-        None,
-        Some(r#"{"theme": "dark", "sidebar": "collapsed", "density": "compact"}"#.to_string()),
+        UpdateUserProfileParams {
+            name: None,
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: None,
+            language: None,
+            signature: Some("Complex signature with\nmultiple lines".to_string()),
+            notification_preferences: None,
+            ui_preferences: Some(
+                r#"{"theme": "dark", "sidebar": "collapsed", "density": "compact"}"#.to_string(),
+            ),
+        },
     )?;
 
     let profile = ctx
@@ -648,18 +687,21 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
     // 1) Create org (bootstraps owner role + owner membership for caller)
     create_organization(
         ctx,
-        "Onboarding RBAC Org".to_string(),
-        "ONBRBAC".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Onboarding RBAC Org".to_string(),
+            code: "ONBRBAC".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -696,25 +738,31 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
     crate::core::permissions::create_role(
         ctx,
         org.id,
-        "manager".to_string(),
-        Some("Manager role".to_string()),
-        None,
-        vec![
-            "user_organization:write".to_string(),
-            "user_organization:create".to_string(),
-            "user_organization:delete".to_string(),
-            "user_role_assignment:create".to_string(),
-        ],
-        None,
+        CreateRoleParams {
+            name: "manager".to_string(),
+            description: Some("Manager role".to_string()),
+            parent_id: None,
+            permissions: vec![
+                "user_organization:write".to_string(),
+                "user_organization:create".to_string(),
+                "user_organization:delete".to_string(),
+                "user_role_assignment:create".to_string(),
+            ],
+            is_active: true,
+            metadata: None,
+        },
     )?;
     crate::core::permissions::create_role(
         ctx,
         org.id,
-        "viewer".to_string(),
-        Some("Viewer role".to_string()),
-        None,
-        vec!["organization:read".to_string()],
-        None,
+        CreateRoleParams {
+            name: "viewer".to_string(),
+            description: Some("Viewer role".to_string()),
+            parent_id: None,
+            permissions: vec!["organization:read".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let manager_role = ctx
@@ -741,12 +789,16 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
         ctx,
         member_a,
         org.id,
-        viewer_role.id,
-        None,
-        Some("Analyst".to_string()),
-        None,
-        Some("EMP-001".to_string()),
-        Some("{\"source\":\"test\"}".to_string()),
+        AddUserToOrganizationParams {
+            role_id: viewer_role.id,
+            company_id: None,
+            job_title: Some("Analyst".to_string()),
+            department_id: None,
+            employee_id: Some("EMP-001".to_string()),
+            is_active: true,
+            is_default: false,
+            metadata: Some("{\"source\":\"test\"}".to_string()),
+        },
     )?;
 
     let membership_a = ctx
@@ -767,12 +819,16 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
         ctx,
         member_a,
         org.id,
-        viewer_role.id,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AddUserToOrganizationParams {
+            role_id: viewer_role.id,
+            company_id: None,
+            job_title: None,
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
     ) {
         Ok(_) => return Err("Duplicate active membership should fail".to_string()),
         Err(_) => log::info!("✓ Duplicate active membership correctly rejected"),
@@ -783,12 +839,16 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
         ctx,
         member_b,
         org.id,
-        "viewer".to_string(),
-        None,
-        Some("Intern".to_string()),
-        None,
-        None,
-        None,
+        AddOrgMemberParams {
+            role_name: "viewer".to_string(),
+            company_id: None,
+            job_title: Some("Intern".to_string()),
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
     )?;
 
     let membership_b = ctx
@@ -824,9 +884,11 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
     update_org_member_details(
         ctx,
         membership_b.id,
-        Some(42),
-        Some("Operations".to_string()),
-        Some("EMP-042".to_string()),
+        UpdateOrgMemberDetailsParams {
+            department_id: Some(42),
+            job_title: Some("Operations".to_string()),
+            employee_id: Some("EMP-042".to_string()),
+        },
     )?;
 
     let membership_b_after_details = ctx
@@ -854,8 +916,10 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
         member_b,
         manager_role.id,
         org.id,
-        None,
-        Some("{\"source\":\"test_assign\"}".to_string()),
+        AssignRoleParams {
+            expires_at_micros: None,
+            metadata: Some("{\"source\":\"test_assign\"}".to_string()),
+        },
     )?;
 
     let assignments_for_b: Vec<_> = ctx
@@ -877,7 +941,16 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
     log::info!("✓ assign_role works");
 
     // 9) Duplicate assignment should fail
-    match assign_role(ctx, member_b, manager_role.id, org.id, None, None) {
+    match assign_role(
+        ctx,
+        member_b,
+        manager_role.id,
+        org.id,
+        AssignRoleParams {
+            expires_at_micros: None,
+            metadata: None,
+        },
+    ) {
         Ok(_) => return Err("Duplicate role assignment should fail".to_string()),
         Err(_) => log::info!("✓ Duplicate role assignment correctly rejected"),
     }
@@ -903,12 +976,16 @@ pub fn test_onboarding_rbac_membership_flows(ctx: &ReducerContext) -> Result<(),
         ctx,
         member_a,
         org.id,
-        viewer_role.id,
-        None,
-        Some("Re-added Analyst".to_string()),
-        None,
-        Some("EMP-001-R".to_string()),
-        None,
+        AddUserToOrganizationParams {
+            role_id: viewer_role.id,
+            company_id: None,
+            job_title: Some("Re-added Analyst".to_string()),
+            department_id: None,
+            employee_id: Some("EMP-001-R".to_string()),
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
     )?;
 
     let active_membership_a_count = ctx

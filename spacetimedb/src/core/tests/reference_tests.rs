@@ -3,11 +3,12 @@
 /// Test reducers for Country, Currency, CurrencyRate, UOMCategory, UOM, UOMConversion tables.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
 use crate::core::reference::{
     country, create_country, create_currency, create_currency_rate, create_uom,
     create_uom_category, create_uom_conversion, currency, currency_rate, uom, uom_cat,
-    uom_conversion,
+    uom_conversion, CreateCountryParams, CreateCurrencyParams, CreateCurrencyRateParams,
+    CreateUomCategoryParams, CreateUomConversionParams, CreateUomParams,
 };
 
 /// Test reference data lifecycle
@@ -18,40 +19,49 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_country(
         ctx,
         "US".to_string(),
-        "United States".to_string(),
-        "USA".to_string(),
-        840,
-        "+1".to_string(),
-        Some("United States of America".to_string()),
-        Some("USD".to_string()),
-        vec!["en".to_string(), "es".to_string()],
-        None,
+        CreateCountryParams {
+            name: "United States".to_string(),
+            iso3: "USA".to_string(),
+            numcode: 840,
+            phone_code: "+1".to_string(),
+            official_name: Some("United States of America".to_string()),
+            currency_code: Some("USD".to_string()),
+            language_codes: vec!["en".to_string(), "es".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_country(
         ctx,
         "CA".to_string(),
-        "Canada".to_string(),
-        "CAN".to_string(),
-        124,
-        "+1".to_string(),
-        None,
-        Some("CAD".to_string()),
-        vec!["en".to_string(), "fr".to_string()],
-        None,
+        CreateCountryParams {
+            name: "Canada".to_string(),
+            iso3: "CAN".to_string(),
+            numcode: 124,
+            phone_code: "+1".to_string(),
+            official_name: None,
+            currency_code: Some("CAD".to_string()),
+            language_codes: vec!["en".to_string(), "fr".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_country(
         ctx,
         "GB".to_string(),
-        "United Kingdom".to_string(),
-        "GBR".to_string(),
-        826,
-        "+44".to_string(),
-        None,
-        Some("GBP".to_string()),
-        vec!["en".to_string()],
-        None,
+        CreateCountryParams {
+            name: "United Kingdom".to_string(),
+            iso3: "GBR".to_string(),
+            numcode: 826,
+            phone_code: "+44".to_string(),
+            official_name: None,
+            currency_code: Some("GBP".to_string()),
+            language_codes: vec!["en".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let us = ctx
@@ -76,34 +86,43 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_currency(
         ctx,
         "USD".to_string(),
-        "US Dollar".to_string(),
-        "$".to_string(),
-        2,
-        0.01,
-        "before".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "US Dollar".to_string(),
+            symbol: "$".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "before".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     create_currency(
         ctx,
         "EUR".to_string(),
-        "Euro".to_string(),
-        "€".to_string(),
-        2,
-        0.01,
-        "after".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Euro".to_string(),
+            symbol: "€".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "after".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     create_currency(
         ctx,
         "GBP".to_string(),
-        "British Pound".to_string(),
-        "£".to_string(),
-        2,
-        0.01,
-        "before".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "British Pound".to_string(),
+            symbol: "£".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "before".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     let usd = ctx
@@ -128,14 +147,17 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let duplicate = create_country(
         ctx,
         "US".to_string(),
-        "Duplicate".to_string(),
-        "DUP".to_string(),
-        999,
-        "+999".to_string(),
-        None,
-        None,
-        vec![],
-        None,
+        CreateCountryParams {
+            name: "Duplicate".to_string(),
+            iso3: "DUP".to_string(),
+            numcode: 999,
+            phone_code: "+999".to_string(),
+            official_name: None,
+            currency_code: None,
+            language_codes: vec![],
+            is_active: true,
+            metadata: None,
+        },
     );
 
     if duplicate.is_ok() {
@@ -148,12 +170,15 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let duplicate_curr = create_currency(
         ctx,
         "USD".to_string(),
-        "Duplicate".to_string(),
-        "X".to_string(),
-        0,
-        0.0,
-        "before".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Duplicate".to_string(),
+            symbol: "X".to_string(),
+            decimal_places: 0,
+            rounding_factor: 0.0,
+            position: "before".to_string(),
+            active: true,
+            metadata: None,
+        },
     );
 
     if duplicate_curr.is_ok() {
@@ -166,12 +191,15 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let invalid_pos = create_currency(
         ctx,
         "XXX".to_string(),
-        "Test".to_string(),
-        "T".to_string(),
-        2,
-        0.01,
-        "invalid".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Test".to_string(),
+            symbol: "T".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "invalid".to_string(),
+            active: true,
+            metadata: None,
+        },
     );
 
     if invalid_pos.is_ok() {
@@ -183,18 +211,21 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Creating test organization...");
     create_organization(
         ctx,
-        "Reference Test Org".to_string(),
-        "REFORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Reference Test Org".to_string(),
+            code: "REFORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -211,21 +242,25 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_currency_rate(
         ctx,
         org_id,
-        "USD".to_string(),
-        "EUR".to_string(),
-        0.85,
         Some(1),
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "USD".to_string(),
+            to_currency: "EUR".to_string(),
+            rate: 0.85,
+            metadata: None,
+        },
     )?;
 
     create_currency_rate(
         ctx,
         org_id,
-        "USD".to_string(),
-        "GBP".to_string(),
-        0.73,
         None,
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "USD".to_string(),
+            to_currency: "GBP".to_string(),
+            rate: 0.73,
+            metadata: None,
+        },
     )?;
 
     let rates: Vec<_> = ctx
@@ -259,11 +294,13 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let invalid_rate = create_currency_rate(
         ctx,
         org_id,
-        "USD".to_string(),
-        "JPY".to_string(),
-        -1.0,
         None,
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "USD".to_string(),
+            to_currency: "JPY".to_string(),
+            rate: -1.0,
+            metadata: None,
+        },
     );
 
     if invalid_rate.is_ok() {
@@ -273,11 +310,13 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let zero_rate = create_currency_rate(
         ctx,
         org_id,
-        "USD".to_string(),
-        "JPY".to_string(),
-        0.0,
         None,
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "USD".to_string(),
+            to_currency: "JPY".to_string(),
+            rate: 0.0,
+            metadata: None,
+        },
     );
 
     if zero_rate.is_ok() {
@@ -290,19 +329,23 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_uom_category(
         ctx,
         org_id,
-        "Weight".to_string(),
-        Some("Units of weight".to_string()),
-        1,
-        None,
+        CreateUomCategoryParams {
+            name: "Weight".to_string(),
+            description: Some("Units of weight".to_string()),
+            sequence: 1,
+            metadata: None,
+        },
     )?;
 
     create_uom_category(
         ctx,
         org_id,
-        "Length".to_string(),
-        Some("Units of length".to_string()),
-        2,
-        None,
+        CreateUomCategoryParams {
+            name: "Length".to_string(),
+            description: Some("Units of length".to_string()),
+            sequence: 2,
+            metadata: None,
+        },
     )?;
 
     let weight_cat = ctx
@@ -323,40 +366,49 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_uom(
         ctx,
         org_id,
-        weight_cat.id,
-        "Kilogram".to_string(),
-        "kg".to_string(),
-        1.0,
-        0.001,
-        1.0,
-        true,
-        None,
+        CreateUomParams {
+            category_id: weight_cat.id,
+            name: "Kilogram".to_string(),
+            symbol: "kg".to_string(),
+            factor: 1.0,
+            rounding: 0.001,
+            times_bigger: 1.0,
+            is_reference_unit: true,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_uom(
         ctx,
         org_id,
-        weight_cat.id,
-        "Gram".to_string(),
-        "g".to_string(),
-        0.001,
-        0.0001,
-        0.001,
-        false,
-        None,
+        CreateUomParams {
+            category_id: weight_cat.id,
+            name: "Gram".to_string(),
+            symbol: "g".to_string(),
+            factor: 0.001,
+            rounding: 0.0001,
+            times_bigger: 0.001,
+            is_reference_unit: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_uom(
         ctx,
         org_id,
-        weight_cat.id,
-        "Pound".to_string(),
-        "lb".to_string(),
-        0.453592,
-        0.001,
-        0.453592,
-        false,
-        None,
+        CreateUomParams {
+            category_id: weight_cat.id,
+            name: "Pound".to_string(),
+            symbol: "lb".to_string(),
+            factor: 0.453592,
+            rounding: 0.001,
+            times_bigger: 0.453592,
+            is_reference_unit: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let kg = ctx
@@ -396,22 +448,28 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         weight_cat.id,
-        kg.id,
-        gram.id,
-        1000.0,
-        None,
-        None,
+        CreateUomConversionParams {
+            from_uom_id: kg.id,
+            to_uom_id: gram.id,
+            factor: 1000.0,
+            product_id: None,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     create_uom_conversion(
         ctx,
         org_id,
         weight_cat.id,
-        kg.id,
-        pound.id,
-        2.20462,
-        None,
-        None,
+        CreateUomConversionParams {
+            from_uom_id: kg.id,
+            to_uom_id: pound.id,
+            factor: 2.20462,
+            product_id: None,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let conversions: Vec<_> = ctx
@@ -432,15 +490,37 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 11: Invalid conversion factor
     log::info!("TEST: Invalid conversion factor validation...");
-    let invalid_conv =
-        create_uom_conversion(ctx, org_id, weight_cat.id, kg.id, gram.id, -1.0, None, None);
+    let invalid_conv = create_uom_conversion(
+        ctx,
+        org_id,
+        weight_cat.id,
+        CreateUomConversionParams {
+            from_uom_id: kg.id,
+            to_uom_id: gram.id,
+            factor: -1.0,
+            product_id: None,
+            is_active: true,
+            metadata: None,
+        },
+    );
 
     if invalid_conv.is_ok() {
         return Err("Should reject negative conversion factor".to_string());
     }
 
-    let zero_conv =
-        create_uom_conversion(ctx, org_id, weight_cat.id, kg.id, gram.id, 0.0, None, None);
+    let zero_conv = create_uom_conversion(
+        ctx,
+        org_id,
+        weight_cat.id,
+        CreateUomConversionParams {
+            from_uom_id: kg.id,
+            to_uom_id: gram.id,
+            factor: 0.0,
+            product_id: None,
+            is_active: true,
+            metadata: None,
+        },
+    );
 
     if zero_conv.is_ok() {
         return Err("Should reject zero conversion factor".to_string());
@@ -507,14 +587,17 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
     create_country(
         ctx,
         "FR".to_string(),
-        "France".to_string(),
-        "FRA".to_string(),
-        250,
-        "+33".to_string(),
-        None,
-        Some("EUR".to_string()),
-        vec!["fr".to_string()],
-        None,
+        CreateCountryParams {
+            name: "France".to_string(),
+            iso3: "FRA".to_string(),
+            numcode: 250,
+            phone_code: "+33".to_string(),
+            official_name: None,
+            currency_code: Some("EUR".to_string()),
+            language_codes: vec!["fr".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let france = ctx
@@ -558,12 +641,15 @@ pub fn test_currency_data_integrity(ctx: &ReducerContext) -> Result<(), String> 
     create_currency(
         ctx,
         "JPY".to_string(),
-        "Japanese Yen".to_string(),
-        "¥".to_string(),
-        0,
-        1.0,
-        "before".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Japanese Yen".to_string(),
+            symbol: "¥".to_string(),
+            decimal_places: 0,
+            rounding_factor: 1.0,
+            position: "before".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     let yen = ctx
@@ -598,18 +684,21 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
     create_organization(
         ctx,
-        "UOM Edge Org".to_string(),
-        "UOMEDGE".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "UOM Edge Org".to_string(),
+            code: "UOMEDGE".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -620,7 +709,16 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("Test org not found")?;
 
     // Create category
-    create_uom_category(ctx, org.id, "Volume".to_string(), None, 1, None)?;
+    create_uom_category(
+        ctx,
+        org.id,
+        CreateUomCategoryParams {
+            name: "Volume".to_string(),
+            description: None,
+            sequence: 1,
+            metadata: None,
+        },
+    )?;
 
     let vol_cat = ctx
         .db
@@ -634,28 +732,34 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_uom(
         ctx,
         org.id,
-        vol_cat.id,
-        "Liter".to_string(),
-        "L".to_string(),
-        1.0,
-        0.001,
-        1.0,
-        true,
-        None,
+        CreateUomParams {
+            category_id: vol_cat.id,
+            name: "Liter".to_string(),
+            symbol: "L".to_string(),
+            factor: 1.0,
+            rounding: 0.001,
+            times_bigger: 1.0,
+            is_reference_unit: true,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     // Try to create another reference unit
     create_uom(
         ctx,
         org.id,
-        vol_cat.id,
-        "Milliliter".to_string(),
-        "mL".to_string(),
-        0.001,
-        0.0001,
-        0.001,
-        true,
-        None,
+        CreateUomParams {
+            category_id: vol_cat.id,
+            name: "Milliliter".to_string(),
+            symbol: "mL".to_string(),
+            factor: 0.001,
+            rounding: 0.0001,
+            times_bigger: 0.001,
+            is_reference_unit: true,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let ref_units: Vec<_> = ctx
@@ -679,14 +783,17 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_uom(
         ctx,
         org.id,
-        vol_cat.id,
-        "Microliter".to_string(),
-        "µL".to_string(),
-        0.000001,
-        0.0000001,
-        0.000001,
-        false,
-        None,
+        CreateUomParams {
+            category_id: vol_cat.id,
+            name: "Microliter".to_string(),
+            symbol: "µL".to_string(),
+            factor: 0.000001,
+            rounding: 0.0000001,
+            times_bigger: 0.000001,
+            is_reference_unit: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let micro = ctx
@@ -707,14 +814,17 @@ pub fn test_uom_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_uom(
         ctx,
         org.id,
-        vol_cat.id,
-        "Kiloliter".to_string(),
-        "kL".to_string(),
-        1000.0,
-        0.001,
-        1000.0,
-        false,
-        None,
+        CreateUomParams {
+            category_id: vol_cat.id,
+            name: "Kiloliter".to_string(),
+            symbol: "kL".to_string(),
+            factor: 1000.0,
+            rounding: 0.001,
+            times_bigger: 1000.0,
+            is_reference_unit: false,
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let kilo = ctx
@@ -750,18 +860,21 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
     // Setup
     create_organization(
         ctx,
-        "Rate Edge Org".to_string(),
-        "RATEEDGE".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Rate Edge Org".to_string(),
+            code: "RATEEDGE".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -775,23 +888,29 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
     create_currency(
         ctx,
         "CHF".to_string(),
-        "Swiss Franc".to_string(),
-        "Fr".to_string(),
-        2,
-        0.05,
-        "before".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Swiss Franc".to_string(),
+            symbol: "Fr".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.05,
+            position: "before".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     create_currency(
         ctx,
         "SEK".to_string(),
-        "Swedish Krona".to_string(),
-        "kr".to_string(),
-        2,
-        0.01,
-        "after".to_string(),
-        None,
+        CreateCurrencyParams {
+            name: "Swedish Krona".to_string(),
+            symbol: "kr".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "after".to_string(),
+            active: true,
+            metadata: None,
+        },
     )?;
 
     // Test: Very small exchange rate
@@ -799,11 +918,13 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
     create_currency_rate(
         ctx,
         org.id,
-        "CHF".to_string(),
-        "SEK".to_string(),
-        0.0001,
         None,
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "CHF".to_string(),
+            to_currency: "SEK".to_string(),
+            rate: 0.0001,
+            metadata: None,
+        },
     )?;
 
     let small_rate = ctx
@@ -828,11 +949,13 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
     create_currency_rate(
         ctx,
         org.id,
-        "SEK".to_string(),
-        "CHF".to_string(),
-        10000.0,
         None,
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "SEK".to_string(),
+            to_currency: "CHF".to_string(),
+            rate: 10000.0,
+            metadata: None,
+        },
     )?;
 
     let large_rate = ctx
@@ -853,11 +976,13 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
     create_currency_rate(
         ctx,
         org.id,
-        "CHF".to_string(),
-        "SEK".to_string(),
-        11.5,
         Some(999), // Non-existent company ID
-        None,
+        CreateCurrencyRateParams {
+            from_currency: "CHF".to_string(),
+            to_currency: "SEK".to_string(),
+            rate: 11.5,
+            metadata: None,
+        },
     )?;
 
     let rate_with_company = ctx

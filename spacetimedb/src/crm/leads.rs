@@ -8,23 +8,27 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::opportunities::{opportunity, Opportunity};
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INPUT TYPES
+// PARAMS TYPES
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Input data for creating a lead
+/// Params for creating a lead.
+/// Scope: `organization_id` is a flat reducer param (not in this struct).
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct LeadInput {
-    pub organization_id: u64,
+pub struct CreateLeadParams {
     pub name: String,
+    pub priority: String,
+    pub state: String, // "new", "qualified", "converted", "lost"
+    pub expected_revenue: f64,
+    pub probability: f64,
+    pub tag_ids: Vec<u64>,
+    // Contact details
     pub email: Option<String>,
     pub phone: Option<String>,
     pub mobile: Option<String>,
     pub company_name: Option<String>,
-    pub priority: String,
-    // Contact details
     pub contact_name: Option<String>,
     pub title: Option<String>,
     // Address fields
@@ -45,24 +49,48 @@ pub struct LeadInput {
     pub user_id: Option<Identity>,
     pub team_id: Option<u64>,
     pub partner_id: Option<u64>,
-    // Deadline
     pub date_deadline: Option<Timestamp>,
-    // Business value fields
-    pub expected_revenue: Option<f64>,
-    pub probability: Option<f64>,
-    pub tag_ids: Option<Vec<u64>>,
-    pub state: Option<String>,
     pub metadata: Option<String>,
 }
 
-/// Input data for converting a lead to customer
+/// Params for updating lead details.
+/// Scope: `organization_id` + `lead_id` are flat reducer params.
+/// None = clear the field (all fields are nullable in the table).
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct ConvertLeadInput {
-    pub organization_id: u64,
-    pub lead_id: u64,
+pub struct UpdateLeadDetailsParams {
+    pub contact_name: Option<String>,
+    pub title: Option<String>,
+    pub website: Option<String>,
+    pub industry: Option<String>,
+    pub referred_by: Option<String>,
+    pub description: Option<String>,
+}
+
+/// Params for updating lead address.
+/// Scope: `organization_id` + `lead_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLeadAddressParams {
+    pub street: Option<String>,
+    pub city: Option<String>,
+    pub zip: Option<String>,
+    pub country_code: Option<String>,
+}
+
+/// Params for updating lead revenue forecast.
+/// Scope: `organization_id` + `lead_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLeadRevenueParams {
+    pub expected_revenue: f64,
+    pub probability: f64,
+}
+
+/// Params for converting a lead to a contact/opportunity.
+/// Scope: `organization_id` + `lead_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ConvertLeadParams {
     pub create_contact: bool,
     pub create_opportunity: bool,
-    // Contact creation options
+    // Contact creation options (used when create_contact is true)
     pub contact_type: Option<String>,
     pub is_vendor: Option<bool>,
     pub is_employee: Option<bool>,
@@ -70,6 +98,8 @@ pub struct ConvertLeadInput {
     pub is_partner: Option<bool>,
     pub customer_rank: Option<i32>,
     pub supplier_rank: Option<i32>,
+    // Opportunity creation (used when create_opportunity is true; required if create_opportunity)
+    pub opportunity_stage_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -84,6 +114,7 @@ pub struct ConvertLeadInput {
     index(accessor = lead_by_email, btree(columns = [email])),
     index(accessor = lead_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct Lead {
     #[primary_key]
     #[auto_inc]
@@ -168,67 +199,77 @@ pub struct LeadLostReason {
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[spacetimedb::reducer]
-pub fn create_lead(ctx: &ReducerContext, input: LeadInput) -> Result<(), String> {
-    check_permission(ctx, input.organization_id, "lead", "create")?;
+pub fn create_lead(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateLeadParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "lead", "create")?;
 
-    if input.name.is_empty() {
+    if params.name.is_empty() {
         return Err("Lead name cannot be empty".to_string());
     }
 
     let lead = ctx.db.lead().insert(Lead {
         id: 0,
-        organization_id: input.organization_id,
-        name: input.name.clone(),
-        email: input.email.clone(),
-        phone: input.phone,
-        mobile: input.mobile,
-        company_name: input.company_name,
-        contact_name: input.contact_name,
-        title: input.title,
-        street: input.street,
-        city: input.city,
-        zip: input.zip,
-        country_code: input.country_code,
-        website: input.website,
-        industry: input.industry,
-        source_id: input.source_id,
-        campaign_id: input.campaign_id,
-        medium_id: input.medium_id,
-        referred_by: input.referred_by,
-        description: input.description,
-        priority: input.priority,
-        state: input.state.unwrap_or_else(|| "new".to_string()),
-        expected_revenue: input.expected_revenue.unwrap_or(0.0),
-        probability: input.probability.unwrap_or(0.0),
+        organization_id,
+        name: params.name.clone(),
+        email: params.email.clone(),
+        phone: params.phone,
+        mobile: params.mobile,
+        company_name: params.company_name,
+        contact_name: params.contact_name,
+        title: params.title,
+        street: params.street,
+        city: params.city,
+        zip: params.zip,
+        country_code: params.country_code,
+        website: params.website,
+        industry: params.industry,
+        source_id: params.source_id,
+        campaign_id: params.campaign_id,
+        medium_id: params.medium_id,
+        referred_by: params.referred_by,
+        description: params.description,
+        priority: params.priority,
+        state: params.state,
+        expected_revenue: params.expected_revenue,
+        probability: params.probability,
+        // System-managed: initialized on create, not user-supplied
         date_open: Some(ctx.timestamp),
         date_close: None,
-        date_deadline: input.date_deadline,
         date_conversion: None,
         date_last_stage_update: Some(ctx.timestamp),
-        user_id: input.user_id,
-        team_id: input.team_id,
-        partner_id: input.partner_id,
         day_open: None,
         day_close: None,
         lost_reason_id: None,
-        tag_ids: input.tag_ids.unwrap_or_default(),
+        date_deadline: params.date_deadline,
+        user_id: params.user_id,
+        team_id: params.team_id,
+        partner_id: params.partner_id,
+        tag_ids: params.tag_ids,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
-        metadata: input.metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        input.organization_id,
-        None,
-        "lead",
-        lead.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": input.name, "email": input.email }).to_string()),
-        vec!["name".to_string(), "email".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead",
+            record_id: lead.id,
+            action: "create",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "email": params.email }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "email".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -237,24 +278,23 @@ pub fn create_lead(ctx: &ReducerContext, input: LeadInput) -> Result<(), String>
 #[spacetimedb::reducer]
 pub fn update_lead_details(
     ctx: &ReducerContext,
+    organization_id: u64,
     lead_id: u64,
-    contact_name: Option<String>,
-    title: Option<String>,
-    website: Option<String>,
-    industry: Option<String>,
-    referred_by: Option<String>,
-    description: Option<String>,
+    params: UpdateLeadDetailsParams,
 ) -> Result<(), String> {
     let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
-    check_permission(ctx, lead.organization_id, "lead", "write")?;
+    if lead.organization_id != organization_id {
+        return Err("Lead does not belong to this organization".to_string());
+    }
+    check_permission(ctx, organization_id, "lead", "write")?;
 
     ctx.db.lead().id().update(Lead {
-        contact_name,
-        title,
-        website,
-        industry,
-        referred_by,
-        description,
+        contact_name: params.contact_name,
+        title: params.title,
+        website: params.website,
+        industry: params.industry,
+        referred_by: params.referred_by,
+        description: params.description,
         updated_at: ctx.timestamp,
         ..lead
     });
@@ -265,20 +305,21 @@ pub fn update_lead_details(
 #[spacetimedb::reducer]
 pub fn update_lead_address(
     ctx: &ReducerContext,
+    organization_id: u64,
     lead_id: u64,
-    street: Option<String>,
-    city: Option<String>,
-    zip: Option<String>,
-    country_code: Option<String>,
+    params: UpdateLeadAddressParams,
 ) -> Result<(), String> {
     let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
-    check_permission(ctx, lead.organization_id, "lead", "write")?;
+    if lead.organization_id != organization_id {
+        return Err("Lead does not belong to this organization".to_string());
+    }
+    check_permission(ctx, organization_id, "lead", "write")?;
 
     ctx.db.lead().id().update(Lead {
-        street,
-        city,
-        zip,
-        country_code,
+        street: params.street,
+        city: params.city,
+        zip: params.zip,
+        country_code: params.country_code,
         updated_at: ctx.timestamp,
         ..lead
     });
@@ -289,19 +330,42 @@ pub fn update_lead_address(
 #[spacetimedb::reducer]
 pub fn update_lead_revenue(
     ctx: &ReducerContext,
+    organization_id: u64,
     lead_id: u64,
-    expected_revenue: f64,
-    probability: f64,
+    params: UpdateLeadRevenueParams,
 ) -> Result<(), String> {
     let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
-    check_permission(ctx, lead.organization_id, "lead", "write")?;
+    if lead.organization_id != organization_id {
+        return Err("Lead does not belong to this organization".to_string());
+    }
+    check_permission(ctx, organization_id, "lead", "write")?;
 
+    let old_revenue = lead.expected_revenue;
     ctx.db.lead().id().update(Lead {
-        expected_revenue,
-        probability,
+        expected_revenue: params.expected_revenue,
+        probability: params.probability,
         updated_at: ctx.timestamp,
         ..lead
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead",
+            record_id: lead_id,
+            action: "update",
+            old_values: Some(
+                serde_json::json!({ "expected_revenue": old_revenue }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "expected_revenue": params.expected_revenue, "probability": params.probability }).to_string(),
+            ),
+            changed_fields: vec!["expected_revenue".to_string(), "probability".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -309,18 +373,20 @@ pub fn update_lead_revenue(
 #[spacetimedb::reducer]
 pub fn convert_lead_to_customer(
     ctx: &ReducerContext,
-    input: ConvertLeadInput,
+    organization_id: u64,
+    lead_id: u64,
+    params: ConvertLeadParams,
 ) -> Result<(), String> {
-    check_permission(ctx, input.organization_id, "lead", "write")?;
+    check_permission(ctx, organization_id, "lead", "write")?;
 
     let lead = ctx
         .db
         .lead()
         .id()
-        .find(&input.lead_id)
+        .find(&lead_id)
         .ok_or("Lead not found")?;
 
-    if lead.organization_id != input.organization_id {
+    if lead.organization_id != organization_id {
         return Err("Lead does not belong to this organization".to_string());
     }
 
@@ -330,12 +396,12 @@ pub fn convert_lead_to_customer(
 
     let mut contact_id: Option<u64> = None;
 
-    if input.create_contact {
+    if params.create_contact {
         let contact = ctx.db.contact().insert(Contact {
             id: 0,
-            organization_id: input.organization_id,
+            organization_id,
             company_id: None,
-            type_: input.contact_type.unwrap_or_else(|| "contact".to_string()),
+            type_: params.contact_type.unwrap_or_else(|| "contact".to_string()),
             name: lead.name.clone(),
             display_name: lead.name.clone(),
             first_name: lead
@@ -366,12 +432,12 @@ pub fn convert_lead_to_customer(
             annual_revenue: None,
             description: lead.description.clone(),
             is_customer: true,
-            is_vendor: input.is_vendor.unwrap_or(false),
-            is_employee: input.is_employee.unwrap_or(false),
-            is_prospect: input.is_prospect.unwrap_or(false),
-            is_partner: input.is_partner.unwrap_or(false),
-            customer_rank: input.customer_rank.unwrap_or(0),
-            supplier_rank: input.supplier_rank.unwrap_or(0),
+            is_vendor: params.is_vendor.unwrap_or(false),
+            is_employee: params.is_employee.unwrap_or(false),
+            is_prospect: params.is_prospect.unwrap_or(false),
+            is_partner: params.is_partner.unwrap_or(false),
+            customer_rank: params.customer_rank.unwrap_or(0),
+            supplier_rank: params.supplier_rank.unwrap_or(0),
             salesperson_id: lead.user_id,
             assigned_user_id: None,
             parent_id: None,
@@ -381,20 +447,24 @@ pub fn convert_lead_to_customer(
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             deleted_at: None,
-            metadata: input.metadata,
+            metadata: params.metadata.clone(),
         });
         contact_id = Some(contact.id);
     }
 
-    if input.create_opportunity && contact_id.is_some() {
+    if params.create_opportunity && contact_id.is_some() {
+        let stage_id = params
+            .opportunity_stage_id
+            .ok_or("opportunity_stage_id is required when create_opportunity is true")?;
+
         ctx.db.opportunity().insert(Opportunity {
             id: 0,
-            organization_id: input.organization_id,
-            lead_id: Some(input.lead_id),
+            organization_id,
+            lead_id: Some(lead_id),
             name: format!("{} - Opportunity", lead.name),
             expected_revenue: lead.expected_revenue,
             probability: lead.probability,
-            stage_id: 1,
+            stage_id,
             priority: lead.priority.clone(),
             color: None,
             partner_id: None,
@@ -421,10 +491,11 @@ pub fn convert_lead_to_customer(
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             deleted_at: None,
-            metadata: None,
+            metadata: params.metadata,
         });
     }
 
+    let old_state = lead.state.clone();
     ctx.db.lead().id().update(Lead {
         state: "converted".to_string(),
         date_conversion: Some(ctx.timestamp),
@@ -433,16 +504,19 @@ pub fn convert_lead_to_customer(
         ..lead
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        input.organization_id,
-        None,
-        "lead",
-        input.lead_id,
-        "convert",
-        Some(serde_json::json!({ "state": format!("{:?}", lead.state) }).to_string()),
-        Some(r#"{"state":"converted"}"#.to_string()),
-        vec!["state".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead",
+            record_id: lead_id,
+            action: "convert",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(r#"{"state":"converted"}"#.to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

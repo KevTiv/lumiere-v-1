@@ -3,10 +3,10 @@
 /// Test reducers for QueueJob and QueueWorker tables.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
 use crate::core::queue::{
     claim_queue_job, complete_queue_job, enqueue_job, queue_job, queue_worker,
-    register_queue_worker, worker_heartbeat,
+    register_queue_worker, worker_heartbeat, EnqueueJobParams, RegisterQueueWorkerParams,
 };
 use crate::types::JobStatus;
 
@@ -17,18 +17,21 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Creating test organization...");
     create_organization(
         ctx,
-        "Queue Test Org".to_string(),
-        "QUEUEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Queue Test Org".to_string(),
+            code: "QUEUEORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -46,9 +49,11 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     register_queue_worker(
         ctx,
         org_id,
-        "worker-001".to_string(),
-        vec!["default".to_string(), "priority".to_string()],
-        None,
+        RegisterQueueWorkerParams {
+            name: "worker-001".to_string(),
+            queues: vec!["default".to_string(), "priority".to_string()],
+            metadata: None,
+        },
     )?;
 
     let worker = ctx
@@ -89,13 +94,15 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org_id,
-        "default".to_string(),
-        "process_data".to_string(),
-        r#"{"file": "data.csv", "format": "csv"}"#.to_string(),
-        5,    // priority
-        3,    // max_attempts
-        None, // immediate
-        None,
+        EnqueueJobParams {
+            queue_name: "default".to_string(),
+            job_type: "process_data".to_string(),
+            payload: r#"{"file": "data.csv", "format": "csv"}"#.to_string(),
+            priority: 5,
+            max_attempts: 3,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let jobs: Vec<_> = ctx
@@ -129,13 +136,15 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org_id,
-        "priority".to_string(),
-        "send_report".to_string(),
-        r#"{"report_type": "daily"}"#.to_string(),
-        10,
-        5,
-        Some(future_micros),
-        None,
+        EnqueueJobParams {
+            queue_name: "priority".to_string(),
+            job_type: "send_report".to_string(),
+            payload: r#"{"report_type": "daily"}"#.to_string(),
+            priority: 10,
+            max_attempts: 5,
+            scheduled_at_micros: Some(future_micros),
+            metadata: None,
+        },
     )?;
 
     let scheduled_jobs: Vec<_> = ctx
@@ -189,13 +198,15 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org_id,
-        "default".to_string(),
-        "failing_job".to_string(),
-        "{}".to_string(),
-        1,
-        3, // max_attempts = 3
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "default".to_string(),
+            job_type: "failing_job".to_string(),
+            payload: "{}".to_string(),
+            priority: 1,
+            max_attempts: 3,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let fail_job = ctx
@@ -288,13 +299,15 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org_id,
-        "default".to_string(),
-        "processing_job".to_string(),
-        "{}".to_string(),
-        1,
-        1,
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "default".to_string(),
+            job_type: "processing_job".to_string(),
+            payload: "{}".to_string(),
+            priority: 1,
+            max_attempts: 1,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let proc_job = ctx
@@ -316,18 +329,21 @@ pub fn test_queue_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Error - claim job from different org...");
     create_organization(
         ctx,
-        "Other Queue Org".to_string(),
-        "OTHERQORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Other Queue Org".to_string(),
+            code: "OTHERQORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let other_org = ctx
@@ -351,18 +367,21 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
     create_organization(
         ctx,
-        "Queue Edge Org".to_string(),
-        "QEDGEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Queue Edge Org".to_string(),
+            code: "QEDGEORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -375,9 +394,11 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     register_queue_worker(
         ctx,
         org.id,
-        "edge-worker".to_string(),
-        vec!["edge-queue".to_string()],
-        None,
+        RegisterQueueWorkerParams {
+            name: "edge-worker".to_string(),
+            queues: vec!["edge-queue".to_string()],
+            metadata: None,
+        },
     )?;
 
     // Test 1: Job with negative priority
@@ -385,13 +406,15 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org.id,
-        "edge-queue".to_string(),
-        "low_priority".to_string(),
-        "{}".to_string(),
-        -10, // Negative priority
-        1,
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "edge-queue".to_string(),
+            job_type: "low_priority".to_string(),
+            payload: "{}".to_string(),
+            priority: -10,
+            max_attempts: 1,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let low_priority = ctx
@@ -411,13 +434,15 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org.id,
-        "edge-queue".to_string(),
-        "high_priority".to_string(),
-        "{}".to_string(),
-        1000,
-        1,
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "edge-queue".to_string(),
+            job_type: "high_priority".to_string(),
+            payload: "{}".to_string(),
+            priority: 1000,
+            max_attempts: 1,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let high_priority = ctx
@@ -439,13 +464,15 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org.id,
-        "edge-queue".to_string(),
-        "large_payload".to_string(),
-        large_payload.clone(),
-        5,
-        1,
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "edge-queue".to_string(),
+            job_type: "large_payload".to_string(),
+            payload: large_payload.clone(),
+            priority: 5,
+            max_attempts: 1,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let large_job = ctx
@@ -465,13 +492,15 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org.id,
-        "edge-queue".to_string(),
-        "empty_payload".to_string(),
-        "{}".to_string(),
-        5,
-        1,
-        None,
-        None,
+        EnqueueJobParams {
+            queue_name: "edge-queue".to_string(),
+            job_type: "empty_payload".to_string(),
+            payload: "{}".to_string(),
+            priority: 5,
+            max_attempts: 1,
+            scheduled_at_micros: None,
+            metadata: None,
+        },
     )?;
 
     let empty_job = ctx
@@ -494,13 +523,15 @@ pub fn test_queue_job_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     enqueue_job(
         ctx,
         org.id,
-        "edge-queue".to_string(),
-        "past_scheduled".to_string(),
-        "{}".to_string(),
-        5,
-        1,
-        Some(past_micros),
-        None,
+        EnqueueJobParams {
+            queue_name: "edge-queue".to_string(),
+            job_type: "past_scheduled".to_string(),
+            payload: "{}".to_string(),
+            priority: 5,
+            max_attempts: 1,
+            scheduled_at_micros: Some(past_micros),
+            metadata: None,
+        },
     )?;
 
     let past_job = ctx
@@ -539,18 +570,21 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     // Setup
     create_organization(
         ctx,
-        "Worker Edge Org".to_string(),
-        "WEDGEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Worker Edge Org".to_string(),
+            code: "WEDGEORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -565,9 +599,11 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     register_queue_worker(
         ctx,
         org.id,
-        "no-queue-worker".to_string(),
-        vec![], // Empty queues
-        None,
+        RegisterQueueWorkerParams {
+            name: "no-queue-worker".to_string(),
+            queues: vec![],
+            metadata: None,
+        },
     )?;
 
     let no_queue_worker = ctx
@@ -589,9 +625,11 @@ pub fn test_worker_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     register_queue_worker(
         ctx,
         org.id,
-        "many-queue-worker".to_string(),
-        many_queues.clone(),
-        None,
+        RegisterQueueWorkerParams {
+            name: "many-queue-worker".to_string(),
+            queues: many_queues.clone(),
+            metadata: None,
+        },
     )?;
 
     let many_worker = ctx

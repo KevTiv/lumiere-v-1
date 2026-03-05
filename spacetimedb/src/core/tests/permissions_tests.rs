@@ -3,9 +3,10 @@
 /// Test reducers for Role, CasbinRule, and UserRoleAssignment tables.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
 use crate::core::permissions::{
     add_casbin_rule, casbin_rule, create_role, remove_casbin_rule, role, update_role,
+    AddCasbinRuleParams, CreateRoleParams, UpdateRoleParams,
 };
 
 /// Test permission system lifecycle
@@ -15,18 +16,21 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Creating test organization for permissions...");
     create_organization(
         ctx,
-        "Permission Test Org".to_string(),
-        "PERMORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Permission Test Org".to_string(),
+            code: "PERMORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -43,15 +47,18 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
     create_role(
         ctx,
         org_id,
-        "Test Manager".to_string(),
-        Some("Manager role for testing".to_string()),
-        None,
-        vec![
-            "organization:read".to_string(),
-            "organization:write".to_string(),
-            "user:read".to_string(),
-        ],
-        None, // metadata
+        CreateRoleParams {
+            name: "Test Manager".to_string(),
+            description: Some("Manager role for testing".to_string()),
+            parent_id: None,
+            permissions: vec![
+                "organization:read".to_string(),
+                "organization:write".to_string(),
+                "user:read".to_string(),
+            ],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let role = ctx
@@ -89,15 +96,17 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
     update_role(
         ctx,
         role_id,
-        Some("Updated Manager".to_string()),
-        Some("Updated description".to_string()),
-        Some(vec![
-            "organization:read".to_string(),
-            "organization:write".to_string(),
-            "user:read".to_string(),
-            "user:write".to_string(),
-        ]),
-        None,
+        UpdateRoleParams {
+            name: Some("Updated Manager".to_string()),
+            description: Some("Updated description".to_string()),
+            permissions: Some(vec![
+                "organization:read".to_string(),
+                "organization:write".to_string(),
+                "user:read".to_string(),
+                "user:write".to_string(),
+            ]),
+            is_active: None,
+        },
     )?;
 
     let updated_role = ctx
@@ -122,14 +131,16 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
     add_casbin_rule(
         ctx,
         org_id,
-        "p".to_string(),
-        Some(role_id.to_string()),
-        Some(org_id.to_string()),
-        Some("resource".to_string()),
-        Some("action".to_string()),
-        None,
-        None,
-        None, // metadata
+        AddCasbinRuleParams {
+            ptype: "p".to_string(),
+            v0: Some(role_id.to_string()),
+            v1: Some(org_id.to_string()),
+            v2: Some("resource".to_string()),
+            v3: Some("action".to_string()),
+            v4: None,
+            v5: None,
+            metadata: None,
+        },
     )?;
 
     let rules: Vec<_> = ctx
@@ -161,7 +172,18 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 5: Error - create role with empty name
     log::info!("TEST: Error case - empty role name...");
-    match create_role(ctx, org_id, "".to_string(), None, None, vec![], None) {
+    match create_role(
+        ctx,
+        org_id,
+        CreateRoleParams {
+            name: "".to_string(),
+            description: None,
+            parent_id: None,
+            permissions: vec![],
+            is_active: true,
+            metadata: None,
+        },
+    ) {
         Ok(_) => return Err("Should reject empty role name".to_string()),
         Err(_) => log::info!("✓ Correctly rejected empty role name"),
     }
@@ -171,14 +193,16 @@ pub fn test_permission_system(ctx: &ReducerContext) -> Result<(), String> {
     match add_casbin_rule(
         ctx,
         org_id,
-        "invalid".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AddCasbinRuleParams {
+            ptype: "invalid".to_string(),
+            v0: None,
+            v1: None,
+            v2: None,
+            v3: None,
+            v4: None,
+            v5: None,
+            metadata: None,
+        },
     ) {
         Ok(_) => return Err("Should reject invalid ptype".to_string()),
         Err(_) => log::info!("✓ Correctly rejected invalid ptype"),
@@ -195,18 +219,21 @@ pub fn test_role_hierarchy(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Setting up for role hierarchy...");
     create_organization(
         ctx,
-        "Hierarchy Test Org".to_string(),
-        "HIERORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Hierarchy Test Org".to_string(),
+            code: "HIERORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -221,11 +248,14 @@ pub fn test_role_hierarchy(ctx: &ReducerContext) -> Result<(), String> {
     create_role(
         ctx,
         org.id,
-        "Parent Role".to_string(),
-        Some("Base role with common permissions".to_string()),
-        None,
-        vec!["common:read".to_string()],
-        None,
+        CreateRoleParams {
+            name: "Parent Role".to_string(),
+            description: Some("Base role with common permissions".to_string()),
+            parent_id: None,
+            permissions: vec!["common:read".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let parent = ctx
@@ -240,11 +270,14 @@ pub fn test_role_hierarchy(ctx: &ReducerContext) -> Result<(), String> {
     create_role(
         ctx,
         org.id,
-        "Child Role".to_string(),
-        Some("Inherited role".to_string()),
-        Some(parent.id),
-        vec!["specific:write".to_string()],
-        None,
+        CreateRoleParams {
+            name: "Child Role".to_string(),
+            description: Some("Inherited role".to_string()),
+            parent_id: Some(parent.id),
+            permissions: vec!["specific:write".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let child = ctx
@@ -278,18 +311,21 @@ pub fn test_casbin_rule_patterns(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Setting up for Casbin patterns...");
     create_organization(
         ctx,
-        "Casbin Test Org".to_string(),
-        "CASORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Casbin Test Org".to_string(),
+            code: "CASORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -304,14 +340,16 @@ pub fn test_casbin_rule_patterns(ctx: &ReducerContext) -> Result<(), String> {
     add_casbin_rule(
         ctx,
         org.id,
-        "p".to_string(),
-        Some("role:1".to_string()),
-        Some("org:1".to_string()),
-        Some("resource".to_string()),
-        Some("read".to_string()),
-        Some("allow".to_string()),
-        Some("domain".to_string()),
-        None,
+        AddCasbinRuleParams {
+            ptype: "p".to_string(),
+            v0: Some("role:1".to_string()),
+            v1: Some("org:1".to_string()),
+            v2: Some("resource".to_string()),
+            v3: Some("read".to_string()),
+            v4: Some("allow".to_string()),
+            v5: Some("domain".to_string()),
+            metadata: None,
+        },
     )?;
 
     // Test 2: Grouping rule
@@ -319,14 +357,16 @@ pub fn test_casbin_rule_patterns(ctx: &ReducerContext) -> Result<(), String> {
     add_casbin_rule(
         ctx,
         org.id,
-        "g".to_string(),
-        Some("user:1".to_string()),
-        Some("role:admin".to_string()),
-        Some("org:1".to_string()),
-        None,
-        None,
-        None,
-        None,
+        AddCasbinRuleParams {
+            ptype: "g".to_string(),
+            v0: Some("user:1".to_string()),
+            v1: Some("role:admin".to_string()),
+            v2: Some("org:1".to_string()),
+            v3: None,
+            v4: None,
+            v5: None,
+            metadata: None,
+        },
     )?;
 
     // Test 3: Minimal rule
@@ -334,14 +374,16 @@ pub fn test_casbin_rule_patterns(ctx: &ReducerContext) -> Result<(), String> {
     add_casbin_rule(
         ctx,
         org.id,
-        "p".to_string(),
-        Some("admin".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AddCasbinRuleParams {
+            ptype: "p".to_string(),
+            v0: Some("admin".to_string()),
+            v1: None,
+            v2: None,
+            v3: None,
+            v4: None,
+            v5: None,
+            metadata: None,
+        },
     )?;
 
     // Verify all rules exist
@@ -373,18 +415,21 @@ pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Setting up for role updates...");
     create_organization(
         ctx,
-        "Role Update Test Org".to_string(),
-        "ROLEUPDORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Role Update Test Org".to_string(),
+            code: "ROLEUPDORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -398,11 +443,14 @@ pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     create_role(
         ctx,
         org.id,
-        "Update Test Role".to_string(),
-        Some("Original description".to_string()),
-        None,
-        vec!["perm1".to_string()],
-        None,
+        CreateRoleParams {
+            name: "Update Test Role".to_string(),
+            description: Some("Original description".to_string()),
+            parent_id: None,
+            permissions: vec!["perm1".to_string()],
+            is_active: true,
+            metadata: None,
+        },
     )?;
 
     let role = ctx
@@ -419,10 +467,12 @@ pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
     update_role(
         ctx,
         role_id,
-        Some("Updated Name Only".to_string()),
-        None,
-        None,
-        None,
+        UpdateRoleParams {
+            name: Some("Updated Name Only".to_string()),
+            description: None,
+            permissions: None,
+            is_active: None,
+        },
     )?;
 
     let updated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
@@ -439,7 +489,16 @@ pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 2: Deactivate role
     log::info!("TEST: Deactivating role...");
-    update_role(ctx, role_id, None, None, None, Some(false))?;
+    update_role(
+        ctx,
+        role_id,
+        UpdateRoleParams {
+            name: None,
+            description: None,
+            permissions: None,
+            is_active: Some(false),
+        },
+    )?;
 
     let deactivated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
@@ -451,7 +510,16 @@ pub fn test_role_update_edge_cases(ctx: &ReducerContext) -> Result<(), String> {
 
     // Test 3: Reactivate role
     log::info!("TEST: Reactivating role...");
-    update_role(ctx, role_id, None, None, None, Some(true))?;
+    update_role(
+        ctx,
+        role_id,
+        UpdateRoleParams {
+            name: None,
+            description: None,
+            permissions: None,
+            is_active: Some(true),
+        },
+    )?;
 
     let reactivated = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
@@ -472,18 +540,21 @@ pub fn test_permissions_error_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("TEST: Setting up for error cases...");
     create_organization(
         ctx,
-        "Error Test Org".to_string(),
-        "ERRORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Error Test Org".to_string(),
+            code: "ERRORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -495,7 +566,16 @@ pub fn test_permissions_error_cases(ctx: &ReducerContext) -> Result<(), String> 
 
     // Test 1: Update non-existent role
     log::info!("TEST: Error - update non-existent role...");
-    match update_role(ctx, 99999, Some("Name".to_string()), None, None, None) {
+    match update_role(
+        ctx,
+        99999,
+        UpdateRoleParams {
+            name: Some("Name".to_string()),
+            description: None,
+            permissions: None,
+            is_active: None,
+        },
+    ) {
         Ok(_) => return Err("Should fail for non-existent role".to_string()),
         Err(_) => log::info!("✓ Correctly rejected non-existent role"),
     }

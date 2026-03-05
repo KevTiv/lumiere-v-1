@@ -3,10 +3,11 @@
 /// Test reducers for DataClassification, DataClassificationRule, and PrivacyConsent tables.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization};
+use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
 use crate::core::privacy::{
     create_data_classification, create_data_classification_rule, data_classification,
     data_classification_rule, privacy_consent, record_privacy_consent,
+    CreateDataClassificationParams, CreateDataClassificationRuleParams, RecordPrivacyConsentParams,
 };
 
 /// Test privacy system lifecycle
@@ -16,18 +17,21 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Creating test organization...");
     create_organization(
         ctx,
-        "Privacy Test Org".to_string(),
-        "PRIVORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Privacy Test Org".to_string(),
+            code: "PRIVORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -45,45 +49,53 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     create_data_classification(
         ctx,
         org_id,
-        "Public".to_string(),
-        1,
-        Some("Data that can be freely shared".to_string()),
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Public".to_string(),
+            level: 1,
+            description: Some("Data that can be freely shared".to_string()),
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     )?;
 
     create_data_classification(
         ctx,
         org_id,
-        "Internal".to_string(),
-        2,
-        Some("Data for internal use only".to_string()),
-        Some(365),
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Internal".to_string(),
+            level: 2,
+            description: Some("Data for internal use only".to_string()),
+            retention_days: Some(365),
+            encryption_required: false,
+            metadata: None,
+        },
     )?;
 
     create_data_classification(
         ctx,
         org_id,
-        "Confidential".to_string(),
-        3,
-        Some("Sensitive data requiring protection".to_string()),
-        Some(90),
-        true,
-        None,
+        CreateDataClassificationParams {
+            name: "Confidential".to_string(),
+            level: 3,
+            description: Some("Sensitive data requiring protection".to_string()),
+            retention_days: Some(90),
+            encryption_required: true,
+            metadata: None,
+        },
     )?;
 
     create_data_classification(
         ctx,
         org_id,
-        "Restricted".to_string(),
-        4,
-        Some("Highly sensitive data".to_string()),
-        Some(30),
-        true,
-        None,
+        CreateDataClassificationParams {
+            name: "Restricted".to_string(),
+            level: 4,
+            description: Some("Highly sensitive data".to_string()),
+            retention_days: Some(30),
+            encryption_required: true,
+            metadata: None,
+        },
     )?;
 
     let classifications: Vec<_> = ctx
@@ -121,35 +133,41 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     create_data_classification_rule(
         ctx,
         org_id,
-        "user_profile".to_string(),
-        Some("ssn".to_string()),
-        conf_id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "user_profile".to_string(),
+            column_name: Some("ssn".to_string()),
+            classification_id: conf_id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     create_data_classification_rule(
         ctx,
         org_id,
-        "user_profile".to_string(),
-        Some("salary".to_string()),
-        conf_id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "user_profile".to_string(),
+            column_name: Some("salary".to_string()),
+            classification_id: conf_id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     create_data_classification_rule(
         ctx,
         org_id,
-        "contact".to_string(),
-        None,
-        classifications
-            .iter()
-            .find(|c| c.name == "Internal")
-            .ok_or("Internal not found")?
-            .id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "contact".to_string(),
+            column_name: None,
+            classification_id: classifications
+                .iter()
+                .find(|c| c.name == "Internal")
+                .ok_or("Internal not found")?
+                .id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     let rules: Vec<_> = ctx
@@ -173,12 +191,14 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     record_privacy_consent(
         ctx,
         org_id,
-        1,
-        "email_marketing".to_string(),
-        true,
-        Some("192.168.1.1".to_string()),
-        Some("Mozilla/5.0".to_string()),
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "email_marketing".to_string(),
+            granted: true,
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+            metadata: None,
+        },
     )?;
 
     let consents: Vec<_> = ctx
@@ -204,12 +224,14 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     record_privacy_consent(
         ctx,
         org_id,
-        1,
-        "email_marketing".to_string(),
-        false,
-        Some("192.168.1.1".to_string()),
-        Some("Mozilla/5.0".to_string()),
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "email_marketing".to_string(),
+            granted: false,
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+            metadata: None,
+        },
     )?;
 
     let revoked_consents: Vec<_> = ctx
@@ -235,34 +257,40 @@ pub fn test_privacy_system(ctx: &ReducerContext) -> Result<(), String> {
     record_privacy_consent(
         ctx,
         org_id,
-        1,
-        "sms_marketing".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "sms_marketing".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     record_privacy_consent(
         ctx,
         org_id,
-        1,
-        "data_processing".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "data_processing".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     record_privacy_consent(
         ctx,
         org_id,
-        2,
-        "email_marketing".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 2,
+            consent_type: "email_marketing".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let all_consents: Vec<_> = ctx
@@ -315,18 +343,21 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
     // Setup
     create_organization(
         ctx,
-        "Classification Val Org".to_string(),
-        "CVALORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Classification Val Org".to_string(),
+            code: "CVALORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -341,12 +372,14 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
     let result = create_data_classification(
         ctx,
         org.id,
-        "Invalid".to_string(),
-        0,
-        None,
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Invalid".to_string(),
+            level: 0,
+            description: None,
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     );
     assert!(result.is_err());
     log::info!("✓ Level 0 rejected");
@@ -356,12 +389,14 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
     let result = create_data_classification(
         ctx,
         org.id,
-        "Invalid".to_string(),
-        5,
-        None,
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Invalid".to_string(),
+            level: 5,
+            description: None,
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     );
     assert!(result.is_err());
     log::info!("✓ Level 5 rejected");
@@ -372,12 +407,14 @@ pub fn test_classification_level_validation(ctx: &ReducerContext) -> Result<(), 
         create_data_classification(
             ctx,
             org.id,
-            format!("Level {}", level),
-            level,
-            None,
-            None,
-            false,
-            None,
+            CreateDataClassificationParams {
+                name: format!("Level {}", level),
+                level,
+                description: None,
+                retention_days: None,
+                encryption_required: false,
+                metadata: None,
+            },
         )?;
     }
 
@@ -409,18 +446,21 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     // Setup
     create_organization(
         ctx,
-        "Consent Edge Org".to_string(),
-        "CONEDGEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Consent Edge Org".to_string(),
+            code: "CONEDGEORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -435,12 +475,14 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     record_privacy_consent(
         ctx,
         org.id,
-        1,
-        "minimal_consent".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "minimal_consent".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let minimal = ctx
@@ -458,7 +500,18 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     // Test 2: Long consent type name
     log::info!("TEST: Long consent type name...");
     let long_type = "a".repeat(100);
-    record_privacy_consent(ctx, org.id, 1, long_type.clone(), true, None, None, None)?;
+    record_privacy_consent(
+        ctx,
+        org.id,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: long_type.clone(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
+    )?;
 
     let long_consent = ctx
         .db
@@ -475,12 +528,14 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     record_privacy_consent(
         ctx,
         org.id,
-        1,
-        "consent-with_underscore.and.dot".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 1,
+            consent_type: "consent-with_underscore.and.dot".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let special = ctx
@@ -499,12 +554,14 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
         record_privacy_consent(
             ctx,
             org.id,
-            2,
-            "repeated_consent".to_string(),
-            true,
-            Some(format!("192.168.1.{}", i)),
-            None,
-            None,
+            RecordPrivacyConsentParams {
+                contact_id: 2,
+                consent_type: "repeated_consent".to_string(),
+                granted: true,
+                ip_address: Some(format!("192.168.1.{}", i)),
+                user_agent: None,
+                metadata: None,
+            },
         )?;
     }
 
@@ -525,36 +582,42 @@ pub fn test_privacy_consent_edge_cases(ctx: &ReducerContext) -> Result<(), Strin
     record_privacy_consent(
         ctx,
         org.id,
-        3,
-        "cyclic_consent".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 3,
+            consent_type: "cyclic_consent".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     // Revoke
     record_privacy_consent(
         ctx,
         org.id,
-        3,
-        "cyclic_consent".to_string(),
-        false,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 3,
+            consent_type: "cyclic_consent".to_string(),
+            granted: false,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     // Grant again
     record_privacy_consent(
         ctx,
         org.id,
-        3,
-        "cyclic_consent".to_string(),
-        true,
-        None,
-        None,
-        None,
+        RecordPrivacyConsentParams {
+            contact_id: 3,
+            consent_type: "cyclic_consent".to_string(),
+            granted: true,
+            ip_address: None,
+            user_agent: None,
+            metadata: None,
+        },
     )?;
 
     let cyclic: Vec<_> = ctx
@@ -581,18 +644,21 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     // Setup
     create_organization(
         ctx,
-        "Rule Edge Org".to_string(),
-        "RULEEDGEORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Rule Edge Org".to_string(),
+            code: "RULEEDGEORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -606,12 +672,14 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     create_data_classification(
         ctx,
         org.id,
-        "Test Class".to_string(),
-        2,
-        None,
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Test Class".to_string(),
+            level: 2,
+            description: None,
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     )?;
 
     let class = ctx
@@ -626,11 +694,13 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     create_data_classification_rule(
         ctx,
         org.id,
-        "whole_table".to_string(),
-        None,
-        class.id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "whole_table".to_string(),
+            column_name: None,
+            classification_id: class.id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     let whole_rule = ctx
@@ -648,11 +718,13 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     create_data_classification_rule(
         ctx,
         org.id,
-        "filtered_table".to_string(),
-        Some("notes".to_string()),
-        class.id,
-        "department == 'hr'".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "filtered_table".to_string(),
+            column_name: Some("notes".to_string()),
+            classification_id: class.id,
+            applies_to: "department == 'hr'".to_string(),
+            metadata: None,
+        },
     )?;
 
     let filtered = ctx
@@ -670,31 +742,37 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     create_data_classification_rule(
         ctx,
         org.id,
-        "multi_column".to_string(),
-        Some("col1".to_string()),
-        class.id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "multi_column".to_string(),
+            column_name: Some("col1".to_string()),
+            classification_id: class.id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     create_data_classification_rule(
         ctx,
         org.id,
-        "multi_column".to_string(),
-        Some("col2".to_string()),
-        class.id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "multi_column".to_string(),
+            column_name: Some("col2".to_string()),
+            classification_id: class.id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     create_data_classification_rule(
         ctx,
         org.id,
-        "multi_column".to_string(),
-        Some("col3".to_string()),
-        class.id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: "multi_column".to_string(),
+            column_name: Some("col3".to_string()),
+            classification_id: class.id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     let multi_rules: Vec<_> = ctx
@@ -715,11 +793,13 @@ pub fn test_classification_rule_edge_cases(ctx: &ReducerContext) -> Result<(), S
     create_data_classification_rule(
         ctx,
         org.id,
-        long_table.clone(),
-        Some(long_column.clone()),
-        class.id,
-        "all".to_string(),
-        None,
+        CreateDataClassificationRuleParams {
+            table_name: long_table.clone(),
+            column_name: Some(long_column.clone()),
+            classification_id: class.id,
+            applies_to: "all".to_string(),
+            metadata: None,
+        },
     )?;
 
     let long_rule = ctx
@@ -755,18 +835,21 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
     // Setup
     create_organization(
         ctx,
-        "Protection Org".to_string(),
-        "PROTORG".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        CreateOrganizationParams {
+            name: "Protection Org".to_string(),
+            code: "PROTORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -781,12 +864,14 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
     create_data_classification(
         ctx,
         org.id,
-        "No Retention".to_string(),
-        1,
-        None,
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "No Retention".to_string(),
+            level: 1,
+            description: None,
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     )?;
 
     let no_ret = ctx
@@ -812,12 +897,14 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
         create_data_classification(
             ctx,
             org.id,
-            name.to_string(),
-            2,
-            None,
-            Some(days),
-            false,
-            None,
+            CreateDataClassificationParams {
+                name: name.to_string(),
+                level: 2,
+                description: None,
+                retention_days: Some(days),
+                encryption_required: false,
+                metadata: None,
+            },
         )?;
     }
 
@@ -836,23 +923,27 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
     create_data_classification(
         ctx,
         org.id,
-        "Encrypted".to_string(),
-        3,
-        None,
-        None,
-        true,
-        None,
+        CreateDataClassificationParams {
+            name: "Encrypted".to_string(),
+            level: 3,
+            description: None,
+            retention_days: None,
+            encryption_required: true,
+            metadata: None,
+        },
     )?;
 
     create_data_classification(
         ctx,
         org.id,
-        "Not Encrypted".to_string(),
-        2,
-        None,
-        None,
-        false,
-        None,
+        CreateDataClassificationParams {
+            name: "Not Encrypted".to_string(),
+            level: 2,
+            description: None,
+            retention_days: None,
+            encryption_required: false,
+            metadata: None,
+        },
     )?;
 
     let encrypted = ctx
@@ -878,12 +969,14 @@ pub fn test_data_protection_settings(ctx: &ReducerContext) -> Result<(), String>
     create_data_classification(
         ctx,
         org.id,
-        "Critical".to_string(),
-        4,
-        None,
-        Some(7),
-        true,
-        None,
+        CreateDataClassificationParams {
+            name: "Critical".to_string(),
+            level: 4,
+            description: None,
+            retention_days: Some(7),
+            encryption_required: true,
+            metadata: None,
+        },
     )?;
 
     let critical = ctx

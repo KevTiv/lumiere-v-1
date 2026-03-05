@@ -9,63 +9,9 @@
 ///   - ContactTagAssignment
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
-// ══════════════════════════════════════════════════════════════════════════════
-// INPUT TYPES
-// ══════════════════════════════════════════════════════════════════════════════
-
-/// Input data for creating a contact
-#[derive(SpacetimeType, Clone, Debug)]
-pub struct ContactInput {
-    pub organization_id: u64,
-    pub name: String,
-    pub type_: String,
-    pub email: Option<String>,
-    pub phone: Option<String>,
-    pub mobile: Option<String>,
-    pub company_id: Option<u64>,
-    pub is_customer: bool,
-    pub is_vendor: bool,
-    pub is_employee: Option<bool>,
-    pub is_prospect: bool,
-    pub is_partner: bool,
-    pub customer_rank: Option<i32>,
-    pub supplier_rank: Option<i32>,
-    pub display_name: Option<String>,
-    // Personal details
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub title: Option<String>,
-    pub email_secondary: Option<String>,
-    pub fax: Option<String>,
-    pub website: Option<String>,
-    // Address fields
-    pub street: Option<String>,
-    pub street2: Option<String>,
-    pub city: Option<String>,
-    pub state_code: Option<String>,
-    pub zip: Option<String>,
-    pub country_code: Option<String>,
-    // Business details
-    pub tax_id: Option<String>,
-    pub company_registry: Option<String>,
-    pub industry: Option<String>,
-    pub employees_count: Option<i32>,
-    pub annual_revenue: Option<f64>,
-    pub description: Option<String>,
-    // Assignment fields
-    pub salesperson_id: Option<Identity>,
-    pub assigned_user_id: Option<Identity>,
-    pub parent_id: Option<u64>,
-    pub user_id: Option<Identity>,
-    pub color: Option<String>,
-    pub metadata: Option<String>,
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// TABLES: CONTACTS
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Tables ────────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = contact,
@@ -74,6 +20,7 @@ pub struct ContactInput {
     index(accessor = contact_by_company, btree(columns = [company_id])),
     index(accessor = contact_by_email, btree(columns = [email]))
 )]
+#[derive(Clone)]
 pub struct Contact {
     #[primary_key]
     #[auto_inc]
@@ -201,80 +148,191 @@ pub struct ContactTagAssignment {
     pub metadata: Option<String>,
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// REDUCERS: CONTACT MANAGEMENT
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Input Params ──────────────────────────────────────────────────────────────
+
+/// `display_name` defaults to `name` if not provided (derived in reducer).
+/// `deleted_at` is system-managed; `created_by`/`created_at`/`updated_at` from ctx.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateContactParams {
+    pub name: String,
+    pub type_: String,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub mobile: Option<String>,
+    pub company_id: Option<u64>,
+    pub is_customer: bool,
+    pub is_vendor: bool,
+    pub is_employee: bool,
+    pub is_prospect: bool,
+    pub is_partner: bool,
+    pub customer_rank: i32,
+    pub supplier_rank: i32,
+    pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub title: Option<String>,
+    pub email_secondary: Option<String>,
+    pub fax: Option<String>,
+    pub website: Option<String>,
+    pub street: Option<String>,
+    pub street2: Option<String>,
+    pub city: Option<String>,
+    pub state_code: Option<String>,
+    pub zip: Option<String>,
+    pub country_code: Option<String>,
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+    pub industry: Option<String>,
+    pub employees_count: Option<i32>,
+    pub annual_revenue: Option<f64>,
+    pub description: Option<String>,
+    pub salesperson_id: Option<Identity>,
+    pub assigned_user_id: Option<Identity>,
+    pub parent_id: Option<u64>,
+    pub user_id: Option<Identity>,
+    pub color: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Address fields: `None` = clear the field.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateContactAddressParams {
+    pub street: Option<String>,
+    pub street2: Option<String>,
+    pub city: Option<String>,
+    pub state_code: Option<String>,
+    pub zip: Option<String>,
+    pub country_code: Option<String>,
+}
+
+/// Business fields: `None` = clear the field.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateContactBusinessParams {
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+    pub industry: Option<String>,
+    pub employees_count: Option<i32>,
+    pub annual_revenue: Option<f64>,
+}
+
+/// Personal detail fields: `None` = clear the field.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateContactDetailsParams {
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub title: Option<String>,
+    pub email_secondary: Option<String>,
+    pub fax: Option<String>,
+    pub website: Option<String>,
+    pub description: Option<String>,
+    pub color: Option<String>,
+}
+
+/// Core contact fields: `None` = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateContactCoreParams {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub mobile: Option<String>,
+    pub company_id: Option<u64>,
+    pub is_customer: Option<bool>,
+    pub is_vendor: Option<bool>,
+    pub is_prospect: Option<bool>,
+    pub is_partner: Option<bool>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateContactTagParams {
+    pub name: String,
+    pub color: Option<String>,
+    pub description: Option<String>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ──────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
-pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), String> {
-    check_permission(ctx, input.organization_id, "contact", "create")?;
+pub fn create_contact(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateContactParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "create")?;
 
-    if input.name.is_empty() {
+    if params.name.is_empty() {
         return Err("Contact name cannot be empty".to_string());
     }
 
-    let display_name = input
+    // Derived: display_name defaults to name if not provided
+    let display_name = params
         .display_name
         .clone()
-        .unwrap_or_else(|| input.name.clone());
+        .unwrap_or_else(|| params.name.clone());
 
     let contact = ctx.db.contact().insert(Contact {
         id: 0,
-        organization_id: input.organization_id,
-        company_id: input.company_id,
-        type_: input.type_,
-        name: input.name.clone(),
+        organization_id,
+        company_id: params.company_id,
+        type_: params.type_,
+        name: params.name.clone(),
         display_name,
-        first_name: input.first_name,
-        last_name: input.last_name,
-        title: input.title,
-        email: input.email.clone(),
-        email_secondary: input.email_secondary,
-        phone: input.phone,
-        mobile: input.mobile,
-        fax: input.fax,
-        website: input.website,
-        street: input.street,
-        street2: input.street2,
-        city: input.city,
-        state_code: input.state_code,
-        zip: input.zip,
-        country_code: input.country_code,
-        tax_id: input.tax_id,
-        company_registry: input.company_registry,
-        industry: input.industry,
-        employees_count: input.employees_count,
-        annual_revenue: input.annual_revenue,
-        description: input.description,
-        is_customer: input.is_customer,
-        is_vendor: input.is_vendor,
-        is_employee: input.is_employee.unwrap_or(false),
-        is_prospect: input.is_prospect,
-        is_partner: input.is_partner,
-        customer_rank: input.customer_rank.unwrap_or(0),
-        supplier_rank: input.supplier_rank.unwrap_or(0),
-        salesperson_id: input.salesperson_id,
-        assigned_user_id: input.assigned_user_id,
-        parent_id: input.parent_id,
-        user_id: input.user_id,
-        color: input.color,
+        first_name: params.first_name,
+        last_name: params.last_name,
+        title: params.title,
+        email: params.email.clone(),
+        email_secondary: params.email_secondary,
+        phone: params.phone,
+        mobile: params.mobile,
+        fax: params.fax,
+        website: params.website,
+        street: params.street,
+        street2: params.street2,
+        city: params.city,
+        state_code: params.state_code,
+        zip: params.zip,
+        country_code: params.country_code,
+        tax_id: params.tax_id,
+        company_registry: params.company_registry,
+        industry: params.industry,
+        employees_count: params.employees_count,
+        annual_revenue: params.annual_revenue,
+        description: params.description,
+        is_customer: params.is_customer,
+        is_vendor: params.is_vendor,
+        is_employee: params.is_employee,
+        is_prospect: params.is_prospect,
+        is_partner: params.is_partner,
+        customer_rank: params.customer_rank,
+        supplier_rank: params.supplier_rank,
+        salesperson_id: params.salesperson_id,
+        assigned_user_id: params.assigned_user_id,
+        parent_id: params.parent_id,
+        user_id: params.user_id,
+        color: params.color,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+        // System-managed: set via delete_contact
         deleted_at: None,
-        metadata: input.metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        input.organization_id,
-        None,
-        "contact",
-        contact.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": input.name, "email": input.email }).to_string()),
-        vec!["name".to_string(), "email".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "email": params.email }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "email".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -283,14 +341,12 @@ pub fn create_contact(ctx: &ReducerContext, input: ContactInput) -> Result<(), S
 #[spacetimedb::reducer]
 pub fn update_contact_address(
     ctx: &ReducerContext,
+    organization_id: u64,
     contact_id: u64,
-    street: Option<String>,
-    street2: Option<String>,
-    city: Option<String>,
-    state_code: Option<String>,
-    zip: Option<String>,
-    country_code: Option<String>,
+    params: UpdateContactAddressParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "write")?;
+
     let contact = ctx
         .db
         .contact()
@@ -298,18 +354,35 @@ pub fn update_contact_address(
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    check_permission(ctx, contact.organization_id, "contact", "write")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
     ctx.db.contact().id().update(Contact {
-        street,
-        street2,
-        city,
-        state_code,
-        zip,
-        country_code,
+        street: params.street,
+        street2: params.street2,
+        city: params.city,
+        state_code: params.state_code,
+        zip: params.zip,
+        country_code: params.country_code,
         updated_at: ctx.timestamp,
         ..contact
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["street".to_string(), "city".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -317,13 +390,12 @@ pub fn update_contact_address(
 #[spacetimedb::reducer]
 pub fn update_contact_business(
     ctx: &ReducerContext,
+    organization_id: u64,
     contact_id: u64,
-    tax_id: Option<String>,
-    company_registry: Option<String>,
-    industry: Option<String>,
-    employees_count: Option<i32>,
-    annual_revenue: Option<f64>,
+    params: UpdateContactBusinessParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "write")?;
+
     let contact = ctx
         .db
         .contact()
@@ -331,17 +403,34 @@ pub fn update_contact_business(
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    check_permission(ctx, contact.organization_id, "contact", "write")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
     ctx.db.contact().id().update(Contact {
-        tax_id,
-        company_registry,
-        industry,
-        employees_count,
-        annual_revenue,
+        tax_id: params.tax_id,
+        company_registry: params.company_registry,
+        industry: params.industry,
+        employees_count: params.employees_count,
+        annual_revenue: params.annual_revenue,
         updated_at: ctx.timestamp,
         ..contact
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["tax_id".to_string(), "industry".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -349,16 +438,12 @@ pub fn update_contact_business(
 #[spacetimedb::reducer]
 pub fn update_contact_details(
     ctx: &ReducerContext,
+    organization_id: u64,
     contact_id: u64,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    title: Option<String>,
-    email_secondary: Option<String>,
-    fax: Option<String>,
-    website: Option<String>,
-    description: Option<String>,
-    color: Option<String>,
+    params: UpdateContactDetailsParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "write")?;
+
     let contact = ctx
         .db
         .contact()
@@ -366,20 +451,41 @@ pub fn update_contact_details(
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    check_permission(ctx, contact.organization_id, "contact", "write")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
     ctx.db.contact().id().update(Contact {
-        first_name,
-        last_name,
-        title,
-        email_secondary,
-        fax,
-        website,
-        description,
-        color,
+        first_name: params.first_name,
+        last_name: params.last_name,
+        title: params.title,
+        email_secondary: params.email_secondary,
+        fax: params.fax,
+        website: params.website,
+        description: params.description,
+        color: params.color,
         updated_at: ctx.timestamp,
         ..contact
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "first_name".to_string(),
+                "last_name".to_string(),
+                "title".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -387,17 +493,12 @@ pub fn update_contact_details(
 #[spacetimedb::reducer]
 pub fn update_contact(
     ctx: &ReducerContext,
+    organization_id: u64,
     contact_id: u64,
-    name: Option<String>,
-    email: Option<String>,
-    phone: Option<String>,
-    mobile: Option<String>,
-    company_id: Option<u64>,
-    is_customer: Option<bool>,
-    is_vendor: Option<bool>,
-    is_prospect: Option<bool>,
-    is_partner: Option<bool>,
+    params: UpdateContactCoreParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "write")?;
+
     let contact = ctx
         .db
         .contact()
@@ -405,43 +506,90 @@ pub fn update_contact(
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    check_permission(ctx, contact.organization_id, "contact", "write")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
-    let new_name = name.clone().unwrap_or_else(|| contact.name.clone());
-    let new_email = email.clone().or(contact.email.clone());
+    let old_name = contact.name.clone();
+    let old_email = contact.email.clone();
+
+    let new_name = params.name.clone().unwrap_or_else(|| contact.name.clone());
+    let new_email = params.email.clone().or(contact.email.clone());
+
+    let mut changed_fields = Vec::new();
+    if params.name.is_some() {
+        changed_fields.push("name".to_string());
+    }
+    if params.email.is_some() {
+        changed_fields.push("email".to_string());
+    }
+    if params.phone.is_some() {
+        changed_fields.push("phone".to_string());
+    }
+    if params.mobile.is_some() {
+        changed_fields.push("mobile".to_string());
+    }
+    if params.company_id.is_some() {
+        changed_fields.push("company_id".to_string());
+    }
+    if params.is_customer.is_some() {
+        changed_fields.push("is_customer".to_string());
+    }
+    if params.is_vendor.is_some() {
+        changed_fields.push("is_vendor".to_string());
+    }
+    if params.is_prospect.is_some() {
+        changed_fields.push("is_prospect".to_string());
+    }
+    if params.is_partner.is_some() {
+        changed_fields.push("is_partner".to_string());
+    }
 
     ctx.db.contact().id().update(Contact {
         name: new_name.clone(),
         display_name: new_name,
         email: new_email.clone(),
-        phone: phone.or(contact.phone.clone()),
-        mobile: mobile.or(contact.mobile.clone()),
-        company_id: company_id.or(contact.company_id),
-        is_customer: is_customer.unwrap_or(contact.is_customer),
-        is_vendor: is_vendor.unwrap_or(contact.is_vendor),
-        is_prospect: is_prospect.unwrap_or(contact.is_prospect),
-        is_partner: is_partner.unwrap_or(contact.is_partner),
+        phone: params.phone.or(contact.phone.clone()),
+        mobile: params.mobile.or(contact.mobile.clone()),
+        company_id: params.company_id.or(contact.company_id),
+        is_customer: params.is_customer.unwrap_or(contact.is_customer),
+        is_vendor: params.is_vendor.unwrap_or(contact.is_vendor),
+        is_prospect: params.is_prospect.unwrap_or(contact.is_prospect),
+        is_partner: params.is_partner.unwrap_or(contact.is_partner),
         updated_at: ctx.timestamp,
         ..contact
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        contact.organization_id,
-        None,
-        "contact",
-        contact_id,
-        "update",
-        None,
-        Some(serde_json::json!({ "name": name, "email": email }).to_string()),
-        vec!["name".to_string(), "email".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "name": old_name, "email": old_email }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "email": new_email }).to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
 #[spacetimedb::reducer]
-pub fn delete_contact(ctx: &ReducerContext, contact_id: u64) -> Result<(), String> {
+pub fn delete_contact(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "delete")?;
+
     let contact = ctx
         .db
         .contact()
@@ -449,7 +597,9 @@ pub fn delete_contact(ctx: &ReducerContext, contact_id: u64) -> Result<(), Strin
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    check_permission(ctx, contact.organization_id, "contact", "delete")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
     let contact_name = contact.name.clone();
 
@@ -459,16 +609,19 @@ pub fn delete_contact(ctx: &ReducerContext, contact_id: u64) -> Result<(), Strin
         ..contact
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        contact.organization_id,
-        None,
-        "contact",
-        contact_id,
-        "delete",
-        Some(serde_json::json!({ "name": contact_name }).to_string()),
-        None,
-        vec!["deleted_at".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact",
+            record_id: contact_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": contact_name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["deleted_at".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -478,26 +631,38 @@ pub fn delete_contact(ctx: &ReducerContext, contact_id: u64) -> Result<(), Strin
 pub fn create_contact_tag(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    color: Option<String>,
-    description: Option<String>,
-    metadata: Option<String>,
+    params: CreateContactTagParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_tag", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Tag name cannot be empty".to_string());
     }
 
-    ctx.db.contact_tag().insert(ContactTag {
+    let tag = ctx.db.contact_tag().insert(ContactTag {
         id: 0,
         organization_id,
-        name,
-        color,
-        description,
+        name: params.name.clone(),
+        color: params.color,
+        description: params.description,
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_tag",
+            record_id: tag.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -512,15 +677,13 @@ pub fn assign_tag_to_contact(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_tag", "write")?;
 
-    let _contact = ctx
-        .db
+    ctx.db
         .contact()
         .id()
         .find(&contact_id)
         .ok_or("Contact not found")?;
 
-    let _tag = ctx
-        .db
+    ctx.db
         .contact_tag()
         .id()
         .find(&tag_id)

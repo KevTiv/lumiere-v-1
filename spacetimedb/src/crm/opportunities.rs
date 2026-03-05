@@ -4,9 +4,51 @@
 ///   - Opportunity
 ///   - OpportunityStage
 ///   - OpportunityLine
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PARAMS TYPES
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Params for creating an opportunity.
+/// Scope: `organization_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateOpportunityParams {
+    pub name: String,
+    pub expected_revenue: f64,
+    pub probability: f64,
+    pub stage_id: u64,
+    pub priority: String,
+    pub is_won: bool,
+    pub is_lost: bool,
+    pub tag_ids: Vec<u64>,
+    // Relations
+    pub lead_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub contact_id: Option<u64>,
+    pub campaign_id: Option<u64>,
+    pub medium_id: Option<u64>,
+    pub source_id: Option<u64>,
+    pub user_id: Option<Identity>,
+    pub team_id: Option<u64>,
+    pub company_id: Option<u64>,
+    pub company_currency_id: Option<u64>,
+    pub lost_reason_id: Option<u64>,
+    // Dates
+    pub date_open: Option<Timestamp>,
+    pub date_closed: Option<Timestamp>,
+    pub date_deadline: Option<Timestamp>,
+    pub date_last_stage_update: Option<Timestamp>,
+    // Metrics
+    pub day_open: Option<i32>,
+    pub day_close: Option<i32>,
+    // Display
+    pub color: Option<String>,
+    pub description: Option<String>,
+    pub metadata: Option<String>,
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: OPPORTUNITIES
@@ -18,6 +60,7 @@ use crate::helpers::{check_permission, write_audit_log};
     index(name = "opp_by_org_idx", accessor = opp_by_org, btree(columns = [organization_id])),
     index(name = "opp_by_stage_idx", accessor = opp_by_stage, btree(columns = [stage_id]))
 )]
+#[derive(Clone)]
 pub struct Opportunity {
     #[primary_key]
     #[auto_inc]
@@ -106,99 +149,74 @@ pub struct OpportunityLine {
 pub fn create_opportunity(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    expected_revenue: f64,
-    probability: f64,
-    stage_id: u64,
-    partner_id: Option<u64>,
-    contact_id: Option<u64>,
-    // Additional fields
-    priority: String,
-    color: Option<String>,
-    campaign_id: Option<u64>,
-    medium_id: Option<u64>,
-    source_id: Option<u64>,
-    user_id: Option<Identity>,
-    team_id: Option<u64>,
-    company_id: Option<u64>,
-    company_currency_id: Option<u64>,
-    date_deadline: Option<Timestamp>,
-    description: Option<String>,
-    tag_ids: Vec<u64>,
-    // Link and status fields
-    lead_id: Option<u64>,
-    date_open: Option<Timestamp>,
-    date_closed: Option<Timestamp>,
-    date_last_stage_update: Option<Timestamp>,
-    is_won: bool,
-    is_lost: bool,
-    lost_reason_id: Option<u64>,
-    // Metrics fields
-    day_open: Option<i32>,
-    day_close: Option<i32>,
+    params: CreateOpportunityParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "opportunity", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Opportunity name cannot be empty".to_string());
     }
 
     ctx.db
         .opp_stage()
         .id()
-        .find(&stage_id)
+        .find(&params.stage_id)
         .ok_or("Stage not found")?;
 
     let opp = ctx.db.opportunity().insert(Opportunity {
         id: 0,
         organization_id,
-        lead_id,
-        name: name.clone(),
-        expected_revenue,
-        probability,
-        stage_id,
-        priority,
-        color,
-        partner_id,
-        contact_id,
-        campaign_id,
-        medium_id,
-        source_id,
-        user_id,
-        team_id,
-        company_currency_id,
-        company_id,
-        date_open,
-        date_closed,
-        date_deadline,
-        date_last_stage_update,
-        day_open,
-        day_close,
-        is_won,
-        is_lost,
-        lost_reason_id,
-        description,
-        tag_ids,
+        lead_id: params.lead_id,
+        name: params.name.clone(),
+        expected_revenue: params.expected_revenue,
+        probability: params.probability,
+        stage_id: params.stage_id,
+        priority: params.priority,
+        color: params.color,
+        partner_id: params.partner_id,
+        contact_id: params.contact_id,
+        campaign_id: params.campaign_id,
+        medium_id: params.medium_id,
+        source_id: params.source_id,
+        user_id: params.user_id,
+        team_id: params.team_id,
+        company_currency_id: params.company_currency_id,
+        company_id: params.company_id,
+        date_open: params.date_open,
+        date_closed: params.date_closed,
+        date_deadline: params.date_deadline,
+        date_last_stage_update: params.date_last_stage_update,
+        day_open: params.day_open,
+        day_close: params.day_close,
+        is_won: params.is_won,
+        is_lost: params.is_lost,
+        lost_reason_id: params.lost_reason_id,
+        description: params.description,
+        tag_ids: params.tag_ids,
+        // System-managed
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "opportunity",
-        opp.id,
-        "create",
-        None,
-        Some(
-            serde_json::json!({ "name": opp.name, "expected_revenue": expected_revenue })
-                .to_string(),
-        ),
-        vec!["name".to_string(), "expected_revenue".to_string()],
+        AuditLogParams {
+            company_id: params.company_id,
+            table_name: "opportunity",
+            record_id: opp.id,
+            action: "create",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "expected_revenue": params.expected_revenue })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "expected_revenue".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

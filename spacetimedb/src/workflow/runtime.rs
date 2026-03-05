@@ -7,7 +7,7 @@
 /// | **WorkflowWorkitem** | An active work item (token) within a workflow instance |
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InstanceState, WorkitemState};
 use crate::workflow::definitions::{
     workflow_activity, workflow_transition, WorkflowActivity, WorkflowTransition,
@@ -124,16 +124,19 @@ pub fn start_workflow(
         metadata: None,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         company_id,
-        None,
-        "workflow_instance",
-        instance.id,
-        "create",
-        None,
-        None,
-        vec!["started".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "workflow_instance",
+            record_id: instance.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["started".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -257,16 +260,19 @@ pub fn signal_workflow(
         }
     }
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         company_id,
-        None,
-        "workflow_instance",
-        instance_id,
-        "write",
-        None,
-        None,
-        vec![format!("signal:{}", signal)],
+        AuditLogParams {
+            company_id: None,
+            table_name: "workflow_instance",
+            record_id: instance_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![format!("signal:{}", signal)],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -320,16 +326,19 @@ pub fn set_workitem_exception(
             ..item
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         company_id,
-        None,
-        "workflow_workitem",
-        workitem_id,
-        "write",
-        None,
-        None,
-        vec!["exception".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "workflow_workitem",
+            record_id: workitem_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["exception".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Workitem exception set: id={}", workitem_id);
@@ -387,16 +396,19 @@ pub fn cancel_workflow_instance(
             ..instance
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         company_id,
-        None,
-        "workflow_instance",
-        instance_id,
-        "write",
-        None,
-        None,
-        vec!["cancelled".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "workflow_instance",
+            record_id: instance_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["cancelled".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Workflow instance cancelled: id={}", instance_id);

@@ -3,10 +3,99 @@
 /// Tables:  Country · Currency · CurrencyRate · UOMCategory · UOM · UOMConversion
 /// Pattern: Country and Currency are global (no organization_id); everything else
 ///          is scoped to an organization. Only superusers may manage global tables.
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::users::user_profile;
 use crate::helpers::check_permission;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating a country (superuser only).
+/// Scope: `code` is a flat reducer param (PK / duplicate check).
+/// `is_active` hardcoded in original — moved to params for configurability.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCountryParams {
+    pub name: String,
+    pub iso3: String,
+    pub numcode: u16,
+    pub phone_code: String,
+    pub official_name: Option<String>,
+    pub currency_code: Option<String>,
+    pub language_codes: Vec<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a currency (superuser only).
+/// Scope: `code` is a flat reducer param (PK / duplicate check).
+/// `active` hardcoded in original — moved to params for configurability.
+/// `created_at` is system-derived.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCurrencyParams {
+    pub name: String,
+    pub symbol: String,
+    pub decimal_places: u8,
+    pub rounding_factor: f64,
+    /// Symbol position relative to amount: `"before"` or `"after"`.
+    pub position: String,
+    pub active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a currency rate.
+/// Scope: `organization_id` + `company_id` are flat reducer params.
+/// `inverse_rate`, `date`, `created_at` are system-derived.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCurrencyRateParams {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a UOM category.
+/// Scope: `organization_id` is a flat reducer param.
+/// `created_at` is system-derived.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateUomCategoryParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub sequence: u32,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a unit of measure.
+/// Scope: `organization_id` is a flat reducer param.
+/// `is_active` hardcoded in original — moved to params.
+/// `created_at` is system-derived.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateUomParams {
+    pub category_id: u64,
+    pub name: String,
+    pub symbol: String,
+    /// Conversion factor relative to the reference unit in this category.
+    pub factor: f64,
+    pub rounding: f64,
+    pub times_bigger: f64,
+    pub is_reference_unit: bool,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a UOM conversion.
+/// Scope: `organization_id` + `category_id` are flat reducer params.
+/// `is_active` hardcoded in original — moved to params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateUomConversionParams {
+    pub from_uom_id: u64,
+    pub to_uom_id: u64,
+    pub factor: f64,
+    pub product_id: Option<u64>, // None = applies to all products in category
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -144,14 +233,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 pub fn create_country(
     ctx: &ReducerContext,
     code: String,
-    name: String,
-    iso3: String,
-    numcode: u16,
-    phone_code: String,
-    official_name: Option<String>,
-    currency_code: Option<String>,
-    language_codes: Vec<String>,
-    metadata: Option<String>,
+    params: CreateCountryParams,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
@@ -161,15 +243,15 @@ pub fn create_country(
 
     ctx.db.country().insert(Country {
         code,
-        name,
-        official_name,
-        iso3,
-        numcode,
-        phone_code,
-        currency_code,
-        language_codes,
-        is_active: true,
-        metadata,
+        name: params.name,
+        official_name: params.official_name,
+        iso3: params.iso3,
+        numcode: params.numcode,
+        phone_code: params.phone_code,
+        currency_code: params.currency_code,
+        language_codes: params.language_codes,
+        is_active: params.is_active,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -179,12 +261,7 @@ pub fn create_country(
 pub fn create_currency(
     ctx: &ReducerContext,
     code: String,
-    name: String,
-    symbol: String,
-    decimal_places: u8,
-    rounding_factor: f64,
-    position: String,
-    metadata: Option<String>,
+    params: CreateCurrencyParams,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
@@ -192,20 +269,21 @@ pub fn create_currency(
         return Err(format!("Currency '{}' already exists", code));
     }
 
-    if position != "before" && position != "after" {
+    if params.position != "before" && params.position != "after" {
         return Err("Position must be 'before' or 'after'".to_string());
     }
 
     ctx.db.currency().insert(Currency {
         code,
-        name,
-        symbol,
-        decimal_places,
-        rounding_factor,
-        active: true,
-        position,
+        name: params.name,
+        symbol: params.symbol,
+        decimal_places: params.decimal_places,
+        rounding_factor: params.rounding_factor,
+        active: params.active,
+        position: params.position,
+        // System-derived: creation timestamp
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -215,29 +293,27 @@ pub fn create_currency(
 pub fn create_currency_rate(
     ctx: &ReducerContext,
     organization_id: u64,
-    from_currency: String,
-    to_currency: String,
-    rate: f64,
     company_id: Option<u64>,
-    metadata: Option<String>,
+    params: CreateCurrencyRateParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "currency_rate", "create")?;
 
-    if rate <= 0.0 {
+    if params.rate <= 0.0 {
         return Err("Rate must be positive".to_string());
     }
 
     ctx.db.currency_rate().insert(CurrencyRate {
         id: 0,
         organization_id,
-        from_currency,
-        to_currency,
-        rate,
-        inverse_rate: 1.0 / rate,
+        from_currency: params.from_currency,
+        to_currency: params.to_currency,
+        rate: params.rate,
+        // System-derived: inverse is always 1/rate
+        inverse_rate: 1.0 / params.rate,
         date: ctx.timestamp,
         company_id,
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -247,21 +323,19 @@ pub fn create_currency_rate(
 pub fn create_uom_category(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    description: Option<String>,
-    sequence: u32,
-    metadata: Option<String>,
+    params: CreateUomCategoryParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_category", "create")?;
 
     ctx.db.uom_cat().insert(UOMCategory {
         id: 0,
         organization_id,
-        name,
-        description,
-        sequence,
+        name: params.name,
+        description: params.description,
+        sequence: params.sequence,
+        // System-derived: creation timestamp
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -271,14 +345,7 @@ pub fn create_uom_category(
 pub fn create_uom(
     ctx: &ReducerContext,
     organization_id: u64,
-    category_id: u64,
-    name: String,
-    symbol: String,
-    factor: f64,
-    rounding: f64,
-    times_bigger: f64,
-    is_reference_unit: bool,
-    metadata: Option<String>,
+    params: CreateUomParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom", "create")?;
 
@@ -286,7 +353,7 @@ pub fn create_uom(
         .db
         .uom_cat()
         .id()
-        .find(&category_id)
+        .find(&params.category_id)
         .ok_or("UOM category not found")?;
 
     if category.organization_id != organization_id {
@@ -296,16 +363,17 @@ pub fn create_uom(
     ctx.db.uom().insert(UOM {
         id: 0,
         organization_id,
-        category_id,
-        name,
-        symbol,
-        factor,
-        rounding,
-        times_bigger,
-        is_reference_unit,
-        is_active: true,
+        category_id: params.category_id,
+        name: params.name,
+        symbol: params.symbol,
+        factor: params.factor,
+        rounding: params.rounding,
+        times_bigger: params.times_bigger,
+        is_reference_unit: params.is_reference_unit,
+        is_active: params.is_active,
+        // System-derived: creation timestamp
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -316,15 +384,11 @@ pub fn create_uom_conversion(
     ctx: &ReducerContext,
     organization_id: u64,
     category_id: u64,
-    from_uom_id: u64,
-    to_uom_id: u64,
-    factor: f64,
-    product_id: Option<u64>,
-    metadata: Option<String>,
+    params: CreateUomConversionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_conversion", "create")?;
 
-    if factor <= 0.0 {
+    if params.factor <= 0.0 {
         return Err("Conversion factor must be positive".to_string());
     }
 
@@ -332,12 +396,12 @@ pub fn create_uom_conversion(
         id: 0,
         organization_id,
         category_id,
-        from_uom_id,
-        to_uom_id,
-        factor,
-        product_id,
-        is_active: true,
-        metadata,
+        from_uom_id: params.from_uom_id,
+        to_uom_id: params.to_uom_id,
+        factor: params.factor,
+        product_id: params.product_id,
+        is_active: params.is_active,
+        metadata: params.metadata,
     });
 
     Ok(())

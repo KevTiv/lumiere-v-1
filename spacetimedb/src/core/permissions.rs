@@ -4,9 +4,58 @@
 /// Pattern: Roles carry a `permissions` string list (`"resource:action"`).
 ///          CasbinRule provides fine-grained policy overrides (Casbin "p" / "g").
 ///          UserRoleAssignment links identities to roles within an organization.
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating a role.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateRoleParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub parent_id: Option<u64>,
+    pub permissions: Vec<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating a role.
+/// Scope: `role_id` is a flat reducer param.
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateRoleParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub permissions: Option<Vec<String>>,
+    pub is_active: Option<bool>,
+}
+
+/// Params for adding a Casbin policy or grouping rule.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddCasbinRuleParams {
+    pub ptype: String,
+    pub v0: Option<String>,
+    pub v1: Option<String>,
+    pub v2: Option<String>,
+    pub v3: Option<String>,
+    pub v4: Option<String>,
+    pub v5: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for assigning a role to a user.
+/// Scope: `user_identity` + `role_id` + `organization_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AssignRoleParams {
+    pub expires_at_micros: Option<u64>,
+    pub metadata: Option<String>,
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -79,30 +128,27 @@ pub struct UserRoleAssignment {
 pub fn create_role(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    description: Option<String>,
-    parent_id: Option<u64>,
-    permissions: Vec<String>,
-    metadata: Option<String>,
+    params: CreateRoleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "role", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Role name cannot be empty".to_string());
     }
 
     ctx.db.role().insert(Role {
         id: 0,
         organization_id,
-        name,
-        description,
-        parent_id,
-        permissions,
+        name: params.name,
+        description: params.description,
+        parent_id: params.parent_id,
+        permissions: params.permissions,
+        // System-managed: user-created roles are never system roles
         is_system: false,
-        is_active: true,
+        is_active: params.is_active,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -112,10 +158,7 @@ pub fn create_role(
 pub fn update_role(
     ctx: &ReducerContext,
     role_id: u64,
-    name: Option<String>,
-    description: Option<String>,
-    permissions: Option<Vec<String>>,
-    is_active: Option<bool>,
+    params: UpdateRoleParams,
 ) -> Result<(), String> {
     let role = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
 
@@ -126,10 +169,10 @@ pub fn update_role(
     check_permission(ctx, role.organization_id, "role", "write")?;
 
     ctx.db.role().id().update(Role {
-        name: name.unwrap_or(role.name),
-        description: description.or(role.description),
-        permissions: permissions.unwrap_or(role.permissions),
-        is_active: is_active.unwrap_or(role.is_active),
+        name: params.name.unwrap_or(role.name),
+        description: params.description.or(role.description),
+        permissions: params.permissions.unwrap_or(role.permissions),
+        is_active: params.is_active.unwrap_or(role.is_active),
         updated_at: ctx.timestamp,
         ..role
     });
@@ -143,32 +186,25 @@ pub fn update_role(
 pub fn add_casbin_rule(
     ctx: &ReducerContext,
     organization_id: u64,
-    ptype: String,
-    v0: Option<String>,
-    v1: Option<String>,
-    v2: Option<String>,
-    v3: Option<String>,
-    v4: Option<String>,
-    v5: Option<String>,
-    metadata: Option<String>,
+    params: AddCasbinRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "casbin_rule", "create")?;
 
-    if ptype != "p" && ptype != "g" {
+    if params.ptype != "p" && params.ptype != "g" {
         return Err("ptype must be 'p' (policy) or 'g' (grouping)".to_string());
     }
 
     ctx.db.casbin_rule().insert(CasbinRule {
         id: 0,
-        ptype,
-        v0,
-        v1,
-        v2,
-        v3,
-        v4,
-        v5,
+        ptype: params.ptype,
+        v0: params.v0,
+        v1: params.v1,
+        v2: params.v2,
+        v3: params.v3,
+        v4: params.v4,
+        v5: params.v5,
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -191,8 +227,7 @@ pub fn assign_role(
     user_identity: Identity,
     role_id: u64,
     organization_id: u64,
-    expires_at_micros: Option<u64>,
-    metadata: Option<String>,
+    params: AssignRoleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_role_assignment", "create")?;
 
@@ -213,7 +248,9 @@ pub fn assign_role(
         return Err("User already has this role in this organization".to_string());
     }
 
-    let expires_at = expires_at_micros.map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
+    let expires_at = params
+        .expires_at_micros
+        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
     ctx.db.user_role_assignment().insert(UserRoleAssignment {
         id: 0,
@@ -223,8 +260,9 @@ pub fn assign_role(
         assigned_by: ctx.sender(),
         assigned_at: ctx.timestamp,
         expires_at,
+        // System-managed: always active when assigned
         is_active: true,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())

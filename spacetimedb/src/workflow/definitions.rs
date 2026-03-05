@@ -6,15 +6,71 @@
 /// | **Workflow** | Workflow definitions attached to ERP models |
 /// | **WorkflowActivity** | Individual steps/nodes within a workflow |
 /// | **WorkflowTransition** | Directed edges between activities with conditions |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating a workflow definition.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWorkflowParams {
+    pub name: String,
+    pub model: String,
+    pub state_field: String,
+    pub on_create: bool,
+    pub is_active: bool,
+    pub description: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for adding an activity node to a workflow.
+/// Scope: `company_id` + `workflow_id` are flat reducer params.
+/// `outgoing_transition_ids` + `incoming_transition_ids` are system-managed
+/// (populated by `add_workflow_transition`).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddWorkflowActivityParams {
+    pub name: String,
+    pub kind: String,
+    pub split_mode: String,
+    pub join_mode: String,
+    pub flow_start: bool,
+    pub flow_stop: bool,
+    pub sequence: u32,
+    pub action: Option<String>,
+    pub action_id: Option<u64>,
+    pub trigger_model: Option<String>,
+    pub trigger_expr_id: Option<u64>,
+    pub signal_send: Option<String>,
+    pub subflow_id: Option<u64>,
+    pub state_from: Option<String>,
+    pub state_to: Option<String>,
+    pub description: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for adding a transition edge between two activities.
+/// Scope: `company_id` + `workflow_id` + `activity_from` + `activity_to` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddWorkflowTransitionParams {
+    pub sequence: u32,
+    pub signal: Option<String>,
+    pub condition: Option<String>,
+    pub trigger_model: Option<String>,
+    pub trigger_expr_id: Option<u64>,
+    pub group_id: Option<u64>,
+    pub metadata: Option<String>,
+}
 
 // ============================================================================
 // TABLES
 // ============================================================================
 
 /// Workflow — Defines an automated workflow for a specific ERP model
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = workflow,
     public,
@@ -82,6 +138,7 @@ pub struct WorkflowActivity {
 }
 
 /// WorkflowTransition — A directed edge between two activities with optional conditions
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = workflow_transition,
     public,
@@ -117,22 +174,20 @@ pub struct WorkflowTransition {
 pub fn create_workflow(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    model: String,
-    state_field: String,
-    on_create: bool,
+    params: CreateWorkflowParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "workflow", "create")?;
 
     let wf = ctx.db.workflow().insert(Workflow {
         id: 0,
-        name,
-        description: None,
-        model,
-        state_field,
-        on_create,
-        is_active: true,
+        name: params.name,
+        description: params.description,
+        model: params.model,
+        state_field: params.state_field,
+        on_create: params.on_create,
+        is_active: params.is_active,
+        // System-managed: start empty, populated by add_workflow_activity / add_workflow_transition
         activity_ids: Vec::new(),
         transition_ids: Vec::new(),
         transition_count: 0,
@@ -141,19 +196,22 @@ pub fn create_workflow(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "workflow",
-        wf.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "workflow",
+            record_id: wf.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Workflow created: id={}, model={}", wf.id, wf.model);
@@ -166,15 +224,7 @@ pub fn add_workflow_activity(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     workflow_id: u64,
-    name: String,
-    kind: String,
-    action: Option<String>,
-    split_mode: String,
-    join_mode: String,
-    flow_start: bool,
-    flow_stop: bool,
-    state_from: Option<String>,
-    state_to: Option<String>,
+    params: AddWorkflowActivityParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "workflow_activity", "create")?;
@@ -188,30 +238,31 @@ pub fn add_workflow_activity(
 
     let activity = ctx.db.workflow_activity().insert(WorkflowActivity {
         id: 0,
-        name,
-        description: None,
+        name: params.name,
+        description: params.description,
         workflow_id,
-        sequence: 0,
-        kind,
-        action,
-        action_id: None,
-        trigger_model: None,
-        trigger_expr_id: None,
-        split_mode,
-        join_mode,
-        signal_send: None,
-        subflow_id: None,
+        sequence: params.sequence,
+        kind: params.kind,
+        action: params.action,
+        action_id: params.action_id,
+        trigger_model: params.trigger_model,
+        trigger_expr_id: params.trigger_expr_id,
+        split_mode: params.split_mode,
+        join_mode: params.join_mode,
+        signal_send: params.signal_send,
+        subflow_id: params.subflow_id,
+        // System-managed: populated by add_workflow_transition
         outgoing_transition_ids: Vec::new(),
         incoming_transition_ids: Vec::new(),
-        flow_start,
-        flow_stop,
-        state_from,
-        state_to,
+        flow_start: params.flow_start,
+        flow_stop: params.flow_stop,
+        state_from: params.state_from,
+        state_to: params.state_to,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     // Register activity on parent workflow
@@ -224,16 +275,19 @@ pub fn add_workflow_activity(
         ..wf
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "workflow_activity",
-        activity.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "workflow_activity",
+            record_id: activity.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -252,8 +306,7 @@ pub fn add_workflow_transition(
     workflow_id: u64,
     activity_from: u64,
     activity_to: u64,
-    signal: Option<String>,
-    condition: Option<String>,
+    params: AddWorkflowTransitionParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "workflow_transition", "create")?;
@@ -287,17 +340,17 @@ pub fn add_workflow_transition(
         id: 0,
         activity_from,
         activity_to,
-        sequence: 0,
-        signal,
-        condition,
-        trigger_model: None,
-        trigger_expr_id: None,
-        group_id: None,
+        sequence: params.sequence,
+        signal: params.signal,
+        condition: params.condition,
+        trigger_model: params.trigger_model,
+        trigger_expr_id: params.trigger_expr_id,
+        group_id: params.group_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     // Update outgoing/incoming lists on the activity nodes
@@ -324,22 +377,26 @@ pub fn add_workflow_transition(
     transition_ids.push(transition.id);
     ctx.db.workflow().id().update(Workflow {
         transition_ids,
+        // System-managed: derived count
         transition_count: wf.transition_count + 1,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..wf
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "workflow_transition",
-        transition.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "workflow_transition",
+            record_id: transition.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -376,20 +433,23 @@ pub fn set_workflow_active(
         ..wf
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "workflow",
-        workflow_id,
-        "write",
-        None,
-        None,
-        vec![if is_active {
-            "activated".to_string()
-        } else {
-            "deactivated".to_string()
-        }],
+        AuditLogParams {
+            company_id,
+            table_name: "workflow",
+            record_id: workflow_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![if is_active {
+                "activated".to_string()
+            } else {
+                "deactivated".to_string()
+            }],
+            metadata: None,
+        },
     );
 
     log::info!(

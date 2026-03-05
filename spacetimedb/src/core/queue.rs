@@ -4,10 +4,38 @@
 /// Pattern: Jobs transition Pending → Processing → Completed | Failed.
 ///          Workers register themselves and send periodic heartbeats.
 ///          Use `enqueue_job` from any domain reducer that needs background work.
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
 use crate::types::JobStatus;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for enqueueing a job.
+/// Scope: `organization_id` is a flat reducer param.
+/// `attempts`, `status`, `started_at`, `completed_at`, `error_message` are system-managed.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct EnqueueJobParams {
+    pub queue_name: String,
+    pub job_type: String,
+    pub payload: String,
+    pub priority: i32,
+    pub max_attempts: u32,
+    pub scheduled_at_micros: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+/// Params for registering a queue worker.
+/// Scope: `organization_id` is a flat reducer param.
+/// `is_active`, `last_heartbeat`, `started_at` are system-managed.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RegisterQueueWorkerParams {
+    pub name: String,
+    pub queues: Vec<String>,
+    pub metadata: Option<String>,
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -58,24 +86,20 @@ pub struct QueueWorker {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-/// Push a new job onto a queue. Pass `scheduled_at_micros = Some(…)` for deferred jobs.
+/// Push a new job onto a queue.
 #[spacetimedb::reducer]
 pub fn enqueue_job(
     ctx: &ReducerContext,
     organization_id: u64,
-    queue_name: String,
-    job_type: String,
-    payload: String,
-    priority: i32,
-    max_attempts: u32,
-    scheduled_at_micros: Option<u64>,
-    metadata: Option<String>,
+    params: EnqueueJobParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "queue_job", "create")?;
 
-    let scheduled_at =
-        scheduled_at_micros.map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
+    let scheduled_at = params
+        .scheduled_at_micros
+        .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
+    // System-derived: status depends on whether the job is scheduled
     let status = if scheduled_at.is_some() {
         JobStatus::Scheduled
     } else {
@@ -85,20 +109,22 @@ pub fn enqueue_job(
     ctx.db.queue_job().insert(QueueJob {
         id: 0,
         organization_id,
-        queue_name,
-        job_type,
-        payload,
-        priority,
+        queue_name: params.queue_name,
+        job_type: params.job_type,
+        payload: params.payload,
+        priority: params.priority,
+        // System-managed: starts at 0, incremented by claim_queue_job
         attempts: 0,
-        max_attempts,
+        max_attempts: params.max_attempts,
         status,
         scheduled_at,
+        // System-managed: set by claim/complete transitions
         started_at: None,
         completed_at: None,
         error_message: None,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -175,21 +201,20 @@ pub fn complete_queue_job(
 pub fn register_queue_worker(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    queues: Vec<String>,
-    metadata: Option<String>,
+    params: RegisterQueueWorkerParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "queue_worker", "create")?;
 
     ctx.db.queue_worker().insert(QueueWorker {
         id: 0,
         organization_id,
-        name,
-        queues,
+        name: params.name,
+        queues: params.queues,
+        // System-managed: always active when registered; timestamps from ctx
         is_active: true,
         last_heartbeat: ctx.timestamp,
         started_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())

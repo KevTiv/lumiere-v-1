@@ -6,7 +6,9 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::{
     company, create_company, create_organization, delete_company, organization,
     organization_settings, update_company_address, update_company_business, update_organization,
-    upsert_organization_settings,
+    upsert_organization_settings, CreateCompanyParams, CreateOrganizationParams,
+    UpdateCompanyAddressParams, UpdateCompanyBusinessParams, UpdateOrganizationParams,
+    UpsertOrganizationSettingsParams,
 };
 
 /// Test reducer for organization lifecycle operations
@@ -18,18 +20,21 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
 
     create_organization(
         ctx,
-        org_name.clone(),
-        org_code.clone(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None, // description
-        None, // logo_url
-        None, // website
-        None, // email
-        None, // phone
-        None, // currency_id
-        None, // metadata
+        CreateOrganizationParams {
+            name: org_name.clone(),
+            code: org_code.clone(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     // Verify organization was created
@@ -57,16 +62,18 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     update_organization(
         ctx,
         org_id,
-        Some("Updated Test Organization".to_string()),
-        Some("Test Description".to_string()),
-        None,
-        Some("https://test.com".to_string()),
-        Some("test@test.com".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
+        UpdateOrganizationParams {
+            name: Some("Updated Test Organization".to_string()),
+            description: Some("Test Description".to_string()),
+            timezone: None,
+            website: Some("https://test.com".to_string()),
+            email: Some("test@test.com".to_string()),
+            phone: None,
+            logo_url: None,
+            date_format: None,
+            language: None,
+            currency_id: None,
+        },
     )?;
 
     let updated_org = ctx
@@ -84,9 +91,12 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     upsert_organization_settings(
         ctx,
         org_id,
-        Some(r#"{"theme": "light"}"#.to_string()),
-        vec!["feature_a".to_string(), "feature_b".to_string()],
-        Some(r#"{"api_key": "secret123"}"#.to_string()),
+        UpsertOrganizationSettingsParams {
+            module_config: Some(r#"{"theme": "light"}"#.to_string()),
+            feature_flags: vec!["feature_a".to_string(), "feature_b".to_string()],
+            integration_keys: Some(r#"{"api_key": "secret123"}"#.to_string()),
+            metadata: None,
+        },
     )?;
 
     let settings = ctx
@@ -104,20 +114,22 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     create_company(
         ctx,
         org_id,
-        "Test Company".to_string(),
-        "COMP001".to_string(),
-        1,     // currency_id
-        12,    // fiscal_year_end_month
-        31,    // fiscal_year_end_day
-        false, // is_parent
-        None,  // parent_id
-        None,  // tax_id
-        None,  // company_registry
-        None,  // address_street
-        None,  // address_city
-        None,  // address_zip
-        None,  // address_country_code
-        None,  // metadata
+        CreateCompanyParams {
+            name: "Test Company".to_string(),
+            code: "COMP001".to_string(),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
     )?;
 
     let company = ctx
@@ -137,18 +149,22 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     update_company_address(
         ctx,
         company_id,
-        Some("123 Test St".to_string()),
-        Some("Test City".to_string()),
-        Some("12345".to_string()),
-        Some("US".to_string()),
+        UpdateCompanyAddressParams {
+            address_street: Some("123 Test St".to_string()),
+            address_city: Some("Test City".to_string()),
+            address_zip: Some("12345".to_string()),
+            address_country_code: Some("US".to_string()),
+        },
     )?;
 
     // Test 6: Update company business info
     update_company_business(
         ctx,
         company_id,
-        Some("TAX123456".to_string()),
-        Some("REG789".to_string()),
+        UpdateCompanyBusinessParams {
+            tax_id: Some("TAX123456".to_string()),
+            company_registry: Some("REG789".to_string()),
+        },
     )?;
 
     let updated_company = ctx
@@ -180,18 +196,21 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     // Empty organization name should fail
     match create_organization(
         ctx,
-        "".to_string(),
-        "CODE".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "".to_string(),
+            code: "CODE".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     ) {
         Ok(_) => return Err("Should reject empty organization name".to_string()),
         Err(_) => {} // Expected
@@ -200,18 +219,21 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     // Empty organization code should fail
     match create_organization(
         ctx,
-        "Name".to_string(),
-        "".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Name".to_string(),
+            code: "".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     ) {
         Ok(_) => return Err("Should reject empty organization code".to_string()),
         Err(_) => {} // Expected
@@ -221,20 +243,22 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     match create_company(
         ctx,
         org_id,
-        "".to_string(),
-        "COMP001".to_string(),
-        1,
-        12,
-        31,
-        false,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateCompanyParams {
+            name: "".to_string(),
+            code: "COMP001".to_string(),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
     ) {
         Ok(_) => return Err("Should reject empty company name".to_string()),
         Err(_) => {} // Expected
@@ -244,16 +268,18 @@ pub fn test_organization_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     match update_organization(
         ctx,
         99999,
-        Some("Name".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        UpdateOrganizationParams {
+            name: Some("Name".to_string()),
+            description: None,
+            timezone: None,
+            website: None,
+            email: None,
+            phone: None,
+            logo_url: None,
+            date_format: None,
+            language: None,
+            currency_id: None,
+        },
     ) {
         Ok(_) => return Err("Should reject update of non-existent organization".to_string()),
         Err(_) => {} // Expected
@@ -268,34 +294,40 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
     // Create two organizations
     create_organization(
         ctx,
-        "Org A".to_string(),
-        "ORGA".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Org A".to_string(),
+            code: "ORGA".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     create_organization(
         ctx,
-        "Org B".to_string(),
-        "ORGB".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Org B".to_string(),
+            code: "ORGB".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     // Verify both exist
@@ -322,39 +354,43 @@ pub fn test_organization_isolation(ctx: &ReducerContext) -> Result<(), String> {
     create_company(
         ctx,
         org_a.id,
-        "Company A".to_string(),
-        "COMPA".to_string(),
-        1,
-        12,
-        31,
-        false,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateCompanyParams {
+            name: "Company A".to_string(),
+            code: "COMPA".to_string(),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
     )?;
 
     create_company(
         ctx,
         org_b.id,
-        "Company B".to_string(),
-        "COMPB".to_string(),
-        1,
-        12,
-        31,
-        false,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateCompanyParams {
+            name: "Company B".to_string(),
+            code: "COMPB".to_string(),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
     )?;
 
     // Verify isolation - companies should belong to correct orgs
@@ -378,18 +414,21 @@ pub fn test_organization_settings_edge_cases(ctx: &ReducerContext) -> Result<(),
     // Create organization
     create_organization(
         ctx,
-        "Settings Test Org".to_string(),
-        "SETTINGS".to_string(),
-        "UTC".to_string(),
-        "YYYY-MM-DD".to_string(),
-        "en".to_string(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None, // metadata
+        CreateOrganizationParams {
+            name: "Settings Test Org".to_string(),
+            code: "SETTINGS".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
     )?;
 
     let org = ctx
@@ -403,17 +442,23 @@ pub fn test_organization_settings_edge_cases(ctx: &ReducerContext) -> Result<(),
     upsert_organization_settings(
         ctx,
         org.id,
-        Some(r#"{"initial": true}"#.to_string()),
-        vec!["flag1".to_string()],
-        None,
+        UpsertOrganizationSettingsParams {
+            module_config: Some(r#"{"initial": true}"#.to_string()),
+            feature_flags: vec!["flag1".to_string()],
+            integration_keys: None,
+            metadata: None,
+        },
     )?;
 
     upsert_organization_settings(
         ctx,
         org.id,
-        Some(r#"{"updated": true}"#.to_string()),
-        vec!["flag1".to_string(), "flag2".to_string()],
-        Some(r#"{"key": "value"}"#.to_string()),
+        UpsertOrganizationSettingsParams {
+            module_config: Some(r#"{"updated": true}"#.to_string()),
+            feature_flags: vec!["flag1".to_string(), "flag2".to_string()],
+            integration_keys: Some(r#"{"key": "value"}"#.to_string()),
+            metadata: None,
+        },
     )?;
 
     let settings = ctx

@@ -4,10 +4,28 @@
 ///   - ContactSegment
 ///   - SegmentMember
 ///   - AssignmentRule
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::contact;
 use crate::helpers::check_permission;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PARAMS TYPES
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Params for creating a contact segment.
+/// Scope: `organization_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateContactSegmentParams {
+    pub name: String,
+    pub is_dynamic: bool,
+    pub is_active: bool,
+    pub description: Option<String>,
+    pub domain: Option<String>,
+    pub color: Option<String>,
+    pub parent_id: Option<u64>,
+    pub metadata: Option<String>,
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: SEGMENTS
@@ -80,34 +98,29 @@ pub struct AssignmentRule {
 pub fn create_contact_segment(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    description: Option<String>,
-    domain: Option<String>,
-    is_dynamic: bool,
-    // Additional optional fields
-    color: Option<String>,
-    parent_id: Option<u64>,
+    params: CreateContactSegmentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_segment", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Segment name cannot be empty".to_string());
     }
 
     ctx.db.contact_segment().insert(ContactSegment {
         id: 0,
         organization_id,
-        name,
-        description,
-        domain,
-        is_dynamic,
+        name: params.name,
+        description: params.description,
+        domain: params.domain,
+        is_dynamic: params.is_dynamic,
+        // System-managed: always starts at 0, incremented by add_contact_to_segment
         member_count: 0,
-        color,
-        parent_id,
-        is_active: true,
+        color: params.color,
+        parent_id: params.parent_id,
+        is_active: params.is_active,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     Ok(())

@@ -4,11 +4,83 @@
 /// Pattern: UserProfile is keyed by SpacetimeDB `Identity` (auto-created on
 ///          first connect). UserOrganization links a user to an org+role.
 ///          UserSession tracks active client connections.
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::organization;
 use crate::core::permissions::{role, Role};
 use crate::helpers::check_permission;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for updating the calling user's own profile.
+/// Scope: no scope param (operates on ctx.sender()).
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateUserProfileParams {
+    pub name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub phone: Option<String>,
+    pub mobile: Option<String>,
+    pub timezone: Option<String>,
+    pub language: Option<String>,
+    pub signature: Option<String>,
+    pub notification_preferences: Option<String>,
+    pub ui_preferences: Option<String>,
+}
+
+/// Params for adding a user to an organization by role ID.
+/// Scope: `user_identity` + `organization_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddUserToOrganizationParams {
+    pub role_id: u64,
+    pub company_id: Option<u64>,
+    pub job_title: Option<String>,
+    pub department_id: Option<u64>,
+    pub employee_id: Option<String>,
+    pub is_active: bool,
+    pub is_default: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for adding a user to an organization by role name.
+/// Scope: `user_identity` + `organization_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddOrgMemberParams {
+    pub role_name: String,
+    pub company_id: Option<u64>,
+    pub job_title: Option<String>,
+    pub department_id: Option<u64>,
+    pub employee_id: Option<String>,
+    pub is_active: bool,
+    pub is_default: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating org membership details.
+/// Scope: `user_org_id` is a flat reducer param.
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateOrgMemberDetailsParams {
+    pub department_id: Option<u64>,
+    pub job_title: Option<String>,
+    pub employee_id: Option<String>,
+}
+
+/// Params for creating a user session.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateUserSessionParams {
+    pub session_token: String,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub device_info: Option<String>,
+    pub expires_at_micros: u64,
+    pub metadata: Option<String>,
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -90,17 +162,7 @@ pub struct UserSession {
 #[spacetimedb::reducer]
 pub fn update_user_profile(
     ctx: &ReducerContext,
-    name: Option<String>,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    avatar_url: Option<String>,
-    phone: Option<String>,
-    mobile: Option<String>,
-    timezone: Option<String>,
-    language: Option<String>,
-    signature: Option<String>,
-    notification_preferences: Option<String>,
-    ui_preferences: Option<String>,
+    params: UpdateUserProfileParams,
 ) -> Result<(), String> {
     let profile = ctx
         .db
@@ -110,17 +172,19 @@ pub fn update_user_profile(
         .ok_or("User profile not found")?;
 
     ctx.db.user_profile().identity().update(UserProfile {
-        name: name.unwrap_or(profile.name),
-        first_name: first_name.or(profile.first_name),
-        last_name: last_name.or(profile.last_name),
-        avatar_url: avatar_url.or(profile.avatar_url),
-        phone: phone.or(profile.phone),
-        mobile: mobile.or(profile.mobile),
-        timezone: timezone.unwrap_or(profile.timezone),
-        language: language.unwrap_or(profile.language),
-        signature: signature.or(profile.signature),
-        notification_preferences: notification_preferences.or(profile.notification_preferences),
-        ui_preferences: ui_preferences.or(profile.ui_preferences),
+        name: params.name.unwrap_or(profile.name),
+        first_name: params.first_name.or(profile.first_name),
+        last_name: params.last_name.or(profile.last_name),
+        avatar_url: params.avatar_url.or(profile.avatar_url),
+        phone: params.phone.or(profile.phone),
+        mobile: params.mobile.or(profile.mobile),
+        timezone: params.timezone.unwrap_or(profile.timezone),
+        language: params.language.unwrap_or(profile.language),
+        signature: params.signature.or(profile.signature),
+        notification_preferences: params
+            .notification_preferences
+            .or(profile.notification_preferences),
+        ui_preferences: params.ui_preferences.or(profile.ui_preferences),
         updated_at: ctx.timestamp,
         ..profile
     });
@@ -135,13 +199,7 @@ pub fn add_user_to_organization(
     ctx: &ReducerContext,
     user_identity: Identity,
     organization_id: u64,
-    role_id: u64,
-    company_id: Option<u64>,
-    job_title: Option<String>,
-    // Additional fields
-    department_id: Option<u64>,
-    employee_id: Option<String>,
-    metadata: Option<String>,
+    params: AddUserToOrganizationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -151,7 +209,12 @@ pub fn add_user_to_organization(
         .find(&organization_id)
         .ok_or("Organization not found")?;
 
-    let role = ctx.db.role().id().find(&role_id).ok_or("Role not found")?;
+    let role = ctx
+        .db
+        .role()
+        .id()
+        .find(&params.role_id)
+        .ok_or("Role not found")?;
 
     if role.organization_id != organization_id {
         return Err("Role does not belong to this organization".to_string());
@@ -169,15 +232,15 @@ pub fn add_user_to_organization(
         id: 0,
         user_identity,
         organization_id,
-        company_id,
-        role_id,
-        department_id,
-        job_title,
-        employee_id,
+        company_id: params.company_id,
+        role_id: params.role_id,
+        department_id: params.department_id,
+        job_title: params.job_title,
+        employee_id: params.employee_id,
         date_joined: ctx.timestamp,
-        is_active: true,
-        is_default: false,
-        metadata,
+        is_active: params.is_active,
+        is_default: params.is_default,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -190,12 +253,7 @@ pub fn add_org_member(
     ctx: &ReducerContext,
     user_identity: Identity,
     organization_id: u64,
-    role_name: String,
-    company_id: Option<u64>,
-    job_title: Option<String>,
-    department_id: Option<u64>,
-    employee_id: Option<String>,
-    metadata: Option<String>,
+    params: AddOrgMemberParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -205,7 +263,7 @@ pub fn add_org_member(
         .find(&organization_id)
         .ok_or("Organization not found")?;
 
-    let normalized_role = role_name.trim().to_lowercase();
+    let normalized_role = params.role_name.trim().to_lowercase();
     if normalized_role.is_empty() {
         return Err("Role name cannot be empty".to_string());
     }
@@ -233,15 +291,15 @@ pub fn add_org_member(
         id: 0,
         user_identity,
         organization_id,
-        company_id,
+        company_id: params.company_id,
         role_id: selected_role.id,
-        department_id,
-        job_title,
-        employee_id,
+        department_id: params.department_id,
+        job_title: params.job_title,
+        employee_id: params.employee_id,
         date_joined: ctx.timestamp,
-        is_active: true,
-        is_default: false,
-        metadata,
+        is_active: params.is_active,
+        is_default: params.is_default,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -296,9 +354,7 @@ pub fn update_org_member_role(
 pub fn update_org_member_details(
     ctx: &ReducerContext,
     user_org_id: u64,
-    department_id: Option<u64>,
-    job_title: Option<String>,
-    employee_id: Option<String>,
+    params: UpdateOrgMemberDetailsParams,
 ) -> Result<(), String> {
     let membership = ctx
         .db
@@ -315,9 +371,9 @@ pub fn update_org_member_details(
     )?;
 
     ctx.db.user_organization().id().update(UserOrganization {
-        department_id: department_id.or(membership.department_id),
-        job_title: job_title.or(membership.job_title),
-        employee_id: employee_id.or(membership.employee_id),
+        department_id: params.department_id.or(membership.department_id),
+        job_title: params.job_title.or(membership.job_title),
+        employee_id: params.employee_id.or(membership.employee_id),
         ..membership
     });
 
@@ -382,17 +438,12 @@ pub fn remove_user_from_organization(
     Ok(())
 }
 
-/// Register a client session. `expires_at_micros` is microseconds since Unix epoch.
+/// Register a client session.
 #[spacetimedb::reducer]
 pub fn create_user_session(
     ctx: &ReducerContext,
     organization_id: u64,
-    session_token: String,
-    ip_address: Option<String>,
-    user_agent: Option<String>,
-    device_info: Option<String>,
-    expires_at_micros: u64,
-    metadata: Option<String>,
+    params: CreateUserSessionParams,
 ) -> Result<(), String> {
     let user = ctx
         .db
@@ -405,21 +456,22 @@ pub fn create_user_session(
         return Err("User account is inactive".to_string());
     }
 
-    let expires_at = Timestamp::from_micros_since_unix_epoch(expires_at_micros as i64);
+    let expires_at = Timestamp::from_micros_since_unix_epoch(params.expires_at_micros as i64);
 
     ctx.db.user_session().insert(UserSession {
         id: 0,
         user_identity: ctx.sender(),
         organization_id,
-        session_token,
-        ip_address,
-        user_agent,
-        device_info,
+        session_token: params.session_token,
+        ip_address: params.ip_address,
+        user_agent: params.user_agent,
+        device_info: params.device_info,
         started_at: ctx.timestamp,
         last_activity: ctx.timestamp,
         expires_at,
+        // System-managed: always active when created
         is_active: true,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())

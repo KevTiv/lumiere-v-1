@@ -3,11 +3,120 @@
 /// Tables:  Organization · OrganizationSettings · Company
 /// Pattern: every table row carries `organization_id` for tenant isolation.
 ///          Companies are sub-units within an Organization.
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, Role};
 use crate::core::users::{user_organization, UserOrganization};
 use crate::helpers::check_permission;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating an organization.
+/// Scope: no scope param (any authenticated user can create an org).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateOrganizationParams {
+    pub name: String,
+    pub code: String,
+    pub timezone: String,
+    pub date_format: String,
+    pub language: String,
+    pub is_active: bool,
+    pub description: Option<String>,
+    pub logo_url: Option<String>,
+    pub website: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub currency_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating an organization.
+/// Scope: `organization_id` is a flat reducer param.
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateOrganizationParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub logo_url: Option<String>,
+    pub website: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub currency_id: Option<u64>,
+    pub timezone: Option<String>,
+    pub date_format: Option<String>,
+    pub language: Option<String>,
+}
+
+/// Params for upserting organization settings.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpsertOrganizationSettingsParams {
+    pub module_config: Option<String>,
+    pub feature_flags: Vec<String>,
+    pub integration_keys: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a company.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCompanyParams {
+    pub name: String,
+    pub code: String,
+    pub currency_id: u64,
+    pub fiscal_year_end_month: u8,
+    pub fiscal_year_end_day: u8,
+    pub is_parent: bool,
+    pub parent_id: Option<u64>,
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+    pub address_street: Option<String>,
+    pub address_city: Option<String>,
+    pub address_zip: Option<String>,
+    pub address_country_code: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating core company fields.
+/// Scope: `company_id` is a flat reducer param.
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCompanyParams {
+    pub name: Option<String>,
+    pub tax_id: Option<String>,
+    pub address_street: Option<String>,
+    pub address_city: Option<String>,
+    pub address_zip: Option<String>,
+    pub address_country_code: Option<String>,
+}
+
+/// Params for updating company address fields.
+/// Scope: `company_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCompanyAddressParams {
+    pub address_street: Option<String>,
+    pub address_city: Option<String>,
+    pub address_zip: Option<String>,
+    pub address_country_code: Option<String>,
+}
+
+/// Params for updating company business identifiers.
+/// Scope: `company_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCompanyBusinessParams {
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+}
+
+/// Params for updating company hierarchy placement.
+/// Scope: `company_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCompanyHierarchyParams {
+    pub is_parent: bool,
+    pub parent_id: Option<u64>,
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -80,51 +189,42 @@ pub struct Company {
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Create a new top-level Organization. No permission check — any authenticated
-/// user can create an org (they become its first admin via `add_user_to_organization`).
+/// user can create an org (they become its first admin via the bootstrap below).
 #[spacetimedb::reducer]
 pub fn create_organization(
     ctx: &ReducerContext,
-    name: String,
-    code: String,
-    timezone: String,
-    date_format: String,
-    language: String,
-    // Optional details
-    description: Option<String>,
-    logo_url: Option<String>,
-    website: Option<String>,
-    email: Option<String>,
-    phone: Option<String>,
-    currency_id: Option<u64>,
-    metadata: Option<String>,
+    params: CreateOrganizationParams,
 ) -> Result<(), String> {
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
     }
-    if code.is_empty() {
+    if params.code.is_empty() {
         return Err("Organization code cannot be empty".to_string());
     }
 
+    // Capture code before moving into params
+    let code = params.code.clone();
+
     let org = ctx.db.organization().insert(Organization {
         id: 0,
-        name,
-        code: code.clone(),
-        description,
-        logo_url,
-        website,
-        email,
-        phone,
-        currency_id,
-        timezone,
-        date_format,
-        language,
-        is_active: true,
+        name: params.name,
+        code: params.code,
+        description: params.description,
+        logo_url: params.logo_url,
+        website: params.website,
+        email: params.email,
+        phone: params.phone,
+        currency_id: params.currency_id,
+        timezone: params.timezone,
+        date_format: params.date_format,
+        language: params.language,
+        is_active: params.is_active,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    // Bootstrap default owner role for this organization
+    // System-managed: bootstrap default owner role for this organization
     let owner_role = ctx.db.role().insert(Role {
         id: 0,
         organization_id: org.id,
@@ -139,7 +239,7 @@ pub fn create_organization(
         metadata: Some(format!("{{\"bootstrap\":true,\"org_code\":\"{}\"}}", code)),
     });
 
-    // Bootstrap creator membership as owner
+    // System-managed: bootstrap creator membership as owner
     ctx.db.user_organization().insert(UserOrganization {
         id: 0,
         user_identity: ctx.sender(),
@@ -162,16 +262,7 @@ pub fn create_organization(
 pub fn update_organization(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: Option<String>,
-    description: Option<String>,
-    logo_url: Option<String>,
-    website: Option<String>,
-    email: Option<String>,
-    phone: Option<String>,
-    currency_id: Option<u64>,
-    timezone: Option<String>,
-    date_format: Option<String>,
-    language: Option<String>,
+    params: UpdateOrganizationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "organization", "write")?;
 
@@ -183,16 +274,16 @@ pub fn update_organization(
         .ok_or("Organization not found")?;
 
     ctx.db.organization().id().update(Organization {
-        name: name.unwrap_or(org.name),
-        description: description.or(org.description),
-        logo_url: logo_url.or(org.logo_url),
-        website: website.or(org.website),
-        email: email.or(org.email),
-        phone: phone.or(org.phone),
-        currency_id: currency_id.or(org.currency_id),
-        timezone: timezone.unwrap_or(org.timezone),
-        date_format: date_format.unwrap_or(org.date_format),
-        language: language.unwrap_or(org.language),
+        name: params.name.unwrap_or(org.name),
+        description: params.description.or(org.description),
+        logo_url: params.logo_url.or(org.logo_url),
+        website: params.website.or(org.website),
+        email: params.email.or(org.email),
+        phone: params.phone.or(org.phone),
+        currency_id: params.currency_id.or(org.currency_id),
+        timezone: params.timezone.unwrap_or(org.timezone),
+        date_format: params.date_format.unwrap_or(org.date_format),
+        language: params.language.unwrap_or(org.language),
         updated_at: ctx.timestamp,
         ..org
     });
@@ -204,9 +295,7 @@ pub fn update_organization(
 pub fn upsert_organization_settings(
     ctx: &ReducerContext,
     organization_id: u64,
-    module_config: Option<String>,
-    feature_flags: Vec<String>,
-    integration_keys: Option<String>,
+    params: UpsertOrganizationSettingsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "organization", "write")?;
 
@@ -221,21 +310,22 @@ pub fn upsert_organization_settings(
                 .organization_settings()
                 .organization_id()
                 .update(OrganizationSettings {
-                    module_config: module_config.or(existing.module_config),
-                    feature_flags,
-                    integration_keys: integration_keys.or(existing.integration_keys),
+                    module_config: params.module_config.or(existing.module_config),
+                    feature_flags: params.feature_flags,
+                    integration_keys: params.integration_keys.or(existing.integration_keys),
                     updated_at: ctx.timestamp,
+                    metadata: params.metadata.or(existing.metadata),
                     ..existing
                 });
         }
         None => {
             ctx.db.organization_settings().insert(OrganizationSettings {
                 organization_id,
-                module_config,
-                feature_flags,
-                integration_keys,
+                module_config: params.module_config,
+                feature_flags: params.feature_flags,
+                integration_keys: params.integration_keys,
                 updated_at: ctx.timestamp,
-                metadata: None,
+                metadata: params.metadata,
             });
         }
     }
@@ -247,50 +337,35 @@ pub fn upsert_organization_settings(
 pub fn create_company(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    code: String,
-    currency_id: u64,
-    fiscal_year_end_month: u8,
-    fiscal_year_end_day: u8,
-    // Hierarchy fields
-    is_parent: bool,
-    parent_id: Option<u64>,
-    // Business fields
-    tax_id: Option<String>,
-    company_registry: Option<String>,
-    // Address fields
-    address_street: Option<String>,
-    address_city: Option<String>,
-    address_zip: Option<String>,
-    address_country_code: Option<String>,
-    metadata: Option<String>,
+    params: CreateCompanyParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "company", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Company name cannot be empty".to_string());
     }
 
     ctx.db.company().insert(Company {
         id: 0,
         organization_id,
-        name,
-        code,
-        is_parent,
-        parent_id,
-        currency_id,
-        fiscal_year_end_month,
-        fiscal_year_end_day,
-        tax_id,
-        company_registry,
-        address_street,
-        address_city,
-        address_zip,
-        address_country_code,
+        name: params.name,
+        code: params.code,
+        is_parent: params.is_parent,
+        parent_id: params.parent_id,
+        currency_id: params.currency_id,
+        fiscal_year_end_month: params.fiscal_year_end_month,
+        fiscal_year_end_day: params.fiscal_year_end_day,
+        tax_id: params.tax_id,
+        company_registry: params.company_registry,
+        address_street: params.address_street,
+        address_city: params.address_city,
+        address_zip: params.address_zip,
+        address_country_code: params.address_country_code,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+        // System-managed: not yet deleted
         deleted_at: None,
-        metadata,
+        metadata: params.metadata,
     });
 
     Ok(())
@@ -300,12 +375,7 @@ pub fn create_company(
 pub fn update_company(
     ctx: &ReducerContext,
     company_id: u64,
-    name: Option<String>,
-    tax_id: Option<String>,
-    address_street: Option<String>,
-    address_city: Option<String>,
-    address_zip: Option<String>,
-    address_country_code: Option<String>,
+    params: UpdateCompanyParams,
 ) -> Result<(), String> {
     let company = ctx
         .db
@@ -317,12 +387,12 @@ pub fn update_company(
     check_permission(ctx, company.organization_id, "company", "write")?;
 
     ctx.db.company().id().update(Company {
-        name: name.unwrap_or(company.name),
-        tax_id: tax_id.or(company.tax_id),
-        address_street: address_street.or(company.address_street),
-        address_city: address_city.or(company.address_city),
-        address_zip: address_zip.or(company.address_zip),
-        address_country_code: address_country_code.or(company.address_country_code),
+        name: params.name.unwrap_or(company.name),
+        tax_id: params.tax_id.or(company.tax_id),
+        address_street: params.address_street.or(company.address_street),
+        address_city: params.address_city.or(company.address_city),
+        address_zip: params.address_zip.or(company.address_zip),
+        address_country_code: params.address_country_code.or(company.address_country_code),
         updated_at: ctx.timestamp,
         ..company
     });
@@ -334,10 +404,7 @@ pub fn update_company(
 pub fn update_company_address(
     ctx: &ReducerContext,
     company_id: u64,
-    address_street: Option<String>,
-    address_city: Option<String>,
-    address_zip: Option<String>,
-    address_country_code: Option<String>,
+    params: UpdateCompanyAddressParams,
 ) -> Result<(), String> {
     let company = ctx
         .db
@@ -349,10 +416,10 @@ pub fn update_company_address(
     check_permission(ctx, company.organization_id, "company", "write")?;
 
     ctx.db.company().id().update(Company {
-        address_street,
-        address_city,
-        address_zip,
-        address_country_code,
+        address_street: params.address_street,
+        address_city: params.address_city,
+        address_zip: params.address_zip,
+        address_country_code: params.address_country_code,
         updated_at: ctx.timestamp,
         ..company
     });
@@ -364,8 +431,7 @@ pub fn update_company_address(
 pub fn update_company_business(
     ctx: &ReducerContext,
     company_id: u64,
-    tax_id: Option<String>,
-    company_registry: Option<String>,
+    params: UpdateCompanyBusinessParams,
 ) -> Result<(), String> {
     let company = ctx
         .db
@@ -377,8 +443,8 @@ pub fn update_company_business(
     check_permission(ctx, company.organization_id, "company", "write")?;
 
     ctx.db.company().id().update(Company {
-        tax_id,
-        company_registry,
+        tax_id: params.tax_id,
+        company_registry: params.company_registry,
         updated_at: ctx.timestamp,
         ..company
     });
@@ -390,8 +456,7 @@ pub fn update_company_business(
 pub fn update_company_hierarchy(
     ctx: &ReducerContext,
     company_id: u64,
-    is_parent: bool,
-    parent_id: Option<u64>,
+    params: UpdateCompanyHierarchyParams,
 ) -> Result<(), String> {
     let company = ctx
         .db
@@ -403,8 +468,8 @@ pub fn update_company_hierarchy(
     check_permission(ctx, company.organization_id, "company", "write")?;
 
     ctx.db.company().id().update(Company {
-        is_parent,
-        parent_id,
+        is_parent: params.is_parent,
+        parent_id: params.parent_id,
         updated_at: ctx.timestamp,
         ..company
     });
