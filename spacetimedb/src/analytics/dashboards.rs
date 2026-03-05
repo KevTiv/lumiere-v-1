@@ -5,10 +5,69 @@
 /// |-------|-------------|
 /// | **DashboardWidget** | Configurable chart/table/KPI widget |
 /// | **Dashboard** | Named collection of widgets |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::WidgetType;
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating a dashboard widget.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateDashboardWidgetParams {
+    pub name: String,
+    pub widget_type: WidgetType,
+    pub model: String,
+    pub fields: Vec<String>,
+    pub position_x: u32,
+    pub position_y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub is_active: bool,
+    pub domain: Option<String>,
+    pub group_by: Option<String>,
+    pub aggregation: Option<String>,
+    pub chart_type: Option<String>,
+    pub sort_order: Option<String>,
+    pub limit: Option<u32>,
+    pub refresh_interval: Option<u32>,
+    pub configuration: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating widget position and size.
+/// Scope: `company_id` + `widget_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWidgetLayoutParams {
+    pub position_x: u32,
+    pub position_y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Params for creating a dashboard.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateDashboardParams {
+    pub name: String,
+    pub is_default: bool,
+    pub is_system: bool,
+    pub description: Option<String>,
+    pub share_with: Vec<Identity>,
+    pub share_with_groups: Vec<u64>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating dashboard sharing configuration.
+/// Scope: `company_id` + `dashboard_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateDashboardShareParams {
+    pub share_with: Vec<Identity>,
+    pub share_with_groups: Vec<u64>,
+}
 
 // ============================================================================
 // TABLES
@@ -88,57 +147,51 @@ pub struct Dashboard {
 pub fn create_dashboard_widget(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    widget_type: WidgetType,
-    model: String,
-    fields: Vec<String>,
-    aggregation: Option<String>,
-    chart_type: Option<String>,
-    position_x: u32,
-    position_y: u32,
-    width: u32,
-    height: u32,
+    params: CreateDashboardWidgetParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "dashboard_widget", "create")?;
 
     let widget = ctx.db.dashboard_widget().insert(DashboardWidget {
         id: 0,
-        name,
-        widget_type,
-        model,
-        domain: None,
-        fields,
-        group_by: None,
-        aggregation,
-        chart_type,
-        sort_order: None,
-        limit: None,
-        refresh_interval: None,
-        configuration: None,
-        position_x,
-        position_y,
-        width,
-        height,
-        is_active: true,
+        name: params.name,
+        widget_type: params.widget_type,
+        model: params.model,
+        domain: params.domain,
+        fields: params.fields,
+        group_by: params.group_by,
+        aggregation: params.aggregation,
+        chart_type: params.chart_type,
+        sort_order: params.sort_order,
+        limit: params.limit,
+        refresh_interval: params.refresh_interval,
+        configuration: params.configuration,
+        position_x: params.position_x,
+        position_y: params.position_y,
+        width: params.width,
+        height: params.height,
+        is_active: params.is_active,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "dashboard_widget",
-        widget.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "dashboard_widget",
+            record_id: widget.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Dashboard widget created: id={}", widget.id);
@@ -151,10 +204,7 @@ pub fn update_widget_layout(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     widget_id: u64,
-    position_x: u32,
-    position_y: u32,
-    width: u32,
-    height: u32,
+    params: UpdateWidgetLayoutParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "dashboard_widget", "write")?;
@@ -166,26 +216,35 @@ pub fn update_widget_layout(
         .find(&widget_id)
         .ok_or("Widget not found")?;
 
+    if let (Some(wc), Some(rc)) = (company_id, widget.company_id) {
+        if wc != rc {
+            return Err("Widget does not belong to this company".to_string());
+        }
+    }
+
     ctx.db.dashboard_widget().id().update(DashboardWidget {
-        position_x,
-        position_y,
-        width,
-        height,
+        position_x: params.position_x,
+        position_y: params.position_y,
+        width: params.width,
+        height: params.height,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..widget
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "dashboard_widget",
-        widget_id,
-        "write",
-        None,
-        None,
-        vec!["layout_updated".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "dashboard_widget",
+            record_id: widget_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["layout_updated".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Widget layout updated: id={}", widget_id);
@@ -197,41 +256,47 @@ pub fn update_widget_layout(
 pub fn create_dashboard(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    description: Option<String>,
-    is_default: bool,
+    params: CreateDashboardParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "dashboard", "create")?;
 
+    // is_shared is derived from share_with / share_with_groups
+    let is_shared = !params.share_with.is_empty() || !params.share_with_groups.is_empty();
+
     let db = ctx.db.dashboard().insert(Dashboard {
         id: 0,
-        name,
-        description,
+        name: params.name,
+        description: params.description,
+        // System-managed: starts empty, populated via add_widget_to_dashboard
         widget_ids: Vec::new(),
-        is_system: false,
-        is_default,
-        share_with: Vec::new(),
-        share_with_groups: Vec::new(),
-        is_shared: false,
+        is_system: params.is_system,
+        is_default: params.is_default,
+        share_with: params.share_with,
+        share_with_groups: params.share_with_groups,
+        // System-derived: computed from share_with / share_with_groups
+        is_shared,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "dashboard",
-        db.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "dashboard",
+            record_id: db.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Dashboard created: id={}", db.id);
@@ -277,16 +342,19 @@ pub fn add_widget_to_dashboard(
         ..dash
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "dashboard",
-        dashboard_id,
-        "write",
-        None,
-        None,
-        vec!["widget_added".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "dashboard",
+            record_id: dashboard_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["widget_added".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Widget {} added to dashboard {}", widget_id, dashboard_id);
@@ -299,8 +367,7 @@ pub fn share_dashboard(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     dashboard_id: u64,
-    share_with: Vec<Identity>,
-    share_with_groups: Vec<u64>,
+    params: UpdateDashboardShareParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "dashboard", "write")?;
@@ -312,27 +379,37 @@ pub fn share_dashboard(
         .find(&dashboard_id)
         .ok_or("Dashboard not found")?;
 
-    let is_shared = !share_with.is_empty() || !share_with_groups.is_empty();
+    if let (Some(wc), Some(rc)) = (company_id, dash.company_id) {
+        if wc != rc {
+            return Err("Dashboard does not belong to this company".to_string());
+        }
+    }
+
+    // is_shared is derived from the new share lists
+    let is_shared = !params.share_with.is_empty() || !params.share_with_groups.is_empty();
 
     ctx.db.dashboard().id().update(Dashboard {
-        share_with,
-        share_with_groups,
+        share_with: params.share_with,
+        share_with_groups: params.share_with_groups,
         is_shared,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..dash
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "dashboard",
-        dashboard_id,
-        "write",
-        None,
-        None,
-        vec!["shared".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "dashboard",
+            record_id: dashboard_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["shared".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Dashboard shared: id={}", dashboard_id);

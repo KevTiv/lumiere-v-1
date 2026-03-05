@@ -6,15 +6,105 @@
 /// | **ReportTemplate** | Layout and format definitions for generated reports |
 /// | **ScheduledReport** | Automated periodic report delivery configuration |
 /// | **AnalyticsMetric** | KPI / trend metric with cached computed values |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating a report template.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateReportTemplateParams {
+    pub name: String,
+    pub model: String,
+    pub report_type: String,
+    pub orientation: String,
+    pub margin_top: f64,
+    pub margin_bottom: f64,
+    pub margin_left: f64,
+    pub margin_right: f64,
+    pub header_line: bool,
+    pub footer_line: bool,
+    pub attachment_use: bool,
+    pub multi_company: bool,
+    pub is_active: bool,
+    pub description: Option<String>,
+    pub template_content: Option<String>,
+    pub paper_format: Option<String>,
+    pub print_report_name: Option<String>,
+    pub attachment: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating report template content.
+/// Scope: `company_id` + `template_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateReportTemplateParams {
+    pub orientation: String,
+    pub template_content: Option<String>,
+    pub paper_format: Option<String>,
+}
+
+/// Params for creating a scheduled report.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateScheduledReportParams {
+    pub name: String,
+    pub report_template_id: u64,
+    pub model: String,
+    pub frequency: String,
+    pub hour: u8,
+    pub minute: u8,
+    pub attachment_format: String,
+    pub next_run: Timestamp,
+    pub is_active: bool,
+    pub recipients: Vec<String>,
+    pub description: Option<String>,
+    pub domain: Option<String>,
+    pub day_of_week: Option<u8>,
+    pub day_of_month: Option<u8>,
+    pub subject: Option<String>,
+    pub body: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating an analytics metric.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAnalyticsMetricParams {
+    pub name: String,
+    pub category: String,
+    pub metric_type: String,
+    pub model: String,
+    pub field: String,
+    pub aggregation: String,
+    pub time_period: String,
+    pub refresh_frequency_minutes: u32,
+    pub is_active: bool,
+    pub domain: Option<String>,
+    pub target_value: Option<f64>,
+    pub target_period: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating cached metric values after computation.
+/// Scope: `company_id` + `metric_id` are flat reducer params.
+/// `change_amount`, `change_percentage`, `trend_direction` are computed — not in params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateMetricValuesParams {
+    pub current_value: f64,
+    pub previous_value: Option<f64>,
+}
 
 // ============================================================================
 // TABLES
 // ============================================================================
 
 /// ReportTemplate — Defines the layout, model, and output format of a report
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = report_template,
     public,
@@ -140,53 +230,52 @@ pub struct AnalyticsMetric {
 pub fn create_report_template(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    model: String,
-    report_type: String,
-    orientation: String,
-    template_content: Option<String>,
+    params: CreateReportTemplateParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "report_template", "create")?;
 
     let tmpl = ctx.db.report_template().insert(ReportTemplate {
         id: 0,
-        name,
-        description: None,
-        model,
-        report_type,
-        template_content,
-        paper_format: Some("A4".to_string()),
-        orientation,
-        margin_top: 10.0,
-        margin_bottom: 10.0,
-        margin_left: 10.0,
-        margin_right: 10.0,
-        header_line: true,
-        footer_line: true,
-        print_report_name: None,
-        attachment_use: false,
-        attachment: None,
-        multi_company: false,
-        is_active: true,
+        name: params.name,
+        description: params.description,
+        model: params.model,
+        report_type: params.report_type,
+        template_content: params.template_content,
+        paper_format: params.paper_format,
+        orientation: params.orientation,
+        margin_top: params.margin_top,
+        margin_bottom: params.margin_bottom,
+        margin_left: params.margin_left,
+        margin_right: params.margin_right,
+        header_line: params.header_line,
+        footer_line: params.footer_line,
+        print_report_name: params.print_report_name,
+        attachment_use: params.attachment_use,
+        attachment: params.attachment,
+        multi_company: params.multi_company,
+        is_active: params.is_active,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "report_template",
-        tmpl.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "report_template",
+            record_id: tmpl.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Report template created: id={}, model={}", tmpl.id, tmpl.model);
@@ -199,9 +288,7 @@ pub fn update_report_template(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     template_id: u64,
-    template_content: Option<String>,
-    paper_format: Option<String>,
-    orientation: String,
+    params: UpdateReportTemplateParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "report_template", "write")?;
@@ -213,25 +300,34 @@ pub fn update_report_template(
         .find(&template_id)
         .ok_or("Report template not found")?;
 
+    if let (Some(wc), Some(rc)) = (company_id, tmpl.company_id) {
+        if wc != rc {
+            return Err("Report template does not belong to this company".to_string());
+        }
+    }
+
     ctx.db.report_template().id().update(ReportTemplate {
-        template_content,
-        paper_format,
-        orientation,
+        template_content: params.template_content,
+        paper_format: params.paper_format,
+        orientation: params.orientation,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..tmpl
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "report_template",
-        template_id,
-        "write",
-        None,
-        None,
-        vec!["updated".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "report_template",
+            record_id: template_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Report template updated: id={}", template_id);
@@ -243,15 +339,7 @@ pub fn update_report_template(
 pub fn create_scheduled_report(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    report_template_id: u64,
-    model: String,
-    frequency: String,
-    hour: u8,
-    minute: u8,
-    recipients: Vec<String>,
-    attachment_format: String,
-    next_run: Timestamp,
+    params: CreateScheduledReportParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "scheduled_report", "create")?;
@@ -260,51 +348,56 @@ pub fn create_scheduled_report(
     ctx.db
         .report_template()
         .id()
-        .find(&report_template_id)
+        .find(&params.report_template_id)
         .ok_or("Report template not found")?;
 
-    if recipients.is_empty() {
+    if params.recipients.is_empty() {
         return Err("At least one recipient is required".to_string());
     }
 
     let report = ctx.db.scheduled_report().insert(ScheduledReport {
         id: 0,
-        name,
-        description: None,
-        report_template_id,
-        model,
-        domain: None,
-        frequency,
-        day_of_week: None,
-        day_of_month: None,
-        hour,
-        minute,
-        recipients,
-        subject: None,
-        body: None,
-        attachment_format,
+        name: params.name,
+        description: params.description,
+        report_template_id: params.report_template_id,
+        model: params.model,
+        domain: params.domain,
+        frequency: params.frequency,
+        day_of_week: params.day_of_week,
+        day_of_month: params.day_of_month,
+        hour: params.hour,
+        minute: params.minute,
+        recipients: params.recipients,
+        subject: params.subject,
+        body: params.body,
+        attachment_format: params.attachment_format,
+        // System-managed: starts with no prior run
         last_run: None,
-        next_run,
-        is_active: true,
+        next_run: params.next_run,
+        is_active: params.is_active,
+        // System-managed: starts at 0, incremented by record_report_run
         run_count: 0,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "scheduled_report",
-        report.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "scheduled_report",
+            record_id: report.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -336,22 +429,26 @@ pub fn record_report_run(
     ctx.db.scheduled_report().id().update(ScheduledReport {
         last_run: Some(ctx.timestamp),
         next_run,
+        // System-managed: incremented on each run
         run_count: report.run_count + 1,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..report
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "scheduled_report",
-        report_id,
-        "write",
-        None,
-        None,
-        vec!["run_recorded".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "scheduled_report",
+            record_id: report_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["run_recorded".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Scheduled report run recorded: id={}", report_id);
@@ -363,58 +460,54 @@ pub fn record_report_run(
 pub fn create_analytics_metric(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    category: String,
-    metric_type: String,
-    model: String,
-    field: String,
-    aggregation: String,
-    time_period: String,
-    refresh_frequency_minutes: u32,
-    target_value: Option<f64>,
+    params: CreateAnalyticsMetricParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "analytics_metric", "create")?;
 
     let metric = ctx.db.analytics_metric().insert(AnalyticsMetric {
         id: 0,
-        name,
-        category,
-        metric_type,
-        model,
-        domain: None,
-        field,
-        aggregation,
-        time_period,
+        name: params.name,
+        category: params.category,
+        metric_type: params.metric_type,
+        model: params.model,
+        domain: params.domain,
+        field: params.field,
+        aggregation: params.aggregation,
+        time_period: params.time_period,
+        // System-managed: populated by update_metric_values after first computation
         current_value: None,
         previous_value: None,
         change_amount: None,
         change_percentage: None,
         trend_direction: None,
         calculated_at: None,
-        target_value,
-        target_period: None,
-        is_active: true,
-        refresh_frequency_minutes,
         last_refresh: None,
+        target_value: params.target_value,
+        target_period: params.target_period,
+        is_active: params.is_active,
+        refresh_frequency_minutes: params.refresh_frequency_minutes,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "analytics_metric",
-        metric.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "analytics_metric",
+            record_id: metric.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Analytics metric created: id={}, category={}", metric.id, metric.category);
@@ -427,8 +520,7 @@ pub fn update_metric_values(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     metric_id: u64,
-    current_value: f64,
-    previous_value: Option<f64>,
+    params: UpdateMetricValuesParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "analytics_metric", "write")?;
@@ -440,9 +532,10 @@ pub fn update_metric_values(
         .find(&metric_id)
         .ok_or("Metric not found")?;
 
+    // change_amount, change_percentage, trend_direction are computed from inputs
     let (change_amount, change_percentage, trend_direction) =
-        if let Some(prev) = previous_value {
-            let delta = current_value - prev;
+        if let Some(prev) = params.previous_value {
+            let delta = params.current_value - prev;
             let pct = if prev != 0.0 { delta / prev * 100.0 } else { 0.0 };
             let trend = if delta > 0.0 {
                 "Up".to_string()
@@ -457,8 +550,8 @@ pub fn update_metric_values(
         };
 
     ctx.db.analytics_metric().id().update(AnalyticsMetric {
-        current_value: Some(current_value),
-        previous_value,
+        current_value: Some(params.current_value),
+        previous_value: params.previous_value,
         change_amount,
         change_percentage,
         trend_direction,
@@ -472,7 +565,7 @@ pub fn update_metric_values(
     log::info!(
         "Metric values updated: id={}, value={}",
         metric_id,
-        current_value
+        params.current_value
     );
     Ok(())
 }
