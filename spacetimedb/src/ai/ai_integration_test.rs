@@ -34,15 +34,28 @@ mod tests {
         let result = create_ai_agent(
             &ctx,
             Some(1),
-            "Test Agent".to_string(),
-            "claude-sonnet-4-6".to_string(),
-            "Anthropic".to_string(),
-            0.7,
-            4096,
-            Some("You are a helpful assistant".to_string()),
-            Some(1000.0),
-            60,
-            0.1,
+            CreateAiAgentParams {
+                name: "Test Agent".to_string(),
+                model: "claude-sonnet-4-6".to_string(),
+                provider: "Anthropic".to_string(),
+                temperature: 0.7,
+                max_tokens: 4096,
+                rate_limit_per_minute: 60,
+                cost_per_1k_tokens: 0.1,
+                context_window: 128_000,
+                top_p: 1.0,
+                frequency_penalty: 0.0,
+                presence_penalty: 0.0,
+                is_active: true,
+                is_default: false,
+                allowed_models: Vec::new(),
+                allowed_actions: Vec::new(),
+                description: None,
+                api_key_reference: None,
+                system_prompt: Some("You are a helpful assistant".to_string()),
+                monthly_budget: Some(1000.0),
+                metadata: None,
+            },
         );
 
         assert!(result.is_ok(), "AI agent creation should succeed");
@@ -66,15 +79,28 @@ mod tests {
         create_ai_agent(
             &ctx,
             Some(1),
-            "Insight Agent".to_string(),
-            "gpt-4o".to_string(),
-            "OpenAI".to_string(),
-            0.5,
-            8192,
-            None,
-            Some(500.0),
-            30,
-            0.2,
+            CreateAiAgentParams {
+                name: "Insight Agent".to_string(),
+                model: "gpt-4o".to_string(),
+                provider: "OpenAI".to_string(),
+                temperature: 0.5,
+                max_tokens: 8192,
+                rate_limit_per_minute: 30,
+                cost_per_1k_tokens: 0.2,
+                context_window: 128_000,
+                top_p: 1.0,
+                frequency_penalty: 0.0,
+                presence_penalty: 0.0,
+                is_active: true,
+                is_default: false,
+                allowed_models: Vec::new(),
+                allowed_actions: Vec::new(),
+                description: None,
+                api_key_reference: None,
+                system_prompt: None,
+                monthly_budget: Some(500.0),
+                metadata: None,
+            },
         ).unwrap();
 
         // Get agent ID
@@ -85,15 +111,20 @@ mod tests {
         let result = create_ai_insight(
             &ctx,
             Some(1),
-            InsightSeverity::High,
-            "Low Inventory Alert".to_string(),
-            "Product XYZ is running low on stock".to_string(),
-            vec!["Order more stock".to_string()],
-            "inventory".to_string(),
-            Some(123),
-            0.95,
-            Some(agent_id),
-            vec!["inventory".to_string(), "urgent".to_string()],
+            CreateAiInsightParams {
+                severity: InsightSeverity::High,
+                title: "Low Inventory Alert".to_string(),
+                description: "Product XYZ is running low on stock".to_string(),
+                recommendations: vec!["Order more stock".to_string()],
+                related_model: "inventory".to_string(),
+                confidence: 0.95,
+                tags: vec!["inventory".to_string(), "urgent".to_string()],
+                related_id: Some(123),
+                generated_by: Some(agent_id),
+                impact_score: None,
+                priority: None,
+                metadata: None,
+            },
         );
 
         assert!(result.is_ok(), "AI insight creation should succeed");
@@ -132,10 +163,13 @@ mod tests {
         let result = create_document_processing_job(
             &ctx,
             Some(1),
-            "Invoice".to_string(),
-            "OCR".to_string(),
-            None,
-            Some(r#"{"document_url": "https://example.com/invoice.pdf"}"#.to_string()),
+            CreateDocumentProcessingJobParams {
+                document_type: "Invoice".to_string(),
+                job_type: "OCR".to_string(),
+                ai_agent_id: None,
+                input_data: Some(r#"{"document_url": "https://example.com/invoice.pdf"}"#.to_string()),
+                metadata: None,
+            },
         );
 
         assert!(result.is_ok(), "Document processing job creation should succeed");
@@ -155,12 +189,14 @@ mod tests {
             &ctx,
             Some(1),
             job.id,
-            Some(r#"{"amount": 1000.0, "vendor": "Acme Corp"}"#.to_string()),
-            Some(0.98),
-            Some("claude-sonnet-4-6".to_string()),
-            Some(1000),
-            Some(0.50),
-            None,
+            CompleteDocumentProcessingJobParams {
+                extracted_data: Some(r#"{"amount": 1000.0, "vendor": "Acme Corp"}"#.to_string()),
+                confidence_score: Some(0.98),
+                model_used: Some("claude-sonnet-4-6".to_string()),
+                tokens_used: Some(1000),
+                cost: Some(0.50),
+                error_message: None,
+            },
         );
 
         assert!(complete_result.is_ok(), "Completing job should succeed");
@@ -203,11 +239,14 @@ mod tests {
         let result = upsert_search_embedding(
             &ctx,
             Some(1),
-            "product".to_string(),
-            123,
-            "High-quality widget".to_string(),
-            embedding.clone(),
-            Some("abc123".to_string()),
+            UpsertSearchEmbeddingParams {
+                content_type: "product".to_string(),
+                content_id: 123,
+                text: "High-quality widget".to_string(),
+                embedding: embedding.clone(),
+                embedding_hash: Some("abc123".to_string()),
+                metadata: None,
+            },
         );
 
         assert!(result.is_ok(), "Upserting embedding should succeed");
@@ -232,11 +271,14 @@ mod tests {
         let update_result = upsert_search_embedding(
             &ctx,
             Some(1),
-            "product".to_string(),
-            123,
-            "Updated high-quality widget".to_string(),
-            updated_embedding.clone(),
-            Some("def456".to_string()),
+            UpsertSearchEmbeddingParams {
+                content_type: "product".to_string(),
+                content_id: 123,
+                text: "Updated high-quality widget".to_string(),
+                embedding: updated_embedding.clone(),
+                embedding_hash: Some("def456".to_string()),
+                metadata: None,
+            },
         );
 
         assert!(update_result.is_ok(), "Updating embedding should succeed");
@@ -259,15 +301,28 @@ mod tests {
         create_ai_agent(
             &ctx,
             Some(1),
-            "Team Agent".to_string(),
-            "gpt-4o".to_string(),
-            "OpenAI".to_string(),
-            0.7,
-            8192,
-            None,
-            Some(1000.0),
-            60,
-            0.1,
+            CreateAiAgentParams {
+                name: "Team Agent".to_string(),
+                model: "gpt-4o".to_string(),
+                provider: "OpenAI".to_string(),
+                temperature: 0.7,
+                max_tokens: 8192,
+                rate_limit_per_minute: 60,
+                cost_per_1k_tokens: 0.1,
+                context_window: 128_000,
+                top_p: 1.0,
+                frequency_penalty: 0.0,
+                presence_penalty: 0.0,
+                is_active: true,
+                is_default: false,
+                allowed_models: Vec::new(),
+                allowed_actions: Vec::new(),
+                description: None,
+                api_key_reference: None,
+                system_prompt: None,
+                monthly_budget: Some(1000.0),
+                metadata: None,
+            },
         ).unwrap();
 
         // Get agent ID
@@ -278,12 +333,19 @@ mod tests {
         let result = create_ai_team_member(
             &ctx,
             Some(1),
-            "Inventory Analyst".to_string(),
-            agent_id,
-            "Analyst".to_string(),
-            "Formal".to_string(),
-            Some("Hello, I'm your inventory analyst".to_string()),
-            Some("Detail-oriented and analytical".to_string()),
+            CreateAiTeamMemberParams {
+                name: "Inventory Analyst".to_string(),
+                ai_agent_id: agent_id,
+                role: "Analyst".to_string(),
+                response_style: "Formal".to_string(),
+                is_active: true,
+                responsibilities: Vec::new(),
+                expertise_areas: Vec::new(),
+                avatar_url: None,
+                greeting_message: Some("Hello, I'm your inventory analyst".to_string()),
+                personality: Some("Detail-oriented and analytical".to_string()),
+                metadata: None,
+            },
         );
 
         assert!(result.is_ok(), "AI team member creation should succeed");
@@ -307,19 +369,31 @@ mod tests {
         let result = create_ai_agent(
             &ctx,
             Some(999), // Non-existent company
-            "Unauthorized Agent".to_string(),
-            "gpt-4o".to_string(),
-            "OpenAI".to_string(),
-            0.7,
-            8192,
-            None,
-            Some(1000.0),
-            60,
-            0.1,
+            CreateAiAgentParams {
+                name: "Unauthorized Agent".to_string(),
+                model: "gpt-4o".to_string(),
+                provider: "OpenAI".to_string(),
+                temperature: 0.7,
+                max_tokens: 8192,
+                rate_limit_per_minute: 60,
+                cost_per_1k_tokens: 0.1,
+                context_window: 128_000,
+                top_p: 1.0,
+                frequency_penalty: 0.0,
+                presence_penalty: 0.0,
+                is_active: true,
+                is_default: false,
+                allowed_models: Vec::new(),
+                allowed_actions: Vec::new(),
+                description: None,
+                api_key_reference: None,
+                system_prompt: None,
+                monthly_budget: Some(1000.0),
+                metadata: None,
+            },
         );
 
         assert!(result.is_err(), "Should fail due to permission check");
         assert!(result.unwrap_err().contains("Permission denied"));
     }
 }
-

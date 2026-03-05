@@ -5,9 +5,72 @@
 /// |-------|-------------|
 /// | **AiAgent** | AI model configuration (provider, params, budget) |
 /// | **AiTeamMember** | AI persona with role, personality, and responsibilities |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ============================================================================
+// PARAMS TYPES
+// ============================================================================
+
+/// Params for creating an AI agent configuration.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAiAgentParams {
+    pub name: String,
+    pub model: String,
+    pub provider: String,
+    pub temperature: f64,
+    pub max_tokens: u32,
+    pub rate_limit_per_minute: u32,
+    pub cost_per_1k_tokens: f64,
+    pub context_window: u32,
+    pub top_p: f64,
+    pub frequency_penalty: f64,
+    pub presence_penalty: f64,
+    pub is_active: bool,
+    pub is_default: bool,
+    pub allowed_models: Vec<String>,
+    pub allowed_actions: Vec<String>,
+    pub description: Option<String>,
+    pub api_key_reference: Option<String>,
+    pub system_prompt: Option<String>,
+    pub monthly_budget: Option<f64>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating AI agent configuration.
+/// Scope: `company_id` + `agent_id` are flat reducer params.
+/// Option fields: None = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAiAgentParams {
+    pub temperature: f64,
+    pub max_tokens: u32,
+    pub rate_limit_per_minute: u32,
+    pub context_window: Option<u32>,
+    pub top_p: Option<f64>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
+    pub system_prompt: Option<String>,
+    pub monthly_budget: Option<f64>,
+}
+
+/// Params for creating an AI team member persona.
+/// Scope: `company_id` is a flat reducer param (not in this struct).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAiTeamMemberParams {
+    pub name: String,
+    pub ai_agent_id: u64,
+    pub role: String,
+    pub response_style: String,
+    pub is_active: bool,
+    pub responsibilities: Vec<String>,
+    pub expertise_areas: Vec<String>,
+    pub avatar_url: Option<String>,
+    pub greeting_message: Option<String>,
+    pub personality: Option<String>,
+    pub metadata: Option<String>,
+}
 
 // ============================================================================
 // TABLES
@@ -54,6 +117,7 @@ pub struct AiAgent {
 }
 
 /// AiTeamMember — An AI persona with a defined role and personality
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = ai_team_member,
     public,
@@ -92,82 +156,68 @@ pub struct AiTeamMember {
 pub fn create_ai_agent(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    model: String,
-    provider: String,
-    temperature: f64,
-    max_tokens: u32,
-    system_prompt: Option<String>,
-    monthly_budget: Option<f64>,
-    rate_limit_per_minute: u32,
-    cost_per_1k_tokens: f64,
-    context_window: Option<u32>,
-    top_p: Option<f64>,
-    frequency_penalty: Option<f64>,
-    presence_penalty: Option<f64>,
+    params: CreateAiAgentParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_agent", "create")?;
 
-    if temperature < 0.0 || temperature > 2.0 {
+    if params.temperature < 0.0 || params.temperature > 2.0 {
         return Err("Temperature must be between 0.0 and 2.0".to_string());
     }
-    if let Some(tp) = top_p {
-        if !(0.0..=1.0).contains(&tp) {
-            return Err("top_p must be between 0.0 and 1.0".to_string());
-        }
+    if !(0.0..=1.0).contains(&params.top_p) {
+        return Err("top_p must be between 0.0 and 1.0".to_string());
     }
-    if let Some(fp) = frequency_penalty {
-        if !(-2.0..=2.0).contains(&fp) {
-            return Err("frequency_penalty must be between -2.0 and 2.0".to_string());
-        }
+    if !(-2.0..=2.0).contains(&params.frequency_penalty) {
+        return Err("frequency_penalty must be between -2.0 and 2.0".to_string());
     }
-    if let Some(pp) = presence_penalty {
-        if !(-2.0..=2.0).contains(&pp) {
-            return Err("presence_penalty must be between -2.0 and 2.0".to_string());
-        }
+    if !(-2.0..=2.0).contains(&params.presence_penalty) {
+        return Err("presence_penalty must be between -2.0 and 2.0".to_string());
     }
 
     let agent = ctx.db.ai_agent().insert(AiAgent {
         id: 0,
-        name,
-        description: None,
-        model,
-        provider,
-        api_key_reference: None,
-        temperature,
-        max_tokens,
-        top_p: top_p.unwrap_or(1.0),
-        frequency_penalty: frequency_penalty.unwrap_or(0.0),
-        presence_penalty: presence_penalty.unwrap_or(0.0),
-        system_prompt,
-        context_window: context_window.unwrap_or(128_000),
-        is_active: true,
-        is_default: false,
-        allowed_models: Vec::new(),
-        allowed_actions: Vec::new(),
-        rate_limit_per_minute,
-        cost_per_1k_tokens,
-        monthly_budget,
+        name: params.name,
+        description: params.description,
+        model: params.model,
+        provider: params.provider,
+        api_key_reference: params.api_key_reference,
+        temperature: params.temperature,
+        max_tokens: params.max_tokens,
+        top_p: params.top_p,
+        frequency_penalty: params.frequency_penalty,
+        presence_penalty: params.presence_penalty,
+        system_prompt: params.system_prompt,
+        context_window: params.context_window,
+        is_active: params.is_active,
+        is_default: params.is_default,
+        allowed_models: params.allowed_models,
+        allowed_actions: params.allowed_actions,
+        rate_limit_per_minute: params.rate_limit_per_minute,
+        cost_per_1k_tokens: params.cost_per_1k_tokens,
+        monthly_budget: params.monthly_budget,
+        // System-managed: starts at 0, incremented by record_ai_spend
         monthly_spend: 0.0,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "ai_agent",
-        agent.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "ai_agent",
+            record_id: agent.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("AI agent created: id={}, provider={}", agent.id, agent.provider);
@@ -180,33 +230,25 @@ pub fn update_ai_agent(
     ctx: &ReducerContext,
     company_id: Option<u64>,
     agent_id: u64,
-    temperature: f64,
-    max_tokens: u32,
-    system_prompt: Option<String>,
-    monthly_budget: Option<f64>,
-    rate_limit_per_minute: u32,
-    context_window: Option<u32>,
-    top_p: Option<f64>,
-    frequency_penalty: Option<f64>,
-    presence_penalty: Option<f64>,
+    params: UpdateAiAgentParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_agent", "write")?;
 
-    if temperature < 0.0 || temperature > 2.0 {
+    if params.temperature < 0.0 || params.temperature > 2.0 {
         return Err("Temperature must be between 0.0 and 2.0".to_string());
     }
-    if let Some(tp) = top_p {
+    if let Some(tp) = params.top_p {
         if !(0.0..=1.0).contains(&tp) {
             return Err("top_p must be between 0.0 and 1.0".to_string());
         }
     }
-    if let Some(fp) = frequency_penalty {
+    if let Some(fp) = params.frequency_penalty {
         if !(-2.0..=2.0).contains(&fp) {
             return Err("frequency_penalty must be between -2.0 and 2.0".to_string());
         }
     }
-    if let Some(pp) = presence_penalty {
+    if let Some(pp) = params.presence_penalty {
         if !(-2.0..=2.0).contains(&pp) {
             return Err("presence_penalty must be between -2.0 and 2.0".to_string());
         }
@@ -219,31 +261,40 @@ pub fn update_ai_agent(
         .find(&agent_id)
         .ok_or("AI agent not found")?;
 
+    if let (Some(wc), Some(rc)) = (company_id, agent.company_id) {
+        if wc != rc {
+            return Err("AI agent does not belong to this company".to_string());
+        }
+    }
+
     ctx.db.ai_agent().id().update(AiAgent {
-        temperature,
-        max_tokens,
-        system_prompt,
-        monthly_budget,
-        rate_limit_per_minute,
-        context_window: context_window.unwrap_or(agent.context_window),
-        top_p: top_p.unwrap_or(agent.top_p),
-        frequency_penalty: frequency_penalty.unwrap_or(agent.frequency_penalty),
-        presence_penalty: presence_penalty.unwrap_or(agent.presence_penalty),
+        temperature: params.temperature,
+        max_tokens: params.max_tokens,
+        system_prompt: params.system_prompt,
+        monthly_budget: params.monthly_budget,
+        rate_limit_per_minute: params.rate_limit_per_minute,
+        context_window: params.context_window.unwrap_or(agent.context_window),
+        top_p: params.top_p.unwrap_or(agent.top_p),
+        frequency_penalty: params.frequency_penalty.unwrap_or(agent.frequency_penalty),
+        presence_penalty: params.presence_penalty.unwrap_or(agent.presence_penalty),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..agent
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "ai_agent",
-        agent_id,
-        "write",
-        None,
-        None,
-        vec!["updated".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "ai_agent",
+            record_id: agent_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("AI agent updated: id={}", agent_id);
@@ -275,20 +326,23 @@ pub fn set_ai_agent_active(
         ..agent
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "ai_agent",
-        agent_id,
-        "write",
-        None,
-        None,
-        vec![if is_active {
-            "activated".to_string()
-        } else {
-            "deactivated".to_string()
-        }],
+        AuditLogParams {
+            company_id,
+            table_name: "ai_agent",
+            record_id: agent_id,
+            action: "write",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![if is_active {
+                "activated".to_string()
+            } else {
+                "deactivated".to_string()
+            }],
+            metadata: None,
+        },
     );
 
     log::info!("AI agent active state: id={}, active={}", agent_id, is_active);
@@ -349,12 +403,7 @@ pub fn record_ai_spend(
 pub fn create_ai_team_member(
     ctx: &ReducerContext,
     company_id: Option<u64>,
-    name: String,
-    ai_agent_id: u64,
-    role: String,
-    response_style: String,
-    greeting_message: Option<String>,
-    personality: Option<String>,
+    params: CreateAiTeamMemberParams,
 ) -> Result<(), String> {
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_team_member", "create")?;
@@ -363,39 +412,42 @@ pub fn create_ai_team_member(
     ctx.db
         .ai_agent()
         .id()
-        .find(&ai_agent_id)
+        .find(&params.ai_agent_id)
         .ok_or("AI agent not found")?;
 
     let member = ctx.db.ai_team_member().insert(AiTeamMember {
         id: 0,
-        name,
-        ai_agent_id,
-        role,
-        responsibilities: Vec::new(),
-        expertise_areas: Vec::new(),
-        is_active: true,
-        avatar_url: None,
-        greeting_message,
-        personality,
-        response_style,
+        name: params.name,
+        ai_agent_id: params.ai_agent_id,
+        role: params.role,
+        responsibilities: params.responsibilities,
+        expertise_areas: params.expertise_areas,
+        is_active: params.is_active,
+        avatar_url: params.avatar_url,
+        greeting_message: params.greeting_message,
+        personality: params.personality,
+        response_style: params.response_style,
         company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         cid,
-        None,
-        "ai_team_member",
-        member.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        AuditLogParams {
+            company_id,
+            table_name: "ai_team_member",
+            record_id: member.id,
+            action: "create",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("AI team member created: id={}, role={}", member.id, member.role);
