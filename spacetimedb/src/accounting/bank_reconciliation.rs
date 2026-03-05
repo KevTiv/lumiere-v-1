@@ -942,7 +942,7 @@ pub fn reconcile_account_bank_statement_line(
 }
 
 #[spacetimedb::reducer]
-pub fn unreconcile_account_bank_statement_line(
+pub fn unreconciled_account_bank_statement_line(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -1392,10 +1392,10 @@ pub fn match_bank_line(
 }
 
 // ── Helper Functions ─────────────────────────────────────────────────────────
-
+///TODO: should this be scoped to organization_id
 fn match_by_exact_amount(
     ctx: &ReducerContext,
-    organization_id: u64,
+    _organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
     amount: f64,
@@ -1429,9 +1429,10 @@ fn match_by_exact_amount(
     Ok(())
 }
 
+///TODO: should this be scoped to organization_id
 fn match_by_partner(
     ctx: &ReducerContext,
-    organization_id: u64,
+    _organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
     partner_id: u64,
