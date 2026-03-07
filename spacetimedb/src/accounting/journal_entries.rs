@@ -5,12 +5,22 @@
 /// Tables for accounting journal entries and move lines.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::budgeting::{
+    budget_post, crossovered_budget, crossovered_budget_lines, CrossoveredBudget,
+    CrossoveredBudgetLines,
+};
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::core::organization::company;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
-use crate::types::{AccountMoveState, MoveType, PaymentState};
+use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
+use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
+use crate::sales::sales_core::{sale_order, sale_order_line};
+use crate::types::{
+    AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
+    PoInvoiceStatus,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -252,6 +262,17 @@ pub struct UpdateAccountMoveLineParams {
     pub partner_id: Option<Option<u64>>,
     pub analytic_account_id: Option<Option<u64>>,
     pub metadata: Option<String>,
+}
+
+/// Parameters for the `bill_timesheets` workflow action.
+/// Creates a draft OutInvoice for a set of validated, billable timesheets.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BillTimesheetsParams {
+    pub timesheet_ids: Vec<u64>,
+    pub journal_id: u64,
+    pub income_account_id: u64,
+    pub partner_id: u64,
+    pub invoice_date: Option<Timestamp>,
 }
 
 // ── Accounting helpers and invoice posting ───────────────────────────────────
@@ -1125,6 +1146,89 @@ pub fn post_account_move(
         },
     );
 
+    // Auto-sync budget actuals for lines that carry an analytic account
+    let move_date = move_record.date;
+    let move_company_id = move_record.company_id;
+    let posted_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .collect();
+    for line in posted_lines {
+        let Some(analytic_id) = line.analytic_account_id else {
+            continue;
+        };
+        let net_amount = line.debit - line.credit;
+        if net_amount == 0.0 {
+            continue;
+        }
+        // Find all BudgetPosts that include this line's GL account
+        for bp in ctx
+            .db
+            .budget_post()
+            .iter()
+            .filter(|bp| bp.company_id == move_company_id && bp.account_ids.contains(&line.account_id))
+        {
+            // Find matching budget lines (analytic + date range)
+            for bline in ctx
+                .db
+                .crossovered_budget_lines()
+                .iter()
+                .filter(|bl| bl.analytic_account_id == Some(analytic_id))
+            {
+                if bline.general_budget_id != bp.id {
+                    continue;
+                }
+                if move_date < bline.date_from || move_date > bline.date_to {
+                    continue;
+                }
+                let Some(budget) = ctx.db.crossovered_budget().id().find(&bline.general_budget_id) else {
+                    continue;
+                };
+                if budget.state != BudgetState::Validate && budget.state != BudgetState::Confirm {
+                    continue;
+                }
+                let old_practical = bline.practical_amount;
+                let new_practical = old_practical + net_amount;
+                let variance = new_practical - bline.planned_amount;
+                let achieve_pct = if bline.planned_amount != 0.0 {
+                    (new_practical / bline.planned_amount) * 100.0
+                } else {
+                    0.0
+                };
+                let variance_pct = if bline.planned_amount != 0.0 {
+                    (variance / bline.planned_amount) * 100.0
+                } else {
+                    0.0
+                };
+                ctx.db.crossovered_budget_lines().id().update(CrossoveredBudgetLines {
+                    practical_amount: new_practical,
+                    variance,
+                    variance_percentage: variance_pct,
+                    achieve_percentage: achieve_pct,
+                    is_above_budget: new_practical > bline.planned_amount,
+                    write_uid: Some(ctx.sender()),
+                    write_date: Some(ctx.timestamp),
+                    ..bline
+                });
+                let new_total = budget.total_practical - old_practical + new_practical;
+                let total_var_pct = if budget.total_planned != 0.0 {
+                    ((new_total - budget.total_planned) / budget.total_planned) * 100.0
+                } else {
+                    0.0
+                };
+                ctx.db.crossovered_budget().id().update(CrossoveredBudget {
+                    total_practical: new_total,
+                    variance_percentage: total_var_pct,
+                    write_uid: Some(ctx.sender()),
+                    write_date: Some(ctx.timestamp),
+                    ..budget
+                });
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1351,5 +1455,1000 @@ pub fn delete_account_move_line(
         },
     );
 
+    Ok(())
+}
+
+// ── Billing flow reducers ─────────────────────────────────────────────────────
+
+/// Create a customer invoice (OutInvoice) from a confirmed Sale Order.
+///
+/// - `journal_id`: AR journal to post to
+/// - `default_income_account_id`: fallback income account for lines that lack
+///   a product-level account mapping
+///
+/// Returns an error if there are no lines to invoice.
+#[spacetimedb::reducer]
+pub fn create_invoice_from_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    sale_order_id: u64,
+    journal_id: u64,
+    default_income_account_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&sale_order_id)
+        .ok_or("Sale order not found")?;
+
+    if order.organization_id != organization_id {
+        return Err("Sale order does not belong to this organization".to_string());
+    }
+
+    use crate::types::SaleState;
+    if order.state != SaleState::Sale && order.state != SaleState::Done {
+        return Err("Sale order must be confirmed before invoicing".to_string());
+    }
+
+    let invoiceable_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&sale_order_id)
+        .filter(|l| l.qty_to_invoice > 0.0 && l.display_type.is_none())
+        .collect();
+
+    if invoiceable_lines.is_empty() {
+        return Err("No lines to invoice on this sale order".to_string());
+    }
+
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("Journal not found")?;
+
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&order.company_id)
+        .ok_or("Company not found")?;
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: String::new(), // auto-assigned on post
+        ref_: order.client_order_ref.clone(),
+        move_type: MoveType::OutInvoice,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: order.payment_term_id,
+        invoice_origin: Some(format!("SO{}", sale_order_id)),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: None,
+        partner_shipping_id: Some(order.partner_shipping_id),
+        sale_order_id: Some(sale_order_id),
+        partner_id: Some(order.partner_invoice_id),
+        commercial_partner_id: Some(order.partner_invoice_id),
+        partner_bank_id: None,
+        fiscal_position_id: order.fiscal_position_id,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: None,
+        incoterm_location: order.incoterm_location.clone(),
+        campaign_id: order.campaign_id,
+        source_id: order.source_id,
+        medium_id: order.medium_id,
+        company_id: order.company_id,
+        journal_id,
+        currency_id: journal.currency_id.unwrap_or(order.currency_id),
+        company_currency_id: company.currency_id,
+        amount_untaxed: 0.0,
+        amount_tax: 0.0,
+        amount_total: 0.0,
+        amount_residual: 0.0,
+        amount_untaxed_signed: 0.0,
+        amount_tax_signed: 0.0,
+        amount_total_signed: 0.0,
+        amount_total_in_currency_signed: 0.0,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: journal.restrict_mode_hash_table,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
+
+    let mut amount_untaxed = 0.0f64;
+    let mut amount_tax = 0.0f64;
+
+    for (seq, line) in invoiceable_lines.into_iter().enumerate() {
+        // Capture all fields needed for the AccountMoveLine insert before the spread
+        let qty = line.qty_to_invoice;
+        let subtotal = qty * line.price_unit * (1.0 - line.discount / 100.0);
+        let tax_amount = calculate_tax(ctx, &line.tax_id, subtotal);
+        let total = subtotal + tax_amount;
+        let tax_ids = line.tax_id.clone();
+        let analytic_tag_ids = line.analytic_tag_ids.clone();
+        let is_downpayment = line.is_downpayment;
+        let product_id = line.product_id;
+        let product_uom = line.product_uom;
+        let line_name = line.name.clone();
+        let line_discount = line.discount;
+        let qty_invoiced_prev = line.qty_invoiced;
+
+        ctx.db.account_move_line().insert(AccountMoveLine {
+            id: 0,
+            move_id: move_record.id,
+            move_name: Some(move_record.name.clone()),
+            date: ctx.timestamp,
+            ref_: order.client_order_ref.clone(),
+            parent_state: AccountMoveState::Draft,
+            journal_id,
+            company_id: order.company_id,
+            company_currency_id: company.currency_id,
+            sequence: seq as u32,
+            name: line_name,
+            quantity: qty,
+            price_unit: line.price_unit,
+            price: subtotal,
+            price_subtotal: subtotal,
+            price_total: total,
+            discount: line_discount,
+            balance: subtotal,
+            currency_id: order.currency_id,
+            amount_currency: subtotal,
+            amount_residual: subtotal,
+            amount_residual_currency: subtotal,
+            debit: subtotal,
+            credit: 0.0,
+            debit_currency: subtotal,
+            credit_currency: 0.0,
+            tax_base_amount: 0.0,
+            account_id: default_income_account_id,
+            account_internal_type: None,
+            account_internal_group: None,
+            account_root_id: None,
+            group_tax_id: None,
+            tax_line_id: None,
+            tax_group_id: None,
+            tax_ids,
+            tax_repartition_line_id: None,
+            tax_audit: None,
+            partner_id: Some(order.partner_invoice_id),
+            commercial_partner_id: Some(order.partner_invoice_id),
+            reconcile_model_id: None,
+            payment_id: None,
+            statement_line_id: None,
+            currency_id_field: Some(order.currency_id),
+            blocked: false,
+            matching_number: None,
+            matching_label: None,
+            is_matching: false,
+            expected_pay_date: None,
+            expected_pay_date_currency_id: None,
+            expected_pay_date_amount: 0.0,
+            expected_pay_date_residual: 0.0,
+            display_type: None,
+            is_downpayment,
+            exclude_from_invoice_tab: false,
+            analytic_account_id: order.analytic_account_id,
+            analytic_tag_ids,
+            product_id: Some(product_id),
+            product_uom_id: Some(product_uom),
+            product_category_id: None,
+            cogs_amount: 0.0,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: None,
+        });
+
+        // Mark line as invoiced
+        ctx.db.sale_order_line().id().update(crate::sales::sales_core::SaleOrderLine {
+            qty_invoiced: qty_invoiced_prev + qty,
+            qty_to_invoice: 0.0,
+            invoice_status: LineInvoiceStatus::Invoiced,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..line
+        });
+
+        amount_untaxed += subtotal;
+        amount_tax += tax_amount;
+    }
+
+    let amount_total = amount_untaxed + amount_tax;
+
+    // Update AccountMove totals
+    ctx.db.account_move().id().update(AccountMove {
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
+        amount_untaxed_signed: amount_untaxed,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total,
+        amount_residual_signed: amount_total,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record.clone()
+    });
+
+    // Determine new invoice_status: all lines invoiced → Invoiced, else ToInvoice
+    let any_remaining = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&sale_order_id)
+        .any(|l| l.qty_to_invoice > 0.0 && l.display_type.is_none());
+
+    let new_invoice_status = if any_remaining {
+        InvoiceStatus::ToInvoice
+    } else {
+        InvoiceStatus::Invoiced
+    };
+
+    // Update SaleOrder
+    let mut updated_invoice_ids = order.invoice_ids.clone();
+    updated_invoice_ids.push(move_record.id);
+    let new_invoice_count = order.invoice_count + 1;
+    let company_id = order.company_id;
+
+    ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
+        invoice_ids: updated_invoice_ids,
+        invoice_count: new_invoice_count,
+        invoice_status: new_invoice_status,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_record.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": "OutInvoice",
+                    "sale_order_id": sale_order_id,
+                    "amount_total": amount_total,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "move_type".to_string(),
+                "sale_order_id".to_string(),
+                "amount_total".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Created invoice {} for sale order {}",
+        move_record.id,
+        sale_order_id
+    );
+    Ok(())
+}
+
+/// Create a vendor bill (InInvoice) from a confirmed Purchase Order.
+///
+/// Lines are created for any PO line where `qty_received > qty_invoiced`.
+/// Returns an error if there are no uninvoiced received quantities.
+#[spacetimedb::reducer]
+pub fn create_bill_from_purchase_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    purchase_order_id: u64,
+    journal_id: u64,
+    default_expense_account_id: u64,
+    invoice_date: Timestamp,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let po = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&purchase_order_id)
+        .ok_or("Purchase order not found")?;
+
+    use crate::types::PoState;
+    if po.state != PoState::Purchase && po.state != PoState::Done {
+        return Err("Purchase order must be confirmed before billing".to_string());
+    }
+
+    let billable_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&purchase_order_id)
+        .filter(|l| l.qty_received > l.qty_invoiced)
+        .collect();
+
+    if billable_lines.is_empty() {
+        return Err("No received quantity to bill on this purchase order".to_string());
+    }
+
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("Journal not found")?;
+
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&po.company_id)
+        .ok_or("Company not found")?;
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: String::new(),
+        ref_: po.partner_ref.clone(),
+        move_type: MoveType::InInvoice,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_date: Some(invoice_date),
+        invoice_date_due: None,
+        invoice_payment_term_id: po.payment_term_id,
+        invoice_origin: Some(format!("PO{}", purchase_order_id)),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: Some(po.partner_id),
+        commercial_partner_id: Some(po.partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: po.fiscal_position_id,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: po.incoterm_id,
+        incoterm_location: po.incoterm_location.clone(),
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id: po.company_id,
+        journal_id,
+        currency_id: journal.currency_id.unwrap_or(po.currency_id),
+        company_currency_id: company.currency_id,
+        amount_untaxed: 0.0,
+        amount_tax: 0.0,
+        amount_total: 0.0,
+        amount_residual: 0.0,
+        amount_untaxed_signed: 0.0,
+        amount_tax_signed: 0.0,
+        amount_total_signed: 0.0,
+        amount_total_in_currency_signed: 0.0,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: journal.restrict_mode_hash_table,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
+
+    let mut amount_untaxed = 0.0f64;
+    let mut amount_tax = 0.0f64;
+
+    for (seq, line) in billable_lines.into_iter().enumerate() {
+        // Capture fields needed before the spread move
+        let qty = line.qty_received - line.qty_invoiced;
+        let subtotal = qty * line.price_unit;
+        let tax_amount = line.price_tax * (qty / line.product_qty.max(1.0));
+        let total = subtotal + tax_amount;
+        let analytic_tag_ids = line.analytic_tag_ids.clone();
+        let account_analytic_id = line.account_analytic_id;
+        let product_id = line.product_id;
+        let product_uom = line.product_uom;
+        let price_unit = line.price_unit;
+        let qty_invoiced_prev = line.qty_invoiced;
+        let product_qty = line.product_qty;
+
+        ctx.db.account_move_line().insert(AccountMoveLine {
+            id: 0,
+            move_id: move_record.id,
+            move_name: Some(move_record.name.clone()),
+            date: ctx.timestamp,
+            ref_: po.partner_ref.clone(),
+            parent_state: AccountMoveState::Draft,
+            journal_id,
+            company_id: po.company_id,
+            company_currency_id: company.currency_id,
+            sequence: seq as u32,
+            name: format!("Product {}", product_id),
+            quantity: qty,
+            price_unit,
+            price: subtotal,
+            price_subtotal: subtotal,
+            price_total: total,
+            discount: 0.0,
+            balance: subtotal,
+            currency_id: po.currency_id,
+            amount_currency: subtotal,
+            amount_residual: subtotal,
+            amount_residual_currency: subtotal,
+            debit: subtotal,
+            credit: 0.0,
+            debit_currency: subtotal,
+            credit_currency: 0.0,
+            tax_base_amount: 0.0,
+            account_id: default_expense_account_id,
+            account_internal_type: None,
+            account_internal_group: None,
+            account_root_id: None,
+            group_tax_id: None,
+            tax_line_id: None,
+            tax_group_id: None,
+            tax_ids: Vec::new(),
+            tax_repartition_line_id: None,
+            tax_audit: None,
+            partner_id: Some(po.partner_id),
+            commercial_partner_id: Some(po.partner_id),
+            reconcile_model_id: None,
+            payment_id: None,
+            statement_line_id: None,
+            currency_id_field: Some(po.currency_id),
+            blocked: false,
+            matching_number: None,
+            matching_label: None,
+            is_matching: false,
+            expected_pay_date: None,
+            expected_pay_date_currency_id: None,
+            expected_pay_date_amount: 0.0,
+            expected_pay_date_residual: 0.0,
+            display_type: None,
+            is_downpayment: false,
+            exclude_from_invoice_tab: false,
+            analytic_account_id: account_analytic_id,
+            analytic_tag_ids,
+            product_id: Some(product_id),
+            product_uom_id: Some(product_uom),
+            product_category_id: None,
+            cogs_amount: 0.0,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: None,
+        });
+
+        // Mark qty as invoiced on PO line
+        ctx.db
+            .purchase_order_line()
+            .id()
+            .update(crate::purchasing::purchase_orders::PurchaseOrderLine {
+                qty_invoiced: qty_invoiced_prev + qty,
+                qty_to_invoice: (product_qty - (qty_invoiced_prev + qty)).max(0.0),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..line
+            });
+
+        amount_untaxed += subtotal;
+        amount_tax += tax_amount;
+    }
+
+    let amount_total = amount_untaxed + amount_tax;
+
+    // Update AccountMove totals
+    ctx.db.account_move().id().update(AccountMove {
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
+        amount_untaxed_signed: amount_untaxed,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total,
+        amount_residual_signed: amount_total,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record.clone()
+    });
+
+    // Update PO invoice tracking
+    let all_invoiced = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&purchase_order_id)
+        .all(|l| l.qty_received <= l.qty_invoiced);
+
+    let new_invoice_status = if all_invoiced {
+        PoInvoiceStatus::Invoiced
+    } else {
+        PoInvoiceStatus::Partial
+    };
+
+    let mut updated_invoice_ids = po.invoice_ids.clone();
+    updated_invoice_ids.push(move_record.id);
+    let new_invoice_count = po.invoice_count + 1;
+    let company_id = po.company_id;
+
+    ctx.db
+        .purchase_order()
+        .id()
+        .update(crate::purchasing::purchase_orders::PurchaseOrder {
+            invoice_ids: updated_invoice_ids,
+            invoice_count: new_invoice_count,
+            invoice_status: new_invoice_status,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..po
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_record.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": "InInvoice",
+                    "purchase_order_id": purchase_order_id,
+                    "amount_total": amount_total,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "move_type".to_string(),
+                "purchase_order_id".to_string(),
+                "amount_total".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Created bill {} for purchase order {}",
+        move_record.id,
+        purchase_order_id
+    );
+    Ok(())
+}
+
+/// Reconcile a payment AccountMove against an invoice AccountMove.
+///
+/// Marks the receivable/payable lines as matched and updates the invoice's
+/// `payment_state` to `Partial` or `Paid` depending on remaining residual.
+#[spacetimedb::reducer]
+pub fn reconcile_payment_with_invoice(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_move_id: u64,
+    invoice_move_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "write")?;
+
+    let payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment move not found")?;
+
+    let invoice_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("Invoice move not found")?;
+
+    if payment_move.state != AccountMoveState::Posted {
+        return Err("Payment move must be posted".to_string());
+    }
+    if invoice_move.state != AccountMoveState::Posted {
+        return Err("Invoice move must be posted".to_string());
+    }
+
+    let matching_number = format!("MATCH-{}-{}", payment_move_id, invoice_move_id);
+
+    // Find the receivable/payable line on the invoice
+    let invoice_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_move_id)
+        .filter(|l| {
+            matches!(
+                l.account_internal_type.as_deref(),
+                Some("receivable") | Some("payable")
+            )
+        })
+        .collect();
+
+    // Find the matching line on the payment
+    let payment_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|l| {
+            matches!(
+                l.account_internal_type.as_deref(),
+                Some("receivable") | Some("payable")
+            )
+        })
+        .collect();
+
+    if invoice_lines.is_empty() {
+        return Err("Invoice has no receivable/payable lines to reconcile".to_string());
+    }
+    if payment_lines.is_empty() {
+        return Err("Payment has no receivable/payable lines to reconcile".to_string());
+    }
+
+    let payment_amount: f64 = payment_lines.iter().map(|l| l.amount_residual.abs()).sum();
+
+    let mut remaining_payment = payment_amount;
+
+    for line in &invoice_lines {
+        if remaining_payment <= 0.0 {
+            break;
+        }
+        let apply = remaining_payment.min(line.amount_residual.abs());
+        let new_residual = (line.amount_residual.abs() - apply).max(0.0);
+        remaining_payment -= apply;
+
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            amount_residual: new_residual,
+            amount_residual_currency: new_residual,
+            matching_number: Some(matching_number.clone()),
+            is_matching: new_residual == 0.0,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..(*line).clone()
+        });
+    }
+
+    // Mark payment lines as matched
+    for line in &payment_lines {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            matching_number: Some(matching_number.clone()),
+            is_matching: true,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..(*line).clone()
+        });
+    }
+
+    // Recompute invoice residual and payment_state
+    let remaining_invoice_residual: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_move_id)
+        .filter(|l| {
+            matches!(
+                l.account_internal_type.as_deref(),
+                Some("receivable") | Some("payable")
+            )
+        })
+        .map(|l| l.amount_residual.abs())
+        .sum();
+
+    let new_payment_state = if remaining_invoice_residual == 0.0 {
+        PaymentState::Paid
+    } else {
+        PaymentState::Partial
+    };
+
+    // Update SO amount_paid / amount_residual if this invoice links to a SO
+    if let Some(so_id) = invoice_move.sale_order_id {
+        if let Some(so) = ctx.db.sale_order().id().find(&so_id) {
+            let applied = payment_amount - remaining_payment.max(0.0);
+            ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
+                amount_paid: so.amount_paid + applied,
+                amount_residual: (so.amount_residual - applied).max(0.0),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..so
+            });
+        }
+    }
+
+    let company_id = invoice_move.company_id;
+
+    ctx.db.account_move().id().update(AccountMove {
+        payment_state: new_payment_state,
+        amount_residual: remaining_invoice_residual,
+        amount_residual_signed: remaining_invoice_residual,
+        invoice_has_outstanding: remaining_invoice_residual > 0.0,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..invoice_move
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: invoice_move_id,
+            action: "RECONCILE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "payment_move_id": payment_move_id,
+                    "matching_number": matching_number,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["payment_state".to_string(), "amount_residual".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Reconciled payment {} against invoice {}",
+        payment_move_id,
+        invoice_move_id
+    );
+    Ok(())
+}
+
+/// Create a customer invoice from validated billable timesheets.
+///
+/// Validates each timesheet (must be validated, billable, not yet invoiced),
+/// creates an OutInvoice AccountMove with one line per timesheet, then marks
+/// each timesheet with the resulting invoice id.
+#[spacetimedb::reducer]
+pub fn bill_timesheets(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: BillTimesheetsParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    if params.timesheet_ids.is_empty() {
+        return Err("No timesheets provided".to_string());
+    }
+
+    let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
+
+    // Fetch and validate all timesheets upfront
+    let mut billable_sheets: Vec<ProjectTimesheet> = Vec::new();
+    for ts_id in &params.timesheet_ids {
+        let ts = ctx
+            .db
+            .project_timesheet()
+            .id()
+            .find(ts_id)
+            .ok_or_else(|| format!("Timesheet {} not found", ts_id))?;
+        if ts.company_id != company_id {
+            return Err(format!(
+                "Timesheet {} does not belong to this company",
+                ts_id
+            ));
+        }
+        if ts.validation_status != "validated" {
+            return Err(format!(
+                "Timesheet {} must be validated before billing",
+                ts_id
+            ));
+        }
+        if ts.timesheet_invoice_type != "billable" {
+            return Err(format!("Timesheet {} is not billable", ts_id));
+        }
+        if ts.timesheet_invoice_id.is_some() {
+            return Err(format!("Timesheet {} is already invoiced", ts_id));
+        }
+        billable_sheets.push(ts);
+    }
+
+    let amount_untaxed: f64 = billable_sheets.iter().map(|ts| ts.amount).sum();
+    // billable_sheets is guaranteed non-empty (checked above)
+    let currency_id = billable_sheets[0].currency_id;
+
+    let move_row = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: String::new(),
+        ref_: None,
+        move_type: MoveType::OutInvoice,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: inv_date,
+        invoice_date: Some(inv_date),
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: Some("Timesheets".to_string()),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: Some(params.partner_id),
+        commercial_partner_id: Some(params.partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: params.journal_id,
+        currency_id,
+        company_currency_id: currency_id,
+        amount_untaxed,
+        amount_tax: 0.0,
+        amount_total: amount_untaxed,
+        amount_residual: amount_untaxed,
+        amount_untaxed_signed: amount_untaxed,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount_untaxed,
+        amount_total_in_currency_signed: amount_untaxed,
+        amount_residual_signed: amount_untaxed,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
+
+    let move_id = move_row.id;
+
+    // One AccountMoveLine per timesheet entry
+    for (seq, ts) in billable_sheets.iter().enumerate() {
+        ctx.db.account_move_line().insert(AccountMoveLine {
+            id: 0,
+            move_id,
+            move_name: None,
+            date: inv_date,
+            ref_: None,
+            parent_state: AccountMoveState::Draft,
+            journal_id: params.journal_id,
+            company_id,
+            company_currency_id: ts.currency_id,
+            sequence: (seq + 1) as u32,
+            name: ts.name.clone(),
+            quantity: ts.unit_amount,
+            price_unit: ts.employee_cost,
+            price: ts.amount,
+            price_subtotal: ts.amount,
+            price_total: ts.amount,
+            discount: 0.0,
+            balance: ts.amount,
+            currency_id: ts.currency_id,
+            amount_currency: ts.amount,
+            amount_residual: ts.amount,
+            amount_residual_currency: ts.amount,
+            debit: ts.amount,
+            credit: 0.0,
+            debit_currency: ts.amount,
+            credit_currency: 0.0,
+            tax_base_amount: 0.0,
+            account_id: params.income_account_id,
+            account_internal_type: None,
+            account_internal_group: None,
+            account_root_id: None,
+            group_tax_id: None,
+            tax_line_id: None,
+            tax_group_id: None,
+            tax_ids: vec![],
+            tax_repartition_line_id: None,
+            tax_audit: None,
+            partner_id: Some(params.partner_id),
+            commercial_partner_id: Some(params.partner_id),
+            reconcile_model_id: None,
+            payment_id: None,
+            statement_line_id: None,
+            currency_id_field: None,
+            blocked: false,
+            matching_number: None,
+            matching_label: None,
+            is_matching: false,
+            expected_pay_date: None,
+            expected_pay_date_currency_id: None,
+            expected_pay_date_amount: 0.0,
+            expected_pay_date_residual: 0.0,
+            display_type: None,
+            is_downpayment: false,
+            exclude_from_invoice_tab: false,
+            analytic_account_id: ts.account_id,
+            analytic_tag_ids: vec![],
+            product_id: ts.product_id,
+            product_uom_id: ts.product_uom_id,
+            product_category_id: None,
+            cogs_amount: 0.0,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: None,
+        });
+    }
+
+    // Mark each timesheet as invoiced
+    for ts in billable_sheets {
+        ctx.db.project_timesheet().id().update(ProjectTimesheet {
+            timesheet_invoice_id: Some(move_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..ts
+        });
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": "OutInvoice",
+                    "timesheet_count": params.timesheet_ids.len(),
+                    "amount_untaxed": amount_untaxed,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Created invoice {} from {} timesheets (total: {})",
+        move_id,
+        params.timesheet_ids.len(),
+        amount_untaxed
+    );
     Ok(())
 }

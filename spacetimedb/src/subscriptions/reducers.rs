@@ -12,6 +12,7 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::sales::sales_core::sale_order;
 use crate::subscriptions::tables::*;
 
 // ============================================================================
@@ -373,8 +374,38 @@ pub fn create_subscription_from_sale_order(
 ) -> Result<(), String> {
     check_permission(ctx, company_id, "subscription", "create")?;
 
-    // TODO: Fetch sale order data and create subscription
-    // This is a placeholder - would need to integrate with sales module
+    // Fetch sale order to derive authoritative partner, company, currency, pricelist
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&params.sale_order_id)
+        .ok_or("Sale order not found")?;
+
+    use crate::types::SaleState;
+    if order.state != SaleState::Sale && order.state != SaleState::Done {
+        return Err("Sale order must be confirmed before creating a subscription".to_string());
+    }
+
+    // Fetch plan to derive authoritative billing cadence
+    let plan = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&params.plan_id)
+        .ok_or("Subscription plan not found")?;
+
+    // Server-authoritative fields derived from SO and plan
+    let partner_id = order.partner_id;
+    let partner_invoice_id = order.partner_invoice_id;
+    let partner_shipping_id = order.partner_shipping_id;
+    let currency_id = order.currency_id;
+    let pricelist_id = order.pricelist_id;
+    let resolved_company_id = order.company_id;
+    // Use plan billing period for recurrence; ignore client-passed values
+    let recurring_rule_type = plan.billing_period.clone();
+    let recurring_interval = plan.billing_period_unit;
+    let recurring_invoice_day = plan.recurring_invoice_day;
 
     let code = params.code.clone().unwrap_or_else(|| {
         format!(
@@ -391,19 +422,19 @@ pub fn create_subscription_from_sale_order(
         code,
         description: params.description.clone().unwrap_or_default(),
         plan_id: params.plan_id,
-        partner_id: params.partner_id,
-        partner_invoice_id: params.partner_invoice_id,
-        partner_shipping_id: params.partner_shipping_id,
-        company_id,
-        currency_id: params.currency_id,
-        pricelist_id: params.pricelist_id,
+        partner_id,
+        partner_invoice_id,
+        partner_shipping_id,
+        company_id: resolved_company_id,
+        currency_id,
+        pricelist_id,
         analytic_account_id: params.analytic_account_id,
         date_start: params.date_start,
         date: ctx.timestamp,
         recurring_next_date: params.date_start,
-        recurring_invoice_day: params.recurring_invoice_day,
-        recurring_rule_type: params.recurring_rule_type.clone(),
-        recurring_interval: params.recurring_interval,
+        recurring_invoice_day,
+        recurring_rule_type,
+        recurring_interval,
         close_reason_id: None,
         close_date: None,
         payment_token_id: None,
@@ -443,7 +474,7 @@ pub fn create_subscription_from_sale_order(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(resolved_company_id),
             table_name: "subscription",
             record_id: inserted.id,
             action: "CREATE",
@@ -452,7 +483,7 @@ pub fn create_subscription_from_sale_order(
                 serde_json::json!({
                     "code": inserted.code,
                     "sale_order_id": params.sale_order_id,
-                    "partner_id": params.partner_id,
+                    "partner_id": partner_id,
                     "state": params.state
                 })
                 .to_string(),

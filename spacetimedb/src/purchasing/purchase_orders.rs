@@ -9,7 +9,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::crm::contacts::{contact, Contact};
+use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -181,6 +182,7 @@ pub struct CreatePurchaseOrderParams {
     pub fiscal_position_id: Option<u64>,
     pub incoterm_id: Option<u64>,
     pub incoterm_location: Option<String>,
+    pub user_id: Option<Identity>,
     pub invoice_ids: Vec<u64>,
     pub picking_ids: Vec<u64>,
     pub message_follower_ids: Vec<u64>,
@@ -204,6 +206,8 @@ pub struct AddPurchaseOrderLineParams {
     pub product_variant_id: Option<u64>,
     pub account_analytic_id: Option<u64>,
     pub date_planned: Option<Timestamp>,
+    pub propagate_cancel: Option<bool>,
+    pub metadata: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -283,6 +287,16 @@ pub fn create_purchase_order(
 
     validate_company_in_organization(ctx, organization_id, company_id)?;
 
+    let vendor = ctx
+        .db
+        .contact()
+        .id()
+        .find(&params.partner_id)
+        .ok_or("Vendor contact not found")?;
+    if !vendor.is_vendor {
+        return Err("Partner is not a vendor".to_string());
+    }
+
     let invoice_count = params.invoice_ids.len() as u32;
     let picking_count = params.picking_ids.len() as u32;
     let has_message = !params.message_ids.is_empty();
@@ -306,7 +320,7 @@ pub fn create_purchase_order(
         date_calendar_start: None,
         date_calendar_done: None,
         company_id,
-        user_id: ctx.sender(),
+        user_id: params.user_id.unwrap_or_else(|| ctx.sender()),
         invoice_count,
         invoice_ids: params.invoice_ids,
         invoice_status: PoInvoiceStatus::No,
@@ -422,6 +436,9 @@ pub fn confirm_purchase_order(
         );
     }
 
+    let partner_id = order.partner_id;
+    let company_id = order.company_id;
+
     ctx.db.purchase_order().id().update(PurchaseOrder {
         state: PoState::Purchase,
         date_approve: Some(ctx.timestamp),
@@ -430,11 +447,19 @@ pub fn confirm_purchase_order(
         ..order
     });
 
+    // Increment supplier_rank on the partner contact
+    if let Some(vendor) = ctx.db.contact().id().find(&partner_id) {
+        ctx.db.contact().id().update(Contact {
+            supplier_rank: vendor.supplier_rank + 1,
+            ..vendor
+        });
+    }
+
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(order.company_id),
+            company_id: Some(company_id),
             table_name: "purchase_order",
             record_id: order_id,
             action: "UPDATE",
@@ -509,6 +534,7 @@ pub fn add_purchase_order_line(
     }
 
     let subtotal = params.quantity * params.price_unit;
+    let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
 
     ctx.db.purchase_order_line().insert(PurchaseOrderLine {
         id: 0,
@@ -525,8 +551,8 @@ pub fn add_purchase_order_line(
         product_template_id: None,
         price_unit: params.price_unit,
         price_subtotal: subtotal,
-        price_total: subtotal,
-        price_tax: 0.0,
+        price_total: subtotal + tax,
+        price_tax: tax,
         order_id,
         account_analytic_id: params.account_analytic_id,
         analytic_tag_ids: Vec::new(),
@@ -543,7 +569,7 @@ pub fn add_purchase_order_line(
         display_type: params.display_type,
         product_no_variant_attribute_value_ids: Vec::new(),
         product_custom_attribute_value_ids: Vec::new(),
-        propagate_cancel: true,
+        propagate_cancel: params.propagate_cancel.unwrap_or(true),
         sale_line_id: None,
         sale_order_id: None,
         move_dest_ids: Vec::new(),
@@ -552,7 +578,7 @@ pub fn add_purchase_order_line(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     ctx.db.purchase_order().id().update(PurchaseOrder {
@@ -638,7 +664,8 @@ pub fn compute_purchase_order_line_totals(
 
     for line in lines {
         let subtotal = line.product_qty * line.price_unit;
-        let tax = 0.0;
+        // tax_ids are not stored on the line; preserve the existing price_tax
+        let tax = line.price_tax;
         let total = subtotal + tax;
 
         ctx.db.purchase_order_line().id().update(PurchaseOrderLine {

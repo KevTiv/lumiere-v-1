@@ -8,7 +8,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::ProcureMethod;
+use crate::sales::sales_core::{sale_order, sale_order_line};
+use crate::types::{InvoiceStatus, LineInvoiceStatus, ProcureMethod};
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1305,6 +1306,77 @@ pub fn validate_stock_picking(
             move_record.date = Some(ctx.timestamp);
             move_record.quantity_done = move_record.product_uom_qty;
             ctx.db.stock_move().id().update(move_record);
+        }
+    }
+
+    // Propagate delivered quantities back to SaleOrderLine
+    if let Some(so_id) = picking.sale_id {
+        // Collect qty_done per sale_line_id
+        let mut delivered: std::collections::HashMap<u64, f64> =
+            std::collections::HashMap::new();
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_org()
+            .filter(&picking.organization_id)
+        {
+            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+                continue;
+            }
+            if let Some(sl_id) = move_record.sale_line_id {
+                *delivered.entry(sl_id).or_default() +=
+                    move_record.quantity_done;
+            }
+        }
+
+        for (sl_id, qty_done) in &delivered {
+            if let Some(sol) = ctx.db.sale_order_line().id().find(sl_id) {
+                let new_qty_delivered = sol.qty_delivered + qty_done;
+                let new_qty_to_invoice =
+                    (sol.product_uom_qty - sol.qty_invoiced - new_qty_delivered).max(0.0);
+                let new_line_status = if new_qty_delivered >= sol.product_uom_qty {
+                    LineInvoiceStatus::ToInvoice
+                } else {
+                    sol.invoice_status.clone()
+                };
+
+                ctx.db.sale_order_line().id().update(
+                    crate::sales::sales_core::SaleOrderLine {
+                        qty_delivered: new_qty_delivered,
+                        is_delivered: new_qty_delivered >= sol.product_uom_qty,
+                        qty_to_invoice: new_qty_to_invoice,
+                        invoice_status: new_line_status,
+                        write_uid: ctx.sender(),
+                        write_date: ctx.timestamp,
+                        ..sol
+                    },
+                );
+            }
+        }
+
+        // If all lines have qty_to_invoice > 0, mark SO as ToInvoice
+        if !delivered.is_empty() {
+            let all_to_invoice = ctx
+                .db
+                .sale_order_line()
+                .order_line_by_order()
+                .filter(&so_id)
+                .all(|l| l.qty_to_invoice > 0.0 || l.invoice_status == LineInvoiceStatus::Invoiced);
+
+            if all_to_invoice {
+                if let Some(so) = ctx.db.sale_order().id().find(&so_id) {
+                    if so.invoice_status != InvoiceStatus::Invoiced {
+                        ctx.db.sale_order().id().update(
+                            crate::sales::sales_core::SaleOrder {
+                                invoice_status: InvoiceStatus::ToInvoice,
+                                write_uid: ctx.sender(),
+                                write_date: ctx.timestamp,
+                                ..so
+                            },
+                        );
+                    }
+                }
+            }
         }
     }
 

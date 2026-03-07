@@ -8,6 +8,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::{stock_move, stock_quant, StockQuant};
 use crate::types::{LandedCostState, SplitMethod};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -439,6 +440,163 @@ pub fn remove_landed_cost_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
+    );
+
+    Ok(())
+}
+
+/// Apply a posted landed cost to the StockQuant valuation of the related pickings.
+///
+/// For each cost line, collects the done moves from the landed cost's pickings,
+/// computes each move's share of the cost according to the line's split_method,
+/// and increments the matching StockQuant's value (and recalculates unit cost).
+#[reducer]
+pub fn apply_landed_costs(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    landed_cost_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_landed_cost", "write")?;
+
+    let lc = ctx
+        .db
+        .stock_landed_cost()
+        .id()
+        .find(&landed_cost_id)
+        .ok_or("Landed cost not found")?;
+
+    if lc.company_id != company_id {
+        return Err("Landed cost does not belong to this company".to_string());
+    }
+
+    if lc.state != LandedCostState::Posted {
+        return Err("Landed cost must be posted before applying".to_string());
+    }
+
+    if lc.picking_ids.is_empty() {
+        return Err("No pickings linked to this landed cost".to_string());
+    }
+
+    // Collect all done moves from the linked pickings
+    let done_moves: Vec<_> = ctx
+        .db
+        .stock_move()
+        .iter()
+        .filter(|m| {
+            m.is_done
+                && m.picking_id
+                    .map(|pid| lc.picking_ids.contains(&pid))
+                    .unwrap_or(false)
+        })
+        .collect();
+
+    if done_moves.is_empty() {
+        return Ok(()); // nothing to allocate
+    }
+
+    // Fetch cost lines
+    let cost_lines: Vec<_> = ctx
+        .db
+        .stock_landed_cost_lines()
+        .stock_landed_cost_lines_by_landed_cost()
+        .filter(&landed_cost_id)
+        .collect();
+
+    for cost_line in &cost_lines {
+        let total_cost = cost_line.price_unit;
+        if total_cost == 0.0 {
+            continue;
+        }
+
+        // Compute each move's basis value depending on split method
+        let basis_values: Vec<f64> = done_moves
+            .iter()
+            .map(|m| match cost_line.split_method {
+                SplitMethod::Equal => 1.0,
+                SplitMethod::ByQuantity => m.quantity_done,
+                SplitMethod::ByCurrentCost | SplitMethod::ByWeight | SplitMethod::ByVolume => {
+                    // Fall back to current StockQuant value for ByCurrentCost;
+                    // ByWeight/ByVolume require product dimensions — use quantity as proxy
+                    ctx.db
+                        .stock_quant()
+                        .iter()
+                        .find(|q| {
+                            q.product_id == m.product_id
+                                && q.location_id == m.location_dest_id
+                                && q.company_id == company_id
+                        })
+                        .map(|q| {
+                            if matches!(cost_line.split_method, SplitMethod::ByCurrentCost) {
+                                q.value
+                            } else {
+                                q.quantity
+                            }
+                        })
+                        .unwrap_or(m.quantity_done)
+                }
+            })
+            .collect();
+
+        let total_basis: f64 = basis_values.iter().sum();
+        if total_basis == 0.0 {
+            continue;
+        }
+
+        for (mv, basis) in done_moves.iter().zip(basis_values.iter()) {
+            let allocated = total_cost * (basis / total_basis);
+            if allocated == 0.0 {
+                continue;
+            }
+
+            // Find or create the StockQuant for this product + destination location
+            if let Some(quant) = ctx.db.stock_quant().iter().find(|q| {
+                q.product_id == mv.product_id
+                    && q.location_id == mv.location_dest_id
+                    && q.company_id == company_id
+                    && q.lot_id.is_none()
+                    && q.package_id.is_none()
+                    && q.owner_id.is_none()
+            }) {
+                let new_value = quant.value + allocated;
+                let new_cost = if quant.quantity > 0.0 {
+                    new_value / quant.quantity
+                } else {
+                    quant.cost
+                };
+                ctx.db.stock_quant().id().update(StockQuant {
+                    value: new_value,
+                    cost: new_cost,
+                    user_id: Some(ctx.sender()),
+                    inventory_date: Some(ctx.timestamp),
+                    ..quant
+                });
+            }
+        }
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_landed_cost",
+            record_id: landed_cost_id,
+            action: "APPLY",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "amount_total": lc.amount_total }).to_string(),
+            ),
+            changed_fields: vec!["valuation_adjustment_lines".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Applied landed cost {} to {} moves across {} pickings",
+        landed_cost_id,
+        done_moves.len(),
+        lc.picking_ids.len()
     );
 
     Ok(())

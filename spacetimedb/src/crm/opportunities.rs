@@ -6,7 +6,11 @@
 ///   - OpportunityLine
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::sales::sales_core::{
+    create_sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -48,6 +52,13 @@ pub struct CreateOpportunityParams {
     pub color: Option<String>,
     pub description: Option<String>,
     pub metadata: Option<String>,
+}
+
+/// Params for the `convert_opportunity_to_sale_order` workflow action.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ConvertOpportunityParams {
+    pub pricelist_id: u64,
+    pub warehouse_id: u64,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -215,6 +226,145 @@ pub fn create_opportunity(
                     .to_string(),
             ),
             changed_fields: vec!["name".to_string(), "expected_revenue".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Convert a CRM Opportunity into a Sale Order.
+///
+/// Fetches the opportunity and its lines, ensures the partner is flagged as
+/// a customer, then creates a Sale Order with one line per OpportunityLine
+/// (lines without a product_id are skipped).
+#[spacetimedb::reducer]
+pub fn convert_opportunity_to_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    opportunity_id: u64,
+    params: ConvertOpportunityParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity", "write")?;
+
+    let opp = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opportunity_id)
+        .ok_or("Opportunity not found")?;
+
+    if opp.organization_id != organization_id {
+        return Err("Opportunity does not belong to this organization".to_string());
+    }
+
+    let partner_id = opp
+        .partner_id
+        .ok_or("Opportunity has no partner — set a partner before converting")?;
+
+    let currency_id = opp.company_currency_id.unwrap_or(1);
+    let opp_company_id = opp.company_id.unwrap_or(company_id);
+
+    // Ensure the partner is flagged as a customer
+    if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
+        if !partner.is_customer {
+            ctx.db.contact().id().update(Contact {
+                is_customer: true,
+                ..partner
+            });
+        }
+    }
+
+    // Build SO lines from opportunity lines (skip those without a product)
+    let opp_lines: Vec<_> = ctx
+        .db
+        .opportunity_line()
+        .iter()
+        .filter(|l| l.opportunity_id == opportunity_id)
+        .collect();
+
+    let order_lines: Vec<CreateSaleOrderLineParams> = opp_lines
+        .iter()
+        .filter_map(|l| {
+            let product_id = l.product_id?;
+            Some(CreateSaleOrderLineParams {
+                product_id,
+                quantity: l.quantity,
+                uom_id: l.uom_id.unwrap_or(1),
+                price_unit: Some(l.price_unit),
+                discount: l.discount,
+                tax_ids: l.tax_ids.clone(),
+                name: Some(l.name.clone()),
+                sequence: l.sequence as u32,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            })
+        })
+        .collect();
+
+    let so_params = CreateSaleOrderParams {
+        partner_id,
+        partner_invoice_id: partner_id,
+        partner_shipping_id: partner_id,
+        pricelist_id: params.pricelist_id,
+        currency_id,
+        warehouse_id: params.warehouse_id,
+        order_lines,
+        origin: Some(format!("CRM/{}", opportunity_id)),
+        client_order_ref: None,
+        payment_term_id: None,
+        fiscal_position_id: None,
+        team_id: opp.team_id,
+        opportunity_id: Some(opportunity_id),
+        note: opp.description.clone(),
+        terms_and_conditions: None,
+        validity_days: None,
+        shipping_policy: None,
+        picking_policy: None,
+        campaign_id: opp.campaign_id,
+        medium_id: opp.medium_id,
+        source_id: opp.source_id,
+        commitment_date: None,
+        expected_date: opp.date_deadline,
+        incoterm: None,
+        incoterm_location: None,
+        carrier_id: None,
+        customer_lead: None,
+        analytic_account_id: None,
+        user_id: opp.user_id,
+        is_printed: None,
+        is_locked: None,
+        is_dropship: None,
+        message_follower_ids: None,
+        message_partner_ids: None,
+        message_channel_ids: None,
+        activity_ids: None,
+        metadata: None,
+    };
+
+    create_sale_order(ctx, organization_id, opp_company_id, so_params)?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(opp_company_id),
+            table_name: "opportunity",
+            record_id: opportunity_id,
+            action: "CONVERT_TO_SO",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "partner_id": partner_id, "currency_id": currency_id })
+                    .to_string(),
+            ),
+            changed_fields: vec![],
             metadata: None,
         },
     );

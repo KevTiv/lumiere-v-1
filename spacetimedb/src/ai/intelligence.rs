@@ -8,6 +8,7 @@
 /// | **SearchEmbedding** | Vector embeddings for semantic search |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::queue::{queue_job, QueueJob};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InsightSeverity, JobStatus};
 
@@ -156,18 +157,28 @@ pub struct AiDocumentProcessingJob {
     accessor = search_embedding,
     public,
     index(name = "by_content", accessor = embedding_by_content, btree(columns = [content_type])),
-    index(name = "by_company", accessor = embedding_by_company, btree(columns = [company_id]))
+    index(name = "by_company", accessor = embedding_by_company, btree(columns = [company_id])),
+    index(name = "by_sync_status", accessor = embedding_by_sync_status, btree(columns = [sync_status]))
 )]
 pub struct SearchEmbedding {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
 
-    pub content_type: String,         // product, contact, document, article, etc.
+    pub content_type: String,              // product, contact, document, article, etc.
     pub content_id: u64,
-    pub text: String,                 // Original text that was embedded
-    pub embedding: Vec<f32>,          // Vector embedding values
-    pub embedding_hash: Option<String>, // Hash of text for change detection
+    pub text: String,                      // Original text that was embedded
+    pub embedding: Vec<f32>,              // Vector embedding values (backup copy)
+    pub embedding_hash: Option<String>,   // Hash of text for change detection
+
+    // Qdrant sync tracking
+    pub sync_status: String,              // "pending" | "synced" | "failed" | "deleted"
+    pub vector_db_id: Option<String>,     // Qdrant point ID (stringified STDB id)
+    pub embedding_model: Option<String>,  // e.g. "voyage-3", "text-embedding-3-small"
+    pub embedding_dim: Option<u32>,       // e.g. 1024, 1536 — for model migration tracking
+    pub last_synced_at: Option<Timestamp>,
+    pub sync_error: Option<String>,       // Last sync error message
+
     pub company_id: Option<u64>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -530,10 +541,6 @@ pub fn upsert_search_embedding(
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "search_embedding", "create")?;
 
-    if params.embedding.is_empty() {
-        return Err("Embedding vector cannot be empty".to_string());
-    }
-
     // Check if an embedding already exists for this content
     let existing: Option<SearchEmbedding> = ctx
         .db
@@ -543,10 +550,14 @@ pub fn upsert_search_embedding(
         .find(|e| e.content_id == params.content_id && e.company_id == company_id);
 
     if let Some(existing) = existing {
+        // Reset sync_status to "pending" so the gateway re-indexes the updated content
         ctx.db.search_embedding().id().update(SearchEmbedding {
             text: params.text,
             embedding: params.embedding,
             embedding_hash: params.embedding_hash,
+            sync_status: "pending".to_string(),
+            last_synced_at: None,
+            sync_error: None,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
             ..existing
@@ -564,6 +575,12 @@ pub fn upsert_search_embedding(
             text: params.text,
             embedding: params.embedding,
             embedding_hash: params.embedding_hash,
+            sync_status: "pending".to_string(),
+            vector_db_id: None,
+            embedding_model: None,
+            embedding_dim: None,
+            last_synced_at: None,
+            sync_error: None,
             company_id,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
@@ -579,4 +596,142 @@ pub fn upsert_search_embedding(
     }
 
     Ok(())
+}
+
+/// Called by the AI Gateway after a vector has been successfully upserted into Qdrant.
+/// Updates sync metadata so clients and workers can track indexing state.
+#[reducer]
+pub fn mark_embedding_synced(
+    ctx: &ReducerContext,
+    company_id: Option<u64>,
+    embedding_id: u64,
+    model: String,
+    dim: u32,
+) -> Result<(), String> {
+    let cid = company_id.unwrap_or(0);
+    check_permission(ctx, cid, "search_embedding", "write")?;
+
+    let existing = ctx
+        .db
+        .search_embedding()
+        .id()
+        .find(&embedding_id)
+        .ok_or("Embedding not found")?;
+
+    ctx.db.search_embedding().id().update(SearchEmbedding {
+        sync_status: "synced".to_string(),
+        vector_db_id: Some(embedding_id.to_string()),
+        embedding_model: Some(model),
+        embedding_dim: Some(dim),
+        last_synced_at: Some(ctx.timestamp),
+        sync_error: None,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..existing
+    });
+
+    log::info!("Search embedding synced to vector DB: id={}", embedding_id);
+    Ok(())
+}
+
+/// Soft-delete a search embedding (marks as "deleted" so the AI Gateway removes it from Qdrant).
+/// Preserves the row for audit trail.
+#[reducer]
+pub fn delete_search_embedding(
+    ctx: &ReducerContext,
+    company_id: Option<u64>,
+    content_type: String,
+    content_id: u64,
+) -> Result<(), String> {
+    let cid = company_id.unwrap_or(0);
+    check_permission(ctx, cid, "search_embedding", "delete")?;
+
+    let existing = ctx
+        .db
+        .search_embedding()
+        .embedding_by_content()
+        .filter(&content_type)
+        .find(|e| e.content_id == content_id && e.company_id == company_id)
+        .ok_or("Embedding not found for this content")?;
+
+    ctx.db.search_embedding().id().update(SearchEmbedding {
+        sync_status: "deleted".to_string(),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..existing
+    });
+
+    log::info!(
+        "Search embedding marked for deletion: content_type={}, content_id={}",
+        content_type,
+        content_id
+    );
+    Ok(())
+}
+
+/// Enqueue an embedding job for the AI Gateway worker to process.
+/// Call this after creating or updating any ERP record that should be searchable.
+/// The gateway polls the "embedding" queue, generates the vector, and calls mark_embedding_synced.
+#[reducer]
+pub fn request_embedding_job(
+    ctx: &ReducerContext,
+    company_id: Option<u64>,
+    content_type: String,
+    content_id: u64,
+    text: String,
+) -> Result<(), String> {
+    let cid = company_id.unwrap_or(0);
+    check_permission(ctx, cid, "search_embedding", "create")?;
+
+    let payload = format!(
+        r#"{{"company_id":{},"content_type":"{}","content_id":{},"text":{}}}"#,
+        cid,
+        content_type,
+        content_id,
+        serde_json_escape(&text)
+    );
+
+    ctx.db.queue_job().insert(QueueJob {
+        id: 0,
+        organization_id: cid,
+        queue_name: "embedding".to_string(),
+        job_type: "embed_content".to_string(),
+        payload,
+        priority: 5,
+        attempts: 0,
+        max_attempts: 3,
+        status: JobStatus::Pending,
+        scheduled_at: None,
+        started_at: None,
+        completed_at: None,
+        error_message: None,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
+    log::info!(
+        "Embedding job queued: content_type={}, content_id={}",
+        content_type,
+        content_id
+    );
+    Ok(())
+}
+
+/// Minimal JSON string escaping for embedding payloads (avoids pulling in serde_json).
+fn serde_json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }

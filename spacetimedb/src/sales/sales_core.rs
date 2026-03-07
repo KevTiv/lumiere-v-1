@@ -14,7 +14,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
@@ -72,6 +72,7 @@ pub struct CreateSaleOrderParams {
     pub carrier_id: Option<u64>,
     pub customer_lead: Option<f64>,
     pub analytic_account_id: Option<u64>,
+    pub user_id: Option<Identity>,
     pub is_printed: Option<bool>,
     pub is_locked: Option<bool>,
     pub is_dropship: Option<bool>,
@@ -350,11 +351,7 @@ fn create_sale_order_line_internal(
     let discount_amount = price_unit * params.quantity * (params.discount / 100.0);
     let price_subtotal = price_unit * params.quantity - discount_amount;
 
-    let price_tax: f64 = if params.tax_ids.is_empty() {
-        0.0
-    } else {
-        price_subtotal * 0.10 // FIXME: lookup actual tax rate from tax configuration
-    };
+    let price_tax = calculate_tax(ctx, &params.tax_ids, price_subtotal);
 
     let line = ctx.db.sale_order_line().insert(SaleOrderLine {
         id: 0,
@@ -498,7 +495,7 @@ pub fn create_sale_order(
         currency_id: params.currency_id,
         payment_term_id: params.payment_term_id,
         fiscal_position_id: params.fiscal_position_id,
-        user_id: ctx.sender(),
+        user_id: params.user_id.unwrap_or_else(|| ctx.sender()),
         team_id: params.team_id,
         origin_so_id: None,
         opportunity_id: params.opportunity_id,
@@ -662,6 +659,9 @@ pub fn confirm_sales_order(
         }
     }
 
+    let partner_id = order.partner_id;
+    let company_id = order.company_id;
+
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Sale,
         confirmation_date: Some(ctx.timestamp),
@@ -671,11 +671,19 @@ pub fn confirm_sales_order(
         ..order
     });
 
+    // Increment customer_rank on the partner contact
+    if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
+        ctx.db.contact().id().update(crate::crm::contacts::Contact {
+            customer_rank: partner.customer_rank + 1,
+            ..partner
+        });
+    }
+
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(order.company_id),
+            company_id: Some(company_id),
             table_name: "sale_order",
             record_id: order_id,
             action: "UPDATE",

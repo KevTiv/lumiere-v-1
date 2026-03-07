@@ -1,15 +1,18 @@
 /// Cross-cutting helpers available to every domain module.
 ///
-/// - `check_permission` — multi-tenant RBAC + Casbin policy check
-/// - `write_audit_log`  — structured audit trail insert
+/// - `check_permission`  — multi-tenant RBAC + Casbin policy check
+/// - `write_audit_log`   — structured audit trail insert
+/// - `calculate_tax`     — compute tax amount from AccountTax records
 ///
 /// To add a new helper: add the function here and `use crate::helpers::…`
 /// in the domain module that needs it.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{casbin_rule, role};
 use crate::core::users::{user_organization, user_profile};
+use crate::types::TaxAmountType;
 
 /// Returns `Ok(())` when the calling identity holds `resource:action`
 /// in `organization_id`, `Err(reason)` otherwise.
@@ -165,4 +168,50 @@ pub fn write_audit_log(
         timestamp: ctx.timestamp,
         metadata: None,
     });
+}
+
+/// Compute the combined tax amount for a list of tax IDs applied to a subtotal.
+///
+/// Handles `Percent`, `Fixed`, and `Division` amount types.
+/// `price_include` taxes are already embedded in the subtotal — their tax portion
+/// is extracted rather than added on top.
+/// Returns `0.0` gracefully when no matching tax records are found.
+pub fn calculate_tax(ctx: &ReducerContext, tax_ids: &[u64], subtotal: f64) -> f64 {
+    if tax_ids.is_empty() || subtotal == 0.0 {
+        return 0.0;
+    }
+    let mut total_tax = 0.0;
+    for &tax_id in tax_ids {
+        let Some(tax) = ctx.db.account_tax().id().find(&tax_id) else {
+            continue;
+        };
+        if !tax.active {
+            continue;
+        }
+        let tax_amount = match tax.amount_type {
+            TaxAmountType::Percent => {
+                if tax.price_include {
+                    // Tax already in subtotal: extract it
+                    subtotal - subtotal / (1.0 + tax.amount / 100.0)
+                } else {
+                    subtotal * (tax.amount / 100.0)
+                }
+            }
+            TaxAmountType::Fixed => {
+                // Fixed amount — not price_include aware
+                tax.amount
+            }
+            TaxAmountType::Division => {
+                // Odoo "division" type: tax = subtotal / (1 - rate) - subtotal
+                if tax.amount < 100.0 {
+                    subtotal / (1.0 - tax.amount / 100.0) - subtotal
+                } else {
+                    0.0
+                }
+            }
+            TaxAmountType::PythonCode => 0.0, // cannot evaluate in WASM
+        };
+        total_tax += tax_amount;
+    }
+    total_tax
 }

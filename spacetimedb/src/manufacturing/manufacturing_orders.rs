@@ -16,7 +16,7 @@ use crate::inventory::stock::{
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
 use crate::manufacturing::work_centers::mrp_workcenter;
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
-use serde_json;
+use serde_json::{self, Number};
 
 // ============================================================================
 // MANUFACTURING ORDER TABLES
@@ -170,7 +170,7 @@ pub struct CreateMrpProductionParams {
     pub location_dest_id: u64,
     pub warehouse_id: u64,
     pub picking_type_id: u64,
-    pub consumption: String,
+    pub consumption: Option<String>,
     pub state: MoState,
     pub availability: String,
     pub reservation_state: String,
@@ -190,6 +190,7 @@ pub struct CreateMrpProductionParams {
     pub procurement_group_id: Option<u64>,
     pub date_deadline: Option<Timestamp>,
     pub origin: Option<String>,
+    pub responsible_user_id: Option<Identity>,
     pub metadata: Option<String>,
 }
 
@@ -251,13 +252,14 @@ fn upsert_stock_quant(
         let new_quantity = existing.quantity + qty_delta;
         let new_available = new_quantity - existing.reserved_quantity;
         let new_value = new_quantity * existing.cost;
+        let inventory_diff_quantity = existing.available_quantity - new_available;
 
         ctx.db.stock_quant().id().update(StockQuant {
             quantity: new_quantity,
             available_quantity: new_available,
             value: new_value,
             inventory_quantity: new_quantity,
-            inventory_diff_quantity: 0.0,
+            inventory_diff_quantity,
             user_id: Some(ctx.sender()),
             inventory_date: Some(ctx.timestamp),
             ..existing
@@ -322,8 +324,12 @@ pub fn create_manufacturing_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "create")?;
 
-    // Validate consumption mode
-    ConsumptionMode::from_str(&params.consumption)?;
+    // Validate consumption mode (default to "use_created" if not provided)
+    let consumption_str = params
+        .consumption
+        .clone()
+        .unwrap_or_else(|| "use_created".to_string());
+    ConsumptionMode::from_str(&consumption_str)?;
 
     // Get product info — product_tmpl_id and product_tracking are derived from params.product_id
     let product = ctx
@@ -373,7 +379,7 @@ pub fn create_manufacturing_order(
         delay_alert_date: None,
         procurement_group_id: params.procurement_group_id,
         reservation_state: params.reservation_state,
-        user_id: ctx.sender(),
+        user_id: params.responsible_user_id.unwrap_or_else(|| ctx.sender()),
         activity_user_id: None,
         activity_date_deadline: None,
         activity_state: None,
@@ -390,7 +396,7 @@ pub fn create_manufacturing_order(
         check_to_done: false,
         unreserve_visible: false,
         post_visible: false,
-        consumption: params.consumption,
+        consumption: consumption_str,
         picking_ids: Vec::new(),
         delivery_count: 0,
         confirm_cancel_backorder: false,
@@ -690,7 +696,7 @@ pub fn consume_mo_materials(
             .filter(&bom_id)
             .collect();
 
-        for line in bom_lines {
+        for (seq_idx, line) in bom_lines.into_iter().enumerate() {
             let required_qty = line.product_qty * mo.product_qty.max(1.0);
 
             create_stock_move(
@@ -709,7 +715,7 @@ pub fn consume_mo_materials(
                     move_type: "direct".to_string(),
                     priority: "normal".to_string(),
                     reference: Some(format!("MO/{}", mo.id)),
-                    sequence: 10,
+                    sequence: (seq_idx + 1) as i32,
                     origin: Some(format!("MO {}", mo.id)),
                     note: None,
                     date: Some(ctx.timestamp),
@@ -863,7 +869,7 @@ pub fn finish_manufacturing_order(
                     move_type: "direct".to_string(),
                     priority: "normal".to_string(),
                     reference: Some(format!("MO/{}", mo.id)),
-                    sequence: 10,
+                    sequence: (mo.move_finished_count + 1) as i32,
                     origin: Some(format!("MO {}", mo.id)),
                     note: None,
                     date: Some(ctx.timestamp),
@@ -931,7 +937,13 @@ pub fn finish_manufacturing_order(
                 });
             }
 
-            done_stock_move(ctx, organization_id, company_id, finished_move_id, finished_qty)?;
+            done_stock_move(
+                ctx,
+                organization_id,
+                company_id,
+                finished_move_id,
+                finished_qty,
+            )?;
             upsert_stock_quant(
                 ctx,
                 organization_id,
@@ -940,6 +952,68 @@ pub fn finish_manufacturing_order(
                 dest_location_id,
                 finished_qty,
             )?;
+
+            // Auto-consume raw materials if consume_mo_materials was not called separately
+            let prod_source_location = get_production_location(&mo);
+            if mo.move_raw_ids.is_empty() {
+                // No raw moves exist yet — deduct component stock directly from BOM
+                if let Some(bom_id) = mo.bom_id {
+                    let bom_lines: Vec<_> = ctx
+                        .db
+                        .mrp_bom_line()
+                        .mrp_bom_line_by_bom()
+                        .filter(&bom_id)
+                        .collect();
+                    for line in bom_lines {
+                        let required_qty = line.product_qty * mo.product_qty.max(1.0);
+                        upsert_stock_quant(
+                            ctx,
+                            organization_id,
+                            company_id,
+                            line.product_id,
+                            prod_source_location,
+                            -required_qty,
+                        )?;
+                    }
+                }
+            } else {
+                // Raw moves exist — mark any not yet done as done and deduct stock
+                for raw_move_id in &mo.move_raw_ids {
+                    if let Some(raw_move) = ctx.db.stock_move().id().find(raw_move_id) {
+                        if raw_move.state != "done" {
+                            let qty = if raw_move.quantity_done > 0.0 {
+                                raw_move.quantity_done
+                            } else {
+                                raw_move.product_uom_qty
+                            };
+                            let component_product_id = raw_move.product_id;
+                            let component_location_id = raw_move.location_id;
+                            if raw_move.state == "draft" {
+                                ctx.db.stock_move().id().update(StockMove {
+                                    state: "assigned".to_string(),
+                                    is_assigned: true,
+                                    write_uid: ctx.sender(),
+                                    write_date: ctx.timestamp,
+                                    ..raw_move
+                                });
+                            }
+                            // done_stock_move re-fetches the move internally
+                            if done_stock_move(ctx, organization_id, company_id, *raw_move_id, qty)
+                                .is_ok()
+                            {
+                                upsert_stock_quant(
+                                    ctx,
+                                    organization_id,
+                                    company_id,
+                                    component_product_id,
+                                    component_location_id,
+                                    -qty,
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
 
             let mut finished_ids = mo.move_finished_ids.clone();
             finished_ids.push(finished_move_id);
