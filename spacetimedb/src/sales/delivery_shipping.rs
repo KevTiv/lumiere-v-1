@@ -11,33 +11,27 @@
 ///   - Multi-carrier support
 ///   - Dynamic pricing rules
 ///   - Shipping cost calculation
-use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
 use crate::inventory::product::product;
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
 
-// ══════════════════════════════════════════════════════════════════════════════
-// INPUT TYPES
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Input Params ──────────────────────────────────────────────────────────────
 
-/// Input for creating picking batch
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct PickingBatchInput {
+pub struct CreatePickingBatchParams {
     pub name: String,
-    pub company_id: u64,
     pub picking_type_id: Option<u64>,
     pub scheduled_date: Option<Timestamp>,
     pub picking_ids: Vec<u64>,
     pub is_wave: bool,
 }
 
-/// Input for creating delivery carrier
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct DeliveryCarrierInput {
+pub struct CreateDeliveryCarrierParams {
     pub name: String,
-    pub company_id: u64,
     pub product_id: u64,
     pub delivery_type: String,
     pub integration_level: String,
@@ -61,25 +55,21 @@ pub struct DeliveryCarrierInput {
     pub metadata: Option<String>,
 }
 
-/// Input for creating delivery price rule
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct DeliveryPriceRuleInput {
+pub struct CreateDeliveryPriceRuleParams {
     pub variable: String,
     pub operator: String,
     pub max_value: f64,
     pub list_base_price: f64,
     pub list_price: f64,
     pub standard_price: f64,
-    pub company_id: u64,
     pub metadata: Option<String>,
 }
 
-/// Input for creating shipping method
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct ShippingMethodInput {
+pub struct CreateShippingMethodParams {
     pub name: String,
     pub provider: String,
-    pub company_id: u64,
     pub product_id: u64,
     pub delivery_type: String,
     pub integration_level: String,
@@ -102,9 +92,7 @@ pub struct ShippingCostResult {
     pub is_available: bool,
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TABLES: DELIVERY & SHIPPING
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = stock_picking_batch,
@@ -239,196 +227,20 @@ pub struct ShippingMethod {
     pub metadata: Option<String>,
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// REDUCERS: DELIVERY & SHIPPING
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::reducer]
-pub fn create_picking_batch(ctx: &ReducerContext, input: PickingBatchInput) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "stock_picking_batch", "create")?;
-
-    // Validate pickings
-    for picking_id in &input.picking_ids {
-        let picking = ctx
-            .db
-            .stock_picking()
-            .id()
-            .find(picking_id)
-            .ok_or_else(|| format!("Picking {} not found", picking_id))?;
-
-        if picking.company_id != input.company_id {
-            return Err(format!(
-                "Picking {} belongs to different company",
-                picking_id
-            ));
-        }
-
-        // Verify picking is not already in a batch
-        if picking.batch_id.is_some() {
-            return Err(format!("Picking {} is already in a batch", picking_id));
-        }
+fn check_rule_condition(value: f64, operator: &str, max_value: f64) -> bool {
+    match operator {
+        "<=" => value <= max_value,
+        "<" => value < max_value,
+        ">=" => value >= max_value,
+        ">" => value > max_value,
+        "=" => (value - max_value).abs() < f64::EPSILON,
+        _ => false,
     }
-
-    let batch = ctx.db.stock_picking_batch().insert(StockPickingBatch {
-        id: 0,
-        name: input.name,
-        user_id: ctx.sender(),
-        state: BatchState::Draft,
-        company_id: input.company_id,
-        picking_ids: input.picking_ids.clone(),
-        scheduled_date: input.scheduled_date,
-        move_line_ids: Vec::new(),
-        show_check_availability: true,
-        move_ids: Vec::new(),
-        picking_type_id: input.picking_type_id,
-        is_wave: input.is_wave,
-        activity_ids: Vec::new(),
-        activity_state: None,
-        activity_date_deadline: None,
-        activity_type_id: None,
-        activity_user_id: None,
-        activity_summary: None,
-        message_follower_ids: Vec::new(),
-        message_ids: Vec::new(),
-        message_needaction: false,
-        message_needaction_counter: 0,
-        rating_ids: Vec::new(),
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: None,
-    });
-
-    // Update pickings to reference this batch
-    for picking_id in &input.picking_ids {
-        if let Some(picking) = ctx.db.stock_picking().id().find(picking_id) {
-            ctx.db.stock_picking().id().update(StockPicking {
-                batch_id: Some(batch.id),
-                updated_at: ctx.timestamp,
-                ..picking
-            });
-        }
-    }
-
-    Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn create_delivery_carrier(
-    ctx: &ReducerContext,
-    input: DeliveryCarrierInput,
-) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "delivery_carrier", "create")?;
-
-    // Validate price rules
-    for rule_id in &input.price_rule_ids {
-        let _rule = ctx
-            .db
-            .delivery_price_rule()
-            .id()
-            .find(rule_id)
-            .ok_or_else(|| format!("Price rule {} not found", rule_id))?;
-    }
-
-    ctx.db.delivery_carrier().insert(DeliveryCarrier {
-        id: 0,
-        name: input.name,
-        active: true,
-        company_id: input.company_id,
-        product_id: input.product_id,
-        sequence: 0,
-        delivery_type: input.delivery_type,
-        integration_level: input.integration_level,
-        invoice_policy: input.invoice_policy,
-        country_ids: input.country_ids,
-        state_ids: input.state_ids,
-        zip_prefix_ids: input.zip_prefix_ids,
-        margin: input.margin,
-        free_over: input.free_over,
-        amount: input.amount,
-        can_generate_return: input.can_generate_return,
-        return_label_on_delivery: input.return_label_on_delivery,
-        get_return_label_from_portal: input.get_return_label_from_portal,
-        fixed_charge: input.fixed_charge,
-        fixed_weight: input.fixed_weight,
-        base_on_rule_charge: 0.0,
-        base_on_rule_weight: 0.0,
-        price_rule_ids: input.price_rule_ids,
-        shipping_insurance: input.shipping_insurance,
-        shipping_insurance_is_percentage: input.shipping_insurance_is_percentage,
-        use_detailed_delivery_description: input.use_detailed_delivery_description,
-        currency_id: input.currency_id,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: input.metadata,
-    });
-
-    Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn create_delivery_price_rule(
-    ctx: &ReducerContext,
-    input: DeliveryPriceRuleInput,
-) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "delivery_price_rule", "create")?;
-
-    ctx.db.delivery_price_rule().insert(DeliveryPriceRule {
-        id: 0,
-        carrier_id: 0, // Should be set when linking to carrier
-        variable: input.variable,
-        operator: input.operator,
-        max_value: input.max_value,
-        list_base_price: input.list_base_price,
-        list_price: input.list_price,
-        standard_price: input.standard_price,
-        company_id: input.company_id,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: input.metadata,
-    });
-
-    Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn create_shipping_method(
-    ctx: &ReducerContext,
-    input: ShippingMethodInput,
-) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "shipping_method", "create")?;
-
-    let method = ctx.db.shipping_method().insert(ShippingMethod {
-        id: 0,
-        name: input.name,
-        provider: input.provider,
-        company_id: input.company_id,
-        product_id: input.product_id,
-        delivery_type: input.delivery_type,
-        integration_level: input.integration_level,
-        invoice_policy: input.invoice_policy,
-        fixed_price: input.fixed_price,
-        margin: input.margin,
-        free_over: input.free_over,
-        amount: input.amount,
-        active: true,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: input.metadata,
-    });
-
-    Ok(())
-}
-
-/// Calculate shipping cost - internal function, not a reducer
-/// This can be called from other reducers but cannot be called directly from clients
+/// Calculate shipping cost — internal helper, not a reducer
 pub fn calculate_shipping_cost_internal(
     ctx: &ReducerContext,
     carrier_id: u64,
@@ -448,7 +260,6 @@ pub fn calculate_shipping_cost_internal(
 
     check_permission(ctx, carrier.company_id, "delivery_carrier", "read")?;
 
-    // Check if carrier services the destination
     if !carrier.country_ids.is_empty() && !carrier.country_ids.contains(&destination_country_id) {
         return Err("Carrier does not service this country".to_string());
     }
@@ -461,7 +272,6 @@ pub fn calculate_shipping_cost_internal(
         }
     }
 
-    // Check ZIP prefix restrictions
     if !carrier.zip_prefix_ids.is_empty() {
         let mut zip_allowed = false;
         for prefix in &carrier.zip_prefix_ids {
@@ -475,11 +285,9 @@ pub fn calculate_shipping_cost_internal(
         }
     }
 
-    // Calculate base cost
     let mut cost = match carrier.delivery_type.as_str() {
         "fixed" => carrier.fixed_charge,
         "base_on_rule" => {
-            // Apply price rules
             let mut rule_cost = 0.0;
             for rule_id in &carrier.price_rule_ids {
                 if let Some(rule) = ctx.db.delivery_price_rule().id().find(rule_id) {
@@ -507,15 +315,12 @@ pub fn calculate_shipping_cost_internal(
         _ => carrier.fixed_charge,
     };
 
-    // Add margin
     cost = cost * (1.0 + carrier.margin / 100.0);
 
-    // Check free over threshold
     if carrier.free_over && order_value >= carrier.amount {
         cost = 0.0;
     }
 
-    // Add insurance if applicable
     if carrier.shipping_insurance > 0.0 {
         let insurance = if carrier.shipping_insurance_is_percentage {
             order_value * (carrier.shipping_insurance / 100.0)
@@ -528,19 +333,205 @@ pub fn calculate_shipping_cost_internal(
     Ok(())
 }
 
-fn check_rule_condition(value: f64, operator: &str, max_value: f64) -> bool {
-    match operator {
-        "<=" => value <= max_value,
-        "<" => value < max_value,
-        ">=" => value >= max_value,
-        ">" => value > max_value,
-        "=" => (value - max_value).abs() < f64::EPSILON,
-        _ => false,
+// ── Reducers ──────────────────────────────────────────────────────────────────
+
+#[reducer]
+pub fn create_picking_batch(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreatePickingBatchParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking_batch", "create")?;
+
+    for picking_id in &params.picking_ids {
+        let picking = ctx
+            .db
+            .stock_picking()
+            .id()
+            .find(picking_id)
+            .ok_or_else(|| format!("Picking {} not found", picking_id))?;
+
+        if picking.company_id != company_id {
+            return Err(format!(
+                "Picking {} belongs to different company",
+                picking_id
+            ));
+        }
+
+        if picking.batch_id.is_some() {
+            return Err(format!("Picking {} is already in a batch", picking_id));
+        }
     }
+
+    let batch = ctx.db.stock_picking_batch().insert(StockPickingBatch {
+        id: 0,
+        name: params.name,
+        user_id: ctx.sender(),
+        state: BatchState::Draft,
+        company_id,
+        picking_ids: params.picking_ids.clone(),
+        scheduled_date: params.scheduled_date,
+        move_line_ids: Vec::new(),
+        show_check_availability: true,
+        move_ids: Vec::new(),
+        picking_type_id: params.picking_type_id,
+        is_wave: params.is_wave,
+        activity_ids: Vec::new(),
+        activity_state: None,
+        activity_date_deadline: None,
+        activity_type_id: None,
+        activity_user_id: None,
+        activity_summary: None,
+        message_follower_ids: Vec::new(),
+        message_ids: Vec::new(),
+        message_needaction: false,
+        message_needaction_counter: 0,
+        rating_ids: Vec::new(),
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: None,
+    });
+
+    for picking_id in &params.picking_ids {
+        if let Some(picking) = ctx.db.stock_picking().id().find(picking_id) {
+            ctx.db.stock_picking().id().update(StockPicking {
+                batch_id: Some(batch.id),
+                updated_at: ctx.timestamp,
+                ..picking
+            });
+        }
+    }
+
+    Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn start_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn create_delivery_carrier(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateDeliveryCarrierParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "delivery_carrier", "create")?;
+
+    for rule_id in &params.price_rule_ids {
+        let _rule = ctx
+            .db
+            .delivery_price_rule()
+            .id()
+            .find(rule_id)
+            .ok_or_else(|| format!("Price rule {} not found", rule_id))?;
+    }
+
+    ctx.db.delivery_carrier().insert(DeliveryCarrier {
+        id: 0,
+        name: params.name,
+        active: true,
+        company_id,
+        product_id: params.product_id,
+        sequence: 0,
+        delivery_type: params.delivery_type,
+        integration_level: params.integration_level,
+        invoice_policy: params.invoice_policy,
+        country_ids: params.country_ids,
+        state_ids: params.state_ids,
+        zip_prefix_ids: params.zip_prefix_ids,
+        margin: params.margin,
+        free_over: params.free_over,
+        amount: params.amount,
+        can_generate_return: params.can_generate_return,
+        return_label_on_delivery: params.return_label_on_delivery,
+        get_return_label_from_portal: params.get_return_label_from_portal,
+        fixed_charge: params.fixed_charge,
+        fixed_weight: params.fixed_weight,
+        base_on_rule_charge: 0.0,
+        base_on_rule_weight: 0.0,
+        price_rule_ids: params.price_rule_ids,
+        shipping_insurance: params.shipping_insurance,
+        shipping_insurance_is_percentage: params.shipping_insurance_is_percentage,
+        use_detailed_delivery_description: params.use_detailed_delivery_description,
+        currency_id: params.currency_id,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn create_delivery_price_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateDeliveryPriceRuleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "delivery_price_rule", "create")?;
+
+    ctx.db.delivery_price_rule().insert(DeliveryPriceRule {
+        id: 0,
+        carrier_id: 0, // Should be set when linking to carrier
+        variable: params.variable,
+        operator: params.operator,
+        max_value: params.max_value,
+        list_base_price: params.list_base_price,
+        list_price: params.list_price,
+        standard_price: params.standard_price,
+        company_id,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn create_shipping_method(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateShippingMethodParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "shipping_method", "create")?;
+
+    ctx.db.shipping_method().insert(ShippingMethod {
+        id: 0,
+        name: params.name,
+        provider: params.provider,
+        company_id,
+        product_id: params.product_id,
+        delivery_type: params.delivery_type,
+        integration_level: params.integration_level,
+        invoice_policy: params.invoice_policy,
+        fixed_price: params.fixed_price,
+        margin: params.margin,
+        free_over: params.free_over,
+        amount: params.amount,
+        active: true,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn start_picking_batch(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    batch_id: u64,
+) -> Result<(), String> {
     let batch = ctx
         .db
         .stock_picking_batch()
@@ -548,7 +539,7 @@ pub fn start_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), St
         .find(&batch_id)
         .ok_or("Batch not found")?;
 
-    check_permission(ctx, batch.company_id, "stock_picking_batch", "write")?;
+    check_permission(ctx, organization_id, "stock_picking_batch", "write")?;
 
     if batch.state != BatchState::Draft {
         return Err("Batch must be in Draft state to start".to_string());
@@ -564,8 +555,12 @@ pub fn start_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), St
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn complete_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn complete_picking_batch(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    batch_id: u64,
+) -> Result<(), String> {
     let batch = ctx
         .db
         .stock_picking_batch()
@@ -573,7 +568,7 @@ pub fn complete_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(),
         .find(&batch_id)
         .ok_or("Batch not found")?;
 
-    check_permission(ctx, batch.company_id, "stock_picking_batch", "write")?;
+    check_permission(ctx, organization_id, "stock_picking_batch", "write")?;
 
     if batch.state != BatchState::InProgress {
         return Err("Batch must be In Progress to complete".to_string());
@@ -589,8 +584,12 @@ pub fn complete_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(),
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn cancel_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn cancel_picking_batch(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    batch_id: u64,
+) -> Result<(), String> {
     let batch = ctx
         .db
         .stock_picking_batch()
@@ -598,7 +597,7 @@ pub fn cancel_picking_batch(ctx: &ReducerContext, batch_id: u64) -> Result<(), S
         .find(&batch_id)
         .ok_or("Batch not found")?;
 
-    check_permission(ctx, batch.company_id, "stock_picking_batch", "cancel")?;
+    check_permission(ctx, organization_id, "stock_picking_batch", "cancel")?;
 
     if batch.state == BatchState::Done {
         return Err("Cannot cancel a completed batch".to_string());

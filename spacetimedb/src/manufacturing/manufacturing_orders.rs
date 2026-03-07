@@ -5,23 +5,25 @@
 /// |-------|-------------|
 /// | **MrpProduction** | Manufacturing orders |
 /// | **MrpWorkorder** | Work order operations |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    create_stock_move, done_stock_move, stock_move, stock_quant, StockMove, StockQuant,
+    create_stock_move, done_stock_move, stock_move, stock_quant, CreateStockMoveParams, StockMove,
+    StockQuant,
 };
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
-use crate::manufacturing::work_centers::{mrp_workcenter, MrpWorkcenter};
+use crate::manufacturing::work_centers::mrp_workcenter;
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
+use serde_json;
 
 // ============================================================================
 // MANUFACTURING ORDER TABLES
 // ============================================================================
 
 /// Manufacturing Order — Production order for manufacturing products
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = mrp_production,
     public,
@@ -103,6 +105,7 @@ pub struct MrpProduction {
 }
 
 /// Work Order — Individual operations within a manufacturing order
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = mrp_workorder,
     public,
@@ -154,22 +157,71 @@ pub struct MrpWorkorder {
     pub metadata: Option<String>,
 }
 
-// ============================================================================
-// REDUCERS
-// ============================================================================
+// ── Input Params ─────────────────────────────────────────────────────────────
 
-fn resolve_organization_id_from_company(
-    ctx: &ReducerContext,
-    company_id: u64,
-) -> Result<u64, String> {
-    let company = ctx
-        .db
-        .company()
-        .id()
-        .find(&company_id)
-        .ok_or("Company not found")?;
-    Ok(company.organization_id)
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateMrpProductionParams {
+    pub product_id: u64,
+    pub product_qty: f64,
+    pub product_uom_id: u64,
+    pub date_planned_start: Timestamp,
+    pub date_planned_finished: Timestamp,
+    pub location_src_id: u64,
+    pub location_dest_id: u64,
+    pub warehouse_id: u64,
+    pub picking_type_id: u64,
+    pub consumption: String,
+    pub state: MoState,
+    pub availability: String,
+    pub reservation_state: String,
+    pub components_availability: String,
+    pub components_availability_state: String,
+    pub is_planned: bool,
+    pub is_locked: bool,
+    pub is_workorder: bool,
+    pub delay_alert: bool,
+    pub lot_producing_count: u32,
+    pub qty_producing: f64,
+    pub qty_produced: f64,
+    pub product_uom_qty_producing: f64,
+    pub bom_id: Option<u64>,
+    pub routing_id: Option<u64>,
+    pub proc_group_id: Option<u64>,
+    pub procurement_group_id: Option<u64>,
+    pub date_deadline: Option<Timestamp>,
+    pub origin: Option<String>,
+    pub metadata: Option<String>,
 }
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWorkorderParams {
+    pub workcenter_id: u64,
+    pub production_id: u64,
+    pub duration_expected: f64,
+    pub name: String,
+    pub sequence: u32,
+    pub state: WorkorderState,
+    pub production_availability: String,
+    pub is_user_working: bool,
+    pub is_produced: bool,
+    pub is_last_unfinished_wo: bool,
+    pub quality_check_todo: bool,
+    pub quality_check_fail: bool,
+    pub capacity: Option<f64>,
+    pub worksheet: Option<String>,
+    pub worksheet_url: Option<String>,
+    pub operation_note: Option<String>,
+    pub operation_id: Option<u64>,
+    pub blocked_by_workorder_id: Option<u64>,
+    pub quality_state: Option<String>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
+// ============================================================================
+// INTERNAL HELPERS
+// ============================================================================
 
 fn get_production_location(mo: &MrpProduction) -> u64 {
     mo.location_src_id
@@ -256,118 +308,117 @@ fn upsert_stock_quant(
     Ok(())
 }
 
+// ============================================================================
+// REDUCERS: MANUFACTURING ORDER
+// ============================================================================
+
 /// Create a new Manufacturing Order
 #[reducer]
 pub fn create_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
-    product_id: u64,
-    product_qty: f64,
-    product_uom_id: u64,
-    bom_id: Option<u64>,
-    location_src_id: u64,
-    location_dest_id: u64,
-    warehouse_id: u64,
-    picking_type_id: u64,
-    date_planned_start: Timestamp,
-    date_planned_finished: Timestamp,
-    consumption: Option<String>,
+    params: CreateMrpProductionParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "create")?;
+    check_permission(ctx, organization_id, "mrp_production", "create")?;
 
-    // Validate consumption mode if provided
-    if let Some(ref c) = consumption {
-        ConsumptionMode::from_str(c)?;
-    }
+    // Validate consumption mode
+    ConsumptionMode::from_str(&params.consumption)?;
 
-    // Get product info
+    // Get product info — product_tmpl_id and product_tracking are derived from params.product_id
     let product = ctx
         .db
         .product()
         .id()
-        .find(&product_id)
+        .find(&params.product_id)
         .ok_or("Product not found")?;
 
     let mo = ctx.db.mrp_production().insert(MrpProduction {
         id: 0,
-        origin: None,
-        product_id,
+        origin: params.origin,
+        product_id: params.product_id,
         product_tmpl_id: product.id,
-        product_qty,
-        product_uom_id,
-        product_uom_qty: product_qty,
+        product_qty: params.product_qty,
+        product_uom_id: params.product_uom_id,
+        product_uom_qty: params.product_qty,
         product_tracking: product.tracking.clone(),
         lot_producing_id: None,
-        lot_producing_count: 0,
-        qty_producing: 0.0,
-        qty_produced: 0.0,
-        product_uom_qty_producing: 0.0,
+        lot_producing_count: params.lot_producing_count,
+        qty_producing: params.qty_producing,
+        qty_produced: params.qty_produced,
+        product_uom_qty_producing: params.product_uom_qty_producing,
         company_id,
-        state: MoState::Draft,
-        availability: "not_available".to_string(),
-        date_planned_start,
-        date_planned_finished,
-        date_deadline: None,
+        state: params.state,
+        availability: params.availability,
+        date_planned_start: params.date_planned_start,
+        date_planned_finished: params.date_planned_finished,
+        date_deadline: params.date_deadline,
         date_start: None,
         date_finished: None,
-        bom_id,
-        routing_id: None,
-        location_src_id,
-        location_dest_id,
-        location_finished_id: location_dest_id,
-        warehouse_id,
-        picking_type_id,
-        proc_group_id: None,
+        bom_id: params.bom_id,
+        routing_id: params.routing_id,
+        location_src_id: params.location_src_id,
+        location_dest_id: params.location_dest_id,
+        location_finished_id: params.location_dest_id,
+        warehouse_id: params.warehouse_id,
+        picking_type_id: params.picking_type_id,
+        proc_group_id: params.proc_group_id,
         move_raw_ids: Vec::new(),
         move_finished_ids: Vec::new(),
         finished_move_line_ids: Vec::new(),
         workorder_ids: Vec::new(),
-        is_planned: false,
-        is_locked: false,
+        is_planned: params.is_planned,
+        is_locked: params.is_locked,
         is_delayed: false,
         delay_alert_date: None,
-        procurement_group_id: None,
-        reservation_state: "not_available".to_string(),
+        procurement_group_id: params.procurement_group_id,
+        reservation_state: params.reservation_state,
         user_id: ctx.sender(),
         activity_user_id: None,
         activity_date_deadline: None,
         activity_state: None,
         activity_type_id: None,
         activity_summary: None,
-        delay_alert: false,
+        delay_alert: params.delay_alert,
         message_follower_ids: Vec::new(),
         activity_ids: Vec::new(),
         message_ids: Vec::new(),
-        is_workorder: false,
+        is_workorder: params.is_workorder,
         mo_count: 0,
         move_raw_count: 0,
         move_finished_count: 0,
         check_to_done: false,
         unreserve_visible: false,
         post_visible: false,
-        consumption: consumption.unwrap_or_else(|| "flexible".to_string()),
+        consumption: params.consumption,
         picking_ids: Vec::new(),
         delivery_count: 0,
         confirm_cancel_backorder: false,
-        components_availability: "not_available".to_string(),
-        components_availability_state: "not_available".to_string(),
+        components_availability: params.components_availability,
+        components_availability_state: params.components_availability_state,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_production",
-        mo.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "product_id": mo.product_id, "product_qty": mo.product_qty })
+                    .to_string(),
+            ),
+            changed_fields: vec!["product_id".to_string(), "product_qty".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Manufacturing order created: id={}", mo.id);
@@ -378,10 +429,11 @@ pub fn create_manufacturing_order(
 #[reducer]
 pub fn confirm_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -396,23 +448,26 @@ pub fn confirm_manufacturing_order(
 
     match mo.state {
         MoState::Draft => {
-            let _updated = ctx.db.mrp_production().id().update(MrpProduction {
+            ctx.db.mrp_production().id().update(MrpProduction {
                 state: MoState::Confirmed,
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..mo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_production",
-                mo_id,
-                "write",
-                None,
-                None,
-                vec!["confirmed".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_production",
+                    record_id: mo_id,
+                    action: "UPDATE",
+                    old_values: Some(serde_json::json!({ "state": "draft" }).to_string()),
+                    new_values: Some(serde_json::json!({ "state": "confirmed" }).to_string()),
+                    changed_fields: vec!["state".to_string()],
+                    metadata: None,
+                },
             );
 
             log::info!("Manufacturing order confirmed: id={}", mo_id);
@@ -426,10 +481,11 @@ pub fn confirm_manufacturing_order(
 #[reducer]
 pub fn check_mo_availability(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -442,30 +498,31 @@ pub fn check_mo_availability(
         return Err("MO does not belong to this company".to_string());
     }
 
-    // Update availability state
     let availability = "available".to_string();
-    let availability_state = "available".to_string();
 
     ctx.db.mrp_production().id().update(MrpProduction {
         availability: availability.clone(),
         components_availability: availability,
-        components_availability_state: availability_state,
+        components_availability_state: "available".to_string(),
         reservation_state: "available".to_string(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..mo
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_production",
-        mo_id,
-        "write",
-        None,
-        None,
-        vec!["availability_checked".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "reservation_state": "available" }).to_string()),
+            changed_fields: vec!["availability".to_string(), "reservation_state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("MO availability checked: id={}", mo_id);
@@ -476,10 +533,11 @@ pub fn check_mo_availability(
 #[reducer]
 pub fn start_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -502,16 +560,19 @@ pub fn start_manufacturing_order(
                 ..mo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_production",
-                mo_id,
-                "write",
-                None,
-                None,
-                vec!["started".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_production",
+                    record_id: mo_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(serde_json::json!({ "state": "progress" }).to_string()),
+                    changed_fields: vec!["state".to_string(), "date_start".to_string()],
+                    metadata: None,
+                },
             );
 
             log::info!("Manufacturing order started: id={}", mo_id);
@@ -525,11 +586,12 @@ pub fn start_manufacturing_order(
 #[reducer]
 pub fn produce_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
     qty_producing: f64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -562,16 +624,22 @@ pub fn produce_manufacturing_order(
         ..mo
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_production",
-        mo_id,
-        "write",
-        None,
-        None,
-        vec!["produced".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "qty_producing": qty_producing, "qty_produced": new_qty_produced })
+                    .to_string(),
+            ),
+            changed_fields: vec!["qty_producing".to_string(), "qty_produced".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -586,10 +654,11 @@ pub fn produce_manufacturing_order(
 #[reducer]
 pub fn consume_mo_materials(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -609,7 +678,6 @@ pub fn consume_mo_materials(
         );
     }
 
-    let organization_id = resolve_organization_id_from_company(ctx, company_id)?;
     let source_location_id = get_production_location(&mo);
 
     let mut created_move_ids = mo.move_raw_ids.clone();
@@ -628,36 +696,60 @@ pub fn consume_mo_materials(
             create_stock_move(
                 ctx,
                 organization_id,
-                line.product_id,
-                line.product_tmpl_id,
-                format!("MO {} consume component {}", mo.id, line.product_id),
-                source_location_id,
-                source_location_id,
-                required_qty,
-                line.product_uom_id,
                 company_id,
-                ctx.timestamp,
-                "direct".to_string(),
-                None,
-                Some(mo.picking_type_id),
-                None,
-                None,
-                None,
-                Some(format!("MO/{}", mo.id)),
-                Some(format!("MO {}", mo.id)),
-                None,
-                Some(ctx.timestamp),
-                None,
-                None,
-                None,
-                None,
-                Some(mo.warehouse_id),
-                Some(mo.id),
-                None,
-                None,
-                None,
-                None, // procure_method — use default make_to_stock
-                None, // sequence — use default
+                CreateStockMoveParams {
+                    name: format!("MO {} consume component {}", mo.id, line.product_id),
+                    product_id: line.product_id,
+                    product_tmpl_id: line.product_tmpl_id,
+                    product_uom: line.product_uom_id,
+                    product_uom_qty: required_qty,
+                    location_id: source_location_id,
+                    location_dest_id: source_location_id,
+                    date_expected: ctx.timestamp,
+                    move_type: "direct".to_string(),
+                    priority: "normal".to_string(),
+                    reference: Some(format!("MO/{}", mo.id)),
+                    sequence: 10,
+                    origin: Some(format!("MO {}", mo.id)),
+                    note: None,
+                    date: Some(ctx.timestamp),
+                    date_deadline: None,
+                    picking_id: None,
+                    picking_type_id: Some(mo.picking_type_id),
+                    partner_id: None,
+                    product_variant_id: None,
+                    group_id: None,
+                    rule_id: None,
+                    procure_method: "make_to_stock".to_string(),
+                    price_unit: 0.0,
+                    scrapped: false,
+                    to_refund: false,
+                    propagate_cancel: true,
+                    delay_alert: false,
+                    product_packaging_id: None,
+                    product_packaging_qty: 0.0,
+                    warehouse_id: Some(mo.warehouse_id),
+                    production_id: Some(mo.id),
+                    raw_material_production_id: None,
+                    unbuild_id: None,
+                    consume_unbuild_id: None,
+                    cost_share: 0.0,
+                    is_subcontract: false,
+                    purchase_line_id: None,
+                    need_release: false,
+                    release_ready: false,
+                    propagation_cancel: false,
+                    has_tracking: false,
+                    inventory_id: None,
+                    sale_line_id: None,
+                    lot_id: None,
+                    package_id: None,
+                    result_package_id: None,
+                    owner_id: None,
+                    package_level_id: None,
+                    product_type: None,
+                    metadata: None,
+                },
             )?;
 
             let move_id = ctx
@@ -685,7 +777,7 @@ pub fn consume_mo_materials(
                 });
             }
 
-            done_stock_move(ctx, move_id, required_qty)?;
+            done_stock_move(ctx, organization_id, company_id, move_id, required_qty)?;
             upsert_stock_quant(
                 ctx,
                 organization_id,
@@ -707,16 +799,19 @@ pub fn consume_mo_materials(
         ..mo
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_production",
-        mo_id,
-        "write",
-        None,
-        None,
-        vec!["materials_consumed".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["move_raw_ids".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -726,10 +821,11 @@ pub fn consume_mo_materials(
 #[reducer]
 pub fn finish_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -744,7 +840,6 @@ pub fn finish_manufacturing_order(
 
     match mo.state {
         MoState::Progress | MoState::ToClose => {
-            let organization_id = resolve_organization_id_from_company(ctx, company_id)?;
             let dest_location_id = get_stock_location(&mo);
             let finished_qty = if mo.qty_produced > 0.0 {
                 mo.qty_produced
@@ -755,36 +850,60 @@ pub fn finish_manufacturing_order(
             create_stock_move(
                 ctx,
                 organization_id,
-                mo.product_id,
-                mo.product_tmpl_id,
-                format!("MO {} finished product {}", mo.id, mo.product_id),
-                mo.location_src_id,
-                dest_location_id,
-                finished_qty,
-                mo.product_uom_id,
                 company_id,
-                ctx.timestamp,
-                "direct".to_string(),
-                None,
-                Some(mo.picking_type_id),
-                None,
-                None,
-                None,
-                Some(format!("MO/{}", mo.id)),
-                Some(format!("MO {}", mo.id)),
-                None,
-                Some(ctx.timestamp),
-                None,
-                None,
-                None,
-                None,
-                Some(mo.warehouse_id),
-                Some(mo.id),
-                None,
-                None,
-                None,
-                None, // procure_method — use default make_to_stock
-                None, // sequence — use default
+                CreateStockMoveParams {
+                    name: format!("MO {} finished product {}", mo.id, mo.product_id),
+                    product_id: mo.product_id,
+                    product_tmpl_id: mo.product_tmpl_id,
+                    product_uom: mo.product_uom_id,
+                    product_uom_qty: finished_qty,
+                    location_id: mo.location_src_id,
+                    location_dest_id: dest_location_id,
+                    date_expected: ctx.timestamp,
+                    move_type: "direct".to_string(),
+                    priority: "normal".to_string(),
+                    reference: Some(format!("MO/{}", mo.id)),
+                    sequence: 10,
+                    origin: Some(format!("MO {}", mo.id)),
+                    note: None,
+                    date: Some(ctx.timestamp),
+                    date_deadline: None,
+                    picking_id: None,
+                    picking_type_id: Some(mo.picking_type_id),
+                    partner_id: None,
+                    product_variant_id: None,
+                    group_id: None,
+                    rule_id: None,
+                    procure_method: "make_to_stock".to_string(),
+                    price_unit: 0.0,
+                    scrapped: false,
+                    to_refund: false,
+                    propagate_cancel: true,
+                    delay_alert: false,
+                    product_packaging_id: None,
+                    product_packaging_qty: 0.0,
+                    warehouse_id: Some(mo.warehouse_id),
+                    production_id: Some(mo.id),
+                    raw_material_production_id: None,
+                    unbuild_id: None,
+                    consume_unbuild_id: None,
+                    cost_share: 0.0,
+                    is_subcontract: false,
+                    purchase_line_id: None,
+                    need_release: false,
+                    release_ready: false,
+                    propagation_cancel: false,
+                    has_tracking: false,
+                    inventory_id: None,
+                    sale_line_id: None,
+                    lot_id: None,
+                    package_id: None,
+                    result_package_id: None,
+                    owner_id: None,
+                    package_level_id: None,
+                    product_type: None,
+                    metadata: None,
+                },
             )?;
 
             let finished_move_id = ctx
@@ -812,7 +931,7 @@ pub fn finish_manufacturing_order(
                 });
             }
 
-            done_stock_move(ctx, finished_move_id, finished_qty)?;
+            done_stock_move(ctx, organization_id, company_id, finished_move_id, finished_qty)?;
             upsert_stock_quant(
                 ctx,
                 organization_id,
@@ -835,16 +954,23 @@ pub fn finish_manufacturing_order(
                 ..mo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_production",
-                mo_id,
-                "write",
-                None,
-                None,
-                vec!["finished".to_string(), "stock_posted".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_production",
+                    record_id: mo_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
+                    changed_fields: vec![
+                        "state".to_string(),
+                        "date_finished".to_string(),
+                        "move_finished_ids".to_string(),
+                    ],
+                    metadata: None,
+                },
             );
 
             log::info!("Manufacturing order finished: id={}", mo_id);
@@ -858,10 +984,11 @@ pub fn finish_manufacturing_order(
 #[reducer]
 pub fn cancel_manufacturing_order(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_production", "write")?;
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = ctx
         .db
@@ -884,16 +1011,19 @@ pub fn cancel_manufacturing_order(
                 ..mo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_production",
-                mo_id,
-                "write",
-                None,
-                None,
-                vec!["cancelled".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_production",
+                    record_id: mo_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(serde_json::json!({ "state": "cancelled" }).to_string()),
+                    changed_fields: vec!["state".to_string()],
+                    metadata: None,
+                },
             );
 
             log::info!("Manufacturing order cancelled: id={}", mo_id);
@@ -903,28 +1033,24 @@ pub fn cancel_manufacturing_order(
 }
 
 // ============================================================================
-// WORK ORDER REDUCERS
+// REDUCERS: WORK ORDER
 // ============================================================================
 
 /// Create a work order for a manufacturing order
 #[reducer]
 pub fn create_workorder(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
-    production_id: u64,
-    workcenter_id: u64,
-    _name: String,
-    _sequence: u32,
-    duration_expected: f64,
-    capacity: Option<f64>,
+    params: CreateWorkorderParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workorder", "create")?;
+    check_permission(ctx, organization_id, "mrp_workorder", "create")?;
 
     let mo = ctx
         .db
         .mrp_production()
         .id()
-        .find(&production_id)
+        .find(&params.production_id)
         .ok_or("Manufacturing order not found")?;
 
     if mo.company_id != company_id {
@@ -932,42 +1058,42 @@ pub fn create_workorder(
     }
 
     // Resolve capacity: use supplied value, fall back to work center's capacity, then 1.0
-    let resolved_capacity = capacity.unwrap_or_else(|| {
+    let resolved_capacity = params.capacity.unwrap_or_else(|| {
         ctx.db
             .mrp_workcenter()
             .id()
-            .find(&workcenter_id)
+            .find(&params.workcenter_id)
             .map(|wc| wc.capacity)
             .unwrap_or(1.0)
     });
 
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
-        workcenter_id,
-        production_id,
+        workcenter_id: params.workcenter_id,
+        production_id: params.production_id,
         product_id: mo.product_id,
         product_tracking: mo.product_tracking.clone(),
-        worksheet: None,
-        state: WorkorderState::Pending,
+        worksheet: params.worksheet,
+        state: params.state,
         date_start: None,
         date_finished: None,
-        duration_expected,
+        duration_expected: params.duration_expected,
         duration: 0.0,
         duration_percent: 0.0,
         progress: 0.0,
-        is_user_working: false,
+        is_user_working: params.is_user_working,
         time_ids: Vec::new(),
-        is_produced: false,
-        operation_id: None,
-        blocked_by_workorder_id: None,
-        worksheet_url: None,
-        operation_note: None,
+        is_produced: params.is_produced,
+        operation_id: params.operation_id,
+        blocked_by_workorder_id: params.blocked_by_workorder_id,
+        worksheet_url: params.worksheet_url,
+        operation_note: params.operation_note,
         leave_ids: Vec::new(),
         capacity: resolved_capacity,
-        production_availability: "not_available".to_string(),
-        quality_check_todo: false,
-        quality_check_fail: false,
-        quality_state: None,
+        production_availability: params.production_availability,
+        quality_check_todo: params.quality_check_todo,
+        quality_check_fail: params.quality_check_fail,
+        quality_state: params.quality_state,
         quality_alert_count: 0,
         quality_alert_ids: Vec::new(),
         check_ids: Vec::new(),
@@ -975,12 +1101,12 @@ pub fn create_workorder(
         company_id,
         working_user_ids: Vec::new(),
         last_working_user_id: None,
-        is_last_unfinished_wo: false,
+        is_last_unfinished_wo: params.is_last_unfinished_wo,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     // Update MO with workorder ID
@@ -994,16 +1120,25 @@ pub fn create_workorder(
         ..mo
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workorder",
-        wo.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workorder",
+            record_id: wo.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "production_id": wo.production_id,
+                    "workcenter_id": wo.workcenter_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["production_id".to_string(), "workcenter_id".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Work order created: id={}", wo.id);
@@ -1014,10 +1149,11 @@ pub fn create_workorder(
 #[reducer]
 pub fn start_workorder(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workorder", "write")?;
+    check_permission(ctx, organization_id, "mrp_workorder", "write")?;
 
     let wo = ctx
         .db
@@ -1041,16 +1177,19 @@ pub fn start_workorder(
                 ..wo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_workorder",
-                workorder_id,
-                "write",
-                None,
-                None,
-                vec!["started".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_workorder",
+                    record_id: workorder_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(serde_json::json!({ "state": "progress" }).to_string()),
+                    changed_fields: vec!["state".to_string(), "date_start".to_string()],
+                    metadata: None,
+                },
             );
 
             log::info!("Work order started: id={}", workorder_id);
@@ -1064,10 +1203,11 @@ pub fn start_workorder(
 #[reducer]
 pub fn finish_workorder(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workorder", "write")?;
+    check_permission(ctx, organization_id, "mrp_workorder", "write")?;
 
     let wo = ctx
         .db
@@ -1082,7 +1222,6 @@ pub fn finish_workorder(
 
     match wo.state {
         WorkorderState::Progress => {
-            // Calculate duration
             let duration = wo.duration + 1.0; // Simplified
             let progress = 100.0;
 
@@ -1098,16 +1237,23 @@ pub fn finish_workorder(
                 ..wo
             });
 
-            write_audit_log(
+            write_audit_log_v2(
                 ctx,
-                company_id,
-                None,
-                "mrp_workorder",
-                workorder_id,
-                "write",
-                None,
-                None,
-                vec!["finished".to_string()],
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(company_id),
+                    table_name: "mrp_workorder",
+                    record_id: workorder_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
+                    changed_fields: vec![
+                        "state".to_string(),
+                        "date_finished".to_string(),
+                        "is_produced".to_string(),
+                    ],
+                    metadata: None,
+                },
             );
 
             log::info!("Work order finished: id={}", workorder_id);

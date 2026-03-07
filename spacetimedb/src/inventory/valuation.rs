@@ -5,6 +5,7 @@
 use spacetimedb::{Identity, Timestamp};
 
 /// Inventory Valuation
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = inventory_valuation,
     public,

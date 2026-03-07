@@ -3,10 +3,12 @@
 /// Tables:
 ///   - ReplenishmentRule
 ///   - StockReorderGroup
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
+
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 /// Replenishment Rule
 #[spacetimedb::table(
@@ -66,130 +68,160 @@ pub struct StockReorderGroup {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateReplenishmentRuleParams {
+    pub product_id: u64,
+    pub location_id: u64,
+    pub warehouse_id: Option<u64>,
+    pub uom_id: u64,
+    pub product_min_qty: f64,
+    pub product_max_qty: f64,
+    pub qty_multiple: f64,
+    pub lead_days: i32,
+    pub route_id: Option<u64>,
+    pub trigger: String,
+    pub group_id: Option<u64>,
+    pub active: bool,
+    pub last_run: Option<Timestamp>,
+    pub next_run: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
 /// Create a new replenishment rule
+#[spacetimedb::reducer]
 pub fn create_replenishment_rule(
     ctx: &ReducerContext,
     organization_id: u64,
-    product_id: u64,
-    location_id: u64,
-    product_min_qty: f64,
-    product_max_qty: f64,
     company_id: u64,
-    warehouse_id: Option<u64>,
-    uom_id: u64,
-    qty_multiple: f64,
-    lead_days: i32,
-    route_id: Option<u64>,
-    trigger: String,
-    group_id: Option<u64>,
-    active: bool,
-    last_run: Option<Timestamp>,
-    next_run: Option<Timestamp>,
-    metadata: Option<String>,
+    params: CreateReplenishmentRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "replenishment_rule", "create")?;
 
-    let qty_to_order = if product_max_qty > product_min_qty {
-        product_max_qty - product_min_qty
+    // qty_to_order derived from min/max quantities
+    let qty_to_order = if params.product_max_qty > params.product_min_qty {
+        params.product_max_qty - params.product_min_qty
     } else {
         0.0
     };
 
-    let trigger_clone = trigger.clone();
-
     let rule = ctx.db.replenishment_rule().insert(ReplenishmentRule {
         id: 0,
         organization_id,
-        product_id,
-        location_id,
-        warehouse_id,
-        uom_id,
-        product_min_qty,
-        product_max_qty,
-        qty_multiple,
+        product_id: params.product_id,
+        location_id: params.location_id,
+        warehouse_id: params.warehouse_id,
+        uom_id: params.uom_id,
+        product_min_qty: params.product_min_qty,
+        product_max_qty: params.product_max_qty,
+        qty_multiple: params.qty_multiple,
         qty_to_order,
-        lead_days,
-        route_id,
-        trigger,
-        group_id,
+        lead_days: params.lead_days,
+        route_id: params.route_id,
+        trigger: params.trigger.clone(),
+        group_id: params.group_id,
         company_id,
-        active,
+        active: params.active,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        last_run,
-        next_run,
-        metadata,
+        last_run: params.last_run,
+        next_run: params.next_run,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "replenishment_rule",
-        rule.id,
-        "create",
-        None,
-        Some(
-            serde_json::json!({
-                "product_id": product_id,
-                "location_id": location_id,
-                "min_qty": product_min_qty,
-                "max_qty": product_max_qty,
-                "trigger": trigger_clone,
-                "active": active
-            })
-            .to_string(),
-        ),
-        vec![
-            "product_id".to_string(),
-            "location_id".to_string(),
-            "trigger".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "replenishment_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "product_id": params.product_id,
+                    "location_id": params.location_id,
+                    "min_qty": params.product_min_qty,
+                    "max_qty": params.product_max_qty,
+                    "trigger": params.trigger,
+                    "active": params.active,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "product_id".to_string(),
+                "location_id".to_string(),
+                "trigger".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Execute replenishment rule
+/// Execute replenishment rule — sets last_run to now and schedules next_run in 24h
+#[spacetimedb::reducer]
 pub fn execute_replenishment_rule(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     rule_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "replenishment_rule", "execute")?;
 
-    if let Some(mut rule) = ctx.db.replenishment_rule().id().find(&rule_id) {
-        if !rule.active {
-            return Err("Rule is not active".to_string());
-        }
+    let rule = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Rule not found")?;
 
-        let last_run = Some(ctx.timestamp);
-        let next_run = Some(ctx.timestamp + std::time::Duration::from_secs(86400)); // 24 hours later
-        rule.last_run = last_run;
-        rule.next_run = next_run;
-        ctx.db.replenishment_rule().id().update(rule);
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
+    }
+    if rule.company_id != company_id {
+        return Err("Rule does not belong to this company".to_string());
+    }
+    if !rule.active {
+        return Err("Rule is not active".to_string());
+    }
 
-        write_audit_log(
-            ctx,
-            organization_id,
-            None,
-            "replenishment_rule",
-            rule_id,
-            "execute",
-            None,
-            Some(
+    let last_run = ctx.timestamp;
+    let next_run = ctx.timestamp + std::time::Duration::from_secs(86400);
+
+    ctx.db.replenishment_rule().id().update(ReplenishmentRule {
+        last_run: Some(last_run),
+        next_run: Some(next_run),
+        updated_at: ctx.timestamp,
+        ..rule
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "replenishment_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
                 serde_json::json!({
-                    "last_run": last_run.unwrap().to_string(),
-                    "next_run": next_run.map(|t| t.to_string())
+                    "last_run": last_run.to_string(),
+                    "next_run": next_run.to_string(),
                 })
                 .to_string(),
             ),
-            vec!["last_run".to_string()],
-        );
-    } else {
-        return Err("Rule not found".to_string());
-    }
+            changed_fields: vec!["last_run".to_string(), "next_run".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

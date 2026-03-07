@@ -3,15 +3,16 @@
 /// Manages connections to WhatsApp Business API for messaging,
 /// notifications, and customer communication.
 /// Supports multiple WhatsApp Business numbers per organization.
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
 /// WhatsApp Business Account Configuration
 ///
 /// Note: Only credential references are stored. Actual API keys, access tokens,
 /// and webhook verification tokens must be stored in an external secret management system.
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = whatsapp_business_account,
     public,
@@ -96,7 +97,81 @@ pub enum VerificationLevel {
     BusinessVerified,
 }
 
-// ── Reducers ─────────────────────────────────────────────────────────────────
+// ============================================================================
+// INPUT PARAMS
+// ============================================================================
+
+/// Params for creating a WhatsApp Business account.
+/// Scope: `organization_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWhatsAppBusinessAccountParams {
+    pub name: String,
+    pub phone_number: String,
+    pub phone_number_id: String,
+    pub business_account_id: String,
+    pub display_name: String,
+    pub credentials_reference: String,
+    pub webhook_secret_reference: String,
+    pub messaging_enabled: bool,
+    pub notifications_enabled: bool,
+    pub template_messaging_enabled: bool,
+    pub interactive_messaging_enabled: bool,
+    pub default_language: String,
+    pub webhook_enabled: bool,
+    pub webhook_url: Option<String>,
+    pub subscribed_webhook_events: Vec<String>,
+    pub daily_message_limit: u32,
+    pub is_primary: bool,
+    pub template_namespace: Option<String>,
+    pub media_provider: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating a WhatsApp Business account.
+/// Scope: `organization_id` and `account_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWhatsAppBusinessAccountParams {
+    pub name: Option<String>,
+    pub display_name: Option<String>,
+    pub messaging_enabled: Option<bool>,
+    pub notifications_enabled: Option<bool>,
+    pub template_messaging_enabled: Option<bool>,
+    pub interactive_messaging_enabled: Option<bool>,
+    pub default_language: Option<String>,
+    pub webhook_enabled: Option<bool>,
+    pub webhook_url: Option<String>,
+    pub subscribed_webhook_events: Option<Vec<String>>,
+    pub daily_message_limit: Option<u32>,
+    pub template_namespace: Option<String>,
+    pub media_provider: Option<String>,
+}
+
+/// Params for updating WhatsApp credentials.
+/// Scope: `organization_id` and `account_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWhatsAppCredentialsParams {
+    pub credentials_reference: String,
+    pub webhook_secret_reference: String,
+}
+
+/// Params for updating verification status.
+/// Scope: `organization_id` and `account_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWhatsAppVerificationParams {
+    pub verification_status: VerificationStatus,
+    pub business_verification_level: VerificationLevel,
+}
+
+/// Params for recording a health check.
+/// Scope: `organization_id` and `account_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordWhatsAppHealthCheckParams {
+    pub is_healthy: bool,
+}
+
+// ============================================================================
+// REDUCERS
+// ============================================================================
 
 /// Create a new WhatsApp Business account connection
 ///
@@ -106,73 +181,58 @@ pub enum VerificationLevel {
 pub fn create_whatsapp_business_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    phone_number: String,
-    phone_number_id: String,
-    business_account_id: String,
-    display_name: String,
-    credentials_reference: String,
-    webhook_secret_reference: String,
-    messaging_enabled: bool,
-    notifications_enabled: bool,
-    template_messaging_enabled: bool,
-    interactive_messaging_enabled: bool,
-    default_language: String,
-    webhook_enabled: bool,
-    webhook_url: Option<String>,
-    subscribed_webhook_events: Vec<String>,
-    daily_message_limit: u32,
-    is_primary: bool,
+    params: CreateWhatsAppBusinessAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Account name cannot be empty".to_string());
     }
 
-    if phone_number.is_empty() {
+    if params.phone_number.is_empty() {
         return Err("Phone number cannot be empty".to_string());
     }
 
-    if phone_number_id.is_empty() {
+    if params.phone_number_id.is_empty() {
         return Err("Phone number ID cannot be empty".to_string());
     }
 
-    if business_account_id.is_empty() {
+    if params.business_account_id.is_empty() {
         return Err("Business account ID cannot be empty".to_string());
     }
 
-    if credentials_reference.is_empty() {
+    if params.credentials_reference.is_empty() {
         return Err("Credentials reference cannot be empty".to_string());
     }
 
-    if webhook_secret_reference.is_empty() {
+    if params.webhook_secret_reference.is_empty() {
         return Err("Webhook secret reference cannot be empty".to_string());
     }
 
-    ctx.db
+    let account = ctx
+        .db
         .whatsapp_business_account()
         .insert(WhatsAppBusinessAccount {
             id: 0,
             organization_id,
-            name,
-            phone_number,
-            phone_number_id,
-            business_account_id,
-            display_name,
-            credentials_reference,
-            webhook_secret_reference,
-            messaging_enabled,
-            notifications_enabled,
-            template_messaging_enabled,
-            interactive_messaging_enabled,
-            template_namespace: None,
-            default_language: default_language.clone().to_lowercase(),
-            media_provider: None,
-            webhook_enabled,
-            webhook_url,
-            subscribed_webhook_events,
-            daily_message_limit,
+            name: params.name,
+            phone_number: params.phone_number,
+            phone_number_id: params.phone_number_id,
+            business_account_id: params.business_account_id,
+            display_name: params.display_name,
+            credentials_reference: params.credentials_reference,
+            webhook_secret_reference: params.webhook_secret_reference,
+            messaging_enabled: params.messaging_enabled,
+            notifications_enabled: params.notifications_enabled,
+            template_messaging_enabled: params.template_messaging_enabled,
+            interactive_messaging_enabled: params.interactive_messaging_enabled,
+            template_namespace: params.template_namespace,
+            default_language: params.default_language.to_lowercase(),
+            media_provider: params.media_provider,
+            webhook_enabled: params.webhook_enabled,
+            webhook_url: params.webhook_url,
+            subscribed_webhook_events: params.subscribed_webhook_events,
+            daily_message_limit: params.daily_message_limit,
             messages_sent_today: 0,
             last_message_reset: None,
             verification_status: VerificationStatus::Pending,
@@ -185,14 +245,37 @@ pub fn create_whatsapp_business_account(
             last_error: None,
             error_count: 0,
             is_active: true,
-            is_primary,
+            is_primary: params.is_primary,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             deleted_at: None,
             created_by: Some(ctx.sender().to_hex().to_string()),
-            metadata: None,
+            metadata: params.metadata,
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(format!(
+                "{{\"name\":\"{}\",\"phone_number\":\"{}\"}}",
+                account.name, account.phone_number
+            )),
+            changed_fields: vec!["created".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "WhatsApp Business account created: id={}, name={}",
+        account.id,
+        account.name
+    );
     Ok(())
 }
 
@@ -200,19 +283,9 @@ pub fn create_whatsapp_business_account(
 #[spacetimedb::reducer]
 pub fn update_whatsapp_business_account(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
-    name: Option<String>,
-    display_name: Option<String>,
-    messaging_enabled: Option<bool>,
-    notifications_enabled: Option<bool>,
-    template_messaging_enabled: Option<bool>,
-    interactive_messaging_enabled: Option<bool>,
-    default_language: Option<String>,
-    webhook_enabled: Option<bool>,
-    webhook_url: Option<String>,
-    subscribed_webhook_events: Option<Vec<String>>,
-    daily_message_limit: Option<u32>,
+    account_id: u64,
+    params: UpdateWhatsAppBusinessAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
@@ -231,30 +304,101 @@ pub fn update_whatsapp_business_account(
         return Err("Cannot update deleted account".to_string());
     }
 
-    ctx.db
-        .whatsapp_business_account()
-        .id()
-        .update(WhatsAppBusinessAccount {
-            name: name.unwrap_or(account.name),
-            display_name: display_name.unwrap_or(account.display_name),
-            messaging_enabled: messaging_enabled.unwrap_or(account.messaging_enabled),
-            notifications_enabled: notifications_enabled.unwrap_or(account.notifications_enabled),
-            template_messaging_enabled: template_messaging_enabled
-                .unwrap_or(account.template_messaging_enabled),
-            interactive_messaging_enabled: interactive_messaging_enabled
-                .unwrap_or(account.interactive_messaging_enabled),
-            default_language: default_language
-                .map(|l| l.to_lowercase())
-                .unwrap_or(account.default_language),
-            webhook_enabled: webhook_enabled.unwrap_or(account.webhook_enabled),
-            webhook_url: webhook_url.or(account.webhook_url),
-            subscribed_webhook_events: subscribed_webhook_events
-                .unwrap_or(account.subscribed_webhook_events),
-            daily_message_limit: daily_message_limit.unwrap_or(account.daily_message_limit),
-            updated_at: ctx.timestamp,
-            ..account
-        });
+    let mut changed_fields = Vec::new();
 
+    let new_account = WhatsAppBusinessAccount {
+        name: params.name.unwrap_or(account.name.clone()),
+        display_name: params.display_name.unwrap_or(account.display_name.clone()),
+        messaging_enabled: params
+            .messaging_enabled
+            .unwrap_or(account.messaging_enabled),
+        notifications_enabled: params
+            .notifications_enabled
+            .unwrap_or(account.notifications_enabled),
+        template_messaging_enabled: params
+            .template_messaging_enabled
+            .unwrap_or(account.template_messaging_enabled),
+        interactive_messaging_enabled: params
+            .interactive_messaging_enabled
+            .unwrap_or(account.interactive_messaging_enabled),
+        default_language: params
+            .default_language
+            .map(|l| l.to_lowercase())
+            .unwrap_or(account.default_language.clone()),
+        webhook_enabled: params.webhook_enabled.unwrap_or(account.webhook_enabled),
+        webhook_url: params.webhook_url.or(account.webhook_url.clone()),
+        subscribed_webhook_events: params
+            .subscribed_webhook_events
+            .unwrap_or(account.subscribed_webhook_events.clone()),
+        daily_message_limit: params
+            .daily_message_limit
+            .unwrap_or(account.daily_message_limit),
+        template_namespace: params
+            .template_namespace
+            .or(account.template_namespace.clone()),
+        media_provider: params.media_provider.or(account.media_provider.clone()),
+        updated_at: ctx.timestamp,
+        ..account.clone()
+    };
+
+    if new_account.name != account.name {
+        changed_fields.push("name");
+    }
+    if new_account.display_name != account.display_name {
+        changed_fields.push("display_name");
+    }
+    if new_account.messaging_enabled != account.messaging_enabled {
+        changed_fields.push("messaging_enabled");
+    }
+    if new_account.notifications_enabled != account.notifications_enabled {
+        changed_fields.push("notifications_enabled");
+    }
+    if new_account.template_messaging_enabled != account.template_messaging_enabled {
+        changed_fields.push("template_messaging_enabled");
+    }
+    if new_account.interactive_messaging_enabled != account.interactive_messaging_enabled {
+        changed_fields.push("interactive_messaging_enabled");
+    }
+    if new_account.default_language != account.default_language {
+        changed_fields.push("default_language");
+    }
+    if new_account.webhook_enabled != account.webhook_enabled {
+        changed_fields.push("webhook_enabled");
+    }
+    if new_account.webhook_url != account.webhook_url {
+        changed_fields.push("webhook_url");
+    }
+    if new_account.subscribed_webhook_events != account.subscribed_webhook_events {
+        changed_fields.push("subscribed_webhook_events");
+    }
+    if new_account.daily_message_limit != account.daily_message_limit {
+        changed_fields.push("daily_message_limit");
+    }
+    if new_account.template_namespace != account.template_namespace {
+        changed_fields.push("template_namespace");
+    }
+    if new_account.media_provider != account.media_provider {
+        changed_fields.push("media_provider");
+    }
+
+    ctx.db.whatsapp_business_account().id().update(new_account);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business account updated: id={}", account_id);
     Ok(())
 }
 
@@ -262,12 +406,19 @@ pub fn update_whatsapp_business_account(
 #[spacetimedb::reducer]
 pub fn update_whatsapp_credentials(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
-    credentials_reference: Option<String>,
-    webhook_secret_reference: Option<String>,
+    account_id: u64,
+    params: UpdateWhatsAppCredentialsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
+
+    if params.credentials_reference.is_empty() {
+        return Err("Credentials reference cannot be empty".to_string());
+    }
+
+    if params.webhook_secret_reference.is_empty() {
+        return Err("Webhook secret reference cannot be empty".to_string());
+    }
 
     let account = ctx
         .db
@@ -280,20 +431,35 @@ pub fn update_whatsapp_credentials(
         return Err("Account does not belong to this organization".to_string());
     }
 
-    let new_credentials = credentials_reference.filter(|c| !c.is_empty());
-    let new_webhook_secret = webhook_secret_reference.filter(|w| !w.is_empty());
-
     ctx.db
         .whatsapp_business_account()
         .id()
         .update(WhatsAppBusinessAccount {
-            credentials_reference: new_credentials.unwrap_or(account.credentials_reference),
-            webhook_secret_reference: new_webhook_secret
-                .unwrap_or(account.webhook_secret_reference),
+            credentials_reference: params.credentials_reference,
+            webhook_secret_reference: params.webhook_secret_reference,
             updated_at: ctx.timestamp,
             ..account
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some("{\"credentials_updated\":true}".to_string()),
+            changed_fields: vec![
+                "credentials_reference".to_string(),
+                "webhook_secret_reference".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business credentials updated: id={}", account_id);
     Ok(())
 }
 
@@ -301,10 +467,9 @@ pub fn update_whatsapp_credentials(
 #[spacetimedb::reducer]
 pub fn update_whatsapp_verification_status(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
-    verification_status: VerificationStatus,
-    business_verification_level: VerificationLevel,
+    account_id: u64,
+    params: UpdateWhatsAppVerificationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
@@ -319,23 +484,51 @@ pub fn update_whatsapp_verification_status(
         return Err("Account does not belong to this organization".to_string());
     }
 
-    let new_integration_status = match &verification_status {
+    let new_integration_status = match &params.verification_status {
         VerificationStatus::Approved => IntegrationStatus::Active,
         VerificationStatus::Rejected | VerificationStatus::Revoked => IntegrationStatus::Suspended,
         _ => account.status.clone(),
     };
 
+    let old_verification = format!("{:?}", account.verification_status);
+    let new_verification = format!("{:?}", params.verification_status);
+
     ctx.db
         .whatsapp_business_account()
         .id()
         .update(WhatsAppBusinessAccount {
-            verification_status,
-            business_verification_level,
+            verification_status: params.verification_status,
+            business_verification_level: params.business_verification_level,
             status: new_integration_status,
             updated_at: ctx.timestamp,
             ..account
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: Some(format!(
+                "{{\"verification_status\":\"{}\"}}",
+                old_verification
+            )),
+            new_values: Some(format!(
+                "{{\"verification_status\":\"{}\"}}",
+                new_verification
+            )),
+            changed_fields: vec![
+                "verification_status".to_string(),
+                "business_verification_level".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business verification updated: id={}", account_id);
     Ok(())
 }
 
@@ -343,8 +536,8 @@ pub fn update_whatsapp_verification_status(
 #[spacetimedb::reducer]
 pub fn update_whatsapp_quality_score(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
+    account_id: u64,
     quality_score: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
@@ -360,16 +553,34 @@ pub fn update_whatsapp_quality_score(
         return Err("Account does not belong to this organization".to_string());
     }
 
+    let old_score = account.quality_score.clone().unwrap_or_default();
+
     ctx.db
         .whatsapp_business_account()
         .id()
         .update(WhatsAppBusinessAccount {
-            quality_score: Some(quality_score),
+            quality_score: Some(quality_score.clone()),
             quality_score_updated_at: Some(ctx.timestamp),
             updated_at: ctx.timestamp,
             ..account
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: Some(format!("{{\"quality_score\":\"{}\"}}", old_score)),
+            new_values: Some(format!("{{\"quality_score\":\"{}\"}}", quality_score)),
+            changed_fields: vec!["quality_score".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business quality score updated: id={}", account_id);
     Ok(())
 }
 
@@ -377,8 +588,8 @@ pub fn update_whatsapp_quality_score(
 #[spacetimedb::reducer]
 pub fn record_whatsapp_message_sent(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
+    account_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
@@ -423,6 +634,7 @@ pub fn record_whatsapp_message_sent(
             ..account
         });
 
+    // Note: Not logging every message to avoid audit log spam
     Ok(())
 }
 
@@ -430,9 +642,9 @@ pub fn record_whatsapp_message_sent(
 #[spacetimedb::reducer]
 pub fn record_whatsapp_health_check(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
-    is_healthy: bool,
+    account_id: u64,
+    params: RecordWhatsAppHealthCheckParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
@@ -447,11 +659,14 @@ pub fn record_whatsapp_health_check(
         return Err("Account does not belong to this organization".to_string());
     }
 
-    let (new_sync_status, new_error_count) = if is_healthy {
+    let (new_sync_status, new_error_count) = if params.is_healthy {
         (SyncStatus::Connected, 0u32)
     } else {
         (SyncStatus::Error, account.error_count + 1)
     };
+
+    let old_status = format!("{:?}", account.sync_status);
+    let new_status = format!("{:?}", new_sync_status);
 
     ctx.db
         .whatsapp_business_account()
@@ -464,6 +679,22 @@ pub fn record_whatsapp_health_check(
             ..account
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: Some(format!("{{\"sync_status\":\"{}\"}}", old_status)),
+            new_values: Some(format!("{{\"sync_status\":\"{}\"}}", new_status)),
+            changed_fields: vec!["sync_status".to_string(), "last_health_check".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business health check recorded: id={}", account_id);
     Ok(())
 }
 
@@ -472,8 +703,8 @@ pub fn record_whatsapp_health_check(
 #[spacetimedb::reducer]
 pub fn set_whatsapp_primary_account(
     ctx: &ReducerContext,
-    account_id: u64,
     organization_id: u64,
+    account_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
@@ -492,44 +723,9 @@ pub fn set_whatsapp_primary_account(
                 .whatsapp_business_account()
                 .id()
                 .update(WhatsAppBusinessAccount {
-                    id: account.id,
-                    organization_id: account.organization_id,
-                    name: account.name,
-                    phone_number: account.phone_number,
-                    phone_number_id: account.phone_number_id,
-                    business_account_id: account.business_account_id,
-                    display_name: account.display_name,
-                    credentials_reference: account.credentials_reference,
-                    webhook_secret_reference: account.webhook_secret_reference,
-                    messaging_enabled: account.messaging_enabled,
-                    notifications_enabled: account.notifications_enabled,
-                    template_messaging_enabled: account.template_messaging_enabled,
-                    interactive_messaging_enabled: account.interactive_messaging_enabled,
-                    template_namespace: account.template_namespace,
-                    default_language: account.default_language,
-                    media_provider: account.media_provider,
-                    webhook_enabled: account.webhook_enabled,
-                    webhook_url: account.webhook_url,
-                    subscribed_webhook_events: account.subscribed_webhook_events,
-                    daily_message_limit: account.daily_message_limit,
-                    messages_sent_today: account.messages_sent_today,
-                    last_message_reset: account.last_message_reset,
-                    verification_status: account.verification_status,
-                    business_verification_level: account.business_verification_level,
-                    quality_score: account.quality_score,
-                    quality_score_updated_at: account.quality_score_updated_at,
-                    status: account.status,
-                    sync_status: account.sync_status,
-                    last_health_check: account.last_health_check,
-                    last_error: account.last_error,
-                    error_count: account.error_count,
                     is_primary: false,
-                    is_active: account.is_active,
-                    created_at: account.created_at,
                     updated_at: ctx.timestamp,
-                    deleted_at: account.deleted_at,
-                    created_by: account.created_by,
-                    metadata: account.metadata,
+                    ..account
                 });
         }
     }
@@ -550,45 +746,81 @@ pub fn set_whatsapp_primary_account(
         .whatsapp_business_account()
         .id()
         .update(WhatsAppBusinessAccount {
-            id: account.id,
-            organization_id: account.organization_id,
-            name: account.name,
-            phone_number: account.phone_number,
-            phone_number_id: account.phone_number_id,
-            business_account_id: account.business_account_id,
-            display_name: account.display_name,
-            credentials_reference: account.credentials_reference,
-            webhook_secret_reference: account.webhook_secret_reference,
-            messaging_enabled: account.messaging_enabled,
-            notifications_enabled: account.notifications_enabled,
-            template_messaging_enabled: account.template_messaging_enabled,
-            interactive_messaging_enabled: account.interactive_messaging_enabled,
-            template_namespace: account.template_namespace,
-            default_language: account.default_language,
-            media_provider: account.media_provider,
-            webhook_enabled: account.webhook_enabled,
-            webhook_url: account.webhook_url,
-            subscribed_webhook_events: account.subscribed_webhook_events,
-            daily_message_limit: account.daily_message_limit,
-            messages_sent_today: account.messages_sent_today,
-            last_message_reset: account.last_message_reset,
-            verification_status: account.verification_status,
-            business_verification_level: account.business_verification_level,
-            quality_score: account.quality_score,
-            quality_score_updated_at: account.quality_score_updated_at,
-            status: account.status,
-            sync_status: account.sync_status,
-            last_health_check: account.last_health_check,
-            last_error: account.last_error,
-            error_count: account.error_count,
             is_primary: true,
-            is_active: account.is_active,
-            created_at: account.created_at,
             updated_at: ctx.timestamp,
-            deleted_at: account.deleted_at,
-            created_by: account.created_by,
-            metadata: account.metadata,
+            ..account
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "UPDATE",
+            old_values: Some("{\"is_primary\":false}".to_string()),
+            new_values: Some("{\"is_primary\":true}".to_string()),
+            changed_fields: vec!["is_primary".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "WhatsApp Business account set as primary: id={}",
+        account_id
+    );
+    Ok(())
+}
+
+/// Soft-delete a WhatsApp Business account
+#[spacetimedb::reducer]
+pub fn delete_whatsapp_business_account(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    account_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "integrations", "delete")?;
+
+    let account = ctx
+        .db
+        .whatsapp_business_account()
+        .id()
+        .find(&account_id)
+        .ok_or("WhatsApp Business account not found")?;
+
+    if account.organization_id != organization_id {
+        return Err("Account does not belong to this organization".to_string());
+    }
+
+    let account_name = account.name.clone();
+
+    ctx.db
+        .whatsapp_business_account()
+        .id()
+        .update(WhatsAppBusinessAccount {
+            is_active: false,
+            is_primary: false,
+            deleted_at: Some(ctx.timestamp),
+            updated_at: ctx.timestamp,
+            ..account
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "whatsapp_business_account",
+            record_id: account_id,
+            action: "DELETE",
+            old_values: Some(format!("{{\"name\":\"{}\"}}", account_name)),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!("WhatsApp Business account soft-deleted: id={}", account_id);
     Ok(())
 }

@@ -6,9 +6,9 @@
 /// | **DocumentFolder** | Folder hierarchy for organizing documents |
 /// | **Document** | File documents with metadata and access control |
 /// | **DocumentVersion** | Version history for documents |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // TABLES
@@ -136,6 +136,71 @@ pub struct DocumentVersion {
 }
 
 // ============================================================================
+// INPUT PARAMS
+// ============================================================================
+
+/// Params for creating a document folder.
+/// Scope: `company_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateDocumentFolderParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub parent_id: Option<u64>,
+    pub is_access_restricted: bool,
+    pub is_hidden: bool,
+    pub is_readonly: bool,
+    pub is_favorite: bool,
+    pub sequence: u32,
+    pub storage_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a document.
+/// Scope: `company_id` is a flat reducer param.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateDocumentParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub file_name: String,
+    pub file_size: u64,
+    pub mimetype: String,
+    pub url: String,
+    pub folder_id: Option<u64>,
+    pub res_model: Option<String>,
+    pub res_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub tag_ids: Vec<u64>,
+    pub is_favorite: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for adding a document version.
+/// Scope: `company_id` and `document_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddDocumentVersionParams {
+    pub file_name: String,
+    pub file_size: u64,
+    pub mimetype: String,
+    pub url: String,
+    pub changes_description: Option<String>,
+}
+
+/// Params for updating document metadata.
+/// Scope: `company_id` and `document_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateDocumentParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub folder_id: Option<u64>,
+    pub tag_ids: Option<Vec<u64>>,
+    pub is_favorite: Option<bool>,
+    pub res_model: Option<String>,
+    pub res_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+// ============================================================================
 // REDUCERS
 // ============================================================================
 
@@ -143,15 +208,13 @@ pub struct DocumentVersion {
 #[reducer]
 pub fn create_document_folder(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
-    name: String,
-    parent_id: Option<u64>,
-    is_access_restricted: bool,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateDocumentFolderParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document_folder", "create")?;
+    check_permission(ctx, company_id, "document_folder", "create")?;
 
-    let parent_path = if let Some(pid) = parent_id {
+    let parent_path = if let Some(pid) = params.parent_id {
         let parent = ctx
             .db
             .document_folder()
@@ -163,25 +226,27 @@ pub fn create_document_folder(
         "/".to_string()
     };
 
+    let write_access_ids = vec![ctx.sender()];
+
     let folder = ctx.db.document_folder().insert(DocumentFolder {
         id: 0,
-        name,
-        description: None,
-        parent_id,
+        name: params.name,
+        description: params.description,
+        parent_id: params.parent_id,
         parent_path,
-        sequence: 0,
-        company_id,
+        sequence: params.sequence,
+        company_id: Some(company_id),
         owner_id: ctx.sender(),
-        storage_id: None,
+        storage_id: params.storage_id,
         share_link: None,
         share_expires: None,
-        write_access_ids: vec![ctx.sender()],
+        write_access_ids,
         read_access_ids: Vec::new(),
         document_count: 0,
-        is_hidden: false,
-        is_readonly: false,
-        is_access_restricted,
-        is_favorite: false,
+        is_hidden: params.is_hidden,
+        is_readonly: params.is_readonly,
+        is_access_restricted: params.is_access_restricted,
+        is_favorite: params.is_favorite,
         activity_ids: Vec::new(),
         message_follower_ids: Vec::new(),
         message_ids: Vec::new(),
@@ -189,19 +254,22 @@ pub fn create_document_folder(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document_folder",
-        folder.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document_folder",
+            record_id: folder.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(format!("{{\"name\":\"{}\"}}", folder.name)),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Document folder created: id={}", folder.id);
@@ -212,42 +280,35 @@ pub fn create_document_folder(
 #[reducer]
 pub fn create_document(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
-    name: String,
-    file_name: String,
-    file_size: u64,
-    mimetype: String,
-    url: String,
-    folder_id: Option<u64>,
-    res_model: Option<String>,
-    res_id: Option<u64>,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateDocumentParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document", "create")?;
+    check_permission(ctx, company_id, "document", "create")?;
 
     let doc = ctx.db.document().insert(Document {
         id: 0,
-        name,
-        description: None,
-        file_name: file_name.clone(),
-        file_size,
-        mimetype: mimetype.clone(),
+        name: params.name,
+        description: params.description,
+        file_name: params.file_name.clone(),
+        file_size: params.file_size,
+        mimetype: params.mimetype.clone(),
         checksum: None,
         index_content: None,
         access_token: None,
-        url: Some(url.clone()),
-        res_model,
-        res_id,
+        url: Some(params.url.clone()),
+        res_model: params.res_model,
+        res_id: params.res_id,
         res_name: None,
-        partner_id: None,
+        partner_id: params.partner_id,
         owner_id: ctx.sender(),
-        company_id,
-        folder_id,
-        tag_ids: Vec::new(),
+        company_id: Some(company_id),
+        folder_id: params.folder_id,
+        tag_ids: params.tag_ids,
         is_locked: false,
         locked_by: None,
         locked_at: None,
-        is_favorite: false,
+        is_favorite: params.is_favorite,
         is_shared: false,
         share_link: None,
         share_expires: None,
@@ -266,7 +327,7 @@ pub fn create_document(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     // Create initial version
@@ -275,17 +336,20 @@ pub fn create_document(
         document_id: doc.id,
         version_number: 1,
         name: "Initial version".to_string(),
-        file_name,
-        file_size,
-        mimetype,
+        file_name: params.file_name,
+        file_size: params.file_size,
+        mimetype: params.mimetype,
         checksum: None,
-        url,
+        url: params.url,
         changes_description: None,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         is_current: true,
         metadata: None,
     });
+
+    let doc_id = doc.id;
+    let doc_name = doc.name.clone();
 
     // Back-link version to document
     ctx.db.document().id().update(Document {
@@ -294,7 +358,7 @@ pub fn create_document(
     });
 
     // Increment folder document count
-    if let Some(fid) = folder_id {
+    if let Some(fid) = params.folder_id {
         if let Some(folder) = ctx.db.document_folder().id().find(&fid) {
             ctx.db.document_folder().id().update(DocumentFolder {
                 document_count: folder.document_count + 1,
@@ -305,19 +369,22 @@ pub fn create_document(
         }
     }
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document",
-        doc.id,
-        "create",
-        None,
-        None,
-        vec!["uploaded".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: doc_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(format!("{{\"name\":\"{}\"}}", doc_name)),
+            changed_fields: vec!["uploaded".to_string()],
+            metadata: None,
+        },
     );
 
-    log::info!("Document created: id={}", doc.id);
+    log::info!("Document created: id={}", doc_id);
     Ok(())
 }
 
@@ -325,16 +392,12 @@ pub fn create_document(
 #[reducer]
 pub fn add_document_version(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
+    company_id: u64,
     document_id: u64,
-    file_name: String,
-    file_size: u64,
-    mimetype: String,
-    url: String,
-    changes_description: Option<String>,
+    params: AddDocumentVersionParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document", "write")?;
+    check_permission(ctx, company_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -354,12 +417,12 @@ pub fn add_document_version(
         document_id,
         version_number: new_version_number,
         name: format!("Version {}", new_version_number),
-        file_name,
-        file_size,
-        mimetype,
+        file_name: params.file_name,
+        file_size: params.file_size,
+        mimetype: params.mimetype,
         checksum: None,
-        url,
-        changes_description,
+        url: params.url,
+        changes_description: params.changes_description,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         is_current: true,
@@ -384,16 +447,19 @@ pub fn add_document_version(
         ..doc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document",
-        document_id,
-        "write",
-        None,
-        None,
-        vec!["new_version".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: document_id,
+            action: "UPDATE",
+            old_values: Some(format!("{{\"version_count\":{}}}", doc.version_count)),
+            new_values: Some(format!("{{\"version_count\":{}}}", new_version_number)),
+            changed_fields: vec!["new_version".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!(
@@ -408,11 +474,11 @@ pub fn add_document_version(
 #[reducer]
 pub fn lock_document(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
+    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document", "write")?;
+    check_permission(ctx, company_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -434,16 +500,19 @@ pub fn lock_document(
         ..doc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document",
-        document_id,
-        "write",
-        None,
-        None,
-        vec!["locked".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: document_id,
+            action: "UPDATE",
+            old_values: Some("{\"is_locked\":false}".to_string()),
+            new_values: Some("{\"is_locked\":true}".to_string()),
+            changed_fields: vec!["locked".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Document locked: id={}", document_id);
@@ -454,11 +523,11 @@ pub fn lock_document(
 #[reducer]
 pub fn unlock_document(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
+    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document", "write")?;
+    check_permission(ctx, company_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -468,7 +537,7 @@ pub fn unlock_document(
         .ok_or("Document not found")?;
 
     if doc.locked_by != Some(ctx.sender()) {
-        check_permission(ctx, cid, "document", "admin")?; // Admins can force-unlock
+        check_permission(ctx, company_id, "document", "admin")?; // Admins can force-unlock
     }
 
     ctx.db.document().id().update(Document {
@@ -480,16 +549,19 @@ pub fn unlock_document(
         ..doc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document",
-        document_id,
-        "write",
-        None,
-        None,
-        vec!["unlocked".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: document_id,
+            action: "UPDATE",
+            old_values: Some("{\"is_locked\":true}".to_string()),
+            new_values: Some("{\"is_locked\":false}".to_string()),
+            changed_fields: vec!["unlocked".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Document unlocked: id={}", document_id);
@@ -500,11 +572,11 @@ pub fn unlock_document(
 #[reducer]
 pub fn delete_document(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
+    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "document", "delete")?;
+    check_permission(ctx, company_id, "document", "delete")?;
 
     let doc = ctx
         .db
@@ -516,6 +588,8 @@ pub fn delete_document(
     if doc.is_locked {
         return Err("Cannot delete a locked document".to_string());
     }
+
+    let doc_name = doc.name.clone();
 
     // Decrement folder count
     if let Some(fid) = doc.folder_id {
@@ -538,19 +612,111 @@ pub fn delete_document(
         ..doc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        cid,
-        None,
-        "document",
-        document_id,
-        "delete",
-        None,
-        None,
-        vec!["soft_deleted".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: document_id,
+            action: "DELETE",
+            old_values: Some(format!("{{\"name\":\"{}\"}}", doc_name)),
+            new_values: None,
+            changed_fields: vec!["soft_deleted".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Document soft-deleted: id={}", document_id);
+    Ok(())
+}
+
+/// Update document metadata
+#[reducer]
+pub fn update_document(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    document_id: u64,
+    params: UpdateDocumentParams,
+) -> Result<(), String> {
+    check_permission(ctx, company_id, "document", "write")?;
+
+    let doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&document_id)
+        .ok_or("Document not found")?;
+
+    if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
+        return Err("Document is locked by another user".to_string());
+    }
+
+    // Track changed fields
+    let mut changed_fields = Vec::new();
+
+    let new_doc = Document {
+        name: params.name.unwrap_or(doc.name.clone()),
+        description: params.description.or(doc.description.clone()),
+        folder_id: params.folder_id.or(doc.folder_id),
+        tag_ids: params.tag_ids.unwrap_or(doc.tag_ids.clone()),
+        is_favorite: params.is_favorite.unwrap_or(doc.is_favorite),
+        res_model: params.res_model.or(doc.res_model.clone()),
+        res_id: params.res_id.or(doc.res_id),
+        partner_id: params.partner_id.or(doc.partner_id),
+        metadata: params.metadata.or(doc.metadata.clone()),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..doc.clone()
+    };
+
+    if new_doc.name != doc.name {
+        changed_fields.push("name");
+    }
+    if new_doc.description != doc.description {
+        changed_fields.push("description");
+    }
+    if new_doc.folder_id != doc.folder_id {
+        changed_fields.push("folder_id");
+    }
+    if new_doc.tag_ids != doc.tag_ids {
+        changed_fields.push("tag_ids");
+    }
+    if new_doc.is_favorite != doc.is_favorite {
+        changed_fields.push("is_favorite");
+    }
+    if new_doc.res_model != doc.res_model {
+        changed_fields.push("res_model");
+    }
+    if new_doc.res_id != doc.res_id {
+        changed_fields.push("res_id");
+    }
+    if new_doc.partner_id != doc.partner_id {
+        changed_fields.push("partner_id");
+    }
+    if new_doc.metadata != doc.metadata {
+        changed_fields.push("metadata");
+    }
+
+    ctx.db.document().id().update(new_doc);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "document",
+            record_id: document_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
+            metadata: None,
+        },
+    );
+
+    log::info!("Document updated: id={}", document_id);
     Ok(())
 }
 
@@ -558,8 +724,12 @@ pub fn delete_document(
 #[reducer]
 pub fn record_document_view(
     ctx: &ReducerContext,
+    _organization_id: u64,
+    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, company_id, "document", "read")?;
+
     let doc = ctx
         .db
         .document()
@@ -570,6 +740,8 @@ pub fn record_document_view(
     ctx.db.document().id().update(Document {
         last_viewed_at: Some(ctx.timestamp),
         last_viewed_by: Some(ctx.sender()),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
         ..doc
     });
 

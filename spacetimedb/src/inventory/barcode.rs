@@ -4,13 +4,15 @@
 ///   - BarcodeRule
 ///   - BarcodeScan
 ///   - BarcodeNomenclature
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, product_packaging, product_variant};
 use crate::inventory::tracking::stock_production_lot;
 use crate::inventory::warehouse::stock_location;
 use serde_json;
+
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.19: BARCODE RULE
@@ -101,6 +103,69 @@ pub struct BarcodeNomenclature {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateBarcodeRuleParams {
+    pub name: String,
+    pub encoding: String,
+    pub pattern: String,
+    pub type_: String,
+    pub description: Option<String>,
+    pub sequence: i32,
+    pub alias: Option<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateBarcodeRuleParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub sequence: Option<i32>,
+    pub encoding: Option<String>,
+    pub pattern: Option<String>,
+    pub type_: Option<String>,
+    pub alias: Option<String>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordBarcodeScanParams {
+    pub barcode: String,
+    pub barcode_type: String,
+    pub context_type: Option<String>,
+    pub context_id: Option<u64>,
+    pub quantity: Option<f64>,
+    pub uom_id: Option<u64>,
+    pub session_id: Option<String>,
+    pub device_id: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateBarcodeNomenclatureParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub is_default: bool,
+    pub upc_ean_conv: String,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateBarcodeNomenclatureParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub is_default: Option<bool>,
+    pub upc_ean_conv: Option<String>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
 // ══════════════════════════════════════════════════════════════════════════════
 // REDUCERS: BARCODE RULE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -109,51 +174,49 @@ pub struct BarcodeNomenclature {
 pub fn create_barcode_rule(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    encoding: String,
-    pattern: String,
-    type_: String,
-    description: Option<String>,
-    sequence: i32,
-    alias: Option<String>,
+    params: CreateBarcodeRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "barcode_rule", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Rule name cannot be empty".to_string());
     }
 
-    if pattern.is_empty() {
+    if params.pattern.is_empty() {
         return Err("Pattern cannot be empty".to_string());
     }
 
-    let type_val = type_.clone();
     let rule = ctx.db.barcode_rule().insert(BarcodeRule {
         id: 0,
         organization_id,
-        name: name.clone(),
-        description,
-        sequence,
-        encoding,
-        pattern,
-        type_: type_val,
-        alias,
-        is_active: true,
+        name: params.name.clone(),
+        description: params.description,
+        sequence: params.sequence,
+        encoding: params.encoding,
+        pattern: params.pattern,
+        type_: params.type_.clone(),
+        alias: params.alias,
+        is_active: params.is_active,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "barcode_rule",
-        rule.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name, "type": rule.type_ }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "type": rule.type_ }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -162,15 +225,9 @@ pub fn create_barcode_rule(
 #[spacetimedb::reducer]
 pub fn update_barcode_rule(
     ctx: &ReducerContext,
+    organization_id: u64,
     rule_id: u64,
-    name: Option<String>,
-    description: Option<String>,
-    sequence: Option<i32>,
-    encoding: Option<String>,
-    pattern: Option<String>,
-    type_: Option<String>,
-    alias: Option<String>,
-    is_active: Option<bool>,
+    params: UpdateBarcodeRuleParams,
 ) -> Result<(), String> {
     let rule = ctx
         .db
@@ -179,26 +236,53 @@ pub fn update_barcode_rule(
         .find(&rule_id)
         .ok_or("Barcode rule not found")?;
 
-    check_permission(ctx, rule.organization_id, "barcode_rule", "write")?;
+    check_permission(ctx, organization_id, "barcode_rule", "write")?;
+
+    if rule.organization_id != organization_id {
+        return Err("Barcode rule does not belong to this organization".to_string());
+    }
+
+    let old_values =
+        serde_json::json!({ "name": rule.name, "type": rule.type_ }).to_string();
 
     ctx.db.barcode_rule().id().update(BarcodeRule {
-        name: name.unwrap_or_else(|| rule.name.clone()),
-        description: description.or(rule.description),
-        sequence: sequence.unwrap_or(rule.sequence),
-        encoding: encoding.unwrap_or_else(|| rule.encoding.clone()),
-        pattern: pattern.unwrap_or_else(|| rule.pattern.clone()),
-        type_: type_.unwrap_or_else(|| rule.type_.clone()),
-        alias: alias.or(rule.alias),
-        is_active: is_active.unwrap_or(rule.is_active),
+        name: params.name.unwrap_or_else(|| rule.name.clone()),
+        description: params.description.or(rule.description),
+        sequence: params.sequence.unwrap_or(rule.sequence),
+        encoding: params.encoding.unwrap_or_else(|| rule.encoding.clone()),
+        pattern: params.pattern.unwrap_or_else(|| rule.pattern.clone()),
+        type_: params.type_.unwrap_or_else(|| rule.type_.clone()),
+        alias: params.alias.or(rule.alias),
+        is_active: params.is_active.unwrap_or(rule.is_active),
+        metadata: params.metadata.or(rule.metadata),
         updated_at: ctx.timestamp,
         ..rule
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: None,
+            changed_fields: vec!["name".to_string(), "type".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
 
 #[spacetimedb::reducer]
-pub fn delete_barcode_rule(ctx: &ReducerContext, rule_id: u64) -> Result<(), String> {
+pub fn delete_barcode_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    rule_id: u64,
+) -> Result<(), String> {
     let rule = ctx
         .db
         .barcode_rule()
@@ -206,21 +290,28 @@ pub fn delete_barcode_rule(ctx: &ReducerContext, rule_id: u64) -> Result<(), Str
         .find(&rule_id)
         .ok_or("Barcode rule not found")?;
 
-    check_permission(ctx, rule.organization_id, "barcode_rule", "delete")?;
+    check_permission(ctx, organization_id, "barcode_rule", "delete")?;
+
+    if rule.organization_id != organization_id {
+        return Err("Barcode rule does not belong to this organization".to_string());
+    }
 
     let rule_name = rule.name.clone();
     ctx.db.barcode_rule().id().delete(&rule_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        rule.organization_id,
-        None,
-        "barcode_rule",
-        rule_id,
-        "delete",
-        Some(serde_json::json!({ "name": rule_name }).to_string()),
-        None,
-        vec!["deleted".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_rule",
+            record_id: rule_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": rule_name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -234,38 +325,31 @@ pub fn delete_barcode_rule(ctx: &ReducerContext, rule_id: u64) -> Result<(), Str
 pub fn record_barcode_scan(
     ctx: &ReducerContext,
     organization_id: u64,
-    barcode: String,
-    barcode_type: String,
-    context_type: Option<String>,
-    context_id: Option<u64>,
-    quantity: Option<f64>,
-    uom_id: Option<u64>,
-    session_id: Option<String>,
-    device_id: Option<String>,
+    params: RecordBarcodeScanParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "barcode_scan", "create")?;
 
-    if barcode.is_empty() {
+    if params.barcode.is_empty() {
         return Err("Barcode cannot be empty".to_string());
     }
 
     let (product_id, lot_id, location_id, package_id, error_message) =
-        resolve_barcode(ctx, organization_id, &barcode);
+        resolve_barcode(ctx, organization_id, &params.barcode);
 
     let scan = ctx.db.barcode_scan().insert(BarcodeScan {
         id: 0,
         organization_id,
-        barcode: barcode.clone(),
-        barcode_type,
+        barcode: params.barcode.clone(),
+        barcode_type: params.barcode_type,
         product_id,
         lot_id,
         location_id,
         package_id,
-        quantity,
-        uom_id,
+        quantity: params.quantity,
+        uom_id: params.uom_id,
         user_id: ctx.sender(),
-        session_id,
-        device_id,
+        session_id: params.session_id,
+        device_id: params.device_id,
         scanned_at: ctx.timestamp,
         processed: error_message.is_none(),
         processed_at: if error_message.is_none() {
@@ -274,21 +358,24 @@ pub fn record_barcode_scan(
             None
         },
         error_message,
-        context_type,
-        context_id,
-        metadata: None,
+        context_type: params.context_type,
+        context_id: params.context_id,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "barcode_scan",
-        scan.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "barcode": barcode }).to_string()),
-        vec!["barcode".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_scan",
+            record_id: scan.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "barcode": params.barcode }).to_string()),
+            changed_fields: vec!["barcode".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -399,18 +486,15 @@ pub fn process_pending_scans(ctx: &ReducerContext, organization_id: u64) -> Resu
 pub fn create_barcode_nomenclature(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    description: Option<String>,
-    is_default: bool,
-    upc_ean_conv: String,
+    params: CreateBarcodeNomenclatureParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "barcode_nomenclature", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Nomenclature name cannot be empty".to_string());
     }
 
-    if is_default {
+    if params.is_default {
         for mut nomenclature in ctx
             .db
             .barcode_nomenclature()
@@ -423,30 +507,34 @@ pub fn create_barcode_nomenclature(
         }
     }
 
+    // rule_ids is always empty on create — managed exclusively by add/remove_rule_to_nomenclature
     let nomenclature = ctx.db.barcode_nomenclature().insert(BarcodeNomenclature {
         id: 0,
         organization_id,
-        name: name.clone(),
-        description,
-        is_default,
+        name: params.name.clone(),
+        description: params.description,
+        is_default: params.is_default,
         rule_ids: vec![],
-        upc_ean_conv,
-        is_active: true,
+        upc_ean_conv: params.upc_ean_conv,
+        is_active: params.is_active,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "barcode_nomenclature",
-        nomenclature.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_nomenclature",
+            record_id: nomenclature.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -455,12 +543,9 @@ pub fn create_barcode_nomenclature(
 #[spacetimedb::reducer]
 pub fn update_barcode_nomenclature(
     ctx: &ReducerContext,
+    organization_id: u64,
     nomenclature_id: u64,
-    name: Option<String>,
-    description: Option<String>,
-    is_default: Option<bool>,
-    upc_ean_conv: Option<String>,
-    is_active: Option<bool>,
+    params: UpdateBarcodeNomenclatureParams,
 ) -> Result<(), String> {
     let nomenclature = ctx
         .db
@@ -469,14 +554,13 @@ pub fn update_barcode_nomenclature(
         .find(&nomenclature_id)
         .ok_or("Nomenclature not found")?;
 
-    check_permission(
-        ctx,
-        nomenclature.organization_id,
-        "barcode_nomenclature",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "barcode_nomenclature", "write")?;
 
-    let new_is_default = is_default.unwrap_or(nomenclature.is_default);
+    if nomenclature.organization_id != organization_id {
+        return Err("Nomenclature does not belong to this organization".to_string());
+    }
+
+    let new_is_default = params.is_default.unwrap_or(nomenclature.is_default);
 
     if new_is_default && !nomenclature.is_default {
         for mut other in ctx
@@ -491,18 +575,38 @@ pub fn update_barcode_nomenclature(
         }
     }
 
+    let old_values = serde_json::json!({ "name": nomenclature.name }).to_string();
+
     ctx.db
         .barcode_nomenclature()
         .id()
         .update(BarcodeNomenclature {
-            name: name.unwrap_or_else(|| nomenclature.name.clone()),
-            description: description.or(nomenclature.description),
+            name: params.name.unwrap_or_else(|| nomenclature.name.clone()),
+            description: params.description.or(nomenclature.description),
             is_default: new_is_default,
-            upc_ean_conv: upc_ean_conv.unwrap_or_else(|| nomenclature.upc_ean_conv.clone()),
-            is_active: is_active.unwrap_or(nomenclature.is_active),
+            upc_ean_conv: params
+                .upc_ean_conv
+                .unwrap_or_else(|| nomenclature.upc_ean_conv.clone()),
+            is_active: params.is_active.unwrap_or(nomenclature.is_active),
+            metadata: params.metadata.or(nomenclature.metadata),
             updated_at: ctx.timestamp,
             ..nomenclature
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_nomenclature",
+            record_id: nomenclature_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: None,
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -510,6 +614,7 @@ pub fn update_barcode_nomenclature(
 #[spacetimedb::reducer]
 pub fn add_rule_to_nomenclature(
     ctx: &ReducerContext,
+    organization_id: u64,
     nomenclature_id: u64,
     rule_id: u64,
 ) -> Result<(), String> {
@@ -520,12 +625,11 @@ pub fn add_rule_to_nomenclature(
         .find(&nomenclature_id)
         .ok_or("Nomenclature not found")?;
 
-    check_permission(
-        ctx,
-        nomenclature.organization_id,
-        "barcode_nomenclature",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "barcode_nomenclature", "write")?;
+
+    if nomenclature.organization_id != organization_id {
+        return Err("Nomenclature does not belong to this organization".to_string());
+    }
 
     let _rule = ctx
         .db
@@ -556,6 +660,7 @@ pub fn add_rule_to_nomenclature(
 #[spacetimedb::reducer]
 pub fn remove_rule_from_nomenclature(
     ctx: &ReducerContext,
+    organization_id: u64,
     nomenclature_id: u64,
     rule_id: u64,
 ) -> Result<(), String> {
@@ -566,12 +671,11 @@ pub fn remove_rule_from_nomenclature(
         .find(&nomenclature_id)
         .ok_or("Nomenclature not found")?;
 
-    check_permission(
-        ctx,
-        nomenclature.organization_id,
-        "barcode_nomenclature",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "barcode_nomenclature", "write")?;
+
+    if nomenclature.organization_id != organization_id {
+        return Err("Nomenclature does not belong to this organization".to_string());
+    }
 
     let mut rule_ids = nomenclature.rule_ids;
     rule_ids.retain(|&id| id != rule_id);
@@ -591,6 +695,7 @@ pub fn remove_rule_from_nomenclature(
 #[spacetimedb::reducer]
 pub fn delete_barcode_nomenclature(
     ctx: &ReducerContext,
+    organization_id: u64,
     nomenclature_id: u64,
 ) -> Result<(), String> {
     let nomenclature = ctx
@@ -600,12 +705,11 @@ pub fn delete_barcode_nomenclature(
         .find(&nomenclature_id)
         .ok_or("Nomenclature not found")?;
 
-    check_permission(
-        ctx,
-        nomenclature.organization_id,
-        "barcode_nomenclature",
-        "delete",
-    )?;
+    check_permission(ctx, organization_id, "barcode_nomenclature", "delete")?;
+
+    if nomenclature.organization_id != organization_id {
+        return Err("Nomenclature does not belong to this organization".to_string());
+    }
 
     if nomenclature.is_default {
         return Err("Cannot delete default nomenclature".to_string());
@@ -614,16 +718,19 @@ pub fn delete_barcode_nomenclature(
     let nom_name = nomenclature.name.clone();
     ctx.db.barcode_nomenclature().id().delete(&nomenclature_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        nomenclature.organization_id,
-        None,
-        "barcode_nomenclature",
-        nomenclature_id,
-        "delete",
-        Some(serde_json::json!({ "name": nom_name }).to_string()),
-        None,
-        vec!["deleted".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "barcode_nomenclature",
+            record_id: nomenclature_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": nom_name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

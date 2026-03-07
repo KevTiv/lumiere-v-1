@@ -5,15 +5,13 @@
 /// |-------|-------------|
 /// | **MrpWorkcenter** | Work center definitions |
 /// | **MrpWorkcenterProductivity** | Work center productivity tracking |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::WorkingState;
+use serde_json;
 
-use crate::helpers::{check_permission, write_audit_log};
-
-// ============================================================================
-// WORK CENTER TABLES
-// ============================================================================
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 /// Work Center — Manufacturing resource where operations are performed
 #[spacetimedb::table(
@@ -89,76 +87,142 @@ pub struct MrpWorkcenterProductivity {
     pub metadata: Option<String>,
 }
 
-// ============================================================================
-// REDUCERS
-// ============================================================================
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+/// Params for creating a new work center. Covers all MrpWorkcenter fields
+/// except id (auto_inc) and audit fields (from ctx).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWorkcenterParams {
+    pub name: String,
+    pub active: bool,
+    pub code: Option<String>,
+    pub working_state: String,
+    pub oee_target: f64,
+    pub time_efficiency: f64,
+    pub capacity: f64,
+    pub capacity_ids: Vec<u64>,
+    pub oee: f64,
+    pub performance: f64,
+    pub blocked_time: f64,
+    pub productive_time: f64,
+    pub productivity_ids: Vec<u64>,
+    pub order_ids: Vec<u64>,
+    pub workorder_count: u32,
+    pub workorder_ready_count: u32,
+    pub workorder_progress_count: u32,
+    pub workorder_pending_count: u32,
+    pub workorder_late_count: u32,
+    pub alternative_workcenter_ids: Vec<u64>,
+    pub color: Option<u8>,
+    pub resource_calendar_id: Option<u64>,
+    pub tag_ids: Vec<u64>,
+    pub default_capacity_parent_id: Option<u64>,
+    pub default_time_efficiency: f64,
+    pub default_oee_target: f64,
+    pub sequence: u32,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating a work center. All fields are optional; only Some values
+/// are applied. System-computed fields (oee, performance, workorder counts,
+/// productivity_ids, order_ids) are omitted — they are managed by domain logic.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWorkcenterParams {
+    pub name: Option<String>,
+    pub active: Option<bool>,
+    pub code: Option<String>,
+    pub working_state: Option<String>,
+    pub capacity: Option<f64>,
+    pub time_efficiency: Option<f64>,
+    pub oee_target: Option<f64>,
+    pub color: Option<u8>,
+    pub resource_calendar_id: Option<u64>,
+    pub tag_ids: Option<Vec<u64>>,
+    pub alternative_workcenter_ids: Option<Vec<u64>>,
+    pub capacity_ids: Option<Vec<u64>>,
+    pub default_capacity_parent_id: Option<u64>,
+    pub default_time_efficiency: Option<f64>,
+    pub default_oee_target: Option<f64>,
+    pub sequence: Option<u32>,
+    pub metadata: Option<String>,
+}
+
+/// Params for logging productivity time against a work center.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWorkcenterProductivityParams {
+    pub workorder_id: u64,
+    pub loss_id: u64,
+    pub description: Option<String>,
+    pub duration: f64,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Create a new work center
 #[reducer]
 pub fn create_workcenter(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
-    name: String,
-    code: Option<String>,
-    capacity: f64,
-    time_efficiency: f64,
-    oee_target: f64,
-    working_state: Option<String>,
+    params: CreateWorkcenterParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter", "create")?;
+    check_permission(ctx, organization_id, "mrp_workcenter", "create")?;
 
-    // Validate working_state if provided
-    if let Some(ref ws) = working_state {
-        WorkingState::from_str(ws)?;
-    }
+    WorkingState::from_str(&params.working_state)?;
 
     let wc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
-        name,
-        active: true,
-        code,
+        name: params.name,
+        active: params.active,
+        code: params.code,
         company_id,
-        working_state: working_state.unwrap_or_else(|| "normal".to_string()),
-        oee_target,
-        time_efficiency,
-        capacity,
-        capacity_ids: Vec::new(),
-        oee: 0.0,
-        performance: 0.0,
-        blocked_time: 0.0,
-        productive_time: 0.0,
-        productivity_ids: Vec::new(),
-        order_ids: Vec::new(),
-        workorder_count: 0,
-        workorder_ready_count: 0,
-        workorder_progress_count: 0,
-        workorder_pending_count: 0,
-        workorder_late_count: 0,
-        alternative_workcenter_ids: Vec::new(),
-        color: None,
-        resource_calendar_id: None,
-        tag_ids: Vec::new(),
-        default_capacity_parent_id: None,
-        default_time_efficiency: time_efficiency,
-        default_oee_target: oee_target,
-        sequence: 0,
+        working_state: params.working_state,
+        oee_target: params.oee_target,
+        time_efficiency: params.time_efficiency,
+        capacity: params.capacity,
+        capacity_ids: params.capacity_ids,
+        oee: params.oee,
+        performance: params.performance,
+        blocked_time: params.blocked_time,
+        productive_time: params.productive_time,
+        productivity_ids: params.productivity_ids,
+        order_ids: params.order_ids,
+        workorder_count: params.workorder_count,
+        workorder_ready_count: params.workorder_ready_count,
+        workorder_progress_count: params.workorder_progress_count,
+        workorder_pending_count: params.workorder_pending_count,
+        workorder_late_count: params.workorder_late_count,
+        alternative_workcenter_ids: params.alternative_workcenter_ids,
+        color: params.color,
+        resource_calendar_id: params.resource_calendar_id,
+        tag_ids: params.tag_ids,
+        default_capacity_parent_id: params.default_capacity_parent_id,
+        default_time_efficiency: params.default_time_efficiency,
+        default_oee_target: params.default_oee_target,
+        sequence: params.sequence,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter",
-        wc.id,
-        "create",
-        None,
-        None,
-        vec!["created".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter",
+            record_id: wc.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": wc.name, "capacity": wc.capacity }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "capacity".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Work center created: id={}", wc.id);
@@ -169,14 +233,12 @@ pub fn create_workcenter(
 #[reducer]
 pub fn update_workcenter(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workcenter_id: u64,
-    name: String,
-    capacity: f64,
-    time_efficiency: f64,
-    active: bool,
+    params: UpdateWorkcenterParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter", "write")?;
+    check_permission(ctx, organization_id, "mrp_workcenter", "write")?;
 
     let wc = ctx
         .db
@@ -189,26 +251,52 @@ pub fn update_workcenter(
         return Err("Work center does not belong to this company".to_string());
     }
 
+    if let Some(ref ws) = params.working_state {
+        WorkingState::from_str(ws)?;
+    }
+
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
-        name,
-        capacity,
-        time_efficiency,
-        active,
+        name: params.name.unwrap_or(wc.name.clone()),
+        active: params.active.unwrap_or(wc.active),
+        code: params.code.or(wc.code.clone()),
+        working_state: params.working_state.unwrap_or(wc.working_state.clone()),
+        capacity: params.capacity.unwrap_or(wc.capacity),
+        time_efficiency: params.time_efficiency.unwrap_or(wc.time_efficiency),
+        oee_target: params.oee_target.unwrap_or(wc.oee_target),
+        color: params.color.or(wc.color),
+        resource_calendar_id: params.resource_calendar_id.or(wc.resource_calendar_id),
+        tag_ids: params.tag_ids.unwrap_or(wc.tag_ids.clone()),
+        alternative_workcenter_ids: params
+            .alternative_workcenter_ids
+            .unwrap_or(wc.alternative_workcenter_ids.clone()),
+        capacity_ids: params.capacity_ids.unwrap_or(wc.capacity_ids.clone()),
+        default_capacity_parent_id: params
+            .default_capacity_parent_id
+            .or(wc.default_capacity_parent_id),
+        default_time_efficiency: params
+            .default_time_efficiency
+            .unwrap_or(wc.default_time_efficiency),
+        default_oee_target: params.default_oee_target.unwrap_or(wc.default_oee_target),
+        sequence: params.sequence.unwrap_or(wc.sequence),
+        metadata: params.metadata.or(wc.metadata.clone()),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..wc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter",
-        workcenter_id,
-        "write",
-        None,
-        None,
-        vec!["updated".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter",
+            record_id: workcenter_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Work center updated: id={}", workcenter_id);
@@ -219,11 +307,12 @@ pub fn update_workcenter(
 #[reducer]
 pub fn block_workcenter(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workcenter_id: u64,
     reason: String,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter", "write")?;
+    check_permission(ctx, organization_id, "mrp_workcenter", "write")?;
 
     let wc = ctx
         .db
@@ -243,16 +332,21 @@ pub fn block_workcenter(
         ..wc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter",
-        workcenter_id,
-        "write",
-        None,
-        None,
-        vec!["blocked".to_string(), reason],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter",
+            record_id: workcenter_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "working_state": "blocked", "reason": reason }).to_string(),
+            ),
+            changed_fields: vec!["working_state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Work center blocked: id={}", workcenter_id);
@@ -263,10 +357,11 @@ pub fn block_workcenter(
 #[reducer]
 pub fn unblock_workcenter(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workcenter_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter", "write")?;
+    check_permission(ctx, organization_id, "mrp_workcenter", "write")?;
 
     let wc = ctx
         .db
@@ -286,16 +381,19 @@ pub fn unblock_workcenter(
         ..wc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter",
-        workcenter_id,
-        "write",
-        None,
-        None,
-        vec!["unblocked".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter",
+            record_id: workcenter_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "working_state": "normal" }).to_string()),
+            changed_fields: vec!["working_state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Work center unblocked: id={}", workcenter_id);
@@ -306,14 +404,12 @@ pub fn unblock_workcenter(
 #[reducer]
 pub fn log_workcenter_productivity(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     workcenter_id: u64,
-    workorder_id: u64,
-    loss_id: u64,
-    description: Option<String>,
-    duration: f64,
+    params: CreateWorkcenterProductivityParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter_productivity", "create")?;
+    check_permission(ctx, organization_id, "mrp_workcenter_productivity", "create")?;
 
     let wc = ctx
         .db
@@ -332,26 +428,25 @@ pub fn log_workcenter_productivity(
         .insert(MrpWorkcenterProductivity {
             id: 0,
             workcenter_id,
-            workorder_id,
-            description,
-            loss_id,
+            workorder_id: params.workorder_id,
+            description: params.description,
+            loss_id: params.loss_id,
             date_start: ctx.timestamp,
             date_end: None,
-            duration,
+            duration: params.duration,
             user_id: ctx.sender(),
             company_id,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
-            metadata: None,
+            metadata: params.metadata,
         });
 
     // Update work center productivity tracking
     let mut prod_ids = wc.productivity_ids.clone();
     prod_ids.push(productivity.id);
-
-    let productive_time = wc.productive_time + duration;
+    let productive_time = wc.productive_time + params.duration;
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         productivity_ids: prod_ids,
@@ -361,23 +456,37 @@ pub fn log_workcenter_productivity(
         ..wc
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter_productivity",
-        productivity.id,
-        "create",
-        None,
-        None,
-        vec!["logged".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter_productivity",
+            record_id: productivity.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "workcenter_id": workcenter_id,
+                    "workorder_id": productivity.workorder_id,
+                    "duration": productivity.duration,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "workcenter_id".to_string(),
+                "workorder_id".to_string(),
+                "duration".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     log::info!(
         "Work center productivity logged: id={}, wc={}, duration={}",
         productivity.id,
         workcenter_id,
-        duration
+        productivity.duration
     );
     Ok(())
 }
@@ -386,46 +495,46 @@ pub fn log_workcenter_productivity(
 #[reducer]
 pub fn complete_productivity_log(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     log_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "mrp_workcenter_productivity", "write")?;
+    check_permission(ctx, organization_id, "mrp_workcenter_productivity", "write")?;
 
-    let log = ctx
+    let log_entry = ctx
         .db
         .mrp_workcenter_productivity()
         .id()
         .find(&log_id)
         .ok_or("Productivity log not found")?;
 
-    if log.company_id != company_id {
+    if log_entry.company_id != company_id {
         return Err("Log does not belong to this company".to_string());
     }
-
-    // Calculate actual duration
-    let duration = log.duration; // Simplified - in real implementation would calculate from timestamps
 
     ctx.db
         .mrp_workcenter_productivity()
         .id()
         .update(MrpWorkcenterProductivity {
             date_end: Some(ctx.timestamp),
-            duration,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
-            ..log
+            ..log_entry
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        company_id,
-        None,
-        "mrp_workcenter_productivity",
-        log_id,
-        "write",
-        None,
-        None,
-        vec!["completed".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workcenter_productivity",
+            record_id: log_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "date_end": "set" }).to_string()),
+            changed_fields: vec!["date_end".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Productivity log completed: id={}", log_id);

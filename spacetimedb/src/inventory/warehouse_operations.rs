@@ -5,12 +5,17 @@
 ///   - PickingWave
 ///   - PackagingMaterial
 ///   - CartonizationResult
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
 
+// ══════════════════════════════════════════════════════════════════════════════
+// TABLES
+// ══════════════════════════════════════════════════════════════════════════════
+
 /// Warehouse Task
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = warehouse_task,
     public,
@@ -50,6 +55,7 @@ pub struct WarehouseTask {
 }
 
 /// Picking Wave
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = picking_wave,
     public,
@@ -78,6 +84,7 @@ pub struct PickingWave {
 }
 
 /// Packaging Material
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = packaging_material,
     public,
@@ -106,6 +113,7 @@ pub struct PackagingMaterial {
 }
 
 /// Cartonization Result
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = cartonization_result,
     public,
@@ -130,214 +138,272 @@ pub struct CartonizationResult {
     pub metadata: Option<String>,
 }
 
-/// Create a new picking wave
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePickingWaveParams {
+    pub name: String,
+    pub picking_type_id: u64,
+    pub state: String,
+    pub is_wave: bool,
+    pub picking_ids: Vec<u64>,
+    pub move_line_ids: Vec<u64>,
+    pub user_id: Option<Identity>,
+    pub team_id: Option<u64>,
+    pub date_start: Option<Timestamp>,
+    pub date_done: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWarehouseTaskParams {
+    pub name: String,
+    pub task_type: String,
+    pub state: String,
+    pub priority: String,
+    pub quantity: f64,
+    pub user_id: Option<Identity>,
+    pub picking_id: Option<u64>,
+    pub move_id: Option<u64>,
+    pub move_line_id: Option<u64>,
+    pub location_id: Option<u64>,
+    pub location_dest_id: Option<u64>,
+    pub product_id: Option<u64>,
+    pub lot_id: Option<u64>,
+    pub package_id: Option<u64>,
+    pub uom_id: Option<u64>,
+    pub date_scheduled: Option<Timestamp>,
+    pub date_started: Option<Timestamp>,
+    pub date_finished: Option<Timestamp>,
+    pub duration_expected: Option<f64>,
+    pub duration_real: Option<f64>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
+#[reducer]
 pub fn create_picking_wave(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    picking_type_id: u64,
     company_id: u64,
-    date_done: Option<Timestamp>,
-    picking_ids: Vec<u64>,
-    move_line_ids: Vec<u64>,
-    state: String,
-    user_id: Option<Identity>,
-    team_id: Option<u64>,
-    date_start: Option<Timestamp>,
-    is_wave: bool,
-    metadata: Option<String>,
+    params: CreatePickingWaveParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "picking_wave", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Wave name cannot be empty".to_string());
     }
-
-    let state_clone = state.clone();
 
     let wave = ctx.db.picking_wave().insert(PickingWave {
         id: 0,
         organization_id,
-        name: name.clone(),
-        state,
-        picking_type_id,
-        user_id,
-        team_id,
-        date_start,
-        date_done,
-        picking_ids,
-        move_line_ids,
+        name: params.name.clone(),
+        state: params.state.clone(),
+        picking_type_id: params.picking_type_id,
+        user_id: params.user_id,
+        team_id: params.team_id,
+        date_start: params.date_start,
+        date_done: params.date_done,
+        picking_ids: params.picking_ids,
+        move_line_ids: params.move_line_ids,
         company_id,
-        is_wave,
+        is_wave: params.is_wave,
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "picking_wave",
-        wave.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name, "picking_type_id": picking_type_id, "state": state_clone, "is_wave": is_wave }).to_string()),
-        vec!["name".to_string(), "state".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "picking_wave",
+            record_id: wave.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": wave.name,
+                    "picking_type_id": wave.picking_type_id,
+                    "state": wave.state,
+                    "is_wave": wave.is_wave,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "state".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Create a new warehouse task
+#[reducer]
 pub fn create_warehouse_task(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    task_type: String,
-    picking_id: Option<u64>,
     company_id: u64,
-    state: String,
-    priority: String,
-    user_id: Option<Identity>,
-    move_id: Option<u64>,
-    move_line_id: Option<u64>,
-    location_id: Option<u64>,
-    location_dest_id: Option<u64>,
-    product_id: Option<u64>,
-    lot_id: Option<u64>,
-    package_id: Option<u64>,
-    quantity: f64,
-    uom_id: Option<u64>,
-    date_scheduled: Option<Timestamp>,
-    date_started: Option<Timestamp>,
-    date_finished: Option<Timestamp>,
-    duration_expected: Option<f64>,
-    duration_real: Option<f64>,
-    notes: Option<String>,
-    metadata: Option<String>,
+    params: CreateWarehouseTaskParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "warehouse_task", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Task name cannot be empty".to_string());
     }
-
-    let task_type_clone = task_type.clone();
-    let state_clone = state.clone();
-    let priority_clone = priority.clone();
 
     let task = ctx.db.warehouse_task().insert(WarehouseTask {
         id: 0,
         organization_id,
-        name: name.clone(),
-        task_type,
-        state,
-        priority,
-        user_id,
-        picking_id,
-        move_id,
-        move_line_id,
-        location_id,
-        location_dest_id,
-        product_id,
-        lot_id,
-        package_id,
-        quantity,
-        uom_id,
+        name: params.name.clone(),
+        task_type: params.task_type.clone(),
+        state: params.state.clone(),
+        priority: params.priority.clone(),
+        user_id: params.user_id,
+        picking_id: params.picking_id,
+        move_id: params.move_id,
+        move_line_id: params.move_line_id,
+        location_id: params.location_id,
+        location_dest_id: params.location_dest_id,
+        product_id: params.product_id,
+        lot_id: params.lot_id,
+        package_id: params.package_id,
+        quantity: params.quantity,
+        uom_id: params.uom_id,
         company_id,
-        date_scheduled,
-        date_started,
-        date_finished,
-        duration_expected,
-        duration_real,
-        notes,
+        date_scheduled: params.date_scheduled,
+        date_started: params.date_started,
+        date_finished: params.date_finished,
+        duration_expected: params.duration_expected,
+        duration_real: params.duration_real,
+        notes: params.notes,
         created_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "warehouse_task",
-        task.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name, "task_type": task_type_clone, "picking_id": picking_id, "state": state_clone, "priority": priority_clone }).to_string()),
-        vec![
-            "name".to_string(),
-            "task_type".to_string(),
-            "state".to_string(),
-        ],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "warehouse_task",
+            record_id: task.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": task.name,
+                    "task_type": task.task_type,
+                    "state": task.state,
+                    "priority": task.priority,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "task_type".to_string(),
+                "state".to_string(),
+            ],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-/// Complete picking wave
+#[reducer]
 pub fn complete_picking_wave(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     wave_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "picking_wave", "update")?;
 
-    if let Some(mut wave) = ctx.db.picking_wave().id().find(&wave_id) {
-        if wave.state != "in_progress" {
-            return Err("Only waves in progress can be completed".to_string());
-        }
+    let wave = ctx
+        .db
+        .picking_wave()
+        .id()
+        .find(&wave_id)
+        .ok_or("Wave not found")?;
 
-        let old_state = wave.state.clone();
-        wave.state = "done".to_string();
-        wave.date_done = Some(ctx.timestamp);
-        ctx.db.picking_wave().id().update(wave);
-
-        write_audit_log(
-            ctx,
-            organization_id,
-            None,
-            "picking_wave",
-            wave_id,
-            "update",
-            Some(serde_json::json!({ "state": old_state }).to_string()),
-            Some(serde_json::json!({ "state": "done" }).to_string()),
-            vec!["state".to_string()],
-        );
-    } else {
-        return Err("Wave not found".to_string());
+    if wave.company_id != company_id {
+        return Err("Wave does not belong to this company".to_string());
     }
+
+    if wave.state != "in_progress" {
+        return Err("Only waves in progress can be completed".to_string());
+    }
+
+    let old_state = wave.state.clone();
+
+    ctx.db.picking_wave().id().update(PickingWave {
+        state: "done".to_string(),
+        date_done: Some(ctx.timestamp),
+        ..wave
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "picking_wave",
+            record_id: wave_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
 
-/// Update warehouse task status
+#[reducer]
 pub fn update_warehouse_task_status(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     task_id: u64,
     new_status: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "warehouse_task", "update")?;
 
-    if let Some(mut task) = ctx.db.warehouse_task().id().find(&task_id) {
-        let old_status = task.state.clone();
-        task.state = new_status.clone();
-        ctx.db.warehouse_task().id().update(task);
+    let task = ctx
+        .db
+        .warehouse_task()
+        .id()
+        .find(&task_id)
+        .ok_or("Task not found")?;
 
-        write_audit_log(
-            ctx,
-            organization_id,
-            None,
-            "warehouse_task",
-            task_id,
-            "update",
-            Some(serde_json::json!({ "state": old_status }).to_string()),
-            Some(serde_json::json!({ "state": new_status }).to_string()),
-            vec!["state".to_string()],
-        );
-    } else {
-        return Err("Task not found".to_string());
+    if task.company_id != company_id {
+        return Err("Task does not belong to this company".to_string());
     }
+
+    let old_status = task.state.clone();
+
+    ctx.db.warehouse_task().id().update(WarehouseTask {
+        state: new_status.clone(),
+        ..task
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "warehouse_task",
+            record_id: task_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_status }).to_string()),
+            new_values: Some(serde_json::json!({ "state": new_status }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

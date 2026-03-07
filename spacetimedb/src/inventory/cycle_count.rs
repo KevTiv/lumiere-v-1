@@ -3,11 +3,13 @@
 /// Tables:
 ///   - StockCycleCount
 ///   - StockCountSheet
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::{stock_quant, StockQuant};
 use serde_json;
+
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 /// Stock Cycle Count Plan / Session
 #[spacetimedb::table(
@@ -78,6 +80,39 @@ pub struct StockCountSheet {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCycleCountPlanParams {
+    /// If None, defaults to "Cycle Count @ {location_id}"
+    pub name: Option<String>,
+    pub count_by: String,
+    pub frequency: String,
+    pub tolerance_percentage: f64,
+    pub tolerance_value: f64,
+    pub next_count_date: Option<Timestamp>,
+    pub user_id: Option<Identity>,
+    pub team_id: Option<u64>,
+    pub product_ids: Vec<u64>,
+    pub product_category_ids: Vec<u64>,
+    pub reason: Option<String>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordCycleCountLineParams {
+    pub product_id: u64,
+    pub location_id: u64,
+    pub lot_id: Option<u64>,
+    pub qty_counted: f64,
+    pub uom_id: u64,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
 fn find_quant_for_sheet(ctx: &ReducerContext, sheet: &StockCountSheet) -> Option<StockQuant> {
     ctx.db.stock_quant().iter().find(|q| {
         q.organization_id == sheet.organization_id
@@ -103,70 +138,69 @@ pub fn create_cycle_count_plan(
     organization_id: u64,
     company_id: u64,
     location_id: u64,
-    method: String,
-    frequency: String,
-    name: Option<String>,
-    tolerance_percentage: Option<f64>,
-    tolerance_value: Option<f64>,
-    user_id: Option<Identity>,
-    team_id: Option<u64>,
-    product_ids: Vec<u64>,
-    product_category_ids: Vec<u64>,
-    notes: Option<String>,
-    metadata: Option<String>,
+    params: CreateCycleCountPlanParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_cycle_count", "create")?;
 
-    let plan_name = name.unwrap_or_else(|| format!("Cycle Count @ {}", location_id));
+    let plan_name = params
+        .name
+        .unwrap_or_else(|| format!("Cycle Count @ {}", location_id));
     if plan_name.trim().is_empty() {
         return Err("Cycle count plan name cannot be empty".to_string());
     }
 
+    let product_count = params.product_ids.len();
+    let category_count = params.product_category_ids.len();
+
+    // state starts as "draft"; line_ids and inventory_id are system-managed
     let cycle = ctx.db.stock_cycle_count().insert(StockCycleCount {
         id: 0,
         organization_id,
         name: plan_name.clone(),
         state: "draft".to_string(),
         location_id,
-        product_ids: product_ids.clone(),
-        product_category_ids: product_category_ids.clone(),
-        count_by: method,
-        frequency,
+        product_ids: params.product_ids,
+        product_category_ids: params.product_category_ids,
+        count_by: params.count_by,
+        frequency: params.frequency,
         last_count_date: None,
-        next_count_date: None,
-        tolerance_percentage: tolerance_percentage.unwrap_or(0.0),
-        tolerance_value: tolerance_value.unwrap_or(0.0),
-        user_id,
-        team_id,
+        next_count_date: params.next_count_date,
+        tolerance_percentage: params.tolerance_percentage,
+        tolerance_value: params.tolerance_value,
+        user_id: params.user_id,
+        team_id: params.team_id,
         company_id,
         inventory_id: None,
-        line_ids: Vec::new(),
-        reason: None,
-        notes,
+        line_ids: vec![],
+        reason: params.reason,
+        notes: params.notes,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "stock_cycle_count",
-        cycle.id,
-        "create",
-        None,
-        Some(
-            serde_json::json!({
-                "state": "draft",
-                "location_id": location_id,
-                "product_count": product_ids.len(),
-                "category_count": product_category_ids.len()
-            })
-            .to_string(),
-        ),
-        vec!["state".to_string(), "location_id".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_cycle_count",
+            record_id: cycle.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "state": "draft",
+                    "location_id": location_id,
+                    "product_count": product_count,
+                    "category_count": category_count,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "location_id".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -177,11 +211,12 @@ pub fn create_cycle_count_plan(
 pub fn start_cycle_count_session(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     cycle_count_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_cycle_count", "write")?;
 
-    let mut cycle = ctx
+    let cycle = ctx
         .db
         .stock_cycle_count()
         .id()
@@ -191,14 +226,33 @@ pub fn start_cycle_count_session(
     if cycle.organization_id != organization_id {
         return Err("Cycle count does not belong to this organization".to_string());
     }
-
+    if cycle.company_id != company_id {
+        return Err("Cycle count does not belong to this company".to_string());
+    }
     if cycle.state != "draft" && cycle.state != "validated" {
         return Err("Only draft/validated cycle counts can be started".to_string());
     }
 
-    cycle.state = "in_progress".to_string();
-    cycle.updated_at = ctx.timestamp;
-    ctx.db.stock_cycle_count().id().update(cycle);
+    ctx.db.stock_cycle_count().id().update(StockCycleCount {
+        state: "in_progress".to_string(),
+        updated_at: ctx.timestamp,
+        ..cycle
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_cycle_count",
+            record_id: cycle_count_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "in_progress" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -208,17 +262,13 @@ pub fn start_cycle_count_session(
 pub fn record_cycle_count_line(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     cycle_count_id: u64,
-    product_id: u64,
-    location_id: u64,
-    lot_id: Option<u64>,
-    qty_counted: f64,
-    uom_id: u64,
-    notes: Option<String>,
+    params: RecordCycleCountLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_count_sheet", "create")?;
 
-    let mut cycle = ctx
+    let cycle = ctx
         .db
         .stock_cycle_count()
         .id()
@@ -228,35 +278,25 @@ pub fn record_cycle_count_line(
     if cycle.organization_id != organization_id {
         return Err("Cycle count does not belong to this organization".to_string());
     }
+    if cycle.company_id != company_id {
+        return Err("Cycle count does not belong to this company".to_string());
+    }
     if cycle.state != "in_progress" {
         return Err("Cycle count must be in_progress to record lines".to_string());
     }
 
-    let expected_qty = find_quant_for_sheet(
-        ctx,
-        &StockCountSheet {
-            id: 0,
-            organization_id,
-            cycle_count_id,
-            product_id,
-            location_id,
-            lot_id,
-            expected_qty: 0.0,
-            counted_qty: 0.0,
-            uom_id,
-            variance: 0.0,
-            variance_value: 0.0,
-            counted_by: None,
-            counted_at: None,
-            notes: None,
-            is_processed: false,
-            processed_at: None,
-            created_at: ctx.timestamp,
-            metadata: None,
-        },
-    )
-    .map(|q| q.quantity)
-    .unwrap_or(0.0);
+    let expected_qty = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.product_id == params.product_id
+                && q.location_id == params.location_id
+                && q.lot_id == params.lot_id
+        })
+        .map(|q| q.quantity)
+        .unwrap_or(0.0);
 
     let quant_cost = ctx
         .db
@@ -264,41 +304,67 @@ pub fn record_cycle_count_line(
         .iter()
         .find(|q| {
             q.organization_id == organization_id
-                && q.product_id == product_id
-                && q.location_id == location_id
-                && q.lot_id == lot_id
+                && q.product_id == params.product_id
+                && q.location_id == params.location_id
+                && q.lot_id == params.lot_id
         })
         .map(|q| q.cost);
 
-    let variance = qty_counted - expected_qty;
-    let variance_value = compute_sheet_variance_value(expected_qty, qty_counted, quant_cost);
+    let variance = params.qty_counted - expected_qty;
+    let variance_value =
+        compute_sheet_variance_value(expected_qty, params.qty_counted, quant_cost);
 
+    // is_processed and processed_at are system-managed; set by post_cycle_count_adjustments
     let sheet = ctx.db.stock_count_sheet().insert(StockCountSheet {
         id: 0,
         organization_id,
         cycle_count_id,
-        product_id,
-        location_id,
-        lot_id,
+        product_id: params.product_id,
+        location_id: params.location_id,
+        lot_id: params.lot_id,
         expected_qty,
-        counted_qty: qty_counted,
-        uom_id,
+        counted_qty: params.qty_counted,
+        uom_id: params.uom_id,
         variance,
         variance_value,
         counted_by: Some(ctx.sender()),
         counted_at: Some(ctx.timestamp),
-        notes,
+        notes: params.notes,
         is_processed: false,
         processed_at: None,
         created_at: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
     let mut ids = cycle.line_ids.clone();
     ids.push(sheet.id);
-    cycle.line_ids = ids;
-    cycle.updated_at = ctx.timestamp;
-    ctx.db.stock_cycle_count().id().update(cycle);
+    ctx.db.stock_cycle_count().id().update(StockCycleCount {
+        line_ids: ids,
+        updated_at: ctx.timestamp,
+        ..cycle
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_count_sheet",
+            record_id: sheet.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "product_id": params.product_id,
+                    "counted_qty": params.qty_counted,
+                    "variance": variance,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["counted_qty".to_string(), "variance".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -309,11 +375,12 @@ pub fn record_cycle_count_line(
 pub fn validate_cycle_count(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     cycle_count_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_cycle_count", "write")?;
 
-    let mut cycle = ctx
+    let cycle = ctx
         .db
         .stock_cycle_count()
         .id()
@@ -323,7 +390,9 @@ pub fn validate_cycle_count(
     if cycle.organization_id != organization_id {
         return Err("Cycle count does not belong to this organization".to_string());
     }
-
+    if cycle.company_id != company_id {
+        return Err("Cycle count does not belong to this company".to_string());
+    }
     if cycle.state != "in_progress" {
         return Err("Cycle count must be in_progress to validate".to_string());
     }
@@ -338,9 +407,26 @@ pub fn validate_cycle_count(
         return Err("Cannot validate cycle count without lines".to_string());
     }
 
-    cycle.state = "validated".to_string();
-    cycle.updated_at = ctx.timestamp;
-    ctx.db.stock_cycle_count().id().update(cycle);
+    ctx.db.stock_cycle_count().id().update(StockCycleCount {
+        state: "validated".to_string(),
+        updated_at: ctx.timestamp,
+        ..cycle
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_cycle_count",
+            record_id: cycle_count_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "in_progress" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "validated" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -353,11 +439,12 @@ pub fn validate_cycle_count(
 pub fn post_cycle_count_adjustments(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     cycle_count_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_cycle_count", "write")?;
 
-    let mut cycle = ctx
+    let cycle = ctx
         .db
         .stock_cycle_count()
         .id()
@@ -367,14 +454,16 @@ pub fn post_cycle_count_adjustments(
     if cycle.organization_id != organization_id {
         return Err("Cycle count does not belong to this organization".to_string());
     }
-
+    if cycle.company_id != company_id {
+        return Err("Cycle count does not belong to this company".to_string());
+    }
     if cycle.state != "validated" {
         return Err("Cycle count must be validated before posting adjustments".to_string());
     }
 
     let sheet_ids = cycle.line_ids.clone();
     for sheet_id in sheet_ids {
-        let mut sheet = ctx
+        let sheet = ctx
             .db
             .stock_count_sheet()
             .id()
@@ -433,27 +522,33 @@ pub fn post_cycle_count_adjustments(
             });
         }
 
-        sheet.is_processed = true;
-        sheet.processed_at = Some(ctx.timestamp);
-        ctx.db.stock_count_sheet().id().update(sheet);
+        ctx.db.stock_count_sheet().id().update(StockCountSheet {
+            is_processed: true,
+            processed_at: Some(ctx.timestamp),
+            ..sheet
+        });
     }
 
-    cycle.state = "posted".to_string();
-    cycle.last_count_date = Some(ctx.timestamp);
-    cycle.updated_at = ctx.timestamp;
-    let cycle_company_id = cycle.company_id;
-    ctx.db.stock_cycle_count().id().update(cycle);
+    ctx.db.stock_cycle_count().id().update(StockCycleCount {
+        state: "posted".to_string(),
+        last_count_date: Some(ctx.timestamp),
+        updated_at: ctx.timestamp,
+        ..cycle
+    });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(cycle_company_id),
-        "stock_cycle_count",
-        cycle_count_id,
-        "post",
-        Some(serde_json::json!({ "state": "validated" }).to_string()),
-        Some(serde_json::json!({ "state": "posted" }).to_string()),
-        vec!["state".to_string(), "last_count_date".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_cycle_count",
+            record_id: cycle_count_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "validated" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "posted" }).to_string()),
+            changed_fields: vec!["state".to_string(), "last_count_date".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())

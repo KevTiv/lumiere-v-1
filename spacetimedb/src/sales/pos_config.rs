@@ -10,47 +10,15 @@
 ///   - Flexible payment method configuration
 ///   - Loyalty program management
 ///   - Module toggles for features
-use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::reference::currency;
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::PaymentMethodType;
 
-// ══════════════════════════════════════════════════════════════════════════════
-// INPUT TYPES
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Input Params ──────────────────────────────────────────────────────────────
 
-/// Input for creating POS configuration
-#[derive(SpacetimeType, Clone, Debug)]
-pub struct PosConfigInput {
-    pub name: String,
-    pub company_id: u64,
-    pub picking_type_id: u64,
-    pub journal_id: u64,
-    pub currency_id: u64,
-    pub pricelist_id: u64,
-    pub warehouse_id: u64,
-    pub stock_location_id: u64,
-    pub invoice_journal_id: Option<u64>,
-    pub tip_product_id: Option<u64>,
-    pub iface_start_categ_id: Option<u64>,
-    pub iface_available_categ_ids: Vec<u64>,
-    pub fpos_id: Option<u64>,
-    pub team_id: Option<u64>,
-    pub crm_team_id: Option<u64>,
-    pub route_id: Option<u64>,
-    pub partner_id: Option<u64>,
-    pub analytic_account_id: Option<u64>,
-    pub payment_method_ids: Vec<u64>,
-    pub trusted_config_ids: Vec<u64>,
-    pub receipt_header: Option<String>,
-    pub receipt_footer: Option<String>,
-    pub proxy_ip: Option<String>,
-    pub available_pricelist_ids: Vec<u64>,
-    pub module_config: ModuleConfigInput,
-}
-
-/// Module configuration input
+/// Module configuration input (nested config — not a top-level params struct)
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct ModuleConfigInput {
     pub module_account: bool,
@@ -77,11 +45,37 @@ pub struct ModuleConfigInput {
     pub auto_validate_terminal_payment: bool,
 }
 
-/// Input for creating payment method
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct PaymentMethodInput {
+pub struct CreatePosConfigParams {
     pub name: String,
-    pub company_id: u64,
+    pub picking_type_id: u64,
+    pub journal_id: u64,
+    pub currency_id: u64,
+    pub pricelist_id: u64,
+    pub warehouse_id: u64,
+    pub stock_location_id: u64,
+    pub invoice_journal_id: Option<u64>,
+    pub tip_product_id: Option<u64>,
+    pub iface_start_categ_id: Option<u64>,
+    pub iface_available_categ_ids: Vec<u64>,
+    pub fpos_id: Option<u64>,
+    pub team_id: Option<u64>,
+    pub crm_team_id: Option<u64>,
+    pub route_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub analytic_account_id: Option<u64>,
+    pub payment_method_ids: Vec<u64>,
+    pub trusted_config_ids: Vec<u64>,
+    pub receipt_header: Option<String>,
+    pub receipt_footer: Option<String>,
+    pub proxy_ip: Option<String>,
+    pub available_pricelist_ids: Vec<u64>,
+    pub module_config: ModuleConfigInput,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePaymentMethodParams {
+    pub name: String,
     pub payment_method_type: PaymentMethodType,
     pub is_cash_count: bool,
     pub is_card_payment: bool,
@@ -96,9 +90,8 @@ pub struct PaymentMethodInput {
     pub sequence: u32,
 }
 
-/// Input for creating loyalty program
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct LoyaltyProgramInput {
+pub struct CreateLoyaltyProgramParams {
     pub name: String,
     pub currency_id: u64,
     pub program_type: String,
@@ -110,9 +103,7 @@ pub struct LoyaltyProgramInput {
     pub limit_usage: u32,
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TABLES: POS CONFIGURATION
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = pos_config,
@@ -261,16 +252,18 @@ pub struct PosLoyaltyProgram {
     pub metadata: Option<String>,
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// REDUCERS: POS CONFIGURATION
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Reducers ──────────────────────────────────────────────────────────────────
 
-#[spacetimedb::reducer]
-pub fn create_pos_config(ctx: &ReducerContext, input: PosConfigInput) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "pos_config", "create")?;
+#[reducer]
+pub fn create_pos_config(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreatePosConfigParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_config", "create")?;
 
-    // Validate payment methods
-    for method_id in &input.payment_method_ids {
+    for method_id in &params.payment_method_ids {
         let _method = ctx
             .db
             .pos_payment_method()
@@ -281,71 +274,71 @@ pub fn create_pos_config(ctx: &ReducerContext, input: PosConfigInput) -> Result<
 
     let config = ctx.db.pos_config().insert(PosConfig {
         id: 0,
-        name: input.name,
+        name: params.name,
         is_active: true,
-        company_id: input.company_id,
-        picking_type_id: input.picking_type_id,
-        journal_id: input.journal_id,
-        invoice_journal_id: input.invoice_journal_id,
-        currency_id: input.currency_id,
-        iface_tipproduct: input.tip_product_id.is_some(),
-        tip_product_id: input.tip_product_id,
-        iface_tax_included: input.module_config.iface_tax_included,
-        iface_start_categ_id: input.iface_start_categ_id,
-        iface_available_categ_ids: input.iface_available_categ_ids.clone(),
-        restrict_categ: !input.iface_available_categ_ids.is_empty(),
-        module_account: input.module_config.module_account,
-        module_invoice: input.module_config.module_invoice,
-        module_pos_hr: input.module_config.module_pos_hr,
-        module_pos_restaurant: input.module_config.module_pos_restaurant,
-        module_pos_discount: input.module_config.module_pos_discount,
-        module_pos_loyalty: input.module_config.module_pos_loyalty,
-        module_pos_mercury: input.module_config.module_pos_mercury,
-        module_pos_reprint: input.module_config.module_pos_reprint,
-        module_pos_restaurant_appointment: input.module_config.module_pos_restaurant_appointment,
-        module_pos_restaurant_preparation_display: input
+        company_id,
+        picking_type_id: params.picking_type_id,
+        journal_id: params.journal_id,
+        invoice_journal_id: params.invoice_journal_id,
+        currency_id: params.currency_id,
+        iface_tipproduct: params.tip_product_id.is_some(),
+        tip_product_id: params.tip_product_id,
+        iface_tax_included: params.module_config.iface_tax_included,
+        iface_start_categ_id: params.iface_start_categ_id,
+        restrict_categ: !params.iface_available_categ_ids.is_empty(),
+        iface_available_categ_ids: params.iface_available_categ_ids.clone(),
+        module_account: params.module_config.module_account,
+        module_invoice: params.module_config.module_invoice,
+        module_pos_hr: params.module_config.module_pos_hr,
+        module_pos_restaurant: params.module_config.module_pos_restaurant,
+        module_pos_discount: params.module_config.module_pos_discount,
+        module_pos_loyalty: params.module_config.module_pos_loyalty,
+        module_pos_mercury: params.module_config.module_pos_mercury,
+        module_pos_reprint: params.module_config.module_pos_reprint,
+        module_pos_restaurant_appointment: params.module_config.module_pos_restaurant_appointment,
+        module_pos_restaurant_preparation_display: params
             .module_config
             .module_pos_restaurant_preparation_display,
-        module_pos_stripe: input.module_config.module_pos_stripe,
-        module_pos_six: input.module_config.module_pos_six,
-        module_pos_adyen: input.module_config.module_pos_adyen,
-        module_pos_paytm: input.module_config.module_pos_paytm,
-        module_pos_vantiv: input.module_config.module_pos_vantiv,
-        module_pos_ingenico: input.module_config.module_pos_ingenico,
-        is_posbox: input.module_config.is_posbox,
-        is_header_or_footer: input.receipt_header.is_some() || input.receipt_footer.is_some(),
-        receipt_header: input.receipt_header,
-        receipt_footer: input.receipt_footer,
-        proxy_ip: input.proxy_ip,
+        module_pos_stripe: params.module_config.module_pos_stripe,
+        module_pos_six: params.module_config.module_pos_six,
+        module_pos_adyen: params.module_config.module_pos_adyen,
+        module_pos_paytm: params.module_config.module_pos_paytm,
+        module_pos_vantiv: params.module_config.module_pos_vantiv,
+        module_pos_ingenico: params.module_config.module_pos_ingenico,
+        is_posbox: params.module_config.is_posbox,
+        is_header_or_footer: params.receipt_header.is_some() || params.receipt_footer.is_some(),
+        receipt_header: params.receipt_header,
+        receipt_footer: params.receipt_footer,
+        proxy_ip: params.proxy_ip,
         iot_device_ids: Vec::new(),
         pos_device_ids: Vec::new(),
         floor_ids: Vec::new(),
-        pricelist_id: input.pricelist_id,
-        available_pricelist_ids: input.available_pricelist_ids.clone(),
-        use_pricelist: !input.available_pricelist_ids.is_empty(),
-        tax_regime_selection: input.module_config.tax_regime_selection,
-        tax_regime: input.module_config.tax_regime,
-        fpos_id: input.fpos_id,
+        pricelist_id: params.pricelist_id,
+        use_pricelist: !params.available_pricelist_ids.is_empty(),
+        available_pricelist_ids: params.available_pricelist_ids,
+        tax_regime_selection: params.module_config.tax_regime_selection,
+        tax_regime: params.module_config.tax_regime,
+        fpos_id: params.fpos_id,
         company_has_template: true,
         journal_user: true,
-        invoice_journal_type: input.module_config.module_invoice,
+        invoice_journal_type: params.module_config.module_invoice,
         sequence_id: 0,
         sequence_line_id: 0,
         default_cashbox_lines_ids: Vec::new(),
-        team_id: input.team_id,
-        crm_team_id: input.crm_team_id,
+        team_id: params.team_id,
+        crm_team_id: params.crm_team_id,
         last_session_closing_cash: 0.0,
         last_session_closing_date: None,
-        cash_control: input.module_config.cash_control,
-        warehouse_id: input.warehouse_id,
-        route_id: input.route_id,
-        stock_location_id: input.stock_location_id,
-        partner_id: input.partner_id,
-        analytic_account_id: input.analytic_account_id,
+        cash_control: params.module_config.cash_control,
+        warehouse_id: params.warehouse_id,
+        route_id: params.route_id,
+        stock_location_id: params.stock_location_id,
+        partner_id: params.partner_id,
+        analytic_account_id: params.analytic_account_id,
         update_stock_quantities: "manual".to_string(),
-        auto_validate_terminal_payment: input.module_config.auto_validate_terminal_payment,
-        trusted_config_ids: input.trusted_config_ids,
-        payment_method_ids: input.payment_method_ids,
+        auto_validate_terminal_payment: params.module_config.auto_validate_terminal_payment,
+        trusted_config_ids: params.trusted_config_ids,
+        payment_method_ids: params.payment_method_ids,
         sequence_number: 0,
         cash_journal_id: None,
         cash_register_id: None,
@@ -356,52 +349,56 @@ pub fn create_pos_config(ctx: &ReducerContext, input: PosConfigInput) -> Result<
         metadata: None,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        input.company_id,
-        Some(input.company_id),
-        "pos_config",
-        config.id,
-        "create",
-        None,
-        Some(
-            serde_json::json!({ "name": config.name, "company_id": input.company_id }).to_string(),
-        ),
-        vec!["name".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_config",
+            record_id: config.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": config.name, "company_id": company_id }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_payment_method(
     ctx: &ReducerContext,
-    input: PaymentMethodInput,
+    organization_id: u64,
+    company_id: u64,
+    params: CreatePaymentMethodParams,
 ) -> Result<(), String> {
-    check_permission(ctx, input.company_id, "pos_payment_method", "create")?;
+    check_permission(ctx, organization_id, "pos_payment_method", "create")?;
 
-    // Extract the value before moving
-    let use_payment_terminal = input.use_payment_terminal.clone();
+    let use_payment_terminal = params.use_payment_terminal.clone();
     let hide_use_payment_terminal = use_payment_terminal.is_none();
 
     ctx.db.pos_payment_method().insert(PosPaymentMethod {
         id: 0,
-        name: input.name,
-        outstanding_account_id: input.outstanding_account_id,
-        receivable_account_id: input.receivable_account_id,
-        journal_id: input.journal_id,
-        company_id: input.company_id,
+        name: params.name,
+        outstanding_account_id: params.outstanding_account_id,
+        receivable_account_id: params.receivable_account_id,
+        journal_id: params.journal_id,
+        company_id,
         config_ids: Vec::new(),
-        is_cash_count: input.is_cash_count,
-        is_card_payment: input.is_card_payment,
+        is_cash_count: params.is_cash_count,
+        is_card_payment: params.is_card_payment,
         use_payment_terminal,
         hide_use_payment_terminal,
-        open_cashbox: input.open_cashbox,
-        cash_journal_id: input.cash_journal_id,
-        split_transactions: input.split_transactions,
-        payment_method_type: input.payment_method_type,
-        image: input.image,
-        sequence: input.sequence,
+        open_cashbox: params.open_cashbox,
+        cash_journal_id: params.cash_journal_id,
+        split_transactions: params.split_transactions,
+        payment_method_type: params.payment_method_type,
+        image: params.image,
+        sequence: params.sequence,
         active: true,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
@@ -413,45 +410,41 @@ pub fn create_payment_method(
     Ok(())
 }
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_loyalty_program(
     ctx: &ReducerContext,
-    input: LoyaltyProgramInput,
+    organization_id: u64,
+    params: CreateLoyaltyProgramParams,
 ) -> Result<(), String> {
-    // For now, skip currency lookup and use a default company_id
-    // In production, you'd want to properly look up the currency and get its company
-    let company_id = 1u64; // Default company
+    check_permission(ctx, organization_id, "pos_loyalty_program", "create")?;
 
-    check_permission(ctx, company_id, "pos_loyalty_program", "create")?;
-
-    // Check if code already exists
     let existing: Vec<_> = ctx
         .db
         .pos_loyalty_program()
         .iter()
-        .filter(|p| p.name == input.name && p.currency_id == input.currency_id)
+        .filter(|p| p.name == params.name && p.currency_id == params.currency_id)
         .collect();
 
     if !existing.is_empty() {
         return Err("Loyalty program with this name already exists".to_string());
     }
 
-    let program = ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
+    ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
         id: 0,
-        name: input.name,
-        currency_id: input.currency_id,
-        program_type: input.program_type,
-        is_nominative: input.is_nominative,
+        name: params.name,
+        currency_id: params.currency_id,
+        program_type: params.program_type,
+        is_nominative: params.is_nominative,
         portal_visible: true,
-        trigger_product_ids: input.trigger_product_ids,
+        trigger_product_ids: params.trigger_product_ids,
         rule_ids: Vec::new(),
         reward_ids: Vec::new(),
         communication_plan_ids: Vec::new(),
-        limit_usage: input.limit_usage,
+        limit_usage: params.limit_usage,
         is_active: true,
-        validity_duration: input.validity_duration,
-        validity_duration_type: input.validity_duration_type,
-        date_to: input.date_to,
+        validity_duration: params.validity_duration,
+        validity_duration_type: params.validity_duration_type,
+        date_to: params.date_to,
         total_order_count: 0,
         active_order_count: 0,
         create_uid: ctx.sender(),
@@ -464,8 +457,12 @@ pub fn create_loyalty_program(
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn activate_pos_config(ctx: &ReducerContext, config_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn activate_pos_config(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    config_id: u64,
+) -> Result<(), String> {
     let config = ctx
         .db
         .pos_config()
@@ -473,7 +470,7 @@ pub fn activate_pos_config(ctx: &ReducerContext, config_id: u64) -> Result<(), S
         .find(&config_id)
         .ok_or("POS config not found")?;
 
-    check_permission(ctx, config.company_id, "pos_config", "write")?;
+    check_permission(ctx, organization_id, "pos_config", "write")?;
 
     ctx.db.pos_config().id().update(PosConfig {
         is_active: true,
@@ -485,8 +482,12 @@ pub fn activate_pos_config(ctx: &ReducerContext, config_id: u64) -> Result<(), S
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn deactivate_pos_config(ctx: &ReducerContext, config_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn deactivate_pos_config(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    config_id: u64,
+) -> Result<(), String> {
     let config = ctx
         .db
         .pos_config()
@@ -494,7 +495,7 @@ pub fn deactivate_pos_config(ctx: &ReducerContext, config_id: u64) -> Result<(),
         .find(&config_id)
         .ok_or("POS config not found")?;
 
-    check_permission(ctx, config.company_id, "pos_config", "write")?;
+    check_permission(ctx, organization_id, "pos_config", "write")?;
 
     ctx.db.pos_config().id().update(PosConfig {
         is_active: false,

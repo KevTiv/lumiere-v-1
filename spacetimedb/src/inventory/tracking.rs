@@ -5,15 +5,16 @@
 ///   - StockProductionSerial
 ///   - SerialLotTraceability
 ///   - StockTraceabilityReport
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3.15: STOCK PRODUCTION LOT
 // ══════════════════════════════════════════════════════════════════════════════
 
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = stock_production_lot,
     public,
@@ -52,6 +53,7 @@ pub struct StockProductionLot {
 // SECTION 3.16: STOCK PRODUCTION SERIAL
 // ══════════════════════════════════════════════════════════════════════════════
 
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = stock_production_serial,
     public,
@@ -98,6 +100,7 @@ pub struct StockProductionSerial {
 // SECTION 3.17: SERIAL/LOT TRACEABILITY
 // ══════════════════════════════════════════════════════════════════════════════
 
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = serial_lot_traceability,
     public,
@@ -133,6 +136,7 @@ pub struct SerialLotTraceability {
 // SECTION 3.18: STOCK TRACEABILITY REPORT
 // ══════════════════════════════════════════════════════════════════════════════
 
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = stock_traceability_report,
     public,
@@ -160,84 +164,193 @@ pub struct StockTraceabilityReport {
     pub metadata: Option<String>,
 }
 
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateStockProductionLotParams {
+    pub name: String,
+    pub product_id: u64,
+    pub product_variant_id: Option<u64>,
+    pub ref_: Option<String>,
+    pub note: Option<String>,
+    pub expiration_date: Option<Timestamp>,
+    pub use_date: Option<Timestamp>,
+    pub removal_date: Option<Timestamp>,
+    pub alert_date: Option<Timestamp>,
+    pub product_qty: f64,
+    pub location_id: Option<u64>,
+    pub package_id: Option<u64>,
+    pub owner_id: Option<u64>,
+    pub is_scrap: bool,
+    pub is_locked: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateStockProductionLotParams {
+    pub name: Option<String>,
+    pub ref_: Option<String>,
+    pub note: Option<String>,
+    pub expiration_date: Option<Timestamp>,
+    pub use_date: Option<Timestamp>,
+    pub removal_date: Option<Timestamp>,
+    pub alert_date: Option<Timestamp>,
+    pub product_qty: Option<f64>,
+    pub location_id: Option<u64>,
+    pub is_locked: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateStockProductionSerialParams {
+    pub name: String,
+    pub product_id: u64,
+    pub product_variant_id: Option<u64>,
+    pub lot_id: Option<u64>,
+    pub ref_: Option<String>,
+    pub note: Option<String>,
+    pub expiration_date: Option<Timestamp>,
+    pub use_date: Option<Timestamp>,
+    pub removal_date: Option<Timestamp>,
+    pub alert_date: Option<Timestamp>,
+    pub product_qty: f64,
+    pub location_id: Option<u64>,
+    pub package_id: Option<u64>,
+    pub owner_id: Option<u64>,
+    pub state: String,
+    pub is_scrap: bool,
+    pub is_locked: bool,
+    pub warranty_expiration: Option<Timestamp>,
+    pub warranty_start: Option<Timestamp>,
+    pub last_maintenance: Option<Timestamp>,
+    pub next_maintenance: Option<Timestamp>,
+    pub maintenance_count: i32,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateStockProductionSerialParams {
+    pub name: Option<String>,
+    pub ref_: Option<String>,
+    pub note: Option<String>,
+    pub state: Option<String>,
+    pub expiration_date: Option<Timestamp>,
+    pub use_date: Option<Timestamp>,
+    pub removal_date: Option<Timestamp>,
+    pub alert_date: Option<Timestamp>,
+    pub location_id: Option<u64>,
+    pub is_locked: Option<bool>,
+    pub warranty_expiration: Option<Timestamp>,
+    pub warranty_start: Option<Timestamp>,
+    pub last_maintenance: Option<Timestamp>,
+    pub next_maintenance: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateTraceabilityRecordParams {
+    pub product_id: u64,
+    pub document_type: String,
+    pub document_id: u64,
+    pub quantity: f64,
+    pub uom_id: u64,
+    pub date: Timestamp,
+    pub serial_id: Option<u64>,
+    pub lot_id: Option<u64>,
+    pub document_line_id: Option<u64>,
+    pub move_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub origin: Option<String>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateStockTraceabilityReportParams {
+    pub name: String,
+    pub date_from: Timestamp,
+    pub date_to: Timestamp,
+    pub product_ids: Vec<u64>,
+    pub lot_ids: Vec<u64>,
+    pub serial_ids: Vec<u64>,
+    pub location_ids: Vec<u64>,
+    pub warehouse_ids: Vec<u64>,
+    pub partner_ids: Vec<u64>,
+    pub picking_type_ids: Vec<u64>,
+    pub state: String,
+    pub metadata: Option<String>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
 // ══════════════════════════════════════════════════════════════════════════════
 // REDUCERS: STOCK PRODUCTION LOT
 // ══════════════════════════════════════════════════════════════════════════════
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_stock_production_lot(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    product_id: u64,
     company_id: u64,
-    product_variant_id: Option<u64>,
-    ref_: Option<String>,
-    note: Option<String>,
-    expiration_date: Option<Timestamp>,
-    use_date: Option<Timestamp>,
-    removal_date: Option<Timestamp>,
-    alert_date: Option<Timestamp>,
-    location_id: Option<u64>,
+    params: CreateStockProductionLotParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_production_lot", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Lot name cannot be empty".to_string());
     }
 
     let lot = ctx.db.stock_production_lot().insert(StockProductionLot {
         id: 0,
         organization_id,
-        name: name.clone(),
-        ref_,
-        product_id,
-        product_variant_id,
+        name: params.name.clone(),
+        ref_: params.ref_,
+        product_id: params.product_id,
+        product_variant_id: params.product_variant_id,
         company_id,
-        note,
-        expiration_date,
-        use_date,
-        removal_date,
-        alert_date,
-        product_qty: 0.0,
-        location_id,
-        package_id: None,
-        owner_id: None,
-        is_scrap: false,
-        is_locked: false,
+        note: params.note,
+        expiration_date: params.expiration_date,
+        use_date: params.use_date,
+        removal_date: params.removal_date,
+        alert_date: params.alert_date,
+        product_qty: params.product_qty,
+        location_id: params.location_id,
+        package_id: params.package_id,
+        owner_id: params.owner_id,
+        is_scrap: params.is_scrap,
+        is_locked: params.is_locked,
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
-        metadata: None,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "stock_production_lot",
-        lot.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name, "product_id": product_id }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_lot",
+            record_id: lot.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": lot.name, "product_id": lot.product_id }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "product_id".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn update_stock_production_lot(
     ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
     lot_id: u64,
-    name: Option<String>,
-    note: Option<String>,
-    expiration_date: Option<Timestamp>,
-    use_date: Option<Timestamp>,
-    removal_date: Option<Timestamp>,
-    alert_date: Option<Timestamp>,
-    product_qty: Option<f64>,
-    location_id: Option<u64>,
-    is_locked: Option<bool>,
+    params: UpdateStockProductionLotParams,
 ) -> Result<(), String> {
     let lot = ctx
         .db
@@ -246,30 +359,56 @@ pub fn update_stock_production_lot(
         .find(&lot_id)
         .ok_or("Lot not found")?;
 
-    check_permission(ctx, lot.organization_id, "stock_production_lot", "write")?;
+    check_permission(ctx, organization_id, "stock_production_lot", "write")?;
+
+    if lot.company_id != company_id {
+        return Err("Lot does not belong to this company".to_string());
+    }
 
     ctx.db
         .stock_production_lot()
         .id()
         .update(StockProductionLot {
-            name: name.unwrap_or_else(|| lot.name.clone()),
-            note: note.or(lot.note),
-            expiration_date: expiration_date.or(lot.expiration_date),
-            use_date: use_date.or(lot.use_date),
-            removal_date: removal_date.or(lot.removal_date),
-            alert_date: alert_date.or(lot.alert_date),
-            product_qty: product_qty.unwrap_or(lot.product_qty),
-            location_id: location_id.or(lot.location_id),
-            is_locked: is_locked.unwrap_or(lot.is_locked),
+            name: params.name.unwrap_or_else(|| lot.name.clone()),
+            ref_: params.ref_.or(lot.ref_),
+            note: params.note.or(lot.note),
+            expiration_date: params.expiration_date.or(lot.expiration_date),
+            use_date: params.use_date.or(lot.use_date),
+            removal_date: params.removal_date.or(lot.removal_date),
+            alert_date: params.alert_date.or(lot.alert_date),
+            product_qty: params.product_qty.unwrap_or(lot.product_qty),
+            location_id: params.location_id.or(lot.location_id),
+            is_locked: params.is_locked.unwrap_or(lot.is_locked),
+            metadata: params.metadata.or(lot.metadata),
             write_date: ctx.timestamp,
             ..lot
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_lot",
+            record_id: lot_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn delete_stock_production_lot(ctx: &ReducerContext, lot_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn delete_stock_production_lot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    lot_id: u64,
+) -> Result<(), String> {
     let lot = ctx
         .db
         .stock_production_lot()
@@ -277,21 +416,27 @@ pub fn delete_stock_production_lot(ctx: &ReducerContext, lot_id: u64) -> Result<
         .find(&lot_id)
         .ok_or("Lot not found")?;
 
-    check_permission(ctx, lot.organization_id, "stock_production_lot", "delete")?;
+    check_permission(ctx, organization_id, "stock_production_lot", "delete")?;
 
-    let lot_name = lot.name.clone();
+    if lot.company_id != company_id {
+        return Err("Lot does not belong to this company".to_string());
+    }
+
     ctx.db.stock_production_lot().id().delete(&lot_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        lot.organization_id,
-        Some(lot.company_id),
-        "stock_production_lot",
-        lot_id,
-        "delete",
-        Some(serde_json::json!({ "name": lot_name }).to_string()),
-        None,
-        vec!["deleted".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_lot",
+            record_id: lot_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": lot.name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -301,28 +446,16 @@ pub fn delete_stock_production_lot(ctx: &ReducerContext, lot_id: u64) -> Result<
 // REDUCERS: STOCK PRODUCTION SERIAL
 // ══════════════════════════════════════════════════════════════════════════════
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_stock_production_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    product_id: u64,
     company_id: u64,
-    product_variant_id: Option<u64>,
-    lot_id: Option<u64>,
-    ref_: Option<String>,
-    note: Option<String>,
-    expiration_date: Option<Timestamp>,
-    use_date: Option<Timestamp>,
-    removal_date: Option<Timestamp>,
-    alert_date: Option<Timestamp>,
-    location_id: Option<u64>,
-    warranty_expiration: Option<Timestamp>,
-    warranty_start: Option<Timestamp>,
+    params: CreateStockProductionSerialParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_production_serial", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Serial name cannot be empty".to_string());
     }
 
@@ -332,66 +465,62 @@ pub fn create_stock_production_serial(
         .insert(StockProductionSerial {
             id: 0,
             organization_id,
-            name: name.clone(),
-            ref_,
-            product_id,
-            product_variant_id,
-            lot_id,
+            name: params.name.clone(),
+            ref_: params.ref_,
+            product_id: params.product_id,
+            product_variant_id: params.product_variant_id,
+            lot_id: params.lot_id,
             company_id,
-            note,
-            expiration_date,
-            use_date,
-            removal_date,
-            alert_date,
-            product_qty: 1.0,
-            location_id,
-            package_id: None,
-            owner_id: None,
-            state: "free".to_string(),
-            is_scrap: false,
-            is_locked: false,
-            warranty_expiration,
-            warranty_start,
-            last_maintenance: None,
-            next_maintenance: None,
-            maintenance_count: 0,
+            note: params.note,
+            expiration_date: params.expiration_date,
+            use_date: params.use_date,
+            removal_date: params.removal_date,
+            alert_date: params.alert_date,
+            product_qty: params.product_qty,
+            location_id: params.location_id,
+            package_id: params.package_id,
+            owner_id: params.owner_id,
+            state: params.state,
+            is_scrap: params.is_scrap,
+            is_locked: params.is_locked,
+            warranty_expiration: params.warranty_expiration,
+            warranty_start: params.warranty_start,
+            last_maintenance: params.last_maintenance,
+            next_maintenance: params.next_maintenance,
+            maintenance_count: params.maintenance_count,
             create_date: ctx.timestamp,
             write_date: ctx.timestamp,
-            metadata: None,
+            metadata: params.metadata,
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "stock_production_serial",
-        serial.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name, "product_id": product_id }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": serial.name, "product_id": serial.product_id })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "product_id".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn update_stock_production_serial(
     ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
     serial_id: u64,
-    name: Option<String>,
-    note: Option<String>,
-    state: Option<String>,
-    expiration_date: Option<Timestamp>,
-    use_date: Option<Timestamp>,
-    removal_date: Option<Timestamp>,
-    alert_date: Option<Timestamp>,
-    location_id: Option<u64>,
-    is_locked: Option<bool>,
-    warranty_expiration: Option<Timestamp>,
-    warranty_start: Option<Timestamp>,
-    last_maintenance: Option<Timestamp>,
-    next_maintenance: Option<Timestamp>,
+    params: UpdateStockProductionSerialParams,
 ) -> Result<(), String> {
     let serial = ctx
         .db
@@ -400,14 +529,13 @@ pub fn update_stock_production_serial(
         .find(&serial_id)
         .ok_or("Serial not found")?;
 
-    check_permission(
-        ctx,
-        serial.organization_id,
-        "stock_production_serial",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
-    let new_maintenance_count = if last_maintenance.is_some() {
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
+
+    let new_maintenance_count = if params.last_maintenance.is_some() {
         serial.maintenance_count + 1
     } else {
         serial.maintenance_count
@@ -417,29 +545,51 @@ pub fn update_stock_production_serial(
         .stock_production_serial()
         .id()
         .update(StockProductionSerial {
-            name: name.unwrap_or_else(|| serial.name.clone()),
-            note: note.or(serial.note),
-            state: state.unwrap_or_else(|| serial.state.clone()),
-            expiration_date: expiration_date.or(serial.expiration_date),
-            use_date: use_date.or(serial.use_date),
-            removal_date: removal_date.or(serial.removal_date),
-            alert_date: alert_date.or(serial.alert_date),
-            location_id: location_id.or(serial.location_id),
-            is_locked: is_locked.unwrap_or(serial.is_locked),
-            warranty_expiration: warranty_expiration.or(serial.warranty_expiration),
-            warranty_start: warranty_start.or(serial.warranty_start),
-            last_maintenance: last_maintenance.or(serial.last_maintenance),
-            next_maintenance: next_maintenance.or(serial.next_maintenance),
+            name: params.name.unwrap_or_else(|| serial.name.clone()),
+            ref_: params.ref_.or(serial.ref_),
+            note: params.note.or(serial.note),
+            state: params.state.unwrap_or_else(|| serial.state.clone()),
+            expiration_date: params.expiration_date.or(serial.expiration_date),
+            use_date: params.use_date.or(serial.use_date),
+            removal_date: params.removal_date.or(serial.removal_date),
+            alert_date: params.alert_date.or(serial.alert_date),
+            location_id: params.location_id.or(serial.location_id),
+            is_locked: params.is_locked.unwrap_or(serial.is_locked),
+            warranty_expiration: params.warranty_expiration.or(serial.warranty_expiration),
+            warranty_start: params.warranty_start.or(serial.warranty_start),
+            last_maintenance: params.last_maintenance.or(serial.last_maintenance),
+            next_maintenance: params.next_maintenance.or(serial.next_maintenance),
             maintenance_count: new_maintenance_count,
+            metadata: params.metadata.or(serial.metadata),
             write_date: ctx.timestamp,
             ..serial
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn reserve_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn reserve_serial(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    serial_id: u64,
+) -> Result<(), String> {
     let serial = ctx
         .db
         .stock_production_serial()
@@ -447,12 +597,11 @@ pub fn reserve_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String
         .find(&serial_id)
         .ok_or("Serial not found")?;
 
-    check_permission(
-        ctx,
-        serial.organization_id,
-        "stock_production_serial",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
+
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
 
     if serial.state != "free" {
         return Err(format!(
@@ -470,11 +619,31 @@ pub fn reserve_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String
             ..serial
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "free" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "reserved" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn use_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn use_serial(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    serial_id: u64,
+) -> Result<(), String> {
     let serial = ctx
         .db
         .stock_production_serial()
@@ -482,12 +651,11 @@ pub fn use_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String> {
         .find(&serial_id)
         .ok_or("Serial not found")?;
 
-    check_permission(
-        ctx,
-        serial.organization_id,
-        "stock_production_serial",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
+
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
 
     if serial.state != "reserved" {
         return Err(format!(
@@ -505,12 +673,29 @@ pub fn use_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String> {
             ..serial
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "reserved" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "in_use" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn block_serial(
     ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
     serial_id: u64,
     reason: Option<String>,
 ) -> Result<(), String> {
@@ -521,12 +706,13 @@ pub fn block_serial(
         .find(&serial_id)
         .ok_or("Serial not found")?;
 
-    check_permission(
-        ctx,
-        serial.organization_id,
-        "stock_production_serial",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
+
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
+
+    let old_state = serial.state.clone();
 
     ctx.db
         .stock_production_serial()
@@ -539,11 +725,31 @@ pub fn block_serial(
             ..serial
         });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "blocked", "is_locked": true }).to_string()),
+            changed_fields: vec!["state".to_string(), "is_locked".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn delete_stock_production_serial(ctx: &ReducerContext, serial_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn delete_stock_production_serial(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    serial_id: u64,
+) -> Result<(), String> {
     let serial = ctx
         .db
         .stock_production_serial()
@@ -551,26 +757,27 @@ pub fn delete_stock_production_serial(ctx: &ReducerContext, serial_id: u64) -> R
         .find(&serial_id)
         .ok_or("Serial not found")?;
 
-    check_permission(
-        ctx,
-        serial.organization_id,
-        "stock_production_serial",
-        "delete",
-    )?;
+    check_permission(ctx, organization_id, "stock_production_serial", "delete")?;
 
-    let serial_name = serial.name.clone();
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
+
     ctx.db.stock_production_serial().id().delete(&serial_id);
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
-        serial.organization_id,
-        Some(serial.company_id),
-        "stock_production_serial",
-        serial_id,
-        "delete",
-        Some(serde_json::json!({ "name": serial_name }).to_string()),
-        None,
-        vec!["deleted".to_string()],
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_production_serial",
+            record_id: serial_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": serial.name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -580,63 +787,61 @@ pub fn delete_stock_production_serial(ctx: &ReducerContext, serial_id: u64) -> R
 // REDUCERS: SERIAL/LOT TRACEABILITY
 // ══════════════════════════════════════════════════════════════════════════════
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_traceability_record(
     ctx: &ReducerContext,
     organization_id: u64,
-    product_id: u64,
-    document_type: String,
-    document_id: u64,
-    quantity: f64,
-    uom_id: u64,
-    serial_id: Option<u64>,
-    lot_id: Option<u64>,
-    document_line_id: Option<u64>,
-    move_id: Option<u64>,
-    partner_id: Option<u64>,
-    origin: Option<String>,
-    notes: Option<String>,
+    params: CreateTraceabilityRecordParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "serial_lot_traceability", "create")?;
 
-    if document_type.is_empty() {
+    if params.document_type.is_empty() {
         return Err("Document type cannot be empty".to_string());
     }
 
-    let doc_type = document_type.clone();
     let trace = ctx
         .db
         .serial_lot_traceability()
         .insert(SerialLotTraceability {
             id: 0,
             organization_id,
-            serial_id,
-            lot_id,
-            product_id,
-            document_type,
-            document_id,
-            document_line_id,
-            move_id,
-            quantity,
-            uom_id,
-            date: ctx.timestamp,
-            partner_id,
-            origin,
-            notes,
+            serial_id: params.serial_id,
+            lot_id: params.lot_id,
+            product_id: params.product_id,
+            document_type: params.document_type.clone(),
+            document_id: params.document_id,
+            document_line_id: params.document_line_id,
+            move_id: params.move_id,
+            quantity: params.quantity,
+            uom_id: params.uom_id,
+            date: params.date,
+            partner_id: params.partner_id,
+            origin: params.origin,
+            notes: params.notes,
             created_at: ctx.timestamp,
-            metadata: None,
+            metadata: params.metadata,
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "serial_lot_traceability",
-        trace.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "product_id": product_id, "document_type": doc_type, "document_id": document_id }).to_string()),
-        vec!["product_id".to_string(), "document_type".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "serial_lot_traceability",
+            record_id: trace.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "product_id": trace.product_id,
+                    "document_type": trace.document_type,
+                    "document_id": trace.document_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["product_id".to_string(), "document_type".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -646,24 +851,15 @@ pub fn create_traceability_record(
 // REDUCERS: STOCK TRACEABILITY REPORT
 // ══════════════════════════════════════════════════════════════════════════════
 
-#[spacetimedb::reducer]
+#[reducer]
 pub fn create_traceability_report(
     ctx: &ReducerContext,
     organization_id: u64,
-    name: String,
-    date_from: Timestamp,
-    date_to: Timestamp,
-    product_ids: Vec<u64>,
-    lot_ids: Vec<u64>,
-    serial_ids: Vec<u64>,
-    location_ids: Vec<u64>,
-    warehouse_ids: Vec<u64>,
-    partner_ids: Vec<u64>,
-    picking_type_ids: Vec<u64>,
+    params: CreateStockTraceabilityReportParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_traceability_report", "create")?;
 
-    if name.is_empty() {
+    if params.name.is_empty() {
         return Err("Report name cannot be empty".to_string());
     }
 
@@ -673,39 +869,46 @@ pub fn create_traceability_report(
         .insert(StockTraceabilityReport {
             id: 0,
             organization_id,
-            name: name.clone(),
-            date_from,
-            date_to,
-            product_ids,
-            lot_ids,
-            serial_ids,
-            location_ids,
-            warehouse_ids,
-            partner_ids,
-            picking_type_ids,
-            state: "draft".to_string(),
+            name: params.name.clone(),
+            date_from: params.date_from,
+            date_to: params.date_to,
+            product_ids: params.product_ids,
+            lot_ids: params.lot_ids,
+            serial_ids: params.serial_ids,
+            location_ids: params.location_ids,
+            warehouse_ids: params.warehouse_ids,
+            partner_ids: params.partner_ids,
+            picking_type_ids: params.picking_type_ids,
+            state: params.state,
             created_by: ctx.sender(),
             created_at: ctx.timestamp,
-            metadata: None,
+            metadata: params.metadata,
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        None,
-        "stock_traceability_report",
-        report.id,
-        "create",
-        None,
-        Some(serde_json::json!({ "name": name }).to_string()),
-        vec!["name".to_string()],
+        AuditLogParams {
+            company_id: None,
+            table_name: "stock_traceability_report",
+            record_id: report.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": report.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
 
-#[spacetimedb::reducer]
-pub fn run_traceability_report(ctx: &ReducerContext, report_id: u64) -> Result<(), String> {
+#[reducer]
+pub fn run_traceability_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    report_id: u64,
+) -> Result<(), String> {
     let report = ctx
         .db
         .stock_traceability_report()
@@ -713,12 +916,7 @@ pub fn run_traceability_report(ctx: &ReducerContext, report_id: u64) -> Result<(
         .find(&report_id)
         .ok_or("Report not found")?;
 
-    check_permission(
-        ctx,
-        report.organization_id,
-        "stock_traceability_report",
-        "write",
-    )?;
+    check_permission(ctx, organization_id, "stock_traceability_report", "write")?;
 
     if report.state != "draft" {
         return Err("Report must be in draft state to run".to_string());
@@ -731,6 +929,21 @@ pub fn run_traceability_report(ctx: &ReducerContext, report_id: u64) -> Result<(
             state: "completed".to_string(),
             ..report
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "stock_traceability_report",
+            record_id: report_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "completed" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

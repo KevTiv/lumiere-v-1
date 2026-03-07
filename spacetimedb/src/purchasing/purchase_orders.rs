@@ -6,21 +6,19 @@
 /// | **PurchaseOrder** | Purchase orders and quotations |
 /// | **PurchaseOrderLine** | Purchase order lines with products, quantities, and pricing |
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company;
-use crate::helpers::{check_permission, write_audit_log};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState};
 
-// ============================================================================
-// PURCHASE ORDER TABLES
-// ============================================================================
+// ── Tables ───────────────────────────────────────────────────────────────────
 
 /// Purchase Order — Quotations and Confirmed Purchase Orders
 #[spacetimedb::table(
     accessor = purchase_order,
     public,
-    index(name = "by_partner", accessor = purchase_order_by_partner, btree(columns = [partner_id]))
+    index(accessor = purchase_order_by_partner, btree(columns = [partner_id]))
 )]
 pub struct PurchaseOrder {
     #[primary_key]
@@ -81,7 +79,7 @@ pub struct PurchaseOrder {
 #[spacetimedb::table(
     accessor = purchase_order_line,
     public,
-    index(name = "by_order", accessor = purchase_order_line_by_order, btree(columns = [order_id]))
+    index(accessor = purchase_order_line_by_order, btree(columns = [order_id]))
 )]
 pub struct PurchaseOrderLine {
     #[primary_key]
@@ -135,7 +133,7 @@ pub struct PurchaseOrderLine {
 #[spacetimedb::table(
     accessor = purchase_requisition,
     public,
-    index(name = "by_user", accessor = purchase_requisition_by_user, btree(columns = [user_id]))
+    index(accessor = purchase_requisition_by_user, btree(columns = [user_id]))
 )]
 pub struct PurchaseRequisition {
     #[primary_key]
@@ -169,13 +167,31 @@ pub struct PurchaseRequisition {
     pub metadata: Option<String>,
 }
 
-// ============================================================================
-// INPUT STRUCTS FOR REDUCERS
-// ============================================================================
+// ── Input Params ──────────────────────────────────────────────────────────────
 
-/// Input for creating a purchase order line
-#[derive(spacetimedb::SpacetimeType, Clone, Debug)]
-pub struct OrderLineInput {
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePurchaseOrderParams {
+    pub partner_id: u64,
+    pub currency_id: u64,
+    pub origin: Option<String>,
+    pub partner_ref: Option<String>,
+    pub notes: Option<String>,
+    pub date_planned: Option<Timestamp>,
+    pub payment_term_id: Option<u64>,
+    pub fiscal_position_id: Option<u64>,
+    pub incoterm_id: Option<u64>,
+    pub incoterm_location: Option<String>,
+    pub invoice_ids: Vec<u64>,
+    pub picking_ids: Vec<u64>,
+    pub message_follower_ids: Vec<u64>,
+    pub message_ids: Vec<u64>,
+    pub activity_ids: Vec<u64>,
+    pub is_quantity_copy: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddPurchaseOrderLineParams {
     pub product_id: u64,
     pub quantity: f64,
     pub uom_id: u64,
@@ -190,9 +206,25 @@ pub struct OrderLineInput {
     pub date_planned: Option<Timestamp>,
 }
 
-// ============================================================================
-// PURCHASE ORDER REDUCERS
-// ============================================================================
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePurchaseRequisitionParams {
+    pub description: Option<String>,
+    pub ordering_date: Option<Timestamp>,
+    pub date_end: Option<Timestamp>,
+    pub schedule_date: Option<Timestamp>,
+    pub department_id: Option<u64>,
+    pub exclusive: Option<String>,
+    pub multiple_product: bool,
+    pub line_ids: Vec<u64>,
+    pub purchase_ids: Vec<u64>,
+    pub vendor_id: Option<u64>,
+    pub activity_ids: Vec<u64>,
+    pub message_follower_ids: Vec<u64>,
+    pub message_ids: Vec<u64>,
+    pub metadata: Option<String>,
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn validate_company_in_organization(
     ctx: &ReducerContext,
@@ -233,77 +265,64 @@ fn validate_order_in_organization(
     Ok(order)
 }
 
+// ── Reducers ──────────────────────────────────────────────────────────────────
+
 /// Create a new purchase order (quotation)
 #[reducer]
 pub fn create_purchase_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    partner_id: u64,
-    currency_id: u64,
     company_id: u64,
-    origin: Option<String>,
-    partner_ref: Option<String>,
-    notes: Option<String>,
-    date_planned: Option<Timestamp>,
-    payment_term_id: Option<u64>,
-    fiscal_position_id: Option<u64>,
-    incoterm_id: Option<u64>,
-    incoterm_location: Option<String>,
-    invoice_ids: Vec<u64>,
-    picking_ids: Vec<u64>,
-    message_follower_ids: Vec<u64>,
-    message_ids: Vec<u64>,
-    activity_ids: Vec<u64>,
-    is_quantity_copy: Option<String>,
-    metadata: Option<String>,
+    params: CreatePurchaseOrderParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
 
-    // Validate is_quantity_copy if provided
-    if let Some(ref iqc) = is_quantity_copy {
+    if let Some(ref iqc) = params.is_quantity_copy {
         IsQuantityCopy::from_str(iqc)?;
     }
 
     validate_company_in_organization(ctx, organization_id, company_id)?;
 
-    // Calculate all derived values before moving the vectors
-    let invoice_count = invoice_ids.len() as u32;
-    let picking_count = picking_ids.len() as u32;
-    let has_message = !message_ids.is_empty();
+    let invoice_count = params.invoice_ids.len() as u32;
+    let picking_count = params.picking_ids.len() as u32;
+    let has_message = !params.message_ids.is_empty();
+    let is_quantity_copy = params
+        .is_quantity_copy
+        .unwrap_or_else(|| "none".to_string());
 
     let order = ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
-        origin,
-        partner_ref,
+        origin: params.origin,
+        partner_ref: params.partner_ref,
         state: PoState::Draft,
         date_order: ctx.timestamp,
         date_approve: None,
-        partner_id,
+        partner_id: params.partner_id,
         dest_address_id: None,
-        currency_id,
-        payment_term_id,
-        fiscal_position_id,
-        date_planned,
+        currency_id: params.currency_id,
+        payment_term_id: params.payment_term_id,
+        fiscal_position_id: params.fiscal_position_id,
+        date_planned: params.date_planned,
         date_calendar_start: None,
         date_calendar_done: None,
         company_id,
         user_id: ctx.sender(),
         invoice_count,
-        invoice_ids,
+        invoice_ids: params.invoice_ids,
         invoice_status: PoInvoiceStatus::No,
         picking_count,
-        picking_ids,
+        picking_ids: params.picking_ids,
         effective_date: None,
         amount_untaxed: 0.0,
         amount_tax: 0.0,
         amount_total: 0.0,
         receipt_status: "nothing".to_string(),
-        notes,
+        notes: params.notes,
         message_main_attachment_id: None,
-        message_follower_ids,
-        message_ids,
+        message_follower_ids: params.message_follower_ids,
+        message_ids: params.message_ids,
         has_message,
-        activity_ids,
+        activity_ids: params.activity_ids,
         activity_state: None,
         activity_date_deadline: None,
         activity_type_id: None,
@@ -313,26 +332,29 @@ pub fn create_purchase_order(
         access_token: None,
         access_warning: None,
         is_locked: false,
-        is_quantity_copy: is_quantity_copy.unwrap_or_else(|| "none".to_string()),
-        incoterm_id,
-        incoterm_location,
+        is_quantity_copy,
+        incoterm_id: params.incoterm_id,
+        incoterm_location: params.incoterm_location,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "purchase_order",
-        order.id,
-        "create",
-        None,
-        None,
-        vec!["id".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "id": order.id }).to_string()),
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase order {} created", order.id);
@@ -361,16 +383,19 @@ pub fn send_purchase_order(
         ..order
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(order.company_id),
-        "purchase_order",
-        order_id,
-        "send",
-        Some("Draft".to_string()),
-        Some("Sent".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some("Draft".to_string()),
+            new_values: Some("Sent".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase order {} sent to vendor", order_id);
@@ -405,16 +430,19 @@ pub fn confirm_purchase_order(
         ..order
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(order.company_id),
-        "purchase_order",
-        order_id,
-        "confirm",
-        Some("Sent".to_string()),
-        Some("Purchase".to_string()),
-        vec!["state".to_string(), "date_approve".to_string()],
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some("Sent".to_string()),
+            new_values: Some("Purchase".to_string()),
+            changed_fields: vec!["state".to_string(), "date_approve".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase order {} confirmed", order_id);
@@ -443,16 +471,21 @@ pub fn cancel_purchase_order(
         ..order
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(order.company_id),
-        "purchase_order",
-        order_id,
-        "cancel",
-        Some(serde_json::json!({ "state": format!("{:?}", order.state) }).to_string()),
-        Some("Cancelled".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "state": format!("{:?}", order.state) }).to_string(),
+            ),
+            new_values: Some("Cancelled".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase order {} cancelled", order_id);
@@ -465,7 +498,7 @@ pub fn add_purchase_order_line(
     ctx: &ReducerContext,
     organization_id: u64,
     order_id: u64,
-    line: OrderLineInput,
+    params: AddPurchaseOrderLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "create")?;
 
@@ -475,27 +508,27 @@ pub fn add_purchase_order_line(
         return Err("Can only add lines to draft purchase orders".to_string());
     }
 
-    let subtotal = line.quantity * line.price_unit;
+    let subtotal = params.quantity * params.price_unit;
 
     ctx.db.purchase_order_line().insert(PurchaseOrderLine {
         id: 0,
-        sequence: line.sequence.unwrap_or(0),
-        product_qty: line.quantity,
-        product_uom_qty: line.quantity,
-        date_planned: line.date_planned.or(order.date_planned),
+        sequence: params.sequence.unwrap_or(0),
+        product_qty: params.quantity,
+        product_uom_qty: params.quantity,
+        date_planned: params.date_planned.or(order.date_planned),
         date_departure: None,
         date_arrival: None,
-        product_uom: line.uom_id,
-        product_id: line.product_id,
+        product_uom: params.uom_id,
+        product_id: params.product_id,
         product_type: None,
-        product_variant_id: line.product_variant_id,
+        product_variant_id: params.product_variant_id,
         product_template_id: None,
-        price_unit: line.price_unit,
+        price_unit: params.price_unit,
         price_subtotal: subtotal,
         price_total: subtotal,
         price_tax: 0.0,
         order_id,
-        account_analytic_id: line.account_analytic_id,
+        account_analytic_id: params.account_analytic_id,
         analytic_tag_ids: Vec::new(),
         company_id: order.company_id,
         state: LineState::Draft,
@@ -507,7 +540,7 @@ pub fn add_purchase_order_line(
         qty_to_invoice: 0.0,
         partner_id: order.partner_id,
         currency_id: order.currency_id,
-        display_type: line.display_type,
+        display_type: params.display_type,
         product_no_variant_attribute_value_ids: Vec::new(),
         product_custom_attribute_value_ids: Vec::new(),
         propagate_cancel: true,
@@ -566,16 +599,21 @@ pub fn remove_purchase_order_line(
     update_po_receipt_status(ctx, organization_id, order_id)?;
     update_po_invoice_status(ctx, organization_id, order_id)?;
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(order.company_id),
-        "purchase_order_line",
-        line_id,
-        "delete",
-        Some(serde_json::json!({ "line_id": line_id, "action": "deleted" }).to_string()),
-        None,
-        vec!["id".to_string()],
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order_line",
+            record_id: line_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({ "line_id": line_id, "action": "deleted" }).to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Line {} removed from purchase order {}", line_id, order.id);
@@ -770,27 +808,27 @@ pub fn receive_po_line(
     update_po_receipt_status(ctx, organization_id, order_id)?;
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(line.company_id),
-        "purchase_order_line",
-        line_id,
-        "receive",
-        Some(
-            serde_json::json!({
-                "qty_received_before": line.qty_received
-            })
-            .to_string(),
-        ),
-        Some(
-            serde_json::json!({
-                "qty_received_after": new_qty_received,
-                "qty_delta": qty
-            })
-            .to_string(),
-        ),
-        vec!["qty_received".to_string()],
+        AuditLogParams {
+            company_id: Some(line.company_id),
+            table_name: "purchase_order_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "qty_received_before": line.qty_received }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "qty_received_after": new_qty_received,
+                    "qty_delta": qty
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["qty_received".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
@@ -839,37 +877,36 @@ pub fn invoice_po_line(
     update_po_invoice_status(ctx, organization_id, order_id)?;
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(line.company_id),
-        "purchase_order_line",
-        line_id,
-        "invoice",
-        Some(
-            serde_json::json!({
-                "qty_invoiced_before": line.qty_invoiced,
-                "qty_to_invoice_before": line.qty_to_invoice
-            })
-            .to_string(),
-        ),
-        Some(
-            serde_json::json!({
-                "qty_invoiced_after": new_qty_invoiced,
-                "qty_to_invoice_after": qty_to_invoice,
-                "qty_delta": qty
-            })
-            .to_string(),
-        ),
-        vec!["qty_invoiced".to_string(), "qty_to_invoice".to_string()],
+        AuditLogParams {
+            company_id: Some(line.company_id),
+            table_name: "purchase_order_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "qty_invoiced_before": line.qty_invoiced,
+                    "qty_to_invoice_before": line.qty_to_invoice
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "qty_invoiced_after": new_qty_invoiced,
+                    "qty_to_invoice_after": qty_to_invoice,
+                    "qty_delta": qty
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["qty_invoiced".to_string(), "qty_to_invoice".to_string()],
+            metadata: None,
+        },
     );
 
     Ok(())
 }
-
-// ============================================================================
-// PURCHASE REQUISITION REDUCERS
-// ============================================================================
 
 /// Create a new purchase requisition (RFQ)
 #[reducer]
@@ -877,71 +914,63 @@ pub fn create_purchase_requisition(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    description: Option<String>,
-    ordering_date: Option<Timestamp>,
-    date_end: Option<Timestamp>,
-    schedule_date: Option<Timestamp>,
-    department_id: Option<u64>,
-    exclusive: Option<String>,
-    multiple_product: bool,
-    line_ids: Vec<u64>,
-    purchase_ids: Vec<u64>,
-    vendor_id: Option<u64>,
-    activity_ids: Vec<u64>,
-    message_follower_ids: Vec<u64>,
-    message_ids: Vec<u64>,
-    metadata: Option<String>,
+    params: CreatePurchaseRequisitionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "create")?;
 
     validate_company_in_organization(ctx, organization_id, company_id)?;
 
-    // Validate exclusive mode if provided
-    if let Some(ref excl) = exclusive {
+    if let Some(ref excl) = params.exclusive {
         ExclusiveMode::from_str(excl)?;
     }
 
-    let order_count = purchase_ids.len() as u32;
+    let order_count = params.purchase_ids.len() as u32;
+    let exclusive = params
+        .exclusive
+        .unwrap_or_else(|| "multiple".to_string());
 
     let requisition = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,
         origin: None,
-        ordering_date,
-        date_end,
-        schedule_date,
+        ordering_date: params.ordering_date,
+        date_end: params.date_end,
+        schedule_date: params.schedule_date,
         user_id: ctx.sender(),
         company_id,
-        department_id,
-        description,
+        department_id: params.department_id,
+        description: params.description,
         state: RequisitionState::Draft,
-        exclusive: exclusive.unwrap_or_else(|| "multiple".to_string()),
+        exclusive,
         account_analytic_id: None,
         picking_type_id: None,
-        line_ids,
-        purchase_ids,
+        line_ids: params.line_ids,
+        purchase_ids: params.purchase_ids,
         order_count,
-        vendor_id,
-        multiple_product,
-        activity_ids,
-        message_follower_ids,
-        message_ids,
+        vendor_id: params.vendor_id,
+        multiple_product: params.multiple_product,
+        activity_ids: params.activity_ids,
+        message_follower_ids: params.message_follower_ids,
+        message_ids: params.message_ids,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
-        metadata,
+        metadata: params.metadata,
     });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(company_id),
-        "purchase_requisition",
-        requisition.id,
-        "create",
-        None,
-        None,
-        vec!["id".to_string()],
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "id": requisition.id }).to_string()),
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase requisition {} created", requisition.id);
@@ -978,16 +1007,19 @@ pub fn submit_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(requisition.company_id),
-        "purchase_requisition",
-        requisition_id,
-        "submit",
-        Some("Draft".to_string()),
-        Some("InProgress".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(requisition.company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition_id,
+            action: "UPDATE",
+            old_values: Some("Draft".to_string()),
+            new_values: Some("InProgress".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase requisition {} submitted", requisition_id);
@@ -1024,16 +1056,19 @@ pub fn approve_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(requisition.company_id),
-        "purchase_requisition",
-        requisition_id,
-        "approve",
-        Some("InProgress".to_string()),
-        Some("Open".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(requisition.company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition_id,
+            action: "UPDATE",
+            old_values: Some("InProgress".to_string()),
+            new_values: Some("Open".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase requisition {} approved", requisition_id);
@@ -1073,16 +1108,21 @@ pub fn close_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(requisition.company_id),
-        "purchase_requisition",
-        requisition_id,
-        "close",
-        Some(serde_json::json!({ "state": format!("{:?}", requisition.state) }).to_string()),
-        Some("Closed".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(requisition.company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "state": format!("{:?}", requisition.state) }).to_string(),
+            ),
+            new_values: Some("Closed".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase requisition {} closed", requisition_id);
@@ -1122,16 +1162,21 @@ pub fn cancel_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log(
+    write_audit_log_v2(
         ctx,
         organization_id,
-        Some(requisition.company_id),
-        "purchase_requisition",
-        requisition_id,
-        "cancel",
-        Some(serde_json::json!({ "state": format!("{:?}", requisition.state) }).to_string()),
-        Some("Cancelled".to_string()),
-        vec!["state".to_string()],
+        AuditLogParams {
+            company_id: Some(requisition.company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "state": format!("{:?}", requisition.state) }).to_string(),
+            ),
+            new_values: Some("Cancelled".to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
     );
 
     log::info!("Purchase requisition {} cancelled", requisition_id);
