@@ -10,7 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ pub struct PurchaseOrder {
     #[auto_inc]
     pub id: u64,
 
+    pub name: Option<String>,
     pub origin: Option<String>,
     pub partner_ref: Option<String>,
     pub state: PoState,
@@ -306,6 +307,7 @@ pub fn create_purchase_order(
 
     let order = ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
+        name: Some(next_doc_number(ctx, "PO")),
         origin: params.origin,
         partner_ref: params.partner_ref,
         state: PoState::Draft,

@@ -14,13 +14,17 @@
 /// | audit            | AuditLog · AuditRule                                |
 /// | queue            | QueueJob · QueueWorker                              |
 /// | privacy          | DataClassification · … · PrivacyConsent             |
+/// | messaging        | MailMessage · MailFollower                          |
+/// | utm              | UtmCampaign · UtmMedium · UtmSource                 |
 pub mod audit;
+pub mod messaging;
 pub mod organization;
 pub mod permissions;
 pub mod privacy;
 pub mod queue;
 pub mod reference;
 pub mod users;
+pub mod utm;
 
 /// Test suite for core modules
 ///

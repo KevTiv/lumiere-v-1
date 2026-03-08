@@ -11,7 +11,7 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::core::organization::company;
-use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
 use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
@@ -1105,9 +1105,14 @@ pub fn post_account_move(
         return Err("Cannot post a move without lines".to_string());
     }
 
-    // Generate name from journal sequence if not set
+    // Generate name from document sequence if not set
     let name = if move_record.name.is_empty() {
-        format!("M{}/{}", move_record.journal_id, move_id)
+        let doc_type = match move_record.move_type {
+            MoveType::OutInvoice | MoveType::OutRefund => "INV",
+            MoveType::InInvoice | MoveType::InRefund => "BILL",
+            _ => "JRNL",
+        };
+        next_doc_number(ctx, doc_type)
     } else {
         move_record.name.clone()
     };

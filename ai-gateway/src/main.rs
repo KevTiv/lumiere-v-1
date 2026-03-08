@@ -1,6 +1,7 @@
 mod config;
 mod embeddings;
 mod error;
+mod kaggle;
 mod qdrant_client;
 mod routes;
 mod state;
@@ -13,6 +14,7 @@ use axum::{
     Router,
     routing::{delete, get, post},
 };
+use dashmap::DashMap;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -76,6 +78,8 @@ async fn main() -> anyhow::Result<()> {
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
         http: Arc::new(reqwest::Client::new()),
+        download_jobs: Arc::new(DashMap::new()),
+        kaggle_search_cache: Arc::new(DashMap::new()),
     };
 
     // Spawn background queue worker
@@ -98,6 +102,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/embed", delete(routes::embed::delete_embed))
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
+        // Kaggle dataset proxy
+        .route("/v1/kaggle/search", post(routes::kaggle::post_search))
+        .route("/v1/kaggle/download", post(routes::kaggle::post_download))
+        .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state);

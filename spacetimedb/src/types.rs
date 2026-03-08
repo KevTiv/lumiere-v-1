@@ -809,3 +809,127 @@ pub enum WorkitemState {
     Exception,
     Dummy,
 }
+
+// Dangling-ref fixes: Payment Terms
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentTermValue {
+    Balance,
+    Percent,
+    Fixed,
+}
+
+// Dangling-ref fixes: Pricelists
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum DiscountPolicy {
+    WithDiscount,
+    WithoutDiscount,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ComputePrice {
+    Fixed,
+    Percentage,
+    Formula,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PricelistAppliedOn {
+    AllProducts,
+    Category,
+    Product,
+}
+
+// Dangling-ref fixes: Payments
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentType {
+    InBound,
+    OutBound,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PartnerType {
+    Customer,
+    Supplier,
+}
+
+// Dangling-ref fixes: Messaging
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MailMessageType {
+    Comment,
+    Note,
+    Email,
+    Notification,
+}
+
+// HR Module
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum EmploymentType {
+    FullTime,
+    PartTime,
+    Contract,
+    Intern,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum HrLeaveState {
+    Draft,
+    Confirm,
+    Refused,
+    Validated,
+    ValidatedOne,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ContractState {
+    New,
+    Open,
+    Expired,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PayslipState {
+    Draft,
+    Verify,
+    Done,
+    Cancelled,
+}
+
+// Helpdesk Module
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum TicketPriority {
+    Low,
+    Normal,
+    High,
+    Urgent,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum HelpdeskTicketState {
+    New,
+    InProgress,
+    OnHold,
+    Closed,
+    Cancelled,
+}
+
+// Expenses Module
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpenseState {
+    Draft,
+    Submitted,
+    Approved,
+    Posted,
+    Done,
+    Refused,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpenseSheetState {
+    Draft,
+    Submitted,
+    Approved,
+    Posted,
+    Done,
+    Refused,
+}

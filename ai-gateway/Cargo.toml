@@ -17,8 +17,17 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# HTTP client (Voyage AI, Claude API)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+# HTTP client (Voyage AI, Claude API, Kaggle)
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+
+# Concurrent in-memory maps (job tracking, search cache)
+dashmap = "6"
+
+# UUIDs for download job IDs
+uuid = { version = "1", features = ["v4"] }
+
+# Async stream utilities (Kaggle download progress)
+futures = "0.3"
 
 # Qdrant vector DB (official Rust client)
 qdrant-client = "1"

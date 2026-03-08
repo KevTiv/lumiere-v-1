@@ -14,7 +14,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
-use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
@@ -481,7 +481,7 @@ pub fn create_sale_order(
         company_id,
         origin: params.origin,
         client_order_ref: params.client_order_ref,
-        reference: None,
+        reference: Some(next_doc_number(ctx, "SO")),
         state: SaleState::Draft,
         date_order: ctx.timestamp,
         validity_date,

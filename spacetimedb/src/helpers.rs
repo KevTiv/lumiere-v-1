@@ -11,6 +11,7 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{casbin_rule, role};
+use crate::core::reference::{document_sequence, DocumentSequence};
 use crate::core::users::{user_organization, user_profile};
 use crate::types::TaxAmountType;
 
@@ -168,6 +169,34 @@ pub fn write_audit_log(
         timestamp: ctx.timestamp,
         metadata: None,
     });
+}
+
+/// Generate the next human-readable document number for a given document type.
+///
+/// Atomically reads and bumps the counter in the `DocumentSequence` table.
+/// Creates a new sequence starting at 1 if none exists yet.
+///
+/// # Examples
+/// ```
+/// let so_ref = next_doc_number(ctx, "SO");  // "SO-0001"
+/// let po_ref = next_doc_number(ctx, "PO");  // "PO-0001"
+/// ```
+pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
+    let seq = ctx
+        .db
+        .document_sequence()
+        .doc_type()
+        .find(&doc_type.to_string())
+        .unwrap_or(DocumentSequence {
+            doc_type: doc_type.to_string(),
+            next_number: 1,
+        });
+    let number = seq.next_number;
+    ctx.db.document_sequence().doc_type().update(DocumentSequence {
+        next_number: number + 1,
+        ..seq
+    });
+    format!("{}-{:04}", doc_type, number)
 }
 
 /// Compute the combined tax amount for a list of tax IDs applied to a subtotal.

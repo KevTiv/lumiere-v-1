@@ -209,6 +209,17 @@ pub struct UOMConversion {
     pub metadata: Option<String>,
 }
 
+/// Document Sequence — Auto-incrementing counters for human-readable document numbers.
+///
+/// Each `doc_type` key (e.g. "SO", "PO", "INV", "BILL", "JRNL") tracks its own counter.
+/// Use `next_doc_number(ctx, "SO")` from `helpers` to atomically read + bump the counter.
+#[spacetimedb::table(accessor = document_sequence, public)]
+pub struct DocumentSequence {
+    #[primary_key]
+    pub doc_type: String, // "SO" | "PO" | "INV" | "BILL" | "JRNL"
+    pub next_number: u64,
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {

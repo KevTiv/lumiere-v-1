@@ -18,6 +18,13 @@ pub struct Config {
     pub worker_poll_secs: u64,
     /// Max jobs to process per poll cycle
     pub worker_batch_size: u32,
+    // Kaggle integration (optional — routes return 503 if not set)
+    pub kaggle_username: Option<String>,
+    pub kaggle_api_key: Option<String>,
+    /// Local directory for cached dataset files
+    pub dataset_cache_dir: String,
+    /// Kaggle search cache TTL in seconds
+    pub kaggle_cache_ttl_secs: u64,
 }
 
 impl Config {
@@ -56,6 +63,14 @@ impl Config {
                 .unwrap_or_else(|_| "20".to_string())
                 .parse()
                 .context("WORKER_BATCH_SIZE must be a valid number")?,
+            kaggle_username: std::env::var("KAGGLE_USERNAME").ok(),
+            kaggle_api_key: std::env::var("KAGGLE_KEY").ok(),
+            dataset_cache_dir: std::env::var("DATASET_CACHE_DIR")
+                .unwrap_or_else(|_| "/tmp/lumiere_datasets".to_string()),
+            kaggle_cache_ttl_secs: std::env::var("KAGGLE_CACHE_TTL_SECS")
+                .unwrap_or_else(|_| "3600".to_string())
+                .parse()
+                .context("KAGGLE_CACHE_TTL_SECS must be a valid number")?,
         })
     }
 }

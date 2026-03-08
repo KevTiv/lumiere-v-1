@@ -68,6 +68,9 @@ pub mod workflow;   // Phase 13 — Workflow Engine
 pub mod ai;         // Phase 14 — AI Agents & Embeddings
 pub mod data_ops;   // Phase 15 — CSV Import/Export
 pub mod analytics;  // Phase 16 — Dashboards & Metrics
+pub mod hr;         // Phase 17 — HR, Leaves, Contracts, Payroll
+pub mod helpdesk;   // Phase 18 — Helpdesk & Support Tickets
+pub mod expenses;   // Phase 19 — Employee Expenses
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 

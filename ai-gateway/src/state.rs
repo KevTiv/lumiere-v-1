@@ -1,7 +1,12 @@
 use std::sync::Arc;
 
+use dashmap::DashMap;
+
 use crate::{
-    config::Config, embeddings::EmbeddingClient, qdrant_client::VectorStore,
+    config::Config,
+    embeddings::EmbeddingClient,
+    kaggle::{DownloadJobStatus, KaggleCacheEntry},
+    qdrant_client::VectorStore,
     stdb_client::StdbClient,
 };
 
@@ -13,4 +18,8 @@ pub struct AppState {
     pub vector_store: Arc<VectorStore>,
     pub stdb: Arc<StdbClient>,
     pub http: Arc<reqwest::Client>,
+    /// In-flight and completed Kaggle download jobs (job_id → status).
+    pub download_jobs: Arc<DashMap<String, DownloadJobStatus>>,
+    /// Short-lived Kaggle search result cache (cache_key → entry).
+    pub kaggle_search_cache: Arc<DashMap<String, KaggleCacheEntry>>,
 }

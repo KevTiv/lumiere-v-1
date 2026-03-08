@@ -66,6 +66,7 @@ pub fn import_purchase_order_csv(
 
         ctx.db.purchase_order().insert(PurchaseOrder {
             id: 0,
+            name: opt_str(col(&headers, row, "name")),
             origin: opt_str(col(&headers, row, "origin")),
             partner_ref: opt_str(col(&headers, row, "partner_ref")),
             state: PoState::Draft,
