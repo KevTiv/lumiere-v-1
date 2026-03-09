@@ -1,0 +1,8 @@
+# This directory is populated by:
+#   npm run stdb:generate   (from frontend/)
+#
+# Command: spacetime generate --lang typescript \
+#   --out-dir packages/stdb/src/generated \
+#   --module-path ../spacetimedb
+#
+# Run this whenever you publish a new version of the SpacetimeDB module.

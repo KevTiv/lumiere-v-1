@@ -1,0 +1,22 @@
+{
+  "name": "lumiere-frontend",
+  "private": true,
+  "scripts": {
+    "web": "pnpm --filter web dev",
+    "mobile": "pnpm --filter mobile start",
+    "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss",
+      "unrs-resolver"
+    ]
+  }
+}
