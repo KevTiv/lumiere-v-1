@@ -43,7 +43,7 @@ pub struct HrExpense {
 
 /// HR Expense Sheet — An expense report grouping multiple expense lines.
 #[spacetimedb::table(
-    accessor = hr_expense_sheet,
+    accessor = expense_sheet,
     public,
     index(accessor = sheet_by_employee, btree(columns = [employee_id])),
     index(accessor = sheet_by_state, btree(columns = [state])),
@@ -253,7 +253,7 @@ pub fn create_expense_sheet(
     if params.name.is_empty() {
         return Err("Expense sheet name cannot be empty".to_string());
     }
-    let sheet = ctx.db.hr_expense_sheet().insert(HrExpenseSheet {
+    let sheet = ctx.db.expense_sheet().insert(HrExpenseSheet {
         id: 0,
         organization_id,
         company_id,
@@ -289,7 +289,7 @@ pub fn submit_expense_sheet(
     params: SubmitExpenseSheetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "update")?;
-    let sheet = ctx.db.hr_expense_sheet().id().find(&sheet_id)
+    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -298,7 +298,7 @@ pub fn submit_expense_sheet(
         return Err("Only draft sheets can be submitted".to_string());
     }
     let company_id = sheet.company_id;
-    ctx.db.hr_expense_sheet().id().update(HrExpenseSheet {
+    ctx.db.expense_sheet().id().update(HrExpenseSheet {
         total_amount: params.total_amount,
         state: ExpenseSheetState::Submitted,
         ..sheet
@@ -323,7 +323,7 @@ pub fn approve_expense_sheet(
     sheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
-    let sheet = ctx.db.hr_expense_sheet().id().find(&sheet_id)
+    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -332,7 +332,7 @@ pub fn approve_expense_sheet(
         return Err("Only submitted sheets can be approved".to_string());
     }
     let company_id = sheet.company_id;
-    ctx.db.hr_expense_sheet().id().update(HrExpenseSheet {
+    ctx.db.expense_sheet().id().update(HrExpenseSheet {
         state: ExpenseSheetState::Approved,
         approver_id: Some(ctx.sender()),
         ..sheet
@@ -357,13 +357,13 @@ pub fn refuse_expense_sheet(
     sheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
-    let sheet = ctx.db.hr_expense_sheet().id().find(&sheet_id)
+    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
     }
     let company_id = sheet.company_id;
-    ctx.db.hr_expense_sheet().id().update(HrExpenseSheet {
+    ctx.db.expense_sheet().id().update(HrExpenseSheet {
         state: ExpenseSheetState::Refused,
         ..sheet
     });
@@ -388,7 +388,7 @@ pub fn post_expense_sheet(
     accounting_date: Timestamp,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "post")?;
-    let sheet = ctx.db.hr_expense_sheet().id().find(&sheet_id)
+    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -397,7 +397,7 @@ pub fn post_expense_sheet(
         return Err("Only approved sheets can be posted".to_string());
     }
     let company_id = sheet.company_id;
-    ctx.db.hr_expense_sheet().id().update(HrExpenseSheet {
+    ctx.db.expense_sheet().id().update(HrExpenseSheet {
         state: ExpenseSheetState::Posted,
         accounting_date: Some(accounting_date),
         ..sheet

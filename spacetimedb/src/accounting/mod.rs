@@ -68,7 +68,7 @@ pub use consolidation::{
     ConsolidationJournal,
 };
 pub use financial_statements::{
-    BalanceSheetLine, CashFlowLine, FinancialReport, ProfitLossLine, ReportTemplate, TrialBalance,
+    BalanceSheetLine, CashFlowLine, FinancialReport, ProfitLossLine, TrialBalance,
 };
 pub use fixed_assets::{AccountAsset, AccountAssetDepreciationLine};
 pub use intercompany::{IntercompanyRule, IntercompanyTransaction};

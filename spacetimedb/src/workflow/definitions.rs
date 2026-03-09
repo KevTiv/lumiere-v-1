@@ -74,8 +74,8 @@ pub struct AddWorkflowTransitionParams {
 #[spacetimedb::table(
     accessor = workflow,
     public,
-    index(name = "by_company", accessor = workflow_by_company, btree(columns = [company_id])),
-    index(name = "by_model", accessor = workflow_by_model, btree(columns = [model]))
+    index(accessor = workflow_by_company, btree(columns = [company_id])),
+    index(accessor = workflow_by_model, btree(columns = [model]))
 )]
 pub struct Workflow {
     #[primary_key]
@@ -104,7 +104,7 @@ pub struct Workflow {
 #[spacetimedb::table(
     accessor = workflow_activity,
     public,
-    index(name = "by_workflow", accessor = activity_by_workflow, btree(columns = [workflow_id]))
+    index(accessor = activity_by_workflow, btree(columns = [workflow_id]))
 )]
 pub struct WorkflowActivity {
     #[primary_key]

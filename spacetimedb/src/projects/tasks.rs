@@ -19,8 +19,8 @@ use crate::types::TaskState;
     accessor = project_task,
     public,
     index(name = "by_project", accessor = task_by_project, btree(columns = [project_id])),
-    index(name = "by_company", accessor = task_by_company, btree(columns = [company_id])),
-    index(name = "by_state", accessor = task_by_state, btree(columns = [state]))
+    index(accessor = task_by_company, btree(columns = [company_id])),
+    index(accessor = task_by_state, btree(columns = [state]))
 )]
 pub struct ProjectTask {
     #[primary_key]

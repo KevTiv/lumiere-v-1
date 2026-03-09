@@ -1,7 +1,6 @@
 /// Product Management — Tables and Reducers
 ///
 /// Tables:
-///   - ProductCategory
 ///   - Product
 ///   - ProductAttribute
 ///   - ProductAttributeValue
@@ -9,48 +8,16 @@
 ///   - ProductVariant
 ///   - ProductSupplierInfo
 ///   - ProductPackaging
+///
+/// Note: ProductCategory is defined in product_category.rs
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product_category::product_category;
 use serde_json;
-use std::collections::{HashMap, VecDeque};
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SECTION 3.1: PRODUCT CATEGORY
-// ══════════════════════════════════════════════════════════════════════════════
-
-#[spacetimedb::table(
-    accessor = product_category,
-    public,
-    index(accessor = product_categ_by_org, btree(columns = [organization_id])),
-    index(accessor = product_categ_by_parent, btree(columns = [parent_id]))
-)]
-#[derive(Clone)]
-pub struct ProductCategory {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    pub organization_id: u64,
-    pub name: String,
-    pub complete_name: Option<String>,
-    pub parent_id: Option<u64>,
-    pub parent_path: String,
-    pub description: Option<String>,
-    pub sequence: i32,
-    pub color: Option<String>,
-    pub image_url: Option<String>,
-    pub property_ids: Vec<u64>,
-    pub removal_strategy_id: Option<u64>,
-    pub total_route_ids: Vec<u64>,
-    pub is_active: bool,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
-    pub deleted_at: Option<Timestamp>,
-    pub metadata: Option<String>,
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// SECTION 3.2: PRODUCT
+// SECTION 3.1: PRODUCT
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[spacetimedb::table(
@@ -512,298 +479,6 @@ pub struct UpdateProductPackagingParams {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// HELPERS: PRODUCT CATEGORY HIERARCHY
-// ══════════════════════════════════════════════════════════════════════════════
-
-fn build_category_maps(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> (
-    HashMap<u64, ProductCategory>,
-    HashMap<Option<u64>, Vec<u64>>,
-) {
-    let mut by_id: HashMap<u64, ProductCategory> = HashMap::new();
-    let mut children_by_parent: HashMap<Option<u64>, Vec<u64>> = HashMap::new();
-
-    for cat in ctx
-        .db
-        .product_category()
-        .iter()
-        .filter(|c| c.organization_id == organization_id)
-    {
-        children_by_parent
-            .entry(cat.parent_id)
-            .or_default()
-            .push(cat.id);
-        by_id.insert(cat.id, cat);
-    }
-
-    (by_id, children_by_parent)
-}
-
-fn compute_complete_name_from_maps(
-    by_id: &HashMap<u64, ProductCategory>,
-    category: &ProductCategory,
-) -> String {
-    let mut names: Vec<String> = vec![category.name.clone()];
-    let mut current_parent = category.parent_id;
-
-    while let Some(pid) = current_parent {
-        if let Some(parent) = by_id.get(&pid) {
-            names.push(parent.name.clone());
-            current_parent = parent.parent_id;
-        } else {
-            break;
-        }
-    }
-
-    names.reverse();
-    names.join(" / ")
-}
-
-fn recompute_category_subtree_complete_names(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    root_id: u64,
-) -> Result<(), String> {
-    let (mut by_id, children_by_parent) = build_category_maps(ctx, organization_id);
-
-    if !by_id.contains_key(&root_id) {
-        return Err("Category not found for subtree recomputation".to_string());
-    }
-
-    let mut queue: VecDeque<u64> = VecDeque::new();
-    queue.push_back(root_id);
-
-    while let Some(current_id) = queue.pop_front() {
-        let current = by_id
-            .get(&current_id)
-            .cloned()
-            .ok_or("Category disappeared during subtree recomputation")?;
-
-        let complete_name = compute_complete_name_from_maps(&by_id, &current);
-
-        let updated = ProductCategory {
-            complete_name: Some(complete_name),
-            updated_at: ctx.timestamp,
-            ..current
-        };
-
-        ctx.db.product_category().id().update(updated.clone());
-        by_id.insert(current_id, updated);
-
-        if let Some(children) = children_by_parent.get(&Some(current_id)) {
-            for child_id in children {
-                queue.push_back(*child_id);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn has_category_descendants(
-    children_by_parent: &HashMap<Option<u64>, Vec<u64>>,
-    category_id: u64,
-) -> bool {
-    children_by_parent
-        .get(&Some(category_id))
-        .map(|children| !children.is_empty())
-        .unwrap_or(false)
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// REDUCERS: PRODUCT CATEGORY
-// ══════════════════════════════════════════════════════════════════════════════
-
-#[spacetimedb::reducer]
-pub fn create_product_category(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    params: CreateProductCategoryParams,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "product_category", "create")?;
-
-    if params.name.is_empty() {
-        return Err("Category name cannot be empty".to_string());
-    }
-
-    let parent_path = if let Some(pid) = params.parent_id {
-        let parent = ctx
-            .db
-            .product_category()
-            .id()
-            .find(&pid)
-            .ok_or("Parent category not found")?;
-
-        if parent.organization_id != organization_id {
-            return Err("Parent category belongs to a different organization".to_string());
-        }
-        if !parent.is_active || parent.deleted_at.is_some() {
-            return Err("Parent category is inactive or deleted".to_string());
-        }
-
-        format!("{}{}/", parent.parent_path, pid)
-    } else {
-        "/".to_string()
-    };
-
-    let category = ctx.db.product_category().insert(ProductCategory {
-        id: 0,
-        organization_id,
-        name: params.name.clone(),
-        complete_name: Some(params.name.clone()),
-        parent_id: params.parent_id,
-        parent_path,
-        description: params.description,
-        sequence: params.sequence,
-        color: params.color,
-        image_url: None,
-        property_ids: vec![], // populated via dedicated relation reducers
-        removal_strategy_id: None,
-        total_route_ids: vec![], // populated via route assignment reducers
-        is_active: true,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        deleted_at: None,
-        metadata: None,
-    });
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: None,
-            table_name: "product_category",
-            record_id: category.id,
-            action: "CREATE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
-            changed_fields: vec!["name".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn update_product_category(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    category_id: u64,
-    params: UpdateProductCategoryParams,
-) -> Result<(), String> {
-    let category = ctx
-        .db
-        .product_category()
-        .id()
-        .find(&category_id)
-        .ok_or("Category not found")?;
-
-    if category.organization_id != organization_id {
-        return Err("Category belongs to a different organization".to_string());
-    }
-
-    check_permission(ctx, organization_id, "product_category", "write")?;
-
-    if category.deleted_at.is_some() {
-        return Err("Cannot update a deleted category".to_string());
-    }
-
-    let new_name = params.name.unwrap_or_else(|| category.name.clone());
-
-    ctx.db.product_category().id().update(ProductCategory {
-        name: new_name,
-        description: params.description.or(category.description),
-        sequence: params.sequence.unwrap_or(category.sequence),
-        color: params.color.or(category.color),
-        is_active: params.is_active.unwrap_or(category.is_active),
-        updated_at: ctx.timestamp,
-        ..category
-    });
-
-    recompute_category_subtree_complete_names(ctx, organization_id, category_id)?;
-
-    Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn delete_product_category(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    category_id: u64,
-    cascade: bool,
-) -> Result<(), String> {
-    let category = ctx
-        .db
-        .product_category()
-        .id()
-        .find(&category_id)
-        .ok_or("Category not found")?;
-
-    if category.organization_id != organization_id {
-        return Err("Category belongs to a different organization".to_string());
-    }
-
-    check_permission(ctx, organization_id, "product_category", "delete")?;
-
-    if category.deleted_at.is_some() {
-        return Err("Category is already deleted".to_string());
-    }
-
-    let (_by_id, children_by_parent) = build_category_maps(ctx, organization_id);
-
-    if has_category_descendants(&children_by_parent, category_id) && !cascade {
-        return Err("Category has descendants; set cascade=true to delete subtree".to_string());
-    }
-
-    let mut queue: VecDeque<u64> = VecDeque::new();
-    queue.push_back(category_id);
-
-    while let Some(current_id) = queue.pop_front() {
-        let current = ctx
-            .db
-            .product_category()
-            .id()
-            .find(&current_id)
-            .ok_or("Category not found during delete cascade")?;
-
-        if let Some(children) = children_by_parent.get(&Some(current_id)) {
-            for child_id in children {
-                queue.push_back(*child_id);
-            }
-        }
-
-        if current.deleted_at.is_none() {
-            ctx.db.product_category().id().update(ProductCategory {
-                is_active: false,
-                deleted_at: Some(ctx.timestamp),
-                updated_at: ctx.timestamp,
-                ..current
-            });
-        }
-    }
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: None,
-            table_name: "product_category",
-            record_id: category_id,
-            action: "DELETE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "cascade": cascade }).to_string()),
-            changed_fields: vec!["deleted_at".to_string(), "is_active".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // REDUCERS: PRODUCT
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -826,11 +501,8 @@ pub fn create_product(
         .find(&params.categ_id)
         .ok_or("Category not found")?;
 
-    if category.organization_id != organization_id {
-        return Err("Category belongs to a different organization".to_string());
-    }
-    if !category.is_active || category.deleted_at.is_some() {
-        return Err("Category is inactive or deleted".to_string());
+    if category.deleted_at.is_some() {
+        return Err("Category is deleted".to_string());
     }
 
     let product = ctx.db.product().insert(Product {
@@ -964,11 +636,8 @@ pub fn update_product(
             .id()
             .find(&cid)
             .ok_or("Category not found")?;
-        if category.organization_id != organization_id {
-            return Err("Category belongs to a different organization".to_string());
-        }
-        if !category.is_active || category.deleted_at.is_some() {
-            return Err("Category is inactive or deleted".to_string());
+        if category.deleted_at.is_some() {
+            return Err("Category is deleted".to_string());
         }
         cid
     } else {

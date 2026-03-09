@@ -79,8 +79,8 @@ pub struct UpsertSearchEmbeddingParams {
 #[spacetimedb::table(
     accessor = ai_insight,
     public,
-    index(name = "by_model", accessor = insight_by_model, btree(columns = [related_model])),
-    index(name = "by_company", accessor = insight_by_company, btree(columns = [company_id]))
+    index(accessor = insight_by_model, btree(columns = [related_model])),
+    index(accessor = insight_by_company, btree(columns = [company_id]))
 )]
 pub struct AiInsight {
     #[primary_key]
@@ -120,7 +120,7 @@ pub struct AiInsight {
     accessor = ai_document_processing_job,
     public,
     index(name = "by_status", accessor = doc_job_by_status, btree(columns = [status])),
-    index(name = "by_company", accessor = doc_job_by_company, btree(columns = [company_id]))
+    index(accessor = doc_job_by_company, btree(columns = [company_id]))
 )]
 pub struct AiDocumentProcessingJob {
     #[primary_key]
@@ -157,7 +157,7 @@ pub struct AiDocumentProcessingJob {
     accessor = search_embedding,
     public,
     index(name = "by_content", accessor = embedding_by_content, btree(columns = [content_type])),
-    index(name = "by_company", accessor = embedding_by_company, btree(columns = [company_id])),
+    index(accessor = embedding_by_company, btree(columns = [company_id])),
     index(name = "by_sync_status", accessor = embedding_by_sync_status, btree(columns = [sync_status]))
 )]
 pub struct SearchEmbedding {

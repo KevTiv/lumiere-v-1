@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::expenses::expenses::{hr_expense, hr_expense_sheet, HrExpense, HrExpenseSheet};
+use crate::expenses::expenses::{hr_expense, expense_sheet, HrExpense, HrExpenseSheet};
 use crate::helpers::check_permission;
 use crate::types::{ExpenseSheetState, ExpenseState};
 
@@ -121,7 +121,7 @@ pub fn import_expense_sheet_csv(
             _ => ExpenseSheetState::Draft,
         };
 
-        ctx.db.hr_expense_sheet().insert(HrExpenseSheet {
+        ctx.db.expense_sheet().insert(HrExpenseSheet {
             id: 0,
             organization_id,
             company_id,

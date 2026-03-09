@@ -22,8 +22,8 @@ use serde_json;
 #[spacetimedb::table(
     accessor = mrp_bom,
     public,
-    index(name = "by_product", accessor = mrp_bom_by_product, btree(columns = [product_id])),
-    index(name = "by_company", accessor = mrp_bom_by_company, btree(columns = [company_id]))
+    index(accessor = mrp_bom_by_product, btree(columns = [product_id])),
+    index(accessor = mrp_bom_by_company, btree(columns = [company_id]))
 )]
 pub struct MrpBom {
     #[primary_key]
@@ -63,7 +63,7 @@ pub struct MrpBom {
 #[spacetimedb::table(
     accessor = mrp_bom_line,
     public,
-    index(name = "by_bom", accessor = mrp_bom_line_by_bom, btree(columns = [bom_id]))
+    index(accessor = mrp_bom_line_by_bom, btree(columns = [bom_id]))
 )]
 pub struct MrpBomLine {
     #[primary_key]
@@ -97,7 +97,7 @@ pub struct MrpBomLine {
 #[spacetimedb::table(
     accessor = mrp_routing_workcenter,
     public,
-    index(name = "by_workcenter", accessor = mrp_routing_by_workcenter, btree(columns = [workcenter_id]))
+    index(accessor = mrp_routing_by_workcenter, btree(columns = [workcenter_id]))
 )]
 pub struct MrpRoutingWorkcenter {
     #[primary_key]
@@ -141,7 +141,7 @@ pub struct BomExplosionRow {
     accessor = bom_explosion_result,
     public,
     index(name = "by_root_bom", accessor = bom_explosion_by_root_bom, btree(columns = [root_bom_id])),
-    index(name = "by_bom", accessor = bom_explosion_by_bom, btree(columns = [bom_id]))
+    index(accessor = bom_explosion_by_bom, btree(columns = [bom_id]))
 )]
 pub struct BomExplosionResult {
     #[primary_key]

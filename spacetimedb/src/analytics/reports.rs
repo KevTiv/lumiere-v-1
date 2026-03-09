@@ -108,8 +108,8 @@ pub struct UpdateMetricValuesParams {
 #[spacetimedb::table(
     accessor = report_template,
     public,
-    index(name = "by_model", accessor = template_by_model, btree(columns = [model])),
-    index(name = "by_company", accessor = template_by_company, btree(columns = [company_id]))
+    index(accessor = template_by_model, btree(columns = [model])),
+    index(accessor = template_by_company, btree(columns = [company_id]))
 )]
 pub struct ReportTemplate {
     #[primary_key]
@@ -148,7 +148,7 @@ pub struct ReportTemplate {
     accessor = scheduled_report,
     public,
     index(name = "by_template", accessor = sched_report_by_template, btree(columns = [report_template_id])),
-    index(name = "by_company", accessor = sched_report_by_company, btree(columns = [company_id]))
+    index(accessor = sched_report_by_company, btree(columns = [company_id]))
 )]
 pub struct ScheduledReport {
     #[primary_key]
@@ -186,8 +186,8 @@ pub struct ScheduledReport {
 #[spacetimedb::table(
     accessor = analytics_metric,
     public,
-    index(name = "by_category", accessor = metric_by_category, btree(columns = [category])),
-    index(name = "by_company", accessor = metric_by_company, btree(columns = [company_id]))
+    index(accessor = metric_by_category, btree(columns = [category])),
+    index(accessor = metric_by_company, btree(columns = [company_id]))
 )]
 pub struct AnalyticsMetric {
     #[primary_key]

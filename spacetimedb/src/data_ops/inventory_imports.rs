@@ -5,9 +5,8 @@ use spacetimedb::{ReducerContext, Table};
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::helpers::check_permission;
-use crate::inventory::product::{
-    product, product_category, product_variant, Product, ProductCategory, ProductVariant,
-};
+use crate::inventory::product::{product, product_variant, Product, ProductVariant};
+use crate::inventory::product_category::{product_category, ProductCategory};
 use crate::inventory::stock::stock_quant;
 use crate::inventory::stock::StockQuant;
 use crate::inventory::tracking::{stock_production_lot, StockProductionLot};
@@ -44,34 +43,18 @@ pub fn import_product_category_csv(
         }
 
         let parent_id = opt_u64(col(&headers, row, "parent_id"));
-        let parent_path = if let Some(pid) = parent_id {
-            if let Some(parent) = ctx.db.product_category().id().find(&pid) {
-                format!("{}{}/", parent.parent_path, pid)
-            } else {
-                "/".to_string()
-            }
-        } else {
-            "/".to_string()
-        };
 
         ctx.db.product_category().insert(ProductCategory {
             id: 0,
-            organization_id,
             name: name.clone(),
-            complete_name: Some(name),
             parent_id,
-            parent_path,
-            description: opt_str(col(&headers, row, "description")),
-            sequence: parse_i32(col(&headers, row, "sequence")),
-            color: opt_str(col(&headers, row, "color")),
-            image_url: None,
-            property_ids: vec![],
-            removal_strategy_id: None,
-            total_route_ids: vec![],
-            is_active: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
+            sequence: parse_u32(col(&headers, row, "sequence")),
             deleted_at: None,
+            company_id: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
         imported += 1;

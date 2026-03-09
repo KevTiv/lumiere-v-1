@@ -17,7 +17,7 @@ use serde_json;
 #[spacetimedb::table(
     accessor = mrp_workcenter,
     public,
-    index(name = "by_company", accessor = mrp_workcenter_by_company, btree(columns = [company_id]))
+    index(accessor = mrp_workcenter_by_company, btree(columns = [company_id]))
 )]
 pub struct MrpWorkcenter {
     #[primary_key]
@@ -64,7 +64,7 @@ pub struct MrpWorkcenter {
     accessor = mrp_workcenter_productivity,
     public,
     index(name = "by_workorder", accessor = mrp_productivity_by_workorder, btree(columns = [workorder_id])),
-    index(name = "by_workcenter", accessor = mrp_productivity_by_workcenter, btree(columns = [workcenter_id]))
+    index(accessor = mrp_productivity_by_workcenter, btree(columns = [workcenter_id]))
 )]
 pub struct MrpWorkcenterProductivity {
     #[primary_key]

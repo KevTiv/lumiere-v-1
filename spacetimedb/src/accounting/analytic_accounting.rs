@@ -98,7 +98,7 @@ pub struct AccountAnalyticLine {
     pub timesheet_invoice_type: Option<String>,
     pub sheet_id: Option<u64>,
     pub is_timesheet: bool,
-    pub r#ref: Option<String>,
+    pub analytic_ref: Option<String>,
     pub create_uid: Option<Identity>,
     pub create_date: Option<Timestamp>,
     pub write_uid: Option<Identity>,
@@ -198,7 +198,7 @@ pub struct CreateAnalyticLineParams {
     pub is_timesheet: bool,
     pub category: Option<String>,
     pub tag_ids: Vec<u64>,
-    pub r#ref: Option<String>,
+    pub analytic_ref: Option<String>,
     pub metadata: Option<String>,
 }
 
@@ -470,7 +470,7 @@ pub fn create_analytic_line(
         timesheet_invoice_type: params.timesheet_invoice_type,
         sheet_id: params.sheet_id,
         is_timesheet: params.is_timesheet,
-        r#ref: params.r#ref,
+        analytic_ref: params.analytic_ref,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),

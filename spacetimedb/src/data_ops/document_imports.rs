@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::documents::knowledge::{knowledge_article, knowledge_article_category, KnowledgeArticle, KnowledgeArticleCategory};
+use crate::documents::knowledge::{kb_category, knowledge_article, KnowledgeArticle, KnowledgeArticleCategory};
 use crate::helpers::check_permission;
 
 // ── KnowledgeArticleCategory ──────────────────────────────────────────────────
@@ -30,7 +30,7 @@ pub fn import_knowledge_category_csv(
             continue;
         }
 
-        ctx.db.knowledge_article_category().insert(KnowledgeArticleCategory {
+        ctx.db.kb_category().insert(KnowledgeArticleCategory {
             id: 0,
             name,
             description: opt_str(col(&headers, row, "description")),

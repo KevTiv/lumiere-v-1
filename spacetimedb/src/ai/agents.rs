@@ -81,7 +81,7 @@ pub struct CreateAiTeamMemberParams {
 #[spacetimedb::table(
     accessor = ai_agent,
     public,
-    index(name = "by_company", accessor = ai_agent_by_company, btree(columns = [company_id]))
+    index(accessor = ai_agent_by_company, btree(columns = [company_id]))
 )]
 pub struct AiAgent {
     #[primary_key]
@@ -122,7 +122,7 @@ pub struct AiAgent {
     accessor = ai_team_member,
     public,
     index(name = "by_agent", accessor = team_member_by_agent, btree(columns = [ai_agent_id])),
-    index(name = "by_company", accessor = team_member_by_company, btree(columns = [company_id]))
+    index(accessor = team_member_by_company, btree(columns = [company_id]))
 )]
 pub struct AiTeamMember {
     #[primary_key]

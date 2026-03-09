@@ -22,7 +22,7 @@ use crate::workflow::definitions::{
 #[spacetimedb::table(
     accessor = workflow_instance,
     public,
-    index(name = "by_workflow", accessor = instance_by_workflow, btree(columns = [workflow_id])),
+    index(accessor = instance_by_workflow, btree(columns = [workflow_id])),
     index(name = "by_res", accessor = instance_by_res, btree(columns = [res_id]))
 )]
 pub struct WorkflowInstance {

@@ -16,7 +16,7 @@ use crate::types::{BillType, PricingType};
 #[spacetimedb::table(
     accessor = project_project,
     public,
-    index(name = "by_company", accessor = project_by_company, btree(columns = [company_id])),
+    index(accessor = project_by_company, btree(columns = [company_id])),
     index(name = "by_user", accessor = project_by_user, btree(columns = [user_id]))
 )]
 pub struct ProjectProject {

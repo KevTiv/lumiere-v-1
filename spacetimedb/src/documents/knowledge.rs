@@ -16,9 +16,9 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 /// Knowledge Article Category — Groups articles by topic
 #[derive(Clone)]
 #[spacetimedb::table(
-    accessor = knowledge_article_category,
+    accessor = kb_category,
     public,
-    index(name = "by_parent", accessor = kb_category_by_parent, btree(columns = [parent_id]))
+    index(accessor = kb_category_by_parent, btree(columns = [parent_id]))
 )]
 pub struct KnowledgeArticleCategory {
     #[primary_key]
@@ -43,8 +43,8 @@ pub struct KnowledgeArticleCategory {
 #[spacetimedb::table(
     accessor = knowledge_article,
     public,
-    index(name = "by_parent", accessor = article_by_parent, btree(columns = [parent_id])),
-    index(name = "by_category", accessor = article_by_category, btree(columns = [category_id]))
+    index(accessor = article_by_parent, btree(columns = [parent_id])),
+    index(accessor = article_by_category, btree(columns = [category_id]))
 )]
 pub struct KnowledgeArticle {
     #[primary_key]
@@ -180,7 +180,7 @@ pub fn create_knowledge_category(
 
     let cat = ctx
         .db
-        .knowledge_article_category()
+        .kb_category()
         .insert(KnowledgeArticleCategory {
             id: 0,
             name: params.name,
@@ -228,7 +228,7 @@ pub fn update_knowledge_category(
 
     let cat = ctx
         .db
-        .knowledge_article_category()
+        .kb_category()
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
@@ -258,7 +258,7 @@ pub fn update_knowledge_category(
         changed_fields.push("sequence");
     }
 
-    ctx.db.knowledge_article_category().id().update(new_cat);
+    ctx.db.kb_category().id().update(new_cat);
 
     write_audit_log_v2(
         ctx,
@@ -362,9 +362,9 @@ pub fn create_knowledge_article(
 
     // Increment category article count
     if let Some(cid) = params.category_id {
-        if let Some(cat) = ctx.db.knowledge_article_category().id().find(&cid) {
+        if let Some(cat) = ctx.db.kb_category().id().find(&cid) {
             ctx.db
-                .knowledge_article_category()
+                .kb_category()
                 .id()
                 .update(KnowledgeArticleCategory {
                     article_count: cat.article_count + 1,
@@ -786,9 +786,9 @@ pub fn delete_knowledge_article(
 
     // Decrement category article count if applicable
     if let Some(cid) = article.category_id {
-        if let Some(cat) = ctx.db.knowledge_article_category().id().find(&cid) {
+        if let Some(cat) = ctx.db.kb_category().id().find(&cid) {
             ctx.db
-                .knowledge_article_category()
+                .kb_category()
                 .id()
                 .update(KnowledgeArticleCategory {
                     article_count: cat.article_count.saturating_sub(1),
@@ -861,7 +861,7 @@ pub fn delete_knowledge_category(
 
     let cat = ctx
         .db
-        .knowledge_article_category()
+        .kb_category()
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
@@ -872,7 +872,7 @@ pub fn delete_knowledge_category(
     }
 
     ctx.db
-        .knowledge_article_category()
+        .kb_category()
         .id()
         .delete(&category_id);
 

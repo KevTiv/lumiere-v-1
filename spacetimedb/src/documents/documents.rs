@@ -16,10 +16,10 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 /// Document Folder — Hierarchical container for organizing documents
 #[spacetimedb::table(
-    accessor = document_folder,
+    accessor = doc_folder,
     public,
-    index(name = "by_parent", accessor = folder_by_parent, btree(columns = [parent_id])),
-    index(name = "by_owner", accessor = folder_by_owner, btree(columns = [owner_id]))
+    index(accessor = folder_by_parent, btree(columns = [parent_id])),
+    index(accessor = folder_by_owner, btree(columns = [owner_id]))
 )]
 pub struct DocumentFolder {
     #[primary_key]
@@ -59,8 +59,8 @@ pub struct DocumentFolder {
     accessor = document,
     public,
     index(name = "by_folder", accessor = document_by_folder, btree(columns = [folder_id])),
-    index(name = "by_owner", accessor = document_by_owner, btree(columns = [owner_id])),
-    index(name = "by_company", accessor = document_by_company, btree(columns = [company_id]))
+    index(accessor = document_by_owner, btree(columns = [owner_id])),
+    index(accessor = document_by_company, btree(columns = [company_id]))
 )]
 pub struct Document {
     #[primary_key]
@@ -217,7 +217,7 @@ pub fn create_document_folder(
     let parent_path = if let Some(pid) = params.parent_id {
         let parent = ctx
             .db
-            .document_folder()
+            .doc_folder()
             .id()
             .find(&pid)
             .ok_or("Parent folder not found")?;
@@ -228,7 +228,7 @@ pub fn create_document_folder(
 
     let write_access_ids = vec![ctx.sender()];
 
-    let folder = ctx.db.document_folder().insert(DocumentFolder {
+    let folder = ctx.db.doc_folder().insert(DocumentFolder {
         id: 0,
         name: params.name,
         description: params.description,
@@ -359,8 +359,8 @@ pub fn create_document(
 
     // Increment folder document count
     if let Some(fid) = params.folder_id {
-        if let Some(folder) = ctx.db.document_folder().id().find(&fid) {
-            ctx.db.document_folder().id().update(DocumentFolder {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            ctx.db.doc_folder().id().update(DocumentFolder {
                 document_count: folder.document_count + 1,
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
@@ -593,8 +593,8 @@ pub fn delete_document(
 
     // Decrement folder count
     if let Some(fid) = doc.folder_id {
-        if let Some(folder) = ctx.db.document_folder().id().find(&fid) {
-            ctx.db.document_folder().id().update(DocumentFolder {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            ctx.db.doc_folder().id().update(DocumentFolder {
                 document_count: folder.document_count.saturating_sub(1),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,

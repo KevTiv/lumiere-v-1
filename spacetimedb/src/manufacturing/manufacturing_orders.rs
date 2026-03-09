@@ -27,9 +27,9 @@ use serde_json::{self, Number};
 #[spacetimedb::table(
     accessor = mrp_production,
     public,
-    index(name = "by_product", accessor = mrp_production_by_product, btree(columns = [product_id])),
-    index(name = "by_company", accessor = mrp_production_by_company, btree(columns = [company_id])),
-    index(name = "by_state", accessor = mrp_production_by_state, btree(columns = [state]))
+    index(accessor = mrp_production_by_product, btree(columns = [product_id])),
+    index(accessor = mrp_production_by_company, btree(columns = [company_id])),
+    index(accessor = mrp_production_by_state, btree(columns = [state]))
 )]
 pub struct MrpProduction {
     #[primary_key]
@@ -110,7 +110,7 @@ pub struct MrpProduction {
     accessor = mrp_workorder,
     public,
     index(name = "by_production", accessor = mrp_workorder_by_production, btree(columns = [production_id])),
-    index(name = "by_workcenter", accessor = mrp_workorder_by_workcenter, btree(columns = [workcenter_id]))
+    index(accessor = mrp_workorder_by_workcenter, btree(columns = [workcenter_id]))
 )]
 pub struct MrpWorkorder {
     #[primary_key]

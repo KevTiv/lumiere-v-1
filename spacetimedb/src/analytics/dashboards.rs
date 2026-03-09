@@ -78,7 +78,7 @@ pub struct UpdateDashboardShareParams {
 #[spacetimedb::table(
     accessor = dashboard_widget,
     public,
-    index(name = "by_company", accessor = widget_by_company, btree(columns = [company_id]))
+    index(accessor = widget_by_company, btree(columns = [company_id]))
 )]
 pub struct DashboardWidget {
     #[primary_key]
@@ -115,7 +115,7 @@ pub struct DashboardWidget {
 #[spacetimedb::table(
     accessor = dashboard,
     public,
-    index(name = "by_company", accessor = dashboard_by_company, btree(columns = [company_id]))
+    index(accessor = dashboard_by_company, btree(columns = [company_id]))
 )]
 pub struct Dashboard {
     #[primary_key]
