@@ -17,6 +17,8 @@ use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig, PosLoyaltyProgram};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
+use crate::iot::registry::iot_device;
+use crate::iot::actions::queue_action_internal;
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
@@ -708,6 +710,68 @@ pub fn create_pos_order(
     if let Some(partner_id) = params.partner_id {
         if config.module_pos_loyalty {
             let _ = update_loyalty_points(ctx, partner_id, loyalty_points, config.currency_id);
+        }
+    }
+
+    // ── IoT hooks ─────────────────────────────────────────────────────────────
+    // Push order total to any CustomerDisplay linked to this POS config
+    // Initiate payment on any PaymentTerminal linked to this POS config
+    for device in ctx.db.iot_device().iter().filter(|d| {
+        d.pos_config_id == Some(config.id) && d.status == "Online"
+    }) {
+        match device.device_type.as_str() {
+            "CustomerDisplay" => {
+                let display_payload = serde_json::json!({
+                    "order_id": order.id,
+                    "amount_total": amount_total,
+                    "currency_id": config.currency_id,
+                    "lines": params.lines.len(),
+                })
+                .to_string();
+                queue_action_internal(
+                    ctx,
+                    organization_id,
+                    device.id,
+                    "DisplayMessage",
+                    &display_payload,
+                    "create_pos_order",
+                );
+            }
+            "PaymentTerminal" => {
+                // Only trigger payment terminal if payment method is card
+                let has_card_payment = params.payments.iter().any(|p| {
+                    p.payment_method_id > 0 // simplified: non-zero method = card
+                });
+                if has_card_payment {
+                    let payment_payload = serde_json::json!({
+                        "order_id": order.id,
+                        "amount": amount_total,
+                        "currency_id": config.currency_id,
+                    })
+                    .to_string();
+                    queue_action_internal(
+                        ctx,
+                        organization_id,
+                        device.id,
+                        "InitiatePayment",
+                        &payment_payload,
+                        "create_pos_order",
+                    );
+                }
+            }
+            "ReceiptPrinter" => {
+                let receipt_payload =
+                    serde_json::json!({ "order_id": order.id, "auto": true }).to_string();
+                queue_action_internal(
+                    ctx,
+                    organization_id,
+                    device.id,
+                    "PrintReceipt",
+                    &receipt_payload,
+                    "create_pos_order",
+                );
+            }
+            _ => {}
         }
     }
 

@@ -35,7 +35,8 @@
 /// ├── workflow/       ← Workflow Engine              [Phase 13]
 /// ├── ai/             ← AI Agents & Embeddings       [Phase 14]
 /// ├── data_ops/       ← Import/Export                [Phase 15]
-/// └── analytics/      ← Dashboards & Metrics         [Phase 16]
+/// ├── analytics/      ← Dashboards & Metrics         [Phase 16]
+/// └── iot/            ← IoT Integration              [Phase 20]
 /// ```
 ///
 /// # Adding a new domain
@@ -71,6 +72,7 @@ pub mod analytics;  // Phase 16 — Dashboards & Metrics
 pub mod hr;         // Phase 17 — HR, Leaves, Contracts, Payroll
 pub mod helpdesk;   // Phase 18 — Helpdesk & Support Tickets
 pub mod expenses;   // Phase 19 — Employee Expenses
+pub mod iot;        // Phase 20 — IoT Integration (devices, telemetry, actions)
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 

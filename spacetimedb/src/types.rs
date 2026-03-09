@@ -933,3 +933,76 @@ pub enum ExpenseSheetState {
     Done,
     Refused,
 }
+
+// IoT Module
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum DeviceType {
+    BarcodeScanner,
+    WeighingScale,
+    ReceiptPrinter,
+    LabelPrinter,
+    CashDrawer,
+    TemperatureSensor,
+    HumiditySensor,
+    RfidReader,
+    Camera,
+    Plc,
+    // Pass 2 additions
+    PaymentTerminal,   // card payment terminal (one per hub)
+    CustomerDisplay,   // customer-facing screen showing order total
+    MeasurementTool,   // calipers, gauge feelers → Quality module
+    Footswitch,        // hands-free trigger for manufacturing workorder steps
+    Custom,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum DeviceStatus {
+    Online,
+    Offline,
+    Error,
+    Pairing,
+    /// Hub is reachable but cannot reach SpacetimeDB (no auth / network partition)
+    ConnectedNoServer,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum SensorUnit {
+    Kg,
+    Lb,
+    Celsius,
+    Fahrenheit,
+    Percent,
+    Count,
+    Lux,
+    Ppm,
+    Bar,
+    Volt,
+    Amp,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IoTActionType {
+    PrintLabel,
+    PrintReceipt,
+    OpenCashDrawer,
+    DisplayMessage,
+    TriggerRelay,
+    /// Initiate a card payment: payload = { amount, currency, order_id }
+    InitiatePayment,
+    Custom,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IoTActionStatus {
+    Pending,
+    Sent,
+    Acknowledged,
+    Failed,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IoTAlertSeverity {
+    Info,
+    Warning,
+    Critical,
+}
