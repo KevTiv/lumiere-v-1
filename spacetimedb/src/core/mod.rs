@@ -25,15 +25,3 @@ pub mod queue;
 pub mod reference;
 pub mod users;
 pub mod utm;
-
-/// Test suite for core modules
-///
-/// Contains test reducers for Phase 1 features:
-/// - Organization lifecycle
-/// - User management
-/// - Permission system
-/// - Reference data
-/// - Audit logging
-/// - Queue system
-/// - Privacy controls
-pub mod tests;
