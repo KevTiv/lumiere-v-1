@@ -1,6 +1,8 @@
-supabase copy
-*.md
-.cursor
-.windsurfrules
+#supabase copy
+#*.md
+#.cursor
+#.windsurfrules
 .DS_Store
 target
+*/**/node_modules
+node_modules
