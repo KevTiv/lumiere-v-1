@@ -1,0 +1,189 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "search": "Search",
+    "export": "Export",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "submit": "Submit",
+    "reset": "Reset",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "noData": "No data available"
+  },
+  "navigation": {
+    "overview": "Overview",
+    "sales": "Sales",
+    "inventory": "Inventory",
+    "customers": "Customers",
+    "analytics": "Analytics",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "erpSystem": "ERP System",
+    "vsLastMonth": "vs last month",
+    "timeRange": {
+      "today": "Today",
+      "7d": "Last 7 Days",
+      "30d": "Last 30 Days",
+      "90d": "Last 90 Days",
+      "ytd": "Year to Date"
+    },
+    "sales": {
+      "title": "Sales Dashboard",
+      "description": "Real-time sales performance and analytics",
+      "sections": {
+        "charts": "Performance Trends",
+        "details": "Sales by Region"
+      },
+      "widgets": {
+        "revenue": "Total Revenue",
+        "orders": "Total Orders",
+        "customers": "New Customers",
+        "revenueTrend": "Revenue Over Time",
+        "targets": "Monthly Targets",
+        "regionSales": "Regional Performance",
+        "topProducts": "Top Products"
+      },
+      "metrics": {
+        "revenueTarget": "Revenue Target",
+        "ordersTarget": "Orders Target",
+        "customerAcquisition": "Customer Acquisition",
+        "retentionRate": "Retention Rate"
+      },
+      "table": {
+        "product": "Product",
+        "sales": "Sales",
+        "revenue": "Revenue"
+      }
+    },
+    "inventory": {
+      "title": "Inventory Dashboard",
+      "description": "Stock levels, movements, and warehouse analytics",
+      "sections": {
+        "stockLevels": "Stock Analysis",
+        "movements": "Recent Activity"
+      },
+      "widgets": {
+        "categoryStock": "Stock by Category",
+        "warehouseCapacity": "Warehouse Capacity",
+        "stockMovement": "Stock Movement Trends"
+      },
+      "stats": {
+        "totalSkus": "Total SKUs",
+        "inStock": "In Stock",
+        "lowStock": "Low Stock",
+        "outOfStock": "Out of Stock"
+      },
+      "warehouses": {
+        "warehouse": "Warehouse {{id}}",
+        "distribution": "Distribution Center"
+      }
+    }
+  },
+  "accounting": {
+    "title": "Accounting",
+    "accounts": {
+      "title": "Chart of Accounts",
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "balance": "Balance",
+      "active": "Active"
+    },
+    "journalEntries": {
+      "title": "Journal Entries",
+      "ref": "Reference",
+      "date": "Date",
+      "journal": "Journal",
+      "state": "Status",
+      "total": "Total"
+    },
+    "invoices": {
+      "title": "Invoices",
+      "ar": "Customer Invoices",
+      "ap": "Vendor Bills",
+      "dueDate": "Due Date",
+      "paymentState": "Payment",
+      "partner": "Partner"
+    },
+    "taxes": {
+      "title": "Taxes",
+      "rate": "Rate",
+      "taxUse": "Type",
+      "priceInclude": "Price Inc."
+    },
+    "budgets": {
+      "title": "Budgets",
+      "planned": "Planned",
+      "practical": "Actual",
+      "variance": "Variance %"
+    },
+    "states": {
+      "draft": "Draft",
+      "posted": "Posted",
+      "cancelled": "Cancelled",
+      "paid": "Paid",
+      "partial": "Partial",
+      "notPaid": "Unpaid"
+    },
+    "nav": {
+      "overview": "Overview",
+      "accounts": "Chart of Accounts",
+      "journalEntries": "Journal Entries",
+      "customerInvoices": "Customer Invoices",
+      "vendorBills": "Vendor Bills",
+      "taxes": "Taxes",
+      "budgets": "Budgets"
+    },
+    "actions": {
+      "newInvoice": "New Invoice",
+      "newBill": "New Bill",
+      "newEntry": "New Journal Entry",
+      "newAccount": "New Account",
+      "newTax": "New Tax",
+      "newBudget": "New Budget",
+      "post": "Post",
+      "registerPayment": "Register Payment"
+    },
+    "overview": {
+      "title": "Accounting",
+      "description": "Financial overview and reporting",
+      "glAccounts": "GL Accounts",
+      "totalAccounts": "Total accounts",
+      "openInvoices": "Open Invoices",
+      "unpaid": "Unpaid",
+      "outstanding": "${{amount}} outstanding",
+      "draftEntries": "Draft Entries",
+      "awaitingPosting": "Awaiting posting",
+      "cashFlow": "Cash Flow Position",
+      "budgetVsActual": "Budget vs Actual"
+    },
+    "messages": {
+      "connecting": "Connecting…",
+      "connectionError": "Failed to connect to SpacetimeDB",
+      "accountNotFound": "Account not found.",
+      "entryNotFound": "Journal entry not found.",
+      "invoiceNotFound": "Invoice not found.",
+      "billNotFound": "Bill not found.",
+      "taxNotFound": "Tax not found.",
+      "budgetNotFound": "Budget not found.",
+      "backToAccounts": "Back to Chart of Accounts",
+      "backToEntries": "Back to Journal Entries",
+      "backToInvoices": "Back to Customer Invoices",
+      "backToBills": "Back to Vendor Bills"
+    }
+  }
+}

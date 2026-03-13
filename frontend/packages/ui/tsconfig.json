@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@lumiere/ui/*": ["./src/*"]
+    },
+    "jsx": "react-jsx",
+    "typeRoots": ["./node_modules/@types", "../mobile/node_modules/@types"]
+  },
+  "include": ["."],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../mobile" }
+  ]
+}

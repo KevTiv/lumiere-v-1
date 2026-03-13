@@ -1,0 +1,21 @@
+{
+  "name": "@lumiere/i18n",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./locales/*": "./src/locales/*.json"
+  },
+  "dependencies": {
+    "i18next": "^25.8.17",
+    "react-i18next": "^15.7.4"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

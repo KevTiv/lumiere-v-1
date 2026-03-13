@@ -1,29 +1,29 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
   "compilerOptions": {
-    "target": "ES2022",
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "baseUrl": ".",
-    "paths": {
-      "#/*": ["./src/*"],
-      "@/*": ["./src/*"]
-    },
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
-
-    /* Linting */
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "target": "ES6",
     "skipLibCheck": true,
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
-  }
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "@lumiere/ui": ["../packages/ui/src/index.ts"],
+      "@lumiere/ui/*": ["../packages/ui/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }
