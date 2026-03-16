@@ -1,3 +1,5 @@
+"use client"
+
 interface AccountEntry {
   code: string
   name: string

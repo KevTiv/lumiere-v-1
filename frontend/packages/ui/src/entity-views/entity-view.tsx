@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "../lib/utils"
 import type { EntityViewConfig } from "../lib/entity-view-types"
 import { EntityTable } from "./entity-table"

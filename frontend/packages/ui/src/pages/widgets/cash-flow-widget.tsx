@@ -1,3 +1,5 @@
+"use client"
+
 interface CashFlowData {
   arTotal: number
   apTotal: number

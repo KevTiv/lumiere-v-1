@@ -1,5 +1,5 @@
-import type { EntryTableConfig, EntryData } from "./entry-table-types"
-import type { FormField } from "./form-types"
+import type { EntryTableConfig, EntryData } from "@lumiere/ui"
+import type { FormField } from "@lumiere/ui"
 
 // Sample product form fields for view/edit modal
 export const productFormFields: FormField[] = [

@@ -1,3 +1,5 @@
+"use client"
+
 import type { ComponentType } from "react"
 import { TrendingUp, TrendingDown, Minus, DollarSign, Users, ShoppingCart, Package } from "lucide-react"
 import type { KPIWidget as KPIWidgetType } from "../../lib/dashboard-types"

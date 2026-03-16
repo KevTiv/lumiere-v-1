@@ -1,11 +1,15 @@
+"use client"
 
-import { useState, useCallback } from "react"
+
+import React, { useState, useCallback } from "react"
 import { cn } from "../lib/utils"
 import type { FormConfig, FormField } from "../lib/form-types"
 import { FormFieldRenderer } from "./forms-field-render"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
-import { Loader2 } from "lucide-react"
+import { Separator } from "../components/separator"
+import { Check, Loader2 } from "lucide-react"
+import * as Icons from "lucide-react"
 
 interface ModularFormProps {
   config: FormConfig
@@ -147,42 +151,58 @@ export function ModularForm({
   }
 
   const formContent = (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {config.sections.map((section) => (
-        <div key={section.id} className="space-y-4">
-          {(section.title || section.description) && (
-            <div className="space-y-1">
-              {section.title && (
-                <h3 className="text-lg font-medium text-foreground">
-                  {section.title}
-                </h3>
-              )}
-              {section.description && (
-                <p className="text-sm text-muted-foreground">
-                  {section.description}
-                </p>
-              )}
-            </div>
-          )}
-          <div className="grid grid-cols-12 gap-4">
-            {section.fields.map((field) => (
-              <FormFieldRenderer
-                key={field.id}
-                field={field}
-                value={values[field.name]}
-                onChange={(value) => handleChange(field.name, value)}
-                error={errors[field.name]}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {config.sections.map((section, idx) => {
+        // Resolve optional section icon
+        const SectionIcon = section.icon
+          ? (Icons as Record<string, unknown>)[section.icon] as React.ComponentType<{ className?: string }> | undefined
+          : undefined
 
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/50">
+        return (
+          <div key={section.id}>
+            {idx > 0 && <Separator className="mb-6" />}
+            <div className="space-y-4">
+              {(section.title || section.description) && (
+                <div className="flex items-start gap-3 bg-muted/40 rounded-lg px-4 py-3 mb-4">
+                  {SectionIcon && (
+                    <SectionIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <div className="space-y-0.5">
+                    {section.title && (
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {section.title}
+                      </h3>
+                    )}
+                    {section.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {section.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-12 gap-4">
+                {section.fields.map((field) => (
+                  <FormFieldRenderer
+                    key={field.id}
+                    field={field}
+                    value={values[field.name]}
+                    onChange={(value) => handleChange(field.name, value)}
+                    error={errors[field.name]}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="flex items-center justify-end gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50">
         {config.showReset && (
           <Button
             type="button"
             variant="ghost"
+            size="sm"
             onClick={handleReset}
             disabled={isSubmitting}
           >
@@ -193,14 +213,18 @@ export function ModularForm({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={handleCancel}
             disabled={isSubmitting}
           >
             {config.cancelLabel || "Cancel"}
           </Button>
         )}
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting
+            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            : <Check className="mr-2 h-4 w-4" />
+          }
           {config.submitLabel || "Submit"}
         </Button>
       </div>

@@ -1,3 +1,5 @@
+"use client"
+
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts"
 import type { BarChartWidget as BarChartWidgetType } from "../../lib/dashboard-types"
 

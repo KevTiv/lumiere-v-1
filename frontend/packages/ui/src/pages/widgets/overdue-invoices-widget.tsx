@@ -1,3 +1,5 @@
+"use client"
+
 interface OverdueInvoicesData {
   count: number
   totalAmount: number

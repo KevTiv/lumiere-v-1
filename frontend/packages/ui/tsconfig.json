@@ -3,7 +3,11 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@lumiere/ui/*": ["./src/*"]
+      "@lumiere/ui/*": ["./src/*"],
+      "@/components/ui/*": ["./src/components/*"],
+      "@/components/*": ["./src/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"]
     },
     "jsx": "react-jsx",
     "typeRoots": ["./node_modules/@types", "../mobile/node_modules/@types"]

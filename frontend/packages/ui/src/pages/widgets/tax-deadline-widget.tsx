@@ -1,3 +1,5 @@
+"use client"
+
 interface TaxDeadlineEntry {
   title: string
   dueDate: string

@@ -15,6 +15,10 @@ export type WidgetType =
   | "budget-progress"
   | "tax-deadline"
   | "account-balance"
+  | "ios-tiles"
+  | "activity-rings"
+  | "countdown"
+  | "quick-actions"
 
 export interface BaseWidget {
   id: string
@@ -123,6 +127,68 @@ export interface AccountBalanceWidget extends BaseWidget {
   data: { accounts: Array<{ code: string; name: string; balance: number; type: string }> }
 }
 
+export interface IosTilesWidget extends BaseWidget {
+  type: "ios-tiles"
+  data: {
+    tiles: Array<{
+      id: string
+      label: string
+      value: string | number
+      subtitle?: string
+      icon?: React.ReactNode
+      color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
+      progress?: number
+      sparkline?: number[]
+      size?: "small" | "medium" | "large"
+    }>
+  }
+}
+
+export interface ActivityRingsWidget extends BaseWidget {
+  type: "activity-rings"
+  data: {
+    rings: Array<{
+      id: string
+      label: string
+      value: number
+      max: number
+      color: "red" | "green" | "blue" | "orange" | "purple" | "teal"
+      unit?: string
+    }>
+    showLegend?: boolean
+    size?: "sm" | "md" | "lg"
+  }
+}
+
+export interface CountdownWidget extends BaseWidget {
+  type: "countdown"
+  data: {
+    items: Array<{
+      id: string
+      label: string
+      value: number
+      unit: string
+      maxValue?: number
+      color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
+    }>
+    layout?: "horizontal" | "grid"
+  }
+}
+
+export interface QuickActionsWidget extends BaseWidget {
+  type: "quick-actions"
+  data: {
+    actions: Array<{
+      id: string
+      label: string
+      icon: string
+      color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
+      onClick?: () => void
+    }>
+    columns?: 2 | 3 | 4
+  }
+}
+
 export type DashboardWidget =
   | KPIWidget
   | AreaChartWidget
@@ -136,6 +202,10 @@ export type DashboardWidget =
   | BudgetProgressWidget
   | TaxDeadlineWidget
   | AccountBalanceWidget
+  | IosTilesWidget
+  | ActivityRingsWidget
+  | CountdownWidget
+  | QuickActionsWidget
 
 export interface DashboardSection {
   id: string

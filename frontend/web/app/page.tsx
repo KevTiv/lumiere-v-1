@@ -1,29 +1,32 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { DashboardGrid } from "@/components/dashboard/dashboard-grid"
+import {
+  DashboardSidebar,
+  DashboardHeader,
+  DashboardGrid,
+  FormModal,
+  EntryTableViewer,
+  useRBAC,
+  SettingsModule,
+  UserSwitcher,
+  AIChatPanel,
+  NotebookPanel,
+  JournalPanel,
+  TaskBoardView,
+  ForensicsView,
+  type DashboardConfig,
+  type DashboardSection,
+  type EntryData,
+} from "@lumiere/ui"
 import { dashboardConfigs } from "@/lib/demo-dashboard-config"
-import { FormModal } from "@/components/forms/form-modal"
 import { formConfigs } from "@/lib/demo-form-configs"
-import { EntryTableViewer } from "@/components/entry-table/entry-table-viewer"
-import { 
-  productTableConfig, 
-  sampleProducts, 
-  customerTableConfig, 
-  sampleCustomers 
+import {
+  productTableConfig,
+  sampleProducts,
+  customerTableConfig,
+  sampleCustomers
 } from "@/lib/demo-entry-table-config"
-import { RBACProvider, useRBAC } from "@/lib/rbac-context"
-import { SettingsModule } from "@/components/settings/settings-module"
-import { UserSwitcher } from "@/components/settings/user-switcher"
-import { AIChatPanel } from "@/components/ai-chat/ai-chat-panel"
-import { NotebookPanel } from "@/components/notebook/notebook-panel"
-import { JournalPanel } from "@/components/journal/journal-panel"
-import { TaskBoardView } from "@/components/tasks/task-board-view"
-import { ForensicsView } from "@/components/forensics/forensics-view"
-import type { DashboardConfig, DashboardSection } from "@/lib/dashboard-types"
-import type { EntryData } from "@/lib/entry-table-types"
 
 function DashboardContent() {
   const [activeView, setActiveView] = useState("sales")
@@ -134,7 +137,7 @@ function DashboardContent() {
         onOpenNotebook={() => setIsNotebookOpen(true)}
         onOpenAIChat={() => setIsAIChatOpen(true)}
       />
-      
+
       <main className="flex-1 overflow-auto scroll-smooth">
         <div className="p-6 lg:p-8 min-w-max">
           {/* User Switcher for demo purposes */}
@@ -147,7 +150,7 @@ function DashboardContent() {
             />
             <UserSwitcher />
           </div>
-          
+
           {/* Settings Module */}
           {activeView === "settings" ? (
             <SettingsModule />
@@ -215,9 +218,8 @@ function DashboardContent() {
       <NotebookPanel
         open={isNotebookOpen}
         onClose={() => setIsNotebookOpen(false)}
-        onAIChat={(message) => {
+        onAIChat={(_message) => {
           setIsAIChatOpen(true)
-          // The AI chat would receive this message
         }}
         dataContext={{
           sales: products,
@@ -236,9 +238,5 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-  return (
-    <RBACProvider>
-      <DashboardContent />
-    </RBACProvider>
-  )
+  return <DashboardContent />
 }

@@ -1,6 +1,9 @@
+"use client"
+
 
 import { cn } from "../lib/utils"
 import type { FormField } from "../lib/form-types"
+import { fieldWidthClasses } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
 import { Checkbox } from "../components/checkbox"
@@ -14,12 +17,8 @@ import {
   SelectValue,
 } from "../components/select"
 
-const widthClasses: Record<string, string> = {
-  full: "col-span-12",
-  "2/3": "col-span-12 md:col-span-8",
-  "1/2": "col-span-12 md:col-span-6",
-  "1/3": "col-span-12 md:col-span-4",
-}
+const inputBase =
+  "bg-background border-input focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-colors duration-150"
 
 interface FormFieldRendererProps {
   field: FormField
@@ -53,10 +52,7 @@ export function FormFieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             disabled={field.disabled}
             required={field.required}
-            className={cn(
-              "bg-secondary/50 border-border/50 focus:border-primary",
-              error && "border-destructive"
-            )}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
           />
         )
 
@@ -74,10 +70,7 @@ export function FormFieldRenderer({
             step={field.step}
             min={field.validation?.min}
             max={field.validation?.max}
-            className={cn(
-              "bg-secondary/50 border-border/50 focus:border-primary",
-              error && "border-destructive"
-            )}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
           />
         )
 
@@ -93,8 +86,9 @@ export function FormFieldRenderer({
             required={field.required}
             rows={field.rows || 3}
             className={cn(
-              "bg-secondary/50 border-border/50 focus:border-primary resize-none",
-              error && "border-destructive"
+              inputBase,
+              "min-h-[80px] resize-none",
+              error && "border-destructive focus-visible:ring-destructive/20"
             )}
           />
         )
@@ -108,8 +102,9 @@ export function FormFieldRenderer({
           >
             <SelectTrigger
               className={cn(
-                "w-full bg-secondary/50 border-border/50 focus:border-primary",
-                error && "border-destructive"
+                "w-full",
+                inputBase,
+                error && "border-destructive focus-visible:ring-destructive/20"
               )}
             >
               <SelectValue placeholder={field.placeholder || "Select..."} />
@@ -150,7 +145,7 @@ export function FormFieldRenderer({
 
       case "switch":
         return (
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="flex items-center justify-between gap-3 bg-muted/30 rounded-lg border border-border/50 px-4 py-3">
             {field.label && (
               <Label
                 htmlFor={field.id}
@@ -172,27 +167,33 @@ export function FormFieldRenderer({
         return (
           <div
             className={cn(
-              "flex gap-4 pt-2",
+              "flex gap-2 pt-1",
               field.layout === "vertical" ? "flex-col" : "flex-row flex-wrap"
             )}
           >
-            {field.options.map((option) => (
-              <label
-                key={option.value}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name={field.name}
-                  value={option.value}
-                  checked={value === option.value}
-                  onChange={() => onChange(option.value)}
+            {field.options.map((option) => {
+              const selected = value === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
                   disabled={field.disabled || option.disabled}
-                  className="w-4 h-4 text-primary bg-secondary/50 border-border focus:ring-primary"
-                />
-                <span className="text-sm text-foreground">{option.label}</span>
-              </label>
-            ))}
+                  onClick={() => onChange(option.value)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors duration-150",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    selected
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-input hover:bg-muted/50",
+                    (field.disabled || option.disabled) && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
           </div>
         )
 
@@ -208,10 +209,7 @@ export function FormFieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             disabled={field.disabled}
             required={field.required}
-            className={cn(
-              "bg-secondary/50 border-border/50 focus:border-primary",
-              error && "border-destructive"
-            )}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
           />
         )
 
@@ -227,7 +225,8 @@ export function FormFieldRenderer({
             disabled={field.disabled}
             required={field.required}
             className={cn(
-              "bg-secondary/50 border-border/50 focus:border-primary file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3",
+              inputBase,
+              "file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3",
               error && "border-destructive"
             )}
           />
@@ -264,7 +263,7 @@ export function FormFieldRenderer({
   const showLabel = field.type !== "checkbox" && field.type !== "switch"
 
   return (
-    <div className={cn(widthClasses[width], "space-y-2", field.className)}>
+    <div className={cn(fieldWidthClasses[width] ?? "col-span-12", "space-y-1.5", field.className)}>
       {showLabel && field.label && (
         <Label
           htmlFor={field.id}
@@ -278,7 +277,12 @@ export function FormFieldRenderer({
       {field.description && (
         <p className="text-xs text-muted-foreground">{field.description}</p>
       )}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p className="text-xs text-destructive flex items-center gap-1">
+          <span className="inline-block w-1 h-1 rounded-full bg-destructive flex-shrink-0" />
+          {error}
+        </p>
+      )}
     </div>
   )
 }

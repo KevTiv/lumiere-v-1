@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "../lib/utils"
 import type { EntityDetailConfig } from "../lib/entity-view-types"
 import { Badge } from "../components/badge"

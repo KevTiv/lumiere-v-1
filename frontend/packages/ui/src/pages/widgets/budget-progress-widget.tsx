@@ -1,3 +1,5 @@
+"use client"
+
 interface BudgetEntry {
   name: string
   planned: number

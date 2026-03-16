@@ -1,3 +1,5 @@
+"use client"
+
 import type { DashboardSection } from "../lib/dashboard-types"
 import { gridWidthClasses } from "../lib/dashboard-types"
 import { DashboardWidgetRenderer } from "./dashboard-widget-renderer"

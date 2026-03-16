@@ -1,3 +1,5 @@
+"use client"
+
 import type { ComponentType } from "react"
 import { TrendingUp, TrendingDown, DollarSign, Users, ShoppingCart, Package } from "lucide-react"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"

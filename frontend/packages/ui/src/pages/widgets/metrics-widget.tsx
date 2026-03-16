@@ -1,3 +1,5 @@
+"use client"
+
 import type { MetricsWidget as MetricsWidgetType } from "../../lib/dashboard-types"
 
 export function MetricsWidget({ data }: { data: MetricsWidgetType["data"] }) {

@@ -3,6 +3,7 @@ import AccountMoveRow from "../generated/account_move_table";
 import AccountJournalRow from "../generated/account_journal_table";
 import AccountTaxRow from "../generated/account_tax_table";
 import CrossoveredBudgetRow from "../generated/crossovered_budget_table";
+import AccountAnalyticAccountRow from "../generated/account_analytic_account_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 
@@ -12,6 +13,7 @@ export type AccountMove = Infer<typeof AccountMoveRow>;
 export type AccountJournal = Infer<typeof AccountJournalRow>;
 export type AccountTax = Infer<typeof AccountTaxRow>;
 export type CrossoveredBudget = Infer<typeof CrossoveredBudgetRow>;
+export type AccountAnalyticAccount = Infer<typeof AccountAnalyticAccountRow>;
 
 // ── Subscription SQL (server-side filtered by company) ────────────────────────
 export function accountingSubscriptions(companyId: bigint): string[] {
@@ -62,4 +64,12 @@ export function queryBudgets(): CrossoveredBudget[] {
   const conn = getStdbConnection();
   if (!conn) return [];
   return [...conn.db.crossovered_budget.iter()];
+}
+
+export function queryAnalyticAccounts(): AccountAnalyticAccount[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.account_analytic_account.iter()].sort((a, b) =>
+    (a.code ?? "").localeCompare(b.code ?? ""),
+  );
 }

@@ -1,4 +1,4 @@
-import type { FormConfig } from "./form-types"
+import type { FormConfig } from "@lumiere/ui"
 
 export const newOrderForm: FormConfig = {
   id: "new-order",

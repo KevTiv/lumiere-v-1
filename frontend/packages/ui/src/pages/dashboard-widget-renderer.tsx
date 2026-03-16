@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import type { DashboardWidget } from "../lib/dashboard-types"
 import { KPIWidget } from "./widgets/kpi-widget"
@@ -11,6 +13,10 @@ import { CashFlowWidget as CashFlowWidgetComp } from "./widgets/cash-flow-widget
 import { BudgetProgressWidget as BudgetProgressWidgetComp } from "./widgets/budget-progress-widget"
 import { TaxDeadlineWidget as TaxDeadlineWidgetComp } from "./widgets/tax-deadline-widget"
 import { AccountBalanceWidget as AccountBalanceWidgetComp } from "./widgets/account-balance-widget"
+import { ActivityRingWidget } from "./widgets/activity-ring-widget"
+import { CountdownWidget } from "./widgets/countdown-widget"
+import { IosTileWidget } from "./widgets/ios-tile-widget"
+import { QuickActionsWidget } from "./widgets/quick-actions-widget"
 
 interface WidgetRendererProps {
   widget: DashboardWidget
@@ -44,6 +50,14 @@ export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererPr
         return <TaxDeadlineWidgetComp data={widget.data} />
       case "account-balance":
         return <AccountBalanceWidgetComp data={widget.data} />
+      case "activity-rings":
+        return <ActivityRingWidget data={widget.data} />
+      case "countdown":
+        return <CountdownWidget data={widget.data} />
+      case "ios-tiles":
+        return <IosTileWidget data={widget.data} />
+      case "quick-actions":
+        return <QuickActionsWidget data={widget.data} />
       case "custom": {
         const CustomComponent = widget.component
         return <CustomComponent data={widget.data} />

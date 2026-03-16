@@ -1,4 +1,4 @@
-import type { DashboardConfig } from "./dashboard-types"
+import type { DashboardConfig } from "@lumiere/ui"
 import { DollarSign, ShoppingCart, Users, Package, TrendingUp, Bell } from "lucide-react"
 
 export const salesDashboard: DashboardConfig = {

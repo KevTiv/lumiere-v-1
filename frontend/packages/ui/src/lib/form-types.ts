@@ -133,6 +133,7 @@ export interface FormSection {
   id: string
   title?: string
   description?: string
+  icon?: string
   fields: FormField[]
   columns?: 1 | 2 | 3
 }
@@ -145,6 +146,9 @@ export interface FormConfig {
   submitLabel?: string
   cancelLabel?: string
   layout?: "default" | "compact" | "card"
+  size?: "md" | "lg" | "xl"
+  icon?: string
+  iconColor?: string
   showReset?: boolean
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   onCancel?: () => void

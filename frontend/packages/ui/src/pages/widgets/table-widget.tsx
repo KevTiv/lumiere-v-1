@@ -1,3 +1,5 @@
+"use client"
+
 import type { TableWidget as TableWidgetType } from "../../lib/dashboard-types"
 
 export function TableWidget({ data }: { data: TableWidgetType["data"] }) {
