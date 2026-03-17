@@ -22,6 +22,7 @@ use crate::workflow::definitions::{
 #[spacetimedb::table(
     accessor = workflow_instance,
     public,
+    index(accessor = instance_by_org, btree(columns = [organization_id])),
     index(accessor = instance_by_workflow, btree(columns = [workflow_id])),
     index(name = "by_res", accessor = instance_by_res, btree(columns = [res_id]))
 )]
@@ -30,6 +31,7 @@ pub struct WorkflowInstance {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub workflow_id: u64,
     pub res_id: u64,         // ID of the related ERP record
     pub res_type: String,    // Model name, e.g., "sale_order"
@@ -55,6 +57,7 @@ pub struct WorkflowWorkitem {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation (inherited from parent WorkflowInstance)
     pub instance_id: u64,
     pub act_id: u64,                        // Current activity
     pub wkf_evaled_condition: Option<String>, // Last evaluated condition result
@@ -74,12 +77,12 @@ pub struct WorkflowWorkitem {
 #[reducer]
 pub fn start_workflow(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     workflow_id: u64,
     res_id: u64,
     res_type: String,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "workflow_instance", "create")?;
+    check_permission(ctx, organization_id, "workflow_instance", "create")?;
 
     // Find the start activity for this workflow
     let start_activities: Vec<WorkflowActivity> = ctx
@@ -98,6 +101,7 @@ pub fn start_workflow(
 
     let instance = ctx.db.workflow_instance().insert(WorkflowInstance {
         id: 0,
+        organization_id,
         workflow_id,
         res_id,
         res_type,
@@ -113,6 +117,7 @@ pub fn start_workflow(
     // Create the initial work item at the start activity
     ctx.db.workflow_workitem().insert(WorkflowWorkitem {
         id: 0,
+        organization_id,
         instance_id: instance.id,
         act_id: start_act.id,
         wkf_evaled_condition: None,
@@ -126,7 +131,7 @@ pub fn start_workflow(
 
     write_audit_log_v2(
         ctx,
-        company_id,
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "workflow_instance",
@@ -152,11 +157,11 @@ pub fn start_workflow(
 #[reducer]
 pub fn signal_workflow(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     instance_id: u64,
     signal: String,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "workflow_instance", "write")?;
+    check_permission(ctx, organization_id, "workflow_instance", "write")?;
 
     let instance = ctx
         .db
@@ -164,6 +169,10 @@ pub fn signal_workflow(
         .id()
         .find(&instance_id)
         .ok_or("Workflow instance not found")?;
+
+    if instance.organization_id != organization_id {
+        return Err("Workflow instance does not belong to this organization".to_string());
+    }
 
     if instance.state != InstanceState::Active {
         return Err("Workflow instance is not active".to_string());
@@ -230,6 +239,7 @@ pub fn signal_workflow(
                 // Otherwise create new workitem at target activity
                 ctx.db.workflow_workitem().insert(WorkflowWorkitem {
                     id: 0,
+                    organization_id,
                     instance_id,
                     act_id: act.id,
                     wkf_evaled_condition: None,
@@ -262,7 +272,7 @@ pub fn signal_workflow(
 
     write_audit_log_v2(
         ctx,
-        company_id,
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "workflow_instance",
@@ -287,10 +297,10 @@ pub fn signal_workflow(
 #[reducer]
 pub fn set_workitem_exception(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     workitem_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "workflow_workitem", "write")?;
+    check_permission(ctx, organization_id, "workflow_workitem", "write")?;
 
     let item = ctx
         .db
@@ -298,6 +308,10 @@ pub fn set_workitem_exception(
         .id()
         .find(&workitem_id)
         .ok_or("Workitem not found")?;
+
+    if item.organization_id != organization_id {
+        return Err("Workitem does not belong to this organization".to_string());
+    }
 
     if item.state != WorkitemState::Active {
         return Err("Workitem is not active".to_string());
@@ -328,7 +342,7 @@ pub fn set_workitem_exception(
 
     write_audit_log_v2(
         ctx,
-        company_id,
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "workflow_workitem",
@@ -349,10 +363,10 @@ pub fn set_workitem_exception(
 #[reducer]
 pub fn cancel_workflow_instance(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     instance_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "workflow_instance", "write")?;
+    check_permission(ctx, organization_id, "workflow_instance", "write")?;
 
     let instance = ctx
         .db
@@ -360,6 +374,10 @@ pub fn cancel_workflow_instance(
         .id()
         .find(&instance_id)
         .ok_or("Workflow instance not found")?;
+
+    if instance.organization_id != organization_id {
+        return Err("Workflow instance does not belong to this organization".to_string());
+    }
 
     if instance.state != InstanceState::Active && instance.state != InstanceState::Exception {
         return Err("Workflow instance cannot be cancelled in its current state".to_string());
@@ -398,7 +416,7 @@ pub fn cancel_workflow_instance(
 
     write_audit_log_v2(
         ctx,
-        company_id,
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "workflow_instance",

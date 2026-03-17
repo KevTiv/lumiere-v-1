@@ -27,6 +27,7 @@ use crate::types::{
 #[spacetimedb::table(
     accessor = account_move,
     public,
+    index(accessor = account_move_by_org, btree(columns = [organization_id])),
     index(accessor = move_by_company, btree(columns = [company_id])),
     index(accessor = move_by_journal, btree(columns = [journal_id])),
     index(accessor = move_by_partner, btree(columns = [partner_id])),
@@ -39,6 +40,8 @@ pub struct AccountMove {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub ref_: Option<String>,
     pub move_type: MoveType,
@@ -95,6 +98,7 @@ pub struct AccountMove {
 #[spacetimedb::table(
     accessor = account_move_line,
     public,
+    index(accessor = account_move_line_by_org, btree(columns = [organization_id])),
     index(accessor = move_line_by_move, btree(columns = [move_id])),
     index(accessor = move_line_by_account, btree(columns = [account_id])),
     index(accessor = move_line_by_partner, btree(columns = [partner_id])),
@@ -105,6 +109,8 @@ pub struct AccountMoveLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub move_id: u64,
     pub move_name: Option<String>,
     pub date: Timestamp,
@@ -525,6 +531,7 @@ fn post_cogs_entries(
 
     let cogs_line = AccountMoveLine {
         id: 0,
+        organization_id: move_record.organization_id,
         move_id: move_record.id,
         move_name: Some(move_record.name.clone()),
         date: move_record.date,
@@ -596,6 +603,7 @@ fn post_cogs_entries(
 
     let inventory_line = AccountMoveLine {
         id: 0,
+        organization_id: move_record.organization_id,
         move_id: move_record.id,
         move_name: Some(move_record.name.clone()),
         date: move_record.date,
@@ -848,6 +856,7 @@ pub fn create_account_move(
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         ref_: params.ref_,
         move_type: params.move_type,
@@ -963,6 +972,7 @@ pub fn add_account_move_line(
 
     let line = ctx.db.account_move_line().insert(AccountMoveLine {
         id: 0,
+        organization_id: move_record.organization_id,
         move_id,
         // Derived from parent move
         move_name: Some(move_record.name.clone()),
@@ -1526,6 +1536,7 @@ pub fn create_invoice_from_sale_order(
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
+        organization_id,
         name: String::new(), // auto-assigned on post
         ref_: order.client_order_ref.clone(),
         move_type: MoveType::OutInvoice,
@@ -1599,6 +1610,7 @@ pub fn create_invoice_from_sale_order(
 
         ctx.db.account_move_line().insert(AccountMoveLine {
             id: 0,
+            organization_id: move_record.organization_id,
             move_id: move_record.id,
             move_name: Some(move_record.name.clone()),
             date: ctx.timestamp,
@@ -1815,6 +1827,7 @@ pub fn create_bill_from_purchase_order(
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
+        organization_id,
         name: String::new(),
         ref_: po.partner_ref.clone(),
         move_type: MoveType::InInvoice,
@@ -1887,6 +1900,7 @@ pub fn create_bill_from_purchase_order(
 
         ctx.db.account_move_line().insert(AccountMoveLine {
             id: 0,
+            organization_id: move_record.organization_id,
             move_id: move_record.id,
             move_name: Some(move_record.name.clone()),
             date: ctx.timestamp,
@@ -2291,6 +2305,7 @@ pub fn bill_timesheets(
 
     let move_row = ctx.db.account_move().insert(AccountMove {
         id: 0,
+        organization_id,
         name: String::new(),
         ref_: None,
         move_type: MoveType::OutInvoice,
@@ -2350,6 +2365,7 @@ pub fn bill_timesheets(
     for (seq, ts) in billable_sheets.iter().enumerate() {
         ctx.db.account_move_line().insert(AccountMoveLine {
             id: 0,
+            organization_id,
             move_id,
             move_name: None,
             date: inv_date,

@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
-import { Plus } from "lucide-react"
 import { DashboardGrid } from "./dashboard-grid"
 import { DashboardHeader } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
@@ -53,8 +52,7 @@ export function ModuleView({
               <div className="space-y-3">
                 {tab.createForm && (
                   <div className="flex justify-end">
-                    <Button size="sm" onClick={() => setOpenForm(tab.id)}>
-                      <Plus className="h-4 w-4 mr-1.5" />
+                    <Button size="lg" onClick={() => setOpenForm(tab.id)}>
                       {tab.createLabel ?? "New"}
                     </Button>
                   </div>

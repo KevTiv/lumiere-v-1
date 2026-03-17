@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   instanceId: __t.u64().name("instance_id"),
   actId: __t.u64().name("act_id"),
   wkfEvaledCondition: __t.option(__t.string()).name("wkf_evaled_condition"),

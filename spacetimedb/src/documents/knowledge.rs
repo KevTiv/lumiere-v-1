@@ -18,6 +18,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[spacetimedb::table(
     accessor = kb_category,
     public,
+    index(accessor = kb_category_by_org, btree(columns = [organization_id])),
     index(accessor = kb_category_by_parent, btree(columns = [parent_id]))
 )]
 pub struct KnowledgeArticleCategory {
@@ -25,6 +26,7 @@ pub struct KnowledgeArticleCategory {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub sequence: u32,
@@ -43,6 +45,7 @@ pub struct KnowledgeArticleCategory {
 #[spacetimedb::table(
     accessor = knowledge_article,
     public,
+    index(accessor = article_by_org, btree(columns = [organization_id])),
     index(accessor = article_by_parent, btree(columns = [parent_id])),
     index(accessor = article_by_category, btree(columns = [category_id]))
 )]
@@ -51,6 +54,7 @@ pub struct KnowledgeArticle {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub body: Option<String>,
@@ -176,13 +180,14 @@ pub fn create_knowledge_category(
     company_id: u64,
     params: CreateKnowledgeCategoryParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article_category", "create")?;
+    check_permission(ctx, organization_id, "knowledge_article_category", "create")?;
 
     let cat = ctx
         .db
         .kb_category()
         .insert(KnowledgeArticleCategory {
             id: 0,
+            organization_id,
             name: params.name,
             description: params.description,
             sequence: params.sequence,
@@ -224,7 +229,7 @@ pub fn update_knowledge_category(
     category_id: u64,
     params: UpdateKnowledgeCategoryParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article_category", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article_category", "write")?;
 
     let cat = ctx
         .db
@@ -232,6 +237,10 @@ pub fn update_knowledge_category(
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
+
+    if cat.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
 
     let mut changed_fields = Vec::new();
 
@@ -287,12 +296,13 @@ pub fn create_knowledge_article(
     company_id: u64,
     params: CreateKnowledgeArticleParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "create")?;
+    check_permission(ctx, organization_id, "knowledge_article", "create")?;
 
     let is_root = params.parent_id.is_none();
 
     let article = ctx.db.knowledge_article().insert(KnowledgeArticle {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         body: params.body,
@@ -403,7 +413,7 @@ pub fn update_knowledge_article(
     article_id: u64,
     params: UpdateKnowledgeArticleParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
 
     let article = ctx
         .db
@@ -411,6 +421,10 @@ pub fn update_knowledge_article(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     if article.is_locked && article.lock_by != Some(ctx.sender()) {
         return Err("Article is locked by another user".to_string());
@@ -500,7 +514,7 @@ pub fn lock_knowledge_article(
     company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
 
     let article = ctx
         .db
@@ -508,6 +522,10 @@ pub fn lock_knowledge_article(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     if article.is_locked {
         return Err("Article is already locked".to_string());
@@ -549,7 +567,7 @@ pub fn unlock_knowledge_article(
     company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
 
     let article = ctx
         .db
@@ -558,8 +576,12 @@ pub fn unlock_knowledge_article(
         .find(&article_id)
         .ok_or("Article not found")?;
 
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
+
     if article.lock_by != Some(ctx.sender()) {
-        check_permission(ctx, company_id, "knowledge_article", "admin")?;
+        check_permission(ctx, organization_id, "knowledge_article", "admin")?;
     }
 
     ctx.db.knowledge_article().id().update(KnowledgeArticle {
@@ -599,7 +621,7 @@ pub fn set_article_published(
     article_id: u64,
     params: SetArticlePublishedParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "publish")?;
+    check_permission(ctx, organization_id, "knowledge_article", "publish")?;
 
     let article = ctx
         .db
@@ -607,6 +629,10 @@ pub fn set_article_published(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     let old_published = article.is_published;
 
@@ -654,7 +680,7 @@ pub fn add_article_member(
     article_id: u64,
     member: Identity,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
 
     let article = ctx
         .db
@@ -662,6 +688,10 @@ pub fn add_article_member(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     if article.member_ids.contains(&member) {
         return Ok(()); // Already a member
@@ -711,7 +741,7 @@ pub fn remove_article_member(
     article_id: u64,
     member: Identity,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
 
     let article = ctx
         .db
@@ -719,6 +749,10 @@ pub fn remove_article_member(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     if !article.member_ids.contains(&member) {
         return Ok(()); // Not a member
@@ -771,7 +805,7 @@ pub fn delete_knowledge_article(
     company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article", "delete")?;
+    check_permission(ctx, organization_id, "knowledge_article", "delete")?;
 
     let article = ctx
         .db
@@ -779,6 +813,10 @@ pub fn delete_knowledge_article(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    if article.organization_id != organization_id {
+        return Err("Article does not belong to this organization".to_string());
+    }
 
     if article.is_locked {
         return Err("Cannot delete a locked article".to_string());
@@ -857,7 +895,7 @@ pub fn delete_knowledge_category(
     company_id: u64,
     category_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "knowledge_article_category", "delete")?;
+    check_permission(ctx, organization_id, "knowledge_article_category", "delete")?;
 
     let cat = ctx
         .db
@@ -865,6 +903,10 @@ pub fn delete_knowledge_category(
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
+
+    if cat.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
 
     // Check if category has articles
     if cat.article_count > 0 {

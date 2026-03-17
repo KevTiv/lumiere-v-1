@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   moveId: __t.u64().name("move_id"),
   moveName: __t.option(__t.string()).name("move_name"),
   date: __t.timestamp(),

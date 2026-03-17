@@ -11,6 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
+  organizationId: __t.u64(),
   resModel: __t.string(),
   resId: __t.u64(),
   subtypes: __t.array(__t.string()),

@@ -14,7 +14,6 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
-use crate::inventory::product::product;
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
 
@@ -250,7 +249,7 @@ pub fn calculate_shipping_cost_internal(
     destination_country_id: u64,
     destination_state_id: Option<u64>,
     destination_zip: &str,
-) -> Result<(), String> {
+) -> Result<f64, String> {
     let carrier = ctx
         .db
         .delivery_carrier()
@@ -330,7 +329,7 @@ pub fn calculate_shipping_cost_internal(
         cost += insurance;
     }
 
-    Ok(())
+    Ok(cost)
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────

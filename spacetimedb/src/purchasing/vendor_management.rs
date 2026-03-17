@@ -16,6 +16,7 @@ use crate::types::IntakeState;
 #[spacetimedb::table(
     accessor = res_partner_bank,
     public,
+    index(accessor = res_partner_bank_by_org, btree(columns = [organization_id])),
     index(accessor = res_partner_bank_by_partner, btree(columns = [partner_id]))
 )]
 pub struct ResPartnerBank {
@@ -23,6 +24,8 @@ pub struct ResPartnerBank {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub sanitized_acc_number: Option<String>,
     pub acc_holder_name: Option<String>,
     pub partner_id: u64,
@@ -46,6 +49,7 @@ pub struct ResPartnerBank {
 #[spacetimedb::table(
     accessor = supplier_intake_request,
     public,
+    index(accessor = supplier_intake_request_by_org, btree(columns = [organization_id])),
     index(accessor = supplier_intake_request_by_state, btree(columns = [state]))
 )]
 pub struct SupplierIntakeRequest {
@@ -53,6 +57,8 @@ pub struct SupplierIntakeRequest {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub state: IntakeState,
     pub company_name: String,
     pub contact_name: String,
@@ -155,6 +161,7 @@ pub fn create_partner_bank(
 
     let bank = ctx.db.res_partner_bank().insert(ResPartnerBank {
         id: 0,
+        organization_id,
         sanitized_acc_number: Some(sanitized),
         acc_holder_name: params.acc_holder_name,
         partner_id: params.partner_id,
@@ -298,6 +305,7 @@ pub fn submit_supplier_intake(
         .supplier_intake_request()
         .insert(SupplierIntakeRequest {
             id: 0,
+            organization_id,
             state: IntakeState::Submitted,
             company_name: params.company_name,
             contact_name: params.contact_name,

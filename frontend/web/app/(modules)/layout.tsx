@@ -17,8 +17,6 @@ function ModulesContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <DashboardSidebar
-        activeView=""
-        onViewChange={() => {}}
         forceCollapsed={isAIChatDocked || isNotebookOpen}
         onOpenJournal={() => setIsJournalOpen(true)}
         onOpenNotebook={() => setIsNotebookOpen(true)}

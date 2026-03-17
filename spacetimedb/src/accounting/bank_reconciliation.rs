@@ -15,6 +15,7 @@ use crate::types::BankStatementState;
 #[spacetimedb::table(
     accessor = account_bank_statement,
     public,
+    index(accessor = bank_statement_by_org, btree(columns = [organization_id])),
     index(accessor = statement_by_journal, btree(columns = [journal_id])),
     index(accessor = statement_by_state, btree(columns = [state])),
     index(accessor = statement_by_date, btree(columns = [date]))
@@ -23,6 +24,8 @@ pub struct AccountBankStatement {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: Option<String>,
     pub reference: Option<String>,
     pub date: Option<Timestamp>,
@@ -51,6 +54,7 @@ pub struct AccountBankStatement {
 #[spacetimedb::table(
     accessor = account_bank_statement_line,
     public,
+    index(accessor = bank_statement_line_by_org, btree(columns = [organization_id])),
     index(accessor = statement_line_by_statement, btree(columns = [statement_id])),
     index(accessor = statement_line_by_partner, btree(columns = [partner_id])),
     index(accessor = statement_line_by_date, btree(columns = [date])),
@@ -60,6 +64,8 @@ pub struct AccountBankStatementLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub date: Timestamp,
     pub amount: f64,
     pub amount_currency: f64,
@@ -88,6 +94,7 @@ pub struct AccountBankStatementLine {
 #[spacetimedb::table(
     accessor = account_reconciliation_widget,
     public,
+    index(accessor = reconciliation_widget_by_org, btree(columns = [organization_id])),
     index(accessor = reconciliation_by_partner, btree(columns = [partner_id])),
     index(accessor = reconciliation_by_account, btree(columns = [account_id]))
 )]
@@ -95,6 +102,8 @@ pub struct AccountReconciliationWidget {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub partner_id: Option<u64>,
     pub account_id: u64,
     pub move_line_ids: Vec<u64>,
@@ -111,6 +120,7 @@ pub struct AccountReconciliationWidget {
 #[spacetimedb::table(
     accessor = bank_match_candidate,
     public,
+    index(accessor = bank_match_candidate_by_org, btree(columns = [organization_id])),
     index(accessor = candidate_by_statement_line, btree(columns = [statement_line_id])),
     index(accessor = candidate_by_entity, btree(columns = [entity_id]))
 )]
@@ -118,6 +128,8 @@ pub struct BankMatchCandidate {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub statement_line_id: u64,
     pub match_type: String, // "invoice" | "payment"
     pub entity_id: u64,
@@ -269,6 +281,7 @@ pub fn create_account_bank_statement(
         .account_bank_statement()
         .insert(AccountBankStatement {
             id: 0,
+            organization_id,
             name: params.name,
             reference: params.reference,
             date: params.date,
@@ -410,6 +423,7 @@ pub fn update_account_bank_statement(
         .id()
         .update(AccountBankStatement {
             id: statement.id,
+            organization_id: statement.organization_id,
             name: new_name,
             reference: new_reference,
             date: new_date,
@@ -546,6 +560,7 @@ pub fn create_account_bank_statement_line(
         .account_bank_statement_line()
         .insert(AccountBankStatementLine {
             id: 0,
+            organization_id,
             date: params.date,
             amount: params.amount,
             amount_currency: params.amount_currency,
@@ -678,6 +693,7 @@ pub fn update_account_bank_statement_line(
         .id()
         .update(AccountBankStatementLine {
             id: line.id,
+            organization_id: line.organization_id,
             date: new_date,
             amount: new_amount,
             amount_currency: new_amount_currency,
@@ -1059,6 +1075,7 @@ pub fn create_account_reconciliation_widget(
         .account_reconciliation_widget()
         .insert(AccountReconciliationWidget {
             id: 0,
+            organization_id,
             partner_id: params.partner_id,
             account_id: params.account_id,
             move_line_ids: params.move_line_ids.clone(),
@@ -1159,6 +1176,7 @@ pub fn update_account_reconciliation_widget(
         .id()
         .update(AccountReconciliationWidget {
             id: widget.id,
+            organization_id: widget.organization_id,
             partner_id: new_partner_id,
             account_id: new_account_id,
             move_line_ids: new_move_line_ids.clone(),
@@ -1376,6 +1394,7 @@ pub fn match_bank_line(
 
                 ctx.db.bank_match_candidate().insert(BankMatchCandidate {
                     id: 0,
+                    organization_id,
                     statement_line_id: line_id,
                     match_type,
                     entity_id: move_line.id,
@@ -1395,7 +1414,7 @@ pub fn match_bank_line(
 ///TODO: should this be scoped to organization_id
 fn match_by_exact_amount(
     ctx: &ReducerContext,
-    _organization_id: u64,
+    organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
     amount: f64,
@@ -1415,6 +1434,7 @@ fn match_by_exact_amount(
 
             ctx.db.bank_match_candidate().insert(BankMatchCandidate {
                 id: 0,
+                organization_id,
                 statement_line_id: line_id,
                 match_type,
                 entity_id: move_line.id,
@@ -1432,7 +1452,7 @@ fn match_by_exact_amount(
 ///TODO: should this be scoped to organization_id
 fn match_by_partner(
     ctx: &ReducerContext,
-    _organization_id: u64,
+    organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
     partner_id: u64,
@@ -1451,6 +1471,7 @@ fn match_by_partner(
 
                 ctx.db.bank_match_candidate().insert(BankMatchCandidate {
                     id: 0,
+                    organization_id,
                     statement_line_id: line_id,
                     match_type,
                     entity_id: move_line.id,
@@ -1468,7 +1489,7 @@ fn match_by_partner(
 
 fn match_by_reference(
     ctx: &ReducerContext,
-    _organization_id: u64,
+    organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
     _account_number: &str,
@@ -1486,6 +1507,7 @@ fn match_by_reference(
         if score > 50 {
             ctx.db.bank_match_candidate().insert(BankMatchCandidate {
                 id: 0,
+                organization_id,
                 statement_line_id: line_id,
                 match_type,
                 entity_id: move_line.id,

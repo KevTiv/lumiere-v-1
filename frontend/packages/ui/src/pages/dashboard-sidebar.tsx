@@ -2,11 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRBAC } from "@/lib/rbac-context"
-import { dashboardViewPermissions } from "@/lib/rbac-defaults"
-import { Badge } from "@/components/ui/badge"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -27,60 +26,82 @@ import {
   Factory,
   FolderKanban,
   Cpu,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react"
 import type { Resource } from "@/lib/rbac-types"
 
-interface NavItem {
-  id: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  resource: Resource
-}
-
-interface ModuleItem {
-  id: string
+interface NavLinkItem {
   label: string
   href: string
   icon: React.ComponentType<{ className?: string }>
   resource: Resource
 }
 
+interface NavGroup {
+  label: string | null
+  items: NavLinkItem[]
+}
+
 interface DashboardSidebarProps {
-  activeView: string
-  onViewChange: (view: string) => void
   forceCollapsed?: boolean
   onOpenJournal?: () => void
   onOpenNotebook?: () => void
   onOpenAIChat?: () => void
 }
 
-const navItems: NavItem[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard, resource: "dashboard:overview" },
-  { id: "tasks", label: "Tasks", icon: KanbanSquare, resource: "dashboard:tasks" },
-  { id: "forensics", label: "Forensics", icon: FileSearch, resource: "dashboard:analytics" },
-  { id: "analytics", label: "Trackers", icon: Activity, resource: "dashboard:analytics" },
-  { id: "settings", label: "Settings", icon: Settings, resource: "dashboard:settings" },
+const navGroups: NavGroup[] = [
+  {
+    label: null,
+    items: [
+      { label: "Overview", href: "/overview", icon: LayoutDashboard, resource: "dashboard:overview" },
+      { label: "Tasks", href: "/tasks", icon: KanbanSquare, resource: "dashboard:tasks" },
+    ],
+  },
+  {
+    label: "Analytics",
+    items: [
+      { label: "Forensics", href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
+      { label: "Trackers", href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Accounting", href: "/accounting", icon: BookOpen, resource: "module:accounting" },
+      { label: "Sales", href: "/sales", icon: TrendingUp, resource: "module:sales" },
+      { label: "CRM", href: "/crm", icon: Users, resource: "module:crm" },
+      { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, resource: "module:purchasing" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Inventory", href: "/inventory", icon: Package, resource: "module:inventory" },
+      { label: "Manufacturing", href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { label: "HR & People", href: "/hr", icon: UserCheck, resource: "module:hr" },
+      { label: "Projects", href: "/projects", icon: FolderKanban, resource: "module:projects" },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { label: "IoT", href: "/iot", icon: Cpu, resource: "module:iot" },
+      { label: "Settings", href: "/settings", icon: Settings, resource: "dashboard:settings" },
+    ],
+  },
 ]
 
-const moduleItems: ModuleItem[] = [
-  { id: "accounting", label: "Accounting", href: "/accounting", icon: BookOpen, resource: "module:accounting" },
-  { id: "sales", label: "Sales", href: "/sales", icon: TrendingUp, resource: "module:sales" },
-  { id: "crm", label: "CRM", href: "/crm", icon: Users, resource: "module:crm" },
-  { id: "inventory", label: "Inventory", href: "/inventory", icon: Package, resource: "module:inventory" },
-  { id: "purchasing", label: "Purchasing", href: "/purchasing", icon: ShoppingCart, resource: "module:purchasing" },
-  { id: "hr", label: "HR & People", href: "/hr", icon: UserCheck, resource: "module:hr" },
-  { id: "manufacturing", label: "Manufacturing", href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
-  { id: "projects", label: "Projects", href: "/projects", icon: FolderKanban, resource: "module:projects" },
-  { id: "iot", label: "IoT", href: "/iot", icon: Cpu, resource: "module:iot" },
-]
-
-export function DashboardSidebar({ activeView, onViewChange, forceCollapsed, onOpenJournal, onOpenNotebook, onOpenAIChat }: DashboardSidebarProps) {
+export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook, onOpenAIChat }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [modulesExpanded, setModulesExpanded] = useState(true)
   const { checkPermission, currentUser, roles } = useRBAC()
+  const pathname = usePathname()
   const isCollapsed = forceCollapsed || collapsed
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
 
   const getUserRoleName = () => {
     if (!currentUser || currentUser.roles.length === 0) return "No Role"
@@ -109,96 +130,66 @@ export function DashboardSidebar({ activeView, onViewChange, forceCollapsed, onO
         </Button>
       </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const isActive = activeView === item.id
-          const hasAccess = checkPermission(item.resource, "read").allowed
+      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+        {navGroups.map((group, groupIndex) => (
+          <div key={`sidebar-option-${groupIndex}`}>
+            {!isCollapsed && group.label && (
+              <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href)
+                const hasAccess = checkPermission(item.resource, "read").allowed
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => hasAccess && onViewChange(item.id)}
-              disabled={!hasAccess}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left",
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent",
-                !hasAccess && "opacity-40 cursor-not-allowed hover:bg-transparent"
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!isCollapsed && (
-                <span className="text-sm font-medium flex-1">{item.label}</span>
-              )}
-              {!isCollapsed && !hasAccess && (
-                <Lock className="h-3 w-3 text-muted-foreground" />
-              )}
-            </button>
-          )
-        })}
+                if (hasAccess) {
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                        active
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent"
+                      )}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {!isCollapsed && (
+                        <span className="text-sm font-medium truncate">{item.label}</span>
+                      )}
+                    </Link>
+                  )
+                }
 
-        {/* Modules section */}
-        <div className="pt-2">
-          {!isCollapsed && (
-            <button
-              onClick={() => setModulesExpanded((v) => !v)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground transition-colors"
-            >
-              {modulesExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-              Modules
-            </button>
-          )}
-
-          {(modulesExpanded || isCollapsed) && moduleItems.map((item) => {
-            const Icon = item.icon
-            const hasModuleAccess = checkPermission(item.resource, "read").allowed
-            if (hasModuleAccess) {
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  title={isCollapsed ? item.label : undefined}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                    "text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!isCollapsed && (
-                    <span className="text-sm font-medium truncate">{item.label}</span>
-                  )}
-                </Link>
-              )
-            }
-            return (
-              <div
-                key={item.id}
-                title={isCollapsed ? item.label : undefined}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
-                  "text-sidebar-foreground opacity-40 cursor-not-allowed"
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!isCollapsed && (
-                  <>
-                    <span className="text-sm font-medium truncate flex-1">{item.label}</span>
-                    <Lock className="h-3 w-3 text-muted-foreground" />
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                return (
+                  <div
+                    key={item.href}
+                    title={isCollapsed ? item.label : undefined}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                      "text-sidebar-foreground opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    {!isCollapsed && (
+                      <>
+                        <span className="text-sm font-medium truncate flex-1">{item.label}</span>
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Tool buttons - Journal, Notebook, AI Chat */}
+      {/* Tool buttons — Journal, Notebook, AI Chat */}
       <div className="flex flex-col gap-2 px-2 pb-2">
         {onOpenJournal && (
           <button

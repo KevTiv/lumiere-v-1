@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   sanitizedAccNumber: __t.option(__t.string()).name("sanitized_acc_number"),
   accHolderName: __t.option(__t.string()).name("acc_holder_name"),
   partnerId: __t.u64().name("partner_id"),

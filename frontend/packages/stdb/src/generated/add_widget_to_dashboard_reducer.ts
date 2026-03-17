@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  companyId: __t.option(__t.u64()),
+  organizationId: __t.u64(),
   dashboardId: __t.u64(),
   widgetId: __t.u64(),
 };

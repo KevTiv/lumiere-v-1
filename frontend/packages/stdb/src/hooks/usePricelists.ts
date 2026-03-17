@@ -1,13 +1,13 @@
 import { queryPricelists, type ProductPricelist } from "../queries/sales";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { ProductPricelist };
 
-export function usePricelists(companyId: bigint) {
+export function usePricelists(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["pricelists", companyId.toString()];
+  const queryKey = useMemo(() => ["pricelists", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function usePricelists(companyId: bigint) {
     conn.db.product_pricelist.onInsert((_ctx, _row) => reload());
     conn.db.product_pricelist.onUpdate((_ctx, _old, _new) => reload());
     conn.db.product_pricelist.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryPricelists, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryPricelists,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

@@ -15,7 +15,7 @@ import {
 } from "./types";
 
 export default {
-  companyId: __t.option(__t.u64()),
+  organizationId: __t.u64(),
   agentId: __t.u64(),
   get params() {
     return UpdateAiAgentParams;

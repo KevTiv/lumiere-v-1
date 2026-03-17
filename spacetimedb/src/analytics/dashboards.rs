@@ -15,7 +15,7 @@ use crate::types::WidgetType;
 // ============================================================================
 
 /// Params for creating a dashboard widget.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDashboardWidgetParams {
     pub name: String,
@@ -39,7 +39,7 @@ pub struct CreateDashboardWidgetParams {
 }
 
 /// Params for updating widget position and size.
-/// Scope: `company_id` + `widget_id` are flat reducer params.
+/// Scope: `organization_id` + `widget_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateWidgetLayoutParams {
     pub position_x: u32,
@@ -49,7 +49,7 @@ pub struct UpdateWidgetLayoutParams {
 }
 
 /// Params for creating a dashboard.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDashboardParams {
     pub name: String,
@@ -62,7 +62,7 @@ pub struct CreateDashboardParams {
 }
 
 /// Params for updating dashboard sharing configuration.
-/// Scope: `company_id` + `dashboard_id` are flat reducer params.
+/// Scope: `organization_id` + `dashboard_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateDashboardShareParams {
     pub share_with: Vec<Identity>,
@@ -78,6 +78,7 @@ pub struct UpdateDashboardShareParams {
 #[spacetimedb::table(
     accessor = dashboard_widget,
     public,
+    index(accessor = widget_by_org, btree(columns = [organization_id])),
     index(accessor = widget_by_company, btree(columns = [company_id]))
 )]
 pub struct DashboardWidget {
@@ -85,6 +86,7 @@ pub struct DashboardWidget {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,              // Tenant isolation
     pub name: String,
     pub widget_type: WidgetType,           // Chart, Table, KPI, List
     pub model: String,                     // ERP model being queried
@@ -102,7 +104,7 @@ pub struct DashboardWidget {
     pub width: u32,
     pub height: u32,
     pub is_active: bool,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,          // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -115,6 +117,7 @@ pub struct DashboardWidget {
 #[spacetimedb::table(
     accessor = dashboard,
     public,
+    index(accessor = dashboard_by_org, btree(columns = [organization_id])),
     index(accessor = dashboard_by_company, btree(columns = [company_id]))
 )]
 pub struct Dashboard {
@@ -122,6 +125,7 @@ pub struct Dashboard {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,              // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub widget_ids: Vec<u64>,
@@ -130,7 +134,7 @@ pub struct Dashboard {
     pub share_with: Vec<Identity>,     // Specific users
     pub share_with_groups: Vec<u64>,   // Group IDs
     pub is_shared: bool,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,       // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -146,14 +150,15 @@ pub struct Dashboard {
 #[reducer]
 pub fn create_dashboard_widget(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateDashboardWidgetParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "dashboard_widget", "create")?;
+    check_permission(ctx, organization_id, "dashboard_widget", "create")?;
 
     let widget = ctx.db.dashboard_widget().insert(DashboardWidget {
         id: 0,
+        organization_id,
         name: params.name,
         widget_type: params.widget_type,
         model: params.model,
@@ -181,7 +186,7 @@ pub fn create_dashboard_widget(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "dashboard_widget",
@@ -202,12 +207,11 @@ pub fn create_dashboard_widget(
 #[reducer]
 pub fn update_widget_layout(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     widget_id: u64,
     params: UpdateWidgetLayoutParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "dashboard_widget", "write")?;
+    check_permission(ctx, organization_id, "dashboard_widget", "write")?;
 
     let widget = ctx
         .db
@@ -216,10 +220,8 @@ pub fn update_widget_layout(
         .find(&widget_id)
         .ok_or("Widget not found")?;
 
-    if let (Some(wc), Some(rc)) = (company_id, widget.company_id) {
-        if wc != rc {
-            return Err("Widget does not belong to this company".to_string());
-        }
+    if widget.organization_id != organization_id {
+        return Err("Widget does not belong to this organization".to_string());
     }
 
     ctx.db.dashboard_widget().id().update(DashboardWidget {
@@ -234,9 +236,9 @@ pub fn update_widget_layout(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "dashboard_widget",
             record_id: widget_id,
             action: "write",
@@ -255,17 +257,18 @@ pub fn update_widget_layout(
 #[reducer]
 pub fn create_dashboard(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateDashboardParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "dashboard", "create")?;
+    check_permission(ctx, organization_id, "dashboard", "create")?;
 
     // is_shared is derived from share_with / share_with_groups
     let is_shared = !params.share_with.is_empty() || !params.share_with_groups.is_empty();
 
     let db = ctx.db.dashboard().insert(Dashboard {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         // System-managed: starts empty, populated via add_widget_to_dashboard
@@ -286,7 +289,7 @@ pub fn create_dashboard(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "dashboard",
@@ -307,12 +310,11 @@ pub fn create_dashboard(
 #[reducer]
 pub fn add_widget_to_dashboard(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     dashboard_id: u64,
     widget_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "dashboard", "write")?;
+    check_permission(ctx, organization_id, "dashboard", "write")?;
 
     let dash = ctx
         .db
@@ -321,12 +323,21 @@ pub fn add_widget_to_dashboard(
         .find(&dashboard_id)
         .ok_or("Dashboard not found")?;
 
-    // Verify widget exists
-    ctx.db
+    if dash.organization_id != organization_id {
+        return Err("Dashboard does not belong to this organization".to_string());
+    }
+
+    // Verify widget exists and belongs to this org
+    let widget = ctx
+        .db
         .dashboard_widget()
         .id()
         .find(&widget_id)
         .ok_or("Widget not found")?;
+
+    if widget.organization_id != organization_id {
+        return Err("Widget does not belong to this organization".to_string());
+    }
 
     if dash.widget_ids.contains(&widget_id) {
         return Ok(()); // Idempotent
@@ -344,9 +355,9 @@ pub fn add_widget_to_dashboard(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "dashboard",
             record_id: dashboard_id,
             action: "write",
@@ -365,12 +376,11 @@ pub fn add_widget_to_dashboard(
 #[reducer]
 pub fn share_dashboard(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     dashboard_id: u64,
     params: UpdateDashboardShareParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "dashboard", "write")?;
+    check_permission(ctx, organization_id, "dashboard", "write")?;
 
     let dash = ctx
         .db
@@ -379,10 +389,8 @@ pub fn share_dashboard(
         .find(&dashboard_id)
         .ok_or("Dashboard not found")?;
 
-    if let (Some(wc), Some(rc)) = (company_id, dash.company_id) {
-        if wc != rc {
-            return Err("Dashboard does not belong to this company".to_string());
-        }
+    if dash.organization_id != organization_id {
+        return Err("Dashboard does not belong to this organization".to_string());
     }
 
     // is_shared is derived from the new share lists
@@ -399,9 +407,9 @@ pub fn share_dashboard(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "dashboard",
             record_id: dashboard_id,
             action: "write",

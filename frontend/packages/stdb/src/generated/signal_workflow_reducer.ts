@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  companyId: __t.u64(),
+  organizationId: __t.u64(),
   instanceId: __t.u64(),
   signal: __t.string(),
 };

@@ -43,6 +43,7 @@ pub fn import_ai_agent_csv(
 
         ctx.db.ai_agent().insert(AiAgent {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             model,

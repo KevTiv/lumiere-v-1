@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   statementLineId: __t.u64().name("statement_line_id"),
   matchType: __t.string().name("match_type"),
   entityId: __t.u64().name("entity_id"),

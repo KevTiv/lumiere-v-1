@@ -1,13 +1,13 @@
 import { queryContacts, type Contact } from "../queries/crm";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { Contact };
 
-export function useContacts(organizationId: bigint) {
+export function useContacts(organizationId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["contacts", organizationId.toString()];
+  const queryKey = useMemo(() => ["contacts", organizationId.toString()], [organizationId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useContacts(organizationId: bigint) {
     conn.db.contact.onInsert((_ctx, _row) => reload());
     conn.db.contact.onUpdate((_ctx, _old, _new) => reload());
     conn.db.contact.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryContacts, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryContacts,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

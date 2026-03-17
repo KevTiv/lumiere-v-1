@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   origin: __t.option(__t.string()),
   orderingDate: __t.option(__t.timestamp()).name("ordering_date"),
   dateEnd: __t.option(__t.timestamp()).name("date_end"),

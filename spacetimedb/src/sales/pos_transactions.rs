@@ -15,7 +15,7 @@
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig, PosLoyaltyProgram};
+use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
 use crate::iot::registry::iot_device;
 use crate::iot::actions::queue_action_internal;

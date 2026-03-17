@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   scheduleId: __t.u64().name("schedule_id"),
   sequence: __t.u32(),
   recognitionDate: __t.timestamp().name("recognition_date"),

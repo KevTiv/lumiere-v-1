@@ -32,6 +32,7 @@ pub fn import_knowledge_category_csv(
 
         ctx.db.kb_category().insert(KnowledgeArticleCategory {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             sequence: parse_u32(col(&headers, row, "sequence")),
@@ -78,6 +79,7 @@ pub fn import_knowledge_article_csv(
 
         ctx.db.knowledge_article().insert(KnowledgeArticle {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             body: opt_str(col(&headers, row, "body")),

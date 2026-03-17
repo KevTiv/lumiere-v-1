@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  companyId: __t.u64(),
+  organizationId: __t.u64(),
   workflowId: __t.u64(),
   resId: __t.u64(),
   resType: __t.string(),

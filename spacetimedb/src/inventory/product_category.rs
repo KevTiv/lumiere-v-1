@@ -15,6 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[spacetimedb::table(
     accessor = product_category,
     public,
+    index(accessor = category_by_org, btree(columns = [organization_id])),
     index(accessor = category_by_parent, btree(columns = [parent_id])),
     index(accessor = category_by_sequence, btree(columns = [sequence])),
     index(accessor = category_by_name, btree(columns = [name]))
@@ -24,6 +25,7 @@ pub struct ProductCategory {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,   // Tenant isolation
     pub name: String,
     pub parent_id: Option<u64>,
     pub sequence: u32,
@@ -81,6 +83,7 @@ pub fn create_product_category(
 
     let category = ctx.db.product_category().insert(ProductCategory {
         id: 0,
+        organization_id,
         name: params.name.trim().to_string(),
         parent_id: params.parent_id,
         sequence: params.sequence,
@@ -139,6 +142,10 @@ pub fn update_product_category(
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
+
+    if category.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
 
     if let Some(parent_id) = params.parent_id {
         if Some(parent_id) != category.parent_id {
@@ -212,6 +219,10 @@ pub fn delete_product_category(
         .find(&category_id)
         .ok_or("Category not found")?;
 
+    if category.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
+
     if category.deleted_at.is_some() {
         return Ok(()); // Idempotent
     }
@@ -259,6 +270,10 @@ pub fn restore_product_category(
         .id()
         .find(&category_id)
         .ok_or("Category not found")?;
+
+    if category.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
 
     if category.deleted_at.is_none() {
         return Ok(()); // Idempotent

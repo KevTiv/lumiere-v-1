@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   name: __t.string(),
   get widgetType() {
     return WidgetType.name("widget_type");

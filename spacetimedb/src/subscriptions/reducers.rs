@@ -264,7 +264,7 @@ pub fn create_subscription_plan(
     company_id: u64,
     params: CreateSubscriptionPlanParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "subscription_plan", "create")?;
+    check_permission(ctx, organization_id, "subscription_plan", "create")?;
 
     // Validate required fields
     if params.name.is_empty() {
@@ -288,6 +288,7 @@ pub fn create_subscription_plan(
 
     let plan = SubscriptionPlan {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description.clone().unwrap_or_default(),
         code: params.code.clone(),
@@ -369,10 +370,10 @@ pub fn create_subscription_plan(
 pub fn create_subscription_from_sale_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
+    _company_id: u64,
     params: CreateSubscriptionFromSaleOrderParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "subscription", "create")?;
+    check_permission(ctx, organization_id, "subscription", "create")?;
 
     // Fetch sale order to derive authoritative partner, company, currency, pricelist
     let order = ctx
@@ -419,6 +420,7 @@ pub fn create_subscription_from_sale_order(
 
     let subscription = Subscription {
         id: 0,
+        organization_id,
         code,
         description: params.description.clone().unwrap_or_default(),
         plan_id: params.plan_id,
@@ -515,7 +517,7 @@ pub fn activate_subscription(
     company_id: u64,
     subscription_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "subscription", "write")?;
+    check_permission(ctx, organization_id, "subscription", "write")?;
 
     let subscription = ctx
         .db
@@ -524,8 +526,8 @@ pub fn activate_subscription(
         .find(&subscription_id)
         .ok_or("Subscription not found")?;
 
-    if subscription.company_id != company_id {
-        return Err("Subscription does not belong to this company".to_string());
+    if subscription.organization_id != organization_id {
+        return Err("Subscription does not belong to this organization".to_string());
     }
 
     if subscription.state != "draft" {
@@ -567,7 +569,7 @@ pub fn close_subscription(
     subscription_id: u64,
     params: CloseSubscriptionParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "subscription", "delete")?;
+    check_permission(ctx, organization_id, "subscription", "delete")?;
 
     let subscription = ctx
         .db
@@ -576,8 +578,8 @@ pub fn close_subscription(
         .find(&subscription_id)
         .ok_or("Subscription not found")?;
 
-    if subscription.company_id != company_id {
-        return Err("Subscription does not belong to this company".to_string());
+    if subscription.organization_id != organization_id {
+        return Err("Subscription does not belong to this organization".to_string());
     }
 
     if subscription.state == "closed" {
@@ -635,7 +637,7 @@ pub fn generate_subscription_invoice(
     subscription_id: u64,
     params: GenerateSubscriptionInvoiceParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "subscription", "write")?;
+    check_permission(ctx, organization_id, "subscription", "write")?;
 
     let subscription = ctx
         .db
@@ -644,8 +646,8 @@ pub fn generate_subscription_invoice(
         .find(&subscription_id)
         .ok_or("Subscription not found")?;
 
-    if subscription.company_id != company_id {
-        return Err("Subscription does not belong to this company".to_string());
+    if subscription.organization_id != organization_id {
+        return Err("Subscription does not belong to this organization".to_string());
     }
 
     if subscription.state != "active" {
@@ -728,7 +730,7 @@ pub fn create_deferred_revenue_schedule(
     company_id: u64,
     params: CreateDeferredRevenueScheduleParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "deferred_revenue_schedule", "create")?;
+    check_permission(ctx, organization_id, "deferred_revenue_schedule", "create")?;
 
     if params.total_amount <= 0.0 {
         return Err("Total amount must be positive".to_string());
@@ -748,6 +750,7 @@ pub fn create_deferred_revenue_schedule(
 
     let schedule = DeferredRevenueSchedule {
         id: 0,
+        organization_id,
         description: params.description.clone(),
         journal_id: params.journal_id,
         account_id: params.account_id,
@@ -777,6 +780,7 @@ pub fn create_deferred_revenue_schedule(
     // Generate recognition lines
     generate_recognition_lines(
         ctx,
+        organization_id,
         inserted.id,
         &params.notes,
         params.metadata.as_deref().unwrap_or(""),
@@ -819,6 +823,7 @@ pub fn create_deferred_revenue_schedule(
 /// Generate recognition lines for a deferred revenue schedule.
 fn generate_recognition_lines(
     ctx: &ReducerContext,
+    organization_id: u64,
     schedule_id: u64,
     notes: &str,
     metadata: &str,
@@ -849,6 +854,7 @@ fn generate_recognition_lines(
 
         let line = DeferredRevenueLine {
             id: 0,
+            organization_id,
             schedule_id,
             sequence: i as u32 + 1,
             recognition_date: Timestamp::from_duration_since_unix_epoch(
@@ -883,7 +889,7 @@ pub fn recognize_deferred_revenue(
     line_id: u64,
     params: RecognizeDeferredRevenueParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "deferred_revenue_line", "write")?;
+    check_permission(ctx, organization_id, "deferred_revenue_line", "write")?;
 
     let line = ctx
         .db
@@ -899,8 +905,8 @@ pub fn recognize_deferred_revenue(
         .find(&line.schedule_id)
         .ok_or("Schedule not found")?;
 
-    if schedule.company_id != company_id {
-        return Err("Revenue line does not belong to this company".to_string());
+    if schedule.organization_id != organization_id {
+        return Err("Revenue line does not belong to this organization".to_string());
     }
 
     if line.recognized {
@@ -975,10 +981,11 @@ pub fn create_revenue_recognition_rule(
     company_id: u64,
     params: CreateRevenueRecognitionRuleParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "revenue_recognition_rule", "create")?;
+    check_permission(ctx, organization_id, "revenue_recognition_rule", "create")?;
 
     let rule = RevenueRecognitionRule {
         id: 0,
+        organization_id,
         description: params.description.clone(),
         product_category_ids: params.product_category_ids.clone(),
         product_ids: params.product_ids.clone(),
@@ -1036,7 +1043,7 @@ pub fn deactivate_revenue_recognition_rule(
     company_id: u64,
     rule_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "revenue_recognition_rule", "write")?;
+    check_permission(ctx, organization_id, "revenue_recognition_rule", "write")?;
 
     let rule = ctx
         .db
@@ -1045,8 +1052,8 @@ pub fn deactivate_revenue_recognition_rule(
         .find(&rule_id)
         .ok_or("Rule not found")?;
 
-    if rule.company_id != company_id {
-        return Err("Rule does not belong to this company".to_string());
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
     }
 
     ctx.db
@@ -1084,7 +1091,7 @@ pub fn activate_revenue_recognition_rule(
     company_id: u64,
     rule_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "revenue_recognition_rule", "write")?;
+    check_permission(ctx, organization_id, "revenue_recognition_rule", "write")?;
 
     let rule = ctx
         .db
@@ -1093,8 +1100,8 @@ pub fn activate_revenue_recognition_rule(
         .find(&rule_id)
         .ok_or("Rule not found")?;
 
-    if rule.company_id != company_id {
-        return Err("Rule does not belong to this company".to_string());
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
     }
 
     ctx.db

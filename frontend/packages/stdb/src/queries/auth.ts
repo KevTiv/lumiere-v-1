@@ -12,14 +12,33 @@ export type StdbRole = Infer<typeof RoleRow>;
 export type UserRoleAssignment = Infer<typeof UserRoleAssignmentRow>;
 export type UserOrganization = Infer<typeof UserOrganizationRow>;
 
-export function authSubscriptions(): string[] {
-  return [
+/**
+ * Returns subscription SQL for the current user's auth data.
+ *
+ * When `identityHex` is provided, `casbin_rule` is filtered to only rules
+ * where v0 matches the user's identity or their assigned role names.
+ * This prevents broadcasting the full permission matrix to every client.
+ *
+ * When called without arguments (before identity is known), casbin_rule is
+ * omitted — the server prefetch via serverQueryCasbinRulesForUser covers that.
+ */
+export function authSubscriptions(
+  identityHex?: string,
+  roleNames?: string[],
+): string[] {
+  const base = [
     "SELECT * FROM user_profile",
     "SELECT * FROM user_role_assignment",
     "SELECT * FROM role",
-    "SELECT * FROM casbin_rule",
     "SELECT * FROM user_organization",
   ];
+
+  if (!identityHex) return base;
+
+  const subjects = [identityHex, ...(roleNames ?? [])]
+    .map((s) => `'${s}'`)
+    .join(", ");
+  return [...base, `SELECT * FROM casbin_rule WHERE v0 IN (${subjects})`];
 }
 
 export function queryUserProfile(identityHex: string): UserProfile | null {

@@ -1,13 +1,13 @@
 import { queryPayslips, type HrPayslip } from "../queries/hr";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { HrPayslip };
 
-export function usePayslips(companyId: bigint) {
+export function usePayslips(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["hr-payslips", companyId.toString()];
+  const queryKey = useMemo(() => ["hr-payslips", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function usePayslips(companyId: bigint) {
     conn.db.hr_payslip.onInsert((_ctx, _row) => reload());
     conn.db.hr_payslip.onUpdate((_ctx, _old, _new) => reload());
     conn.db.hr_payslip.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryPayslips, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryPayslips,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

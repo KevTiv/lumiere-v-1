@@ -65,7 +65,9 @@ function parseRow(
 function resolveHost(override?: string): string {
   const raw =
     override ??
-    (typeof process !== 'undefined' ? process.env['VITE_STDB_HOST'] : undefined) ??
+    (typeof process !== 'undefined'
+      ? process.env['NEXT_PUBLIC_STDB_HOST'] ?? process.env['VITE_STDB_HOST']
+      : undefined) ??
     'https://maincloud.spacetimedb.com'
   return raw.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://')
 }
@@ -73,7 +75,9 @@ function resolveHost(override?: string): string {
 function resolveModule(override?: string): string {
   return (
     override ??
-    (typeof process !== 'undefined' ? process.env['VITE_STDB_MODULE'] : undefined) ??
+    (typeof process !== 'undefined'
+      ? process.env['NEXT_PUBLIC_STDB_MODULE'] ?? process.env['VITE_STDB_MODULE']
+      : undefined) ??
     'lumiere-v1'
   )
 }

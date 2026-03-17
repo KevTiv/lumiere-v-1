@@ -1,13 +1,13 @@
 import { queryPurchaseOrderLines, type PurchaseOrderLine } from "../queries/purchasing";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { PurchaseOrderLine };
 
-export function usePurchaseOrderLines(companyId: bigint) {
+export function usePurchaseOrderLines(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["purchase-order-lines", companyId.toString()];
+  const queryKey = useMemo(() => ["purchase-order-lines", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function usePurchaseOrderLines(companyId: bigint) {
     conn.db.purchase_order_line.onInsert((_ctx, _row) => reload());
     conn.db.purchase_order_line.onUpdate((_ctx, _old, _new) => reload());
     conn.db.purchase_order_line.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryPurchaseOrderLines, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryPurchaseOrderLines,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

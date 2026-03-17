@@ -4,11 +4,16 @@ use spacetimedb::{Identity, Timestamp};
 
 /// Pricing plan template (weekly/monthly/yearly) --------------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = subscription_plan, public)]
+#[spacetimedb::table(
+    accessor = subscription_plan,
+    public,
+    index(accessor = subscription_plan_by_org, btree(columns = [organization_id]))
+)]
 pub struct SubscriptionPlan {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: String,
     pub code: String,
@@ -62,11 +67,16 @@ pub struct SubscriptionPlan {
 
 /// Active subscription contract -------------------------------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = subscription, public)]
+#[spacetimedb::table(
+    accessor = subscription,
+    public,
+    index(accessor = subscription_by_org, btree(columns = [organization_id]))
+)]
 pub struct Subscription {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation
     pub code: String, // generated sequence
     pub description: String,
 
@@ -147,11 +157,16 @@ pub struct Subscription {
 
 /// Subscription line items (recurring contract lines) --------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = subscription_line, public)]
+#[spacetimedb::table(
+    accessor = subscription_line,
+    public,
+    index(accessor = subscription_line_by_org, btree(columns = [organization_id]))
+)]
 pub struct SubscriptionLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation (inherited from parent Subscription)
     pub name: String, // description
 
     pub subscription_id: u64,
@@ -206,11 +221,16 @@ pub struct SubscriptionLine {
 
 /// Deferred revenue schedule header ---------------------------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = deferred_revenue_schedule, public)]
+#[spacetimedb::table(
+    accessor = deferred_revenue_schedule,
+    public,
+    index(accessor = deferred_rev_schedule_by_org, btree(columns = [organization_id]))
+)]
 pub struct DeferredRevenueSchedule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation
     pub description: String,
 
     pub journal_id: u64,          // journal for recognition entries
@@ -247,11 +267,16 @@ pub struct DeferredRevenueSchedule {
 
 /// Single revenue recognition posting line --------------------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = deferred_revenue_line, public)]
+#[spacetimedb::table(
+    accessor = deferred_revenue_line,
+    public,
+    index(accessor = deferred_rev_line_by_org, btree(columns = [organization_id]))
+)]
 pub struct DeferredRevenueLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation (inherited from parent DeferredRevenueSchedule)
     pub schedule_id: u64,
 
     pub sequence: u32,
@@ -277,11 +302,16 @@ pub struct DeferredRevenueLine {
 
 /// Rules to decide WHEN to defer revenue ----------------------- */
 #[derive(Clone)]
-#[spacetimedb::table(accessor = revenue_recognition_rule, public)]
+#[spacetimedb::table(
+    accessor = revenue_recognition_rule,
+    public,
+    index(accessor = rev_recognition_rule_by_org, btree(columns = [organization_id]))
+)]
 pub struct RevenueRecognitionRule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64, // Tenant isolation
     pub description: String,
 
     /// criteria

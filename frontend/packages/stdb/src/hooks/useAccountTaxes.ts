@@ -1,13 +1,13 @@
 import { queryAccountTaxes, type AccountTax } from "../queries/accounting";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { AccountTax };
 
-export function useAccountTaxes(companyId: bigint) {
+export function useAccountTaxes(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["account-taxes", companyId.toString()];
+  const queryKey = useMemo(() => ["account-taxes", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useAccountTaxes(companyId: bigint) {
     conn.db.account_tax.onInsert((_ctx, _row) => reload());
     conn.db.account_tax.onUpdate((_ctx, _old, _new) => reload());
     conn.db.account_tax.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryAccountTaxes, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryAccountTaxes,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

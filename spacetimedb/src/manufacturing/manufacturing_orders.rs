@@ -16,7 +16,7 @@ use crate::inventory::stock::{
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
 use crate::manufacturing::work_centers::mrp_workcenter;
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
-use serde_json::{self, Number};
+use serde_json;
 
 // ============================================================================
 // MANUFACTURING ORDER TABLES

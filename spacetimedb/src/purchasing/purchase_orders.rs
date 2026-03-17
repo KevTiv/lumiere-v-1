@@ -19,6 +19,7 @@ use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, Po
 #[spacetimedb::table(
     accessor = purchase_order,
     public,
+    index(accessor = purchase_order_by_org, btree(columns = [organization_id])),
     index(accessor = purchase_order_by_partner, btree(columns = [partner_id]))
 )]
 pub struct PurchaseOrder {
@@ -26,6 +27,8 @@ pub struct PurchaseOrder {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: Option<String>,
     pub origin: Option<String>,
     pub partner_ref: Option<String>,
@@ -81,6 +84,7 @@ pub struct PurchaseOrder {
 #[spacetimedb::table(
     accessor = purchase_order_line,
     public,
+    index(accessor = purchase_order_line_by_org, btree(columns = [organization_id])),
     index(accessor = purchase_order_line_by_order, btree(columns = [order_id]))
 )]
 pub struct PurchaseOrderLine {
@@ -88,6 +92,8 @@ pub struct PurchaseOrderLine {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub sequence: u32,
     pub product_qty: f64,
     pub product_uom_qty: f64,
@@ -135,6 +141,7 @@ pub struct PurchaseOrderLine {
 #[spacetimedb::table(
     accessor = purchase_requisition,
     public,
+    index(accessor = purchase_requisition_by_org, btree(columns = [organization_id])),
     index(accessor = purchase_requisition_by_user, btree(columns = [user_id]))
 )]
 pub struct PurchaseRequisition {
@@ -142,6 +149,8 @@ pub struct PurchaseRequisition {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub origin: Option<String>,
     pub ordering_date: Option<Timestamp>,
     pub date_end: Option<Timestamp>,
@@ -266,7 +275,9 @@ fn validate_order_in_organization(
         .find(&order_id)
         .ok_or("Purchase order not found")?;
 
-    validate_company_in_organization(ctx, organization_id, order.company_id)?;
+    if order.organization_id != organization_id {
+        return Err("Purchase order does not belong to this organization".to_string());
+    }
     Ok(order)
 }
 
@@ -307,6 +318,7 @@ pub fn create_purchase_order(
 
     let order = ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
+        organization_id,
         name: Some(next_doc_number(ctx, "PO")),
         origin: params.origin,
         partner_ref: params.partner_ref,
@@ -540,6 +552,7 @@ pub fn add_purchase_order_line(
 
     ctx.db.purchase_order_line().insert(PurchaseOrderLine {
         id: 0,
+        organization_id,
         sequence: params.sequence.unwrap_or(0),
         product_qty: params.quantity,
         product_uom_qty: params.quantity,
@@ -960,6 +973,7 @@ pub fn create_purchase_requisition(
 
     let requisition = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,
+        organization_id,
         origin: None,
         ordering_date: params.ordering_date,
         date_end: params.date_end,

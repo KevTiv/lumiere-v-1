@@ -15,7 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 // ============================================================================
 
 /// Params for creating a workflow definition.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWorkflowParams {
     pub name: String,
@@ -28,7 +28,7 @@ pub struct CreateWorkflowParams {
 }
 
 /// Params for adding an activity node to a workflow.
-/// Scope: `company_id` + `workflow_id` are flat reducer params.
+/// Scope: `organization_id` + `workflow_id` are flat reducer params.
 /// `outgoing_transition_ids` + `incoming_transition_ids` are system-managed
 /// (populated by `add_workflow_transition`).
 #[derive(SpacetimeType, Clone, Debug)]
@@ -53,7 +53,7 @@ pub struct AddWorkflowActivityParams {
 }
 
 /// Params for adding a transition edge between two activities.
-/// Scope: `company_id` + `workflow_id` + `activity_from` + `activity_to` are flat reducer params.
+/// Scope: `organization_id` + `workflow_id` + `activity_from` + `activity_to` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct AddWorkflowTransitionParams {
     pub sequence: u32,
@@ -74,6 +74,7 @@ pub struct AddWorkflowTransitionParams {
 #[spacetimedb::table(
     accessor = workflow,
     public,
+    index(accessor = workflow_by_org, btree(columns = [organization_id])),
     index(accessor = workflow_by_company, btree(columns = [company_id])),
     index(accessor = workflow_by_model, btree(columns = [model]))
 )]
@@ -82,6 +83,7 @@ pub struct Workflow {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub model: String,       // e.g., "sale_order", "purchase_order"
@@ -91,7 +93,7 @@ pub struct Workflow {
     pub activity_ids: Vec<u64>,
     pub transition_ids: Vec<u64>,
     pub transition_count: u32,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -111,6 +113,7 @@ pub struct WorkflowActivity {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation (inherited from parent Workflow)
     pub name: String,
     pub description: Option<String>,
     pub workflow_id: u64,
@@ -150,6 +153,7 @@ pub struct WorkflowTransition {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation (inherited from parent Workflow)
     pub activity_from: u64,
     pub activity_to: u64,
     pub sequence: u32,
@@ -173,14 +177,15 @@ pub struct WorkflowTransition {
 #[reducer]
 pub fn create_workflow(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateWorkflowParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "workflow", "create")?;
+    check_permission(ctx, organization_id, "workflow", "create")?;
 
     let wf = ctx.db.workflow().insert(Workflow {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         model: params.model,
@@ -201,7 +206,7 @@ pub fn create_workflow(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "workflow",
@@ -222,12 +227,11 @@ pub fn create_workflow(
 #[reducer]
 pub fn add_workflow_activity(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     workflow_id: u64,
     params: AddWorkflowActivityParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "workflow_activity", "create")?;
+    check_permission(ctx, organization_id, "workflow_activity", "create")?;
 
     let wf = ctx
         .db
@@ -236,8 +240,13 @@ pub fn add_workflow_activity(
         .find(&workflow_id)
         .ok_or("Workflow not found")?;
 
+    if wf.organization_id != organization_id {
+        return Err("Workflow does not belong to this organization".to_string());
+    }
+
     let activity = ctx.db.workflow_activity().insert(WorkflowActivity {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         workflow_id,
@@ -277,9 +286,9 @@ pub fn add_workflow_activity(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "workflow_activity",
             record_id: activity.id,
             action: "create",
@@ -302,14 +311,13 @@ pub fn add_workflow_activity(
 #[reducer]
 pub fn add_workflow_transition(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     workflow_id: u64,
     activity_from: u64,
     activity_to: u64,
     params: AddWorkflowTransitionParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "workflow_transition", "create")?;
+    check_permission(ctx, organization_id, "workflow_transition", "create")?;
 
     let wf = ctx
         .db
@@ -317,6 +325,10 @@ pub fn add_workflow_transition(
         .id()
         .find(&workflow_id)
         .ok_or("Workflow not found")?;
+
+    if wf.organization_id != organization_id {
+        return Err("Workflow does not belong to this organization".to_string());
+    }
 
     // Verify both activities belong to this workflow
     let from_act = ctx
@@ -338,6 +350,7 @@ pub fn add_workflow_transition(
 
     let transition = ctx.db.workflow_transition().insert(WorkflowTransition {
         id: 0,
+        organization_id,
         activity_from,
         activity_to,
         sequence: params.sequence,
@@ -386,9 +399,9 @@ pub fn add_workflow_transition(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "workflow_transition",
             record_id: transition.id,
             action: "create",
@@ -412,12 +425,11 @@ pub fn add_workflow_transition(
 #[reducer]
 pub fn set_workflow_active(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     workflow_id: u64,
     is_active: bool,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "workflow", "write")?;
+    check_permission(ctx, organization_id, "workflow", "write")?;
 
     let wf = ctx
         .db
@@ -425,6 +437,10 @@ pub fn set_workflow_active(
         .id()
         .find(&workflow_id)
         .ok_or("Workflow not found")?;
+
+    if wf.organization_id != organization_id {
+        return Err("Workflow does not belong to this organization".to_string());
+    }
 
     ctx.db.workflow().id().update(Workflow {
         is_active,
@@ -435,9 +451,9 @@ pub fn set_workflow_active(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "workflow",
             record_id: workflow_id,
             action: "write",

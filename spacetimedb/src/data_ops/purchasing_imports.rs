@@ -66,6 +66,7 @@ pub fn import_purchase_order_csv(
 
         ctx.db.purchase_order().insert(PurchaseOrder {
             id: 0,
+            organization_id,
             name: opt_str(col(&headers, row, "name")),
             origin: opt_str(col(&headers, row, "origin")),
             partner_ref: opt_str(col(&headers, row, "partner_ref")),
@@ -184,6 +185,7 @@ pub fn import_purchase_order_line_csv(
 
         ctx.db.purchase_order_line().insert(PurchaseOrderLine {
             id: 0,
+            organization_id,
             sequence: parse_u32(col(&headers, row, "sequence")),
             product_qty: qty,
             product_uom_qty: qty,

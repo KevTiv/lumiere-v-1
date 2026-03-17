@@ -13,6 +13,7 @@ use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 #[spacetimedb::table(
     accessor = account_account,
     public,
+    index(accessor = account_account_by_org, btree(columns = [organization_id])),
     index(accessor = account_by_code, btree(columns = [company_id, code])),
     index(accessor = account_by_company, btree(columns = [company_id])),
     index(accessor = account_by_type, btree(columns = [user_type_id]))
@@ -21,6 +22,8 @@ pub struct AccountAccount {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub code: String,
     pub name: String,
     pub deprecated: bool,
@@ -53,12 +56,15 @@ pub struct AccountAccount {
 #[spacetimedb::table(
     accessor = account_account_type,
     public,
+    index(accessor = account_account_type_by_org, btree(columns = [organization_id])),
     index(accessor = account_type_by_company, btree(columns = [company_id]))
 )]
 pub struct AccountAccountType {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub type_: String, // receivable, payable, liquidity, asset, etc.
     pub internal_group: AccountInternalGroup,
@@ -75,6 +81,7 @@ pub struct AccountAccountType {
 #[spacetimedb::table(
     accessor = account_group,
     public,
+    index(accessor = account_group_by_org, btree(columns = [organization_id])),
     index(accessor = account_group_by_company, btree(columns = [company_id])),
     index(accessor = account_group_by_parent, btree(columns = [parent_id]))
 )]
@@ -82,6 +89,8 @@ pub struct AccountGroup {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub code_prefix_start: Option<String>,
     pub code_prefix_end: Option<String>,
@@ -98,6 +107,7 @@ pub struct AccountGroup {
 #[spacetimedb::table(
     accessor = account_journal,
     public,
+    index(accessor = account_journal_by_org, btree(columns = [organization_id])),
     index(accessor = journal_by_code, btree(columns = [company_id, code])),
     index(accessor = journal_by_company, btree(columns = [company_id])),
     index(accessor = journal_by_type, btree(columns = [type_]))
@@ -106,6 +116,8 @@ pub struct AccountJournal {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub code: String,
     pub active: bool,
@@ -288,6 +300,7 @@ pub fn create_account_account_type(
 
     let account_type = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         type_: params.type_.clone(),
         internal_group: params.internal_group,
@@ -398,6 +411,7 @@ pub fn create_account_group(
 
     let group = ctx.db.account_group().insert(AccountGroup {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         code_prefix_start: params.code_prefix_start,
         code_prefix_end: params.code_prefix_end,
@@ -511,6 +525,7 @@ pub fn create_account_account(
 
     let account = ctx.db.account_account().insert(AccountAccount {
         id: 0,
+        organization_id,
         code: params.code.clone(),
         name: params.name.clone(),
         deprecated: false,
@@ -654,6 +669,7 @@ pub fn create_account_journal(
 
     let journal = ctx.db.account_journal().insert(AccountJournal {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         code: params.code.clone(),
         active: params.active,

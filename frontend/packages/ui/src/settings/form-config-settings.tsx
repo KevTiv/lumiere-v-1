@@ -52,15 +52,15 @@ import {
   AlertCircle,
   Check,
 } from "lucide-react"
-import type { 
-  FormConfiguration, 
-  ConfigurableField, 
+import type {
+  FormConfiguration,
+  ConfigurableField,
   FieldType,
-  FieldOption 
+  FieldOption
 } from "@/lib/form-config-types"
-import { 
-  defaultJournalFormConfig, 
-  defaultForensicFormConfig 
+import {
+  defaultJournalFormConfig,
+  defaultForensicFormConfig
 } from "@/lib/form-config-types"
 import { defaultRoles } from "@/lib/rbac-defaults"
 
@@ -103,7 +103,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
   const handleFieldToggle = (fieldId: string, enabled: boolean) => {
     setActiveConfig(prev => ({
       ...prev,
-      fields: prev.fields.map(f => 
+      fields: prev.fields.map(f =>
         f.id === fieldId ? { ...f, isEnabled: enabled } : f
       ),
       updatedAt: new Date().toISOString(),
@@ -144,7 +144,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
     } else {
       setActiveConfig(prev => ({
         ...prev,
-        fields: prev.fields.map(f => 
+        fields: prev.fields.map(f =>
           f.id === selectedField.id ? selectedField : f
         ),
         updatedAt: new Date().toISOString(),
@@ -187,7 +187,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
       const enabledFields = enabled
         ? [...roleConfig.enabledFields, fieldId]
         : roleConfig.enabledFields.filter(f => f !== fieldId)
-      
+
       return {
         ...prev,
         roleConfigs: {
@@ -206,7 +206,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
       const requiredFields = required
         ? [...roleConfig.requiredFields, fieldId]
         : roleConfig.requiredFields.filter(f => f !== fieldId)
-      
+
       return {
         ...prev,
         roleConfigs: {
@@ -244,7 +244,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
       </div>
 
       {/* Tabs for Journal / Forensic */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "journal" | "forensic")}>
+      <Tabs value={activeTab} className="flex flex-col" onValueChange={(v) => setActiveTab(v as "journal" | "forensic")}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="journal" className="gap-2">
             <BookMarked className="h-4 w-4" />
@@ -293,13 +293,13 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                         key={field.id}
                         className={cn(
                           "flex items-center gap-3 p-3 rounded-lg border transition-colors",
-                          field.isEnabled 
-                            ? "bg-card border-border" 
+                          field.isEnabled
+                            ? "bg-card border-border"
                             : "bg-muted/50 border-transparent opacity-60"
                         )}
                       >
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{field.label}</span>
@@ -343,7 +343,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                               Duplicate
                             </DropdownMenuItem>
                             {!field.isSystem && (
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleDeleteField(field.id)}
                                 className="text-red-600"
                               >
@@ -377,7 +377,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   const roleConfig = activeConfig.roleConfigs?.[role.id]
                   const enabledCount = roleConfig?.enabledFields?.length || 0
                   const requiredCount = roleConfig?.requiredFields?.length || 0
-                  
+
                   return (
                     <div
                       key={role.id}
@@ -385,7 +385,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       onClick={() => setEditingRoleConfig(editingRoleConfig === role.id ? null : role.id)}
                     >
                       <div className="flex items-center gap-3">
-                        <div 
+                        <div
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: `var(--${role.color || 'gray'}-500, #6b7280)` }}
                         />
@@ -396,11 +396,11 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           </p>
                         </div>
                       </div>
-                      <ChevronRight 
+                      <ChevronRight
                         className={cn(
                           "h-4 w-4 text-muted-foreground transition-transform",
                           editingRoleConfig === role.id && "rotate-90"
-                        )} 
+                        )}
                       />
                     </div>
                   )
@@ -418,9 +418,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       const roleConfig = activeConfig.roleConfigs?.[editingRoleConfig]
                       const isEnabled = roleConfig?.enabledFields?.includes(field.id) ?? true
                       const isRequired = roleConfig?.requiredFields?.includes(field.id) ?? false
-                      
+
                       return (
-                        <div 
+                        <div
                           key={field.id}
                           className="flex items-center justify-between py-2 px-3 rounded bg-background"
                         >
@@ -429,7 +429,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                             <label className="flex items-center gap-2 text-xs">
                               <Switch
                                 checked={isEnabled}
-                                onCheckedChange={(checked) => 
+                                onCheckedChange={(checked) =>
                                   handleRoleFieldToggle(editingRoleConfig, field.id, checked)
                                 }
                                 className="scale-75"
@@ -439,7 +439,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                             <label className="flex items-center gap-2 text-xs">
                               <Switch
                                 checked={isRequired}
-                                onCheckedChange={(checked) => 
+                                onCheckedChange={(checked) =>
                                   handleRoleFieldRequired(editingRoleConfig, field.id, checked)
                                 }
                                 disabled={!isEnabled}
@@ -486,9 +486,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                             {suggestion}
                           </Badge>
                         ))}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-5 px-2 text-xs"
                           onClick={() => handleEditField(field)}
                         >
@@ -523,8 +523,8 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   <Input
                     id="field-label"
                     value={selectedField.label}
-                    onChange={(e) => setSelectedField({ 
-                      ...selectedField, 
+                    onChange={(e) => setSelectedField({
+                      ...selectedField,
                       label: e.target.value,
                       name: e.target.value.toLowerCase().replace(/\s+/g, "_"),
                     })}
@@ -535,9 +535,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   <Label htmlFor="field-type">Type</Label>
                   <Select
                     value={selectedField.type}
-                    onValueChange={(value) => setSelectedField({ 
-                      ...selectedField, 
-                      type: value as FieldType 
+                    onValueChange={(value) => setSelectedField({
+                      ...selectedField,
+                      type: value as FieldType
                     })}
                   >
                     <SelectTrigger id="field-type">
@@ -562,9 +562,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                 <Input
                   id="field-description"
                   value={selectedField.description || ""}
-                  onChange={(e) => setSelectedField({ 
-                    ...selectedField, 
-                    description: e.target.value 
+                  onChange={(e) => setSelectedField({
+                    ...selectedField,
+                    description: e.target.value
                   })}
                   placeholder="Help text shown to users"
                 />
@@ -575,9 +575,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                 <Input
                   id="field-placeholder"
                   value={selectedField.placeholder || ""}
-                  onChange={(e) => setSelectedField({ 
-                    ...selectedField, 
-                    placeholder: e.target.value 
+                  onChange={(e) => setSelectedField({
+                    ...selectedField,
+                    placeholder: e.target.value
                   })}
                   placeholder="Placeholder text"
                 />
@@ -594,8 +594,8 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           value={option.label}
                           onChange={(e) => {
                             const newOptions = [...(selectedField.options || [])]
-                            newOptions[idx] = { 
-                              ...option, 
+                            newOptions[idx] = {
+                              ...option,
                               label: e.target.value,
                               value: e.target.value.toLowerCase().replace(/\s+/g, "-"),
                             }
@@ -640,9 +640,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   <Label>AI Suggestions</Label>
                   <Textarea
                     value={selectedField.aiSuggestions?.join("\n") || ""}
-                    onChange={(e) => setSelectedField({ 
-                      ...selectedField, 
-                      aiSuggestions: e.target.value.split("\n").filter(Boolean) 
+                    onChange={(e) => setSelectedField({
+                      ...selectedField,
+                      aiSuggestions: e.target.value.split("\n").filter(Boolean)
                     })}
                     placeholder="Enter one suggestion per line"
                     rows={4}
@@ -668,7 +668,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       })}
                     />
                   </div>
-                  
+
                   {["text", "textarea"].includes(selectedField.type) && (
                     <>
                       <div className="space-y-2">
@@ -679,9 +679,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           value={selectedField.validation?.minLength || ""}
                           onChange={(e) => setSelectedField({
                             ...selectedField,
-                            validation: { 
-                              ...selectedField.validation, 
-                              minLength: parseInt(e.target.value) || undefined 
+                            validation: {
+                              ...selectedField.validation,
+                              minLength: parseInt(e.target.value) || undefined
                             },
                           })}
                         />
@@ -694,9 +694,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           value={selectedField.validation?.maxLength || ""}
                           onChange={(e) => setSelectedField({
                             ...selectedField,
-                            validation: { 
-                              ...selectedField.validation, 
-                              maxLength: parseInt(e.target.value) || undefined 
+                            validation: {
+                              ...selectedField.validation,
+                              maxLength: parseInt(e.target.value) || undefined
                             },
                           })}
                         />
@@ -714,9 +714,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           value={selectedField.validation?.min || ""}
                           onChange={(e) => setSelectedField({
                             ...selectedField,
-                            validation: { 
-                              ...selectedField.validation, 
-                              min: parseInt(e.target.value) || undefined 
+                            validation: {
+                              ...selectedField.validation,
+                              min: parseInt(e.target.value) || undefined
                             },
                           })}
                         />
@@ -729,9 +729,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           value={selectedField.validation?.max || ""}
                           onChange={(e) => setSelectedField({
                             ...selectedField,
-                            validation: { 
-                              ...selectedField.validation, 
-                              max: parseInt(e.target.value) || undefined 
+                            validation: {
+                              ...selectedField.validation,
+                              max: parseInt(e.target.value) || undefined
                             },
                           })}
                         />

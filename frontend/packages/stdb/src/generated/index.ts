@@ -867,6 +867,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'account_account_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'account_by_type', algorithm: 'btree', columns: [
         'userTypeId',
       ] },
@@ -883,6 +886,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'account_account_type_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -1015,6 +1021,9 @@ const tablesSchema = __schema({
       { name: 'statement_by_journal', algorithm: 'btree', columns: [
         'journalId',
       ] },
+      { name: 'bank_statement_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'statement_by_state', algorithm: 'btree', columns: [
         'state',
       ] },
@@ -1034,6 +1043,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'statement_line_by_reconcile', algorithm: 'btree', columns: [
         'isReconciled',
+      ] },
+      { name: 'bank_statement_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'statement_line_by_partner', algorithm: 'btree', columns: [
         'partnerId',
@@ -1076,6 +1088,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'account_group_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'account_group_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -1096,6 +1111,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'account_journal_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'journal_by_type', algorithm: 'btree', columns: [
         'type',
@@ -1123,6 +1141,9 @@ const tablesSchema = __schema({
       { name: 'move_by_name', algorithm: 'btree', columns: [
         'name',
       ] },
+      { name: 'account_move_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'move_by_partner', algorithm: 'btree', columns: [
         'partnerId',
       ] },
@@ -1148,6 +1169,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'move_line_by_move', algorithm: 'btree', columns: [
         'moveId',
+      ] },
+      { name: 'account_move_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'move_line_by_partner', algorithm: 'btree', columns: [
         'partnerId',
@@ -1238,6 +1262,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'reconciliation_widget_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'reconciliation_by_partner', algorithm: 'btree', columns: [
         'partnerId',
       ] },
@@ -1258,6 +1285,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'account_tax_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'tax_by_sequence', algorithm: 'btree', columns: [
         'sequence',
       ] },
@@ -1274,6 +1304,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'account_tax_group_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'tax_group_by_sequence', algorithm: 'btree', columns: [
         'sequence',
@@ -1343,6 +1376,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'ai_agent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'ai_agent_id_key', constraint: 'unique', columns: ['id'] },
@@ -1394,6 +1430,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'ai_team_member_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'ai_team_member_id_key', constraint: 'unique', columns: ['id'] },
@@ -1410,6 +1449,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'analytics_metric_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -1489,6 +1531,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'bank_match_candidate_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'candidate_by_statement_line', algorithm: 'btree', columns: [
         'statementLineId',
@@ -1918,6 +1963,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'dashboard_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'dashboard_id_key', constraint: 'unique', columns: ['id'] },
@@ -1931,6 +1979,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'widget_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -1971,6 +2022,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'deferred_rev_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'deferred_revenue_line_id_key', constraint: 'unique', columns: ['id'] },
@@ -1981,6 +2035,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'deferred_rev_schedule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -2021,6 +2078,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'doc_folder_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'folder_by_owner', algorithm: 'btree', columns: [
         'ownerId',
       ] },
@@ -2043,6 +2103,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'document_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'document_by_owner', algorithm: 'btree', columns: [
         'ownerId',
@@ -2633,6 +2696,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'kb_category_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'kb_category_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -2649,6 +2715,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'article_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'article_by_parent', algorithm: 'btree', columns: [
         'parentId',
@@ -2712,6 +2781,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'mail_follower_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'mail_follower_by_partner', algorithm: 'btree', columns: [
         'partnerId',
       ] },
@@ -2734,6 +2806,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'mail_message_by_model', algorithm: 'btree', columns: [
         'model',
+      ] },
+      { name: 'mail_message_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -3169,6 +3244,9 @@ const tablesSchema = __schema({
       { name: 'category_by_name', algorithm: 'btree', columns: [
         'name',
       ] },
+      { name: 'category_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'category_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -3345,6 +3423,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'purchase_order_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'purchase_order_by_partner', algorithm: 'btree', columns: [
         'partnerId',
       ] },
@@ -3362,6 +3443,9 @@ const tablesSchema = __schema({
       { name: 'purchase_order_line_by_order', algorithm: 'btree', columns: [
         'orderId',
       ] },
+      { name: 'purchase_order_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'purchase_order_line_id_key', constraint: 'unique', columns: ['id'] },
@@ -3372,6 +3456,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'purchase_requisition_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'purchase_requisition_by_user', algorithm: 'btree', columns: [
         'userId',
@@ -3535,6 +3622,9 @@ const tablesSchema = __schema({
       { name: 'template_by_model', algorithm: 'btree', columns: [
         'model',
       ] },
+      { name: 'report_template_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'report_template_id_key', constraint: 'unique', columns: ['id'] },
@@ -3545,6 +3635,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'res_partner_bank_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'res_partner_bank_by_partner', algorithm: 'btree', columns: [
         'partnerId',
@@ -3559,6 +3652,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'rev_recognition_rule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -3635,6 +3731,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'sched_report_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'sched_report_by_template', algorithm: 'btree', columns: [
         'reportTemplateId',
@@ -3802,6 +3901,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'stock_landed_cost_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'stock_landed_cost_by_state', algorithm: 'btree', columns: [
         'state',
       ] },
@@ -3818,6 +3920,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'stock_landed_cost_lines_by_landed_cost', algorithm: 'btree', columns: [
         'landedCostId',
+      ] },
+      { name: 'stock_landed_cost_lines_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -4073,6 +4178,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'subscription_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'subscription_id_key', constraint: 'unique', columns: ['id'] },
@@ -4083,6 +4191,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'subscription_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -4095,6 +4206,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'subscription_plan_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'subscription_plan_id_key', constraint: 'unique', columns: ['id'] },
@@ -4105,6 +4219,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'supplier_intake_request_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'supplier_intake_request_by_state', algorithm: 'btree', columns: [
         'state',
@@ -4163,6 +4280,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'tax_jurisdiction_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'jurisdiction_by_state', algorithm: 'btree', columns: [
         'stateCode',
       ] },
@@ -4182,6 +4302,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'schedule_by_jurisdiction', algorithm: 'btree', columns: [
         'jurisdictionId',
+      ] },
+      { name: 'tax_schedule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -4423,6 +4546,9 @@ const tablesSchema = __schema({
       { name: 'workflow_by_model', algorithm: 'btree', columns: [
         'model',
       ] },
+      { name: 'workflow_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'workflow_id_key', constraint: 'unique', columns: ['id'] },
@@ -4447,6 +4573,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'instance_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'instance_by_res', algorithm: 'btree', columns: [
         'resId',

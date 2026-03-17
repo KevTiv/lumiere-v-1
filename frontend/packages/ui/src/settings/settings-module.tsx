@@ -7,12 +7,12 @@ import { settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  User, 
-  Bell, 
-  Palette, 
-  Users, 
-  Shield, 
+import {
+  User,
+  Bell,
+  Palette,
+  Users,
+  Shield,
   ScrollText,
   ChevronRight,
   Lock,
@@ -78,8 +78,8 @@ export function SettingsModule({ className }: SettingsModuleProps) {
     return (
       <div className={cn("space-y-6", className)}>
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setActiveSection(null)}
             className="gap-2"
           >
@@ -120,7 +120,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
           const hasAccess = result.allowed
 
           return (
-            <Card 
+            <Card
               key={section.id}
               className={cn(
                 "cursor-pointer transition-all hover:border-primary/50",

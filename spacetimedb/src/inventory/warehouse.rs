@@ -5,7 +5,7 @@
 ///   - StockLocation
 ///   - StockRoute
 ///   - StockRule
-use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;

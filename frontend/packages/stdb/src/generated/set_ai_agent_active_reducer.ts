@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  companyId: __t.option(__t.u64()),
+  organizationId: __t.u64(),
   agentId: __t.u64(),
   isActive: __t.bool(),
 };

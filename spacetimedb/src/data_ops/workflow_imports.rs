@@ -38,6 +38,7 @@ pub fn import_workflow_csv(
 
         ctx.db.workflow().insert(Workflow {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             model,

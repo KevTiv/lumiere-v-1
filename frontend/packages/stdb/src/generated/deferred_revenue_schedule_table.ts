@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   description: __t.string(),
   journalId: __t.u64().name("journal_id"),
   accountId: __t.u64().name("account_id"),

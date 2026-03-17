@@ -1,97 +1,30 @@
-"use client"
-
-import { useMemo } from "react"
-import { ModuleView } from "@lumiere/ui"
-import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
+import { getStdbSession } from "@/lib/stdb-session"
 import {
-  usePurchaseOrders,
-  usePurchaseOrderLines,
-  usePurchaseRequisitions,
-  useCreatePurchaseOrder,
-  useCreatePurchaseRequisition,
-} from "@lumiere/stdb"
+  serverQueryPurchaseOrders,
+  serverQueryPurchaseOrderLines,
+  serverQueryPurchaseRequisitions,
+} from "@lumiere/stdb/server"
+import { PurchasingClient } from "./purchasing-client"
 
-const ORG_ID = 1n
-const COMPANY_ID = 1n
+export default async function PurchasingPage() {
+  const { organizationId, opts } = await getStdbSession()
 
-export default function PurchasingPage() {
-  const { data: orders = [] } = usePurchaseOrders(COMPANY_ID)
-  const { data: lines = [] } = usePurchaseOrderLines(COMPANY_ID)
-  const { data: requisitions = [] } = usePurchaseRequisitions(COMPANY_ID)
-
-  const createPurchaseOrder = useCreatePurchaseOrder(ORG_ID, COMPANY_ID)
-  const createPurchaseRequisition = useCreatePurchaseRequisition(ORG_ID, COMPANY_ID)
-
-  const liveSections = useMemo(() => {
-    const openOrders = orders.filter(
-      (o) => String(o.state) !== "Done" && String(o.state) !== "Cancelled"
-    )
-    const spendMtd = orders
-      .filter((o) => String(o.state) === "Approved" || String(o.state) === "Done")
-      .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
-    const pendingReceipt = orders.filter((o) => o.receiptStatus === "pending").length
-    const toApprove = orders.filter((o) => String(o.state) === "ToApprove").length
-
-    return (
-      purchasingModuleConfig.tabs
-        .find((t) => t.id === "dashboard")
-        ?.sections?.map((section) => ({
-          ...section,
-          widgets: section.widgets.map((w) => {
-            if (w.type === "stat-cards") {
-              return {
-                ...w,
-                data: {
-                  stats: [
-                    { label: "Open POs", value: openOrders.length.toString(), icon: "FileText" },
-                    { label: "Spend MTD", value: `$${spendMtd.toLocaleString()}`, icon: "DollarSign" },
-                    { label: "Pending Receipt", value: pendingReceipt.toString(), icon: "Truck" },
-                    { label: "Awaiting Approval", value: toApprove.toString(), icon: "Clock" },
-                  ],
-                },
-              }
-            }
-            return w
-          }),
-        })) ??
-      purchasingModuleConfig.tabs.find((t) => t.id === "dashboard")?.sections ??
-      []
-    )
-  }, [orders])
-
-  const config = useMemo(
-    () => ({
-      ...purchasingModuleConfig,
-      tabs: purchasingModuleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-      ),
-    }),
-    [liveSections]
-  )
-
-  const data = useMemo(
-    () => ({
-      orders: orders as unknown as Record<string, unknown>[],
-      lines: lines as unknown as Record<string, unknown>[],
-      requisitions: requisitions as unknown as Record<string, unknown>[],
-    }),
-    [orders, lines, requisitions]
-  )
-
-  const handleFormSubmit = (
-    _tabId: string,
-    action: string,
-    formData: Record<string, unknown>
-  ) => {
-    if (action === "createPurchaseOrder") createPurchaseOrder.mutate(formData as never)
-    else if (action === "createPurchaseRequisition") createPurchaseRequisition.mutate(formData as never)
+  if (!organizationId) {
+    return <PurchasingClient />
   }
 
+  const [orders, lines, requisitions] = await Promise.all([
+    serverQueryPurchaseOrders(organizationId, opts),
+    serverQueryPurchaseOrderLines(organizationId, opts),
+    serverQueryPurchaseRequisitions(organizationId, opts),
+  ]).catch(() => [[], [], []])
+
   return (
-    <ModuleView
-      config={config}
-      data={data}
-      onFormSubmit={handleFormSubmit}
+    <PurchasingClient
+      initialOrders={orders as Record<string, unknown>[]}
+      initialLines={lines as Record<string, unknown>[]}
+      initialRequisitions={requisitions as Record<string, unknown>[]}
+      organizationId={organizationId}
     />
   )
 }

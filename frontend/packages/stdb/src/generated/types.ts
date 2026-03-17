@@ -12,6 +12,7 @@ import {
 
 export const AccountAccount = __t.object("AccountAccount", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   code: __t.string(),
   name: __t.string(),
   deprecated: __t.bool(),
@@ -48,6 +49,7 @@ export type AccountAccount = __Infer<typeof AccountAccount>;
 
 export const AccountAccountType = __t.object("AccountAccountType", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   type: __t.string(),
   get internalGroup() {
@@ -240,6 +242,7 @@ export type AccountAssetDepreciationLine = __Infer<typeof AccountAssetDepreciati
 
 export const AccountBankStatement = __t.object("AccountBankStatement", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.option(__t.string()),
   reference: __t.option(__t.string()),
   date: __t.option(__t.timestamp()),
@@ -270,6 +273,7 @@ export type AccountBankStatement = __Infer<typeof AccountBankStatement>;
 
 export const AccountBankStatementLine = __t.object("AccountBankStatementLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   date: __t.timestamp(),
   amount: __t.f64(),
   amountCurrency: __t.f64(),
@@ -321,6 +325,7 @@ export type AccountFiscalYear = __Infer<typeof AccountFiscalYear>;
 
 export const AccountGroup = __t.object("AccountGroup", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   codePrefixStart: __t.option(__t.string()),
   codePrefixEnd: __t.option(__t.string()),
@@ -348,6 +353,7 @@ export type AccountInternalGroup = __Infer<typeof AccountInternalGroup>;
 
 export const AccountJournal = __t.object("AccountJournal", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   code: __t.string(),
   active: __t.bool(),
@@ -390,6 +396,7 @@ export type AccountJournal = __Infer<typeof AccountJournal>;
 
 export const AccountMove = __t.object("AccountMove", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   ref: __t.option(__t.string()),
   get moveType() {
@@ -452,6 +459,7 @@ export type AccountMove = __Infer<typeof AccountMove>;
 
 export const AccountMoveLine = __t.object("AccountMoveLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   moveId: __t.u64(),
   moveName: __t.option(__t.string()),
   date: __t.timestamp(),
@@ -605,6 +613,7 @@ export type AccountPeriod = __Infer<typeof AccountPeriod>;
 
 export const AccountReconciliationWidget = __t.object("AccountReconciliationWidget", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   partnerId: __t.option(__t.u64()),
   accountId: __t.u64(),
   moveLineIds: __t.array(__t.u64()),
@@ -621,6 +630,7 @@ export type AccountReconciliationWidget = __Infer<typeof AccountReconciliationWi
 
 export const AccountTax = __t.object("AccountTax", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   get typeTaxUse() {
@@ -653,6 +663,7 @@ export type AccountTax = __Infer<typeof AccountTax>;
 
 export const AccountTaxGroup = __t.object("AccountTaxGroup", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   sequence: __t.u32(),
   companyId: __t.u64(),
@@ -887,6 +898,7 @@ export type AdjustmentReason = __Infer<typeof AdjustmentReason>;
 
 export const AiAgent = __t.object("AiAgent", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   model: __t.string(),
@@ -979,6 +991,7 @@ export type AiInsight = __Infer<typeof AiInsight>;
 
 export const AiTeamMember = __t.object("AiTeamMember", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   aiAgentId: __t.u64(),
   role: __t.string(),
@@ -1000,6 +1013,7 @@ export type AiTeamMember = __Infer<typeof AiTeamMember>;
 
 export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   category: __t.string(),
   metricType: __t.string(),
@@ -1125,6 +1139,7 @@ export type BalanceSheetLine = __Infer<typeof BalanceSheetLine>;
 
 export const BankMatchCandidate = __t.object("BankMatchCandidate", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   statementLineId: __t.u64(),
   matchType: __t.string(),
   entityId: __t.u64(),
@@ -4555,6 +4570,7 @@ export type CurrencyRate = __Infer<typeof CurrencyRate>;
 
 export const Dashboard = __t.object("Dashboard", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   widgetIds: __t.array(__t.u64()),
@@ -4574,6 +4590,7 @@ export type Dashboard = __Infer<typeof Dashboard>;
 
 export const DashboardWidget = __t.object("DashboardWidget", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   get widgetType() {
     return WidgetType;
@@ -4628,6 +4645,7 @@ export type DataClassificationRule = __Infer<typeof DataClassificationRule>;
 
 export const DeferredRevenueLine = __t.object("DeferredRevenueLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   scheduleId: __t.u64(),
   sequence: __t.u32(),
   recognitionDate: __t.timestamp(),
@@ -4648,6 +4666,7 @@ export type DeferredRevenueLine = __Infer<typeof DeferredRevenueLine>;
 
 export const DeferredRevenueSchedule = __t.object("DeferredRevenueSchedule", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   description: __t.string(),
   journalId: __t.u64(),
   accountId: __t.u64(),
@@ -4759,6 +4778,7 @@ export type DisposeAccountAssetParams = __Infer<typeof DisposeAccountAssetParams
 
 export const Document = __t.object("Document", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   fileName: __t.string(),
@@ -4804,6 +4824,7 @@ export type Document = __Infer<typeof Document>;
 
 export const DocumentFolder = __t.object("DocumentFolder", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   parentId: __t.option(__t.u64()),
@@ -5670,6 +5691,7 @@ export type JournalType = __Infer<typeof JournalType>;
 
 export const KnowledgeArticle = __t.object("KnowledgeArticle", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   body: __t.option(__t.string()),
@@ -5715,6 +5737,7 @@ export type KnowledgeArticle = __Infer<typeof KnowledgeArticle>;
 
 export const KnowledgeArticleCategory = __t.object("KnowledgeArticleCategory", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   sequence: __t.u32(),
@@ -5858,6 +5881,7 @@ export type LogTimesheetParams = __Infer<typeof LogTimesheetParams>;
 
 export const MailFollower = __t.object("MailFollower", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   resModel: __t.string(),
   resId: __t.u64(),
   partnerId: __t.identity(),
@@ -5867,6 +5891,7 @@ export type MailFollower = __Infer<typeof MailFollower>;
 
 export const MailMessage = __t.object("MailMessage", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   model: __t.string(),
   resId: __t.u64(),
   authorId: __t.identity(),
@@ -6892,6 +6917,7 @@ export type ProductAttributeValue = __Infer<typeof ProductAttributeValue>;
 
 export const ProductCategory = __t.object("ProductCategory", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   parentId: __t.option(__t.u64()),
   sequence: __t.u32(),
@@ -7198,6 +7224,7 @@ export type ProjectTimesheet = __Infer<typeof ProjectTimesheet>;
 
 export const PurchaseOrder = __t.object("PurchaseOrder", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.option(__t.string()),
   origin: __t.option(__t.string()),
   partnerRef: __t.option(__t.string()),
@@ -7256,6 +7283,7 @@ export type PurchaseOrder = __Infer<typeof PurchaseOrder>;
 
 export const PurchaseOrderLine = __t.object("PurchaseOrderLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   sequence: __t.u32(),
   productQty: __t.f64(),
   productUomQty: __t.f64(),
@@ -7304,6 +7332,7 @@ export type PurchaseOrderLine = __Infer<typeof PurchaseOrderLine>;
 
 export const PurchaseRequisition = __t.object("PurchaseRequisition", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   origin: __t.option(__t.string()),
   orderingDate: __t.option(__t.timestamp()),
   dateEnd: __t.option(__t.timestamp()),
@@ -7615,6 +7644,7 @@ export type ReportState = __Infer<typeof ReportState>;
 
 export const ReportTemplate = __t.object("ReportTemplate", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   model: __t.string(),
@@ -7668,6 +7698,7 @@ export type RequisitionState = __Infer<typeof RequisitionState>;
 
 export const ResPartnerBank = __t.object("ResPartnerBank", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   sanitizedAccNumber: __t.option(__t.string()),
   accHolderName: __t.option(__t.string()),
   partnerId: __t.u64(),
@@ -7690,6 +7721,7 @@ export type ResPartnerBank = __Infer<typeof ResPartnerBank>;
 
 export const RevenueRecognitionRule = __t.object("RevenueRecognitionRule", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   description: __t.string(),
   productCategoryIds: __t.array(__t.u64()),
   productIds: __t.array(__t.u64()),
@@ -7943,6 +7975,7 @@ export type SaleState = __Infer<typeof SaleState>;
 
 export const ScheduledReport = __t.object("ScheduledReport", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   reportTemplateId: __t.u64(),
@@ -8225,6 +8258,7 @@ export type StockInventoryLine = __Infer<typeof StockInventoryLine>;
 
 export const StockLandedCost = __t.object("StockLandedCost", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   get state() {
     return LandedCostState;
   },
@@ -8253,6 +8287,7 @@ export type StockLandedCost = __Infer<typeof StockLandedCost>;
 
 export const StockLandedCostLines = __t.object("StockLandedCostLines", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   landedCostId: __t.u64(),
   productId: __t.u64(),
   priceUnit: __t.f64(),
@@ -8759,6 +8794,7 @@ export type SubmitSupplierIntakeParams = __Infer<typeof SubmitSupplierIntakePara
 
 export const Subscription = __t.object("Subscription", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   code: __t.string(),
   description: __t.string(),
   planId: __t.u64(),
@@ -8811,6 +8847,7 @@ export type Subscription = __Infer<typeof Subscription>;
 
 export const SubscriptionLine = __t.object("SubscriptionLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   subscriptionId: __t.u64(),
   productId: __t.u64(),
@@ -8852,6 +8889,7 @@ export type SubscriptionLine = __Infer<typeof SubscriptionLine>;
 
 export const SubscriptionPlan = __t.object("SubscriptionPlan", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.string(),
   code: __t.string(),
@@ -8890,6 +8928,7 @@ export type SubscriptionPlan = __Infer<typeof SubscriptionPlan>;
 
 export const SupplierIntakeRequest = __t.object("SupplierIntakeRequest", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   get state() {
     return IntakeState;
   },
@@ -9038,6 +9077,7 @@ export type TaxDeadlineType = __Infer<typeof TaxDeadlineType>;
 
 export const TaxJurisdiction = __t.object("TaxJurisdiction", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   code: __t.string(),
   countryCode: __t.string(),
@@ -9057,6 +9097,7 @@ export type TaxJurisdiction = __Infer<typeof TaxJurisdiction>;
 
 export const TaxSchedule = __t.object("TaxSchedule", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   jurisdictionId: __t.option(__t.u64()),
@@ -10489,6 +10530,7 @@ export type WidgetType = __Infer<typeof WidgetType>;
 
 export const Workflow = __t.object("Workflow", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   model: __t.string(),
@@ -10509,6 +10551,7 @@ export type Workflow = __Infer<typeof Workflow>;
 
 export const WorkflowActivity = __t.object("WorkflowActivity", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   workflowId: __t.u64(),
@@ -10538,6 +10581,7 @@ export type WorkflowActivity = __Infer<typeof WorkflowActivity>;
 
 export const WorkflowInstance = __t.object("WorkflowInstance", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   workflowId: __t.u64(),
   resId: __t.u64(),
   resType: __t.string(),
@@ -10555,6 +10599,7 @@ export type WorkflowInstance = __Infer<typeof WorkflowInstance>;
 
 export const WorkflowTransition = __t.object("WorkflowTransition", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   activityFrom: __t.u64(),
   activityTo: __t.u64(),
   sequence: __t.u32(),
@@ -10573,6 +10618,7 @@ export type WorkflowTransition = __Infer<typeof WorkflowTransition>;
 
 export const WorkflowWorkitem = __t.object("WorkflowWorkitem", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   instanceId: __t.u64(),
   actId: __t.u64(),
   wkfEvaledCondition: __t.option(__t.string()),

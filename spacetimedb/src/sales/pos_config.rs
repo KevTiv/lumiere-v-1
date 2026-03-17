@@ -12,7 +12,6 @@
 ///   - Module toggles for features
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::reference::currency;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::PaymentMethodType;
 

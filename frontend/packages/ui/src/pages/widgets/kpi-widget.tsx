@@ -32,7 +32,7 @@ export function KPIWidget({ data }: { data: KPIWidgetType["data"] }) {
         <p className="text-sm text-muted-foreground">{data.label}</p>
         <p className="text-3xl font-bold mt-1">{data.value}</p>
         {data.change !== undefined && (
-          <div className={`flex items-center gap-1 mt-2 text-sm ${trendColor}`}>
+          <div className={`flex items-center gap-1 mt-2  text-sm ${trendColor}`}>
             <TrendIcon className="h-4 w-4" />
             <span>{data.change > 0 ? "+" : ""}{data.change}%</span>
             {data.changeLabel && (

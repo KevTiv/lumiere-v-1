@@ -15,7 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 // ============================================================================
 
 /// Params for creating a report template.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateReportTemplateParams {
     pub name: String,
@@ -40,7 +40,7 @@ pub struct CreateReportTemplateParams {
 }
 
 /// Params for updating report template content.
-/// Scope: `company_id` + `template_id` are flat reducer params.
+/// Scope: `organization_id` + `template_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateReportTemplateParams {
     pub orientation: String,
@@ -49,7 +49,7 @@ pub struct UpdateReportTemplateParams {
 }
 
 /// Params for creating a scheduled report.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateScheduledReportParams {
     pub name: String,
@@ -72,7 +72,7 @@ pub struct CreateScheduledReportParams {
 }
 
 /// Params for creating an analytics metric.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAnalyticsMetricParams {
     pub name: String,
@@ -91,7 +91,7 @@ pub struct CreateAnalyticsMetricParams {
 }
 
 /// Params for updating cached metric values after computation.
-/// Scope: `company_id` + `metric_id` are flat reducer params.
+/// Scope: `organization_id` + `metric_id` are flat reducer params.
 /// `change_amount`, `change_percentage`, `trend_direction` are computed — not in params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateMetricValuesParams {
@@ -108,6 +108,7 @@ pub struct UpdateMetricValuesParams {
 #[spacetimedb::table(
     accessor = report_template,
     public,
+    index(accessor = report_template_by_org, btree(columns = [organization_id])),
     index(accessor = template_by_model, btree(columns = [model])),
     index(accessor = template_by_company, btree(columns = [company_id]))
 )]
@@ -116,6 +117,7 @@ pub struct ReportTemplate {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,              // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub model: String,                     // ERP model the report runs on
@@ -134,7 +136,7 @@ pub struct ReportTemplate {
     pub attachment: Option<String>,        // Attachment name expression
     pub multi_company: bool,
     pub is_active: bool,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,          // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -147,6 +149,7 @@ pub struct ReportTemplate {
 #[spacetimedb::table(
     accessor = scheduled_report,
     public,
+    index(accessor = sched_report_by_org, btree(columns = [organization_id])),
     index(name = "by_template", accessor = sched_report_by_template, btree(columns = [report_template_id])),
     index(accessor = sched_report_by_company, btree(columns = [company_id]))
 )]
@@ -155,25 +158,26 @@ pub struct ScheduledReport {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,             // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub report_template_id: u64,
     pub model: String,
-    pub domain: Option<String>,            // JSON filter applied when generating
-    pub frequency: String,                 // Daily, Weekly, Monthly, Quarterly
-    pub day_of_week: Option<u8>,           // 0=Mon … 6=Sun (for Weekly)
-    pub day_of_month: Option<u8>,          // 1–31 (for Monthly)
+    pub domain: Option<String>,           // JSON filter applied when generating
+    pub frequency: String,                // Daily, Weekly, Monthly, Quarterly
+    pub day_of_week: Option<u8>,          // 0=Mon … 6=Sun (for Weekly)
+    pub day_of_month: Option<u8>,         // 1–31 (for Monthly)
     pub hour: u8,
     pub minute: u8,
-    pub recipients: Vec<String>,           // Email addresses
+    pub recipients: Vec<String>,          // Email addresses
     pub subject: Option<String>,
     pub body: Option<String>,
-    pub attachment_format: String,         // PDF, Excel, CSV
+    pub attachment_format: String,        // PDF, Excel, CSV
     pub last_run: Option<Timestamp>,
     pub next_run: Timestamp,
     pub is_active: bool,
     pub run_count: u32,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,          // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -186,6 +190,7 @@ pub struct ScheduledReport {
 #[spacetimedb::table(
     accessor = analytics_metric,
     public,
+    index(accessor = analytics_metric_by_org, btree(columns = [organization_id])),
     index(accessor = metric_by_category, btree(columns = [category])),
     index(accessor = metric_by_company, btree(columns = [company_id]))
 )]
@@ -194,26 +199,27 @@ pub struct AnalyticsMetric {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,             // Tenant isolation
     pub name: String,
-    pub category: String,                  // Sales, Inventory, Financial, HR
-    pub metric_type: String,               // KPI, Trend, Comparison
+    pub category: String,                 // Sales, Inventory, Financial, HR
+    pub metric_type: String,              // KPI, Trend, Comparison
     pub model: String,
     pub domain: Option<String>,
-    pub field: String,                     // Field being aggregated
-    pub aggregation: String,               // Count, Sum, Average, Min, Max
-    pub time_period: String,               // Today, This Week, This Month, etc.
+    pub field: String,                    // Field being aggregated
+    pub aggregation: String,              // Count, Sum, Average, Min, Max
+    pub time_period: String,              // Today, This Week, This Month, etc.
     pub current_value: Option<f64>,
     pub previous_value: Option<f64>,
     pub change_amount: Option<f64>,
     pub change_percentage: Option<f64>,
-    pub trend_direction: Option<String>,   // Up, Down, Stable
+    pub trend_direction: Option<String>,  // Up, Down, Stable
     pub calculated_at: Option<Timestamp>,
     pub target_value: Option<f64>,
     pub target_period: Option<String>,
     pub is_active: bool,
     pub refresh_frequency_minutes: u32,
     pub last_refresh: Option<Timestamp>,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,          // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -229,14 +235,15 @@ pub struct AnalyticsMetric {
 #[reducer]
 pub fn create_report_template(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateReportTemplateParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "report_template", "create")?;
+    check_permission(ctx, organization_id, "report_template", "create")?;
 
     let tmpl = ctx.db.report_template().insert(ReportTemplate {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         model: params.model,
@@ -265,7 +272,7 @@ pub fn create_report_template(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "report_template",
@@ -286,12 +293,11 @@ pub fn create_report_template(
 #[reducer]
 pub fn update_report_template(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     template_id: u64,
     params: UpdateReportTemplateParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "report_template", "write")?;
+    check_permission(ctx, organization_id, "report_template", "write")?;
 
     let tmpl = ctx
         .db
@@ -300,10 +306,8 @@ pub fn update_report_template(
         .find(&template_id)
         .ok_or("Report template not found")?;
 
-    if let (Some(wc), Some(rc)) = (company_id, tmpl.company_id) {
-        if wc != rc {
-            return Err("Report template does not belong to this company".to_string());
-        }
+    if tmpl.organization_id != organization_id {
+        return Err("Report template does not belong to this organization".to_string());
     }
 
     ctx.db.report_template().id().update(ReportTemplate {
@@ -317,9 +321,9 @@ pub fn update_report_template(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "report_template",
             record_id: template_id,
             action: "write",
@@ -338,18 +342,23 @@ pub fn update_report_template(
 #[reducer]
 pub fn create_scheduled_report(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateScheduledReportParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "scheduled_report", "create")?;
+    check_permission(ctx, organization_id, "scheduled_report", "create")?;
 
-    // Verify template exists
-    ctx.db
+    // Verify template exists and belongs to this org
+    let tmpl = ctx
+        .db
         .report_template()
         .id()
         .find(&params.report_template_id)
         .ok_or("Report template not found")?;
+
+    if tmpl.organization_id != organization_id {
+        return Err("Report template does not belong to this organization".to_string());
+    }
 
     if params.recipients.is_empty() {
         return Err("At least one recipient is required".to_string());
@@ -357,6 +366,7 @@ pub fn create_scheduled_report(
 
     let report = ctx.db.scheduled_report().insert(ScheduledReport {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         report_template_id: params.report_template_id,
@@ -387,7 +397,7 @@ pub fn create_scheduled_report(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "scheduled_report",
@@ -412,12 +422,11 @@ pub fn create_scheduled_report(
 #[reducer]
 pub fn record_report_run(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     report_id: u64,
     next_run: Timestamp,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "scheduled_report", "write")?;
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
 
     let report = ctx
         .db
@@ -425,6 +434,10 @@ pub fn record_report_run(
         .id()
         .find(&report_id)
         .ok_or("Scheduled report not found")?;
+
+    if report.organization_id != organization_id {
+        return Err("Scheduled report does not belong to this organization".to_string());
+    }
 
     ctx.db.scheduled_report().id().update(ScheduledReport {
         last_run: Some(ctx.timestamp),
@@ -438,9 +451,9 @@ pub fn record_report_run(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "scheduled_report",
             record_id: report_id,
             action: "write",
@@ -459,14 +472,15 @@ pub fn record_report_run(
 #[reducer]
 pub fn create_analytics_metric(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateAnalyticsMetricParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "analytics_metric", "create")?;
+    check_permission(ctx, organization_id, "analytics_metric", "create")?;
 
     let metric = ctx.db.analytics_metric().insert(AnalyticsMetric {
         id: 0,
+        organization_id,
         name: params.name,
         category: params.category,
         metric_type: params.metric_type,
@@ -497,7 +511,7 @@ pub fn create_analytics_metric(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "analytics_metric",
@@ -518,12 +532,11 @@ pub fn create_analytics_metric(
 #[reducer]
 pub fn update_metric_values(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     metric_id: u64,
     params: UpdateMetricValuesParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "analytics_metric", "write")?;
+    check_permission(ctx, organization_id, "analytics_metric", "write")?;
 
     let metric = ctx
         .db
@@ -531,6 +544,10 @@ pub fn update_metric_values(
         .id()
         .find(&metric_id)
         .ok_or("Metric not found")?;
+
+    if metric.organization_id != organization_id {
+        return Err("Metric does not belong to this organization".to_string());
+    }
 
     // change_amount, change_percentage, trend_direction are computed from inputs
     let (change_amount, change_percentage, trend_direction) =

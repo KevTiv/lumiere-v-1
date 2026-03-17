@@ -137,6 +137,7 @@ pub fn post_payment(
     // Create a corresponding journal entry (AccountMove)
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
+        organization_id,
         name: name.clone(),
         ref_: payment.ref_.clone(),
         move_type,

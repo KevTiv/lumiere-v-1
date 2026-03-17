@@ -61,6 +61,7 @@ pub fn import_account_csv(
 
         ctx.db.account_account().insert(AccountAccount {
             id: 0,
+            organization_id,
             code,
             name,
             deprecated: false,
@@ -141,6 +142,7 @@ pub fn import_tax_rate_csv(
 
         ctx.db.account_tax().insert(AccountTax {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             type_tax_use,
@@ -230,6 +232,7 @@ pub fn import_account_move_csv(
 
         ctx.db.account_move().insert(AccountMove {
             id: 0,
+            organization_id,
             name: col(&headers, row, "name").to_string(),
             ref_: opt_str(col(&headers, row, "ref_")),
             move_type,
@@ -347,6 +350,7 @@ pub fn import_account_move_line_csv(
 
         ctx.db.account_move_line().insert(AccountMoveLine {
             id: 0,
+            organization_id,
             move_id,
             move_name: None,
             date,

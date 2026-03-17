@@ -15,6 +15,7 @@ import {
 } from "./types";
 
 export default {
+  organizationId: __t.u64(),
   companyId: __t.option(__t.u64()),
   get params() {
     return CreateDashboardParams;

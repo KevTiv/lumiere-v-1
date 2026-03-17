@@ -1,13 +1,13 @@
 import { queryLeads, type Lead } from "../queries/crm";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { Lead };
 
-export function useLeads(organizationId: bigint) {
+export function useLeads(organizationId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["leads", organizationId.toString()];
+  const queryKey = useMemo(() => ["leads", organizationId.toString()], [organizationId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useLeads(organizationId: bigint) {
     conn.db.lead.onInsert((_ctx, _row) => reload());
     conn.db.lead.onUpdate((_ctx, _old, _new) => reload());
     conn.db.lead.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryLeads, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryLeads,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

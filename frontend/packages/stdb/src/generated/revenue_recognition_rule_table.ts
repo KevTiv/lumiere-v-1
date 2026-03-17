@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   description: __t.string(),
   productCategoryIds: __t.array(__t.u64()).name("product_category_ids"),
   productIds: __t.array(__t.u64()).name("product_ids"),

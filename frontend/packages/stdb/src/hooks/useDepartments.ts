@@ -1,13 +1,13 @@
 import { queryDepartments, type HrDepartment } from "../queries/hr";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { HrDepartment };
 
-export function useDepartments(companyId: bigint) {
+export function useDepartments(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["hr-departments", companyId.toString()];
+  const queryKey = useMemo(() => ["hr-departments", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useDepartments(companyId: bigint) {
     conn.db.hr_department.onInsert((_ctx, _row) => reload());
     conn.db.hr_department.onUpdate((_ctx, _old, _new) => reload());
     conn.db.hr_department.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryDepartments, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryDepartments,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

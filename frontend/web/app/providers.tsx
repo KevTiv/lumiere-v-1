@@ -21,6 +21,7 @@ import {
   type Resource,
   type Action,
 } from "@lumiere/ui"
+import { saveStdbSession } from "@/app/actions/save-stdb-token"
 
 // ─── Casbin → RBAC mapping ───────────────────────────────────────────────────
 
@@ -146,11 +147,23 @@ function StdbRBACBridge({ children }: { children: React.ReactNode }) {
 
 // ─── Root providers ───────────────────────────────────────────────────────────
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  serverIdentity,
+  serverRoleNames,
+}: {
+  children: React.ReactNode
+  serverIdentity?: string
+  serverRoleNames?: string[]
+}) {
   const [queryClient] = useState(() => new QueryClient())
   return (
     <QueryClientProvider client={queryClient}>
-      <StdbConnectionProvider>
+      <StdbConnectionProvider
+        onTokenPersisted={saveStdbSession}
+        serverIdentity={serverIdentity}
+        serverRoleNames={serverRoleNames}
+      >
         <StdbRBACBridge>
           {children}
         </StdbRBACBridge>

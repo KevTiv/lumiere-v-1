@@ -46,6 +46,7 @@ pub fn import_product_category_csv(
 
         ctx.db.product_category().insert(ProductCategory {
             id: 0,
+            organization_id,
             name: name.clone(),
             parent_id,
             sequence: parse_u32(col(&headers, row, "sequence")),

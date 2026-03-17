@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getStdbConnection } from "../connection";
 import { useStdbConnection } from "../context";
@@ -23,10 +23,10 @@ export type {
   UserOrganization,
 };
 
-export function useUserProfile(): UserProfile | null {
+export function useUserProfile(initialData?: Record<string, unknown>): UserProfile | null {
   const { identity, connected } = useStdbConnection();
   const queryClient = useQueryClient();
-  const queryKey = ["user-profile", identity];
+  const queryKey = useMemo(() => ["user-profile", identity], [identity]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -43,15 +43,18 @@ export function useUserProfile(): UserProfile | null {
     queryFn: () => queryUserProfile(identity!),
     staleTime: Infinity,
     enabled: !!identity && connected,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData ? 0 : undefined,
   });
 
   return data ?? null;
 }
 
-export function useCasbinRules(): CasbinRule[] {
+export function useCasbinRules(initialData?: Record<string, unknown>[]): CasbinRule[] {
   const { identity, connected } = useStdbConnection();
   const queryClient = useQueryClient();
-  const queryKey = ["casbin-rules"];
+  // Include identity in key to prevent cross-user cache contamination
+  const queryKey = useMemo(() => ["casbin-rules", identity ?? ""], [identity]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -68,15 +71,17 @@ export function useCasbinRules(): CasbinRule[] {
     queryFn: queryCasbinRules,
     staleTime: Infinity,
     enabled: !!identity && connected,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
   });
 
   return data ?? [];
 }
 
-export function useStdbRoles(): StdbRole[] {
+export function useStdbRoles(initialData?: Record<string, unknown>[]): StdbRole[] {
   const { identity, connected } = useStdbConnection();
   const queryClient = useQueryClient();
-  const queryKey = ["stdb-roles"];
+  const queryKey = useMemo(() => ["stdb-roles"], []);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -93,15 +98,17 @@ export function useStdbRoles(): StdbRole[] {
     queryFn: queryStdbRoles,
     staleTime: Infinity,
     enabled: !!identity && connected,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
   });
 
   return data ?? [];
 }
 
-export function useUserRoleAssignments(): UserRoleAssignment[] {
+export function useUserRoleAssignments(initialData?: Record<string, unknown>[]): UserRoleAssignment[] {
   const { identity, connected } = useStdbConnection();
   const queryClient = useQueryClient();
-  const queryKey = ["user-role-assignments", identity];
+  const queryKey = useMemo(() => ["user-role-assignments", identity], [identity]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -118,15 +125,17 @@ export function useUserRoleAssignments(): UserRoleAssignment[] {
     queryFn: () => queryUserRoleAssignments(identity!),
     staleTime: Infinity,
     enabled: !!identity && connected,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
   });
 
   return data ?? [];
 }
 
-export function useUserOrganization(): UserOrganization | null {
+export function useUserOrganization(initialData?: Record<string, unknown>): UserOrganization | null {
   const { identity, connected } = useStdbConnection();
   const queryClient = useQueryClient();
-  const queryKey = ["user-organization", identity];
+  const queryKey = useMemo(() => ["user-organization", identity], [identity]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -143,6 +152,8 @@ export function useUserOrganization(): UserOrganization | null {
     queryFn: () => queryUserOrganization(identity!),
     staleTime: Infinity,
     enabled: !!identity && connected,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData ? 0 : undefined,
   });
 
   return data ?? null;

@@ -17,6 +17,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   code: __t.string(),
   name: __t.string(),
   deprecated: __t.bool(),

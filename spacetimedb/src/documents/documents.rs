@@ -15,9 +15,11 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 // ============================================================================
 
 /// Document Folder — Hierarchical container for organizing documents
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = doc_folder,
     public,
+    index(accessor = doc_folder_by_org, btree(columns = [organization_id])),
     index(accessor = folder_by_parent, btree(columns = [parent_id])),
     index(accessor = folder_by_owner, btree(columns = [owner_id]))
 )]
@@ -26,12 +28,13 @@ pub struct DocumentFolder {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub parent_id: Option<u64>,
     pub parent_path: String,
     pub sequence: u32,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub owner_id: Identity,
     pub storage_id: Option<u64>,
     pub share_link: Option<String>,
@@ -58,6 +61,7 @@ pub struct DocumentFolder {
 #[spacetimedb::table(
     accessor = document,
     public,
+    index(accessor = document_by_org, btree(columns = [organization_id])),
     index(name = "by_folder", accessor = document_by_folder, btree(columns = [folder_id])),
     index(accessor = document_by_owner, btree(columns = [owner_id])),
     index(accessor = document_by_company, btree(columns = [company_id]))
@@ -67,6 +71,7 @@ pub struct Document {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,    // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub file_name: String,
@@ -81,7 +86,7 @@ pub struct Document {
     pub res_name: Option<String>,
     pub partner_id: Option<u64>,
     pub owner_id: Identity,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub folder_id: Option<u64>,
     pub tag_ids: Vec<u64>,
     pub is_locked: bool,
@@ -110,6 +115,7 @@ pub struct Document {
 }
 
 /// Document Version — Immutable snapshot of a document at a point in time
+#[derive(Clone)]
 #[spacetimedb::table(
     accessor = document_version,
     public,
@@ -140,7 +146,7 @@ pub struct DocumentVersion {
 // ============================================================================
 
 /// Params for creating a document folder.
-/// Scope: `company_id` is a flat reducer param.
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDocumentFolderParams {
     pub name: String,
@@ -156,7 +162,7 @@ pub struct CreateDocumentFolderParams {
 }
 
 /// Params for creating a document.
-/// Scope: `company_id` is a flat reducer param.
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDocumentParams {
     pub name: String,
@@ -175,7 +181,7 @@ pub struct CreateDocumentParams {
 }
 
 /// Params for adding a document version.
-/// Scope: `company_id` and `document_id` are flat reducer params.
+/// Scope: `organization_id` + `document_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct AddDocumentVersionParams {
     pub file_name: String,
@@ -186,7 +192,7 @@ pub struct AddDocumentVersionParams {
 }
 
 /// Params for updating document metadata.
-/// Scope: `company_id` and `document_id` are flat reducer params.
+/// Scope: `organization_id` + `document_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateDocumentParams {
     pub name: Option<String>,
@@ -209,10 +215,10 @@ pub struct UpdateDocumentParams {
 pub fn create_document_folder(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
+    company_id: Option<u64>,
     params: CreateDocumentFolderParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document_folder", "create")?;
+    check_permission(ctx, organization_id, "document_folder", "create")?;
 
     let parent_path = if let Some(pid) = params.parent_id {
         let parent = ctx
@@ -221,6 +227,10 @@ pub fn create_document_folder(
             .id()
             .find(&pid)
             .ok_or("Parent folder not found")?;
+
+        if parent.organization_id != organization_id {
+            return Err("Parent folder does not belong to this organization".to_string());
+        }
         format!("{}/{}", parent.parent_path, pid)
     } else {
         "/".to_string()
@@ -230,12 +240,13 @@ pub fn create_document_folder(
 
     let folder = ctx.db.doc_folder().insert(DocumentFolder {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         parent_id: params.parent_id,
         parent_path,
         sequence: params.sequence,
-        company_id: Some(company_id),
+        company_id,
         owner_id: ctx.sender(),
         storage_id: params.storage_id,
         share_link: None,
@@ -261,7 +272,7 @@ pub fn create_document_folder(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id,
             table_name: "document_folder",
             record_id: folder.id,
             action: "CREATE",
@@ -281,13 +292,27 @@ pub fn create_document_folder(
 pub fn create_document(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
+    company_id: Option<u64>,
     params: CreateDocumentParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "create")?;
+    check_permission(ctx, organization_id, "document", "create")?;
+
+    // Validate folder belongs to this org if specified
+    if let Some(fid) = params.folder_id {
+        let folder = ctx
+            .db
+            .doc_folder()
+            .id()
+            .find(&fid)
+            .ok_or("Folder not found")?;
+        if folder.organization_id != organization_id {
+            return Err("Folder does not belong to this organization".to_string());
+        }
+    }
 
     let doc = ctx.db.document().insert(Document {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         file_name: params.file_name.clone(),
@@ -302,7 +327,7 @@ pub fn create_document(
         res_name: None,
         partner_id: params.partner_id,
         owner_id: ctx.sender(),
-        company_id: Some(company_id),
+        company_id,
         folder_id: params.folder_id,
         tag_ids: params.tag_ids,
         is_locked: false,
@@ -373,7 +398,7 @@ pub fn create_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id,
             table_name: "document",
             record_id: doc_id,
             action: "CREATE",
@@ -393,11 +418,10 @@ pub fn create_document(
 pub fn add_document_version(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     document_id: u64,
     params: AddDocumentVersionParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "write")?;
+    check_permission(ctx, organization_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -405,6 +429,10 @@ pub fn add_document_version(
         .id()
         .find(&document_id)
         .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
 
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
         return Err("Document is locked by another user".to_string());
@@ -451,7 +479,7 @@ pub fn add_document_version(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: None,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -475,10 +503,9 @@ pub fn add_document_version(
 pub fn lock_document(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "write")?;
+    check_permission(ctx, organization_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -486,6 +513,10 @@ pub fn lock_document(
         .id()
         .find(&document_id)
         .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
 
     if doc.is_locked {
         return Err("Document is already locked".to_string());
@@ -504,7 +535,7 @@ pub fn lock_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: None,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -524,10 +555,9 @@ pub fn lock_document(
 pub fn unlock_document(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "write")?;
+    check_permission(ctx, organization_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -536,8 +566,12 @@ pub fn unlock_document(
         .find(&document_id)
         .ok_or("Document not found")?;
 
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
+
     if doc.locked_by != Some(ctx.sender()) {
-        check_permission(ctx, company_id, "document", "admin")?; // Admins can force-unlock
+        check_permission(ctx, organization_id, "document", "admin")?; // Admins can force-unlock
     }
 
     ctx.db.document().id().update(Document {
@@ -553,7 +587,7 @@ pub fn unlock_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: None,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -573,10 +607,9 @@ pub fn unlock_document(
 pub fn delete_document(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "delete")?;
+    check_permission(ctx, organization_id, "document", "delete")?;
 
     let doc = ctx
         .db
@@ -584,6 +617,10 @@ pub fn delete_document(
         .id()
         .find(&document_id)
         .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
 
     if doc.is_locked {
         return Err("Cannot delete a locked document".to_string());
@@ -616,7 +653,7 @@ pub fn delete_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: None,
             table_name: "document",
             record_id: document_id,
             action: "DELETE",
@@ -636,11 +673,10 @@ pub fn delete_document(
 pub fn update_document(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     document_id: u64,
     params: UpdateDocumentParams,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "write")?;
+    check_permission(ctx, organization_id, "document", "write")?;
 
     let doc = ctx
         .db
@@ -648,6 +684,10 @@ pub fn update_document(
         .id()
         .find(&document_id)
         .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
 
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
         return Err("Document is locked by another user".to_string());
@@ -705,7 +745,7 @@ pub fn update_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: None,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -724,11 +764,10 @@ pub fn update_document(
 #[reducer]
 pub fn record_document_view(
     ctx: &ReducerContext,
-    _organization_id: u64,
-    company_id: u64,
+    organization_id: u64,
     document_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, company_id, "document", "read")?;
+    check_permission(ctx, organization_id, "document", "read")?;
 
     let doc = ctx
         .db
@@ -736,6 +775,10 @@ pub fn record_document_view(
         .id()
         .find(&document_id)
         .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
 
     ctx.db.document().id().update(Document {
         last_viewed_at: Some(ctx.timestamp),

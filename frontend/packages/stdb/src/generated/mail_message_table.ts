@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   model: __t.string(),
   resId: __t.u64().name("res_id"),
   authorId: __t.identity().name("author_id"),

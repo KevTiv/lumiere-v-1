@@ -1,325 +1,267 @@
-// Journal de Bord Types and Configuration
+// Work Notes / Journal de Bord Types
+// A quick-entry system for work observations, notes, and task-related updates
 
-export type JournalMood = "great" | "good" | "neutral" | "challenging" | "difficult"
+export type NoteType =
+  | "observation"    // Something noticed during work
+  | "task-update"    // Progress on a task
+  | "blocker"        // Something preventing progress
+  | "idea"           // Improvement suggestion
+  | "meeting-note"   // Quick meeting capture
+  | "reminder"       // Self-reminder
+  | "question"       // Something to follow up on
+  | "decision"       // Decision made or needed
 
-export type JournalCategory = 
-  | "accomplishment"
-  | "challenge"
-  | "learning"
-  | "collaboration"
-  | "goal"
-  | "feedback"
-  | "idea"
-  | "other"
+export type NotePriority = "low" | "normal" | "high" | "urgent"
 
-export interface JournalPrompt {
-  id: string
-  text: string
-  category: JournalCategory
-  followUp?: string[]
-  aiSuggestions?: string[]
-}
+export type NoteStatus = "active" | "resolved" | "archived"
 
-export interface JournalEntry {
+export interface WorkNote {
   id: string
   userId: string
-  date: string
-  mood: JournalMood
-  responses: JournalResponse[]
+  type: NoteType
+  content: string
+  priority: NotePriority
+  status: NoteStatus
+  linkedTaskId?: string
+  linkedTaskTitle?: string
   tags: string[]
-  isComplete: boolean
+  mentions: string[]  // @mentioned user IDs
   createdAt: string
   updatedAt: string
+  resolvedAt?: string
 }
 
-export interface JournalResponse {
-  promptId: string
-  prompt: string
-  response: string
-  category: JournalCategory
-  timestamp: string
+export interface QuickNoteTemplate {
+  id: string
+  type: NoteType
+  label: string
+  placeholder: string
+  icon: string
+  color: string
+  suggestedTags: string[]
 }
 
-export interface JournalConfig {
+export interface WorkNotesConfig {
   roleId: string
   roleName: string
-  dailyPrompts: JournalPrompt[]
-  weeklyPrompts?: JournalPrompt[]
+  quickTemplates: QuickNoteTemplate[]
   suggestedTags: string[]
-  aiAssistEnabled: boolean
-  voiceInputEnabled: boolean
+  enableVoiceInput: boolean
+  enableTaskLinking: boolean
+  defaultPriority: NotePriority
 }
 
-export interface JournalStats {
-  totalEntries: number
-  currentStreak: number
-  longestStreak: number
-  averageMood: number
-  topCategories: { category: JournalCategory; count: number }[]
-  recentTags: string[]
-  completionRate: number
+// Note type configurations with visual styling
+export const noteTypeConfig: Record<NoteType, { label: string; icon: string; color: string; bgColor: string }> = {
+  observation: {
+    label: "Observation",
+    icon: "eye",
+    color: "text-blue-600",
+    bgColor: "bg-blue-500/10 border-blue-500/20"
+  },
+  "task-update": {
+    label: "Task Update",
+    icon: "check-circle",
+    color: "text-green-600",
+    bgColor: "bg-green-500/10 border-green-500/20"
+  },
+  blocker: {
+    label: "Blocker",
+    icon: "alert-triangle",
+    color: "text-red-600",
+    bgColor: "bg-red-500/10 border-red-500/20"
+  },
+  idea: {
+    label: "Idea",
+    icon: "lightbulb",
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-500/10 border-yellow-500/20"
+  },
+  "meeting-note": {
+    label: "Meeting Note",
+    icon: "users",
+    color: "text-purple-600",
+    bgColor: "bg-purple-500/10 border-purple-500/20"
+  },
+  reminder: {
+    label: "Reminder",
+    icon: "bell",
+    color: "text-orange-600",
+    bgColor: "bg-orange-500/10 border-orange-500/20"
+  },
+  question: {
+    label: "Question",
+    icon: "help-circle",
+    color: "text-teal-600",
+    bgColor: "bg-teal-500/10 border-teal-500/20"
+  },
+  decision: {
+    label: "Decision",
+    icon: "git-branch",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-500/10 border-indigo-500/20"
+  },
 }
 
-// Role-based journal configurations
-export const journalConfigs: Record<string, JournalConfig> = {
+export const priorityConfig: Record<NotePriority, { label: string; color: string; dotColor: string }> = {
+  low: { label: "Low", color: "text-muted-foreground", dotColor: "bg-muted-foreground" },
+  normal: { label: "Normal", color: "text-foreground", dotColor: "bg-foreground" },
+  high: { label: "High", color: "text-orange-600", dotColor: "bg-orange-500" },
+  urgent: { label: "Urgent", color: "text-red-600", dotColor: "bg-red-500" },
+}
+
+export const statusConfig: Record<NoteStatus, { label: string; color: string }> = {
+  active: { label: "Active", color: "text-blue-600" },
+  resolved: { label: "Resolved", color: "text-green-600" },
+  archived: { label: "Archived", color: "text-muted-foreground" },
+}
+
+// Role-based configurations
+export const workNotesConfigs: Record<string, WorkNotesConfig> = {
   "role-admin": {
     roleId: "role-admin",
     roleName: "Administrator",
-    suggestedTags: ["system", "security", "team", "planning", "infrastructure"],
-    aiAssistEnabled: true,
-    voiceInputEnabled: true,
-    dailyPrompts: [
-      {
-        id: "admin-1",
-        text: "What system or team decisions did you make today?",
-        category: "accomplishment",
-        followUp: ["What was the impact?", "Who was involved?"],
-        aiSuggestions: ["Approved new user access", "Updated security policies", "Resolved escalated issue"]
-      },
-      {
-        id: "admin-2",
-        text: "Were there any security or compliance concerns today?",
-        category: "challenge",
-        followUp: ["How did you address it?", "What preventive measures are needed?"],
-        aiSuggestions: ["No concerns today", "Identified potential vulnerability", "Conducted access review"]
-      },
-      {
-        id: "admin-3",
-        text: "What improvements could enhance the team's workflow?",
-        category: "idea",
-        aiSuggestions: ["Automate routine tasks", "Improve documentation", "Streamline approval process"]
-      },
+    suggestedTags: ["system", "security", "policy", "access", "config", "urgent"],
+    enableVoiceInput: true,
+    enableTaskLinking: true,
+    defaultPriority: "normal",
+    quickTemplates: [
+      { id: "admin-obs", type: "observation", label: "System Observation", placeholder: "Noticed something about the system...", icon: "eye", color: "text-blue-600", suggestedTags: ["system", "monitoring"] },
+      { id: "admin-dec", type: "decision", label: "Policy Decision", placeholder: "Decision made regarding...", icon: "git-branch", color: "text-indigo-600", suggestedTags: ["policy", "security"] },
+      { id: "admin-block", type: "blocker", label: "Critical Issue", placeholder: "Blocking issue identified...", icon: "alert-triangle", color: "text-red-600", suggestedTags: ["urgent", "escalation"] },
     ]
   },
   "role-manager": {
     roleId: "role-manager",
     roleName: "Manager",
-    suggestedTags: ["team", "project", "deadline", "meeting", "performance", "planning"],
-    aiAssistEnabled: true,
-    voiceInputEnabled: true,
-    dailyPrompts: [
-      {
-        id: "mgr-1",
-        text: "What progress did your team make today?",
-        category: "accomplishment",
-        followUp: ["Any blockers removed?", "Who contributed most?"],
-        aiSuggestions: ["Completed sprint goals", "Shipped new feature", "Resolved customer escalation"]
-      },
-      {
-        id: "mgr-2",
-        text: "Did you have meaningful 1:1s or team interactions?",
-        category: "collaboration",
-        followUp: ["What was discussed?", "Any follow-up needed?"],
-        aiSuggestions: ["Conducted performance review", "Addressed team concern", "Celebrated team win"]
-      },
-      {
-        id: "mgr-3",
-        text: "What challenges is your team facing?",
-        category: "challenge",
-        aiSuggestions: ["Resource constraints", "Technical debt", "Communication gaps", "Deadline pressure"]
-      },
-      {
-        id: "mgr-4",
-        text: "What did you learn about leadership today?",
-        category: "learning",
-        aiSuggestions: ["Delegation importance", "Active listening", "Conflict resolution"]
-      },
+    suggestedTags: ["team", "project", "deadline", "1on1", "planning", "review"],
+    enableVoiceInput: true,
+    enableTaskLinking: true,
+    defaultPriority: "normal",
+    quickTemplates: [
+      { id: "mgr-meeting", type: "meeting-note", label: "Meeting Note", placeholder: "Key points from meeting...", icon: "users", color: "text-purple-600", suggestedTags: ["meeting", "team"] },
+      { id: "mgr-update", type: "task-update", label: "Team Update", placeholder: "Team progress update...", icon: "check-circle", color: "text-green-600", suggestedTags: ["progress", "milestone"] },
+      { id: "mgr-decision", type: "decision", label: "Project Decision", placeholder: "Decided to...", icon: "git-branch", color: "text-indigo-600", suggestedTags: ["project", "planning"] },
     ]
   },
   "role-sales": {
     roleId: "role-sales",
-    roleName: "Sales Representative",
-    suggestedTags: ["deal", "prospect", "demo", "follow-up", "close", "pipeline", "quota"],
-    aiAssistEnabled: true,
-    voiceInputEnabled: true,
-    dailyPrompts: [
-      {
-        id: "sales-1",
-        text: "How many customer touchpoints did you have today?",
-        category: "accomplishment",
-        followUp: ["Any promising leads?", "Next steps?"],
-        aiSuggestions: ["5 calls, 2 demos", "3 follow-up emails sent", "1 in-person meeting"]
-      },
-      {
-        id: "sales-2",
-        text: "Did you move any deals forward in the pipeline?",
-        category: "accomplishment",
-        followUp: ["Which stage?", "Expected close date?"],
-        aiSuggestions: ["Moved 2 deals to negotiation", "Got verbal commitment", "Sent proposal"]
-      },
-      {
-        id: "sales-3",
-        text: "What objections did you encounter and how did you handle them?",
-        category: "challenge",
-        aiSuggestions: ["Price concern - showed ROI", "Timing issue - created urgency", "Competitor comparison"]
-      },
-      {
-        id: "sales-4",
-        text: "What's your focus for tomorrow?",
-        category: "goal",
-        aiSuggestions: ["Close pending deal", "Schedule 3 demos", "Follow up on proposals"]
-      },
+    roleName: "Sales Rep",
+    suggestedTags: ["prospect", "deal", "follow-up", "demo", "pricing", "competitor"],
+    enableVoiceInput: true,
+    enableTaskLinking: true,
+    defaultPriority: "normal",
+    quickTemplates: [
+      { id: "sales-obs", type: "observation", label: "Customer Insight", placeholder: "Customer mentioned...", icon: "eye", color: "text-blue-600", suggestedTags: ["customer", "insight"] },
+      { id: "sales-update", type: "task-update", label: "Deal Update", placeholder: "Deal status changed...", icon: "check-circle", color: "text-green-600", suggestedTags: ["deal", "pipeline"] },
+      { id: "sales-remind", type: "reminder", label: "Follow-up Reminder", placeholder: "Remember to follow up on...", icon: "bell", color: "text-orange-600", suggestedTags: ["follow-up", "call"] },
     ]
   },
   "role-warehouse": {
     roleId: "role-warehouse",
     roleName: "Warehouse Staff",
-    suggestedTags: ["inventory", "shipment", "safety", "efficiency", "stock", "quality"],
-    aiAssistEnabled: true,
-    voiceInputEnabled: true,
-    dailyPrompts: [
-      {
-        id: "wh-1",
-        text: "How many orders did you process today?",
-        category: "accomplishment",
-        followUp: ["Any delays?", "Peak hours?"],
-        aiSuggestions: ["Processed 50 orders", "All shipments on time", "Handled rush order"]
-      },
-      {
-        id: "wh-2",
-        text: "Were there any inventory discrepancies or issues?",
-        category: "challenge",
-        followUp: ["How was it resolved?", "Root cause?"],
-        aiSuggestions: ["No issues today", "Found miscount in zone B", "Damaged goods reported"]
-      },
-      {
-        id: "wh-3",
-        text: "Any safety observations or near-misses?",
-        category: "feedback",
-        aiSuggestions: ["All clear today", "Spill cleaned promptly", "Equipment maintenance needed"]
-      },
-      {
-        id: "wh-4",
-        text: "What could make tomorrow more efficient?",
-        category: "idea",
-        aiSuggestions: ["Reorganize high-turnover items", "Request additional staff", "Update labeling system"]
-      },
+    suggestedTags: ["inventory", "shipment", "safety", "equipment", "location", "stock"],
+    enableVoiceInput: true,
+    enableTaskLinking: true,
+    defaultPriority: "normal",
+    quickTemplates: [
+      { id: "wh-obs", type: "observation", label: "Inventory Note", placeholder: "Noticed in warehouse...", icon: "eye", color: "text-blue-600", suggestedTags: ["inventory", "stock"] },
+      { id: "wh-block", type: "blocker", label: "Issue Report", placeholder: "Problem with...", icon: "alert-triangle", color: "text-red-600", suggestedTags: ["safety", "equipment"] },
+      { id: "wh-update", type: "task-update", label: "Task Complete", placeholder: "Completed...", icon: "check-circle", color: "text-green-600", suggestedTags: ["shipment", "processing"] },
     ]
   },
   "role-viewer": {
     roleId: "role-viewer",
     roleName: "Viewer",
-    suggestedTags: ["review", "analysis", "report", "insight", "observation"],
-    aiAssistEnabled: true,
-    voiceInputEnabled: true,
-    dailyPrompts: [
-      {
-        id: "viewer-1",
-        text: "What data or reports did you review today?",
-        category: "accomplishment",
-        aiSuggestions: ["Reviewed sales dashboard", "Analyzed inventory trends", "Checked performance metrics"]
-      },
-      {
-        id: "viewer-2",
-        text: "Did you notice any interesting patterns or anomalies?",
-        category: "learning",
-        aiSuggestions: ["Seasonal trend emerging", "Unusual spike in orders", "Cost variance identified"]
-      },
-      {
-        id: "viewer-3",
-        text: "What insights would you share with the team?",
-        category: "idea",
-        aiSuggestions: ["Opportunity in segment X", "Process improvement needed", "Positive trend to highlight"]
-      },
+    suggestedTags: ["report", "data", "analysis", "question", "insight"],
+    enableVoiceInput: true,
+    enableTaskLinking: false,
+    defaultPriority: "low",
+    quickTemplates: [
+      { id: "view-obs", type: "observation", label: "Data Observation", placeholder: "Noticed in the data...", icon: "eye", color: "text-blue-600", suggestedTags: ["data", "trend"] },
+      { id: "view-question", type: "question", label: "Question", placeholder: "Need clarification on...", icon: "help-circle", color: "text-teal-600", suggestedTags: ["question", "clarify"] },
+      { id: "view-idea", type: "idea", label: "Suggestion", placeholder: "It would be helpful if...", icon: "lightbulb", color: "text-yellow-600", suggestedTags: ["suggestion", "improvement"] },
     ]
   },
 }
 
-// Default journal config for unknown roles
-export const defaultJournalConfig: JournalConfig = {
+export const defaultWorkNotesConfig: WorkNotesConfig = {
   roleId: "default",
   roleName: "Team Member",
-  suggestedTags: ["work", "progress", "learning", "teamwork"],
-  aiAssistEnabled: true,
-  voiceInputEnabled: true,
-  dailyPrompts: [
-    {
-      id: "default-1",
-      text: "What did you accomplish today?",
-      category: "accomplishment",
-      aiSuggestions: ["Completed assigned tasks", "Made progress on project", "Helped a colleague"]
-    },
-    {
-      id: "default-2",
-      text: "What challenges did you face?",
-      category: "challenge",
-      aiSuggestions: ["Technical issue", "Time constraint", "Communication gap"]
-    },
-    {
-      id: "default-3",
-      text: "What did you learn?",
-      category: "learning",
-      aiSuggestions: ["New skill", "Process improvement", "Industry insight"]
-    },
+  suggestedTags: ["work", "task", "note", "follow-up"],
+  enableVoiceInput: true,
+  enableTaskLinking: true,
+  defaultPriority: "normal",
+  quickTemplates: [
+    { id: "def-obs", type: "observation", label: "Observation", placeholder: "I noticed...", icon: "eye", color: "text-blue-600", suggestedTags: ["observation"] },
+    { id: "def-update", type: "task-update", label: "Task Update", placeholder: "Progress on...", icon: "check-circle", color: "text-green-600", suggestedTags: ["progress"] },
+    { id: "def-idea", type: "idea", label: "Idea", placeholder: "What if we...", icon: "lightbulb", color: "text-yellow-600", suggestedTags: ["idea"] },
   ]
 }
 
-// Mood options with labels and colors
-export const moodOptions: { value: JournalMood; label: string; emoji: string; color: string }[] = [
-  { value: "great", label: "Great", emoji: "star", color: "text-green-500" },
-  { value: "good", label: "Good", emoji: "smile", color: "text-teal-500" },
-  { value: "neutral", label: "Neutral", emoji: "meh", color: "text-yellow-500" },
-  { value: "challenging", label: "Challenging", emoji: "frown", color: "text-orange-500" },
-  { value: "difficult", label: "Difficult", emoji: "cloud", color: "text-red-500" },
-]
-
-// Category labels and icons
-export const categoryLabels: Record<JournalCategory, { label: string; icon: string; color: string }> = {
-  accomplishment: { label: "Accomplishment", icon: "trophy", color: "text-green-500" },
-  challenge: { label: "Challenge", icon: "mountain", color: "text-orange-500" },
-  learning: { label: "Learning", icon: "lightbulb", color: "text-yellow-500" },
-  collaboration: { label: "Collaboration", icon: "users", color: "text-blue-500" },
-  goal: { label: "Goal", icon: "target", color: "text-purple-500" },
-  feedback: { label: "Feedback", icon: "message-circle", color: "text-teal-500" },
-  idea: { label: "Idea", icon: "sparkles", color: "text-pink-500" },
-  other: { label: "Other", icon: "file-text", color: "text-muted-foreground" },
-}
-
-// Sample journal entries for demo
-export const sampleJournalEntries: JournalEntry[] = [
+// Sample notes for demo
+export const sampleWorkNotes: WorkNote[] = [
   {
-    id: "entry-1",
+    id: "note-1",
     userId: "user-3",
-    date: "2024-03-13",
-    mood: "great",
-    responses: [
-      {
-        promptId: "sales-1",
-        prompt: "How many customer touchpoints did you have today?",
-        response: "Had 8 customer calls today, including 2 product demos. One enterprise prospect is very interested.",
-        category: "accomplishment",
-        timestamp: "2024-03-13T17:30:00Z"
-      },
-      {
-        promptId: "sales-2",
-        prompt: "Did you move any deals forward in the pipeline?",
-        response: "Moved the Acme Corp deal to final negotiation stage. Expecting to close by end of week.",
-        category: "accomplishment",
-        timestamp: "2024-03-13T17:32:00Z"
-      },
-    ],
-    tags: ["deal", "demo", "enterprise"],
-    isComplete: true,
-    createdAt: "2024-03-13T17:30:00Z",
-    updatedAt: "2024-03-13T17:35:00Z"
+    type: "observation",
+    content: "Customer ABC Corp asked about bulk pricing during demo. Seems interested in enterprise tier.",
+    priority: "high",
+    status: "active",
+    tags: ["customer", "pricing", "enterprise"],
+    mentions: [],
+    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
   },
   {
-    id: "entry-2",
+    id: "note-2",
     userId: "user-3",
-    date: "2024-03-12",
-    mood: "good",
-    responses: [
-      {
-        promptId: "sales-1",
-        prompt: "How many customer touchpoints did you have today?",
-        response: "5 calls and 3 email follow-ups. Quiet day but made good progress on proposals.",
-        category: "accomplishment",
-        timestamp: "2024-03-12T18:00:00Z"
-      },
-    ],
-    tags: ["follow-up", "proposal"],
-    isComplete: false,
-    createdAt: "2024-03-12T18:00:00Z",
-    updatedAt: "2024-03-12T18:05:00Z"
+    type: "task-update",
+    content: "Sent follow-up proposal to XYZ Inc. Waiting for their legal team review.",
+    priority: "normal",
+    status: "active",
+    linkedTaskId: "TASK-123",
+    linkedTaskTitle: "Close XYZ Inc Deal",
+    tags: ["deal", "proposal", "follow-up"],
+    mentions: [],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+  },
+  {
+    id: "note-3",
+    userId: "user-3",
+    type: "reminder",
+    content: "Call back John from Acme Corp tomorrow at 10am - he's interested in the Q2 promotion.",
+    priority: "high",
+    status: "active",
+    tags: ["call", "follow-up", "promotion"],
+    mentions: [],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), // 4 hours ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+  },
+  {
+    id: "note-4",
+    userId: "user-4",
+    type: "blocker",
+    content: "Forklift in Zone B needs maintenance - hydraulic leak detected. Tagged area as restricted.",
+    priority: "urgent",
+    status: "resolved",
+    tags: ["safety", "equipment", "maintenance"],
+    mentions: ["user-2"],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    resolvedAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+  },
+  {
+    id: "note-5",
+    userId: "user-2",
+    type: "meeting-note",
+    content: "Weekly sync: Team agreed to prioritize inventory reconciliation this week. Sarah to lead audit of Zone A.",
+    priority: "normal",
+    status: "active",
+    tags: ["meeting", "team", "inventory"],
+    mentions: ["user-4"],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
   },
 ]

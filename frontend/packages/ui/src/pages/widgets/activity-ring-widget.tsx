@@ -46,9 +46,9 @@ const bgColors = {
 
 export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
   const size = data.size || "md"
-  const baseSize = size === "sm" ? 120 : size === "md" ? 160 : 200
+  const baseSize = size === "sm" ? 150 : size === "md" ? 180 : 220
   const strokeWidth = size === "sm" ? 10 : size === "md" ? 12 : 14
-  const gap = 4
+  const gap = 6
 
   return (
     <div className="flex flex-col lg:flex-row items-center gap-6">
@@ -98,7 +98,7 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
 
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold">
+          <span className={cn("font-bold", size === "sm" ? "text-xl" : "text-2xl")}>
             {Math.round((data.rings.reduce((acc, r) => acc + r.value, 0) / data.rings.reduce((acc, r) => acc + r.max, 0)) * 100)}%
           </span>
           <span className="text-xs text-muted-foreground">Complete</span>

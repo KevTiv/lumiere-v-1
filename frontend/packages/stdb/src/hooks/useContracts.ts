@@ -1,13 +1,13 @@
 import { queryContracts, type HrContract } from "../queries/hr";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { HrContract };
 
-export function useContracts(companyId: bigint) {
+export function useContracts(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["hr-contracts", companyId.toString()];
+  const queryKey = useMemo(() => ["hr-contracts", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useContracts(companyId: bigint) {
     conn.db.hr_contract.onInsert((_ctx, _row) => reload());
     conn.db.hr_contract.onUpdate((_ctx, _old, _new) => reload());
     conn.db.hr_contract.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryContracts, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryContracts,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

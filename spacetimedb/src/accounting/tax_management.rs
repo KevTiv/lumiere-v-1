@@ -15,6 +15,7 @@ use crate::types::{TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse
 #[spacetimedb::table(
     accessor = account_tax,
     public,
+    index(accessor = account_tax_by_org, btree(columns = [organization_id])),
     index(accessor = tax_by_company, btree(columns = [company_id])),
     index(accessor = tax_by_sequence, btree(columns = [sequence])),
     index(accessor = tax_by_country, btree(columns = [country_id]))
@@ -24,6 +25,8 @@ pub struct AccountTax {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub type_tax_use: TaxTypeUse,
@@ -52,6 +55,7 @@ pub struct AccountTax {
 #[spacetimedb::table(
     accessor = account_tax_group,
     public,
+    index(accessor = account_tax_group_by_org, btree(columns = [organization_id])),
     index(accessor = tax_group_by_company, btree(columns = [company_id])),
     index(accessor = tax_group_by_sequence, btree(columns = [sequence]))
 )]
@@ -60,6 +64,8 @@ pub struct AccountTaxGroup {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub sequence: u32,
     pub company_id: u64,
@@ -77,6 +83,7 @@ pub struct AccountTaxGroup {
 #[spacetimedb::table(
     accessor = tax_jurisdiction,
     public,
+    index(accessor = tax_jurisdiction_by_org, btree(columns = [organization_id])),
     index(accessor = jurisdiction_by_country, btree(columns = [country_code])),
     index(accessor = jurisdiction_by_state, btree(columns = [state_code]))
 )]
@@ -85,6 +92,8 @@ pub struct TaxJurisdiction {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub code: String,
     pub country_code: String,
@@ -104,6 +113,7 @@ pub struct TaxJurisdiction {
 #[spacetimedb::table(
     accessor = tax_schedule,
     public,
+    index(accessor = tax_schedule_by_org, btree(columns = [organization_id])),
     index(accessor = schedule_by_jurisdiction, btree(columns = [jurisdiction_id])),
     index(accessor = schedule_by_company, btree(columns = [company_id]))
 )]
@@ -112,6 +122,8 @@ pub struct TaxSchedule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub jurisdiction_id: Option<u64>,
@@ -374,6 +386,7 @@ pub fn create_account_tax_group(
 
     let group = ctx.db.account_tax_group().insert(AccountTaxGroup {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         sequence: params.sequence,
         company_id,
@@ -529,6 +542,7 @@ pub fn create_account_tax(
 
     let tax = ctx.db.account_tax().insert(AccountTax {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description,
         type_tax_use: params.type_tax_use,
@@ -693,6 +707,7 @@ pub fn create_tax_jurisdiction(
 
     let jurisdiction = ctx.db.tax_jurisdiction().insert(TaxJurisdiction {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         code: params.code.clone(),
         country_code: params.country_code,
@@ -843,6 +858,7 @@ pub fn create_tax_schedule(
 
     let schedule = ctx.db.tax_schedule().insert(TaxSchedule {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description,
         jurisdiction_id: params.jurisdiction_id,

@@ -4,157 +4,291 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Progress } from "@/components/ui/progress"
 import { useRBAC } from "@/lib/rbac-context"
 import {
   X,
   Mic,
   MicOff,
   Send,
-  ChevronRight,
-  ChevronLeft,
-  Calendar,
-  Star,
-  Smile,
-  Meh,
-  Frown,
-  Cloud,
-  Trophy,
-  Mountain,
+  Eye,
+  CheckCircle,
+  AlertTriangle,
   Lightbulb,
   Users,
-  Target,
-  MessageCircle,
-  Sparkles,
-  FileText,
+  Bell,
+  HelpCircle,
+  GitBranch,
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
   Clock,
-  TrendingUp,
-  CheckCircle,
+  Tag,
+  Link2,
+  Archive,
+  CheckCircle2,
   Circle,
-  Flame,
-  BookOpen,
-  History,
-  PenLine,
-  Wand2,
+  Trash2,
+  StickyNote,
+  Move,
+  Minus,
+  Minimize2,
+  Maximize2,
 } from "lucide-react"
 import {
-  journalConfigs,
-  defaultJournalConfig,
-  moodOptions,
-  categoryLabels,
-  sampleJournalEntries,
-  type JournalEntry,
-  type JournalPrompt,
-  type JournalMood,
-  type JournalResponse,
-  type JournalConfig,
-  type JournalCategory,
+  workNotesConfigs,
+  defaultWorkNotesConfig,
+  noteTypeConfig,
+  priorityConfig,
+  statusConfig,
+  sampleWorkNotes,
+  type WorkNote,
+  type NoteType,
+  type NotePriority,
+  type NoteStatus,
+  type WorkNotesConfig,
 } from "@/lib/journal-types"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+interface Position {
+  x: number
+  y: number
+}
+
+interface Size {
+  width: number
+  height: number
+}
+
+const MIN_WIDTH = 360
+const MIN_HEIGHT = 320
+const DEFAULT_WIDTH = 480
+const DEFAULT_HEIGHT = 580
 
 interface JournalPanelProps {
   open: boolean
   onClose: () => void
 }
 
-const moodIcons: Record<JournalMood, React.ReactNode> = {
-  great: <Star className="h-5 w-5" />,
-  good: <Smile className="h-5 w-5" />,
-  neutral: <Meh className="h-5 w-5" />,
-  challenging: <Frown className="h-5 w-5" />,
-  difficult: <Cloud className="h-5 w-5" />,
+const noteTypeIcons: Record<NoteType, React.ReactNode> = {
+  observation: <Eye className="h-4 w-4" />,
+  "task-update": <CheckCircle className="h-4 w-4" />,
+  blocker: <AlertTriangle className="h-4 w-4" />,
+  idea: <Lightbulb className="h-4 w-4" />,
+  "meeting-note": <Users className="h-4 w-4" />,
+  reminder: <Bell className="h-4 w-4" />,
+  question: <HelpCircle className="h-4 w-4" />,
+  decision: <GitBranch className="h-4 w-4" />,
 }
 
-const categoryIcons: Record<JournalCategory, React.ReactNode> = {
-  accomplishment: <Trophy className="h-4 w-4" />,
-  challenge: <Mountain className="h-4 w-4" />,
-  learning: <Lightbulb className="h-4 w-4" />,
-  collaboration: <Users className="h-4 w-4" />,
-  goal: <Target className="h-4 w-4" />,
-  feedback: <MessageCircle className="h-4 w-4" />,
-  idea: <Sparkles className="h-4 w-4" />,
-  other: <FileText className="h-4 w-4" />,
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 1) return "Just now"
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
 }
 
 export function JournalPanel({ open, onClose }: JournalPanelProps) {
-  const { currentUser, roles } = useRBAC()
-  const [view, setView] = useState<"entry" | "history" | "insights">("entry")
-  const [currentPromptIndex, setCurrentPromptIndex] = useState(0)
-  const [selectedMood, setSelectedMood] = useState<JournalMood | null>(null)
-  const [responses, setResponses] = useState<Map<string, string>>(new Map())
-  const [currentInput, setCurrentInput] = useState("")
+  const { currentUser } = useRBAC()
+  const [notes, setNotes] = useState<WorkNote[]>(sampleWorkNotes)
+  const [isComposing, setIsComposing] = useState(false)
+  const [selectedType, setSelectedType] = useState<NoteType>("observation")
+  const [content, setContent] = useState("")
+  const [priority, setPriority] = useState<NotePriority>("normal")
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
+  const [linkedTaskId, setLinkedTaskId] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterType, setFilterType] = useState<NoteType | "all">("all")
+  const [filterStatus, setFilterStatus] = useState<NoteStatus | "all">("all")
   const [isRecording, setIsRecording] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [entries, setEntries] = useState<JournalEntry[]>(sampleJournalEntries)
-  const [predictiveText, setPredictiveText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  // Floating panel state
+  const [position, setPosition] = useState<Position>({ x: -1, y: -1 })
+  const [size, setSize] = useState<Size>({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState<string | null>(null)
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(false)
+  const [prevState, setPrevState] = useState<{ position: Position; size: Size } | null>(null)
+
+  const panelRef = useRef<HTMLDivElement>(null)
+  const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number }>({ x: 0, y: 0, posX: 0, posY: 0 })
+  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; posX: number; posY: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 })
 
   // Get role-based config
   const userRoleId = currentUser?.roles[0] || "default"
-  const config: JournalConfig = journalConfigs[userRoleId] || defaultJournalConfig
-  const prompts = config.dailyPrompts
-  const currentPrompt = prompts[currentPromptIndex]
+  const config: WorkNotesConfig = workNotesConfigs[userRoleId] || defaultWorkNotesConfig
 
-  // Calculate stats
-  const stats = {
-    totalEntries: entries.length,
-    currentStreak: 2,
-    completionRate: Math.round((responses.size / prompts.length) * 100),
+  // Filter notes
+  const filteredNotes = notes.filter((note) => {
+    if (filterType !== "all" && note.type !== filterType) return false
+    if (filterStatus !== "all" && note.status !== filterStatus) return false
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        note.content.toLowerCase().includes(query) ||
+        note.tags.some((t) => t.toLowerCase().includes(query))
+      )
+    }
+    return true
+  })
+
+  // Initialize position on first open
+  useEffect(() => {
+    if (open && position.x === -1) {
+      setPosition({
+        x: window.innerWidth - DEFAULT_WIDTH - 24,
+        y: 80,
+      })
+    }
+  }, [open, position.x])
+
+  // Drag handlers
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (isMaximized) return
+    e.preventDefault()
+    setIsDragging(true)
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: position.x,
+      posY: position.y,
+    }
+  }, [position, isMaximized])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const dx = e.clientX - dragStartRef.current.x
+        const dy = e.clientY - dragStartRef.current.y
+        const newX = Math.max(0, Math.min(window.innerWidth - size.width, dragStartRef.current.posX + dx))
+        const newY = Math.max(0, Math.min(window.innerHeight - 60, dragStartRef.current.posY + dy))
+        setPosition({ x: newX, y: newY })
+      }
+
+      if (isResizing) {
+        const dx = e.clientX - resizeStartRef.current.x
+        const dy = e.clientY - resizeStartRef.current.y
+
+        let newWidth = resizeStartRef.current.width
+        let newHeight = resizeStartRef.current.height
+        let newX = position.x
+        let newY = position.y
+
+        if (isResizing.includes("e")) newWidth = Math.max(MIN_WIDTH, resizeStartRef.current.width + dx)
+        if (isResizing.includes("w")) {
+          const widthDelta = Math.min(dx, resizeStartRef.current.width - MIN_WIDTH)
+          newWidth = resizeStartRef.current.width - widthDelta
+          newX = resizeStartRef.current.posX + widthDelta
+        }
+        if (isResizing.includes("s")) newHeight = Math.max(MIN_HEIGHT, resizeStartRef.current.height + dy)
+        if (isResizing.includes("n")) {
+          const heightDelta = Math.min(dy, resizeStartRef.current.height - MIN_HEIGHT)
+          newHeight = resizeStartRef.current.height - heightDelta
+          newY = resizeStartRef.current.posY + heightDelta
+        }
+
+        setSize({ width: newWidth, height: newHeight })
+        if (isResizing.includes("w") || isResizing.includes("n")) {
+          setPosition({ x: newX, y: newY })
+        }
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      setIsResizing(null)
+    }
+
+    if (isDragging || isResizing) {
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
+    }
+  }, [isDragging, isResizing, size.width, position.x, position.y])
+
+  const handleResizeStart = useCallback((direction: string) => (e: React.MouseEvent) => {
+    if (isMaximized) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(direction)
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: size.width,
+      height: size.height,
+      posX: position.x,
+      posY: position.y,
+    }
+  }, [size, position, isMaximized])
+
+  const toggleMaximize = () => {
+    if (isMaximized) {
+      if (prevState) {
+        setPosition(prevState.position)
+        setSize(prevState.size)
+      }
+      setIsMaximized(false)
+    } else {
+      setPrevState({ position, size })
+      setPosition({ x: 20, y: 20 })
+      setSize({ width: window.innerWidth - 40, height: window.innerHeight - 40 })
+      setIsMaximized(true)
+    }
+    setIsMinimized(false)
+  }
+
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized)
+    setIsMaximized(false)
   }
 
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SpeechRecognitionClass = (window as any).webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognitionClass()
+      const SpeechRecognition = window.webkitSpeechRecognition
+      recognitionRef.current = new SpeechRecognition()
       recognitionRef.current.continuous = true
       recognitionRef.current.interimResults = true
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event) => {
         let transcript = ""
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript
         }
-        setCurrentInput((prev) => prev + " " + transcript)
+        setContent((prev) => prev + " " + transcript)
       }
 
-      recognitionRef.current.onerror = () => {
-        setIsRecording(false)
-      }
-
-      recognitionRef.current.onend = () => {
-        setIsRecording(false)
-      }
+      recognitionRef.current.onerror = () => setIsRecording(false)
+      recognitionRef.current.onend = () => setIsRecording(false)
     }
   }, [])
 
-  // Predictive text based on AI suggestions
-  useEffect(() => {
-    if (currentInput.length > 3 && currentPrompt?.aiSuggestions) {
-      const input = currentInput.toLowerCase()
-      const match = currentPrompt.aiSuggestions.find((s) =>
-        s.toLowerCase().startsWith(input)
-      )
-      if (match && match.toLowerCase() !== input) {
-        setPredictiveText(match)
-      } else {
-        setPredictiveText("")
-      }
-    } else {
-      setPredictiveText("")
-    }
-  }, [currentInput, currentPrompt])
-
   const toggleRecording = useCallback(() => {
     if (!recognitionRef.current) return
-
     if (isRecording) {
       recognitionRef.current.stop()
       setIsRecording(false)
@@ -164,539 +298,488 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
     }
   }, [isRecording])
 
-  const handleSuggestionClick = (suggestion: string) => {
-    setCurrentInput(suggestion)
-    setShowSuggestions(false)
-    textareaRef.current?.focus()
-  }
-
-  const handleAcceptPredictive = () => {
-    if (predictiveText) {
-      setCurrentInput(predictiveText)
-      setPredictiveText("")
+  const handleAddTag = (tag: string) => {
+    const trimmed = tag.trim().toLowerCase()
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed])
     }
+    setTagInput("")
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Tab" && predictiveText) {
-      e.preventDefault()
-      handleAcceptPredictive()
-    } else if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmitResponse()
-    }
+  const handleRemoveTag = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag))
   }
 
-  const handleSubmitResponse = () => {
-    if (!currentInput.trim() || !currentPrompt) return
+  const handleSubmit = () => {
+    if (!content.trim()) return
 
-    const newResponses = new Map(responses)
-    newResponses.set(currentPrompt.id, currentInput.trim())
-    setResponses(newResponses)
-    setCurrentInput("")
-    setPredictiveText("")
-
-    // Auto-advance to next prompt
-    if (currentPromptIndex < prompts.length - 1) {
-      setCurrentPromptIndex(currentPromptIndex + 1)
-    }
-  }
-
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    )
-  }
-
-  const handleSaveEntry = () => {
-    if (!selectedMood || responses.size === 0) return
-
-    const newEntry: JournalEntry = {
-      id: `entry-${Date.now()}`,
+    const newNote: WorkNote = {
+      id: `note-${Date.now()}`,
       userId: currentUser?.id || "unknown",
-      date: new Date().toISOString().split("T")[0],
-      mood: selectedMood,
-      responses: Array.from(responses.entries()).map(([promptId, response]) => {
-        const prompt = prompts.find((p) => p.id === promptId)
-        return {
-          promptId,
-          prompt: prompt?.text || "",
-          response,
-          category: prompt?.category || "other",
-          timestamp: new Date().toISOString(),
-        }
-      }),
-      tags: selectedTags,
-      isComplete: responses.size === prompts.length,
+      type: selectedType,
+      content: content.trim(),
+      priority,
+      status: "active",
+      linkedTaskId: linkedTaskId || undefined,
+      linkedTaskTitle: linkedTaskId ? `Task ${linkedTaskId}` : undefined,
+      tags,
+      mentions: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
 
-    setEntries([newEntry, ...entries])
-    // Reset form
-    setResponses(new Map())
-    setSelectedMood(null)
-    setSelectedTags([])
-    setCurrentPromptIndex(0)
-    setView("history")
+    setNotes([newNote, ...notes])
+    resetForm()
+  }
+
+  const resetForm = () => {
+    setContent("")
+    setPriority(config.defaultPriority)
+    setTags([])
+    setLinkedTaskId("")
+    setIsComposing(false)
+  }
+
+  const handleUpdateStatus = (noteId: string, newStatus: NoteStatus) => {
+    setNotes(notes.map((note) => {
+      if (note.id === noteId) {
+        return {
+          ...note,
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+          resolvedAt: newStatus === "resolved" ? new Date().toISOString() : note.resolvedAt,
+        }
+      }
+      return note
+    }))
+  }
+
+  const handleDeleteNote = (noteId: string) => {
+    setNotes(notes.filter((note) => note.id !== noteId))
+  }
+
+  const handleQuickNote = (type: NoteType) => {
+    setSelectedType(type)
+    setIsComposing(true)
+    setTimeout(() => textareaRef.current?.focus(), 100)
   }
 
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <Card className="w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl border-border/50">
-        {/* Header */}
-        <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Journal de Bord</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {config.roleName} - {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* View switcher */}
-            <div className="flex items-center rounded-lg bg-muted p-1">
-              <Button
-                variant={view === "entry" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setView("entry")}
-                className="h-7 px-3 text-xs"
-              >
-                <PenLine className="h-3.5 w-3.5 mr-1.5" />
-                Write
-              </Button>
-              <Button
-                variant={view === "history" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setView("history")}
-                className="h-7 px-3 text-xs"
-              >
-                <History className="h-3.5 w-3.5 mr-1.5" />
-                History
-              </Button>
-              <Button
-                variant={view === "insights" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setView("insights")}
-                className="h-7 px-3 text-xs"
-              >
-                <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-                Insights
-              </Button>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
+    <div
+      ref={panelRef}
+      className={cn(
+        "fixed bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden",
+        "transition-shadow duration-200",
+        isDragging && "shadow-2xl shadow-amber-500/20",
+        isMinimized && "!h-auto"
+      )}
+      style={{
+        left: position.x,
+        top: position.y,
+        width: isMinimized ? 320 : size.width,
+        height: isMinimized ? "auto" : size.height,
+      }}
+    >
+      {/* Resize handles */}
+      {!isMinimized && !isMaximized && (
+        <>
+          <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize z-10" onMouseDown={handleResizeStart("nw")} />
+          <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize z-10" onMouseDown={handleResizeStart("ne")} />
+          <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize z-10" onMouseDown={handleResizeStart("sw")} />
+          <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize z-10" onMouseDown={handleResizeStart("se")} />
+          <div className="absolute top-0 left-3 right-3 h-1 cursor-n-resize" onMouseDown={handleResizeStart("n")} />
+          <div className="absolute bottom-0 left-3 right-3 h-1 cursor-s-resize" onMouseDown={handleResizeStart("s")} />
+          <div className="absolute left-0 top-3 bottom-3 w-1 cursor-w-resize" onMouseDown={handleResizeStart("w")} />
+          <div className="absolute right-0 top-3 bottom-3 w-1 cursor-e-resize" onMouseDown={handleResizeStart("e")} />
+        </>
+      )}
 
-        <CardContent className="flex-1 overflow-hidden p-0">
-          {view === "entry" && (
-            <div className="flex flex-col h-full">
-              {/* Mood selector */}
-              {!selectedMood ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <h3 className="text-lg font-medium mb-2">How was your day?</h3>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Start by selecting how you&apos;re feeling
-                  </p>
-                  <div className="flex items-center gap-3">
-                    {moodOptions.map((mood) => (
+      {/* Header */}
+      <div
+        className={cn(
+          "flex items-center justify-between px-2 py-2 border-b border-border bg-card/50 select-none shrink-0",
+          isMinimized && "border-b-0"
+        )}
+      >
+        <div className="flex items-center gap-1.5">
+          {/* Drag handle */}
+          <button
+            title="Drag to move"
+            onMouseDown={handleDragStart}
+            className={cn(
+              "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0",
+              "hover:bg-muted text-muted-foreground hover:text-foreground",
+              isDragging ? "bg-primary/10 text-primary cursor-grabbing" : "cursor-grab"
+            )}
+          >
+            <Move className="h-3.5 w-3.5" />
+          </button>
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shrink-0">
+            <StickyNote className="h-3 w-3 text-white" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold truncate">Work Notes</h2>
+            {!isMinimized && (
+              <p className="text-[10px] text-muted-foreground truncate">Quick notes, observations & updates</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title="Minimize">
+            <Minus className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? "Restore" : "Maximize"}>
+            {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title="Close">
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Panel body — hidden when minimized */}
+      {!isMinimized && (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Quick action bar */}
+          <div className="px-4 py-3 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-medium text-muted-foreground">Quick add:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {config.quickTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => handleQuickNote(template.type)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border transition-colors",
+                      noteTypeConfig[template.type].bgColor,
+                      "hover:opacity-80"
+                    )}
+                  >
+                    {noteTypeIcons[template.type]}
+                    <span>{template.label}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setIsComposing(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Other</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Search and filter */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search notes..."
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                    <Filter className="h-3 w-3" />
+                    Filter
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Type</div>
+                  <DropdownMenuItem onClick={() => setFilterType("all")}>
+                    <Circle className={cn("h-3 w-3 mr-2", filterType === "all" && "text-primary")} />
+                    All Types
+                  </DropdownMenuItem>
+                  {Object.entries(noteTypeConfig).map(([type, config]) => (
+                    <DropdownMenuItem key={type} onClick={() => setFilterType(type as NoteType)}>
+                      <span className={cn("mr-2", config.color)}>{noteTypeIcons[type as NoteType]}</span>
+                      {config.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Status</div>
+                  <DropdownMenuItem onClick={() => setFilterStatus("all")}>
+                    <Circle className={cn("h-3 w-3 mr-2", filterStatus === "all" && "text-primary")} />
+                    All Status
+                  </DropdownMenuItem>
+                  {Object.entries(statusConfig).map(([status, config]) => (
+                    <DropdownMenuItem key={status} onClick={() => setFilterStatus(status as NoteStatus)}>
+                      <span className={cn("h-3 w-3 mr-2", config.color)}>
+                        {status === "active" ? <Circle className="h-3 w-3" /> :
+                          status === "resolved" ? <CheckCircle2 className="h-3 w-3" /> :
+                            <Archive className="h-3 w-3" />}
+                      </span>
+                      {config.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Compose area */}
+          {isComposing && (
+            <div className="px-4 py-3 border-b border-border bg-card">
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                  noteTypeConfig[selectedType].bgColor
+                )}>
+                  <span className={noteTypeConfig[selectedType].color}>
+                    {noteTypeIcons[selectedType]}
+                  </span>
+                </div>
+                <div className="flex-1 space-y-2">
+                  {/* Type selector */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {Object.entries(noteTypeConfig).map(([type, typeConfig]) => (
                       <button
-                        key={mood.value}
-                        onClick={() => setSelectedMood(mood.value)}
+                        key={type}
+                        onClick={() => setSelectedType(type as NoteType)}
                         className={cn(
-                          "flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-transparent transition-all",
-                          "hover:border-primary/30 hover:bg-muted/50",
-                          mood.color
+                          "px-2 py-0.5 text-[10px] rounded-full border transition-colors",
+                          selectedType === type
+                            ? cn(typeConfig.bgColor, typeConfig.color, "font-medium")
+                            : "border-border text-muted-foreground hover:border-primary/30"
                         )}
                       >
-                        {moodIcons[mood.value]}
-                        <span className="text-xs font-medium text-foreground">{mood.label}</span>
+                        {typeConfig.label}
                       </button>
                     ))}
                   </div>
+
+                  {/* Content */}
+                  <div className="relative">
+                    <Textarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder={config.quickTemplates.find(t => t.type === selectedType)?.placeholder || "Write your note..."}
+                      rows={3}
+                      className="resize-none text-sm pr-10"
+                      autoFocus
+                    />
+                    {config.enableVoiceInput && (
+                      <Button
+                        variant={isRecording ? "destructive" : "ghost"}
+                        size="icon"
+                        onClick={toggleRecording}
+                        className="absolute right-2 bottom-2 h-7 w-7"
+                      >
+                        {isRecording ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Options row */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Priority */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">Priority:</span>
+                      {Object.entries(priorityConfig).map(([p, pConfig]) => (
+                        <button
+                          key={p}
+                          onClick={() => setPriority(p as NotePriority)}
+                          className={cn(
+                            "w-2 h-2 rounded-full transition-all",
+                            pConfig.dotColor,
+                            priority === p ? "ring-2 ring-offset-1 ring-primary" : "opacity-40 hover:opacity-70"
+                          )}
+                          title={pConfig.label}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <Tag className="h-3 w-3 text-muted-foreground" />
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {tags.map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="text-[10px] px-1.5 py-0 h-5 gap-1 cursor-pointer hover:bg-destructive/20"
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            #{tag}
+                            <X className="h-2 w-2" />
+                          </Badge>
+                        ))}
+                        <Input
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === ",") {
+                              e.preventDefault()
+                              handleAddTag(tagInput)
+                            }
+                          }}
+                          placeholder="add tag"
+                          className="h-5 w-16 text-[10px] px-1.5 border-dashed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Suggested tags */}
+                    <div className="flex items-center gap-1">
+                      {config.suggestedTags.slice(0, 4).map((tag) => (
+                        !tags.includes(tag) && (
+                          <button
+                            key={tag}
+                            onClick={() => handleAddTag(tag)}
+                            className="text-[10px] text-muted-foreground hover:text-foreground"
+                          >
+                            +{tag}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Link to task */}
+                  {config.enableTaskLinking && (
+                    <div className="flex items-center gap-2">
+                      <Link2 className="h-3 w-3 text-muted-foreground" />
+                      <Input
+                        value={linkedTaskId}
+                        onChange={(e) => setLinkedTaskId(e.target.value)}
+                        placeholder="Link to task ID (optional)"
+                        className="h-6 text-[10px] flex-1 max-w-48"
+                      />
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button variant="ghost" size="sm" onClick={resetForm} className="h-7 text-xs">
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSubmit} disabled={!content.trim()} className="h-7 text-xs gap-1.5">
+                      <Send className="h-3 w-3" />
+                      Save Note
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  {/* Progress bar */}
-                  <div className="px-6 py-3 border-b border-border bg-muted/30">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted-foreground">
-                        Question {currentPromptIndex + 1} of {prompts.length}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Flame className="h-3.5 w-3.5 text-orange-500" />
-                        <span className="text-xs font-medium">{stats.currentStreak} day streak</span>
-                      </div>
-                    </div>
-                    <Progress value={(responses.size / prompts.length) * 100} className="h-1.5" />
-                  </div>
-
-                  {/* Prompt area */}
-                  <ScrollArea className="flex-1">
-                    <div className="p-6">
-                      {/* Current prompt */}
-                      <div className="mb-6">
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className={cn("p-2 rounded-lg bg-muted", categoryLabels[currentPrompt.category].color)}>
-                            {categoryIcons[currentPrompt.category]}
-                          </div>
-                          <div className="flex-1">
-                            <Badge variant="outline" className="mb-2 text-[10px]">
-                              {categoryLabels[currentPrompt.category].label}
-                            </Badge>
-                            <h4 className="text-base font-medium leading-relaxed">
-                              {currentPrompt.text}
-                            </h4>
-                          </div>
-                        </div>
-
-                        {/* AI suggestions */}
-                        {config.aiAssistEnabled && currentPrompt.aiSuggestions && (
-                          <div className="mb-4">
-                            <button
-                              onClick={() => setShowSuggestions(!showSuggestions)}
-                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Wand2 className="h-3 w-3" />
-                              <span>AI suggestions</span>
-                              <ChevronRight className={cn("h-3 w-3 transition-transform", showSuggestions && "rotate-90")} />
-                            </button>
-                            {showSuggestions && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {currentPrompt.aiSuggestions.map((suggestion, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                    className="px-3 py-1.5 text-xs rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                                  >
-                                    {suggestion}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Input area with predictive text */}
-                        <div className="relative">
-                          <div className="relative">
-                            <Textarea
-                              ref={textareaRef}
-                              value={currentInput}
-                              onChange={(e) => setCurrentInput(e.target.value)}
-                              onKeyDown={handleKeyDown}
-                              placeholder="Type your response... (Tab to accept suggestion, Enter to submit)"
-                              rows={4}
-                              className="pr-24 resize-none"
-                            />
-                            {/* Predictive text overlay */}
-                            {predictiveText && (
-                              <div className="absolute inset-0 pointer-events-none px-3 py-2 text-sm">
-                                <span className="invisible">{currentInput}</span>
-                                <span className="text-muted-foreground/50">
-                                  {predictiveText.slice(currentInput.length)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                            {config.voiceInputEnabled && (
-                              <Button
-                                variant={isRecording ? "destructive" : "ghost"}
-                                size="icon"
-                                onClick={toggleRecording}
-                                className="h-8 w-8"
-                              >
-                                {isRecording ? (
-                                  <MicOff className="h-4 w-4" />
-                                ) : (
-                                  <Mic className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
-                            <Button
-                              size="icon"
-                              onClick={handleSubmitResponse}
-                              disabled={!currentInput.trim()}
-                              className="h-8 w-8"
-                            >
-                              <Send className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {predictiveText && (
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Press Tab to accept: &quot;{predictiveText}&quot;
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Previous responses */}
-                      {responses.size > 0 && (
-                        <div className="space-y-3 mb-6">
-                          <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Your responses
-                          </h5>
-                          {Array.from(responses.entries()).map(([promptId, response]) => {
-                            const prompt = prompts.find((p) => p.id === promptId)
-                            if (!prompt) return null
-                            return (
-                              <div key={promptId} className="p-3 rounded-lg bg-muted/50 border border-border/50">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <CheckCircle className="h-3 w-3 text-green-500" />
-                                  <span className="text-xs text-muted-foreground">{prompt.text}</span>
-                                </div>
-                                <p className="text-sm pl-5">{response}</p>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* Tags */}
-                      <div className="mb-4">
-                        <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                          Tags
-                        </h5>
-                        <div className="flex flex-wrap gap-2">
-                          {config.suggestedTags.map((tag) => (
-                            <button
-                              key={tag}
-                              onClick={() => handleTagToggle(tag)}
-                              className={cn(
-                                "px-2.5 py-1 text-xs rounded-full border transition-colors",
-                                selectedTags.includes(tag)
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "border-border hover:border-primary/50"
-                              )}
-                            >
-                              #{tag}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </ScrollArea>
-
-                  {/* Navigation and save */}
-                  <div className="px-6 py-4 border-t border-border bg-card flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPromptIndex(Math.max(0, currentPromptIndex - 1))}
-                        disabled={currentPromptIndex === 0}
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPromptIndex(Math.min(prompts.length - 1, currentPromptIndex + 1))}
-                        disabled={currentPromptIndex === prompts.length - 1}
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedMood(null)}
-                      >
-                        Change mood
-                      </Button>
-                      <Button
-                        onClick={handleSaveEntry}
-                        disabled={responses.size === 0}
-                        className="gap-2"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Save Entry
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
+              </div>
             </div>
           )}
 
-          {view === "history" && (
-            <ScrollArea className="h-full">
-              <div className="p-6 space-y-4">
-                {entries.length === 0 ? (
-                  <div className="text-center py-12">
-                    <BookOpen className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                    <p className="text-muted-foreground">No journal entries yet</p>
-                    <Button variant="outline" className="mt-4" onClick={() => setView("entry")}>
-                      Write your first entry
-                    </Button>
-                  </div>
-                ) : (
-                  entries.map((entry) => (
-                    <Card key={entry.id} className="border-border/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">
-                              {new Date(entry.date).toLocaleDateString("en-US", {
-                                weekday: "long",
-                                month: "short",
-                                day: "numeric",
-                              })}
+          {/* Notes list */}
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-4 space-y-2">
+              {filteredNotes.length === 0 ? (
+                <div className="text-center py-12">
+                  <StickyNote className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No notes yet</p>
+                  <p className="text-xs text-muted-foreground/70">Use the quick actions above to add your first note</p>
+                </div>
+              ) : (
+                filteredNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className={cn(
+                      "p-3 rounded-lg border transition-colors",
+                      note.status === "resolved" && "opacity-60",
+                      note.status === "archived" && "opacity-40",
+                      noteTypeConfig[note.type].bgColor
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn("mt-0.5", noteTypeConfig[note.type].color)}>
+                        {noteTypeIcons[note.type]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                            {noteTypeConfig[note.type].label}
+                          </Badge>
+                          {note.priority !== "normal" && (
+                            <span className={cn("flex items-center gap-1 text-[10px]", priorityConfig[note.priority].color)}>
+                              <span className={cn("w-1.5 h-1.5 rounded-full", priorityConfig[note.priority].dotColor)} />
+                              {priorityConfig[note.priority].label}
                             </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={moodOptions.find((m) => m.value === entry.mood)?.color}>
-                              {moodIcons[entry.mood]}
-                            </span>
-                            {entry.isComplete ? (
-                              <Badge variant="default" className="text-[10px]">Complete</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px]">Partial</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          {entry.responses.slice(0, 2).map((response, i) => (
-                            <div key={i} className="text-sm">
-                              <span className="text-muted-foreground">{response.prompt}</span>
-                              <p className="mt-0.5">{response.response}</p>
-                            </div>
-                          ))}
-                          {entry.responses.length > 2 && (
-                            <p className="text-xs text-muted-foreground">
-                              +{entry.responses.length - 2} more responses
-                            </p>
                           )}
+                          {note.linkedTaskId && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Link2 className="h-2.5 w-2.5" />
+                              {note.linkedTaskId}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" />
+                            {formatTimeAgo(note.createdAt)}
+                          </span>
                         </div>
-                        {entry.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 mt-3">
-                            {entry.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[10px]">
+                        <p className={cn(
+                          "text-sm leading-relaxed",
+                          note.status === "resolved" && "line-through"
+                        )}>
+                          {note.content}
+                        </p>
+                        {note.tags.length > 0 && (
+                          <div className="flex items-center gap-1 mt-2">
+                            {note.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                                 #{tag}
                               </Badge>
                             ))}
                           </div>
                         )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          )}
-
-          {view === "insights" && (
-            <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
-                {/* Stats overview */}
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="border-border/50">
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-primary">{entries.length}</div>
-                      <div className="text-xs text-muted-foreground">Total Entries</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-border/50">
-                    <CardContent className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Flame className="h-5 w-5 text-orange-500" />
-                        <span className="text-2xl font-bold">2</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">Day Streak</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-border/50">
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-green-500">85%</div>
-                      <div className="text-xs text-muted-foreground">Completion Rate</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Mood distribution */}
-                <Card className="border-border/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Mood Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {moodOptions.map((mood) => {
-                        const count = entries.filter((e) => e.mood === mood.value).length
-                        const percent = entries.length > 0 ? (count / entries.length) * 100 : 0
-                        return (
-                          <div key={mood.value} className="flex items-center gap-3">
-                            <span className={cn("w-20 text-xs flex items-center gap-1.5", mood.color)}>
-                              {moodIcons[mood.value]}
-                              {mood.label}
-                            </span>
-                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={cn("h-full rounded-full", mood.color.replace("text-", "bg-"))}
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-muted-foreground w-8">{count}</span>
-                          </div>
-                        )
-                      })}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          {note.status === "active" && (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "resolved")}>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                              Mark Resolved
+                            </DropdownMenuItem>
+                          )}
+                          {note.status === "resolved" && (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "active")}>
+                              <Circle className="h-3.5 w-3.5 mr-2" />
+                              Reopen
+                            </DropdownMenuItem>
+                          )}
+                          {note.status !== "archived" && (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "archived")}>
+                              <Archive className="h-3.5 w-3.5 mr-2" />
+                              Archive
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
 
-                {/* Common themes */}
-                <Card className="border-border/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Common Themes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(new Set(entries.flatMap((e) => e.tags))).map((tag) => {
-                        const count = entries.filter((e) => e.tags.includes(tag)).length
-                        return (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            #{tag} ({count})
-                          </Badge>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* AI insight placeholder */}
-                <Card className="border-primary/30 bg-primary/5">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium mb-1">AI Insight</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Based on your recent entries, you&apos;ve been most productive on days when you start with customer outreach. 
-                          Consider scheduling your most important calls in the morning to maintain this momentum.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+          {/* Footer stats */}
+          <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center justify-between text-xs text-muted-foreground shrink-0">
+            <span>{filteredNotes.filter(n => n.status === "active").length} active notes</span>
+            <span>{notes.filter(n => n.status === "resolved").length} resolved today</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

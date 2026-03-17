@@ -14,7 +14,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 // ============================================================================
 
 /// Params for creating an AI agent configuration.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAiAgentParams {
     pub name: String,
@@ -40,7 +40,7 @@ pub struct CreateAiAgentParams {
 }
 
 /// Params for updating AI agent configuration.
-/// Scope: `company_id` + `agent_id` are flat reducer params.
+/// Scope: `organization_id` + `agent_id` are flat reducer params.
 /// Option fields: None = keep existing value.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAiAgentParams {
@@ -56,7 +56,7 @@ pub struct UpdateAiAgentParams {
 }
 
 /// Params for creating an AI team member persona.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` + optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAiTeamMemberParams {
     pub name: String,
@@ -81,6 +81,7 @@ pub struct CreateAiTeamMemberParams {
 #[spacetimedb::table(
     accessor = ai_agent,
     public,
+    index(accessor = ai_agent_by_org, btree(columns = [organization_id])),
     index(accessor = ai_agent_by_company, btree(columns = [company_id]))
 )]
 pub struct AiAgent {
@@ -88,6 +89,7 @@ pub struct AiAgent {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,              // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub model: String,                 // e.g., "claude-sonnet-4-6", "gpt-4o"
@@ -108,7 +110,7 @@ pub struct AiAgent {
     pub cost_per_1k_tokens: f64,
     pub monthly_budget: Option<f64>,
     pub monthly_spend: f64,
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,       // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -121,6 +123,7 @@ pub struct AiAgent {
 #[spacetimedb::table(
     accessor = ai_team_member,
     public,
+    index(accessor = ai_team_member_by_org, btree(columns = [organization_id])),
     index(name = "by_agent", accessor = team_member_by_agent, btree(columns = [ai_agent_id])),
     index(accessor = team_member_by_company, btree(columns = [company_id]))
 )]
@@ -129,6 +132,7 @@ pub struct AiTeamMember {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,            // Tenant isolation
     pub name: String,
     pub ai_agent_id: u64,
     pub role: String,                    // Assistant, Analyst, Advisor, etc.
@@ -139,7 +143,7 @@ pub struct AiTeamMember {
     pub greeting_message: Option<String>,
     pub personality: Option<String>,
     pub response_style: String,          // Formal, Casual, Technical, Friendly
-    pub company_id: Option<u64>,
+    pub company_id: Option<u64>,         // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -155,11 +159,11 @@ pub struct AiTeamMember {
 #[reducer]
 pub fn create_ai_agent(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateAiAgentParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_agent", "create")?;
+    check_permission(ctx, organization_id, "ai_agent", "create")?;
 
     if params.temperature < 0.0 || params.temperature > 2.0 {
         return Err("Temperature must be between 0.0 and 2.0".to_string());
@@ -176,6 +180,7 @@ pub fn create_ai_agent(
 
     let agent = ctx.db.ai_agent().insert(AiAgent {
         id: 0,
+        organization_id,
         name: params.name,
         description: params.description,
         model: params.model,
@@ -207,7 +212,7 @@ pub fn create_ai_agent(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "ai_agent",
@@ -228,12 +233,11 @@ pub fn create_ai_agent(
 #[reducer]
 pub fn update_ai_agent(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     agent_id: u64,
     params: UpdateAiAgentParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_agent", "write")?;
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
 
     if params.temperature < 0.0 || params.temperature > 2.0 {
         return Err("Temperature must be between 0.0 and 2.0".to_string());
@@ -261,10 +265,8 @@ pub fn update_ai_agent(
         .find(&agent_id)
         .ok_or("AI agent not found")?;
 
-    if let (Some(wc), Some(rc)) = (company_id, agent.company_id) {
-        if wc != rc {
-            return Err("AI agent does not belong to this company".to_string());
-        }
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
     }
 
     ctx.db.ai_agent().id().update(AiAgent {
@@ -284,9 +286,9 @@ pub fn update_ai_agent(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "ai_agent",
             record_id: agent_id,
             action: "write",
@@ -305,12 +307,11 @@ pub fn update_ai_agent(
 #[reducer]
 pub fn set_ai_agent_active(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     agent_id: u64,
     is_active: bool,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_agent", "write")?;
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
 
     let agent = ctx
         .db
@@ -318,6 +319,10 @@ pub fn set_ai_agent_active(
         .id()
         .find(&agent_id)
         .ok_or("AI agent not found")?;
+
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
+    }
 
     ctx.db.ai_agent().id().update(AiAgent {
         is_active,
@@ -328,9 +333,9 @@ pub fn set_ai_agent_active(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: None,
             table_name: "ai_agent",
             record_id: agent_id,
             action: "write",
@@ -353,12 +358,11 @@ pub fn set_ai_agent_active(
 #[reducer]
 pub fn record_ai_spend(
     ctx: &ReducerContext,
-    company_id: Option<u64>,
+    organization_id: u64,
     agent_id: u64,
     tokens_used: u32,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_agent", "write")?;
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
 
     let agent = ctx
         .db
@@ -366,6 +370,10 @@ pub fn record_ai_spend(
         .id()
         .find(&agent_id)
         .ok_or("AI agent not found")?;
+
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
+    }
 
     let cost = (tokens_used as f64 / 1000.0) * agent.cost_per_1k_tokens;
     let monthly_spend = agent.monthly_spend + cost;
@@ -402,21 +410,27 @@ pub fn record_ai_spend(
 #[reducer]
 pub fn create_ai_team_member(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateAiTeamMemberParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_team_member", "create")?;
+    check_permission(ctx, organization_id, "ai_team_member", "create")?;
 
-    // Verify the agent exists
-    ctx.db
+    // Verify the agent exists and belongs to this org
+    let agent = ctx
+        .db
         .ai_agent()
         .id()
         .find(&params.ai_agent_id)
         .ok_or("AI agent not found")?;
 
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
+    }
+
     let member = ctx.db.ai_team_member().insert(AiTeamMember {
         id: 0,
+        organization_id,
         name: params.name,
         ai_agent_id: params.ai_agent_id,
         role: params.role,
@@ -437,7 +451,7 @@ pub fn create_ai_team_member(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
             company_id,
             table_name: "ai_team_member",

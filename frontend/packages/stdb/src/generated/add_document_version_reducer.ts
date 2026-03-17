@@ -16,7 +16,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   documentId: __t.u64(),
   get params() {
     return AddDocumentVersionParams;

@@ -17,6 +17,7 @@ use crate::types::{LandedCostState, SplitMethod};
 #[spacetimedb::table(
     accessor = stock_landed_cost,
     public,
+    index(accessor = stock_landed_cost_by_org, btree(columns = [organization_id])),
     index(accessor = stock_landed_cost_by_state, btree(columns = [state]))
 )]
 pub struct StockLandedCost {
@@ -24,6 +25,8 @@ pub struct StockLandedCost {
     #[auto_inc]
     pub id: u64,
 
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub state: LandedCostState,
     pub date: Timestamp,
     pub target_move: String,
@@ -51,12 +54,15 @@ pub struct StockLandedCost {
 #[spacetimedb::table(
     accessor = stock_landed_cost_lines,
     public,
+    index(accessor = stock_landed_cost_lines_by_org, btree(columns = [organization_id])),
     index(accessor = stock_landed_cost_lines_by_landed_cost, btree(columns = [landed_cost_id]))
 )]
 pub struct StockLandedCostLines {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation — always required
+    pub organization_id: u64,
     pub landed_cost_id: u64,
 
     pub product_id: u64,
@@ -119,6 +125,7 @@ pub fn create_landed_cost(
 
     let landed_cost = ctx.db.stock_landed_cost().insert(StockLandedCost {
         id: 0,
+        organization_id,
         state: LandedCostState::Draft,
         date: params.date,
         target_move: params.target_move,
@@ -187,6 +194,7 @@ pub fn add_landed_cost_line(
         .stock_landed_cost_lines()
         .insert(StockLandedCostLines {
             id: 0,
+            organization_id: landed_cost.organization_id,
             landed_cost_id,
             product_id: params.product_id,
             price_unit: params.price_unit,
@@ -466,6 +474,9 @@ pub fn apply_landed_costs(
         .find(&landed_cost_id)
         .ok_or("Landed cost not found")?;
 
+    if lc.organization_id != organization_id {
+        return Err("Landed cost does not belong to this organization".to_string());
+    }
     if lc.company_id != company_id {
         return Err("Landed cost does not belong to this company".to_string());
     }

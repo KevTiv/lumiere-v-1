@@ -2,6 +2,11 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Providers } from './providers'
+import { getStdbSession } from '@/lib/stdb-session'
+import {
+  serverQueryUserRoleAssignments,
+  serverQueryRoles,
+} from '@lumiere/stdb/server'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -30,15 +35,37 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const { identityHex, opts } = await getStdbSession()
+
+  let serverRoleNames: string[] = []
+  if (identityHex) {
+    try {
+      const [assignments, allRoles] = await Promise.all([
+        serverQueryUserRoleAssignments(identityHex, opts),
+        serverQueryRoles(opts),
+      ])
+      const assignedIds = new Set(
+        (assignments as Array<Record<string, unknown>>)
+          .filter((a) => a['isActive'])
+          .map((a) => String(a['roleId']))
+      )
+      serverRoleNames = (allRoles as Array<Record<string, unknown>>)
+        .filter((r) => assignedIds.has(String(r['id'])))
+        .map((r) => String(r['name']))
+    } catch {
+      // No session yet — user hasn't connected via WebSocket
+    }
+  }
+
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <Providers>
+        <Providers serverIdentity={identityHex} serverRoleNames={serverRoleNames}>
           {children}
         </Providers>
         <Analytics />

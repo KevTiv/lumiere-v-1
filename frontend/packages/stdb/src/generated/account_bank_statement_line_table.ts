@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   date: __t.timestamp(),
   amount: __t.f64(),
   amountCurrency: __t.f64().name("amount_currency"),

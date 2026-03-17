@@ -1,13 +1,13 @@
 import { queryBudgets, type CrossoveredBudget } from "../queries/accounting";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getStdbConnection } from "../connection";
 
 export type { CrossoveredBudget };
 
-export function useBudgets(companyId: bigint) {
+export function useBudgets(companyId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = ["budgets", companyId.toString()];
+  const queryKey = useMemo(() => ["budgets", companyId.toString()], [companyId]);
 
   useEffect(() => {
     const conn = getStdbConnection();
@@ -16,7 +16,13 @@ export function useBudgets(companyId: bigint) {
     conn.db.crossovered_budget.onInsert((_ctx, _row) => reload());
     conn.db.crossovered_budget.onUpdate((_ctx, _old, _new) => reload());
     conn.db.crossovered_budget.onDelete((_ctx, _row) => reload());
-  }, [queryClient]);
+  }, [queryClient, queryKey]);
 
-  return useQuery({ queryKey, queryFn: queryBudgets, staleTime: Infinity });
+  return useQuery({
+    queryKey,
+    queryFn: queryBudgets,
+    staleTime: Infinity,
+    initialData: initialData as never,
+    initialDataUpdatedAt: initialData?.length ? 0 : undefined,
+  });
 }

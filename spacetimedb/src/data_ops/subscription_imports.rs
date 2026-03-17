@@ -42,6 +42,7 @@ pub fn import_subscription_plan_csv(
 
         ctx.db.subscription_plan().insert(SubscriptionPlan {
             id: 0,
+            organization_id,
             name,
             description: col(&headers, row, "description").to_string(),
             code,
@@ -140,6 +141,7 @@ pub fn import_subscription_csv(
 
         ctx.db.subscription().insert(Subscription {
             id: 0,
+            organization_id,
             code,
             description: col(&headers, row, "description").to_string(),
             plan_id,

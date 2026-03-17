@@ -43,6 +43,7 @@ pub fn import_report_template_csv(
 
         ctx.db.report_template().insert(ReportTemplate {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             model,
@@ -119,6 +120,7 @@ pub fn import_analytics_metric_csv(
 
         ctx.db.analytics_metric().insert(AnalyticsMetric {
             id: 0,
+            organization_id,
             name,
             category: {
                 let v = col(&headers, row, "category");
