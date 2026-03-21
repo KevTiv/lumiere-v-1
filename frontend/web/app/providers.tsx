@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
+import { I18nProvider } from "@lumiere/i18n"
 import {
   StdbConnectionProvider,
   useStdbConnection,
@@ -158,6 +159,7 @@ export function Providers({
 }) {
   const [queryClient] = useState(() => new QueryClient())
   return (
+    <I18nProvider>
     <QueryClientProvider client={queryClient}>
       <StdbConnectionProvider
         onTokenPersisted={saveStdbSession}
@@ -169,5 +171,6 @@ export function Providers({
         </StdbRBACBridge>
       </StdbConnectionProvider>
     </QueryClientProvider>
+    </I18nProvider>
   )
 }

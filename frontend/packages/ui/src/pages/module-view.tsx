@@ -34,9 +34,9 @@ export function ModuleView({
       <DashboardHeader title={config.title} description={config.description} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
-        <TabsList variant="default" className="w-full justify-start">
-          {config.tabs.map((tab) => (
-            <TabsTrigger key={tab.id} value={tab.id}>
+        <TabsList variant="default" className="w-full flex flex-wrap justify-start max-w-fit gap-2">
+          {config.tabs.map((tab, i) => (
+            <TabsTrigger tabIndex={i} key={tab.id} value={tab.id}>
               {tab.label}
             </TabsTrigger>
           ))}
@@ -47,6 +47,8 @@ export function ModuleView({
             {tab.type === "dashboard" && tab.sections && (
               <DashboardGrid sections={tab.sections} />
             )}
+
+            {tab.type === "custom" && tab.customContent}
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">

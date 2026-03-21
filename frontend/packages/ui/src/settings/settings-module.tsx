@@ -99,12 +99,12 @@ export function SettingsModule({ className }: SettingsModuleProps) {
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between">
-        <div>
+        {/*<div>
           <h2 className="text-2xl font-bold">Settings</h2>
           <p className="text-muted-foreground">
             Manage your account and system configuration
           </p>
-        </div>
+        </div>*/}
         {isAdmin() && (
           <Badge variant="outline" className="gap-1 border-primary text-primary">
             <Shield className="h-3 w-3" />

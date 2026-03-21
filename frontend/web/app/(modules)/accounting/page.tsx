@@ -17,7 +17,7 @@ export default async function AccountingPage() {
 
   const [accounts, moves, taxes, budgets, analytic] = await Promise.all([
     serverQueryAccountAccounts(organizationId, opts),
-    serverQueryAccountMoves(organizationId, opts),
+    serverQueryAccountMoves(organizationId, undefined, opts),
     serverQueryAccountTaxes(organizationId, opts),
     serverQueryBudgets(organizationId, opts),
     serverQueryAnalyticAccounts(organizationId, opts),

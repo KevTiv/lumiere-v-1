@@ -1,5 +1,5 @@
 import { DashboardGrid, DashboardHeader } from "@lumiere/ui"
-import { dashboardConfigs } from "@/lib/demo-dashboard-config"
+import { dashboardConfigs } from "@/lib/dashboard-config"
 
 export default function OverviewPage() {
   const config = dashboardConfigs.overview ?? dashboardConfigs.sales

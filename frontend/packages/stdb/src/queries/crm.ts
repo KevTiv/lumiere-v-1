@@ -1,6 +1,7 @@
 import LeadRow from "../generated/lead_table";
 import OpportunityRow from "../generated/opportunity_table";
 import ContactRow from "../generated/contact_table";
+import ActivityRow from "../generated/activity_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 
@@ -8,6 +9,7 @@ import { getStdbConnection } from "../connection";
 export type Lead = Infer<typeof LeadRow>;
 export type Opportunity = Infer<typeof OpportunityRow>;
 export type Contact = Infer<typeof ContactRow>;
+export type Activity = Infer<typeof ActivityRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
 export function crmSubscriptions(organizationId: bigint): string[] {
@@ -19,6 +21,8 @@ export function crmSubscriptions(organizationId: bigint): string[] {
     `SELECT * FROM contact_tag WHERE organization_id = ${id}`,
     `SELECT * FROM lead_source WHERE organization_id = ${id}`,
     `SELECT * FROM opportunity_stage WHERE organization_id = ${id}`,
+    `SELECT * FROM activity WHERE organization_id = ${id}`,
+    `SELECT * FROM activity_type WHERE organization_id = ${id}`,
   ];
 }
 
@@ -44,5 +48,13 @@ export function queryContacts(): Contact[] {
   if (!conn) return [];
   return [...conn.db.contact.iter()].sort((a, b) =>
     (a.name ?? "").localeCompare(b.name ?? ""),
+  );
+}
+
+export function queryActivities(): Activity[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.activity.iter()].sort(
+    (a, b) => Number(b.dateDeadline ?? 0) - Number(a.dateDeadline ?? 0),
   );
 }

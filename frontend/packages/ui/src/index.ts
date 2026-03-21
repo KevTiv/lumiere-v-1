@@ -13,7 +13,7 @@ export * from "./entity-views/entity-view";
 export * from "./entity-views/entity-table";
 export * from "./entity-views/entity-detail";
 export * from "./lib/entity-view-types"; // exports FieldWidth, ColumnType
-export * from "./lib/demo-entity-configs";
+export * from "./lib/entity-configs";
 
 // Modular forms
 export * from "./forms/modular-form";
@@ -38,22 +38,43 @@ export type {
   FormConfig,
 } from "./lib/form-types";
 export { fieldWidthClasses } from "./lib/form-types";
-export * from "./lib/demo-form-configs";
-export * from "./lib/demo-accounting-form-configs";
-export * from "./lib/demo-sales-entity-configs";
-export * from "./lib/demo-sales-form-configs";
-export * from "./lib/demo-crm-entity-configs";
-export * from "./lib/demo-crm-form-configs";
-export * from "./lib/demo-projects-entity-configs";
-export * from "./lib/demo-projects-form-configs";
-export * from "./lib/demo-inventory-entity-configs";
-export * from "./lib/demo-inventory-form-configs";
-export * from "./lib/demo-purchasing-entity-configs";
-export * from "./lib/demo-purchasing-form-configs";
-export * from "./lib/demo-manufacturing-entity-configs";
-export * from "./lib/demo-manufacturing-form-configs";
-export * from "./lib/demo-hr-entity-configs";
-export * from "./lib/demo-hr-form-configs";
+export * from "./lib/form-configs";
+export * from "./lib/accounting-form-configs";
+export * from "./lib/accounting-entity-configs";
+export * from "./lib/sales-entity-configs";
+export * from "./lib/sales-form-configs";
+export * from "./lib/crm-entity-configs";
+export * from "./lib/crm-form-configs";
+export * from "./lib/projects-entity-configs";
+export * from "./lib/projects-form-configs";
+export * from "./lib/inventory-entity-configs";
+export * from "./lib/inventory-form-configs";
+export * from "./lib/purchasing-entity-configs";
+export * from "./lib/purchasing-form-configs";
+export * from "./lib/manufacturing-entity-configs";
+export * from "./lib/manufacturing-form-configs";
+export * from "./lib/hr-entity-configs";
+export * from "./lib/hr-form-configs";
+export * from "./lib/documents-entity-configs";
+export * from "./lib/documents-form-configs";
+export * from "./lib/calendar-types";
+export * from "./lib/calendar-entity-configs";
+export * from "./lib/calendar-form-configs";
+export * from "./lib/reports-entity-configs";
+export * from "./lib/reports-form-configs";
+export * from "./lib/subscriptions-entity-configs";
+export * from "./lib/subscriptions-form-configs";
+export * from "./lib/expenses-entity-configs";
+export * from "./lib/expenses-form-configs";
+export * from "./lib/helpdesk-entity-configs";
+export * from "./lib/helpdesk-form-configs";
+export * from "./lib/workflows-entity-configs";
+export * from "./lib/workflows-form-configs";
+export * from "./lib/messages-entity-configs";
+export * from "./lib/messages-form-configs";
+export * from "./lib/proposals-entity-configs";
+export * from "./lib/proposals-form-configs";
+export * from "./lib/proposal-workspace-types";
 
 // Dashboard pages & widgets
 export * from "./pages/dashboard-grid";
@@ -61,7 +82,7 @@ export * from "./pages/dashboard-header";
 export * from "./pages/dashboard-sidebar";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./lib/dashboard-types";
-export * from "./lib/demo-dashboard-config";
+export * from "./lib/dashboard-config";
 
 // Module view (config-driven tabs + entity views + forms)
 export * from "./lib/module-types";
@@ -154,3 +175,32 @@ export * from "./settings/user-custom-fields";
 
 // Hooks
 export * from "./hooks/use-toast";
+
+// Accounting components
+export * from "./accounting-components/invoice-list-view";
+export * from "./accounting-components/invoice-detail-modal";
+export * from "./accounting-components/create-invoice-modal";
+export * from "./accounting-components/bills-list-view";
+export * from "./accounting-components/chart-of-accounts-view";
+export * from "./accounting-components/general-ledger-view";
+
+// Calendar components
+export * from "./calendar-components/calendar-view";
+export * from "./calendar-components/event-detail-panel";
+
+// Map components — MapView is intentionally NOT exported from this barrel.
+// Leaflet requires browser APIs and cannot be bundled via server/SSR paths.
+// Use dynamic() in your client component instead:
+//   dynamic(() => import("@lumiere/ui/map-components/map-view").then(m => m.MapView), { ssr: false })
+export * from "./map-components/map-pin-hover-card";
+export * from "./map-components/map-layer-legend";
+export * from "./lib/map-types";
+export * from "./lib/map-pin-configs";
+
+// Proposal workspace
+export * from "./proposal-workspace/proposal-workspace";
+export * from "./proposal-workspace/document-input-panel";
+export * from "./proposal-workspace/ai-analysis-panel";
+export * from "./proposal-workspace/tender-editor-panel";
+export * from "./proposal-workspace/version-history-bar";
+export * from "./proposal-workspace/version-diff-modal";

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
 import type { EntityViewConfig } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
@@ -5,7 +6,7 @@ import type { FormConfig } from "./form-types"
 export interface ModuleTab {
   id: string
   label: string
-  type: "dashboard" | "entity"
+  type: "dashboard" | "entity" | "custom"
   /** For type='dashboard': sections rendered by DashboardGrid */
   sections?: DashboardSection[]
   /** For type='entity': EntityView config */
@@ -16,6 +17,8 @@ export interface ModuleTab {
   createLabel?: string
   /** Identifier passed to onFormSubmit so callers know which mutation to invoke */
   createAction?: string
+  /** For type='custom': arbitrary content rendered inside the tab panel */
+  customContent?: ReactNode
 }
 
 export interface ModuleConfig {

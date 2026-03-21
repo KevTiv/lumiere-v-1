@@ -3,6 +3,9 @@ import StockQuantRow from "../generated/stock_quant_table";
 import StockPickingRow from "../generated/stock_picking_table";
 import WarehouseRow from "../generated/warehouse_table";
 import InventoryAdjustmentRow from "../generated/inventory_adjustment_table";
+import StockLocationRow from "../generated/stock_location_table";
+import StockProductionLotRow from "../generated/stock_production_lot_table";
+import QualityCheckRow from "../generated/quality_check_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 
@@ -12,6 +15,9 @@ export type StockQuant = Infer<typeof StockQuantRow>;
 export type StockPicking = Infer<typeof StockPickingRow>;
 export type Warehouse = Infer<typeof WarehouseRow>;
 export type InventoryAdjustment = Infer<typeof InventoryAdjustmentRow>;
+export type StockLocation = Infer<typeof StockLocationRow>;
+export type StockProductionLot = Infer<typeof StockProductionLotRow>;
+export type QualityCheck = Infer<typeof QualityCheckRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
 export function inventorySubscriptions(organizationId: bigint, companyId: bigint): string[] {
@@ -25,6 +31,8 @@ export function inventorySubscriptions(organizationId: bigint, companyId: bigint
     `SELECT * FROM warehouse WHERE company_id = ${cId}`,
     `SELECT * FROM stock_location WHERE company_id = ${cId}`,
     `SELECT * FROM inventory_adjustment WHERE organization_id = ${orgId}`,
+    `SELECT * FROM stock_production_lot WHERE company_id = ${cId}`,
+    `SELECT * FROM quality_check WHERE company_id = ${cId}`,
   ];
 }
 
@@ -62,5 +70,29 @@ export function queryInventoryAdjustments(): InventoryAdjustment[] {
   if (!conn) return [];
   return [...conn.db.inventory_adjustment.iter()].sort(
     (a, b) => Number(b.date ?? 0) - Number(a.date ?? 0),
+  );
+}
+
+export function queryStockLocations(): StockLocation[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.stock_location.iter()].sort((a, b) =>
+    (a.completeName ?? a.name ?? "").localeCompare(b.completeName ?? b.name ?? ""),
+  );
+}
+
+export function queryProductionLots(): StockProductionLot[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.stock_production_lot.iter()].sort(
+    (a, b) => Number(b.createDate ?? 0) - Number(a.createDate ?? 0),
+  );
+}
+
+export function queryQualityChecks(): QualityCheck[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.quality_check.iter()].sort(
+    (a, b) => Number(b.createDate ?? 0) - Number(a.createDate ?? 0),
   );
 }

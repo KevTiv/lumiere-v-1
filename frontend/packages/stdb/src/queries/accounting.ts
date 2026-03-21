@@ -4,6 +4,8 @@ import AccountJournalRow from "../generated/account_journal_table";
 import AccountTaxRow from "../generated/account_tax_table";
 import CrossoveredBudgetRow from "../generated/crossovered_budget_table";
 import AccountAnalyticAccountRow from "../generated/account_analytic_account_table";
+import AccountBankStatementRow from "../generated/account_bank_statement_table";
+import AccountAssetRow from "../generated/account_asset_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 
@@ -14,6 +16,8 @@ export type AccountJournal = Infer<typeof AccountJournalRow>;
 export type AccountTax = Infer<typeof AccountTaxRow>;
 export type CrossoveredBudget = Infer<typeof CrossoveredBudgetRow>;
 export type AccountAnalyticAccount = Infer<typeof AccountAnalyticAccountRow>;
+export type AccountBankStatement = Infer<typeof AccountBankStatementRow>;
+export type AccountAsset = Infer<typeof AccountAssetRow>;
 
 // ── Subscription SQL (server-side filtered by company) ────────────────────────
 export function accountingSubscriptions(companyId: bigint): string[] {
@@ -27,6 +31,10 @@ export function accountingSubscriptions(companyId: bigint): string[] {
     `SELECT * FROM account_analytic_account WHERE company_id = ${id}`,
     `SELECT * FROM crossovered_budget WHERE company_id = ${id}`,
     `SELECT * FROM crossovered_budget_lines WHERE company_id = ${id}`,
+    `SELECT * FROM account_bank_statement WHERE company_id = ${id}`,
+    `SELECT * FROM account_bank_statement_line WHERE company_id = ${id}`,
+    `SELECT * FROM account_asset WHERE company_id = ${id}`,
+    `SELECT * FROM account_asset_depreciation_line WHERE company_id = ${id}`,
   ];
 }
 
@@ -71,5 +79,21 @@ export function queryAnalyticAccounts(): AccountAnalyticAccount[] {
   if (!conn) return [];
   return [...conn.db.account_analytic_account.iter()].sort((a, b) =>
     (a.code ?? "").localeCompare(b.code ?? ""),
+  );
+}
+
+export function queryBankStatements(): AccountBankStatement[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.account_bank_statement.iter()].sort(
+    (a, b) => Number(b.date ?? 0) - Number(a.date ?? 0),
+  );
+}
+
+export function queryFixedAssets(): AccountAsset[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.account_asset.iter()].sort((a, b) =>
+    (a.name ?? "").localeCompare(b.name ?? ""),
   );
 }

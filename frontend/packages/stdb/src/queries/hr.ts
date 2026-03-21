@@ -3,6 +3,7 @@ import HrDepartmentRow from "../generated/hr_department_table";
 import HrLeaveRow from "../generated/hr_leave_table";
 import HrContractRow from "../generated/hr_contract_table";
 import HrPayslipRow from "../generated/hr_payslip_table";
+import HrJobPositionRow from "../generated/hr_job_position_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 
@@ -12,6 +13,7 @@ export type HrDepartment = Infer<typeof HrDepartmentRow>;
 export type HrLeave = Infer<typeof HrLeaveRow>;
 export type HrContract = Infer<typeof HrContractRow>;
 export type HrPayslip = Infer<typeof HrPayslipRow>;
+export type HrJobPosition = Infer<typeof HrJobPositionRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
 export function hrSubscriptions(organizationId: bigint, companyId: bigint): string[] {
@@ -22,6 +24,7 @@ export function hrSubscriptions(organizationId: bigint, companyId: bigint): stri
     `SELECT * FROM hr_leave WHERE company_id = ${cId}`,
     `SELECT * FROM hr_contract WHERE company_id = ${cId}`,
     `SELECT * FROM hr_payslip WHERE company_id = ${cId}`,
+    `SELECT * FROM hr_job_position WHERE company_id = ${cId}`,
   ];
 }
 
@@ -60,4 +63,10 @@ export function queryPayslips(): HrPayslip[] {
   return [...conn.db.hr_payslip.iter()].sort(
     (a, b) => Number(b.dateFrom) - Number(a.dateFrom),
   );
+}
+
+export function queryJobPositions(): HrJobPosition[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  return [...conn.db.hr_job_position.iter()].sort((a, b) => a.name.localeCompare(b.name));
 }

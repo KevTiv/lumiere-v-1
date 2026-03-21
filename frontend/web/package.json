@@ -12,6 +12,9 @@
   "dependencies": {
     "@lumiere/ui": "workspace:*",
     "@lumiere/stdb": "workspace:*",
+    "@lumiere/i18n": "workspace:*",
+    "react-i18next": "^15.7.4",
+    "i18next": "^25.8.17",
     "@tanstack/react-query": "latest",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -64,13 +67,16 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/leaflet": "^1.9.14",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",

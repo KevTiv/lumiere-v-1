@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRBAC } from "@/lib/rbac-context"
+import { useTranslation } from "@lumiere/i18n"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -26,6 +27,16 @@ import {
   Factory,
   FolderKanban,
   Cpu,
+  FileText,
+  Calendar,
+  BarChart2,
+  RefreshCw,
+  Receipt,
+  HelpCircle,
+  GitBranch,
+  MessageSquare,
+  ClipboardList,
+  Map,
 } from "lucide-react"
 import type { Resource } from "@/lib/rbac-types"
 
@@ -48,63 +59,79 @@ interface DashboardSidebarProps {
   onOpenAIChat?: () => void
 }
 
-const navGroups: NavGroup[] = [
-  {
-    label: null,
-    items: [
-      { label: "Overview", href: "/overview", icon: LayoutDashboard, resource: "dashboard:overview" },
-      { label: "Tasks", href: "/tasks", icon: KanbanSquare, resource: "dashboard:tasks" },
-    ],
-  },
-  {
-    label: "Analytics",
-    items: [
-      { label: "Forensics", href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
-      { label: "Trackers", href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
-      { label: "Accounting", href: "/accounting", icon: BookOpen, resource: "module:accounting" },
-      { label: "Sales", href: "/sales", icon: TrendingUp, resource: "module:sales" },
-      { label: "CRM", href: "/crm", icon: Users, resource: "module:crm" },
-      { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, resource: "module:purchasing" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { label: "Inventory", href: "/inventory", icon: Package, resource: "module:inventory" },
-      { label: "Manufacturing", href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
-    ],
-  },
-  {
-    label: "People",
-    items: [
-      { label: "HR & People", href: "/hr", icon: UserCheck, resource: "module:hr" },
-      { label: "Projects", href: "/projects", icon: FolderKanban, resource: "module:projects" },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { label: "IoT", href: "/iot", icon: Cpu, resource: "module:iot" },
-      { label: "Settings", href: "/settings", icon: Settings, resource: "dashboard:settings" },
-    ],
-  },
-]
-
 export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook, onOpenAIChat }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const { checkPermission, currentUser, roles } = useRBAC()
   const pathname = usePathname()
+  const { t } = useTranslation()
   const isCollapsed = forceCollapsed || collapsed
+
+  const navGroups = useMemo((): NavGroup[] => [
+    {
+      label: null,
+      items: [
+        { label: t("nav.overview"), href: "/overview", icon: LayoutDashboard, resource: "dashboard:overview" },
+        { label: t("nav.tasks"), href: "/tasks", icon: KanbanSquare, resource: "dashboard:tasks" },
+      ],
+    },
+    {
+      label: t("nav.groups.analytics"),
+      items: [
+        { label: t("nav.forensics"), href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
+        { label: t("nav.trackers"), href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
+      ],
+    },
+    {
+      label: t("nav.groups.finance"),
+      items: [
+        { label: t("nav.accounting"), href: "/accounting", icon: BookOpen, resource: "module:accounting" },
+        { label: t("nav.sales"), href: "/sales", icon: TrendingUp, resource: "module:sales" },
+        { label: t("nav.crm"), href: "/crm", icon: Users, resource: "module:crm" },
+        { label: t("nav.purchasing"), href: "/purchasing", icon: ShoppingCart, resource: "module:purchasing" },
+        { label: t("nav.reports"), href: "/reports", icon: BarChart2, resource: "module:reports" },
+        { label: t("nav.subscriptions"), href: "/subscriptions", icon: RefreshCw, resource: "module:subscriptions" },
+        { label: t("nav.expenses"), href: "/expenses", icon: Receipt, resource: "module:expenses" },
+      ],
+    },
+    {
+      label: t("nav.groups.operations"),
+      items: [
+        { label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
+        { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
+        { label: t("nav.map"), href: "/map", icon: Map, resource: "module:map" },
+        { label: t("nav.helpdesk"), href: "/helpdesk", icon: HelpCircle, resource: "module:helpdesk" },
+        { label: t("nav.workflows"), href: "/workflows", icon: GitBranch, resource: "module:workflows" },
+      ],
+    },
+    {
+      label: t("nav.groups.productivity"),
+      items: [
+        { label: t("nav.documents"), href: "/documents", icon: FileText, resource: "module:documents" },
+        { label: t("nav.proposals"), href: "/proposals", icon: ClipboardList, resource: "module:proposals" },
+        { label: t("nav.calendar"), href: "/calendar", icon: Calendar, resource: "module:calendar" },
+        { label: t("nav.messages"), href: "/messages", icon: MessageSquare, resource: "module:messages" },
+      ],
+    },
+    {
+      label: t("nav.groups.people"),
+      items: [
+        { label: t("nav.hr"), href: "/hr", icon: UserCheck, resource: "module:hr" },
+        { label: t("nav.projects"), href: "/projects", icon: FolderKanban, resource: "module:projects" },
+      ],
+    },
+    {
+      label: t("nav.groups.system"),
+      items: [
+        { label: t("nav.iot"), href: "/iot", icon: Cpu, resource: "module:iot" },
+        { label: t("nav.settings"), href: "/settings", icon: Settings, resource: "dashboard:settings" },
+      ],
+    },
+  ], [t])
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
 
   const getUserRoleName = () => {
-    if (!currentUser || currentUser.roles.length === 0) return "No Role"
+    if (!currentUser || currentUser.roles.length === 0) return t("nav.noRole")
     const role = roles.find(r => r.id === currentUser.roles[0])
     return role?.name || currentUser.roles[0]
   }
@@ -118,7 +145,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
     >
       <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
         {!isCollapsed && (
-          <span className="font-bold text-lg text-sidebar-foreground">ERP System</span>
+          <span className="font-bold text-lg text-sidebar-foreground">{t("nav.erpSystem")}</span>
         )}
         <Button
           variant="ghost"
@@ -204,7 +231,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
           >
             <BookMarked className="h-5 w-5 shrink-0 text-amber-500" />
             {!isCollapsed && (
-              <span className="text-sm font-medium">Journal</span>
+              <span className="text-sm font-medium">{t("nav.journal")}</span>
             )}
           </button>
         )}
@@ -222,7 +249,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
           >
             <BookOpen className="h-5 w-5 shrink-0 text-orange-500" />
             {!isCollapsed && (
-              <span className="text-sm font-medium">Notebook</span>
+              <span className="text-sm font-medium">{t("nav.notebook")}</span>
             )}
           </button>
         )}
@@ -240,7 +267,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
           >
             <Sparkles className="h-5 w-5 shrink-0 text-primary" />
             {!isCollapsed && (
-              <span className="text-sm font-medium">AI Assistant</span>
+              <span className="text-sm font-medium">{t("nav.aiAssistant")}</span>
             )}
           </button>
         )}

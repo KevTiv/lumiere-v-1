@@ -18,6 +18,7 @@
  */
 
 import { stdbSql, type StdbHttpOptions } from './http'
+export type { StdbHttpOptions }
 
 // ── Query key helpers (must match the keys used in client hooks) ─────────────
 // All business data keys are scoped by organization_id — the top-level tenant.
@@ -492,6 +493,162 @@ export async function serverQueryPayslips(
   const where = await companyWhere(organizationId, opts)
   if (!where) return []
   return stdbSql(`SELECT * FROM hr_payslip ${where}`, opts)
+}
+
+// CALENDAR — organization_id scoped
+
+export function serverQueryCalendarEvents(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM calendar_event WHERE organization_id = ${organizationId} ORDER BY start ASC`,
+    opts,
+  )
+}
+
+// DOCUMENTS — organization_id scoped
+
+export function serverQueryDocuments(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM document WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQueryKnowledgeArticles(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM knowledge_article WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// EXPENSES — organization_id scoped
+
+export function serverQueryExpenses(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM hr_expense WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQueryExpenseSheets(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM expense_sheet WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// HELPDESK — organization_id scoped
+
+export function serverQueryHelpdeskTickets(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM helpdesk_ticket WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// MESSAGES — organization_id scoped
+
+export function serverQueryMailMessages(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM mail_message WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// REPORTS — company_id scoped
+
+export async function serverQueryFinancialReports(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  const where = await companyWhere(organizationId, opts)
+  if (!where) return []
+  return stdbSql(`SELECT * FROM financial_report ${where}`, opts)
+}
+
+export async function serverQueryTrialBalances(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  const where = await companyWhere(organizationId, opts)
+  if (!where) return []
+  return stdbSql(`SELECT * FROM trial_balance ${where} ORDER BY account_code ASC`, opts)
+}
+
+// SUBSCRIPTIONS — organization_id scoped
+
+export function serverQuerySubscriptions(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM subscription WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQuerySubscriptionPlans(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM subscription_plan WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// WORKFLOWS — organization_id scoped
+
+export function serverQueryWorkflows(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM workflow WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQueryWorkflowInstances(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM workflow_instance WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+// PROPOSALS — organization_id scoped
+
+export function serverQueryProposals(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM proposal WHERE organization_id = ${organizationId}`,
+    opts,
+  )
 }
 
 // AUTH (per-user — security-critical)
