@@ -10,7 +10,7 @@ export function useCreateLead(organizationId: bigint) {
     mutationFn: (params: CreateLeadParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createLead(organizationId, params);
+      return conn.reducers.createLead({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -24,7 +24,7 @@ export function useCreateOpportunity(organizationId: bigint) {
     mutationFn: (params: CreateOpportunityParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createOpportunity(organizationId, params);
+      return conn.reducers.createOpportunity({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
@@ -38,7 +38,7 @@ export function useCreateContact(organizationId: bigint) {
     mutationFn: (params: CreateContactParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createContact(organizationId, params);
+      return conn.reducers.createContact({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });

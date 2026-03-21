@@ -1,13 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateMrpProductionParams,
+  CreateBomParams,
+  CreateWorkcenterParams,
+} from "../generated/types";
 import { getStdbConnection } from "../connection";
+
+export type { CreateMrpProductionParams, CreateBomParams, CreateWorkcenterParams };
 
 export function useCreateManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateMrpProductionParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createManufacturingOrder(organizationId, companyId, params as never);
+      return conn.reducers.createManufacturingOrder({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-productions"] });
@@ -21,7 +28,7 @@ export function useConfirmManufacturingOrder(organizationId: bigint, companyId: 
     mutationFn: (moId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.confirmManufacturingOrder(organizationId, companyId, moId);
+      return conn.reducers.confirmManufacturingOrder({ organizationId, companyId, moId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-productions"] });
@@ -35,7 +42,7 @@ export function useStartManufacturingOrder(organizationId: bigint, companyId: bi
     mutationFn: (moId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.startManufacturingOrder(organizationId, companyId, moId);
+      return conn.reducers.startManufacturingOrder({ organizationId, companyId, moId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-productions"] });
@@ -49,7 +56,7 @@ export function useFinishManufacturingOrder(organizationId: bigint, companyId: b
     mutationFn: (moId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.finishManufacturingOrder(organizationId, companyId, moId);
+      return conn.reducers.finishManufacturingOrder({ organizationId, companyId, moId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-productions"] });
@@ -63,7 +70,7 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
     mutationFn: (moId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.cancelManufacturingOrder(organizationId, companyId, moId);
+      return conn.reducers.cancelManufacturingOrder({ organizationId, companyId, moId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-productions"] });
@@ -74,10 +81,10 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
 export function useCreateBom(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateBomParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createBom(organizationId, companyId, params as never);
+      return conn.reducers.createBom({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-boms"] });
@@ -88,10 +95,10 @@ export function useCreateBom(organizationId: bigint, companyId: bigint) {
 export function useCreateWorkcenter(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateWorkcenterParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createWorkcenter(organizationId, companyId, params as never);
+      return conn.reducers.createWorkcenter({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mrp-workcenters"] });

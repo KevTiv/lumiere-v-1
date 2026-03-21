@@ -10,7 +10,7 @@ export function useCreateProject(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateProjectParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createProject(organizationId, companyId, params);
+      return conn.reducers.createProject({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -24,7 +24,7 @@ export function useCreateTask(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateTaskParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createTask(organizationId, companyId, params);
+      return conn.reducers.createTask({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });

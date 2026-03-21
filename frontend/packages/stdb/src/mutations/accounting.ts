@@ -10,7 +10,7 @@ export function useCreateAccount(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateAccountAccountParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createAccountAccount(organizationId, companyId, params);
+      return conn.reducers.createAccountAccount({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-accounts"] });
@@ -24,7 +24,7 @@ export function useCreateMove(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateAccountMoveParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createAccountMove(organizationId, companyId, params);
+      return conn.reducers.createAccountMove({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-moves"] });
@@ -38,7 +38,7 @@ export function usePostMove(organizationId: bigint) {
     mutationFn: (moveId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.postAccountMove(organizationId, moveId);
+      return conn.reducers.postAccountMove({ organizationId, moveId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-moves"] });
@@ -52,7 +52,7 @@ export function useCancelMove(organizationId: bigint) {
     mutationFn: (moveId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.cancelAccountMove(organizationId, moveId);
+      return conn.reducers.cancelAccountMove({ organizationId, moveId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-moves"] });
@@ -66,7 +66,7 @@ export function useCreateTax(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateAccountTaxParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createAccountTax(organizationId, companyId, params);
+      return conn.reducers.createAccountTax({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-taxes"] });
@@ -80,7 +80,7 @@ export function useCreateBudget(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateCrossoveredBudgetParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createCrossoveredBudget(organizationId, companyId, params);
+      return conn.reducers.createCrossoveredBudget({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });

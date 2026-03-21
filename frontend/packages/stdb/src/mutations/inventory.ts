@@ -20,7 +20,7 @@ export function useCreateProduct(organizationId: bigint) {
     mutationFn: (params: CreateProductParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createProduct(organizationId, params);
+      return conn.reducers.createProduct({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -34,7 +34,7 @@ export function useCreateStockPicking(organizationId: bigint, companyId: bigint)
     mutationFn: (params: CreateStockPickingParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createStockPicking(organizationId, companyId, params);
+      return conn.reducers.createStockPicking({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-pickings"] });
@@ -48,7 +48,7 @@ export function useCreateWarehouse(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateWarehouseParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createWarehouse(organizationId, companyId, params);
+      return conn.reducers.createWarehouse({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouses"] });
@@ -62,7 +62,7 @@ export function useCreateInventoryAdjustment(organizationId: bigint) {
     mutationFn: (params: CreateInventoryAdjustmentParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createInventoryAdjustment(organizationId, params);
+      return conn.reducers.createInventoryAdjustment({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-adjustments"] });

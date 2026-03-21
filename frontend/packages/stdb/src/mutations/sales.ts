@@ -10,7 +10,7 @@ export function useCreateSaleOrder(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateSaleOrderParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createSaleOrder(organizationId, companyId, params);
+      return conn.reducers.createSaleOrder({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sale-orders"] });
@@ -24,7 +24,7 @@ export function useConfirmSaleOrder(organizationId: bigint) {
     mutationFn: (orderId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.confirmSalesOrder(organizationId, orderId);
+      return conn.reducers.confirmSalesOrder({ organizationId, orderId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sale-orders"] });
@@ -38,7 +38,7 @@ export function useCancelSaleOrder(organizationId: bigint) {
     mutationFn: (orderId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.cancelSaleOrder(organizationId, orderId);
+      return conn.reducers.cancelSaleOrder({ organizationId, orderId, reason: undefined });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sale-orders"] });
@@ -52,7 +52,7 @@ export function useCreatePricelist(organizationId: bigint) {
     mutationFn: (params: CreatePricelistParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createPricelist(organizationId, params);
+      return conn.reducers.createPricelist({ organizationId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pricelists"] });

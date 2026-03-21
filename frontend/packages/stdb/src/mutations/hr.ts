@@ -1,13 +1,21 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateEmployeeParams,
+  CreateContractParams,
+  CreateLeaveRequestParams,
+  CreatePayslipParams,
+} from "../generated/types";
 import { getStdbConnection } from "../connection";
+
+export type { CreateEmployeeParams, CreateContractParams, CreateLeaveRequestParams, CreatePayslipParams };
 
 export function useCreateEmployee(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateEmployeeParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createEmployee(organizationId, companyId, params as never);
+      return conn.reducers.createEmployee({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-employees"] });
@@ -18,10 +26,10 @@ export function useCreateEmployee(organizationId: bigint, companyId: bigint) {
 export function useCreateContract(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateContractParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createContract(organizationId, companyId, params as never);
+      return conn.reducers.createContract({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-contracts"] });
@@ -32,10 +40,10 @@ export function useCreateContract(organizationId: bigint, companyId: bigint) {
 export function useCreateLeaveRequest(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreateLeaveRequestParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createLeaveRequest(organizationId, companyId, params as never);
+      return conn.reducers.createLeaveRequest({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-leaves"] });
@@ -49,7 +57,7 @@ export function useApproveLeave(organizationId: bigint) {
     mutationFn: (leaveId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.approveLeave(organizationId, leaveId);
+      return conn.reducers.approveLeave({ organizationId, leaveId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-leaves"] });
@@ -63,7 +71,7 @@ export function useRefuseLeave(organizationId: bigint) {
     mutationFn: (leaveId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.refuseLeave(organizationId, leaveId);
+      return conn.reducers.refuseLeave({ organizationId, leaveId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-leaves"] });
@@ -74,10 +82,10 @@ export function useRefuseLeave(organizationId: bigint) {
 export function useCreatePayslip(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreatePayslipParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createPayslip(organizationId, companyId, params as never);
+      return conn.reducers.createPayslip({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-payslips"] });

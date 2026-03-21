@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { CreatePurchaseOrderParams, CreatePurchaseRequisitionParams } from "../generated/types";
 import { getStdbConnection } from "../connection";
+
+export type { CreatePurchaseOrderParams, CreatePurchaseRequisitionParams };
 
 export function useCreatePurchaseOrder(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreatePurchaseOrderParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createPurchaseOrder(organizationId, companyId, params as never);
+      return conn.reducers.createPurchaseOrder({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
@@ -21,7 +24,7 @@ export function useConfirmPurchaseOrder(organizationId: bigint) {
     mutationFn: (orderId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.confirmPurchaseOrder(organizationId, orderId);
+      return conn.reducers.confirmPurchaseOrder({ organizationId, orderId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
@@ -35,7 +38,7 @@ export function useCancelPurchaseOrder(organizationId: bigint) {
     mutationFn: (orderId: bigint) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.cancelPurchaseOrder(organizationId, orderId);
+      return conn.reducers.cancelPurchaseOrder({ organizationId, orderId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
@@ -46,10 +49,10 @@ export function useCancelPurchaseOrder(organizationId: bigint) {
 export function useCreatePurchaseRequisition(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: Record<string, unknown>) => {
+    mutationFn: (params: CreatePurchaseRequisitionParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      conn.reducers.createPurchaseRequisition(organizationId, companyId, params as never);
+      return conn.reducers.createPurchaseRequisition({ organizationId, companyId, params });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
