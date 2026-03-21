@@ -30,6 +30,45 @@
     "analytics": "Analytics",
     "settings": "Settings"
   },
+  "nav": {
+    "overview": "Overview",
+    "tasks": "Tasks",
+    "forensics": "Forensics",
+    "trackers": "Trackers",
+    "accounting": "Accounting",
+    "sales": "Sales",
+    "crm": "CRM",
+    "purchasing": "Purchasing",
+    "reports": "Reports",
+    "subscriptions": "Subscriptions",
+    "expenses": "Expenses",
+    "inventory": "Inventory",
+    "manufacturing": "Manufacturing",
+    "map": "Map",
+    "helpdesk": "Helpdesk",
+    "workflows": "Workflows",
+    "documents": "Documents",
+    "proposals": "Proposals",
+    "calendar": "Calendar",
+    "messages": "Messages",
+    "hr": "HR & People",
+    "projects": "Projects",
+    "iot": "IoT",
+    "settings": "Settings",
+    "journal": "Journal",
+    "notebook": "Notebook",
+    "aiAssistant": "AI Assistant",
+    "noRole": "No Role",
+    "erpSystem": "ERP System",
+    "groups": {
+      "analytics": "Analytics",
+      "finance": "Finance",
+      "operations": "Operations",
+      "productivity": "Productivity",
+      "people": "People",
+      "system": "System"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "erpSystem": "ERP System",
@@ -90,6 +129,373 @@
       "warehouses": {
         "warehouse": "Warehouse {{id}}",
         "distribution": "Distribution Center"
+      }
+    }
+  },
+  "demo": {
+    "dashboards": {
+      "sales": {
+        "title": "Sales Dashboard",
+        "description": "Real-time sales performance and analytics",
+        "sections": {
+          "highlights": "Key Highlights",
+          "charts": "Performance Trends",
+          "details": "Sales by Region",
+          "quickActions": "Quick Actions"
+        },
+        "widgets": {
+          "revenue": {
+            "label": "Revenue",
+            "subtitle": "+12.5% this month"
+          },
+          "orders": {
+            "label": "Orders",
+            "subtitle": "+8.2% growth"
+          },
+          "customers": {
+            "label": "Customers",
+            "subtitle": "New this month"
+          },
+          "conversion": {
+            "label": "Conversion",
+            "subtitle": "Above target"
+          },
+          "dailyGoals": "Daily Goals",
+          "revenueTrend": "Revenue Over Time",
+          "targets": "Monthly Targets",
+          "regionSales": "Regional Performance",
+          "topProducts": "Top Products",
+          "quarterEnd": "Quarter End"
+        },
+        "rings": {
+          "salesTarget": "Sales Target",
+          "orderTarget": "Order Target",
+          "callsMade": "Calls Made"
+        },
+        "countdown": {
+          "days": "Days",
+          "hours": "Hours",
+          "minutes": "Minutes",
+          "seconds": "Seconds"
+        },
+        "actions": {
+          "newOrder": "New Order",
+          "reports": "Reports",
+          "team": "Team",
+          "inventory": "Inventory",
+          "export": "Export",
+          "alerts": "Alerts"
+        },
+        "chartLabels": {
+          "jan": "Jan",
+          "feb": "Feb",
+          "mar": "Mar",
+          "apr": "Apr",
+          "may": "May",
+          "jun": "Jun",
+          "jul": "Jul",
+          "aug": "Aug",
+          "revenue": "Revenue",
+          "target": "Target",
+          "northAmerica": "North America",
+          "europe": "Europe",
+          "asiaPacific": "Asia Pacific",
+          "latinAmerica": "Latin America",
+          "middleEast": "Middle East"
+        }
+      },
+      "inventory": {
+        "title": "Inventory Dashboard",
+        "description": "Stock levels, movements, and warehouse analytics",
+        "sections": {
+          "stats": "Statistics",
+          "stockLevels": "Stock Analysis",
+          "movements": "Recent Activity"
+        },
+        "widgets": {
+          "stockStats": "Stock Statistics",
+          "categoryStock": "Stock by Category",
+          "warehouseCapacity": "Warehouse Capacity",
+          "stockMovement": "Stock Movement Trends"
+        },
+        "stats": {
+          "totalSkus": "Total SKUs",
+          "inStock": "In Stock",
+          "lowStock": "Low Stock",
+          "outOfStock": "Out of Stock"
+        },
+        "warehouses": {
+          "warehouseA": "Warehouse A",
+          "warehouseB": "Warehouse B",
+          "warehouseC": "Warehouse C",
+          "distributionCenter": "Distribution Center"
+        },
+        "chartLabels": {
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat",
+          "sun": "Sun",
+          "inbound": "Inbound",
+          "outbound": "Outbound"
+        }
+      },
+      "trackers": {
+        "title": "Activity Trackers",
+        "description": "iOS-inspired widgets for monitoring key metrics",
+        "sections": {
+          "iosTiles": "Metrics",
+          "activity": "Performance Rings",
+          "countdown": "Time Trackers",
+          "actions": "Quick Actions"
+        },
+        "widgets": {
+          "metrics": "Key Metrics",
+          "dailyGoals": "Daily Goals",
+          "weeklyProgress": "Weekly Progress",
+          "quarterEnd": "Quarter End",
+          "sprintProgress": "Sprint Progress"
+        },
+        "rings": {
+          "salesTarget": "Sales Target",
+          "orderTarget": "Order Target",
+          "callsMade": "Calls Made",
+          "revenue": "Revenue",
+          "leads": "Leads Generated",
+          "meetings": "Meetings"
+        },
+        "tiles": {
+          "revenue": "Revenue",
+          "orders": "Orders",
+          "customers": "Customers",
+          "conversion": "Conversion",
+          "avgOrder": "Avg Order",
+          "retention": "Retention"
+        },
+        "countdown": {
+          "completed": "Completed",
+          "inProgress": "In Progress",
+          "pending": "Pending",
+          "blocked": "Blocked"
+        },
+        "actions": {
+          "newOrder": "New Order",
+          "reports": "Reports",
+          "team": "Team",
+          "inventory": "Inventory",
+          "analytics": "Analytics",
+          "settings": "Settings",
+          "export": "Export",
+          "alerts": "Alerts"
+        }
+      }
+    },
+    "tables": {
+      "products": {
+        "title": "Product Inventory",
+        "description": "Manage your product catalog and inventory",
+        "columns": {
+          "image": "Image",
+          "name": "Product Name",
+          "sku": "SKU",
+          "category": "Category",
+          "price": "Price",
+          "stock": "Stock",
+          "status": "Status"
+        },
+        "categories": {
+          "electronics": "Electronics",
+          "clothing": "Clothing",
+          "furniture": "Furniture",
+          "food": "Food"
+        },
+        "status": {
+          "active": "Active",
+          "inactive": "Inactive",
+          "outOfStock": "Out of Stock"
+        },
+        "form": {
+          "imageUrl": "Image URL",
+          "imagePlaceholder": "https://example.com/image.jpg",
+          "productName": "Product Name",
+          "productPlaceholder": "Enter product name",
+          "sku": "SKU",
+          "skuPlaceholder": "PRD-001",
+          "category": "Category",
+          "price": "Price",
+          "pricePlaceholder": "0.00",
+          "stockQuantity": "Stock Quantity",
+          "stockPlaceholder": "0",
+          "status": "Status",
+          "description": "Description",
+          "descriptionPlaceholder": "Enter product description...",
+          "featured": "Featured Product"
+        }
+      },
+      "customers": {
+        "title": "Customer Directory",
+        "description": "Manage your customer relationships",
+        "columns": {
+          "name": "Name",
+          "email": "Email",
+          "company": "Company",
+          "tier": "Tier",
+          "totalSpent": "Total Spent",
+          "status": "Status"
+        },
+        "tiers": {
+          "bronze": "Bronze",
+          "silver": "Silver",
+          "gold": "Gold",
+          "platinum": "Platinum"
+        },
+        "status": {
+          "active": "Active",
+          "inactive": "Inactive",
+          "pending": "Pending"
+        },
+        "form": {
+          "avatarUrl": "Avatar URL",
+          "avatarPlaceholder": "https://example.com/avatar.jpg",
+          "fullName": "Full Name",
+          "email": "Email Address",
+          "phone": "Phone Number",
+          "company": "Company",
+          "tier": "Customer Tier",
+          "status": "Status",
+          "notes": "Notes"
+        }
+      },
+      "actions": {
+        "view": "View",
+        "edit": "Edit",
+        "delete": "Delete"
+      }
+    },
+    "forms": {
+      "newOrder": {
+        "title": "Create New Order",
+        "description": "Enter the details for the new sales order",
+        "submit": "Create Order",
+        "cancel": "Cancel",
+        "sections": {
+          "customerInfo": "Customer Information",
+          "orderDetails": "Order Details",
+          "options": "Additional Options"
+        },
+        "fields": {
+          "customerName": "Customer Name",
+          "customerPlaceholder": "Enter customer name",
+          "email": "Email Address",
+          "emailPlaceholder": "customer@example.com",
+          "phone": "Phone Number",
+          "phonePlaceholder": "+1 (555) 123-4567",
+          "company": "Company",
+          "companyPlaceholder": "Company name",
+          "product": "Product",
+          "productPlaceholder": "Select a product",
+          "quantity": "Quantity",
+          "priority": "Priority",
+          "billingCycle": "Billing Cycle",
+          "orderNotes": "Order Notes",
+          "notesPlaceholder": "Any special instructions or notes...",
+          "expressShipping": "Express Shipping (+$25)",
+          "giftWrap": "Gift Wrap (+$5)",
+          "terms": "I agree to the terms and conditions",
+          "newsletter": "Subscribe to our newsletter"
+        },
+        "options": {
+          "products": {
+            "enterprise": "Enterprise Suite - $200/mo",
+            "professional": "Professional Plan - $150/mo",
+            "starter": "Starter Kit - $50/mo",
+            "addonA": "Add-on Module A - $50/mo",
+            "support": "Support Package - $100/mo"
+          },
+          "priority": {
+            "low": "Low",
+            "normal": "Normal",
+            "high": "High",
+            "urgent": "Urgent"
+          },
+          "billing": {
+            "monthly": "Monthly",
+            "quarterly": "Quarterly (5% off)",
+            "annual": "Annual (15% off)"
+          }
+        }
+      },
+      "newCustomer": {
+        "title": "Add New Customer",
+        "description": "Register a new customer in the system",
+        "submit": "Add Customer",
+        "cancel": "Cancel",
+        "sections": {
+          "basicInfo": "Basic Information",
+          "companyInfo": "Company Details",
+          "preferences": "Preferences"
+        },
+        "fields": {
+          "firstName": "First Name",
+          "firstPlaceholder": "John",
+          "lastName": "Last Name",
+          "lastPlaceholder": "Doe",
+          "email": "Email",
+          "emailPlaceholder": "john.doe@example.com",
+          "phone": "Phone",
+          "phonePlaceholder": "+1 (555) 123-4567",
+          "company": "Company Name",
+          "companyPlaceholder": "Acme Inc.",
+          "industry": "Industry",
+          "website": "Website",
+          "websitePlaceholder": "https://example.com",
+          "contactMethod": "Preferred Contact Method",
+          "marketing": "Receive marketing communications"
+        },
+        "options": {
+          "industry": {
+            "tech": "Technology",
+            "finance": "Finance",
+            "healthcare": "Healthcare",
+            "retail": "Retail",
+            "manufacturing": "Manufacturing",
+            "other": "Other"
+          },
+          "contactMethod": {
+            "email": "Email",
+            "phone": "Phone",
+            "sms": "SMS"
+          }
+        }
+      },
+      "generateReport": {
+        "title": "Generate Report",
+        "description": "Configure and generate a custom report",
+        "submit": "Generate",
+        "cancel": "Cancel",
+        "fields": {
+          "reportType": "Report Type",
+          "format": "Export Format",
+          "fromDate": "From Date",
+          "toDate": "To Date",
+          "includeCharts": "Include visual charts",
+          "includeSummary": "Include executive summary"
+        },
+        "options": {
+          "reportTypes": {
+            "sales": "Sales Summary",
+            "inventory": "Inventory Report",
+            "customers": "Customer Analysis",
+            "financial": "Financial Overview"
+          },
+          "formats": {
+            "pdf": "PDF Document",
+            "excel": "Excel Spreadsheet",
+            "csv": "CSV File"
+          }
+        }
       }
     }
   },
@@ -184,6 +590,1917 @@
       "backToEntries": "Back to Journal Entries",
       "backToInvoices": "Back to Customer Invoices",
       "backToBills": "Back to Vendor Bills"
+    },
+    "entities": {
+      "bankStatements": {
+        "title": "Bank Statements",
+        "description": "Bank account statements for reconciliation",
+        "searchPlaceholder": "Search by reference…",
+        "emptyMessage": "No bank statements found.",
+        "columns": {
+          "name": "Reference",
+          "journalId": "Journal",
+          "state": "Status",
+          "date": "Date",
+          "balanceStart": "Opening Balance",
+          "balanceEndReal": "Closing Balance",
+          "lineIds": "Lines"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "Open": "Open",
+            "Posted": "Posted",
+            "Confirm": "Confirmed"
+          }
+        },
+        "states": {
+          "Open": "Open",
+          "Posted": "Posted",
+          "Confirm": "Confirmed"
+        }
+      },
+      "fixedAssets": {
+        "title": "Fixed Assets",
+        "description": "Property, plant, and equipment register",
+        "searchPlaceholder": "Search by name or reference…",
+        "emptyMessage": "No fixed assets found.",
+        "columns": {
+          "name": "Asset Name",
+          "state": "Status",
+          "acquisitionDate": "Acquired",
+          "originalValue": "Original Value",
+          "bookValue": "Book Value",
+          "depreciatedValue": "Depreciated",
+          "methodNumberMonth": "Duration (months)"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "Draft": "Draft",
+            "Open": "Running",
+            "Close": "Closed"
+          }
+        },
+        "states": {
+          "Draft": "Draft",
+          "Open": "Running",
+          "Close": "Closed"
+        }
+      }
+    },
+    "forms": {
+      "newInvoice": {
+        "title": "New Invoice",
+        "description": "Create a customer invoice",
+        "submitLabel": "Create Invoice",
+        "sections": {
+          "header": "Invoice Details"
+        },
+        "fields": {
+          "partner": "Customer / Partner",
+          "partnerPlaceholder": "Customer name",
+          "journal": "Journal",
+          "journalPlaceholder": "Select journal",
+          "invoiceDate": "Invoice Date",
+          "dueDate": "Due Date",
+          "ref": "Reference",
+          "refPlaceholder": "PO number or reference",
+          "notes": "Notes",
+          "notesPlaceholder": "Internal notes..."
+        }
+      },
+      "newBill": {
+        "title": "New Vendor Bill",
+        "description": "Create a vendor bill",
+        "submitLabel": "Create Bill",
+        "sections": {
+          "header": "Bill Details"
+        },
+        "fields": {
+          "partner": "Vendor / Partner",
+          "partnerPlaceholder": "Vendor name",
+          "journal": "Journal",
+          "journalPlaceholder": "Select journal",
+          "billDate": "Bill Date",
+          "dueDate": "Due Date",
+          "ref": "Reference",
+          "refPlaceholder": "Vendor reference",
+          "notes": "Notes",
+          "notesPlaceholder": "Internal notes..."
+        }
+      },
+      "newJournalEntry": {
+        "title": "New Journal Entry",
+        "description": "Create a manual journal entry",
+        "submitLabel": "Create Entry",
+        "sections": {
+          "header": "Entry Details"
+        },
+        "fields": {
+          "date": "Accounting Date",
+          "journal": "Journal",
+          "journalPlaceholder": "Select journal",
+          "ref": "Reference",
+          "refPlaceholder": "Optional reference",
+          "notes": "Notes"
+        }
+      },
+      "newAccount": {
+        "title": "New Account",
+        "description": "Add a general ledger account",
+        "submitLabel": "Create Account",
+        "sections": {
+          "identity": "Account Identity"
+        },
+        "fields": {
+          "code": "Account Code",
+          "codePlaceholder": "e.g. 1000",
+          "name": "Account Name",
+          "namePlaceholder": "e.g. Cash",
+          "internalGroup": "Internal Group",
+          "internalType": "Account Type",
+          "reconcile": "Allow reconciliation",
+          "notes": "Notes",
+          "options": {
+            "asset": "Asset",
+            "liability": "Liability",
+            "equity": "Equity",
+            "income": "Income",
+            "expense": "Expense",
+            "other": "Regular",
+            "receivable": "Receivable",
+            "payable": "Payable",
+            "liquidity": "Bank / Cash"
+          }
+        }
+      },
+      "newTax": {
+        "title": "New Tax",
+        "description": "Configure a tax rate",
+        "submitLabel": "Create Tax",
+        "sections": {
+          "config": "Tax Configuration"
+        },
+        "fields": {
+          "name": "Tax Name",
+          "namePlaceholder": "e.g. 15% GST",
+          "amount": "Rate (%)",
+          "taxType": "Tax Type",
+          "computation": "Computation",
+          "priceInclude": "Included in price",
+          "options": {
+            "sale": "Sales",
+            "purchase": "Purchase",
+            "none": "None",
+            "percent": "Percentage of price",
+            "fixed": "Fixed amount",
+            "division": "Percentage of total"
+          }
+        }
+      },
+      "newBudget": {
+        "title": "New Budget",
+        "description": "Create a budget plan",
+        "submitLabel": "Create Budget",
+        "sections": {
+          "info": "Budget Information"
+        },
+        "fields": {
+          "name": "Budget Name",
+          "namePlaceholder": "e.g. FY 2025 Operations",
+          "dateFrom": "Start Date",
+          "dateTo": "End Date",
+          "description": "Description",
+          "descriptionPlaceholder": "Budget purpose or notes..."
+        }
+      },
+      "postMove": {
+        "title": "Confirm Posting",
+        "description": "Post this entry to the general ledger. This action cannot be undone.",
+        "submitLabel": "Post Entry",
+        "fields": {
+          "confirmed": "I confirm this entry is correct and ready to be posted"
+        }
+      }
+    }
+  },
+  "crm": {
+    "leads": {
+      "title": "Leads",
+      "description": "Incoming leads and prospects",
+      "searchPlaceholder": "Search by name, email, or company…",
+      "emptyMessage": "No leads found.",
+      "columns": {
+        "contactName": "Name",
+        "partnerName": "Company",
+        "emailFrom": "Email",
+        "phone": "Phone",
+        "state": "Status",
+        "expectedRevenue": "Expected Revenue",
+        "createDate": "Created"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "New": "New",
+          "Qualified": "Qualified",
+          "Won": "Won",
+          "Lost": "Lost"
+        }
+      },
+      "states": {
+        "New": "New",
+        "Qualified": "Qualified",
+        "Won": "Won",
+        "Lost": "Lost"
+      }
+    },
+    "opportunities": {
+      "title": "Opportunities",
+      "description": "Active pipeline and deals in progress",
+      "searchPlaceholder": "Search opportunities…",
+      "emptyMessage": "No opportunities found.",
+      "columns": {
+        "name": "Opportunity",
+        "stageName": "Stage",
+        "priority": "Priority",
+        "expectedRevenue": "Expected Revenue",
+        "probability": "Win %",
+        "dateDeadline": "Close Date"
+      },
+      "states": {
+        "Low": "Low",
+        "Medium": "Medium",
+        "High": "High"
+      }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Customers, vendors, and partners",
+      "searchPlaceholder": "Search by name or email…",
+      "emptyMessage": "No contacts found.",
+      "columns": {
+        "name": "Name",
+        "companyName": "Company",
+        "email": "Email",
+        "phone": "Phone",
+        "isCompany": "Type",
+        "city": "City",
+        "countryId": "Country"
+      }
+    },
+    "activities": {
+      "title": "Activities",
+      "description": "Scheduled calls, meetings, tasks, and follow-ups",
+      "searchPlaceholder": "Search activities…",
+      "emptyMessage": "No activities found.",
+      "columns": {
+        "summary": "Summary",
+        "activityTypeId": "Type",
+        "dateDeadline": "Due Date",
+        "userId": "Assigned To",
+        "resName": "Related To"
+      },
+      "filters": {
+        "activityCategory": "Type",
+        "activityCategory.options": {
+          "default": "General",
+          "upload_file": "File Upload"
+        }
+      }
+    },
+    "forms": {
+      "newLead": {
+        "title": "New Lead",
+        "description": "Capture a new incoming lead",
+        "sections": {
+          "contact": "Contact",
+          "details": "Details"
+        },
+        "fields": {
+          "contactName": "Contact Name",
+          "contactNamePlaceholder": "Jane Smith",
+          "partnerName": "Company",
+          "partnerNamePlaceholder": "Acme Corp",
+          "emailFrom": "Email",
+          "emailFromPlaceholder": "jane@acme.com",
+          "phone": "Phone",
+          "phonePlaceholder": "+1 555 0100",
+          "expectedRevenue": "Expected Revenue",
+          "probability": "Probability %",
+          "probabilityPlaceholder": "10",
+          "description": "Notes",
+          "descriptionPlaceholder": "Lead context and background…"
+        }
+      },
+      "newOpportunity": {
+        "title": "New Opportunity",
+        "description": "Create a new sales opportunity",
+        "sections": {
+          "opportunity": "Opportunity"
+        },
+        "fields": {
+          "name": "Opportunity Name",
+          "namePlaceholder": "Enterprise deal — Acme Corp",
+          "expectedRevenue": "Expected Revenue",
+          "probability": "Win Probability %",
+          "probabilityPlaceholder": "20",
+          "dateDeadline": "Expected Close Date",
+          "priority": "Priority",
+          "options": {
+            "Low": "Low",
+            "Medium": "Medium",
+            "High": "High"
+          }
+        }
+      },
+      "newContact": {
+        "title": "New Contact",
+        "description": "Add a customer, vendor, or partner",
+        "sections": {
+          "identity": "Identity",
+          "details": "Details"
+        },
+        "fields": {
+          "name": "Full Name / Company Name",
+          "namePlaceholder": "Acme Corp",
+          "isCompany": "Is a Company",
+          "email": "Email",
+          "emailPlaceholder": "contact@example.com",
+          "phone": "Phone",
+          "phonePlaceholder": "+1 555 0100",
+          "city": "City",
+          "zip": "ZIP / Postal Code"
+        }
+      },
+      "newActivity": {
+        "title": "New Activity",
+        "description": "Schedule a call, meeting, or task",
+        "sections": {
+          "activityDetails": "Activity Details"
+        },
+        "fields": {
+          "summary": "Summary",
+          "summaryPlaceholder": "Call with client…",
+          "activityTypeId": "Activity Type",
+          "activityTypePlaceholder": "Type ID",
+          "dateDeadline": "Due Date",
+          "userId": "Assigned To",
+          "userIdPlaceholder": "User ID",
+          "note": "Notes",
+          "notePlaceholder": "Additional details…"
+        }
+      }
+    }
+  },
+  "hr": {
+    "employees": {
+      "title": "Employees",
+      "description": "All employees and their details",
+      "searchPlaceholder": "Search by name, email, or employee number…",
+      "emptyMessage": "No employees found.",
+      "columns": {
+        "employeeNumber": "#",
+        "name": "Name",
+        "jobTitle": "Job Title",
+        "departmentId": "Department",
+        "employmentType": "Type",
+        "workEmail": "Email",
+        "dateHired": "Hire Date",
+        "isActive": "Active"
+      },
+      "filters": {
+        "employmentType": "Type",
+        "employmentType.options": {
+          "FullTime": "Full-Time",
+          "PartTime": "Part-Time",
+          "Contract": "Contract",
+          "Intern": "Intern"
+        }
+      },
+      "states": {
+        "FullTime": "Full-Time",
+        "PartTime": "Part-Time",
+        "Contract": "Contract",
+        "Intern": "Intern"
+      }
+    },
+    "departments": {
+      "title": "Departments",
+      "description": "Company departments and structure",
+      "searchPlaceholder": "Search departments…",
+      "emptyMessage": "No departments found.",
+      "columns": {
+        "name": "Name",
+        "completeName": "Full Path",
+        "managerId": "Manager",
+        "parentId": "Parent Dept.",
+        "isActive": "Active"
+      }
+    },
+    "leaveRequests": {
+      "title": "Leave Requests",
+      "description": "Employee time-off requests",
+      "searchPlaceholder": "Search leave requests…",
+      "emptyMessage": "No leave requests found.",
+      "columns": {
+        "employeeId": "Employee",
+        "leaveTypeId": "Leave Type",
+        "state": "Status",
+        "dateFrom": "From",
+        "dateTo": "To",
+        "numberOfDays": "Days"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Confirm": "To Approve",
+          "ValidatedOne": "Second Approval",
+          "Validated": "Approved",
+          "Refused": "Refused"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Confirm": "To Approve",
+        "ValidatedOne": "Second Approval",
+        "Validated": "Approved",
+        "Refused": "Refused"
+      }
+    },
+    "contracts": {
+      "title": "Contracts",
+      "description": "Employee employment contracts",
+      "searchPlaceholder": "Search contracts…",
+      "emptyMessage": "No contracts found.",
+      "columns": {
+        "name": "Contract",
+        "employeeId": "Employee",
+        "state": "Status",
+        "dateStart": "Start",
+        "dateEnd": "End",
+        "wage": "Wage"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "New": "New",
+          "Open": "Running",
+          "Expired": "Expired",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "New": "New",
+        "Open": "Running",
+        "Expired": "Expired",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "payslips": {
+      "title": "Payslips",
+      "description": "Employee payroll records",
+      "searchPlaceholder": "Search payslips…",
+      "emptyMessage": "No payslips found.",
+      "columns": {
+        "name": "Reference",
+        "employeeId": "Employee",
+        "state": "Status",
+        "dateFrom": "Period Start",
+        "dateTo": "Period End",
+        "basicWage": "Basic Wage",
+        "grossWage": "Gross",
+        "netWage": "Net"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Verify": "Waiting",
+          "Done": "Done",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Verify": "Waiting",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "jobPositions": {
+      "title": "Job Positions",
+      "description": "Open positions and recruitment pipeline",
+      "searchPlaceholder": "Search job positions…",
+      "emptyMessage": "No job positions found.",
+      "columns": {
+        "name": "Job Position",
+        "departmentId": "Department",
+        "state": "Status",
+        "noOfEmployee": "Employees",
+        "expectedEmployees": "Expected",
+        "isActive": "Active"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "recruit": "Recruiting",
+          "open": "Open"
+        }
+      },
+      "states": {
+        "recruit": "Recruiting",
+        "open": "Open"
+      }
+    },
+    "forms": {
+      "newEmployee": {
+        "title": "New Employee",
+        "description": "Add a new employee to the company",
+        "sections": {
+          "personalInformation": "Personal Information",
+          "contact": "Contact"
+        },
+        "fields": {
+          "name": "Full Name",
+          "namePlaceholder": "e.g. Jane Doe",
+          "employmentType": "Employment Type",
+          "jobTitle": "Job Title",
+          "jobTitlePlaceholder": "e.g. Software Engineer",
+          "departmentId": "Department",
+          "departmentPlaceholder": "Department ID",
+          "workEmail": "Work Email",
+          "workEmailPlaceholder": "jane@company.com",
+          "workPhone": "Work Phone",
+          "workPhonePlaceholder": "+1 555 000 0000",
+          "workLocation": "Work Location",
+          "workLocationPlaceholder": "e.g. Office, Remote",
+          "dateHired": "Hire Date",
+          "options": {
+            "FullTime": "Full-Time",
+            "PartTime": "Part-Time",
+            "Contract": "Contract",
+            "Intern": "Intern"
+          }
+        }
+      },
+      "newLeaveRequest": {
+        "title": "New Leave Request",
+        "description": "Submit a time-off request",
+        "sections": {
+          "leaveDetails": "Leave Details"
+        },
+        "fields": {
+          "employeeId": "Employee",
+          "employeePlaceholder": "Employee ID",
+          "leaveTypeId": "Leave Type",
+          "leaveTypePlaceholder": "Leave Type ID",
+          "dateFrom": "From",
+          "dateTo": "To",
+          "numberOfDays": "Number of Days",
+          "notes": "Reason",
+          "notesPlaceholder": "Reason for leave…"
+        }
+      },
+      "newContract": {
+        "title": "New Contract",
+        "description": "Create an employment contract",
+        "sections": {
+          "contractDetails": "Contract Details"
+        },
+        "fields": {
+          "name": "Contract Reference",
+          "namePlaceholder": "e.g. EMP-001-2024",
+          "employeeId": "Employee",
+          "employeePlaceholder": "Employee ID",
+          "wage": "Monthly Wage",
+          "currencyId": "Currency",
+          "currencyPlaceholder": "Currency ID",
+          "dateStart": "Start Date",
+          "dateEnd": "End Date"
+        }
+      },
+      "newPayslip": {
+        "title": "New Payslip",
+        "description": "Generate an employee payslip",
+        "sections": {
+          "payslipDetails": "Payslip Details"
+        },
+        "fields": {
+          "employeeId": "Employee",
+          "employeePlaceholder": "Employee ID",
+          "structId": "Payroll Structure",
+          "structPlaceholder": "Structure ID",
+          "dateFrom": "Period Start",
+          "dateTo": "Period End",
+          "basicWage": "Basic Wage",
+          "contractId": "Contract",
+          "contractPlaceholder": "Contract ID"
+        }
+      },
+      "newJobPosition": {
+        "title": "New Job Position",
+        "description": "Create a new position for recruitment",
+        "sections": {
+          "positionDetails": "Position Details"
+        },
+        "fields": {
+          "name": "Job Title",
+          "namePlaceholder": "e.g. Senior Software Engineer",
+          "departmentId": "Department",
+          "departmentPlaceholder": "Department ID",
+          "expectedEmployees": "Expected Headcount",
+          "expectedEmployeesPlaceholder": "1",
+          "state": "Status",
+          "options": {
+            "recruit": "Recruiting",
+            "open": "Open"
+          }
+        }
+      }
+    }
+  },
+  "inventory": {
+    "products": {
+      "title": "Products",
+      "description": "Product catalog",
+      "searchPlaceholder": "Search by name or internal reference…",
+      "emptyMessage": "No products found.",
+      "columns": {
+        "defaultCode": "SKU",
+        "name": "Name",
+        "type": "Type",
+        "standardPrice": "Cost",
+        "saleOk": "Can Sell",
+        "purchaseOk": "Can Buy"
+      },
+      "filters": {
+        "type": "Type",
+        "type.options": {
+          "product": "Storable",
+          "consu": "Consumable",
+          "service": "Service"
+        }
+      },
+      "states": {
+        "consu": "Consumable",
+        "service": "Service",
+        "product": "Storable"
+      }
+    },
+    "stockOnHand": {
+      "title": "Stock On Hand",
+      "description": "Current inventory quantities by location",
+      "emptyMessage": "No stock records found.",
+      "columns": {
+        "productId": "Product ID",
+        "locationId": "Location",
+        "availableQuantity": "Available",
+        "reservedQuantity": "Reserved",
+        "inventoryQuantity": "On Hand",
+        "value": "Value"
+      }
+    },
+    "transfers": {
+      "title": "Transfers",
+      "description": "Stock movements and delivery orders",
+      "searchPlaceholder": "Search by reference or origin…",
+      "emptyMessage": "No transfers found.",
+      "columns": {
+        "name": "Reference",
+        "origin": "Source",
+        "state": "Status",
+        "scheduledDate": "Scheduled",
+        "dateDone": "Done Date",
+        "moveType": "Move Type"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "draft": "Draft",
+          "confirmed": "Confirmed",
+          "assigned": "Ready",
+          "done": "Done",
+          "cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "waiting": "Waiting",
+        "confirmed": "Confirmed",
+        "assigned": "Ready",
+        "done": "Done",
+        "cancel": "Cancelled"
+      }
+    },
+    "warehouses": {
+      "title": "Warehouses",
+      "description": "Warehouse locations and configuration",
+      "searchPlaceholder": "Search warehouses…",
+      "emptyMessage": "No warehouses found.",
+      "columns": {
+        "name": "Name",
+        "code": "Code",
+        "active": "Active"
+      }
+    },
+    "inventoryAdjustments": {
+      "title": "Inventory Adjustments",
+      "description": "Physical inventory counts and adjustments",
+      "searchPlaceholder": "Search adjustments…",
+      "emptyMessage": "No inventory adjustments found.",
+      "columns": {
+        "name": "Reference",
+        "state": "Status",
+        "date": "Date",
+        "accountingDate": "Accounting Date"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "draft": "Draft",
+          "confirm": "In Progress",
+          "validate": "Validated",
+          "cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "confirm": "In Progress",
+        "validate": "Validated",
+        "cancel": "Cancelled"
+      }
+    },
+    "stockLocations": {
+      "title": "Locations",
+      "description": "Warehouse bin and storage locations",
+      "searchPlaceholder": "Search locations…",
+      "emptyMessage": "No locations found.",
+      "columns": {
+        "completeName": "Location Path",
+        "usage": "Type",
+        "barcode": "Barcode",
+        "active": "Active"
+      },
+      "filters": {
+        "usage": "Type",
+        "usage.options": {
+          "internal": "Internal",
+          "customer": "Customer",
+          "supplier": "Supplier",
+          "inventory": "Inventory",
+          "transit": "Transit"
+        }
+      },
+      "states": {
+        "internal": "Internal",
+        "customer": "Customer",
+        "supplier": "Supplier",
+        "inventory": "Inventory",
+        "transit": "Transit",
+        "view": "View"
+      }
+    },
+    "productionLots": {
+      "title": "Lots & Serials",
+      "description": "Batch lots and serial number tracking",
+      "searchPlaceholder": "Search by lot/serial number…",
+      "emptyMessage": "No lots or serials found.",
+      "columns": {
+        "name": "Lot / Serial #",
+        "productId": "Product",
+        "ref": "Internal Ref",
+        "createDate": "Created",
+        "expirationDate": "Expiry"
+      }
+    },
+    "qualityChecks": {
+      "title": "Quality Checks",
+      "description": "Quality control inspection records",
+      "searchPlaceholder": "Search by name or lot…",
+      "emptyMessage": "No quality checks found.",
+      "columns": {
+        "name": "Reference",
+        "productId": "Product",
+        "qualityState": "Result",
+        "createDate": "Date",
+        "teamId": "QA Team"
+      },
+      "filters": {
+        "qualityState": "Result",
+        "qualityState.options": {
+          "none": "Pending",
+          "pass": "Pass",
+          "fail": "Fail"
+        }
+      },
+      "states": {
+        "none": "Pending",
+        "pass": "Pass",
+        "fail": "Fail"
+      }
+    },
+    "forms": {
+      "newProduct": {
+        "title": "New Product",
+        "description": "Add a product to the catalog",
+        "sections": {
+          "identity": "Identity",
+          "pricing": "Pricing"
+        },
+        "fields": {
+          "name": "Product Name",
+          "namePlaceholder": "e.g. Widget Pro",
+          "defaultCode": "Internal Reference (SKU)",
+          "defaultCodePlaceholder": "WGT-001",
+          "type": "Product Type",
+          "standardPrice": "Cost",
+          "standardPricePlaceholder": "0.00",
+          "saleOk": "Can be Sold",
+          "purchaseOk": "Can be Purchased",
+          "options": {
+            "product": "Storable Product",
+            "consu": "Consumable",
+            "service": "Service"
+          }
+        }
+      },
+      "newTransfer": {
+        "title": "New Transfer",
+        "description": "Create a stock movement",
+        "sections": {
+          "transferDetails": "Transfer Details"
+        },
+        "fields": {
+          "pickingTypeId": "Operation Type ID",
+          "locationId": "Source Location ID",
+          "locationDestId": "Destination Location ID",
+          "scheduledDate": "Scheduled Date",
+          "origin": "Source Document",
+          "originPlaceholder": "SO-001"
+        }
+      },
+      "newInventoryAdjustment": {
+        "title": "New Inventory Adjustment",
+        "description": "Start a physical inventory count",
+        "sections": {
+          "adjustmentDetails": "Adjustment Details"
+        },
+        "fields": {
+          "name": "Reference",
+          "namePlaceholder": "INV/2026/001",
+          "date": "Inventory Date"
+        }
+      }
+    }
+  },
+  "purchasing": {
+    "purchaseOrders": {
+      "title": "Purchase Orders",
+      "description": "All purchase orders",
+      "searchPlaceholder": "Search by reference or origin…",
+      "emptyMessage": "No purchase orders found.",
+      "columns": {
+        "name": "Reference",
+        "partnerId": "Vendor",
+        "state": "Status",
+        "dateOrder": "Order Date",
+        "datePlanned": "Expected",
+        "amountUntaxed": "Subtotal",
+        "amountTotal": "Total"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Sent": "Sent",
+          "ToApprove": "To Approve",
+          "Approved": "Purchase Order",
+          "Done": "Done",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Sent": "Sent",
+        "ToApprove": "To Approve",
+        "Approved": "Purchase Order",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "orderLines": {
+      "title": "Order Lines",
+      "description": "Individual line items across all purchase orders",
+      "emptyMessage": "No order lines found.",
+      "columns": {
+        "orderId": "PO",
+        "productId": "Product",
+        "productQty": "Qty Ordered",
+        "qtyReceived": "Qty Received",
+        "qtyToInvoice": "Qty to Bill",
+        "priceUnit": "Unit Price",
+        "priceSubtotal": "Subtotal",
+        "state": "Status",
+        "datePlanned": "Expected"
+      },
+      "states": {
+        "Draft": "Draft",
+        "Confirmed": "Confirmed",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "purchaseAgreements": {
+      "title": "Purchase Agreements",
+      "description": "Blanket orders and purchase agreements",
+      "searchPlaceholder": "Search agreements…",
+      "emptyMessage": "No purchase agreements found.",
+      "columns": {
+        "origin": "Source Document",
+        "vendorId": "Vendor",
+        "state": "Status",
+        "orderingDate": "Ordering Date",
+        "dateEnd": "Expiry Date",
+        "orderCount": "Orders"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Sent": "Sent",
+          "InProgress": "In Progress",
+          "Approved": "Approved",
+          "Cancelled": "Cancelled",
+          "Closed": "Closed"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Sent": "Sent",
+        "InProgress": "In Progress",
+        "Approved": "Approved",
+        "Cancelled": "Cancelled",
+        "Closed": "Closed"
+      }
+    },
+    "vendors": {
+      "title": "Vendors",
+      "description": "Supplier and vendor directory",
+      "searchPlaceholder": "Search by name, email, or tax ID…",
+      "emptyMessage": "No vendors found.",
+      "columns": {
+        "name": "Vendor Name",
+        "email": "Email",
+        "phone": "Phone",
+        "city": "City",
+        "countryId": "Country",
+        "taxId": "Tax ID"
+      }
+    }
+  },
+  "sales": {
+    "salesOrders": {
+      "title": "Sales Orders",
+      "description": "All sales orders",
+      "searchPlaceholder": "Search by reference or customer ref…",
+      "emptyMessage": "No sales orders found.",
+      "columns": {
+        "reference": "Order #",
+        "clientOrderRef": "Customer Ref",
+        "state": "Status",
+        "amountTotal": "Total",
+        "amountResidual": "Outstanding",
+        "invoiceStatus": "Invoice",
+        "dateOrder": "Order Date",
+        "deliveryCount": "Deliveries"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Sent": "Sent",
+          "Sale": "Confirmed",
+          "Done": "Done",
+          "Cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Sent": "Sent",
+        "Sale": "Confirmed",
+        "Done": "Done",
+        "Cancel": "Cancelled"
+      },
+      "invoiceStates": {
+        "Nothing": "Nothing",
+        "ToInvoice": "To Invoice",
+        "InvoicedPartially": "Partial",
+        "Invoiced": "Invoiced"
+      }
+    },
+    "orderLines": {
+      "title": "Order Lines",
+      "description": "Individual line items across all sales orders",
+      "searchPlaceholder": "Search by product or description…",
+      "emptyMessage": "No order lines found.",
+      "columns": {
+        "orderId": "Order ID",
+        "name": "Product / Description",
+        "productUomQty": "Qty Ordered",
+        "qtyDelivered": "Delivered",
+        "qtyInvoiced": "Invoiced",
+        "priceUnit": "Unit Price",
+        "priceSubtotal": "Subtotal",
+        "discount": "Disc %"
+      }
+    },
+    "pricelists": {
+      "title": "Pricelists",
+      "description": "Product pricelists and pricing rules",
+      "searchPlaceholder": "Search pricelists…",
+      "emptyMessage": "No pricelists found.",
+      "columns": {
+        "name": "Name",
+        "currencyId": "Currency",
+        "discountPolicy": "Discount Policy",
+        "active": "Active"
+      },
+      "states": {
+        "WithoutDiscount": "No Discount",
+        "WithDiscount": "With Discount"
+      }
+    },
+    "deliveries": {
+      "title": "Deliveries",
+      "description": "Stock picking batches and delivery runs",
+      "searchPlaceholder": "Search deliveries…",
+      "emptyMessage": "No deliveries found.",
+      "columns": {
+        "name": "Batch",
+        "state": "Status",
+        "scheduledDate": "Scheduled",
+        "pickingType": "Operation"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "InProgress": "In Progress",
+          "Done": "Done",
+          "Cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "InProgress": "In Progress",
+        "Done": "Done",
+        "Cancel": "Cancelled"
+      }
+    }
+  },
+  "manufacturing": {
+    "manufacturingOrders": {
+      "title": "Manufacturing Orders",
+      "description": "Production orders and their status",
+      "searchPlaceholder": "Search by reference or origin…",
+      "emptyMessage": "No manufacturing orders found.",
+      "columns": {
+        "name": "Reference",
+        "productId": "Product",
+        "productQty": "Qty",
+        "qtyProducing": "Producing",
+        "state": "Status",
+        "datePlannedStart": "Scheduled",
+        "datePlannedFinished": "Deadline",
+        "origin": "Source"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Confirmed": "Confirmed",
+          "Progress": "In Progress",
+          "ToClose": "To Close",
+          "Done": "Done",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Confirmed": "Confirmed",
+        "Progress": "In Progress",
+        "ToClose": "To Close",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "billsOfMaterials": {
+      "title": "Bills of Materials",
+      "description": "Product structures and component lists",
+      "searchPlaceholder": "Search BOMs…",
+      "emptyMessage": "No bills of materials found.",
+      "columns": {
+        "productId": "Product",
+        "productTmplId": "Product Template",
+        "type": "BOM Type",
+        "productQty": "Quantity",
+        "estimatedCost": "Est. Cost",
+        "routingId": "Routing"
+      },
+      "filters": {
+        "type": "Type",
+        "type.options": {
+          "Normal": "Manufacture",
+          "Phantom": "Phantom",
+          "Kit": "Kit",
+          "Subcontracting": "Subcontracting"
+        }
+      },
+      "states": {
+        "Normal": "Manufacture",
+        "Phantom": "Phantom",
+        "Kit": "Kit",
+        "Subcontracting": "Subcontracting"
+      }
+    },
+    "workOrders": {
+      "title": "Work Orders",
+      "description": "Operations scheduled at work centers",
+      "searchPlaceholder": "Search work orders…",
+      "emptyMessage": "No work orders found.",
+      "columns": {
+        "name": "Operation",
+        "productionId": "MO",
+        "workcenterId": "Work Center",
+        "state": "Status",
+        "durationExpected": "Expected (min)",
+        "duration": "Actual (min)",
+        "dateStart": "Start",
+        "dateFinished": "Finish"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Pending": "Pending",
+          "Ready": "Ready",
+          "Progress": "In Progress",
+          "Done": "Done",
+          "Cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "Pending": "Pending",
+        "Ready": "Ready",
+        "Progress": "In Progress",
+        "Done": "Done",
+        "Cancel": "Cancelled"
+      }
+    },
+    "workCenters": {
+      "title": "Work Centers",
+      "description": "Machines and work stations",
+      "searchPlaceholder": "Search work centers…",
+      "emptyMessage": "No work centers found.",
+      "columns": {
+        "name": "Name",
+        "code": "Code",
+        "active": "Active",
+        "timeEfficiency": "Efficiency %",
+        "oee": "OEE %",
+        "capacity": "Capacity",
+        "workorderCount": "WO Count"
+      }
+    },
+    "forms": {
+      "newManufacturingOrder": {
+        "title": "New Manufacturing Order",
+        "description": "Create a new production order",
+        "sections": {
+          "product": "Product",
+          "scheduling": "Scheduling",
+          "other": "Other"
+        },
+        "fields": {
+          "productId": "Product",
+          "productIdPlaceholder": "Product ID",
+          "productQty": "Quantity",
+          "productQtyPlaceholder": "0",
+          "bomId": "Bill of Materials",
+          "bomIdPlaceholder": "BOM ID",
+          "productUomId": "Unit of Measure",
+          "productUomIdPlaceholder": "UOM ID",
+          "datePlannedStart": "Scheduled Start",
+          "datePlannedFinished": "Scheduled End",
+          "origin": "Source Document",
+          "originPlaceholder": "e.g. SO-0042",
+          "routingId": "Routing",
+          "routingIdPlaceholder": "Routing ID"
+        }
+      },
+      "newBom": {
+        "title": "New Bill of Materials",
+        "description": "Define a product structure",
+        "sections": {
+          "product": "Product"
+        },
+        "fields": {
+          "productTmplId": "Product Template",
+          "productTmplIdPlaceholder": "Template ID",
+          "productQty": "Quantity",
+          "productQtyPlaceholder": "1",
+          "type": "BOM Type",
+          "routingId": "Routing",
+          "routingIdPlaceholder": "Routing ID",
+          "options": {
+            "Normal": "Manufacture",
+            "Phantom": "Phantom",
+            "Kit": "Kit",
+            "Subcontracting": "Subcontracting"
+          }
+        }
+      },
+      "newWorkcenter": {
+        "title": "New Work Center",
+        "description": "Register a machine or work station",
+        "sections": {
+          "general": "General"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. Assembly Line A",
+          "code": "Code",
+          "codePlaceholder": "e.g. ALA",
+          "capacity": "Capacity",
+          "capacityPlaceholder": "1",
+          "timeEfficiency": "Efficiency %",
+          "timeEfficiencyPlaceholder": "100",
+          "oeeTarget": "OEE Target %",
+          "oeeTargetPlaceholder": "85"
+        }
+      }
+    }
+  },
+  "projects": {
+    "projects": {
+      "title": "Projects",
+      "description": "All active and completed projects",
+      "searchPlaceholder": "Search projects…",
+      "emptyMessage": "No projects found.",
+      "columns": {
+        "name": "Project",
+        "lastUpdateStatus": "Status",
+        "partnerId": "Customer",
+        "dateStart": "Start",
+        "dateEnd": "Deadline",
+        "allocatedHours": "Budget (h)",
+        "taskCount": "Tasks"
+      },
+      "filters": {
+        "lastUpdateStatus": "Status",
+        "lastUpdateStatus.options": {
+          "InProgress": "In Progress",
+          "Paused": "Paused",
+          "Done": "Done",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "InProgress": "In Progress",
+        "Paused": "Paused",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "tasks": {
+      "title": "Tasks",
+      "description": "All project tasks",
+      "searchPlaceholder": "Search tasks…",
+      "emptyMessage": "No tasks found.",
+      "columns": {
+        "name": "Task",
+        "projectId": "Project",
+        "kanbanState": "Status",
+        "priority": "Priority",
+        "plannedHours": "Planned (h)",
+        "effectiveHours": "Spent (h)",
+        "dateDeadline": "Deadline"
+      },
+      "filters": {
+        "kanbanState": "Status",
+        "kanbanState.options": {
+          "InProgress": "In Progress",
+          "Changes": "Changes Requested",
+          "Approved": "Approved",
+          "Done": "Done",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "InProgress": "In Progress",
+        "Changes": "Changes Requested",
+        "Approved": "Approved",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      },
+      "priority": {
+        "0": "Normal",
+        "1": "Low",
+        "2": "High",
+        "3": "Urgent"
+      }
+    },
+    "timesheets": {
+      "title": "Timesheets",
+      "description": "Time entries logged against projects and tasks",
+      "searchPlaceholder": "Search timesheets…",
+      "emptyMessage": "No timesheet entries found.",
+      "columns": {
+        "date": "Date",
+        "projectId": "Project",
+        "taskId": "Task",
+        "name": "Description",
+        "unitAmount": "Hours",
+        "amount": "Amount"
+      }
+    },
+    "forms": {
+      "newProject": {
+        "title": "New Project",
+        "description": "Create a new project",
+        "sections": {
+          "projectDetails": "Project Details"
+        },
+        "fields": {
+          "name": "Project Name",
+          "namePlaceholder": "Website Redesign",
+          "partnerId": "Customer ID",
+          "partnerIdPlaceholder": "Partner ID",
+          "allocatedHours": "Budget (hours)",
+          "allocatedHoursPlaceholder": "0",
+          "dateStart": "Start Date",
+          "dateEnd": "Deadline",
+          "description": "Description",
+          "descriptionPlaceholder": "Project scope and objectives…"
+        }
+      },
+      "newTask": {
+        "title": "New Task",
+        "description": "Add a task to a project",
+        "sections": {
+          "taskDetails": "Task Details"
+        },
+        "fields": {
+          "name": "Task Name",
+          "namePlaceholder": "Design homepage mockup",
+          "projectId": "Project ID",
+          "projectIdPlaceholder": "Project ID",
+          "priority": "Priority",
+          "plannedHours": "Planned Hours",
+          "plannedHoursPlaceholder": "0",
+          "dateDeadline": "Deadline",
+          "description": "Description",
+          "descriptionPlaceholder": "Task details and acceptance criteria…",
+          "options": {
+            "0": "Normal",
+            "1": "Low",
+            "2": "High",
+            "3": "Urgent"
+          }
+        }
+      }
+    }
+  },
+  "calendar": {
+    "events": {
+      "title": "Calendar Events",
+      "description": "Meetings, appointments, and scheduled events",
+      "searchPlaceholder": "Search events…",
+      "emptyMessage": "No events found.",
+      "columns": {
+        "name": "Event",
+        "start": "Start",
+        "stop": "End",
+        "location": "Location",
+        "allday": "All Day",
+        "state": "Status",
+        "privacy": "Privacy",
+        "recurrency": "Recurring"
+      },
+      "filters": {
+        "state": "Status",
+        "stateOptions": {
+          "draft": "Draft",
+          "confirmed": "Confirmed",
+          "cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "confirmed": "Confirmed",
+        "cancelled": "Cancelled"
+      },
+      "privacy": {
+        "public": "Public",
+        "private": "Private",
+        "confidential": "Confidential"
+      }
+    },
+    "forms": {
+      "newEvent": {
+        "title": "New Event",
+        "description": "Schedule a meeting, call, or event",
+        "sections": {
+          "eventDetails": "Event Details"
+        },
+        "fields": {
+          "name": "Event Title",
+          "namePlaceholder": "Team standup",
+          "start": "Start Date & Time",
+          "stop": "End Date & Time",
+          "location": "Location",
+          "locationPlaceholder": "Conference Room A or video link",
+          "allday": "All Day Event",
+          "privacy": "Privacy",
+          "description": "Description",
+          "descriptionPlaceholder": "Event details and agenda…",
+          "options": {
+            "public": "Public",
+            "private": "Private",
+            "confidential": "Confidential"
+          }
+        }
+      }
+    }
+  },
+  "documents": {
+    "documents": {
+      "title": "Documents",
+      "description": "Files, attachments, and managed documents",
+      "searchPlaceholder": "Search documents…",
+      "emptyMessage": "No documents found.",
+      "columns": {
+        "name": "Name",
+        "fileName": "File",
+        "mimetype": "Type",
+        "fileSize": "Size",
+        "isFavorite": "Favorite",
+        "isShared": "Shared",
+        "versionCount": "Versions",
+        "createDate": "Created"
+      },
+      "filters": {
+        "isDeleted": "Status",
+        "isDeleted.options": {
+          "false": "Active",
+          "true": "Deleted"
+        }
+      }
+    },
+    "knowledgeBase": {
+      "title": "Knowledge Base",
+      "description": "Articles, guides, and internal documentation",
+      "searchPlaceholder": "Search articles…",
+      "emptyMessage": "No articles found.",
+      "columns": {
+        "name": "Title",
+        "description": "Description",
+        "isPublished": "Published",
+        "articleItemCount": "Items",
+        "articleMemberCount": "Members",
+        "createDate": "Created"
+      },
+      "filters": {
+        "isPublished": "Published",
+        "isPublished.options": {
+          "true": "Published",
+          "false": "Draft"
+        }
+      }
+    },
+    "forms": {
+      "newDocument": {
+        "title": "Upload Document",
+        "description": "Add a new document to the repository",
+        "sections": {
+          "documentDetails": "Document Details"
+        },
+        "fields": {
+          "name": "Document Name",
+          "namePlaceholder": "Q4 Financial Report",
+          "fileName": "File Name",
+          "fileNamePlaceholder": "report-q4-2024.pdf",
+          "mimetype": "File Type",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief description of this document…",
+          "isFavorite": "Mark as Favorite",
+          "isShared": "Share with Team",
+          "options": {
+            "pdf": "PDF",
+            "excel": "Excel",
+            "word": "Word",
+            "png": "PNG",
+            "jpeg": "JPEG",
+            "text": "Text"
+          }
+        }
+      },
+      "newKnowledgeArticle": {
+        "title": "New Article",
+        "description": "Create a knowledge base article",
+        "sections": {
+          "articleDetails": "Article Details"
+        },
+        "fields": {
+          "name": "Article Title",
+          "namePlaceholder": "How to process refunds",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief summary of this article…",
+          "isPublished": "Publish immediately"
+        }
+      }
+    }
+  },
+  "helpdesk": {
+    "tickets": {
+      "title": "Helpdesk Tickets",
+      "description": "Customer support and internal IT tickets",
+      "searchPlaceholder": "Search by subject or ticket number…",
+      "emptyMessage": "No tickets found.",
+      "columns": {
+        "name": "Subject",
+        "ticketNumber": "Ticket #",
+        "partnerId": "Customer",
+        "userId": "Assigned To",
+        "priority": "Priority",
+        "state": "Status",
+        "createDate": "Created",
+        " slaDeadline": "SLA Deadline"
+      },
+      "filters": {
+        "priority": "Priority",
+        "priority.options": {
+          "0": "Low",
+          "1": "Medium",
+          "2": "High",
+          "3": "Urgent"
+        },
+        "state": "Status",
+        "state.options": {
+          "New": "New",
+          "InProgress": "In Progress",
+          "Solved": "Solved",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "New": "New",
+        "InProgress": "In Progress",
+        "Solved": "Solved",
+        "Cancelled": "Cancelled"
+      },
+      "priority": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High",
+        "3": "Urgent"
+      }
+    },
+    "forms": {
+      "newTicket": {
+        "title": "New Ticket",
+        "description": "Create a support ticket",
+        "sections": {
+          "ticketDetails": "Ticket Details"
+        },
+        "fields": {
+          "name": "Subject",
+          "namePlaceholder": "Brief description of the issue",
+          "partnerId": "Customer",
+          "partnerPlaceholder": "Customer ID",
+          "priority": "Priority",
+          "description": "Description",
+          "descriptionPlaceholder": "Detailed description of the issue…"
+        }
+      }
+    }
+  },
+  "subscriptions": {
+    "subscriptions": {
+      "title": "Subscriptions",
+      "description": "Customer subscriptions and recurring billing",
+      "searchPlaceholder": "Search subscriptions…",
+      "emptyMessage": "No subscriptions found.",
+      "columns": {
+        "name": "Reference",
+        "partnerId": "Customer",
+        "productId": "Plan",
+        "state": "Status",
+        "dateStart": "Start Date",
+        "dateEnd": "End Date",
+        "recurringTotal": "Recurring Total"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Open": "Active",
+          "Pending": "Pending",
+          "Close": "Closed",
+          "Cancelled": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Open": "Active",
+        "Pending": "Pending",
+        "Close": "Closed",
+        "Cancelled": "Cancelled"
+      }
+    },
+    "plans": {
+      "title": "Subscription Plans",
+      "description": "Recurring products and pricing plans",
+      "searchPlaceholder": "Search plans…",
+      "emptyMessage": "No plans found.",
+      "columns": {
+        "name": "Plan Name",
+        "productId": "Product",
+        "recurrenceId": "Billing Cycle",
+        "active": "Active"
+      }
+    },
+    "forms": {
+      "newSubscription": {
+        "title": "New Subscription",
+        "description": "Create a customer subscription",
+        "sections": {
+          "subscriptionDetails": "Subscription Details"
+        },
+        "fields": {
+          "partnerId": "Customer",
+          "partnerPlaceholder": "Customer ID",
+          "productId": "Plan",
+          "productPlaceholder": "Product ID",
+          "dateStart": "Start Date",
+          "dateEnd": "End Date (optional)"
+        }
+      },
+      "newPlan": {
+        "title": "New Subscription Plan",
+        "description": "Create a new recurring plan",
+        "sections": {
+          "planDetails": "Plan Details"
+        },
+        "fields": {
+          "name": "Plan Name",
+          "namePlaceholder": "e.g. Premium Monthly",
+          "productId": "Product",
+          "productPlaceholder": "Product ID",
+          "recurrenceId": "Billing Cycle",
+          "recurrencePlaceholder": "Recurrence ID"
+        }
+      }
+    }
+  },
+  "expenses": {
+    "expenses": {
+      "title": "Expenses",
+      "description": "Employee expense reports and receipts",
+      "searchPlaceholder": "Search expenses…",
+      "emptyMessage": "No expenses found.",
+      "columns": {
+        "name": "Description",
+        "employeeId": "Employee",
+        "date": "Date",
+        "totalAmount": "Amount",
+        "state": "Status",
+        "sheetId": "Report"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Reported": "Reported",
+          "Approved": "Approved",
+          "Done": "Reimbursed",
+          "Refused": "Refused"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Reported": "Reported",
+        "Approved": "Approved",
+        "Done": "Reimbursed",
+        "Refused": "Refused"
+      }
+    },
+    "sheets": {
+      "title": "Expense Reports",
+      "description": "Expense report summaries for approval",
+      "searchPlaceholder": "Search expense reports…",
+      "emptyMessage": "No expense reports found.",
+      "columns": {
+        "name": "Report Name",
+        "employeeId": "Employee",
+        "state": "Status",
+        "createDate": "Submitted",
+        "totalAmount": "Total Amount"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Submit": "Submitted",
+          "Approve": "Approved",
+          "Post": "Posted",
+          "Done": "Reimbursed",
+          "Cancel": "Cancelled"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Submit": "Submitted",
+        "Approve": "Approved",
+        "Post": "Posted",
+        "Done": "Reimbursed",
+        "Cancel": "Cancelled"
+      }
+    },
+    "forms": {
+      "newExpense": {
+        "title": "New Expense",
+        "description": "Submit a new expense",
+        "sections": {
+          "expenseDetails": "Expense Details"
+        },
+        "fields": {
+          "name": "Description",
+          "namePlaceholder": "e.g. Client dinner",
+          "date": "Date",
+          "totalAmount": "Amount",
+          "employeeId": "Employee",
+          "employeePlaceholder": "Employee ID",
+          "productId": "Category",
+          "productPlaceholder": "Product ID"
+        }
+      },
+      "newExpenseSheet": {
+        "title": "New Expense Report",
+        "description": "Submit expenses for reimbursement",
+        "sections": {
+          "sheetDetails": "Report Details"
+        },
+        "fields": {
+          "name": "Report Name",
+          "namePlaceholder": "e.g. March 2024 Expenses",
+          "employeeId": "Employee",
+          "employeePlaceholder": "Employee ID"
+        }
+      }
+    }
+  },
+  "workflows": {
+    "workflows": {
+      "title": "Workflows",
+      "description": "Business process automation rules",
+      "searchPlaceholder": "Search workflows…",
+      "emptyMessage": "No workflows found.",
+      "columns": {
+        "name": "Name",
+        "modelId": "Model",
+        "state": "Status",
+        "active": "Active"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Draft": "Draft",
+          "Active": "Active",
+          "Inactive": "Inactive"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Active": "Active",
+        "Inactive": "Inactive"
+      }
+    },
+    "instances": {
+      "title": "Workflow Instances",
+      "description": "Running and completed workflow executions",
+      "searchPlaceholder": "Search instances…",
+      "emptyMessage": "No workflow instances found.",
+      "columns": {
+        "workflowId": "Workflow",
+        "resModel": "Model",
+        "resId": "Record",
+        "state": "Status",
+        "dateStart": "Started",
+        "dateEnd": "Completed"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "Running": "Running",
+          "Completed": "Completed",
+          "Cancelled": "Cancelled",
+          "Error": "Error"
+        }
+      },
+      "states": {
+        "Running": "Running",
+        "Completed": "Completed",
+        "Cancelled": "Cancelled",
+        "Error": "Error"
+      }
+    },
+    "forms": {
+      "newWorkflow": {
+        "title": "New Workflow",
+        "description": "Create a business process workflow",
+        "sections": {
+          "workflowDetails": "Workflow Details"
+        },
+        "fields": {
+          "name": "Workflow Name",
+          "namePlaceholder": "e.g. Invoice Approval",
+          "modelId": "Model",
+          "modelPlaceholder": "Model ID",
+          "active": "Active"
+        }
+      }
+    }
+  },
+  "proposals": {
+    "proposals": {
+      "title": "Proposals",
+      "description": "Business proposals and RFP responses",
+      "searchPlaceholder": "Search proposals…",
+      "emptyMessage": "No proposals found.",
+      "columns": {
+        "title": "Title",
+        "clientName": "Client",
+        "status": "Status",
+        "value": "Value",
+        "deadline": "Deadline",
+        "ownerId": "Owner",
+        "versionCount": "Versions",
+        "writeDate": "Updated"
+      },
+      "filters": {
+        "status": "Status",
+        "status.options": {
+          "Draft": "Draft",
+          "Review": "Review",
+          "Submitted": "Submitted",
+          "Awarded": "Awarded",
+          "Rejected": "Rejected",
+          "Archived": "Archived"
+        }
+      },
+      "states": {
+        "Draft": "Draft",
+        "Review": "Review",
+        "Submitted": "Submitted",
+        "Awarded": "Awarded",
+        "Rejected": "Rejected",
+        "Archived": "Archived"
+      }
+    },
+    "templates": {
+      "title": "Proposal Templates",
+      "description": "Reusable proposal templates",
+      "searchPlaceholder": "Search templates…",
+      "emptyMessage": "No templates found.",
+      "columns": {
+        "name": "Name",
+        "category": "Category",
+        "sectionCount": "Sections",
+        "description": "Description",
+        "usageCount": "Uses",
+        "createdAt": "Created"
+      }
+    },
+    "forms": {
+      "newProposal": {
+        "title": "New Proposal",
+        "description": "Create a new business proposal",
+        "sections": {
+          "proposalDetails": "Proposal Details"
+        },
+        "fields": {
+          "name": "Proposal Title",
+          "namePlaceholder": "e.g. ERP Implementation Proposal",
+          "partnerId": "Client",
+          "partnerPlaceholder": "Customer ID",
+          "amountTotal": "Total Value",
+          "probability": "Win Probability %",
+          "dateDeadline": "Due Date"
+        }
+      }
     }
   }
 }
