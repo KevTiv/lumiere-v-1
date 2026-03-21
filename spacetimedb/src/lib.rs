@@ -73,6 +73,8 @@ pub mod hr;         // Phase 17 — HR, Leaves, Contracts, Payroll
 pub mod helpdesk;   // Phase 18 — Helpdesk & Support Tickets
 pub mod expenses;   // Phase 19 — Employee Expenses
 pub mod iot;        // Phase 20 — IoT Integration (devices, telemetry, actions)
+pub mod proposals;  // Phase 21 — Sales Proposals & Tenders
+pub mod fleet;      // Phase 22 — Fleet Vehicles, POS Terminals & Warehouse Geo
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 
