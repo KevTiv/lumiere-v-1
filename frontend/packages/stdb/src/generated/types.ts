@@ -4976,6 +4976,33 @@ export const FiscalYearState = __t.enum("FiscalYearState", {
 });
 export type FiscalYearState = __Infer<typeof FiscalYearState>;
 
+export const FleetVehicle = __t.object("FleetVehicle", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  name: __t.string(),
+  licensePlate: __t.option(__t.string()),
+  driverName: __t.option(__t.string()),
+  driverId: __t.option(__t.identity()),
+  get status() {
+    return VehicleStatus;
+  },
+  latitude: __t.option(__t.f64()),
+  longitude: __t.option(__t.f64()),
+  speedKmh: __t.option(__t.f64()),
+  heading: __t.option(__t.f64()),
+  lastPositionAt: __t.option(__t.timestamp()),
+  fuelLevel: __t.option(__t.f64()),
+  odometerKm: __t.option(__t.f64()),
+  vehicleType: __t.string(),
+  companyId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type FleetVehicle = __Infer<typeof FleetVehicle>;
+
 export const GenerateSubscriptionInvoiceParams = __t.object("GenerateSubscriptionInvoiceParams", {
   invoiceDate: __t.timestamp(),
 });
@@ -6771,6 +6798,37 @@ export const PosSession = __t.object("PosSession", {
 });
 export type PosSession = __Infer<typeof PosSession>;
 
+// The tagged union or sum type for the algebraic type `PosStatus`.
+export const PosStatus = __t.enum("PosStatus", {
+  Open: __t.unit(),
+  Closed: __t.unit(),
+  Error: __t.unit(),
+  Maintenance: __t.unit(),
+});
+export type PosStatus = __Infer<typeof PosStatus>;
+
+export const PosTerminal = __t.object("PosTerminal", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  name: __t.string(),
+  locationLabel: __t.option(__t.string()),
+  get status() {
+    return PosStatus;
+  },
+  latitude: __t.option(__t.f64()),
+  longitude: __t.option(__t.f64()),
+  dailyRevenue: __t.f64(),
+  openOrders: __t.u32(),
+  currencyId: __t.option(__t.u64()),
+  companyId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PosTerminal = __Infer<typeof PosTerminal>;
+
 // The tagged union or sum type for the algebraic type `PricelistAppliedOn`.
 export const PricelistAppliedOn = __t.enum("PricelistAppliedOn", {
   AllProducts: __t.unit(),
@@ -7221,6 +7279,84 @@ export const ProjectTimesheet = __t.object("ProjectTimesheet", {
   metadata: __t.option(__t.string()),
 });
 export type ProjectTimesheet = __Infer<typeof ProjectTimesheet>;
+
+export const Proposal = __t.object("Proposal", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  title: __t.string(),
+  clientName: __t.string(),
+  get status() {
+    return ProposalStatus;
+  },
+  value: __t.f64(),
+  deadline: __t.option(__t.timestamp()),
+  description: __t.option(__t.string()),
+  ownerId: __t.identity(),
+  versionCount: __t.u32(),
+  templateId: __t.option(__t.u64()),
+  partnerId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type Proposal = __Infer<typeof Proposal>;
+
+export const ProposalSection = __t.object("ProposalSection", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  title: __t.string(),
+  content: __t.string(),
+  get status() {
+    return SectionStatus;
+  },
+  aiSuggestion: __t.option(__t.string()),
+  sequence: __t.u32(),
+  wordCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalSection = __Infer<typeof ProposalSection>;
+
+export const ProposalSourceDoc = __t.object("ProposalSourceDoc", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  name: __t.string(),
+  content: __t.string(),
+  docType: __t.string(),
+  wordCount: __t.u32(),
+  addedBy: __t.identity(),
+  addedAt: __t.timestamp(),
+});
+export type ProposalSourceDoc = __Infer<typeof ProposalSourceDoc>;
+
+// The tagged union or sum type for the algebraic type `ProposalStatus`.
+export const ProposalStatus = __t.enum("ProposalStatus", {
+  Draft: __t.unit(),
+  Review: __t.unit(),
+  Submitted: __t.unit(),
+  Awarded: __t.unit(),
+  Rejected: __t.unit(),
+  Archived: __t.unit(),
+});
+export type ProposalStatus = __Infer<typeof ProposalStatus>;
+
+export const ProposalVersion = __t.object("ProposalVersion", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  versionNumber: __t.u32(),
+  message: __t.string(),
+  sectionsJson: __t.string(),
+  authorId: __t.identity(),
+  createDate: __t.timestamp(),
+});
+export type ProposalVersion = __Infer<typeof ProposalVersion>;
 
 export const PurchaseOrder = __t.object("PurchaseOrder", {
   id: __t.u64(),
@@ -8024,6 +8160,15 @@ export const SearchEmbedding = __t.object("SearchEmbedding", {
   metadata: __t.option(__t.string()),
 });
 export type SearchEmbedding = __Infer<typeof SearchEmbedding>;
+
+// The tagged union or sum type for the algebraic type `SectionStatus`.
+export const SectionStatus = __t.enum("SectionStatus", {
+  Empty: __t.unit(),
+  Draft: __t.unit(),
+  Complete: __t.unit(),
+  Reviewed: __t.unit(),
+});
+export type SectionStatus = __Infer<typeof SectionStatus>;
 
 export const SegmentMember = __t.object("SegmentMember", {
   id: __t.u64(),
@@ -10378,6 +10523,15 @@ export const UtmSource = __t.object("UtmSource", {
 });
 export type UtmSource = __Infer<typeof UtmSource>;
 
+// The tagged union or sum type for the algebraic type `VehicleStatus`.
+export const VehicleStatus = __t.enum("VehicleStatus", {
+  Active: __t.unit(),
+  Idle: __t.unit(),
+  Maintenance: __t.unit(),
+  Offline: __t.unit(),
+});
+export type VehicleStatus = __Infer<typeof VehicleStatus>;
+
 // The tagged union or sum type for the algebraic type `VerificationLevel`.
 export const VerificationLevel = __t.enum("VerificationLevel", {
   Unverified: __t.unit(),
@@ -10438,6 +10592,23 @@ export const Warehouse = __t.object("Warehouse", {
   metadata: __t.option(__t.string()),
 });
 export type Warehouse = __Infer<typeof Warehouse>;
+
+export const WarehouseGeo = __t.object("WarehouseGeo", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  warehouseId: __t.u64(),
+  latitude: __t.f64(),
+  longitude: __t.f64(),
+  address: __t.option(__t.string()),
+  city: __t.option(__t.string()),
+  countryCode: __t.option(__t.string()),
+  managerName: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type WarehouseGeo = __Infer<typeof WarehouseGeo>;
 
 export const WarehouseTask = __t.object("WarehouseTask", {
   id: __t.u64(),
