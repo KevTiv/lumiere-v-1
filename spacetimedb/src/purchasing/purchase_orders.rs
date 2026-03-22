@@ -10,8 +10,12 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::types::{ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState};
+use crate::helpers::{
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+};
+use crate::types::{
+    ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -967,9 +971,7 @@ pub fn create_purchase_requisition(
     }
 
     let order_count = params.purchase_ids.len() as u32;
-    let exclusive = params
-        .exclusive
-        .unwrap_or_else(|| "multiple".to_string());
+    let exclusive = params.exclusive.unwrap_or_else(|| "multiple".to_string());
 
     let requisition = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,

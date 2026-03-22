@@ -4,7 +4,9 @@ use spacetimedb::{ReducerContext, Table};
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::helpers::check_permission;
-use crate::subscriptions::tables::{subscription, subscription_plan, Subscription, SubscriptionPlan};
+use crate::subscriptions::tables::{
+    subscription, subscription_plan, Subscription, SubscriptionPlan,
+};
 
 // ── SubscriptionPlan ──────────────────────────────────────────────────────────
 
@@ -17,7 +19,13 @@ pub fn import_subscription_plan_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription_plan", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "subscription_plan", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "subscription_plan",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -37,7 +45,11 @@ pub fn import_subscription_plan_csv(
 
         let code = {
             let v = col(&headers, row, "code");
-            if v.is_empty() { name.to_uppercase().replace(' ', "_") } else { v.to_string() }
+            if v.is_empty() {
+                name.to_uppercase().replace(' ', "_")
+            } else {
+                v.to_string()
+            }
         };
 
         ctx.db.subscription_plan().insert(SubscriptionPlan {
@@ -53,25 +65,45 @@ pub fn import_subscription_plan_csv(
             product_id,
             billing_period: {
                 let v = col(&headers, row, "billing_period");
-                if v.is_empty() { "month".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "month".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             billing_period_unit: {
                 let v = parse_u32(col(&headers, row, "billing_period_unit"));
-                if v == 0 { 1 } else { v }
+                if v == 0 {
+                    1
+                } else {
+                    v
+                }
             },
             recurring_invoice_day: {
                 let v = parse_u8(col(&headers, row, "recurring_invoice_day"));
-                if v == 0 { 1 } else { v }
+                if v == 0 {
+                    1
+                } else {
+                    v
+                }
             },
             trial_period: parse_bool(col(&headers, row, "trial_period")),
             trial_duration: parse_u32(col(&headers, row, "trial_duration")),
             trial_unit: {
                 let v = col(&headers, row, "trial_unit");
-                if v.is_empty() { "day".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "day".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             auto_close_limit: {
                 let v = parse_u32(col(&headers, row, "auto_close_limit"));
-                if v == 0 { 3 } else { v }
+                if v == 0 {
+                    3
+                } else {
+                    v
+                }
             },
             template_id: None,
             invoice_mail_template_id: None,
@@ -89,7 +121,11 @@ pub fn import_subscription_plan_csv(
             close_reason_id: None,
             payment_mode: {
                 let v = col(&headers, row, "payment_mode");
-                if v.is_empty() { "draft_invoice".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "draft_invoice".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
@@ -99,7 +135,11 @@ pub fn import_subscription_plan_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import subscription_plan: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import subscription_plan: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -114,7 +154,13 @@ pub fn import_subscription_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "subscription", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "subscription",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -124,7 +170,14 @@ pub fn import_subscription_csv(
         let partner_id = parse_u64(col(&headers, row, "partner_id"));
 
         if plan_id == 0 || partner_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("plan_id"), None, "plan_id and partner_id are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("plan_id"),
+                None,
+                "plan_id and partner_id are required",
+            );
             errors += 1;
             continue;
         }
@@ -132,11 +185,16 @@ pub fn import_subscription_csv(
         let currency_id = parse_u64(col(&headers, row, "currency_id"));
         let pricelist_id = parse_u64(col(&headers, row, "pricelist_id"));
         let date_start = opt_timestamp(col(&headers, row, "date_start")).unwrap_or(ctx.timestamp);
-        let recurring_next_date = opt_timestamp(col(&headers, row, "recurring_next_date")).unwrap_or(ctx.timestamp);
+        let recurring_next_date =
+            opt_timestamp(col(&headers, row, "recurring_next_date")).unwrap_or(ctx.timestamp);
 
         let code = {
             let v = col(&headers, row, "code");
-            if v.is_empty() { format!("SUB-{}", imported + 1) } else { v.to_string() }
+            if v.is_empty() {
+                format!("SUB-{}", imported + 1)
+            } else {
+                v.to_string()
+            }
         };
 
         ctx.db.subscription().insert(Subscription {
@@ -148,11 +206,19 @@ pub fn import_subscription_csv(
             partner_id,
             partner_invoice_id: {
                 let v = parse_u64(col(&headers, row, "partner_invoice_id"));
-                if v == 0 { partner_id } else { v }
+                if v == 0 {
+                    partner_id
+                } else {
+                    v
+                }
             },
             partner_shipping_id: {
                 let v = parse_u64(col(&headers, row, "partner_shipping_id"));
-                if v == 0 { partner_id } else { v }
+                if v == 0 {
+                    partner_id
+                } else {
+                    v
+                }
             },
             company_id,
             currency_id,
@@ -163,15 +229,27 @@ pub fn import_subscription_csv(
             recurring_next_date,
             recurring_invoice_day: {
                 let v = parse_u8(col(&headers, row, "recurring_invoice_day"));
-                if v == 0 { 1 } else { v }
+                if v == 0 {
+                    1
+                } else {
+                    v
+                }
             },
             recurring_rule_type: {
                 let v = col(&headers, row, "recurring_rule_type");
-                if v.is_empty() { "monthly".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "monthly".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             recurring_interval: {
                 let v = parse_u32(col(&headers, row, "recurring_interval"));
-                if v == 0 { 1 } else { v }
+                if v == 0 {
+                    1
+                } else {
+                    v
+                }
             },
             close_reason_id: None,
             close_date: None,
@@ -209,6 +287,10 @@ pub fn import_subscription_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import subscription: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import subscription: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

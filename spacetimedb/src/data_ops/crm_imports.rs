@@ -34,7 +34,11 @@ pub fn import_contact_csv(
 
         let type_ = {
             let t = col(&headers, row, "type_");
-            if t == "company" { "company".to_string() } else { "contact".to_string() }
+            if t == "company" {
+                "company".to_string()
+            } else {
+                "contact".to_string()
+            }
         };
 
         ctx.db.contact().insert(Contact {
@@ -138,7 +142,11 @@ pub fn import_lead_csv(
             description: opt_str(col(&headers, row, "notes")),
             priority: {
                 let p = col(&headers, row, "priority");
-                if p.is_empty() { "0".to_string() } else { p.to_string() }
+                if p.is_empty() {
+                    "0".to_string()
+                } else {
+                    p.to_string()
+                }
             },
             state: "new".to_string(),
             expected_revenue: parse_f64(col(&headers, row, "expected_revenue")),
@@ -203,7 +211,11 @@ pub fn import_opportunity_csv(
             stage_id: parse_u64(col(&headers, row, "stage_id")),
             priority: {
                 let p = col(&headers, row, "priority");
-                if p.is_empty() { "0".to_string() } else { p.to_string() }
+                if p.is_empty() {
+                    "0".to_string()
+                } else {
+                    p.to_string()
+                }
             },
             color: opt_str(col(&headers, row, "color")),
             partner_id: opt_u64(col(&headers, row, "partner_id")),
@@ -236,6 +248,10 @@ pub fn import_opportunity_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import opportunity: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import opportunity: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

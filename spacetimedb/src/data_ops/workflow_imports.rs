@@ -26,14 +26,25 @@ pub fn import_workflow_csv(
         let model = col(&headers, row, "model").to_string();
 
         if name.is_empty() || model.is_empty() {
-            record_import_error(ctx, job.id, row_num, Some("name"), None, "name and model are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("name"),
+                None,
+                "name and model are required",
+            );
             errors += 1;
             continue;
         }
 
         let state_field = {
             let v = col(&headers, row, "state_field");
-            if v.is_empty() { "state".to_string() } else { v.to_string() }
+            if v.is_empty() {
+                "state".to_string()
+            } else {
+                v.to_string()
+            }
         };
 
         ctx.db.workflow().insert(Workflow {

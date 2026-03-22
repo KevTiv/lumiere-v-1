@@ -20,9 +20,9 @@ pub struct HrResource {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub resource_type: String,      // "user" | "material"
+    pub resource_type: String, // "user" | "material"
     pub user_id: Option<Identity>,
-    pub time_efficiency: f64,       // 100.0 = full capacity
+    pub time_efficiency: f64, // 100.0 = full capacity
     pub is_active: bool,
     pub created_at: Timestamp,
 }
@@ -41,9 +41,9 @@ pub struct HrDepartment {
     pub organization_id: u64,
     pub company_id: u64,
     pub name: String,
-    pub complete_name: Option<String>,  // e.g. "Engineering / Frontend"
-    pub parent_id: Option<u64>,         // FK → HrDepartment (tree structure)
-    pub manager_id: Option<u64>,        // FK → HrEmployee
+    pub complete_name: Option<String>, // e.g. "Engineering / Frontend"
+    pub parent_id: Option<u64>,        // FK → HrDepartment (tree structure)
+    pub manager_id: Option<u64>,       // FK → HrEmployee
     pub note: Option<String>,
     pub is_active: bool,
     pub color: Option<u32>,
@@ -69,7 +69,7 @@ pub struct HrJobPosition {
     pub no_of_employee: u32,
     pub description: Option<String>,
     pub requirements: Option<String>,
-    pub state: String,              // "recruit" | "open"
+    pub state: String, // "recruit" | "open"
     pub is_active: bool,
     pub created_at: Timestamp,
 }
@@ -88,15 +88,15 @@ pub struct HrEmployee {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub user_id: Option<Identity>,      // Linked UserProfile (if has login)
-    pub resource_id: Option<u64>,       // FK → HrResource
+    pub user_id: Option<Identity>, // Linked UserProfile (if has login)
+    pub resource_id: Option<u64>,  // FK → HrResource
     pub name: String,
     pub employee_number: Option<String>,
     pub job_title: Option<String>,
-    pub job_id: Option<u64>,            // FK → HrJobPosition
-    pub department_id: Option<u64>,     // FK → HrDepartment
-    pub parent_id: Option<u64>,         // FK → HrEmployee (direct manager)
-    pub coach_id: Option<u64>,          // FK → HrEmployee (HR coach)
+    pub job_id: Option<u64>,        // FK → HrJobPosition
+    pub department_id: Option<u64>, // FK → HrDepartment
+    pub parent_id: Option<u64>,     // FK → HrEmployee (direct manager)
+    pub coach_id: Option<u64>,      // FK → HrEmployee (HR coach)
     pub work_email: Option<String>,
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
@@ -106,7 +106,7 @@ pub struct HrEmployee {
     pub employment_type: EmploymentType,
     pub gender: Option<String>,
     pub birthday: Option<Timestamp>,
-    pub marital: Option<String>,        // "single" | "married" | "other"
+    pub marital: Option<String>, // "single" | "married" | "other"
     pub emergency_contact: Option<String>,
     pub emergency_phone: Option<String>,
     pub barcode: Option<String>,
@@ -232,16 +232,20 @@ pub fn create_department(
         color: params.color,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_department",
-        record_id: dept.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_department",
+            record_id: dept.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -254,7 +258,11 @@ pub fn update_department(
     params: UpdateDepartmentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_department", "update")?;
-    let dept = ctx.db.hr_department().id().find(&department_id)
+    let dept = ctx
+        .db
+        .hr_department()
+        .id()
+        .find(&department_id)
         .ok_or("Department not found")?;
     if dept.organization_id != organization_id {
         return Err("Department belongs to a different organization".to_string());
@@ -270,16 +278,20 @@ pub fn update_department(
         is_active: params.is_active.unwrap_or(dept.is_active),
         ..dept
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_department",
-        record_id: department_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_department",
+            record_id: department_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -310,16 +322,20 @@ pub fn create_job_position(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_job_position",
-        record_id: job.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_job_position",
+            record_id: job.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -332,7 +348,11 @@ pub fn update_job_position(
     params: UpdateJobPositionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_job_position", "update")?;
-    let job = ctx.db.hr_job_position().id().find(&job_id)
+    let job = ctx
+        .db
+        .hr_job_position()
+        .id()
+        .find(&job_id)
         .ok_or("Job position not found")?;
     if job.organization_id != organization_id {
         return Err("Job position belongs to a different organization".to_string());
@@ -350,16 +370,20 @@ pub fn update_job_position(
         is_active: params.is_active.unwrap_or(job.is_active),
         ..job
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_job_position",
-        record_id: job_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_job_position",
+            record_id: job_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -422,16 +446,20 @@ pub fn create_employee(
         deleted_at: None,
         metadata: params.metadata,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_employee",
-        record_id: employee.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_employee",
+            record_id: employee.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -444,7 +472,11 @@ pub fn update_employee(
     params: UpdateEmployeeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    let emp = ctx.db.hr_employee().id().find(&employee_id)
+    let emp = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&employee_id)
         .ok_or("Employee not found")?;
     if emp.organization_id != organization_id {
         return Err("Employee belongs to a different organization".to_string());
@@ -466,16 +498,20 @@ pub fn update_employee(
         user_id: params.user_id.or(emp.user_id),
         ..emp
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_employee",
-        record_id: employee_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_employee",
+            record_id: employee_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -488,7 +524,11 @@ pub fn archive_employee(
     termination_date: Option<Timestamp>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    let emp = ctx.db.hr_employee().id().find(&employee_id)
+    let emp = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&employee_id)
         .ok_or("Employee not found")?;
     if emp.organization_id != organization_id {
         return Err("Employee belongs to a different organization".to_string());
@@ -502,15 +542,23 @@ pub fn archive_employee(
         deleted_at: Some(ctx.timestamp),
         ..emp
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_employee",
-        record_id: employee_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["is_active".to_string(), "date_terminated".to_string(), "deleted_at".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_employee",
+            record_id: employee_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "is_active".to_string(),
+                "date_terminated".to_string(),
+                "deleted_at".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }

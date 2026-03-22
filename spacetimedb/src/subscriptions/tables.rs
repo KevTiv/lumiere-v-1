@@ -77,7 +77,7 @@ pub struct Subscription {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64, // Tenant isolation
-    pub code: String, // generated sequence
+    pub code: String,         // generated sequence
     pub description: String,
 
     pub plan_id: u64,
@@ -167,7 +167,7 @@ pub struct SubscriptionLine {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64, // Tenant isolation (inherited from parent Subscription)
-    pub name: String, // description
+    pub name: String,         // description
 
     pub subscription_id: u64,
     pub product_id: u64,

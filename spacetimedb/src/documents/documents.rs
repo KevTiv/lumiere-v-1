@@ -28,7 +28,7 @@ pub struct DocumentFolder {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub parent_id: Option<u64>,
@@ -71,7 +71,7 @@ pub struct Document {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub file_name: String,

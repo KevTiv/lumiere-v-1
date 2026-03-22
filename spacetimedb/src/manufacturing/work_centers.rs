@@ -409,7 +409,12 @@ pub fn log_workcenter_productivity(
     workcenter_id: u64,
     params: CreateWorkcenterProductivityParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mrp_workcenter_productivity", "create")?;
+    check_permission(
+        ctx,
+        organization_id,
+        "mrp_workcenter_productivity",
+        "create",
+    )?;
 
     let wc = ctx
         .db

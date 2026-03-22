@@ -95,6 +95,15 @@ export function StdbConnectionProvider({
           setStdbConnection(c);
           setState({ identity: identityHex, connected: false });
 
+          // Dev mode: automatically provision this identity as org admin
+          if (process.env.NEXT_PUBLIC_DEV_ADMIN === "true") {
+            try {
+              c.reducers.ensureDevAdmin();
+            } catch (e) {
+              console.warn("[stdb] ensure_dev_admin failed", e);
+            }
+          }
+
           c.subscriptionBuilder()
             .onApplied(() => {
               setState({ identity: identityHex, connected: true });

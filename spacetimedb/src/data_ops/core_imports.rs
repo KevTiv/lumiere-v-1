@@ -4,8 +4,8 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::{company, Company};
 use crate::core::permissions::{role, Role};
 use crate::core::reference::{
-    country, currency, currency_rate, uom, uom_cat, Country, Currency, CurrencyRate, UOM,
-    UOMCategory,
+    country, currency, currency_rate, uom, uom_cat, Country, Currency, CurrencyRate, UOMCategory,
+    UOM,
 };
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
@@ -31,7 +31,14 @@ pub fn import_country_csv(
         let name = col(&headers, row, "name").to_string();
 
         if code.len() != 2 {
-            record_import_error(ctx, job.id, row_num, Some("code"), Some(&code), "code must be 2 chars");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("code"),
+                Some(&code),
+                "code must be 2 chars",
+            );
             errors += 1;
             continue;
         }
@@ -88,7 +95,14 @@ pub fn import_currency_csv(
         let symbol = col(&headers, row, "symbol").to_string();
 
         if code.is_empty() || name.is_empty() {
-            record_import_error(ctx, job.id, row_num, Some("code"), Some(&code), "code and name are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("code"),
+                Some(&code),
+                "code and name are required",
+            );
             errors += 1;
             continue;
         }
@@ -100,13 +114,21 @@ pub fn import_currency_csv(
 
         let position = {
             let p = col(&headers, row, "position");
-            if p == "after" { "after".to_string() } else { "before".to_string() }
+            if p == "after" {
+                "after".to_string()
+            } else {
+                "before".to_string()
+            }
         };
 
         ctx.db.currency().insert(Currency {
             code,
             name,
-            symbol: if symbol.is_empty() { "?".to_string() } else { symbol },
+            symbol: if symbol.is_empty() {
+                "?".to_string()
+            } else {
+                symbol
+            },
             decimal_places: parse_u8(col(&headers, row, "decimal_places")).max(0),
             rounding_factor: parse_f64(col(&headers, row, "rounding_factor")),
             active: parse_bool(col(&headers, row, "active")),
@@ -132,7 +154,13 @@ pub fn import_currency_rate_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "currency_rate", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "currency_rate", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "currency_rate",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -143,7 +171,14 @@ pub fn import_currency_rate_csv(
         let rate = parse_f64(col(&headers, row, "rate"));
 
         if rate <= 0.0 {
-            record_import_error(ctx, job.id, row_num, Some("rate"), Some(&rate.to_string()), "rate must be positive");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("rate"),
+                Some(&rate.to_string()),
+                "rate must be positive",
+            );
             errors += 1;
             continue;
         }
@@ -164,7 +199,11 @@ pub fn import_currency_rate_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import currency_rate: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import currency_rate: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -178,7 +217,13 @@ pub fn import_uom_category_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_category", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "uom_category", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "uom_category",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -205,7 +250,11 @@ pub fn import_uom_category_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import uom_category: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import uom_category: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -285,12 +334,20 @@ pub fn import_company_csv(
             id: 0,
             organization_id,
             name,
-            code: if code.is_empty() { "CO".to_string() } else { code },
+            code: if code.is_empty() {
+                "CO".to_string()
+            } else {
+                code
+            },
             is_parent: parse_bool(col(&headers, row, "is_parent")),
             parent_id: opt_u64(col(&headers, row, "parent_id")),
             currency_id: parse_u64(col(&headers, row, "currency_id")),
-            fiscal_year_end_month: parse_u8(col(&headers, row, "fiscal_year_end_month")).max(1).min(12),
-            fiscal_year_end_day: parse_u8(col(&headers, row, "fiscal_year_end_day")).max(1).min(31),
+            fiscal_year_end_month: parse_u8(col(&headers, row, "fiscal_year_end_month"))
+                .max(1)
+                .min(12),
+            fiscal_year_end_day: parse_u8(col(&headers, row, "fiscal_year_end_day"))
+                .max(1)
+                .min(31),
             tax_id: opt_str(col(&headers, row, "tax_id")),
             company_registry: opt_str(col(&headers, row, "company_registry")),
             address_street: opt_str(col(&headers, row, "address_street")),

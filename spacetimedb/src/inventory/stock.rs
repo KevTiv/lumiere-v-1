@@ -564,12 +564,8 @@ pub fn update_stock_quant_quantity(
             table_name: "stock_quant",
             record_id: quant_id,
             action: "UPDATE",
-            old_values: Some(
-                serde_json::json!({ "quantity": quant.quantity }).to_string(),
-            ),
-            new_values: Some(
-                serde_json::json!({ "quantity": quantity }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "quantity": quant.quantity }).to_string()),
+            new_values: Some(serde_json::json!({ "quantity": quantity }).to_string()),
             changed_fields: vec!["quantity".to_string()],
             metadata: None,
         },
@@ -623,9 +619,7 @@ pub fn reserve_stock_quant(
             old_values: Some(
                 serde_json::json!({ "reserved_quantity": quant.reserved_quantity }).to_string(),
             ),
-            new_values: Some(
-                serde_json::json!({ "reserved_quantity": new_reserved }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "reserved_quantity": new_reserved }).to_string()),
             changed_fields: vec!["reserved_quantity".to_string()],
             metadata: None,
         },
@@ -675,9 +669,7 @@ pub fn unreserve_stock_quant(
             old_values: Some(
                 serde_json::json!({ "reserved_quantity": quant.reserved_quantity }).to_string(),
             ),
-            new_values: Some(
-                serde_json::json!({ "reserved_quantity": new_reserved }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "reserved_quantity": new_reserved }).to_string()),
             changed_fields: vec!["reserved_quantity".to_string()],
             metadata: None,
         },
@@ -1312,8 +1304,7 @@ pub fn validate_stock_picking(
     // Propagate delivered quantities back to SaleOrderLine
     if let Some(so_id) = picking.sale_id {
         // Collect qty_done per sale_line_id
-        let mut delivered: std::collections::HashMap<u64, f64> =
-            std::collections::HashMap::new();
+        let mut delivered: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
         for move_record in ctx
             .db
             .stock_move()
@@ -1324,8 +1315,7 @@ pub fn validate_stock_picking(
                 continue;
             }
             if let Some(sl_id) = move_record.sale_line_id {
-                *delivered.entry(sl_id).or_default() +=
-                    move_record.quantity_done;
+                *delivered.entry(sl_id).or_default() += move_record.quantity_done;
             }
         }
 
@@ -1340,8 +1330,10 @@ pub fn validate_stock_picking(
                     sol.invoice_status.clone()
                 };
 
-                ctx.db.sale_order_line().id().update(
-                    crate::sales::sales_core::SaleOrderLine {
+                ctx.db
+                    .sale_order_line()
+                    .id()
+                    .update(crate::sales::sales_core::SaleOrderLine {
                         qty_delivered: new_qty_delivered,
                         is_delivered: new_qty_delivered >= sol.product_uom_qty,
                         qty_to_invoice: new_qty_to_invoice,
@@ -1349,8 +1341,7 @@ pub fn validate_stock_picking(
                         write_uid: ctx.sender(),
                         write_date: ctx.timestamp,
                         ..sol
-                    },
-                );
+                    });
             }
         }
 
@@ -1366,14 +1357,15 @@ pub fn validate_stock_picking(
             if all_to_invoice {
                 if let Some(so) = ctx.db.sale_order().id().find(&so_id) {
                     if so.invoice_status != InvoiceStatus::Invoiced {
-                        ctx.db.sale_order().id().update(
-                            crate::sales::sales_core::SaleOrder {
+                        ctx.db
+                            .sale_order()
+                            .id()
+                            .update(crate::sales::sales_core::SaleOrder {
                                 invoice_status: InvoiceStatus::ToInvoice,
                                 write_uid: ctx.sender(),
                                 write_date: ctx.timestamp,
                                 ..so
-                            },
-                        );
+                            });
                     }
                 }
             }

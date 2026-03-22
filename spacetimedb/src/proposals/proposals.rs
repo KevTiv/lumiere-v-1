@@ -82,17 +82,17 @@ pub struct Proposal {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,   // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub title: String,
     pub client_name: String,
     pub status: ProposalStatus,
-    pub value: f64,             // Estimated monetary value
+    pub value: f64, // Estimated monetary value
     pub deadline: Option<Timestamp>,
     pub description: Option<String>,
-    pub owner_id: Identity,     // User responsible
-    pub version_count: u32,     // Cached version counter
+    pub owner_id: Identity, // User responsible
+    pub version_count: u32, // Cached version counter
     pub template_id: Option<u64>,
-    pub partner_id: Option<u64>,    // linked CRM partner
+    pub partner_id: Option<u64>, // linked CRM partner
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -119,7 +119,7 @@ pub struct ProposalSection {
     pub content: String,
     pub status: SectionStatus,
     pub ai_suggestion: Option<String>,
-    pub sequence: u32,          // Display order
+    pub sequence: u32, // Display order
     pub word_count: u32,
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -143,8 +143,8 @@ pub struct ProposalVersion {
     pub organization_id: u64,
     pub proposal_id: u64,
     pub version_number: u32,
-    pub message: String,        // Commit message
-    pub sections_json: String,  // JSON-serialised Vec<ProposalSection> snapshot
+    pub message: String,       // Commit message
+    pub sections_json: String, // JSON-serialised Vec<ProposalSection> snapshot
     pub author_id: Identity,
     pub create_date: Timestamp,
 }
@@ -166,7 +166,7 @@ pub struct ProposalSourceDoc {
     pub proposal_id: u64,
     pub name: String,
     pub content: String,
-    pub doc_type: String,       // "pasted" | "uploaded"
+    pub doc_type: String, // "pasted" | "uploaded"
     pub word_count: u32,
     pub added_by: Identity,
     pub added_at: Timestamp,
@@ -209,16 +209,20 @@ pub fn create_proposal(
         metadata: None,
     });
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "proposal",
-        record_id: row.id,
-        action: "create",
-        old_values: None,
-        new_values: Some(format!("{{\"title\": \"{}\"}}", title)),
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "proposal",
+            record_id: row.id,
+            action: "create",
+            old_values: None,
+            new_values: Some(format!("{{\"title\": \"{}\"}}", title)),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -230,7 +234,11 @@ pub fn update_proposal_status(
     proposal_id: u64,
     status: String,
 ) -> Result<(), String> {
-    let proposal = ctx.db.proposal().id().find(&proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -258,7 +266,11 @@ pub fn update_proposal(
     deadline: Option<Timestamp>,
     description: Option<String>,
 ) -> Result<(), String> {
-    let proposal = ctx.db.proposal().id().find(&proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -289,7 +301,11 @@ pub fn upsert_proposal_section(
     sequence: u32,
     ai_suggestion: Option<String>,
 ) -> Result<(), String> {
-    let proposal = ctx.db.proposal().id().find(&proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -314,7 +330,11 @@ pub fn upsert_proposal_section(
             write_date: ctx.timestamp,
         });
     } else {
-        let section = ctx.db.proposal_section().id().find(&section_id)
+        let section = ctx
+            .db
+            .proposal_section()
+            .id()
+            .find(&section_id)
             .ok_or_else(|| format!("Section {} not found", section_id))?;
 
         ctx.db.proposal_section().id().update(ProposalSection {
@@ -342,14 +362,19 @@ pub fn upsert_proposal_section(
 
 /// Delete a proposal section
 #[reducer]
-pub fn delete_proposal_section(
-    ctx: &ReducerContext,
-    section_id: u64,
-) -> Result<(), String> {
-    let section = ctx.db.proposal_section().id().find(&section_id)
+pub fn delete_proposal_section(ctx: &ReducerContext, section_id: u64) -> Result<(), String> {
+    let section = ctx
+        .db
+        .proposal_section()
+        .id()
+        .find(&section_id)
         .ok_or_else(|| format!("Section {} not found", section_id))?;
 
-    let proposal = ctx.db.proposal().id().find(&section.proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&section.proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", section.proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -367,7 +392,11 @@ pub fn save_proposal_version(
     message: String,
     sections_json: String,
 ) -> Result<(), String> {
-    let proposal = ctx.db.proposal().id().find(&proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -405,7 +434,11 @@ pub fn add_proposal_source_doc(
     doc_type: String,
     word_count: u32,
 ) -> Result<(), String> {
-    let proposal = ctx.db.proposal().id().find(&proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
@@ -427,14 +460,19 @@ pub fn add_proposal_source_doc(
 
 /// Delete a source document from a proposal
 #[reducer]
-pub fn delete_proposal_source_doc(
-    ctx: &ReducerContext,
-    doc_id: u64,
-) -> Result<(), String> {
-    let doc = ctx.db.proposal_source_doc().id().find(&doc_id)
+pub fn delete_proposal_source_doc(ctx: &ReducerContext, doc_id: u64) -> Result<(), String> {
+    let doc = ctx
+        .db
+        .proposal_source_doc()
+        .id()
+        .find(&doc_id)
         .ok_or_else(|| format!("Source doc {} not found", doc_id))?;
 
-    let proposal = ctx.db.proposal().id().find(&doc.proposal_id)
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&doc.proposal_id)
         .ok_or_else(|| format!("Proposal {} not found", doc.proposal_id))?;
 
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;

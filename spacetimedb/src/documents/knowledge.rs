@@ -26,7 +26,7 @@ pub struct KnowledgeArticleCategory {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub sequence: u32,
@@ -54,7 +54,7 @@ pub struct KnowledgeArticle {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub body: Option<String>,
@@ -182,24 +182,21 @@ pub fn create_knowledge_category(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article_category", "create")?;
 
-    let cat = ctx
-        .db
-        .kb_category()
-        .insert(KnowledgeArticleCategory {
-            id: 0,
-            organization_id,
-            name: params.name,
-            description: params.description,
-            sequence: params.sequence,
-            color: params.color,
-            article_count: 0,
-            parent_id: params.parent_id,
-            create_uid: ctx.sender(),
-            create_date: ctx.timestamp,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            metadata: params.metadata,
-        });
+    let cat = ctx.db.kb_category().insert(KnowledgeArticleCategory {
+        id: 0,
+        organization_id,
+        name: params.name,
+        description: params.description,
+        sequence: params.sequence,
+        color: params.color,
+        article_count: 0,
+        parent_id: params.parent_id,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
 
     write_audit_log_v2(
         ctx,
@@ -373,15 +370,12 @@ pub fn create_knowledge_article(
     // Increment category article count
     if let Some(cid) = params.category_id {
         if let Some(cat) = ctx.db.kb_category().id().find(&cid) {
-            ctx.db
-                .kb_category()
-                .id()
-                .update(KnowledgeArticleCategory {
-                    article_count: cat.article_count + 1,
-                    write_uid: ctx.sender(),
-                    write_date: ctx.timestamp,
-                    ..cat
-                });
+            ctx.db.kb_category().id().update(KnowledgeArticleCategory {
+                article_count: cat.article_count + 1,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..cat
+            });
         }
     }
 
@@ -825,15 +819,12 @@ pub fn delete_knowledge_article(
     // Decrement category article count if applicable
     if let Some(cid) = article.category_id {
         if let Some(cat) = ctx.db.kb_category().id().find(&cid) {
-            ctx.db
-                .kb_category()
-                .id()
-                .update(KnowledgeArticleCategory {
-                    article_count: cat.article_count.saturating_sub(1),
-                    write_uid: ctx.sender(),
-                    write_date: ctx.timestamp,
-                    ..cat
-                });
+            ctx.db.kb_category().id().update(KnowledgeArticleCategory {
+                article_count: cat.article_count.saturating_sub(1),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..cat
+            });
         }
     }
 
@@ -913,10 +904,7 @@ pub fn delete_knowledge_category(
         return Err("Cannot delete category with articles".to_string());
     }
 
-    ctx.db
-        .kb_category()
-        .id()
-        .delete(&category_id);
+    ctx.db.kb_category().id().delete(&category_id);
 
     write_audit_log_v2(
         ctx,

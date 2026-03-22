@@ -242,8 +242,7 @@ pub fn update_barcode_rule(
         return Err("Barcode rule does not belong to this organization".to_string());
     }
 
-    let old_values =
-        serde_json::json!({ "name": rule.name, "type": rule.type_ }).to_string();
+    let old_values = serde_json::json!({ "name": rule.name, "type": rule.type_ }).to_string();
 
     ctx.db.barcode_rule().id().update(BarcodeRule {
         name: params.name.unwrap_or_else(|| rule.name.clone()),

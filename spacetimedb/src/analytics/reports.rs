@@ -117,14 +117,14 @@ pub struct ReportTemplate {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,              // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
-    pub model: String,                     // ERP model the report runs on
-    pub report_type: String,               // PDF, Excel, CSV, HTML
-    pub template_content: Option<String>,  // Template markup
-    pub paper_format: Option<String>,      // A4, Letter, A3, etc.
-    pub orientation: String,               // Portrait, Landscape
+    pub model: String,                    // ERP model the report runs on
+    pub report_type: String,              // PDF, Excel, CSV, HTML
+    pub template_content: Option<String>, // Template markup
+    pub paper_format: Option<String>,     // A4, Letter, A3, etc.
+    pub orientation: String,              // Portrait, Landscape
     pub margin_top: f64,
     pub margin_bottom: f64,
     pub margin_left: f64,
@@ -136,7 +136,7 @@ pub struct ReportTemplate {
     pub attachment: Option<String>,        // Attachment name expression
     pub multi_company: bool,
     pub is_active: bool,
-    pub company_id: Option<u64>,          // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -158,26 +158,26 @@ pub struct ScheduledReport {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,             // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub report_template_id: u64,
     pub model: String,
-    pub domain: Option<String>,           // JSON filter applied when generating
-    pub frequency: String,                // Daily, Weekly, Monthly, Quarterly
-    pub day_of_week: Option<u8>,          // 0=Mon … 6=Sun (for Weekly)
-    pub day_of_month: Option<u8>,         // 1–31 (for Monthly)
+    pub domain: Option<String>,   // JSON filter applied when generating
+    pub frequency: String,        // Daily, Weekly, Monthly, Quarterly
+    pub day_of_week: Option<u8>,  // 0=Mon … 6=Sun (for Weekly)
+    pub day_of_month: Option<u8>, // 1–31 (for Monthly)
     pub hour: u8,
     pub minute: u8,
-    pub recipients: Vec<String>,          // Email addresses
+    pub recipients: Vec<String>, // Email addresses
     pub subject: Option<String>,
     pub body: Option<String>,
-    pub attachment_format: String,        // PDF, Excel, CSV
+    pub attachment_format: String, // PDF, Excel, CSV
     pub last_run: Option<Timestamp>,
     pub next_run: Timestamp,
     pub is_active: bool,
     pub run_count: u32,
-    pub company_id: Option<u64>,          // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -199,27 +199,27 @@ pub struct AnalyticsMetric {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,             // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
-    pub category: String,                 // Sales, Inventory, Financial, HR
-    pub metric_type: String,              // KPI, Trend, Comparison
+    pub category: String,    // Sales, Inventory, Financial, HR
+    pub metric_type: String, // KPI, Trend, Comparison
     pub model: String,
     pub domain: Option<String>,
-    pub field: String,                    // Field being aggregated
-    pub aggregation: String,              // Count, Sum, Average, Min, Max
-    pub time_period: String,              // Today, This Week, This Month, etc.
+    pub field: String,       // Field being aggregated
+    pub aggregation: String, // Count, Sum, Average, Min, Max
+    pub time_period: String, // Today, This Week, This Month, etc.
     pub current_value: Option<f64>,
     pub previous_value: Option<f64>,
     pub change_amount: Option<f64>,
     pub change_percentage: Option<f64>,
-    pub trend_direction: Option<String>,  // Up, Down, Stable
+    pub trend_direction: Option<String>, // Up, Down, Stable
     pub calculated_at: Option<Timestamp>,
     pub target_value: Option<f64>,
     pub target_period: Option<String>,
     pub is_active: bool,
     pub refresh_frequency_minutes: u32,
     pub last_refresh: Option<Timestamp>,
-    pub company_id: Option<u64>,          // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -285,7 +285,11 @@ pub fn create_report_template(
         },
     );
 
-    log::info!("Report template created: id={}, model={}", tmpl.id, tmpl.model);
+    log::info!(
+        "Report template created: id={}, model={}",
+        tmpl.id,
+        tmpl.model
+    );
     Ok(())
 }
 
@@ -524,7 +528,11 @@ pub fn create_analytics_metric(
         },
     );
 
-    log::info!("Analytics metric created: id={}, category={}", metric.id, metric.category);
+    log::info!(
+        "Analytics metric created: id={}, category={}",
+        metric.id,
+        metric.category
+    );
     Ok(())
 }
 
@@ -553,7 +561,11 @@ pub fn update_metric_values(
     let (change_amount, change_percentage, trend_direction) =
         if let Some(prev) = params.previous_value {
             let delta = params.current_value - prev;
-            let pct = if prev != 0.0 { delta / prev * 100.0 } else { 0.0 };
+            let pct = if prev != 0.0 {
+                delta / prev * 100.0
+            } else {
+                0.0
+            };
             let trend = if delta > 0.0 {
                 "Up".to_string()
             } else if delta < 0.0 {

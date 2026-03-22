@@ -104,8 +104,8 @@ pub fn create_iot_action(
     check_permission(ctx, organization_id, "iot_action", "create")?;
 
     match params.action_type.as_str() {
-        "PrintLabel" | "PrintReceipt" | "OpenCashDrawer" | "DisplayMessage"
-        | "TriggerRelay" | "InitiatePayment" | "Custom" => {}
+        "PrintLabel" | "PrintReceipt" | "OpenCashDrawer" | "DisplayMessage" | "TriggerRelay"
+        | "InitiatePayment" | "Custom" => {}
         other => return Err(format!("Invalid action_type: {}", other)),
     }
 

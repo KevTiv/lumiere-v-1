@@ -26,16 +26,16 @@ pub struct MailMessage {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    pub organization_id: u64,           // Tenant isolation
-    pub model: String,                  // "sale_order" | "purchase_order" | "account_move" | …
-    pub res_id: u64,                    // PK of the record in that model's table
+    pub organization_id: u64, // Tenant isolation
+    pub model: String,        // "sale_order" | "purchase_order" | "account_move" | …
+    pub res_id: u64,          // PK of the record in that model's table
     pub author_id: Identity,
     pub body: String,
-    pub message_type: MailMessageType,  // Comment | Note | Email | Notification
-    pub subtype: Option<String>,        // e.g. "mail.mt_comment", "mail.mt_note"
+    pub message_type: MailMessageType, // Comment | Note | Email | Notification
+    pub subtype: Option<String>,       // e.g. "mail.mt_comment", "mail.mt_note"
     pub date: Timestamp,
-    pub parent_id: Option<u64>,         // For threaded replies → FK to MailMessage.id
-    pub attachment_ids: Vec<u64>,       // Document attachment IDs
+    pub parent_id: Option<u64>, // For threaded replies → FK to MailMessage.id
+    pub attachment_ids: Vec<u64>, // Document attachment IDs
 }
 
 /// Mail Follower — A user subscribed to notifications on a record.
@@ -52,11 +52,11 @@ pub struct MailFollower {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    pub organization_id: u64,           // Tenant isolation
-    pub res_model: String,              // "sale_order" | "purchase_order" | …
-    pub res_id: u64,                    // PK of the followed record
-    pub partner_id: Identity,           // The following user's identity
-    pub subtypes: Vec<String>,          // ["comment", "note"] — which events trigger notifications
+    pub organization_id: u64,  // Tenant isolation
+    pub res_model: String,     // "sale_order" | "purchase_order" | …
+    pub res_id: u64,           // PK of the followed record
+    pub partner_id: Identity,  // The following user's identity
+    pub subtypes: Vec<String>, // ["comment", "note"] — which events trigger notifications
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -156,10 +156,14 @@ pub fn subscribe_to_record(
         return Err("res_model cannot be empty".to_string());
     }
     // Check if already following
-    let existing = ctx.db.mail_follower()
+    let existing = ctx
+        .db
+        .mail_follower()
         .mail_follower_by_partner()
         .filter(&ctx.sender())
-        .find(|f| f.organization_id == organization_id && f.res_model == res_model && f.res_id == res_id);
+        .find(|f| {
+            f.organization_id == organization_id && f.res_model == res_model && f.res_id == res_id
+        });
 
     if let Some(follower) = existing {
         ctx.db.mail_follower().id().update(MailFollower {
@@ -188,10 +192,14 @@ pub fn unsubscribe_from_record(
     res_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mail_follower", "delete")?;
-    let existing = ctx.db.mail_follower()
+    let existing = ctx
+        .db
+        .mail_follower()
         .mail_follower_by_partner()
         .filter(&ctx.sender())
-        .find(|f| f.organization_id == organization_id && f.res_model == res_model && f.res_id == res_id);
+        .find(|f| {
+            f.organization_id == organization_id && f.res_model == res_model && f.res_id == res_id
+        });
 
     if let Some(follower) = existing {
         ctx.db.mail_follower().id().delete(&follower.id);

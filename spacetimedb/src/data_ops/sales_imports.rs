@@ -27,13 +27,19 @@ pub fn import_sale_order_csv(
         let partner_id = parse_u64(col(&headers, row, "partner_id"));
 
         if partner_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("partner_id"), None, "partner_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("partner_id"),
+                None,
+                "partner_id is required",
+            );
             errors += 1;
             continue;
         }
 
-        let date_order = opt_timestamp(col(&headers, row, "date_order"))
-            .unwrap_or(ctx.timestamp);
+        let date_order = opt_timestamp(col(&headers, row, "date_order")).unwrap_or(ctx.timestamp);
         let currency_id = parse_u64(col(&headers, row, "currency_id"));
 
         ctx.db.sale_order().insert(SaleOrder {
@@ -144,7 +150,11 @@ pub fn import_sale_order_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import sale_order: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import sale_order: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -159,7 +169,13 @@ pub fn import_sale_order_line_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "sale_order_line", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "sale_order_line", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "sale_order_line",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -169,7 +185,14 @@ pub fn import_sale_order_line_csv(
         let product_id = parse_u64(col(&headers, row, "product_id"));
 
         if order_id == 0 || product_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("order_id"), None, "order_id and product_id are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("order_id"),
+                None,
+                "order_id and product_id are required",
+            );
             errors += 1;
             continue;
         }
@@ -181,7 +204,11 @@ pub fn import_sale_order_line_csv(
         let currency_id = parse_u64(col(&headers, row, "currency_id"));
 
         // Get partner from order if available
-        let order_partner_id = ctx.db.sale_order().id().find(&order_id)
+        let order_partner_id = ctx
+            .db
+            .sale_order()
+            .id()
+            .find(&order_id)
             .map(|o| o.partner_id)
             .unwrap_or(0);
 
@@ -253,6 +280,10 @@ pub fn import_sale_order_line_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import sale_order_line: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import sale_order_line: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

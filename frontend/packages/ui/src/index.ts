@@ -204,3 +204,5 @@ export * from "./proposal-workspace/ai-analysis-panel";
 export * from "./proposal-workspace/tender-editor-panel";
 export * from "./proposal-workspace/version-history-bar";
 export * from "./proposal-workspace/version-diff-modal";
+
+export * from "./pos/pos-page";

@@ -2754,6 +2754,44 @@ export const CreateFiscalYearParams = __t.object("CreateFiscalYearParams", {
 });
 export type CreateFiscalYearParams = __Infer<typeof CreateFiscalYearParams>;
 
+export const CreateFormConfigParams = __t.object("CreateFormConfigParams", {
+  moduleId: __t.string(),
+  formId: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  isSystemDefault: __t.bool(),
+});
+export type CreateFormConfigParams = __Infer<typeof CreateFormConfigParams>;
+
+export const CreateFormFieldParams = __t.object("CreateFormFieldParams", {
+  fieldId: __t.string(),
+  name: __t.string(),
+  label: __t.string(),
+  get fieldType() {
+    return FieldType;
+  },
+  description: __t.option(__t.string()),
+  placeholder: __t.option(__t.string()),
+  defaultValue: __t.option(__t.string()),
+  get options() {
+    return __t.array(FieldOption);
+  },
+  get validation() {
+    return FieldValidation;
+  },
+  aiSuggestions: __t.array(__t.string()),
+  order: __t.u32(),
+  isSystem: __t.bool(),
+  isEnabled: __t.bool(),
+  category: __t.option(__t.string()),
+  showInList: __t.bool(),
+  get width() {
+    return FieldWidth;
+  },
+  sectionId: __t.option(__t.string()),
+});
+export type CreateFormFieldParams = __Infer<typeof CreateFormFieldParams>;
+
 export const CreateHelpdeskSlaParams = __t.object("CreateHelpdeskSlaParams", {
   name: __t.string(),
   teamId: __t.u64(),
@@ -3588,6 +3626,14 @@ export const CreateRevenueRecognitionRuleParams = __t.object("CreateRevenueRecog
 });
 export type CreateRevenueRecognitionRuleParams = __Infer<typeof CreateRevenueRecognitionRuleParams>;
 
+export const CreateRoleConfigParams = __t.object("CreateRoleConfigParams", {
+  roleId: __t.string(),
+  enabledFields: __t.array(__t.string()),
+  requiredFields: __t.array(__t.string()),
+  defaultPrompts: __t.array(__t.string()),
+});
+export type CreateRoleConfigParams = __Infer<typeof CreateRoleConfigParams>;
+
 export const CreateRoleParams = __t.object("CreateRoleParams", {
   name: __t.string(),
   description: __t.option(__t.string()),
@@ -4302,6 +4348,30 @@ export const CreateUomParams = __t.object("CreateUomParams", {
 });
 export type CreateUomParams = __Infer<typeof CreateUomParams>;
 
+export const CreateUserCustomFieldParams = __t.object("CreateUserCustomFieldParams", {
+  configurationId: __t.u64(),
+  fieldId: __t.string(),
+  name: __t.string(),
+  label: __t.string(),
+  get fieldType() {
+    return FieldType;
+  },
+  description: __t.option(__t.string()),
+  placeholder: __t.option(__t.string()),
+  defaultValue: __t.option(__t.string()),
+  get options() {
+    return __t.array(FieldOption);
+  },
+  get validation() {
+    return FieldValidation;
+  },
+  order: __t.u32(),
+  get width() {
+    return FieldWidth;
+  },
+});
+export type CreateUserCustomFieldParams = __Infer<typeof CreateUserCustomFieldParams>;
+
 export const CreateUserSessionParams = __t.object("CreateUserSessionParams", {
   sessionToken: __t.string(),
   ipAddress: __t.option(__t.string()),
@@ -4929,6 +4999,62 @@ export const ExportFinancialReportParams = __t.object("ExportFinancialReportPara
 });
 export type ExportFinancialReportParams = __Infer<typeof ExportFinancialReportParams>;
 
+export const FieldOption = __t.object("FieldOption", {
+  value: __t.string(),
+  label: __t.string(),
+  color: __t.option(__t.string()),
+  icon: __t.option(__t.string()),
+});
+export type FieldOption = __Infer<typeof FieldOption>;
+
+// The tagged union or sum type for the algebraic type `FieldType`.
+export const FieldType = __t.enum("FieldType", {
+  Text: __t.unit(),
+  Email: __t.unit(),
+  Password: __t.unit(),
+  Tel: __t.unit(),
+  Url: __t.unit(),
+  Textarea: __t.unit(),
+  Number: __t.unit(),
+  Select: __t.unit(),
+  MultiSelect: __t.unit(),
+  Checkbox: __t.unit(),
+  Switch: __t.unit(),
+  Radio: __t.unit(),
+  Date: __t.unit(),
+  Time: __t.unit(),
+  DateTime: __t.unit(),
+  File: __t.unit(),
+  Hidden: __t.unit(),
+  Rating: __t.unit(),
+  Slider: __t.unit(),
+  Tags: __t.unit(),
+  UserSelect: __t.unit(),
+  Custom: __t.unit(),
+});
+export type FieldType = __Infer<typeof FieldType>;
+
+export const FieldValidation = __t.object("FieldValidation", {
+  required: __t.bool(),
+  minLength: __t.option(__t.u32()),
+  maxLength: __t.option(__t.u32()),
+  min: __t.option(__t.f64()),
+  max: __t.option(__t.f64()),
+  pattern: __t.option(__t.string()),
+  message: __t.option(__t.string()),
+});
+export type FieldValidation = __Infer<typeof FieldValidation>;
+
+// The tagged union or sum type for the algebraic type `FieldWidth`.
+export const FieldWidth = __t.enum("FieldWidth", {
+  Full: __t.unit(),
+  Half: __t.unit(),
+  Third: __t.unit(),
+  TwoThirds: __t.unit(),
+  Quarter: __t.unit(),
+});
+export type FieldWidth = __Infer<typeof FieldWidth>;
+
 export const FinancialReport = __t.object("FinancialReport", {
   id: __t.u64(),
   name: __t.string(),
@@ -5002,6 +5128,64 @@ export const FleetVehicle = __t.object("FleetVehicle", {
   metadata: __t.option(__t.string()),
 });
 export type FleetVehicle = __Infer<typeof FleetVehicle>;
+
+export const FormConfig = __t.object("FormConfig", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  moduleId: __t.string(),
+  formId: __t.string(),
+  name: __t.string(),
+  description: __t.string(),
+  isActive: __t.bool(),
+  isSystemDefault: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  updatedBy: __t.identity(),
+});
+export type FormConfig = __Infer<typeof FormConfig>;
+
+export const FormConfigField = __t.object("FormConfigField", {
+  id: __t.u64(),
+  configurationId: __t.u64(),
+  fieldId: __t.string(),
+  name: __t.string(),
+  label: __t.string(),
+  get fieldType() {
+    return FieldType;
+  },
+  description: __t.string(),
+  placeholder: __t.string(),
+  defaultValue: __t.string(),
+  optionsJson: __t.string(),
+  validationJson: __t.string(),
+  aiSuggestionsJson: __t.string(),
+  order: __t.u32(),
+  isSystem: __t.bool(),
+  isEnabled: __t.bool(),
+  category: __t.string(),
+  showInList: __t.bool(),
+  get width() {
+    return FieldWidth;
+  },
+  sectionId: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type FormConfigField = __Infer<typeof FormConfigField>;
+
+export const FormRoleConfig = __t.object("FormRoleConfig", {
+  id: __t.u64(),
+  configurationId: __t.u64(),
+  roleId: __t.string(),
+  enabledFieldsJson: __t.string(),
+  requiredFieldsJson: __t.string(),
+  defaultPromptsJson: __t.string(),
+  isActive: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type FormRoleConfig = __Infer<typeof FormRoleConfig>;
 
 export const GenerateSubscriptionInvoiceParams = __t.object("GenerateSubscriptionInvoiceParams", {
   invoiceDate: __t.timestamp(),
@@ -9855,6 +10039,25 @@ export const UpdateFiscalYearParams = __t.object("UpdateFiscalYearParams", {
 });
 export type UpdateFiscalYearParams = __Infer<typeof UpdateFiscalYearParams>;
 
+export const UpdateFormFieldParams = __t.object("UpdateFormFieldParams", {
+  label: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  placeholder: __t.option(__t.string()),
+  defaultValue: __t.option(__t.string()),
+  options: __t.option(__t.array(FieldOption)),
+  get validation() {
+    return __t.option(FieldValidation);
+  },
+  aiSuggestions: __t.option(__t.array(__t.string())),
+  order: __t.option(__t.u32()),
+  isEnabled: __t.option(__t.bool()),
+  showInList: __t.option(__t.bool()),
+  get width() {
+    return __t.option(FieldWidth);
+  },
+});
+export type UpdateFormFieldParams = __Infer<typeof UpdateFormFieldParams>;
+
 export const UpdateIntercompanyRuleParams = __t.object("UpdateIntercompanyRuleParams", {
   name: __t.option(__t.string()),
   autoValidation: __t.option(__t.bool()),
@@ -10426,6 +10629,18 @@ export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingPara
   metadata: __t.option(__t.string()),
 });
 export type UpsertSearchEmbeddingParams = __Infer<typeof UpsertSearchEmbeddingParams>;
+
+export const UserCustomField = __t.object("UserCustomField", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  userId: __t.identity(),
+  configurationId: __t.u64(),
+  fieldId: __t.string(),
+  fieldDataJson: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type UserCustomField = __Infer<typeof UserCustomField>;
 
 export const UserOrganization = __t.object("UserOrganization", {
   id: __t.u64(),

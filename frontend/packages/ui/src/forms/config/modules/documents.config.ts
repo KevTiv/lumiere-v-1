@@ -1,0 +1,163 @@
+//! Documents Module Form Configurations
+//!
+//! This module provides form configurations for Documents.
+//! Includes forms for: Documents, Folders
+
+import type { FormRegistryEntry } from "../types"
+
+export const documentsForms: FormRegistryEntry[] = [
+  // Document Upload Form
+  {
+    moduleId: "documents",
+    formId: "new-document",
+    name: "New Document",
+    description: "Upload a new document",
+    icon: "File",
+    category: "Documents",
+    defaultConfig: () => ({
+      moduleId: "documents",
+      formId: "new-document",
+      name: "New Document",
+      description: "Upload a new document",
+      isSystemDefault: true,
+      fields: [
+        {
+          fieldId: "title",
+          name: "title",
+          label: "Title",
+          fieldType: "Text",
+          placeholder: "Document title",
+          validation: { required: true, minLength: 2 },
+          aiSuggestions: [],
+          order: 1,
+          isSystem: true,
+          isEnabled: true,
+          showInList: true,
+          width: "Full",
+        },
+        {
+          fieldId: "description",
+          name: "description",
+          label: "Description",
+          fieldType: "Textarea",
+          placeholder: "Document description...",
+          validation: { required: false },
+          aiSuggestions: [],
+          order: 2,
+          isSystem: true,
+          isEnabled: true,
+          showInList: false,
+          width: "Full",
+        },
+        {
+          fieldId: "category",
+          name: "category",
+          label: "Category",
+          fieldType: "Select",
+          options: [
+            { value: "contract", label: "Contract", color: "blue" },
+            { value: "invoice", label: "Invoice", color: "green" },
+            { value: "report", label: "Report", color: "purple" },
+            { value: "policy", label: "Policy", color: "orange" },
+            { value: "manual", label: "Manual", color: "teal" },
+            { value: "other", label: "Other", color: "gray" },
+          ],
+          validation: { required: false },
+          aiSuggestions: [],
+          order: 3,
+          isSystem: true,
+          isEnabled: true,
+          showInList: true,
+          width: "Half",
+        },
+        {
+          fieldId: "tags",
+          name: "tags",
+          label: "Tags",
+          fieldType: "Tags",
+          validation: { required: false },
+          aiSuggestions: [],
+          order: 4,
+          isSystem: true,
+          isEnabled: true,
+          showInList: false,
+          width: "Full",
+        },
+      ],
+      roleConfigs: {
+        "role-admin": {
+          roleId: "role-admin",
+          enabledFields: ["title", "description", "category", "tags"],
+          requiredFields: ["title"],
+          defaultPrompts: [],
+        },
+        "role-manager": {
+          roleId: "role-manager",
+          enabledFields: ["title", "description", "category", "tags"],
+          requiredFields: ["title"],
+          defaultPrompts: [],
+        },
+      },
+    }),
+  },
+
+  // Folder Form
+  {
+    moduleId: "documents",
+    formId: "new-folder",
+    name: "New Folder",
+    description: "Create a new folder",
+    icon: "FolderPlus",
+    category: "Folders",
+    defaultConfig: () => ({
+      moduleId: "documents",
+      formId: "new-folder",
+      name: "New Folder",
+      description: "Create a new folder",
+      isSystemDefault: true,
+      fields: [
+        {
+          fieldId: "name",
+          name: "name",
+          label: "Folder Name",
+          fieldType: "Text",
+          placeholder: "Enter folder name",
+          validation: { required: true, minLength: 1 },
+          aiSuggestions: [],
+          order: 1,
+          isSystem: true,
+          isEnabled: true,
+          showInList: true,
+          width: "Full",
+        },
+        {
+          fieldId: "description",
+          name: "description",
+          label: "Description",
+          fieldType: "Textarea",
+          validation: { required: false },
+          aiSuggestions: [],
+          order: 2,
+          isSystem: true,
+          isEnabled: true,
+          showInList: false,
+          width: "Full",
+        },
+      ],
+      roleConfigs: {
+        "role-admin": {
+          roleId: "role-admin",
+          enabledFields: ["name", "description"],
+          requiredFields: ["name"],
+          defaultPrompts: [],
+        },
+        "role-manager": {
+          roleId: "role-manager",
+          enabledFields: ["name", "description"],
+          requiredFields: ["name"],
+          defaultPrompts: [],
+        },
+      },
+    }),
+  },
+]

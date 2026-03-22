@@ -2,6 +2,7 @@
 
 
 import React, { useState, useCallback } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { FormConfig, FormField } from "../lib/form-types"
 import { FormFieldRenderer } from "./forms-field-render"
@@ -24,6 +25,7 @@ export function ModularForm({
   onCancel,
   className,
 }: ModularFormProps) {
+  const { t } = useTranslation()
   // Initialize form state with default values
   const getInitialValues = useCallback(() => {
     const values: Record<string, unknown> = {}
@@ -68,7 +70,7 @@ export function ModularForm({
 
   const validateField = (field: FormField, value: unknown): string | null => {
     if (field.required && (value === "" || value === null || value === undefined)) {
-      return `${field.label || field.name} is required`
+      return t("common.validation.required")
     }
 
     if (field.validation) {
@@ -76,22 +78,22 @@ export function ModularForm({
 
       if (typeof value === "string") {
         if (v.minLength && value.length < v.minLength) {
-          return `Minimum ${v.minLength} characters required`
+          return t("common.validation.minLength", { min: v.minLength })
         }
         if (v.maxLength && value.length > v.maxLength) {
-          return `Maximum ${v.maxLength} characters allowed`
+          return t("common.validation.maxLength", { max: v.maxLength })
         }
         if (v.pattern && !new RegExp(v.pattern).test(value)) {
-          return "Invalid format"
+          return t("common.validation.invalidFormat")
         }
       }
 
       if (typeof value === "number") {
         if (v.min !== undefined && value < v.min) {
-          return `Minimum value is ${v.min}`
+          return t("common.validation.min", { min: v.min })
         }
         if (v.max !== undefined && value > v.max) {
-          return `Maximum value is ${v.max}`
+          return t("common.validation.max", { max: v.max })
         }
       }
 
@@ -206,7 +208,7 @@ export function ModularForm({
             onClick={handleReset}
             disabled={isSubmitting}
           >
-            Reset
+            {t("common.reset")}
           </Button>
         )}
         {(onCancel || config.onCancel) && (
@@ -217,7 +219,7 @@ export function ModularForm({
             onClick={handleCancel}
             disabled={isSubmitting}
           >
-            {config.cancelLabel || "Cancel"}
+            {config.cancelLabel || t("common.cancel")}
           </Button>
         )}
         <Button type="submit" size="sm" disabled={isSubmitting}>
@@ -225,7 +227,7 @@ export function ModularForm({
             ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             : <Check className="mr-2 h-4 w-4" />
           }
-          {config.submitLabel || "Submit"}
+          {config.submitLabel || t("common.submit")}
         </Button>
       </div>
     </form>

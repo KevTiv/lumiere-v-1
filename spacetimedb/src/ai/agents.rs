@@ -89,11 +89,11 @@ pub struct AiAgent {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,              // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
-    pub model: String,                 // e.g., "claude-sonnet-4-6", "gpt-4o"
-    pub provider: String,              // OpenAI, Anthropic, Ollama, Mistral, etc.
+    pub model: String,                     // e.g., "claude-sonnet-4-6", "gpt-4o"
+    pub provider: String,                  // OpenAI, Anthropic, Ollama, Mistral, etc.
     pub api_key_reference: Option<String>, // Reference key name (never the key itself)
     pub temperature: f64,
     pub max_tokens: u32,
@@ -110,7 +110,7 @@ pub struct AiAgent {
     pub cost_per_1k_tokens: f64,
     pub monthly_budget: Option<f64>,
     pub monthly_spend: f64,
-    pub company_id: Option<u64>,       // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -132,18 +132,18 @@ pub struct AiTeamMember {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,            // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub ai_agent_id: u64,
-    pub role: String,                    // Assistant, Analyst, Advisor, etc.
+    pub role: String, // Assistant, Analyst, Advisor, etc.
     pub responsibilities: Vec<String>,
     pub expertise_areas: Vec<String>,
     pub is_active: bool,
     pub avatar_url: Option<String>,
     pub greeting_message: Option<String>,
     pub personality: Option<String>,
-    pub response_style: String,          // Formal, Casual, Technical, Friendly
-    pub company_id: Option<u64>,         // ERP company entity scope (within org)
+    pub response_style: String,  // Formal, Casual, Technical, Friendly
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -225,7 +225,11 @@ pub fn create_ai_agent(
         },
     );
 
-    log::info!("AI agent created: id={}, provider={}", agent.id, agent.provider);
+    log::info!(
+        "AI agent created: id={}, provider={}",
+        agent.id,
+        agent.provider
+    );
     Ok(())
 }
 
@@ -350,7 +354,11 @@ pub fn set_ai_agent_active(
         },
     );
 
-    log::info!("AI agent active state: id={}, active={}", agent_id, is_active);
+    log::info!(
+        "AI agent active state: id={}, active={}",
+        agent_id,
+        is_active
+    );
     Ok(())
 }
 
@@ -464,6 +472,10 @@ pub fn create_ai_team_member(
         },
     );
 
-    log::info!("AI team member created: id={}, role={}", member.id, member.role);
+    log::info!(
+        "AI team member created: id={}, role={}",
+        member.id,
+        member.role
+    );
     Ok(())
 }

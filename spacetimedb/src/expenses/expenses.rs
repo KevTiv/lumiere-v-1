@@ -23,21 +23,21 @@ pub struct HrExpense {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: String,                       // Description of the expense
-    pub employee_id: u64,                   // FK → HrEmployee
-    pub product_id: Option<u64>,            // FK → Product (expense category)
+    pub name: String,            // Description of the expense
+    pub employee_id: u64,        // FK → HrEmployee
+    pub product_id: Option<u64>, // FK → Product (expense category)
     pub date: Timestamp,
     pub total_amount: f64,
     pub currency_id: u64,
-    pub quantity: f64,                      // Default 1.0
-    pub unit_amount: f64,                   // Price per unit
-    pub tax_ids: Vec<u64>,                  // FK → AccountTax
-    pub account_id: Option<u64>,            // FK → AccountAccount
-    pub analytic_account_id: Option<u64>,   // FK → AccountAnalyticAccount
-    pub sheet_id: Option<u64>,              // FK → HrExpenseSheet (set when submitted)
+    pub quantity: f64,                    // Default 1.0
+    pub unit_amount: f64,                 // Price per unit
+    pub tax_ids: Vec<u64>,                // FK → AccountTax
+    pub account_id: Option<u64>,          // FK → AccountAccount
+    pub analytic_account_id: Option<u64>, // FK → AccountAnalyticAccount
+    pub sheet_id: Option<u64>,            // FK → HrExpenseSheet (set when submitted)
     pub state: ExpenseState,
     pub description: Option<String>,
-    pub attachment_ids: Vec<u64>,           // File attachment IDs
+    pub attachment_ids: Vec<u64>, // File attachment IDs
     pub created_at: Timestamp,
 }
 
@@ -55,14 +55,14 @@ pub struct HrExpenseSheet {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: String,                       // e.g. "Business Trip - March 2026"
-    pub employee_id: u64,                   // FK → HrEmployee
+    pub name: String,     // e.g. "Business Trip - March 2026"
+    pub employee_id: u64, // FK → HrEmployee
     pub state: ExpenseSheetState,
     pub total_amount: f64,
     pub currency_id: u64,
     pub accounting_date: Option<Timestamp>,
-    pub account_move_id: Option<u64>,       // FK → AccountMove (set on post)
-    pub approver_id: Option<Identity>,      // Who approved this sheet
+    pub account_move_id: Option<u64>, // FK → AccountMove (set on post)
+    pub approver_id: Option<Identity>, // Who approved this sheet
     pub notes: Option<String>,
     pub created_at: Timestamp,
 }
@@ -148,16 +148,20 @@ pub fn create_expense(
         attachment_ids: params.attachment_ids,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense",
-        record_id: expense.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense",
+            record_id: expense.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -170,7 +174,11 @@ pub fn update_expense(
     params: UpdateExpenseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "update")?;
-    let expense = ctx.db.hr_expense().id().find(&expense_id)
+    let expense = ctx
+        .db
+        .hr_expense()
+        .id()
+        .find(&expense_id)
         .ok_or("Expense not found")?;
     if expense.organization_id != organization_id {
         return Err("Expense belongs to a different organization".to_string());
@@ -192,16 +200,20 @@ pub fn update_expense(
         account_id: params.account_id.or(expense.account_id),
         ..expense
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense",
-        record_id: expense_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense",
+            record_id: expense_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -213,7 +225,11 @@ pub fn submit_expense(
     sheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "update")?;
-    let expense = ctx.db.hr_expense().id().find(&expense_id)
+    let expense = ctx
+        .db
+        .hr_expense()
+        .id()
+        .find(&expense_id)
         .ok_or("Expense not found")?;
     if expense.organization_id != organization_id {
         return Err("Expense belongs to a different organization".to_string());
@@ -227,16 +243,20 @@ pub fn submit_expense(
         state: ExpenseState::Submitted,
         ..expense
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense",
-        record_id: expense_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["sheet_id".to_string(), "state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense",
+            record_id: expense_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["sheet_id".to_string(), "state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -268,16 +288,20 @@ pub fn create_expense_sheet(
         notes: params.notes,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense_sheet",
-        record_id: sheet.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_sheet",
+            record_id: sheet.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -289,7 +313,11 @@ pub fn submit_expense_sheet(
     params: SubmitExpenseSheetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "update")?;
-    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -303,16 +331,20 @@ pub fn submit_expense_sheet(
         state: ExpenseSheetState::Submitted,
         ..sheet
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense_sheet",
-        record_id: sheet_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["total_amount".to_string(), "state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_sheet",
+            record_id: sheet_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["total_amount".to_string(), "state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -323,7 +355,11 @@ pub fn approve_expense_sheet(
     sheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
-    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -337,16 +373,20 @@ pub fn approve_expense_sheet(
         approver_id: Some(ctx.sender()),
         ..sheet
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense_sheet",
-        record_id: sheet_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "approver_id".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_sheet",
+            record_id: sheet_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string(), "approver_id".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -357,7 +397,11 @@ pub fn refuse_expense_sheet(
     sheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
-    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -367,16 +411,20 @@ pub fn refuse_expense_sheet(
         state: ExpenseSheetState::Refused,
         ..sheet
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense_sheet",
-        record_id: sheet_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_sheet",
+            record_id: sheet_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -388,7 +436,11 @@ pub fn post_expense_sheet(
     accounting_date: Timestamp,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "post")?;
-    let sheet = ctx.db.expense_sheet().id().find(&sheet_id)
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
@@ -402,15 +454,19 @@ pub fn post_expense_sheet(
         accounting_date: Some(accounting_date),
         ..sheet
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_expense_sheet",
-        record_id: sheet_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "accounting_date".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_sheet",
+            record_id: sheet_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string(), "accounting_date".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }

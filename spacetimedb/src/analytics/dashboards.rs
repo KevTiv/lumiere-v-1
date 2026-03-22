@@ -86,25 +86,25 @@ pub struct DashboardWidget {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,              // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
-    pub widget_type: WidgetType,           // Chart, Table, KPI, List
-    pub model: String,                     // ERP model being queried
-    pub domain: Option<String>,            // JSON filter expression
-    pub fields: Vec<String>,               // Fields to display/aggregate
-    pub group_by: Option<String>,          // Grouping field
-    pub aggregation: Option<String>,       // Count, Sum, Average, Min, Max
-    pub chart_type: Option<String>,        // Bar, Line, Pie, Area, Scatter
-    pub sort_order: Option<String>,        // JSON sort spec
-    pub limit: Option<u32>,               // Max rows
-    pub refresh_interval: Option<u32>,    // Seconds between auto-refresh
-    pub configuration: Option<String>,    // JSON for widget-specific settings
+    pub widget_type: WidgetType,       // Chart, Table, KPI, List
+    pub model: String,                 // ERP model being queried
+    pub domain: Option<String>,        // JSON filter expression
+    pub fields: Vec<String>,           // Fields to display/aggregate
+    pub group_by: Option<String>,      // Grouping field
+    pub aggregation: Option<String>,   // Count, Sum, Average, Min, Max
+    pub chart_type: Option<String>,    // Bar, Line, Pie, Area, Scatter
+    pub sort_order: Option<String>,    // JSON sort spec
+    pub limit: Option<u32>,            // Max rows
+    pub refresh_interval: Option<u32>, // Seconds between auto-refresh
+    pub configuration: Option<String>, // JSON for widget-specific settings
     pub position_x: u32,
     pub position_y: u32,
     pub width: u32,
     pub height: u32,
     pub is_active: bool,
-    pub company_id: Option<u64>,          // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -125,16 +125,16 @@ pub struct Dashboard {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,              // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub widget_ids: Vec<u64>,
-    pub is_system: bool,               // System dashboards cannot be deleted
-    pub is_default: bool,              // Shown on login
-    pub share_with: Vec<Identity>,     // Specific users
-    pub share_with_groups: Vec<u64>,   // Group IDs
+    pub is_system: bool,             // System dashboards cannot be deleted
+    pub is_default: bool,            // Shown on login
+    pub share_with: Vec<Identity>,   // Specific users
+    pub share_with_groups: Vec<u64>, // Group IDs
     pub is_shared: bool,
-    pub company_id: Option<u64>,       // ERP company entity scope (within org)
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,

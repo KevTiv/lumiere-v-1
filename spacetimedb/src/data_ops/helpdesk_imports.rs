@@ -20,7 +20,13 @@ pub fn import_helpdesk_team_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_team", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "helpdesk_team", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "helpdesk_team",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -46,7 +52,11 @@ pub fn import_helpdesk_team_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import helpdesk_team: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import helpdesk_team: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -60,7 +70,13 @@ pub fn import_helpdesk_stage_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_stage", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "helpdesk_stage", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "helpdesk_stage",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -89,7 +105,11 @@ pub fn import_helpdesk_stage_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import helpdesk_stage: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import helpdesk_stage: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -103,7 +123,13 @@ pub fn import_helpdesk_sla_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_sla", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "helpdesk_sla", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "helpdesk_sla",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -119,7 +145,14 @@ pub fn import_helpdesk_sla_csv(
 
         let team_id = parse_u64(col(&headers, row, "team_id"));
         if team_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("team_id"), None, "team_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("team_id"),
+                None,
+                "team_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -147,7 +180,11 @@ pub fn import_helpdesk_sla_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import helpdesk_sla: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import helpdesk_sla: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -161,7 +198,13 @@ pub fn import_helpdesk_ticket_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_ticket", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "helpdesk_ticket", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "helpdesk_ticket",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -177,7 +220,14 @@ pub fn import_helpdesk_ticket_csv(
 
         let team_id = parse_u64(col(&headers, row, "team_id"));
         if team_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("team_id"), None, "team_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("team_id"),
+                None,
+                "team_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -221,6 +271,10 @@ pub fn import_helpdesk_ticket_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import helpdesk_ticket: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import helpdesk_ticket: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

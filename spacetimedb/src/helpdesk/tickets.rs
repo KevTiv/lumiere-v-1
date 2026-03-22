@@ -40,10 +40,10 @@ pub struct HelpdeskStage {
     pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
-    pub team_id: Option<u64>,       // FK → HelpdeskTeam (None = shared across all teams)
+    pub team_id: Option<u64>, // FK → HelpdeskTeam (None = shared across all teams)
     pub sequence: u32,
-    pub is_closed: bool,            // Terminal stage
-    pub template: Option<String>,   // Email template name on entry
+    pub is_closed: bool,          // Terminal stage
+    pub template: Option<String>, // Email template name on entry
     pub created_at: Timestamp,
 }
 
@@ -60,11 +60,11 @@ pub struct HelpdeskSLA {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub team_id: u64,               // FK → HelpdeskTeam
-    pub stage_id: u64,              // Target stage to reach before deadline
+    pub team_id: u64,  // FK → HelpdeskTeam
+    pub stage_id: u64, // Target stage to reach before deadline
     pub priority: TicketPriority,
-    pub time_days: u32,             // Days to resolve
-    pub time_hours: u32,            // Hours (in addition to days)
+    pub time_days: u32,  // Days to resolve
+    pub time_hours: u32, // Hours (in addition to days)
     pub is_active: bool,
     pub created_at: Timestamp,
 }
@@ -83,17 +83,17 @@ pub struct HelpdeskTicket {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
-    pub name: String,                   // Ticket subject
+    pub name: String, // Ticket subject
     pub description: Option<String>,
-    pub partner_id: Option<u64>,        // FK → Contact (customer)
+    pub partner_id: Option<u64>, // FK → Contact (customer)
     pub partner_name: Option<String>,
     pub partner_email: Option<String>,
-    pub team_id: u64,                   // FK → HelpdeskTeam
-    pub stage_id: u64,                  // FK → HelpdeskStage
-    pub user_id: Option<Identity>,      // Assigned support agent
+    pub team_id: u64,              // FK → HelpdeskTeam
+    pub stage_id: u64,             // FK → HelpdeskStage
+    pub user_id: Option<Identity>, // Assigned support agent
     pub priority: TicketPriority,
     pub state: HelpdeskTicketState,
-    pub sla_id: Option<u64>,            // FK → HelpdeskSLA
+    pub sla_id: Option<u64>, // FK → HelpdeskSLA
     pub sla_deadline: Option<Timestamp>,
     pub sla_reached: bool,
     pub closed_at: Option<Timestamp>,
@@ -173,16 +173,20 @@ pub fn create_helpdesk_team(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_team",
-        record_id: team.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_team",
+            record_id: team.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -209,16 +213,20 @@ pub fn create_helpdesk_stage(
         template: params.template,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_stage",
-        record_id: stage.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_stage",
+            record_id: stage.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -246,16 +254,20 @@ pub fn create_helpdesk_sla(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_sla",
-        record_id: sla.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_sla",
+            record_id: sla.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -291,16 +303,20 @@ pub fn create_ticket(
         created_at: ctx.timestamp,
         deleted_at: None,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_ticket",
-        record_id: ticket.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: ticket.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -312,7 +328,11 @@ pub fn update_ticket(
     params: UpdateTicketParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_ticket", "update")?;
-    let ticket = ctx.db.helpdesk_ticket().id().find(&ticket_id)
+    let ticket = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
@@ -324,16 +344,20 @@ pub fn update_ticket(
         priority: params.priority.unwrap_or(ticket.priority),
         ..ticket
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_ticket",
-        record_id: ticket_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: ticket_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -345,7 +369,11 @@ pub fn assign_ticket(
     agent_id: Identity,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_ticket", "update")?;
-    let ticket = ctx.db.helpdesk_ticket().id().find(&ticket_id)
+    let ticket = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
@@ -355,16 +383,20 @@ pub fn assign_ticket(
         state: HelpdeskTicketState::InProgress,
         ..ticket
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_ticket",
-        record_id: ticket_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["user_id".to_string(), "state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: ticket_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["user_id".to_string(), "state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -375,7 +407,11 @@ pub fn close_ticket(
     ticket_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_ticket", "update")?;
-    let ticket = ctx.db.helpdesk_ticket().id().find(&ticket_id)
+    let ticket = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
@@ -385,16 +421,20 @@ pub fn close_ticket(
         closed_at: Some(ctx.timestamp),
         ..ticket
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_ticket",
-        record_id: ticket_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "closed_at".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: ticket_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string(), "closed_at".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -405,7 +445,11 @@ pub fn reopen_ticket(
     ticket_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "helpdesk_ticket", "update")?;
-    let ticket = ctx.db.helpdesk_ticket().id().find(&ticket_id)
+    let ticket = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
@@ -415,15 +459,19 @@ pub fn reopen_ticket(
         closed_at: None,
         ..ticket
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "helpdesk_ticket",
-        record_id: ticket_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "closed_at".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: ticket_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string(), "closed_at".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }

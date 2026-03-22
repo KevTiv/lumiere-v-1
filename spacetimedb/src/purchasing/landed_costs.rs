@@ -226,9 +226,7 @@ pub fn add_landed_cost_line(
             record_id: cost_line.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "price_unit": params.price_unit }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "price_unit": params.price_unit }).to_string()),
             changed_fields: vec!["landed_cost_id".to_string(), "price_unit".to_string()],
             metadata: None,
         },
@@ -595,9 +593,7 @@ pub fn apply_landed_costs(
             record_id: landed_cost_id,
             action: "APPLY",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "amount_total": lc.amount_total }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "amount_total": lc.amount_total }).to_string()),
             changed_fields: vec!["valuation_adjustment_lines".to_string()],
             metadata: None,
         },

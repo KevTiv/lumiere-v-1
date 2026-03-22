@@ -11,7 +11,9 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::core::organization::company;
-use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+};
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
 use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
@@ -1179,12 +1181,9 @@ pub fn post_account_move(
             continue;
         }
         // Find all BudgetPosts that include this line's GL account
-        for bp in ctx
-            .db
-            .budget_post()
-            .iter()
-            .filter(|bp| bp.company_id == move_company_id && bp.account_ids.contains(&line.account_id))
-        {
+        for bp in ctx.db.budget_post().iter().filter(|bp| {
+            bp.company_id == move_company_id && bp.account_ids.contains(&line.account_id)
+        }) {
             // Find matching budget lines (analytic + date range)
             for bline in ctx
                 .db
@@ -1198,7 +1197,12 @@ pub fn post_account_move(
                 if move_date < bline.date_from || move_date > bline.date_to {
                     continue;
                 }
-                let Some(budget) = ctx.db.crossovered_budget().id().find(&bline.general_budget_id) else {
+                let Some(budget) = ctx
+                    .db
+                    .crossovered_budget()
+                    .id()
+                    .find(&bline.general_budget_id)
+                else {
                     continue;
                 };
                 if budget.state != BudgetState::Validate && budget.state != BudgetState::Confirm {
@@ -1217,16 +1221,19 @@ pub fn post_account_move(
                 } else {
                     0.0
                 };
-                ctx.db.crossovered_budget_lines().id().update(CrossoveredBudgetLines {
-                    practical_amount: new_practical,
-                    variance,
-                    variance_percentage: variance_pct,
-                    achieve_percentage: achieve_pct,
-                    is_above_budget: new_practical > bline.planned_amount,
-                    write_uid: Some(ctx.sender()),
-                    write_date: Some(ctx.timestamp),
-                    ..bline
-                });
+                ctx.db
+                    .crossovered_budget_lines()
+                    .id()
+                    .update(CrossoveredBudgetLines {
+                        practical_amount: new_practical,
+                        variance,
+                        variance_percentage: variance_pct,
+                        achieve_percentage: achieve_pct,
+                        is_above_budget: new_practical > bline.planned_amount,
+                        write_uid: Some(ctx.sender()),
+                        write_date: Some(ctx.timestamp),
+                        ..bline
+                    });
                 let new_total = budget.total_practical - old_practical + new_practical;
                 let total_var_pct = if budget.total_planned != 0.0 {
                     ((new_total - budget.total_planned) / budget.total_planned) * 100.0
@@ -1383,7 +1390,9 @@ pub fn update_account_move_line(
         debit_currency: new_debit,
         credit_currency: new_credit,
         partner_id: params.partner_id.unwrap_or(line.partner_id),
-        analytic_account_id: params.analytic_account_id.unwrap_or(line.analytic_account_id),
+        analytic_account_id: params
+            .analytic_account_id
+            .unwrap_or(line.analytic_account_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         metadata: params.metadata.map(Some).unwrap_or(line.metadata),
@@ -1678,14 +1687,17 @@ pub fn create_invoice_from_sale_order(
         });
 
         // Mark line as invoiced
-        ctx.db.sale_order_line().id().update(crate::sales::sales_core::SaleOrderLine {
-            qty_invoiced: qty_invoiced_prev + qty,
-            qty_to_invoice: 0.0,
-            invoice_status: LineInvoiceStatus::Invoiced,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..line
-        });
+        ctx.db
+            .sale_order_line()
+            .id()
+            .update(crate::sales::sales_core::SaleOrderLine {
+                qty_invoiced: qty_invoiced_prev + qty,
+                qty_to_invoice: 0.0,
+                invoice_status: LineInvoiceStatus::Invoiced,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..line
+            });
 
         amount_untaxed += subtotal;
         amount_tax += tax_amount;
@@ -1729,14 +1741,17 @@ pub fn create_invoice_from_sale_order(
     let new_invoice_count = order.invoice_count + 1;
     let company_id = order.company_id;
 
-    ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
-        invoice_ids: updated_invoice_ids,
-        invoice_count: new_invoice_count,
-        invoice_status: new_invoice_status,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..order
-    });
+    ctx.db
+        .sale_order()
+        .id()
+        .update(crate::sales::sales_core::SaleOrder {
+            invoice_ids: updated_invoice_ids,
+            invoice_count: new_invoice_count,
+            invoice_status: new_invoice_status,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..order
+        });
 
     write_audit_log_v2(
         ctx,
@@ -1968,16 +1983,15 @@ pub fn create_bill_from_purchase_order(
         });
 
         // Mark qty as invoiced on PO line
-        ctx.db
-            .purchase_order_line()
-            .id()
-            .update(crate::purchasing::purchase_orders::PurchaseOrderLine {
+        ctx.db.purchase_order_line().id().update(
+            crate::purchasing::purchase_orders::PurchaseOrderLine {
                 qty_invoiced: qty_invoiced_prev + qty,
                 qty_to_invoice: (product_qty - (qty_invoiced_prev + qty)).max(0.0),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..line
-            });
+            },
+        );
 
         amount_untaxed += subtotal;
         amount_tax += tax_amount;
@@ -2198,13 +2212,16 @@ pub fn reconcile_payment_with_invoice(
     if let Some(so_id) = invoice_move.sale_order_id {
         if let Some(so) = ctx.db.sale_order().id().find(&so_id) {
             let applied = payment_amount - remaining_payment.max(0.0);
-            ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
-                amount_paid: so.amount_paid + applied,
-                amount_residual: (so.amount_residual - applied).max(0.0),
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..so
-            });
+            ctx.db
+                .sale_order()
+                .id()
+                .update(crate::sales::sales_core::SaleOrder {
+                    amount_paid: so.amount_paid + applied,
+                    amount_residual: (so.amount_residual - applied).max(0.0),
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..so
+                });
         }
     }
 

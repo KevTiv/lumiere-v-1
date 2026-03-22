@@ -3,7 +3,9 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::documents::knowledge::{kb_category, knowledge_article, KnowledgeArticle, KnowledgeArticleCategory};
+use crate::documents::knowledge::{
+    kb_category, knowledge_article, KnowledgeArticle, KnowledgeArticleCategory,
+};
 use crate::helpers::check_permission;
 
 // ── KnowledgeArticleCategory ──────────────────────────────────────────────────
@@ -16,7 +18,13 @@ pub fn import_knowledge_category_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article_category", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "knowledge_article_category", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "knowledge_article_category",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -49,7 +57,11 @@ pub fn import_knowledge_category_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import knowledge_article_category: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import knowledge_article_category: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -63,7 +75,13 @@ pub fn import_knowledge_article_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "knowledge_article", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "knowledge_article",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -125,6 +143,10 @@ pub fn import_knowledge_article_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import knowledge_article: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import knowledge_article: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

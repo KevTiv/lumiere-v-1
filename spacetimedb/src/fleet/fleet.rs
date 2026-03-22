@@ -29,7 +29,10 @@ impl VehicleStatus {
             "idle" => Ok(Self::Idle),
             "maintenance" => Ok(Self::Maintenance),
             "offline" => Ok(Self::Offline),
-            other => Err(format!("Invalid vehicle status '{}'. Valid: active, idle, maintenance, offline", other)),
+            other => Err(format!(
+                "Invalid vehicle status '{}'. Valid: active, idle, maintenance, offline",
+                other
+            )),
         }
     }
 }
@@ -49,7 +52,10 @@ impl PosStatus {
             "closed" => Ok(Self::Closed),
             "error" => Ok(Self::Error),
             "maintenance" => Ok(Self::Maintenance),
-            other => Err(format!("Invalid POS status '{}'. Valid: open, closed, error, maintenance", other)),
+            other => Err(format!(
+                "Invalid POS status '{}'. Valid: open, closed, error, maintenance",
+                other
+            )),
         }
     }
 }
@@ -72,7 +78,7 @@ pub struct FleetVehicle {
     pub id: u64,
 
     pub organization_id: u64,
-    pub name: String,               // e.g. "Truck #101"
+    pub name: String, // e.g. "Truck #101"
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
     pub driver_id: Option<Identity>,
@@ -80,11 +86,11 @@ pub struct FleetVehicle {
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
     pub speed_kmh: Option<f64>,
-    pub heading: Option<f64>,       // degrees (0–360)
+    pub heading: Option<f64>, // degrees (0–360)
     pub last_position_at: Option<Timestamp>,
-    pub fuel_level: Option<f64>,    // 0.0–1.0
+    pub fuel_level: Option<f64>, // 0.0–1.0
     pub odometer_km: Option<f64>,
-    pub vehicle_type: String,       // "truck", "van", "bike", etc.
+    pub vehicle_type: String, // "truck", "van", "bike", etc.
     pub company_id: Option<u64>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -107,7 +113,7 @@ pub struct PosTerminal {
     pub id: u64,
 
     pub organization_id: u64,
-    pub name: String,               // e.g. "NYC Store — 5th Ave"
+    pub name: String, // e.g. "NYC Store — 5th Ave"
     pub location_label: Option<String>,
     pub status: PosStatus,
     pub latitude: Option<f64>,
@@ -137,7 +143,7 @@ pub struct WarehouseGeo {
     pub id: u64,
 
     pub organization_id: u64,
-    pub warehouse_id: u64,          // FK → Warehouse.id
+    pub warehouse_id: u64, // FK → Warehouse.id
     pub latitude: f64,
     pub longitude: f64,
     pub address: Option<String>,
@@ -204,7 +210,11 @@ pub fn update_vehicle_position(
     heading: f64,
     status: String,
 ) -> Result<(), String> {
-    let vehicle = ctx.db.fleet_vehicle().id().find(&vehicle_id)
+    let vehicle = ctx
+        .db
+        .fleet_vehicle()
+        .id()
+        .find(&vehicle_id)
         .ok_or_else(|| format!("Vehicle {} not found", vehicle_id))?;
 
     check_permission(ctx, vehicle.organization_id, "fleet_vehicle", "write")?;
@@ -269,7 +279,11 @@ pub fn update_pos_terminal(
     daily_revenue: f64,
     open_orders: u32,
 ) -> Result<(), String> {
-    let terminal = ctx.db.pos_terminal().id().find(&terminal_id)
+    let terminal = ctx
+        .db
+        .pos_terminal()
+        .id()
+        .find(&terminal_id)
         .ok_or_else(|| format!("POS terminal {} not found", terminal_id))?;
 
     check_permission(ctx, terminal.organization_id, "pos_terminal", "write")?;
@@ -304,7 +318,9 @@ pub fn upsert_warehouse_geo(
     check_permission(ctx, organization_id, "warehouse_geo", "write")?;
 
     // Find existing geo record for this warehouse
-    let existing = ctx.db.warehouse_geo()
+    let existing = ctx
+        .db
+        .warehouse_geo()
         .warehouse_geo_by_warehouse()
         .filter(&warehouse_id)
         .next();

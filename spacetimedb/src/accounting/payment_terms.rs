@@ -38,11 +38,11 @@ pub struct AccountPaymentTermLine {
     pub id: u64,
     pub payment_term_id: u64,          // FK → AccountPaymentTerm
     pub value: PaymentTermValue,       // Balance | Percent | Fixed
-    pub value_amount: f64,             // 0.0 for Balance, percentage for Percent, fixed amount for Fixed
-    pub days: u32,                     // Days from invoice date
-    pub months: u32,                   // Months from invoice date (added to days)
+    pub value_amount: f64, // 0.0 for Balance, percentage for Percent, fixed amount for Fixed
+    pub days: u32,         // Days from invoice date
+    pub months: u32,       // Months from invoice date (added to days)
     pub days_after_end_of_month: bool, // Compute from end of month instead of invoice date
-    pub sequence: u32,                 // Display/processing order
+    pub sequence: u32,     // Display/processing order
 }
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -84,16 +84,20 @@ pub fn create_payment_term(
         is_active: true,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "account_payment_term",
-        record_id: term.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term",
+            record_id: term.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -107,17 +111,24 @@ pub fn update_payment_term(
     is_active: Option<bool>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_term", "update")?;
-    let term = ctx.db.account_payment_term().id().find(&term_id)
+    let term = ctx
+        .db
+        .account_payment_term()
+        .id()
+        .find(&term_id)
         .ok_or("Payment term not found")?;
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
-    ctx.db.account_payment_term().id().update(AccountPaymentTerm {
-        name: name.unwrap_or(term.name.clone()),
-        note: note.or(term.note.clone()),
-        is_active: is_active.unwrap_or(term.is_active),
-        ..term
-    });
+    ctx.db
+        .account_payment_term()
+        .id()
+        .update(AccountPaymentTerm {
+            name: name.unwrap_or(term.name.clone()),
+            note: note.or(term.note.clone()),
+            is_active: is_active.unwrap_or(term.is_active),
+            ..term
+        });
     Ok(())
 }
 
@@ -128,14 +139,20 @@ pub fn delete_payment_term(
     term_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_term", "delete")?;
-    let term = ctx.db.account_payment_term().id().find(&term_id)
+    let term = ctx
+        .db
+        .account_payment_term()
+        .id()
+        .find(&term_id)
         .ok_or("Payment term not found")?;
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
     ctx.db.account_payment_term().id().delete(&term_id);
     // Cascade: delete all lines
-    let line_ids: Vec<u64> = ctx.db.account_payment_term_line()
+    let line_ids: Vec<u64> = ctx
+        .db
+        .account_payment_term_line()
         .payment_term_line_by_term()
         .filter(&term_id)
         .map(|l| l.id)
@@ -156,21 +173,27 @@ pub fn create_payment_term_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_term", "update")?;
     // Verify the term exists and belongs to this org
-    let term = ctx.db.account_payment_term().id().find(&params.payment_term_id)
+    let term = ctx
+        .db
+        .account_payment_term()
+        .id()
+        .find(&params.payment_term_id)
         .ok_or("Payment term not found")?;
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
-    ctx.db.account_payment_term_line().insert(AccountPaymentTermLine {
-        id: 0,
-        payment_term_id: params.payment_term_id,
-        value: params.value,
-        value_amount: params.value_amount,
-        days: params.days,
-        months: params.months,
-        days_after_end_of_month: params.days_after_end_of_month,
-        sequence: params.sequence,
-    });
+    ctx.db
+        .account_payment_term_line()
+        .insert(AccountPaymentTermLine {
+            id: 0,
+            payment_term_id: params.payment_term_id,
+            value: params.value,
+            value_amount: params.value_amount,
+            days: params.days,
+            months: params.months,
+            days_after_end_of_month: params.days_after_end_of_month,
+            sequence: params.sequence,
+        });
     Ok(())
 }
 
@@ -187,23 +210,35 @@ pub fn update_payment_term_line(
     sequence: Option<u32>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_term", "update")?;
-    let line = ctx.db.account_payment_term_line().id().find(&line_id)
+    let line = ctx
+        .db
+        .account_payment_term_line()
+        .id()
+        .find(&line_id)
         .ok_or("Payment term line not found")?;
     // Verify org ownership via parent term
-    let term = ctx.db.account_payment_term().id().find(&line.payment_term_id)
+    let term = ctx
+        .db
+        .account_payment_term()
+        .id()
+        .find(&line.payment_term_id)
         .ok_or("Parent payment term not found")?;
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
-    ctx.db.account_payment_term_line().id().update(AccountPaymentTermLine {
-        value: value.unwrap_or(line.value.clone()),
-        value_amount: value_amount.unwrap_or(line.value_amount),
-        days: days.unwrap_or(line.days),
-        months: months.unwrap_or(line.months),
-        days_after_end_of_month: days_after_end_of_month.unwrap_or(line.days_after_end_of_month),
-        sequence: sequence.unwrap_or(line.sequence),
-        ..line
-    });
+    ctx.db
+        .account_payment_term_line()
+        .id()
+        .update(AccountPaymentTermLine {
+            value: value.unwrap_or(line.value.clone()),
+            value_amount: value_amount.unwrap_or(line.value_amount),
+            days: days.unwrap_or(line.days),
+            months: months.unwrap_or(line.months),
+            days_after_end_of_month: days_after_end_of_month
+                .unwrap_or(line.days_after_end_of_month),
+            sequence: sequence.unwrap_or(line.sequence),
+            ..line
+        });
     Ok(())
 }
 
@@ -214,9 +249,17 @@ pub fn delete_payment_term_line(
     line_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_term", "update")?;
-    let line = ctx.db.account_payment_term_line().id().find(&line_id)
+    let line = ctx
+        .db
+        .account_payment_term_line()
+        .id()
+        .find(&line_id)
         .ok_or("Payment term line not found")?;
-    let term = ctx.db.account_payment_term().id().find(&line.payment_term_id)
+    let term = ctx
+        .db
+        .account_payment_term()
+        .id()
+        .find(&line.payment_term_id)
         .ok_or("Parent payment term not found")?;
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());

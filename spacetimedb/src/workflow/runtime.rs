@@ -31,10 +31,10 @@ pub struct WorkflowInstance {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub workflow_id: u64,
-    pub res_id: u64,         // ID of the related ERP record
-    pub res_type: String,    // Model name, e.g., "sale_order"
+    pub res_id: u64,      // ID of the related ERP record
+    pub res_type: String, // Model name, e.g., "sale_order"
     pub state: InstanceState,
     pub activity_ids: Vec<u64>, // Currently active activity IDs
     pub create_uid: Identity,
@@ -57,9 +57,9 @@ pub struct WorkflowWorkitem {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation (inherited from parent WorkflowInstance)
+    pub organization_id: u64, // Tenant isolation (inherited from parent WorkflowInstance)
     pub instance_id: u64,
-    pub act_id: u64,                        // Current activity
+    pub act_id: u64,                          // Current activity
     pub wkf_evaled_condition: Option<String>, // Last evaluated condition result
     pub state: WorkitemState,
     pub create_uid: Identity,
@@ -209,15 +209,12 @@ pub fn signal_workflow(
 
             if let Some(act) = target_act {
                 // Complete current workitem
-                ctx.db
-                    .workflow_workitem()
-                    .id()
-                    .update(WorkflowWorkitem {
-                        state: WorkitemState::Complete,
-                        write_uid: ctx.sender(),
-                        write_date: ctx.timestamp,
-                        ..item.clone()
-                    });
+                ctx.db.workflow_workitem().id().update(WorkflowWorkitem {
+                    state: WorkitemState::Complete,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..item.clone()
+                });
 
                 // Remove old activity, add new
                 new_activity_ids.retain(|&a| a != item.act_id);
@@ -319,26 +316,20 @@ pub fn set_workitem_exception(
 
     // Mark the parent instance as exception too
     if let Some(instance) = ctx.db.workflow_instance().id().find(&item.instance_id) {
-        ctx.db
-            .workflow_instance()
-            .id()
-            .update(WorkflowInstance {
-                state: InstanceState::Exception,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..instance
-            });
-    }
-
-    ctx.db
-        .workflow_workitem()
-        .id()
-        .update(WorkflowWorkitem {
-            state: WorkitemState::Exception,
+        ctx.db.workflow_instance().id().update(WorkflowInstance {
+            state: InstanceState::Exception,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
-            ..item
+            ..instance
         });
+    }
+
+    ctx.db.workflow_workitem().id().update(WorkflowWorkitem {
+        state: WorkitemState::Exception,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..item
+    });
 
     write_audit_log_v2(
         ctx,
@@ -393,26 +384,20 @@ pub fn cancel_workflow_instance(
         .collect();
 
     for item in active_items {
-        ctx.db
-            .workflow_workitem()
-            .id()
-            .update(WorkflowWorkitem {
-                state: WorkitemState::Complete,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..item
-            });
-    }
-
-    ctx.db
-        .workflow_instance()
-        .id()
-        .update(WorkflowInstance {
-            state: InstanceState::Complete,
+        ctx.db.workflow_workitem().id().update(WorkflowWorkitem {
+            state: WorkitemState::Complete,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
-            ..instance
+            ..item
         });
+    }
+
+    ctx.db.workflow_instance().id().update(WorkflowInstance {
+        state: InstanceState::Complete,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..instance
+    });
 
     write_audit_log_v2(
         ctx,

@@ -1,9 +1,9 @@
+use spacetimedb::Identity;
 /// IoT Alerts — threshold violations and anomalies.
 ///
 /// Alerts are created automatically by `record_telemetry` when sensor readings
 /// breach configured thresholds, or manually by other reducers detecting anomalies.
 use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp};
-use spacetimedb::Identity;
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::iot::registry::iot_device;

@@ -26,19 +26,34 @@ pub fn import_ai_agent_csv(
         let model = col(&headers, row, "model").to_string();
 
         if name.is_empty() || model.is_empty() {
-            record_import_error(ctx, job.id, row_num, Some("name"), None, "name and model are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("name"),
+                None,
+                "name and model are required",
+            );
             errors += 1;
             continue;
         }
 
         let provider = {
             let v = col(&headers, row, "provider");
-            if v.is_empty() { "anthropic".to_string() } else { v.to_string() }
+            if v.is_empty() {
+                "anthropic".to_string()
+            } else {
+                v.to_string()
+            }
         };
 
         let temperature = {
             let v = parse_f64(col(&headers, row, "temperature"));
-            if v == 0.0 { 0.7 } else { v }
+            if v == 0.0 {
+                0.7
+            } else {
+                v
+            }
         };
 
         ctx.db.ai_agent().insert(AiAgent {
@@ -52,18 +67,30 @@ pub fn import_ai_agent_csv(
             temperature,
             max_tokens: {
                 let v = parse_u32(col(&headers, row, "max_tokens"));
-                if v == 0 { 4096 } else { v }
+                if v == 0 {
+                    4096
+                } else {
+                    v
+                }
             },
             top_p: {
                 let v = parse_f64(col(&headers, row, "top_p"));
-                if v == 0.0 { 1.0 } else { v }
+                if v == 0.0 {
+                    1.0
+                } else {
+                    v
+                }
             },
             frequency_penalty: parse_f64(col(&headers, row, "frequency_penalty")),
             presence_penalty: parse_f64(col(&headers, row, "presence_penalty")),
             system_prompt: opt_str(col(&headers, row, "system_prompt")),
             context_window: {
                 let v = parse_u32(col(&headers, row, "context_window"));
-                if v == 0 { 200000 } else { v }
+                if v == 0 {
+                    200000
+                } else {
+                    v
+                }
             },
             is_active: true,
             is_default: parse_bool(col(&headers, row, "is_default")),
@@ -71,7 +98,11 @@ pub fn import_ai_agent_csv(
             allowed_actions: vec_str(col(&headers, row, "allowed_actions")),
             rate_limit_per_minute: {
                 let v = parse_u32(col(&headers, row, "rate_limit_per_minute"));
-                if v == 0 { 60 } else { v }
+                if v == 0 {
+                    60
+                } else {
+                    v
+                }
             },
             cost_per_1k_tokens: parse_f64(col(&headers, row, "cost_per_1k_tokens")),
             monthly_budget: opt_f64(col(&headers, row, "monthly_budget")),

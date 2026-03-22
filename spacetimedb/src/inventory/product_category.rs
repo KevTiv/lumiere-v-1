@@ -25,7 +25,7 @@ pub struct ProductCategory {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,   // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub parent_id: Option<u64>,
     pub sequence: u32,

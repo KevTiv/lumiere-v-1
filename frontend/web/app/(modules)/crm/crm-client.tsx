@@ -1,25 +1,25 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newLeadForm, newOpportunityForm, newContactForm, newActivityForm } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
-import {
-  useLeads,
-  useOpportunities,
-  useContacts,
-  useActivities,
-  useCreateLead,
-  useCreateOpportunity,
-  useCreateContact,
-} from "@lumiere/stdb"
+import { useTranslation } from "@lumiere/i18n"
 import type {
+  CreateContactParams,
   CreateLeadParams,
   CreateOpportunityParams,
-  CreateContactParams,
 } from "@lumiere/stdb"
+import {
+  useActivities,
+  useContacts,
+  useCreateContact,
+  useCreateLead,
+  useCreateOpportunity,
+  useLeads,
+  useOpportunities,
+} from "@lumiere/stdb"
+import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import { FormModal, ModuleView, newActivityForm, newContactForm, newLeadForm, newOpportunityForm } from "@lumiere/ui"
+import { useMemo, useState } from "react"
 
 interface CrmClientProps {
   initialLeads?: Record<string, unknown>[]

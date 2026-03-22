@@ -38,6 +38,18 @@ export interface StdbSession {
  * Server queries will return empty arrays and the client hydrates via WebSocket.
  */
 export async function getStdbSession(): Promise<StdbSession> {
+  // Dev mode: bypass cookie lookup entirely and use a hardcoded org ID.
+  // Set DEV_MOCK_ORG_ID=1 in .env.local when running locally with seed data.
+  const mockOrgId = process.env['DEV_MOCK_ORG_ID']
+  if (mockOrgId) {
+    return {
+      token: process.env['STDB_SERVER_TOKEN'],
+      identityHex: undefined,
+      organizationId: Number(mockOrgId),
+      opts: { token: process.env['STDB_SERVER_TOKEN'] },
+    }
+  }
+
   const store = await cookies()
   const token =
     store.get('stdb_token')?.value ??

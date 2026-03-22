@@ -91,11 +91,11 @@ pub struct AiInsight {
     pub title: String,
     pub description: String,
     pub recommendations: Vec<String>,
-    pub related_model: String,        // e.g., "sale_order", "inventory"
+    pub related_model: String, // e.g., "sale_order", "inventory"
     pub related_id: Option<u64>,
-    pub confidence: f64,              // 0.0–1.0
+    pub confidence: f64, // 0.0–1.0
     pub generated_at: Timestamp,
-    pub generated_by: Option<u64>,    // AI Agent ID
+    pub generated_by: Option<u64>, // AI Agent ID
     pub is_acknowledged: bool,
     pub acknowledged_by: Option<Identity>,
     pub acknowledged_at: Option<Timestamp>,
@@ -127,13 +127,13 @@ pub struct AiDocumentProcessingJob {
     #[auto_inc]
     pub id: u64,
 
-    pub document_type: String,                    // Invoice, Receipt, Contract, etc.
-    pub job_type: String,                         // OCR, Extraction, Classification, Analysis
+    pub document_type: String, // Invoice, Receipt, Contract, etc.
+    pub job_type: String,      // OCR, Extraction, Classification, Analysis
     pub status: JobStatus,
     pub ai_agent_id: Option<u64>,
     pub model_used: Option<String>,
-    pub input_data: Option<String>,               // JSON — source document reference
-    pub extracted_data: Option<String>,           // JSON — extracted fields
+    pub input_data: Option<String>, // JSON — source document reference
+    pub extracted_data: Option<String>, // JSON — extracted fields
     pub confidence_score: Option<f64>,
     pub error_message: Option<String>,
     pub processing_started_at: Option<Timestamp>,
@@ -165,19 +165,19 @@ pub struct SearchEmbedding {
     #[auto_inc]
     pub id: u64,
 
-    pub content_type: String,              // product, contact, document, article, etc.
+    pub content_type: String, // product, contact, document, article, etc.
     pub content_id: u64,
-    pub text: String,                      // Original text that was embedded
-    pub embedding: Vec<f32>,              // Vector embedding values (backup copy)
-    pub embedding_hash: Option<String>,   // Hash of text for change detection
+    pub text: String,                   // Original text that was embedded
+    pub embedding: Vec<f32>,            // Vector embedding values (backup copy)
+    pub embedding_hash: Option<String>, // Hash of text for change detection
 
     // Qdrant sync tracking
-    pub sync_status: String,              // "pending" | "synced" | "failed" | "deleted"
-    pub vector_db_id: Option<String>,     // Qdrant point ID (stringified STDB id)
-    pub embedding_model: Option<String>,  // e.g. "voyage-3", "text-embedding-3-small"
-    pub embedding_dim: Option<u32>,       // e.g. 1024, 1536 — for model migration tracking
+    pub sync_status: String, // "pending" | "synced" | "failed" | "deleted"
+    pub vector_db_id: Option<String>, // Qdrant point ID (stringified STDB id)
+    pub embedding_model: Option<String>, // e.g. "voyage-3", "text-embedding-3-small"
+    pub embedding_dim: Option<u32>, // e.g. 1024, 1536 — for model migration tracking
     pub last_synced_at: Option<Timestamp>,
-    pub sync_error: Option<String>,       // Last sync error message
+    pub sync_error: Option<String>, // Last sync error message
 
     pub company_id: Option<u64>,
     pub create_uid: Identity,
@@ -251,7 +251,11 @@ pub fn create_ai_insight(
         },
     );
 
-    log::info!("AI insight created: id={}, severity={:?}", insight.id, insight.severity);
+    log::info!(
+        "AI insight created: id={}, severity={:?}",
+        insight.id,
+        insight.severity
+    );
     Ok(())
 }
 
@@ -365,34 +369,37 @@ pub fn create_document_processing_job(
     let cid = company_id.unwrap_or(0);
     check_permission(ctx, cid, "ai_document_processing_job", "create")?;
 
-    let job = ctx.db.ai_document_processing_job().insert(AiDocumentProcessingJob {
-        id: 0,
-        document_type: params.document_type,
-        job_type: params.job_type,
-        // System-managed: new jobs always start as Pending
-        status: JobStatus::Pending,
-        ai_agent_id: params.ai_agent_id,
-        input_data: params.input_data,
-        // System-managed: populated by complete_document_processing_job
-        model_used: None,
-        extracted_data: None,
-        confidence_score: None,
-        error_message: None,
-        processing_started_at: None,
-        processing_completed_at: None,
-        tokens_used: None,
-        cost: None,
-        reviewed_by: None,
-        reviewed_at: None,
-        // System-managed: set to true only via approve_document_processing_job
-        is_approved: false,
-        company_id,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let job = ctx
+        .db
+        .ai_document_processing_job()
+        .insert(AiDocumentProcessingJob {
+            id: 0,
+            document_type: params.document_type,
+            job_type: params.job_type,
+            // System-managed: new jobs always start as Pending
+            status: JobStatus::Pending,
+            ai_agent_id: params.ai_agent_id,
+            input_data: params.input_data,
+            // System-managed: populated by complete_document_processing_job
+            model_used: None,
+            extracted_data: None,
+            confidence_score: None,
+            error_message: None,
+            processing_started_at: None,
+            processing_completed_at: None,
+            tokens_used: None,
+            cost: None,
+            reviewed_by: None,
+            reviewed_at: None,
+            // System-managed: set to true only via approve_document_processing_job
+            is_approved: false,
+            company_id,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
 
     write_audit_log_v2(
         ctx,

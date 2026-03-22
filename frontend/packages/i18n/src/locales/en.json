@@ -20,7 +20,16 @@
     "error": "Error",
     "success": "Success",
     "warning": "Warning",
-    "noData": "No data available"
+    "noData": "No data available",
+    "validation": {
+      "required": "This field is required",
+      "minLength": "Must be at least {{min}} characters",
+      "maxLength": "Must be at most {{max}} characters",
+      "min": "Minimum value is {{min}}",
+      "max": "Maximum value is {{max}}",
+      "invalidFormat": "Invalid format",
+      "invalidEmail": "Invalid email address"
+    }
   },
   "navigation": {
     "overview": "Overview",
@@ -1559,6 +1568,51 @@
         "countryId": "Country",
         "taxId": "Tax ID"
       }
+    },
+    "forms": {
+      "newPurchaseOrder": {
+        "title": "New Purchase Order",
+        "description": "Create a new purchase order",
+        "sections": {
+          "vendor": "Vendor",
+          "schedule": "Schedule",
+          "additionalInfo": "Additional Information"
+        },
+        "fields": {
+          "partnerId": "Vendor",
+          "partnerPlaceholder": "Select a vendor…",
+          "partnerRef": "Vendor Reference",
+          "partnerRefPlaceholder": "Vendor PO number",
+          "currencyId": "Currency",
+          "currencyPlaceholder": "Select currency…",
+          "paymentTermId": "Payment Terms",
+          "paymentTermPlaceholder": "Select payment terms…",
+          "datePlanned": "Expected Arrival",
+          "origin": "Source Document",
+          "originPlaceholder": "e.g. Sale Order #001",
+          "notes": "Notes",
+          "notesPlaceholder": "Internal notes…"
+        }
+      },
+      "newPurchaseRequisition": {
+        "title": "New Purchase Requisition",
+        "description": "Create a purchase requisition / blanket order",
+        "sections": {
+          "general": "General",
+          "dates": "Dates"
+        },
+        "fields": {
+          "vendorId": "Vendor",
+          "vendorPlaceholder": "Select a vendor…",
+          "origin": "Source Document",
+          "originPlaceholder": "e.g. MO/00123",
+          "description": "Description",
+          "descriptionPlaceholder": "Describe the purchase requirement…",
+          "orderingDate": "Ordering Date",
+          "dateEnd": "Expiry Date",
+          "scheduleDate": "Scheduled Date"
+        }
+      }
     }
   },
   "sales": {
@@ -1658,6 +1712,49 @@
         "InProgress": "In Progress",
         "Done": "Done",
         "Cancel": "Cancelled"
+      }
+    },
+    "forms": {
+      "newSaleOrder": {
+        "title": "New Sale Order",
+        "description": "Create a new sales order",
+        "sections": {
+          "customer": "Customer",
+          "orderDetails": "Order Details",
+          "notes": "Notes"
+        },
+        "fields": {
+          "partnerId": "Customer",
+          "partnerPlaceholder": "Select a customer…",
+          "clientOrderRef": "Customer Reference",
+          "clientOrderRefPlaceholder": "Your PO number",
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select pricelist…",
+          "paymentTermId": "Payment Terms",
+          "paymentTermPlaceholder": "Select payment terms…",
+          "validityDate": "Expiration Date",
+          "commitmentDate": "Delivery Date",
+          "note": "Notes",
+          "notePlaceholder": "Internal notes…"
+        }
+      },
+      "newPricelist": {
+        "title": "New Pricelist",
+        "description": "Create a product pricelist",
+        "sections": {
+          "pricelistDetails": "Pricelist Details"
+        },
+        "fields": {
+          "name": "Pricelist Name",
+          "namePlaceholder": "e.g. Retail Prices",
+          "currencyId": "Currency",
+          "currencyPlaceholder": "Select currency…",
+          "discountPolicy": "Discount Policy",
+          "options": {
+            "WithoutDiscount": "No Discount",
+            "WithDiscount": "Include Discount"
+          }
+        }
       }
     }
   },
@@ -2178,11 +2275,22 @@
         "fields": {
           "name": "Subject",
           "namePlaceholder": "Brief description of the issue",
+          "partnerName": "Customer Name",
+          "partnerNamePlaceholder": "e.g. Acme Corp",
+          "partnerEmail": "Customer Email",
+          "partnerEmailPlaceholder": "customer@example.com",
           "partnerId": "Customer",
           "partnerPlaceholder": "Customer ID",
+          "teamId": "Support Team",
           "priority": "Priority",
           "description": "Description",
-          "descriptionPlaceholder": "Detailed description of the issue…"
+          "descriptionPlaceholder": "Detailed description of the issue…",
+          "options": {
+            "low": "Low",
+            "normal": "Normal",
+            "high": "High",
+            "urgent": "Urgent"
+          }
         }
       }
     }
@@ -2242,10 +2350,20 @@
         "fields": {
           "partnerId": "Customer",
           "partnerPlaceholder": "Customer ID",
+          "planId": "Subscription Plan",
           "productId": "Plan",
           "productPlaceholder": "Product ID",
+          "code": "Reference",
+          "codePlaceholder": "Auto-generated if blank",
+          "description": "Description",
+          "descriptionPlaceholder": "Describe this subscription…",
           "dateStart": "Start Date",
-          "dateEnd": "End Date (optional)"
+          "dateEnd": "End Date (optional)",
+          "paymentMode": "Payment Mode",
+          "options": {
+            "automatic": "Automatic",
+            "manual": "Manual"
+          }
         }
       },
       "newPlan": {
@@ -2257,10 +2375,25 @@
         "fields": {
           "name": "Plan Name",
           "namePlaceholder": "e.g. Premium Monthly",
+          "code": "Plan Code",
+          "codePlaceholder": "e.g. PREMIUM_MONTHLY",
+          "description": "Description",
+          "descriptionPlaceholder": "Describe this plan…",
+          "billingPeriod": "Billing Period",
+          "billingPeriodUnit": "Period Unit",
+          "isDefault": "Default Plan",
+          "trialDuration": "Trial Duration",
+          "trialDurationPlaceholder": "e.g. 14",
+          "trialPeriod": "Trial Period Unit",
           "productId": "Product",
           "productPlaceholder": "Product ID",
           "recurrenceId": "Billing Cycle",
-          "recurrencePlaceholder": "Recurrence ID"
+          "recurrencePlaceholder": "Recurrence ID",
+          "options": {
+            "monthly": "Monthly",
+            "quarterly": "Quarterly",
+            "yearly": "Yearly"
+          }
         }
       }
     }
@@ -2339,8 +2472,11 @@
         "fields": {
           "name": "Description",
           "namePlaceholder": "e.g. Client dinner",
+          "description": "Details",
+          "descriptionPlaceholder": "Additional details about this expense…",
           "date": "Date",
           "totalAmount": "Amount",
+          "quantity": "Quantity",
           "employeeId": "Employee",
           "employeePlaceholder": "Employee ID",
           "productId": "Category",
@@ -2358,6 +2494,21 @@
           "namePlaceholder": "e.g. March 2024 Expenses",
           "employeeId": "Employee",
           "employeePlaceholder": "Employee ID"
+        }
+      },
+      "newExpenseReport": {
+        "title": "New Expense Report",
+        "description": "Submit expenses for reimbursement",
+        "sections": {
+          "reportDetails": "Report Details"
+        },
+        "fields": {
+          "name": "Report Name",
+          "namePlaceholder": "e.g. March 2024 Expenses",
+          "employeeId": "Employee",
+          "accountingDate": "Accounting Date",
+          "notes": "Notes",
+          "notesPlaceholder": "Additional notes…"
         }
       }
     }
@@ -2427,9 +2578,16 @@
         "fields": {
           "name": "Workflow Name",
           "namePlaceholder": "e.g. Invoice Approval",
+          "model": "Model",
           "modelId": "Model",
-          "modelPlaceholder": "Model ID",
-          "active": "Active"
+          "modelPlaceholder": "e.g. sale.order",
+          "description": "Description",
+          "descriptionPlaceholder": "Describe what this workflow does…",
+          "isActive": "Active",
+          "active": "Active",
+          "onCreate": "Trigger on Create",
+          "stateField": "State Field",
+          "stateFieldPlaceholder": "e.g. state"
         }
       }
     }
@@ -2492,13 +2650,203 @@
           "proposalDetails": "Proposal Details"
         },
         "fields": {
-          "name": "Proposal Title",
-          "namePlaceholder": "e.g. ERP Implementation Proposal",
-          "partnerId": "Client",
-          "partnerPlaceholder": "Customer ID",
-          "amountTotal": "Total Value",
-          "probability": "Win Probability %",
-          "dateDeadline": "Due Date"
+          "title": "Proposal Title",
+          "titlePlaceholder": "e.g. ERP Implementation Proposal",
+          "clientName": "Client Name",
+          "clientNamePlaceholder": "Client company or person",
+          "description": "Description",
+          "descriptionPlaceholder": "Describe the proposal…",
+          "type": "Proposal Type",
+          "value": "Estimated Value",
+          "deadline": "Deadline",
+          "options": {
+            "commercial": "Commercial",
+            "grant": "Grant",
+            "internal": "Internal",
+            "other": "Other",
+            "partnership": "Partnership",
+            "tender": "Tender"
+          }
+        }
+      }
+    }
+  },
+  "messages": {
+    "forms": {
+      "newMessage": {
+        "title": "New Message",
+        "description": "Send an internal message or notification",
+        "sections": {
+          "message": "Message"
+        },
+        "fields": {
+          "model": "Related Model",
+          "modelPlaceholder": "e.g. sale.order",
+          "resId": "Record ID",
+          "messageType": "Message Type",
+          "body": "Message Body",
+          "bodyPlaceholder": "Write your message…",
+          "subtype": "Subtype",
+          "subtypePlaceholder": "Select subtype…",
+          "options": {
+            "comment": "Comment",
+            "email": "Email",
+            "notification": "Notification"
+          }
+        }
+      }
+    }
+  },
+  "pos": {
+    "searchPlaceholder": "Search products or SKU...",
+    "discountCode": "Discount code",
+    "apply": "Apply",
+    "categories": {
+      "all": "All"
+    },
+    "payment": {
+      "title": "Collect Payment",
+      "amountDue": "Amount Due",
+      "amountTendered": "Amount tendered",
+      "change": "Change",
+      "complete": "Payment Complete!",
+      "charge": "Charge {{amount}}",
+      "methods": {
+        "cash": "Cash",
+        "card": "Card",
+        "split": "Split"
+      }
+    },
+    "receipt": {
+      "title": "Receipt",
+      "storeName": "Lumiere ERP",
+      "storeAddress": "123 Business Park, SF",
+      "orderNumber": "Order: {{number}}",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "change": "Change",
+      "thankYou": "Thank you for your purchase!",
+      "close": "Close"
+    },
+    "cart": {
+      "title": "Cart",
+      "empty": "Cart is empty",
+      "emptyHint": "Click a product to add it",
+      "each": "each",
+      "left": "{{count}} left",
+      "inStock": "{{count}} in stock",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "discount": "Discount ({{pct}}%)",
+      "total": "Total",
+      "charge": "Charge {{amount}}",
+      "reprintReceipt": "Reprint Last Receipt ({{number}})",
+      "discountApplied": "Discount applied: {{pct}}% off"
+    }
+  },
+  "settings": {
+    "backToSettings": "Back to Settings",
+    "adminAccess": "Admin Access",
+    "configure": "Configure",
+    "restricted": "Some settings are restricted. Contact an administrator for access.",
+    "formConfig": {
+      "title": "Form Configuration",
+      "description": "Select a module to configure its forms",
+      "searchPlaceholder": "Search modules...",
+      "formsCount": "{{count}} forms",
+      "configureForms": "Configure Forms",
+      "backToModules": "Back to Modules",
+      "moduleForms": "{{name}} Forms",
+      "selectForm": "Select a form to configure",
+      "configureFields": "Configure Fields",
+      "backToForms": "Back to Forms",
+      "reset": "Reset",
+      "saveChanges": "Save Changes",
+      "unsavedChanges": "You have unsaved changes. Don't forget to save!",
+      "tabs": {
+        "fields": "Fields",
+        "roles": "Role Access",
+        "importExport": "Import/Export"
+      },
+      "addField": "Add Field",
+      "roleConfig": {
+        "description": "Configure field visibility and requirements",
+        "enabledFields": "Enabled Fields",
+        "requiredFields": "Required Fields"
+      },
+      "export": {
+        "title": "Export Configuration",
+        "description": "Download the current form configuration as JSON",
+        "button": "Export to JSON"
+      },
+      "import": {
+        "title": "Import Configuration",
+        "description": "Import a form configuration from JSON file",
+        "button": "Import from JSON"
+      },
+      "resetDefaults": {
+        "title": "Reset to Defaults",
+        "description": "Reset this form to its default configuration",
+        "button": "Reset to Defaults"
+      },
+      "fieldDialog": {
+        "title": "Configure Field",
+        "description": "Add or edit a form field",
+        "fieldId": "Field ID",
+        "fieldIdPlaceholder": "e.g., first_name",
+        "fieldName": "Field Name",
+        "fieldNamePlaceholder": "e.g., First Name",
+        "label": "Label",
+        "labelPlaceholder": "Display label for the field",
+        "type": "Type",
+        "typePlaceholder": "Select field type",
+        "required": "Required",
+        "enabled": "Enabled",
+        "systemField": "System Field",
+        "saveField": "Save Field",
+        "fieldTypes": {
+          "Text": "Text",
+          "Textarea": "Text Area",
+          "Number": "Number",
+          "Select": "Select",
+          "Date": "Date",
+          "Checkbox": "Checkbox",
+          "Radio": "Radio",
+          "Rating": "Rating",
+          "Tags": "Tags"
+        }
+      },
+      "fieldCard": {
+        "system": "System",
+        "required": "Required",
+        "edit": "Edit",
+        "duplicate": "Duplicate",
+        "delete": "Delete"
+      }
+    }
+  },
+  "reports": {
+    "forms": {
+      "generateReport": {
+        "title": "Generate Report",
+        "description": "Configure and generate a financial report",
+        "sections": {
+          "reportParameters": "Report Parameters"
+        },
+        "fields": {
+          "name": "Report Name",
+          "namePlaceholder": "e.g. Q1 Profit & Loss",
+          "dateFrom": "From Date",
+          "dateTo": "To Date",
+          "targetMove": "Target Entries",
+          "showHierarchy": "Show Hierarchy",
+          "showPercentage": "Show Percentage",
+          "showZeroLines": "Show Zero Lines",
+          "options": {
+            "all": "All Entries",
+            "posted": "Posted Only"
+          }
         }
       }
     }

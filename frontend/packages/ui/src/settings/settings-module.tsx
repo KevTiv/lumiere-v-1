@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
-import { useRBAC, usePermission } from "@/lib/rbac-context"
+import { useRBAC } from "@/lib/rbac-context"
 import { settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,6 @@ import {
   Shield,
   ScrollText,
   ChevronRight,
-  Lock,
   Settings2,
   BookMarked
 } from "lucide-react"
@@ -23,9 +23,8 @@ import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
 import { AuditLog } from "./audit-log"
 import { ProfileSettings } from "./profile-settings"
-import { FormConfigSettings } from "./form-config-settings"
+import { UnifiedFormConfigSettings } from "./unified-form-config-settings"
 import { UserCustomFields } from "./user-custom-fields"
-import type { SettingsSection as SettingsSectionType } from "@/lib/rbac-types"
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   user: User,
@@ -43,14 +42,9 @@ interface SettingsModuleProps {
 }
 
 export function SettingsModule({ className }: SettingsModuleProps) {
+  const { t } = useTranslation()
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const { checkPermission, isAdmin } = useRBAC()
-
-  // Filter sections based on permissions
-  const accessibleSections = settingsSections.filter(section => {
-    const result = checkPermission(section.requiredPermission, section.requiredAction)
-    return result.allowed
-  })
 
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -65,7 +59,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
       case "appearance":
         return <ProfileSettings section={activeSection} />
       case "form-config":
-        return <FormConfigSettings />
+        return <UnifiedFormConfigSettings />
       case "custom-fields":
         return <UserCustomFields />
       default:
@@ -84,7 +78,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
             className="gap-2"
           >
             <ChevronRight className="h-4 w-4 rotate-180" />
-            Back to Settings
+            {t("settings.backToSettings")}
           </Button>
           <div>
             <h2 className="text-xl font-semibold">{section?.title}</h2>
@@ -108,7 +102,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
         {isAdmin() && (
           <Badge variant="outline" className="gap-1 border-primary text-primary">
             <Shield className="h-3 w-3" />
-            Admin Access
+            {t("settings.adminAccess")}
           </Badge>
         )}
       </div>
@@ -119,37 +113,31 @@ export function SettingsModule({ className }: SettingsModuleProps) {
           const result = checkPermission(section.requiredPermission, section.requiredAction)
           const hasAccess = result.allowed
 
+          if (!hasAccess) return null
+
           return (
             <Card
               key={section.id}
-              className={cn(
-                "cursor-pointer transition-all hover:border-primary/50",
-                !hasAccess && "opacity-50 cursor-not-allowed"
-              )}
-              onClick={() => hasAccess && setActiveSection(section.id)}
+              className="cursor-pointer transition-all hover:border-primary/50"
+              onClick={() => setActiveSection(section.id)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
-                  {!hasAccess && (
-                    <Lock className="h-4 w-4 text-muted-foreground" />
-                  )}
                 </div>
                 <CardTitle className="text-base mt-3">{section.title}</CardTitle>
                 <CardDescription className="text-sm">
                   {section.description}
                 </CardDescription>
               </CardHeader>
-              {hasAccess && (
-                <CardContent className="pt-0">
-                  <Button variant="ghost" className="w-full justify-between" size="sm">
-                    Configure
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </CardContent>
-              )}
+              <CardContent className="pt-0">
+                <Button variant="ghost" className="w-full justify-between" size="sm">
+                  {t("settings.configure")}
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
             </Card>
           )
         })}
@@ -160,7 +148,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
           <CardContent className="py-8 text-center">
             <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">
-              Some settings are restricted. Contact an administrator for access.
+              {t("settings.restricted")}
             </p>
           </CardContent>
         </Card>

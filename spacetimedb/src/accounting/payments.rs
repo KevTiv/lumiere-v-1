@@ -25,20 +25,20 @@ pub struct AccountPayment {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: Option<String>,               // "PAY-0001" — set on post
-    pub move_id: Option<u64>,               // Linked AccountMove (set on post)
-    pub payment_type: PaymentType,          // InBound (customer pays) | OutBound (we pay supplier)
-    pub partner_type: PartnerType,          // Customer | Supplier
+    pub name: Option<String>,      // "PAY-0001" — set on post
+    pub move_id: Option<u64>,      // Linked AccountMove (set on post)
+    pub payment_type: PaymentType, // InBound (customer pays) | OutBound (we pay supplier)
+    pub partner_type: PartnerType, // Customer | Supplier
     pub partner_id: u64,
     pub amount: f64,
     pub currency_id: u64,
     pub date: Timestamp,
     pub journal_id: u64,
-    pub ref_: Option<String>,               // Internal reference
-    pub memo: Option<String>,               // Communication shown on bank statement
-    pub reconciled_invoice_ids: Vec<u64>,   // Invoices settled by this payment
-    pub reconciled_bill_ids: Vec<u64>,      // Bills settled by this payment
-    pub state: PaymentState,                // NotPaid (Draft) | Paid (Posted) | Reversed (Cancelled)
+    pub ref_: Option<String>,             // Internal reference
+    pub memo: Option<String>,             // Communication shown on bank statement
+    pub reconciled_invoice_ids: Vec<u64>, // Invoices settled by this payment
+    pub reconciled_bill_ids: Vec<u64>,    // Bills settled by this payment
+    pub state: PaymentState,              // NotPaid (Draft) | Paid (Posted) | Reversed (Cancelled)
     pub created_at: Timestamp,
     pub create_uid: Identity,
 }
@@ -94,16 +94,20 @@ pub fn create_payment(
         created_at: ctx.timestamp,
         create_uid: ctx.sender(),
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(params.company_id),
-        table_name: "account_payment",
-        record_id: payment.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(params.company_id),
+            table_name: "account_payment",
+            record_id: payment.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -116,7 +120,11 @@ pub fn post_payment(
     payment_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "post")?;
-    let payment = ctx.db.account_payment().id().find(&payment_id)
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
         .ok_or("Payment not found")?;
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());
@@ -199,16 +207,24 @@ pub fn post_payment(
         ..payment
     });
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(move_record.company_id),
-        table_name: "account_payment",
-        record_id: payment_id,
-        action: "POST",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "name".to_string(), "move_id".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(move_record.company_id),
+            table_name: "account_payment",
+            record_id: payment_id,
+            action: "POST",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "state".to_string(),
+                "name".to_string(),
+                "move_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -220,7 +236,11 @@ pub fn cancel_payment(
     payment_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "cancel")?;
-    let payment = ctx.db.account_payment().id().find(&payment_id)
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
         .ok_or("Payment not found")?;
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());
@@ -246,7 +266,11 @@ pub fn register_payment_on_invoice(
     is_bill: bool,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "reconcile")?;
-    let payment = ctx.db.account_payment().id().find(&payment_id)
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
         .ok_or("Payment not found")?;
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());

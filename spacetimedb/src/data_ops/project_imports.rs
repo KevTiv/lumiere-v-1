@@ -20,7 +20,13 @@ pub fn import_project_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_project", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "project_project", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "project_project",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -62,17 +68,29 @@ pub fn import_project_csv(
             allow_forecast: false,
             bill_type: {
                 let v = col(&headers, row, "bill_type");
-                if v.is_empty() { "no_invoice".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "no_invoice".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             pricing_type: {
                 let v = col(&headers, row, "pricing_type");
-                if v.is_empty() { "task_rate".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "task_rate".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             rating_status: "no_rating".to_string(),
             rating_status_period: "monthly".to_string(),
             privacy_visibility: {
                 let v = col(&headers, row, "privacy_visibility");
-                if v.is_empty() { "followers".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "followers".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             access_instruction_message: None,
             task_count: 0,
@@ -106,7 +124,11 @@ pub fn import_project_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import project_project: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import project_project: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -121,7 +143,13 @@ pub fn import_task_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_task", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "project_task", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "project_task",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -141,7 +169,11 @@ pub fn import_task_csv(
             description: opt_str(col(&headers, row, "description")),
             priority: {
                 let v = col(&headers, row, "priority");
-                if v.is_empty() { "0".to_string() } else { v.to_string() }
+                if v.is_empty() {
+                    "0".to_string()
+                } else {
+                    v.to_string()
+                }
             },
             sequence: parse_u32(col(&headers, row, "sequence")),
             stage_id: opt_u64(col(&headers, row, "stage_id")),
@@ -194,7 +226,11 @@ pub fn import_task_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import project_task: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import project_task: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -209,7 +245,13 @@ pub fn import_timesheet_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "project_timesheet", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "project_timesheet",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -219,7 +261,14 @@ pub fn import_timesheet_csv(
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
 
         if project_id == 0 || employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("project_id"), None, "project_id and employee_id are required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("project_id"),
+                None,
+                "project_id and employee_id are required",
+            );
             errors += 1;
             continue;
         }
@@ -227,7 +276,11 @@ pub fn import_timesheet_csv(
         let currency_id = parse_u64(col(&headers, row, "currency_id"));
         let encoding_uom_id = {
             let v = parse_u64(col(&headers, row, "encoding_uom_id"));
-            if v == 0 { 1 } else { v }
+            if v == 0 {
+                1
+            } else {
+                v
+            }
         };
         let date = opt_timestamp(col(&headers, row, "date")).unwrap_or(ctx.timestamp);
         let unit_amount = parse_f64(col(&headers, row, "unit_amount"));
@@ -271,6 +324,10 @@ pub fn import_timesheet_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import project_timesheet: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import project_timesheet: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

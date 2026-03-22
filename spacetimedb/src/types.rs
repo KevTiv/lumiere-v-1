@@ -948,10 +948,10 @@ pub enum DeviceType {
     Camera,
     Plc,
     // Pass 2 additions
-    PaymentTerminal,   // card payment terminal (one per hub)
-    CustomerDisplay,   // customer-facing screen showing order total
-    MeasurementTool,   // calipers, gauge feelers → Quality module
-    Footswitch,        // hands-free trigger for manufacturing workorder steps
+    PaymentTerminal, // card payment terminal (one per hub)
+    CustomerDisplay, // customer-facing screen showing order total
+    MeasurementTool, // calipers, gauge feelers → Quality module
+    Footswitch,      // hands-free trigger for manufacturing workorder steps
     Custom,
 }
 

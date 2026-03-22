@@ -379,12 +379,7 @@ pub fn convert_lead_to_customer(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "lead", "write")?;
 
-    let lead = ctx
-        .db
-        .lead()
-        .id()
-        .find(&lead_id)
-        .ok_or("Lead not found")?;
+    let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
 
     if lead.organization_id != organization_id {
         return Err("Lead does not belong to this organization".to_string());

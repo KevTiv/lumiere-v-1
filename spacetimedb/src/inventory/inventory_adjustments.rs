@@ -639,12 +639,15 @@ pub fn process_inventory_adjustment(
 
     let old_state = adjustment.state.clone();
 
-    ctx.db.inventory_adjustment().id().update(InventoryAdjustment {
-        state: "processed".to_string(),
-        posted_at: Some(ctx.timestamp),
-        posted_by: Some(ctx.sender()),
-        ..adjustment
-    });
+    ctx.db
+        .inventory_adjustment()
+        .id()
+        .update(InventoryAdjustment {
+            state: "processed".to_string(),
+            posted_at: Some(ctx.timestamp),
+            posted_by: Some(ctx.sender()),
+            ..adjustment
+        });
 
     write_audit_log_v2(
         ctx,

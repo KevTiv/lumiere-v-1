@@ -411,8 +411,7 @@ pub fn create_account_tax_group(
             action: "CREATE",
             old_values: None,
             new_values: Some(
-                serde_json::json!({ "name": params.name, "sequence": params.sequence })
-                    .to_string(),
+                serde_json::json!({ "name": params.name, "sequence": params.sequence }).to_string(),
             ),
             changed_fields: vec!["name".to_string(), "sequence".to_string()],
             metadata: None,
@@ -484,7 +483,9 @@ pub fn update_account_tax_group(
     ctx.db.account_tax_group().id().update(AccountTaxGroup {
         name: params.name.unwrap_or(group.name),
         sequence: params.sequence.unwrap_or(group.sequence),
-        preceding_subtotal: params.preceding_subtotal.unwrap_or(group.preceding_subtotal),
+        preceding_subtotal: params
+            .preceding_subtotal
+            .unwrap_or(group.preceding_subtotal),
         tax_payable_account_id: params
             .tax_payable_account_id
             .unwrap_or(group.tax_payable_account_id),
@@ -668,7 +669,9 @@ pub fn update_account_tax(
         amount: params.amount.unwrap_or(tax.amount),
         active: params.active.unwrap_or(tax.active),
         price_include: params.price_include.unwrap_or(tax.price_include),
-        include_base_amount: params.include_base_amount.unwrap_or(tax.include_base_amount),
+        include_base_amount: params
+            .include_base_amount
+            .unwrap_or(tax.include_base_amount),
         is_base_affected: params.is_base_affected.unwrap_or(tax.is_base_affected),
         sequence: params.sequence.unwrap_or(tax.sequence),
         tax_group_id: params.tax_group_id.unwrap_or(tax.tax_group_id),

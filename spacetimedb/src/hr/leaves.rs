@@ -23,10 +23,10 @@ pub struct HrLeaveType {
     pub name: String,
     pub code: Option<String>,
     pub color: Option<u32>,
-    pub allocation_type: String,    // "no" | "fixed" | "fixed_allocation"
+    pub allocation_type: String, // "no" | "fixed" | "fixed_allocation"
     pub validity_start: Option<Timestamp>,
     pub validity_stop: Option<Timestamp>,
-    pub max_leaves: f64,            // Maximum days allowed per year
+    pub max_leaves: f64, // Maximum days allowed per year
     pub is_active: bool,
     pub created_at: Timestamp,
 }
@@ -45,15 +45,15 @@ pub struct HrLeave {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub employee_id: u64,               // FK → HrEmployee
-    pub leave_type_id: u64,             // FK → HrLeaveType
-    pub name: Option<String>,           // Optional description
+    pub employee_id: u64,     // FK → HrEmployee
+    pub leave_type_id: u64,   // FK → HrLeaveType
+    pub name: Option<String>, // Optional description
     pub state: HrLeaveState,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub number_of_days: f64,
     pub notes: Option<String>,
-    pub manager_id: Option<u64>,        // FK → HrEmployee (approving manager)
+    pub manager_id: Option<u64>, // FK → HrEmployee (approving manager)
     pub first_approver_id: Option<Identity>,
     pub second_approver_id: Option<Identity>,
     pub created_at: Timestamp,
@@ -120,16 +120,20 @@ pub fn create_leave_type(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave_type",
-        record_id: lt.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave_type",
+            record_id: lt.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -142,7 +146,11 @@ pub fn update_leave_type(
     params: UpdateLeaveTypeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave_type", "update")?;
-    let lt = ctx.db.hr_leave_type().id().find(&leave_type_id)
+    let lt = ctx
+        .db
+        .hr_leave_type()
+        .id()
+        .find(&leave_type_id)
         .ok_or("Leave type not found")?;
     if lt.organization_id != organization_id {
         return Err("Leave type belongs to a different organization".to_string());
@@ -156,16 +164,20 @@ pub fn update_leave_type(
         is_active: params.is_active.unwrap_or(lt.is_active),
         ..lt
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave_type",
-        record_id: leave_type_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave_type",
+            record_id: leave_type_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -200,16 +212,20 @@ pub fn create_leave_request(
         created_at: ctx.timestamp,
         deleted_at: None,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave",
-        record_id: leave.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -220,7 +236,11 @@ pub fn approve_leave(
     leave_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave", "approve")?;
-    let leave = ctx.db.hr_leave().id().find(&leave_id)
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
         .ok_or("Leave request not found")?;
     if leave.organization_id != organization_id {
         return Err("Leave request belongs to a different organization".to_string());
@@ -234,16 +254,20 @@ pub fn approve_leave(
         first_approver_id: Some(ctx.sender()),
         ..leave
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave",
-        record_id: leave_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "first_approver_id".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string(), "first_approver_id".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -254,7 +278,11 @@ pub fn refuse_leave(
     leave_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave", "approve")?;
-    let leave = ctx.db.hr_leave().id().find(&leave_id)
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
         .ok_or("Leave request not found")?;
     if leave.organization_id != organization_id {
         return Err("Leave request belongs to a different organization".to_string());
@@ -264,16 +292,20 @@ pub fn refuse_leave(
         state: HrLeaveState::Refused,
         ..leave
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave",
-        record_id: leave_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -284,7 +316,11 @@ pub fn reset_leave_to_draft(
     leave_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave", "update")?;
-    let leave = ctx.db.hr_leave().id().find(&leave_id)
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
         .ok_or("Leave request not found")?;
     if leave.organization_id != organization_id {
         return Err("Leave request belongs to a different organization".to_string());
@@ -296,15 +332,23 @@ pub fn reset_leave_to_draft(
         second_approver_id: None,
         ..leave
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_leave",
-        record_id: leave_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string(), "first_approver_id".to_string(), "second_approver_id".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "state".to_string(),
+                "first_approver_id".to_string(),
+                "second_approver_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }

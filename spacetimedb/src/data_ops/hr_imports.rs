@@ -12,7 +12,9 @@ use crate::hr::employees::{
     HrJobPosition, HrResource,
 };
 use crate::hr::leaves::{hr_leave, hr_leave_type, HrLeave, HrLeaveType};
-use crate::hr::payroll::{hr_payroll_structure, hr_payslip, hr_salary_rule, HrPayrollStructure, HrPayslip, HrSalaryRule};
+use crate::hr::payroll::{
+    hr_payroll_structure, hr_payslip, hr_salary_rule, HrPayrollStructure, HrPayslip, HrSalaryRule,
+};
 use crate::types::{ContractState, EmploymentType, HrLeaveState, PayslipState};
 
 // ── HrResource ────────────────────────────────────────────────────────────────
@@ -41,7 +43,11 @@ pub fn import_hr_resource_csv(
 
         let resource_type = {
             let t = col(&headers, row, "resource_type");
-            if t == "material" { "material".to_string() } else { "user".to_string() }
+            if t == "material" {
+                "material".to_string()
+            } else {
+                "user".to_string()
+            }
         };
 
         ctx.db.hr_resource().insert(HrResource {
@@ -52,7 +58,11 @@ pub fn import_hr_resource_csv(
             user_id: None,
             time_efficiency: {
                 let e = parse_f64(col(&headers, row, "time_efficiency"));
-                if e == 0.0 { 100.0 } else { e }
+                if e == 0.0 {
+                    100.0
+                } else {
+                    e
+                }
             },
             is_active: parse_bool(col(&headers, row, "is_active")),
             created_at: ctx.timestamp,
@@ -61,7 +71,11 @@ pub fn import_hr_resource_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_resource: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_resource: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -75,7 +89,13 @@ pub fn import_hr_department_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_department", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_department", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_department",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -108,7 +128,11 @@ pub fn import_hr_department_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_department: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_department: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -122,7 +146,13 @@ pub fn import_hr_job_position_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_job_position", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_job_position", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_job_position",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -139,7 +169,11 @@ pub fn import_hr_job_position_csv(
         let company_id = parse_u64(col(&headers, row, "company_id"));
         let state = {
             let s = col(&headers, row, "state");
-            if s == "open" { "open".to_string() } else { "recruit".to_string() }
+            if s == "open" {
+                "open".to_string()
+            } else {
+                "recruit".to_string()
+            }
         };
 
         ctx.db.hr_job_position().insert(HrJobPosition {
@@ -160,7 +194,11 @@ pub fn import_hr_job_position_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_job_position: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_job_position: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -234,7 +272,11 @@ pub fn import_hr_employee_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_employee: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_employee: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -264,7 +306,14 @@ pub fn import_hr_contract_csv(
 
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
         if employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("employee_id"), None, "employee_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("employee_id"),
+                None,
+                "employee_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -297,7 +346,11 @@ pub fn import_hr_contract_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_contract: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_contract: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -311,7 +364,13 @@ pub fn import_hr_leave_type_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave_type", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_leave_type", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_leave_type",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -336,7 +395,11 @@ pub fn import_hr_leave_type_csv(
             color: opt_u64(col(&headers, row, "color")).map(|v| v as u32),
             allocation_type: {
                 let a = col(&headers, row, "allocation_type");
-                if a.is_empty() { "fixed".to_string() } else { a.to_string() }
+                if a.is_empty() {
+                    "fixed".to_string()
+                } else {
+                    a.to_string()
+                }
             },
             validity_start: opt_timestamp(col(&headers, row, "validity_start")),
             validity_stop: opt_timestamp(col(&headers, row, "validity_stop")),
@@ -348,7 +411,11 @@ pub fn import_hr_leave_type_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_leave_type: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_leave_type: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -371,14 +438,28 @@ pub fn import_hr_leave_csv(
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
 
         if employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("employee_id"), None, "employee_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("employee_id"),
+                None,
+                "employee_id is required",
+            );
             errors += 1;
             continue;
         }
 
         let leave_type_id = parse_u64(col(&headers, row, "leave_type_id"));
         if leave_type_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("leave_type_id"), None, "leave_type_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("leave_type_id"),
+                None,
+                "leave_type_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -428,7 +509,13 @@ pub fn import_hr_payroll_structure_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_payroll_structure", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_payroll_structure",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -444,7 +531,11 @@ pub fn import_hr_payroll_structure_csv(
 
         let type_ = {
             let t = col(&headers, row, "type_");
-            if t.is_empty() { "employee".to_string() } else { t.to_string() }
+            if t.is_empty() {
+                "employee".to_string()
+            } else {
+                t.to_string()
+            }
         };
 
         ctx.db.hr_payroll_structure().insert(HrPayrollStructure {
@@ -459,7 +550,11 @@ pub fn import_hr_payroll_structure_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_payroll_structure: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_payroll_structure: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -473,7 +568,13 @@ pub fn import_hr_salary_rule_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_salary_rule", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_salary_rule",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -496,19 +597,34 @@ pub fn import_hr_salary_rule_csv(
 
         let structure_id = parse_u64(col(&headers, row, "structure_id"));
         if structure_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("structure_id"), None, "structure_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("structure_id"),
+                None,
+                "structure_id is required",
+            );
             errors += 1;
             continue;
         }
 
         let condition_type = {
             let c = col(&headers, row, "condition_type");
-            if c.is_empty() { "none".to_string() } else { c.to_string() }
+            if c.is_empty() {
+                "none".to_string()
+            } else {
+                c.to_string()
+            }
         };
 
         let amount_type = {
             let a = col(&headers, row, "amount_type");
-            if a.is_empty() { "fix".to_string() } else { a.to_string() }
+            if a.is_empty() {
+                "fix".to_string()
+            } else {
+                a.to_string()
+            }
         };
 
         ctx.db.hr_salary_rule().insert(HrSalaryRule {
@@ -519,7 +635,11 @@ pub fn import_hr_salary_rule_csv(
             structure_id,
             category: {
                 let c = col(&headers, row, "category");
-                if c.is_empty() { "BASIC".to_string() } else { c.to_string() }
+                if c.is_empty() {
+                    "BASIC".to_string()
+                } else {
+                    c.to_string()
+                }
             },
             condition_type,
             amount_type,
@@ -532,7 +652,11 @@ pub fn import_hr_salary_rule_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_salary_rule: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_salary_rule: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -555,14 +679,28 @@ pub fn import_hr_payslip_csv(
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
 
         if employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("employee_id"), None, "employee_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("employee_id"),
+                None,
+                "employee_id is required",
+            );
             errors += 1;
             continue;
         }
 
         let struct_id = parse_u64(col(&headers, row, "struct_id"));
         if struct_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("struct_id"), None, "struct_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("struct_id"),
+                None,
+                "struct_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -570,7 +708,11 @@ pub fn import_hr_payslip_csv(
         let company_id = parse_u64(col(&headers, row, "company_id"));
         let name = {
             let n = col(&headers, row, "name").to_string();
-            if n.is_empty() { format!("Payslip #{}", employee_id) } else { n }
+            if n.is_empty() {
+                format!("Payslip #{}", employee_id)
+            } else {
+                n
+            }
         };
         let basic_wage = parse_f64(col(&headers, row, "basic_wage"));
         let state = match col(&headers, row, "state") {
@@ -594,11 +736,19 @@ pub fn import_hr_payslip_csv(
             basic_wage,
             gross_wage: {
                 let g = parse_f64(col(&headers, row, "gross_wage"));
-                if g == 0.0 { basic_wage } else { g }
+                if g == 0.0 {
+                    basic_wage
+                } else {
+                    g
+                }
             },
             net_wage: {
                 let n = parse_f64(col(&headers, row, "net_wage"));
-                if n == 0.0 { basic_wage } else { n }
+                if n == 0.0 {
+                    basic_wage
+                } else {
+                    n
+                }
             },
             state,
             notes: opt_str(col(&headers, row, "notes")),
@@ -608,6 +758,10 @@ pub fn import_hr_payslip_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_payslip: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_payslip: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

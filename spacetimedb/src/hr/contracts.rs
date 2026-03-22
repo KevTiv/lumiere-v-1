@@ -28,7 +28,7 @@ pub struct HrContract {
     pub department_id: Option<u64>, // FK → HrDepartment
     pub date_start: Timestamp,
     pub date_end: Option<Timestamp>,
-    pub wage: f64,                  // Monthly gross salary
+    pub wage: f64, // Monthly gross salary
     pub currency_id: u64,
     pub state: ContractState,
     pub notes: Option<String>,
@@ -92,16 +92,20 @@ pub fn create_contract(
         notes: params.notes,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_contract",
-        record_id: contract.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_contract",
+            record_id: contract.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -114,7 +118,11 @@ pub fn update_contract(
     params: UpdateContractParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
-    let contract = ctx.db.hr_contract().id().find(&contract_id)
+    let contract = ctx
+        .db
+        .hr_contract()
+        .id()
+        .find(&contract_id)
         .ok_or("Contract not found")?;
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
@@ -131,16 +139,20 @@ pub fn update_contract(
         notes: params.notes.or(contract.notes),
         ..contract
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_contract",
-        record_id: contract_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_contract",
+            record_id: contract_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -152,7 +164,11 @@ pub fn open_contract(
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
-    let contract = ctx.db.hr_contract().id().find(&contract_id)
+    let contract = ctx
+        .db
+        .hr_contract()
+        .id()
+        .find(&contract_id)
         .ok_or("Contract not found")?;
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
@@ -164,16 +180,20 @@ pub fn open_contract(
         state: ContractState::Open,
         ..contract
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_contract",
-        record_id: contract_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_contract",
+            record_id: contract_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -185,7 +205,11 @@ pub fn expire_contract(
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
-    let contract = ctx.db.hr_contract().id().find(&contract_id)
+    let contract = ctx
+        .db
+        .hr_contract()
+        .id()
+        .find(&contract_id)
         .ok_or("Contract not found")?;
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
@@ -197,16 +221,20 @@ pub fn expire_contract(
         state: ContractState::Expired,
         ..contract
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_contract",
-        record_id: contract_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_contract",
+            record_id: contract_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -218,7 +246,11 @@ pub fn cancel_contract(
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
-    let contract = ctx.db.hr_contract().id().find(&contract_id)
+    let contract = ctx
+        .db
+        .hr_contract()
+        .id()
+        .find(&contract_id)
         .ok_or("Contract not found")?;
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
@@ -230,15 +262,19 @@ pub fn cancel_contract(
         state: ContractState::Cancelled,
         ..contract
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_contract",
-        record_id: contract_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_contract",
+            record_id: contract_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }

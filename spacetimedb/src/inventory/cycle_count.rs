@@ -311,8 +311,7 @@ pub fn record_cycle_count_line(
         .map(|q| q.cost);
 
     let variance = params.qty_counted - expected_qty;
-    let variance_value =
-        compute_sheet_variance_value(expected_qty, params.qty_counted, quant_cost);
+    let variance_value = compute_sheet_variance_value(expected_qty, params.qty_counted, quant_cost);
 
     // is_processed and processed_at are system-managed; set by post_cycle_count_adjustments
     let sheet = ctx.db.stock_count_sheet().insert(StockCountSheet {

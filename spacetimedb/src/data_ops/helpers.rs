@@ -14,9 +14,7 @@ pub fn parse_csv(csv: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
         .split(',')
         .map(|h| h.trim().to_lowercase())
         .collect();
-    let rows: Vec<Vec<String>> = lines
-        .map(|line| split_csv_row(line))
-        .collect();
+    let rows: Vec<Vec<String>> = lines.map(|line| split_csv_row(line)).collect();
     Ok((headers, rows))
 }
 
@@ -124,9 +122,7 @@ pub fn vec_u64(v: &str) -> Vec<u64> {
     if v.is_empty() {
         Vec::new()
     } else {
-        v.split(';')
-            .filter_map(|s| s.trim().parse().ok())
-            .collect()
+        v.split(';').filter_map(|s| s.trim().parse().ok()).collect()
     }
 }
 

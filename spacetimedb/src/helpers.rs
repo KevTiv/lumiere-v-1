@@ -192,10 +192,13 @@ pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
             next_number: 1,
         });
     let number = seq.next_number;
-    ctx.db.document_sequence().doc_type().update(DocumentSequence {
-        next_number: number + 1,
-        ..seq
-    });
+    ctx.db
+        .document_sequence()
+        .doc_type()
+        .update(DocumentSequence {
+            next_number: number + 1,
+            ..seq
+        });
     format!("{}-{:04}", doc_type, number)
 }
 

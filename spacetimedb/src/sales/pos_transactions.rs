@@ -15,10 +15,10 @@
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::iot::actions::queue_action_internal;
+use crate::iot::registry::iot_device;
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
-use crate::iot::registry::iot_device;
-use crate::iot::actions::queue_action_internal;
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
@@ -716,9 +716,12 @@ pub fn create_pos_order(
     // ── IoT hooks ─────────────────────────────────────────────────────────────
     // Push order total to any CustomerDisplay linked to this POS config
     // Initiate payment on any PaymentTerminal linked to this POS config
-    for device in ctx.db.iot_device().iter().filter(|d| {
-        d.pos_config_id == Some(config.id) && d.status == "Online"
-    }) {
+    for device in ctx
+        .db
+        .iot_device()
+        .iter()
+        .filter(|d| d.pos_config_id == Some(config.id) && d.status == "Online")
+    {
         match device.device_type.as_str() {
             "CustomerDisplay" => {
                 let display_payload = serde_json::json!({

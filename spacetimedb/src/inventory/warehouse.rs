@@ -816,12 +816,16 @@ pub fn update_stock_route(
         name: params.name.unwrap_or_else(|| route.name.clone()),
         sequence: params.sequence.unwrap_or(route.sequence),
         active: params.active.unwrap_or(route.active),
-        product_selectable: params.product_selectable.unwrap_or(route.product_selectable),
+        product_selectable: params
+            .product_selectable
+            .unwrap_or(route.product_selectable),
         warehouse_selectable: params
             .warehouse_selectable
             .unwrap_or(route.warehouse_selectable),
         sale_selectable: params.sale_selectable.unwrap_or(route.sale_selectable),
-        purchase_selectable: params.purchase_selectable.unwrap_or(route.purchase_selectable),
+        purchase_selectable: params
+            .purchase_selectable
+            .unwrap_or(route.purchase_selectable),
         metadata: params.metadata.or(route.metadata),
         updated_at: ctx.timestamp,
         ..route

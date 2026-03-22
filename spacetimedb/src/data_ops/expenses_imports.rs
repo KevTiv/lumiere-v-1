@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::expenses::expenses::{hr_expense, expense_sheet, HrExpense, HrExpenseSheet};
+use crate::expenses::expenses::{expense_sheet, hr_expense, HrExpense, HrExpenseSheet};
 use crate::helpers::check_permission;
 use crate::types::{ExpenseSheetState, ExpenseState};
 
@@ -34,7 +34,14 @@ pub fn import_expense_csv(
         let company_id = parse_u64(col(&headers, row, "company_id"));
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
         if employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("employee_id"), None, "employee_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("employee_id"),
+                None,
+                "employee_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -60,7 +67,11 @@ pub fn import_expense_csv(
             currency_id: parse_u64(col(&headers, row, "currency_id")),
             quantity: {
                 let q = parse_f64(col(&headers, row, "quantity"));
-                if q == 0.0 { 1.0 } else { q }
+                if q == 0.0 {
+                    1.0
+                } else {
+                    q
+                }
             },
             unit_amount: parse_f64(col(&headers, row, "unit_amount")),
             tax_ids: vec_u64(col(&headers, row, "tax_ids")),
@@ -76,7 +87,11 @@ pub fn import_expense_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_expense: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_expense: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }
 
@@ -90,7 +105,13 @@ pub fn import_expense_sheet_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_expense_sheet", None, rows.len() as u32);
+    let job = begin_import_job(
+        ctx,
+        organization_id,
+        "hr_expense_sheet",
+        None,
+        rows.len() as u32,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -107,7 +128,14 @@ pub fn import_expense_sheet_csv(
         let company_id = parse_u64(col(&headers, row, "company_id"));
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
         if employee_id == 0 {
-            record_import_error(ctx, job.id, row_num, Some("employee_id"), None, "employee_id is required");
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("employee_id"),
+                None,
+                "employee_id is required",
+            );
             errors += 1;
             continue;
         }
@@ -140,6 +168,10 @@ pub fn import_expense_sheet_csv(
     }
 
     finish_import_job(ctx, job, imported, errors);
-    log::info!("Import hr_expense_sheet: imported={}, errors={}", imported, errors);
+    log::info!(
+        "Import hr_expense_sheet: imported={}, errors={}",
+        imported,
+        errors
+    );
     Ok(())
 }

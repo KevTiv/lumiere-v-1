@@ -23,8 +23,8 @@ export type UserOrganization = Infer<typeof UserOrganizationRow>;
  * omitted — the server prefetch via serverQueryCasbinRulesForUser covers that.
  */
 export function authSubscriptions(
-  identityHex?: string,
-  roleNames?: string[],
+  _identityHex?: string,
+  _roleNames?: string[],
 ): string[] {
   const base = [
     "SELECT * FROM user_profile",
@@ -33,12 +33,9 @@ export function authSubscriptions(
     "SELECT * FROM user_organization",
   ];
 
-  if (!identityHex) return base;
-
-  const subjects = [identityHex, ...(roleNames ?? [])]
-    .map((s) => `'${s}'`)
-    .join(", ");
-  return [...base, `SELECT * FROM casbin_rule WHERE v0 IN (${subjects})`];
+  // SpacetimeDB subscriptions don't support IN expressions — subscribe to
+  // all casbin_rule rows and filter client-side in queryCasbinRules().
+  return [...base, "SELECT * FROM casbin_rule"];
 }
 
 export function queryUserProfile(identityHex: string): UserProfile | null {

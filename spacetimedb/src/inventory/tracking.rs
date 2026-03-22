@@ -734,7 +734,9 @@ pub fn block_serial(
             record_id: serial_id,
             action: "UPDATE",
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
-            new_values: Some(serde_json::json!({ "state": "blocked", "is_locked": true }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "state": "blocked", "is_locked": true }).to_string(),
+            ),
             changed_fields: vec!["state".to_string(), "is_locked".to_string()],
             metadata: None,
         },

@@ -44,12 +44,14 @@ import AddArticleMemberReducer from "./add_article_member_reducer";
 import AddCasbinRuleReducer from "./add_casbin_rule_reducer";
 import AddContactToSegmentReducer from "./add_contact_to_segment_reducer";
 import AddDocumentVersionReducer from "./add_document_version_reducer";
+import AddFormFieldReducer from "./add_form_field_reducer";
 import AddLandedCostLineReducer from "./add_landed_cost_line_reducer";
 import AddMemberToQualityTeamReducer from "./add_member_to_quality_team_reducer";
 import AddOrgMemberReducer from "./add_org_member_reducer";
 import AddProposalSourceDocReducer from "./add_proposal_source_doc_reducer";
 import AddPurchaseOrderLineReducer from "./add_purchase_order_line_reducer";
 import AddRuleToNomenclatureReducer from "./add_rule_to_nomenclature_reducer";
+import AddUserCustomFieldReducer from "./add_user_custom_field_reducer";
 import AddUserToOrganizationReducer from "./add_user_to_organization_reducer";
 import AddWidgetToDashboardReducer from "./add_widget_to_dashboard_reducer";
 import AddWorkflowActivityReducer from "./add_workflow_activity_reducer";
@@ -189,6 +191,7 @@ import CreateExpenseSheetReducer from "./create_expense_sheet_reducer";
 import CreateFinancialReportReducer from "./create_financial_report_reducer";
 import CreateFiscalYearReducer from "./create_fiscal_year_reducer";
 import CreateFleetVehicleReducer from "./create_fleet_vehicle_reducer";
+import CreateFormConfigurationReducer from "./create_form_configuration_reducer";
 import CreateGoogleDriveConnectionReducer from "./create_google_drive_connection_reducer";
 import CreateHelpdeskSlaReducer from "./create_helpdesk_sla_reducer";
 import CreateHelpdeskStageReducer from "./create_helpdesk_stage_reducer";
@@ -299,6 +302,7 @@ import DeleteContactReducer from "./delete_contact_reducer";
 import DeleteDocumentReducer from "./delete_document_reducer";
 import DeleteFinancialReportReducer from "./delete_financial_report_reducer";
 import DeleteFiscalYearReducer from "./delete_fiscal_year_reducer";
+import DeleteFormFieldReducer from "./delete_form_field_reducer";
 import DeleteIntegrationReducer from "./delete_integration_reducer";
 import DeleteIntercompanyRuleReducer from "./delete_intercompany_rule_reducer";
 import DeleteIotDeviceReducer from "./delete_iot_device_reducer";
@@ -324,6 +328,7 @@ import DeleteStockProductionSerialReducer from "./delete_stock_production_serial
 import DeleteStockRouteReducer from "./delete_stock_route_reducer";
 import DeleteStockRuleReducer from "./delete_stock_rule_reducer";
 import DeleteTaxDeadlineReducer from "./delete_tax_deadline_reducer";
+import DeleteUserCustomFieldReducer from "./delete_user_custom_field_reducer";
 import DeleteWarehouseReducer from "./delete_warehouse_reducer";
 import DeleteWhatsappBusinessAccountReducer from "./delete_whatsapp_business_account_reducer";
 import DeprecateAccountAccountReducer from "./deprecate_account_account_reducer";
@@ -333,6 +338,7 @@ import DoneBudgetReducer from "./done_budget_reducer";
 import DoneStockMoveReducer from "./done_stock_move_reducer";
 import EndUserSessionReducer from "./end_user_session_reducer";
 import EnqueueJobReducer from "./enqueue_job_reducer";
+import EnsureDevAdminReducer from "./ensure_dev_admin_reducer";
 import ErrorIntercompanyTransactionReducer from "./error_intercompany_transaction_reducer";
 import ExecuteReplenishmentRuleReducer from "./execute_replenishment_rule_reducer";
 import ExpireContractReducer from "./expire_contract_reducer";
@@ -345,6 +351,8 @@ import FinishWorkorderReducer from "./finish_workorder_reducer";
 import GenerateFinancialReportReducer from "./generate_financial_report_reducer";
 import GenerateHubPairingTokenReducer from "./generate_hub_pairing_token_reducer";
 import GenerateSubscriptionInvoiceReducer from "./generate_subscription_invoice_reducer";
+import GetFormConfigurationReducer from "./get_form_configuration_reducer";
+import GetOrganizationFormConfigsReducer from "./get_organization_form_configs_reducer";
 import HoldSupplierIntakeReducer from "./hold_supplier_intake_reducer";
 import ImportAccountCsvReducer from "./import_account_csv_reducer";
 import ImportAccountMoveCsvReducer from "./import_account_move_csv_reducer";
@@ -406,6 +414,7 @@ import ImportUomCsvReducer from "./import_uom_csv_reducer";
 import ImportWarehouseCsvReducer from "./import_warehouse_csv_reducer";
 import ImportWorkcenterCsvReducer from "./import_workcenter_csv_reducer";
 import ImportWorkflowCsvReducer from "./import_workflow_csv_reducer";
+import InitializeDefaultFormConfigsReducer from "./initialize_default_form_configs_reducer";
 import InvoicePoLineReducer from "./invoice_po_line_reducer";
 import LinkDeviceToLocationReducer from "./link_device_to_location_reducer";
 import LinkDeviceToPosReducer from "./link_device_to_pos_reducer";
@@ -485,12 +494,14 @@ import RevokeRoleReducer from "./revoke_role_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
+import SeedDevDataReducer from "./seed_dev_data_reducer";
 import SendPurchaseOrderReducer from "./send_purchase_order_reducer";
 import SetAiAgentActiveReducer from "./set_ai_agent_active_reducer";
 import SetAnalyticAccountActiveReducer from "./set_analytic_account_active_reducer";
 import SetArticlePublishedReducer from "./set_article_published_reducer";
 import SetAssetActiveReducer from "./set_asset_active_reducer";
 import SetConsolidationCompanyRateReducer from "./set_consolidation_company_rate_reducer";
+import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
 import SetIotThresholdReducer from "./set_iot_threshold_reducer";
 import SetProjectActiveReducer from "./set_project_active_reducer";
@@ -566,6 +577,7 @@ import UpdateEmployeeReducer from "./update_employee_reducer";
 import UpdateExpenseReducer from "./update_expense_reducer";
 import UpdateFinancialReportReducer from "./update_financial_report_reducer";
 import UpdateFiscalYearReducer from "./update_fiscal_year_reducer";
+import UpdateFormFieldReducer from "./update_form_field_reducer";
 import UpdateGoogleDriveConnectionReducer from "./update_google_drive_connection_reducer";
 import UpdateGoogleDriveCredentialsReducer from "./update_google_drive_credentials_reducer";
 import UpdateHubHeartbeatReducer from "./update_hub_heartbeat_reducer";
@@ -722,6 +734,9 @@ import DocumentVersionRow from "./document_version_table";
 import ExpenseSheetRow from "./expense_sheet_table";
 import FinancialReportRow from "./financial_report_table";
 import FleetVehicleRow from "./fleet_vehicle_table";
+import FormConfigRow from "./form_config_table";
+import FormConfigFieldRow from "./form_config_field_table";
+import FormRoleConfigRow from "./form_role_config_table";
 import GoogleDriveConnectionRow from "./google_drive_connection_table";
 import HelpdeskSlaRow from "./helpdesk_sla_table";
 import HelpdeskStageRow from "./helpdesk_stage_table";
@@ -853,6 +868,7 @@ import TrialBalanceRow from "./trial_balance_table";
 import UomRow from "./uom_table";
 import UomCatRow from "./uom_cat_table";
 import UomConversionRow from "./uom_conversion_table";
+import UserCustomFieldRow from "./user_custom_field_table";
 import UserOrganizationRow from "./user_organization_table";
 import UserProfileRow from "./user_profile_table";
 import UserRoleAssignmentRow from "./user_role_assignment_table";
@@ -2221,6 +2237,45 @@ const tablesSchema = __schema({
       { name: 'fleet_vehicle_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, FleetVehicleRow),
+  form_config: __table({
+    name: 'form_config',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'form_config_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FormConfigRow),
+  form_config_field: __table({
+    name: 'form_config_field',
+    indexes: [
+      { name: 'configuration_id', algorithm: 'btree', columns: [
+        'configurationId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'form_config_field_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FormConfigFieldRow),
+  form_role_config: __table({
+    name: 'form_role_config',
+    indexes: [
+      { name: 'configuration_id', algorithm: 'btree', columns: [
+        'configurationId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'form_role_config_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FormRoleConfigRow),
   google_drive_connection: __table({
     name: 'google_drive_connection',
     indexes: [
@@ -4501,6 +4556,26 @@ const tablesSchema = __schema({
       { name: 'uom_conversion_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, UomConversionRow),
+  user_custom_field: __table({
+    name: 'user_custom_field',
+    indexes: [
+      { name: 'configuration_id', algorithm: 'btree', columns: [
+        'configurationId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'organization_id', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'user_custom_field_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, UserCustomFieldRow),
   user_organization: __table({
     name: 'user_organization',
     indexes: [
@@ -4775,12 +4850,14 @@ const reducersSchema = __reducers(
   __reducerSchema("add_casbin_rule", AddCasbinRuleReducer),
   __reducerSchema("add_contact_to_segment", AddContactToSegmentReducer),
   __reducerSchema("add_document_version", AddDocumentVersionReducer),
+  __reducerSchema("add_form_field", AddFormFieldReducer),
   __reducerSchema("add_landed_cost_line", AddLandedCostLineReducer),
   __reducerSchema("add_member_to_quality_team", AddMemberToQualityTeamReducer),
   __reducerSchema("add_org_member", AddOrgMemberReducer),
   __reducerSchema("add_proposal_source_doc", AddProposalSourceDocReducer),
   __reducerSchema("add_purchase_order_line", AddPurchaseOrderLineReducer),
   __reducerSchema("add_rule_to_nomenclature", AddRuleToNomenclatureReducer),
+  __reducerSchema("add_user_custom_field", AddUserCustomFieldReducer),
   __reducerSchema("add_user_to_organization", AddUserToOrganizationReducer),
   __reducerSchema("add_widget_to_dashboard", AddWidgetToDashboardReducer),
   __reducerSchema("add_workflow_activity", AddWorkflowActivityReducer),
@@ -4920,6 +4997,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_financial_report", CreateFinancialReportReducer),
   __reducerSchema("create_fiscal_year", CreateFiscalYearReducer),
   __reducerSchema("create_fleet_vehicle", CreateFleetVehicleReducer),
+  __reducerSchema("create_form_configuration", CreateFormConfigurationReducer),
   __reducerSchema("create_google_drive_connection", CreateGoogleDriveConnectionReducer),
   __reducerSchema("create_helpdesk_sla", CreateHelpdeskSlaReducer),
   __reducerSchema("create_helpdesk_stage", CreateHelpdeskStageReducer),
@@ -5030,6 +5108,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_document", DeleteDocumentReducer),
   __reducerSchema("delete_financial_report", DeleteFinancialReportReducer),
   __reducerSchema("delete_fiscal_year", DeleteFiscalYearReducer),
+  __reducerSchema("delete_form_field", DeleteFormFieldReducer),
   __reducerSchema("delete_integration", DeleteIntegrationReducer),
   __reducerSchema("delete_intercompany_rule", DeleteIntercompanyRuleReducer),
   __reducerSchema("delete_iot_device", DeleteIotDeviceReducer),
@@ -5055,6 +5134,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_stock_route", DeleteStockRouteReducer),
   __reducerSchema("delete_stock_rule", DeleteStockRuleReducer),
   __reducerSchema("delete_tax_deadline", DeleteTaxDeadlineReducer),
+  __reducerSchema("delete_user_custom_field", DeleteUserCustomFieldReducer),
   __reducerSchema("delete_warehouse", DeleteWarehouseReducer),
   __reducerSchema("delete_whatsapp_business_account", DeleteWhatsappBusinessAccountReducer),
   __reducerSchema("deprecate_account_account", DeprecateAccountAccountReducer),
@@ -5064,6 +5144,7 @@ const reducersSchema = __reducers(
   __reducerSchema("done_stock_move", DoneStockMoveReducer),
   __reducerSchema("end_user_session", EndUserSessionReducer),
   __reducerSchema("enqueue_job", EnqueueJobReducer),
+  __reducerSchema("ensure_dev_admin", EnsureDevAdminReducer),
   __reducerSchema("error_intercompany_transaction", ErrorIntercompanyTransactionReducer),
   __reducerSchema("execute_replenishment_rule", ExecuteReplenishmentRuleReducer),
   __reducerSchema("expire_contract", ExpireContractReducer),
@@ -5076,6 +5157,8 @@ const reducersSchema = __reducers(
   __reducerSchema("generate_financial_report", GenerateFinancialReportReducer),
   __reducerSchema("generate_hub_pairing_token", GenerateHubPairingTokenReducer),
   __reducerSchema("generate_subscription_invoice", GenerateSubscriptionInvoiceReducer),
+  __reducerSchema("get_form_configuration", GetFormConfigurationReducer),
+  __reducerSchema("get_organization_form_configs", GetOrganizationFormConfigsReducer),
   __reducerSchema("hold_supplier_intake", HoldSupplierIntakeReducer),
   __reducerSchema("import_account_csv", ImportAccountCsvReducer),
   __reducerSchema("import_account_move_csv", ImportAccountMoveCsvReducer),
@@ -5137,6 +5220,7 @@ const reducersSchema = __reducers(
   __reducerSchema("import_warehouse_csv", ImportWarehouseCsvReducer),
   __reducerSchema("import_workcenter_csv", ImportWorkcenterCsvReducer),
   __reducerSchema("import_workflow_csv", ImportWorkflowCsvReducer),
+  __reducerSchema("initialize_default_form_configs", InitializeDefaultFormConfigsReducer),
   __reducerSchema("invoice_po_line", InvoicePoLineReducer),
   __reducerSchema("link_device_to_location", LinkDeviceToLocationReducer),
   __reducerSchema("link_device_to_pos", LinkDeviceToPosReducer),
@@ -5216,12 +5300,14 @@ const reducersSchema = __reducers(
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
+  __reducerSchema("seed_dev_data", SeedDevDataReducer),
   __reducerSchema("send_purchase_order", SendPurchaseOrderReducer),
   __reducerSchema("set_ai_agent_active", SetAiAgentActiveReducer),
   __reducerSchema("set_analytic_account_active", SetAnalyticAccountActiveReducer),
   __reducerSchema("set_article_published", SetArticlePublishedReducer),
   __reducerSchema("set_asset_active", SetAssetActiveReducer),
   __reducerSchema("set_consolidation_company_rate", SetConsolidationCompanyRateReducer),
+  __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),
   __reducerSchema("set_iot_threshold", SetIotThresholdReducer),
   __reducerSchema("set_project_active", SetProjectActiveReducer),
@@ -5297,6 +5383,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_expense", UpdateExpenseReducer),
   __reducerSchema("update_financial_report", UpdateFinancialReportReducer),
   __reducerSchema("update_fiscal_year", UpdateFiscalYearReducer),
+  __reducerSchema("update_form_field", UpdateFormFieldReducer),
   __reducerSchema("update_google_drive_connection", UpdateGoogleDriveConnectionReducer),
   __reducerSchema("update_google_drive_credentials", UpdateGoogleDriveCredentialsReducer),
   __reducerSchema("update_hub_heartbeat", UpdateHubHeartbeatReducer),

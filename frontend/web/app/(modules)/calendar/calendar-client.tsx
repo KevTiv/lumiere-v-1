@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newCalendarEventForm } from "@lumiere/ui"
-import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
-import { useCalendarEvents, useCreateCalendarEvent, useStdbConnection, getStdbConnection, calendarSubscriptions } from "@lumiere/stdb"
+import { useTranslation } from "@lumiere/i18n"
 import type { CreateCalendarEventParams } from "@lumiere/stdb"
+import { calendarSubscriptions, getStdbConnection, useCalendarEvents, useCreateCalendarEvent, useStdbConnection } from "@lumiere/stdb"
+import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
+import { FormModal, ModuleView, newCalendarEventForm } from "@lumiere/ui"
+import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 
 interface CalendarClientProps {
@@ -123,7 +123,7 @@ export function CalendarClient({ initialEvents, organizationId }: CalendarClient
         return tab
       }),
     }),
-    [liveSections, moduleConfig, t],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events.map, currentDate, liveSections, moduleConfig, t],
   )
 
   const data = useMemo(

@@ -14,7 +14,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
-use crate::helpers::{calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+};
 use crate::inventory::product::product;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,

@@ -20,8 +20,8 @@ pub struct HrPayrollStructure {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
-    pub name: String,           // e.g. "Monthly", "Hourly"
-    pub type_: String,          // "employee" | "worker"
+    pub name: String,  // e.g. "Monthly", "Hourly"
+    pub type_: String, // "employee" | "worker"
     pub is_active: bool,
     pub created_at: Timestamp,
 }
@@ -39,13 +39,13 @@ pub struct HrSalaryRule {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub code: String,               // e.g. "BASIC", "NET", "TAX"
-    pub structure_id: u64,          // FK → HrPayrollStructure
-    pub category: String,           // "BASIC" | "ALW" | "DED" | "NET"
-    pub condition_type: String,     // "none" | "range" | "python"
-    pub amount_type: String,        // "fix" | "percentage" | "code"
+    pub code: String,           // e.g. "BASIC", "NET", "TAX"
+    pub structure_id: u64,      // FK → HrPayrollStructure
+    pub category: String,       // "BASIC" | "ALW" | "DED" | "NET"
+    pub condition_type: String, // "none" | "range" | "python"
+    pub amount_type: String,    // "fix" | "percentage" | "code"
     pub amount_fix: f64,
-    pub amount_percentage: f64,     // 0–100
+    pub amount_percentage: f64, // 0–100
     pub sequence: u32,
     pub is_active: bool,
 }
@@ -64,11 +64,11 @@ pub struct HrPayslip {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: String,               // "Payslip - Alice Smith - March 2026"
-    pub number: Option<String>,     // "PAYSLIP-0001" (set on confirm)
-    pub employee_id: u64,           // FK → HrEmployee
-    pub contract_id: Option<u64>,   // FK → HrContract
-    pub struct_id: u64,             // FK → HrPayrollStructure
+    pub name: String,             // "Payslip - Alice Smith - March 2026"
+    pub number: Option<String>,   // "PAYSLIP-0001" (set on confirm)
+    pub employee_id: u64,         // FK → HrEmployee
+    pub contract_id: Option<u64>, // FK → HrContract
+    pub struct_id: u64,           // FK → HrPayrollStructure
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub basic_wage: f64,
@@ -139,16 +139,20 @@ pub fn create_payroll_structure(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "hr_payroll_structure",
-        record_id: structure.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "hr_payroll_structure",
+            record_id: structure.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -165,7 +169,11 @@ pub fn create_salary_rule(
         return Err("Salary rule name and code cannot be empty".to_string());
     }
     // Verify structure belongs to org
-    let structure = ctx.db.hr_payroll_structure().id().find(&params.structure_id)
+    let structure = ctx
+        .db
+        .hr_payroll_structure()
+        .id()
+        .find(&params.structure_id)
         .ok_or("Payroll structure not found")?;
     if structure.organization_id != organization_id {
         return Err("Payroll structure belongs to a different organization".to_string());
@@ -184,16 +192,20 @@ pub fn create_salary_rule(
         sequence: params.sequence,
         is_active: params.is_active,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "hr_salary_rule",
-        record_id: rule.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "hr_salary_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -225,16 +237,20 @@ pub fn create_payslip(
         notes: params.notes,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_payslip",
-        record_id: payslip.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_payslip",
+            record_id: payslip.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -247,7 +263,11 @@ pub fn confirm_payslip(
     params: ConfirmPayslipParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "confirm")?;
-    let payslip = ctx.db.hr_payslip().id().find(&payslip_id)
+    let payslip = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
         .ok_or("Payslip not found")?;
     if payslip.organization_id != organization_id {
         return Err("Payslip belongs to a different organization".to_string());
@@ -264,16 +284,24 @@ pub fn confirm_payslip(
         state: PayslipState::Done,
         ..payslip
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_payslip",
-        record_id: payslip_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["gross_wage".to_string(), "net_wage".to_string(), "state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_payslip",
+            record_id: payslip_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![
+                "gross_wage".to_string(),
+                "net_wage".to_string(),
+                "state".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -285,7 +313,11 @@ pub fn cancel_payslip(
     payslip_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "cancel")?;
-    let payslip = ctx.db.hr_payslip().id().find(&payslip_id)
+    let payslip = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
         .ok_or("Payslip not found")?;
     if payslip.organization_id != organization_id {
         return Err("Payslip belongs to a different organization".to_string());
@@ -300,15 +332,19 @@ pub fn cancel_payslip(
         state: PayslipState::Cancelled,
         ..payslip
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id),
-        table_name: "hr_payslip",
-        record_id: payslip_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["state".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_payslip",
+            record_id: payslip_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }

@@ -318,7 +318,7 @@ pub fn create_quality_check(
         name: params.name.clone(),
         title: None,
         quality_state: "none".to_string(), // initial state
-        status: "draft".to_string(),        // initial status
+        status: "draft".to_string(),       // initial status
         product_id: params.product_id,
         product_variant_id: params.product_variant_id,
         picking_id: params.picking_id,
@@ -330,13 +330,13 @@ pub fn create_quality_check(
         warning_message: None,
         alert_message: None,
         note: None,
-        is_failed: false,           // system-managed by fail reducer
-        failure_location_id: None,  // system-managed by fail reducer
+        is_failed: false,          // system-managed by fail reducer
+        failure_location_id: None, // system-managed by fail reducer
         control_point_id: params.control_point_id,
         workorder_id: None,
         production_id: None,
         qty_tested: params.qty_tested,
-        qty_failed: 0.0,            // system-managed by fail reducer
+        qty_failed: 0.0, // system-managed by fail reducer
         measure: None,
         measure_success: None,
         norm_unit: params.norm_unit,
@@ -347,9 +347,9 @@ pub fn create_quality_check(
         component_id: None,
         operation_id: None,
         test_type: params.test_type.clone(),
-        feedback: None,             // system-managed by pass/fail reducer
+        feedback: None, // system-managed by pass/fail reducer
         is_late: false,
-        check_date: None,           // set by state transition reducers
+        check_date: None, // set by state transition reducers
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
         metadata: params.metadata,
@@ -624,13 +624,13 @@ pub fn create_quality_alert(
         product_variant_id: params.product_variant_id,
         workcenter_id: params.workcenter_id,
         team_id,
-        user_id: None,      // set by assign_quality_alert
+        user_id: None, // set by assign_quality_alert
         company_id,
-        tag_ids: vec![],        // system-managed
-        activity_ids: vec![],   // system-managed
-        message_ids: vec![],    // system-managed
-        date_assign: None,      // set by assign_quality_alert
-        date_close: None,       // set by solve/cancel reducers
+        tag_ids: vec![],      // system-managed
+        activity_ids: vec![], // system-managed
+        message_ids: vec![],  // system-managed
+        date_assign: None,    // set by assign_quality_alert
+        date_close: None,     // set by solve/cancel reducers
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
         metadata: params.metadata,

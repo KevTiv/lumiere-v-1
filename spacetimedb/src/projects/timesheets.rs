@@ -317,9 +317,7 @@ pub fn start_timesheet_timer(
             record_id: entry.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "project_id": entry.project_id }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "project_id": entry.project_id }).to_string()),
             changed_fields: vec!["timer_started".to_string()],
             metadata: None,
         },
@@ -445,17 +443,14 @@ pub fn validate_timesheets(
             return Err("Timesheet does not belong to this company".to_string());
         }
 
-        ctx.db
-            .project_timesheet()
-            .id()
-            .update(ProjectTimesheet {
-                validation_status: "validated".to_string(),
-                validated_by: Some(ctx.sender()),
-                validated_at: Some(ctx.timestamp),
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..entry
-            });
+        ctx.db.project_timesheet().id().update(ProjectTimesheet {
+            validation_status: "validated".to_string(),
+            validated_by: Some(ctx.sender()),
+            validated_at: Some(ctx.timestamp),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..entry
+        });
     }
 
     for tid in &timesheet_ids {

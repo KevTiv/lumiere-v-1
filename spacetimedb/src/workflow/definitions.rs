@@ -83,7 +83,7 @@ pub struct Workflow {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation
+    pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
     pub model: String,       // e.g., "sale_order", "purchase_order"
@@ -113,24 +113,24 @@ pub struct WorkflowActivity {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation (inherited from parent Workflow)
+    pub organization_id: u64, // Tenant isolation (inherited from parent Workflow)
     pub name: String,
     pub description: Option<String>,
     pub workflow_id: u64,
     pub sequence: u32,
-    pub kind: String,              // Dummy, Function, Stopall, Subflow
-    pub action: Option<String>,    // Reducer name to call
-    pub action_id: Option<u64>,    // Reference to a server action record
+    pub kind: String,           // Dummy, Function, Stopall, Subflow
+    pub action: Option<String>, // Reducer name to call
+    pub action_id: Option<u64>, // Reference to a server action record
     pub trigger_model: Option<String>,
     pub trigger_expr_id: Option<u64>,
-    pub split_mode: String,        // XOR, OR, AND — how outgoing transitions fire
-    pub join_mode: String,         // XOR, AND — how incoming transitions merge
+    pub split_mode: String, // XOR, OR, AND — how outgoing transitions fire
+    pub join_mode: String,  // XOR, AND — how incoming transitions merge
     pub signal_send: Option<String>,
-    pub subflow_id: Option<u64>,   // If kind == Subflow, nested workflow ID
+    pub subflow_id: Option<u64>, // If kind == Subflow, nested workflow ID
     pub outgoing_transition_ids: Vec<u64>,
     pub incoming_transition_ids: Vec<u64>,
-    pub flow_start: bool,          // Entry point for the workflow
-    pub flow_stop: bool,           // Terminal node
+    pub flow_start: bool, // Entry point for the workflow
+    pub flow_stop: bool,  // Terminal node
     pub state_from: Option<String>,
     pub state_to: Option<String>,
     pub create_uid: Identity,
@@ -153,15 +153,15 @@ pub struct WorkflowTransition {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64,    // Tenant isolation (inherited from parent Workflow)
+    pub organization_id: u64, // Tenant isolation (inherited from parent Workflow)
     pub activity_from: u64,
     pub activity_to: u64,
     pub sequence: u32,
-    pub signal: Option<String>,          // Signal name that fires this transition
-    pub condition: Option<String>,       // Expression evaluated to allow/block
+    pub signal: Option<String>, // Signal name that fires this transition
+    pub condition: Option<String>, // Expression evaluated to allow/block
     pub trigger_model: Option<String>,
     pub trigger_expr_id: Option<u64>,
-    pub group_id: Option<u64>,           // Permission group that can trigger
+    pub group_id: Option<u64>, // Permission group that can trigger
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,

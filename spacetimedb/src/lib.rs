@@ -55,26 +55,28 @@ pub mod types;
 
 // ── Domain modules ────────────────────────────────────────────────────────────
 pub mod accounting; // Phase 7–8 — Chart of Accounts, Journal Entries, Tax, Bank
+pub mod ai; // Phase 14 — AI Agents & Embeddings
+pub mod analytics; // Phase 16 — Dashboards & Metrics
 pub mod core;
 pub mod crm;
+pub mod data_ops; // Phase 15 — CSV Import/Export
+pub mod documents; // Phase 12 — Docs & Knowledge Base
+pub mod expenses; // Phase 19 — Employee Expenses
+pub mod fleet; // Phase 22 — Fleet Vehicles, POS Terminals & Warehouse Geo
+pub mod forms; // Unified form configuration system
+pub mod helpdesk; // Phase 18 — Helpdesk & Support Tickets
+pub mod hr; // Phase 17 — HR, Leaves, Contracts, Payroll
 pub mod integrations; // Phase 2 — CRM & Contacts
 pub mod inventory; // Phase 3–4 — Products & Inventory
+pub mod iot; // Phase 20 — IoT Integration (devices, telemetry, actions)
+pub mod manufacturing; // Phase 10 — BOM, Work Orders
+pub mod projects; // Phase 11 — Projects, Tasks, Timesheets
+pub mod proposals; // Phase 21 — Sales Proposals & Tenders
 pub mod purchasing; // Phase 6 — Purchase Orders & Supply Chain
 pub mod sales; // Phase 5 — Quotations, POS, Delivery
-pub mod manufacturing; // Phase 10 — BOM, Work Orders
+pub mod seed;
 pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
-pub mod projects;   // Phase 11 — Projects, Tasks, Timesheets
-pub mod documents;  // Phase 12 — Docs & Knowledge Base
-pub mod workflow;   // Phase 13 — Workflow Engine
-pub mod ai;         // Phase 14 — AI Agents & Embeddings
-pub mod data_ops;   // Phase 15 — CSV Import/Export
-pub mod analytics;  // Phase 16 — Dashboards & Metrics
-pub mod hr;         // Phase 17 — HR, Leaves, Contracts, Payroll
-pub mod helpdesk;   // Phase 18 — Helpdesk & Support Tickets
-pub mod expenses;   // Phase 19 — Employee Expenses
-pub mod iot;        // Phase 20 — IoT Integration (devices, telemetry, actions)
-pub mod proposals;  // Phase 21 — Sales Proposals & Tenders
-pub mod fleet;      // Phase 22 — Fleet Vehicles, POS Terminals & Warehouse Geo
+pub mod workflow; // Phase 13 — Workflow Engine // Dev-only — seed_dev_data reducer for local development
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 

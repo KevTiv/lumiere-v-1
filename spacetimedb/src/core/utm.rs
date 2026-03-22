@@ -110,16 +110,20 @@ pub fn create_utm_campaign(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_campaign",
-        record_id: campaign.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_campaign",
+            record_id: campaign.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -131,7 +135,11 @@ pub fn update_utm_campaign(
     params: UpdateUtmCampaignParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "utm", "update")?;
-    let campaign = ctx.db.utm_campaign().id().find(&campaign_id)
+    let campaign = ctx
+        .db
+        .utm_campaign()
+        .id()
+        .find(&campaign_id)
         .ok_or("Campaign not found")?;
     if campaign.organization_id != organization_id {
         return Err("Campaign belongs to a different organization".to_string());
@@ -141,16 +149,20 @@ pub fn update_utm_campaign(
         is_active: params.is_active.unwrap_or(campaign.is_active),
         ..campaign
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_campaign",
-        record_id: campaign_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_campaign",
+            record_id: campaign_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -173,16 +185,20 @@ pub fn create_utm_medium(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_medium",
-        record_id: medium.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_medium",
+            record_id: medium.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -194,7 +210,11 @@ pub fn update_utm_medium(
     params: UpdateUtmMediumParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "utm", "update")?;
-    let medium = ctx.db.utm_medium().id().find(&medium_id)
+    let medium = ctx
+        .db
+        .utm_medium()
+        .id()
+        .find(&medium_id)
         .ok_or("Medium not found")?;
     if medium.organization_id != organization_id {
         return Err("Medium belongs to a different organization".to_string());
@@ -204,16 +224,20 @@ pub fn update_utm_medium(
         is_active: params.is_active.unwrap_or(medium.is_active),
         ..medium
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_medium",
-        record_id: medium_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_medium",
+            record_id: medium_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -236,16 +260,20 @@ pub fn create_utm_source(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_source",
-        record_id: source.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_source",
+            record_id: source.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -257,7 +285,11 @@ pub fn update_utm_source(
     params: UpdateUtmSourceParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "utm", "update")?;
-    let source = ctx.db.utm_source().id().find(&source_id)
+    let source = ctx
+        .db
+        .utm_source()
+        .id()
+        .find(&source_id)
         .ok_or("Source not found")?;
     if source.organization_id != organization_id {
         return Err("Source belongs to a different organization".to_string());
@@ -267,15 +299,19 @@ pub fn update_utm_source(
         is_active: params.is_active.unwrap_or(source.is_active),
         ..source
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "utm_source",
-        record_id: source_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "utm_source",
+            record_id: source_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
     Ok(())
 }

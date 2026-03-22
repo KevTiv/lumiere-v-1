@@ -9,10 +9,10 @@
 use spacetimedb::{reducer, ReducerContext};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::quality::quality_check;
+use crate::inventory::warehouse::stock_location;
 use crate::iot::registry::iot_device;
 use crate::manufacturing::work_centers::mrp_workcenter;
-use crate::inventory::warehouse::stock_location;
-use crate::inventory::quality::quality_check;
 use crate::sales::pos_config::pos_config;
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -49,12 +49,15 @@ pub fn link_device_to_workcenter(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
 
-    ctx.db.iot_device().id().update(crate::iot::registry::IoTDevice {
-        workcenter_id: Some(workcenter_id),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..device
-    });
+    ctx.db
+        .iot_device()
+        .id()
+        .update(crate::iot::registry::IoTDevice {
+            workcenter_id: Some(workcenter_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..device
+        });
 
     write_audit_log_v2(
         ctx,
@@ -106,12 +109,15 @@ pub fn link_device_to_location(
         .find(&location_id)
         .ok_or("Stock location not found")?;
 
-    ctx.db.iot_device().id().update(crate::iot::registry::IoTDevice {
-        stock_location_id: Some(location_id),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..device
-    });
+    ctx.db
+        .iot_device()
+        .id()
+        .update(crate::iot::registry::IoTDevice {
+            stock_location_id: Some(location_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..device
+        });
 
     write_audit_log_v2(
         ctx,
@@ -163,12 +169,15 @@ pub fn link_device_to_pos(
         .find(&pos_config_id)
         .ok_or("POS configuration not found")?;
 
-    ctx.db.iot_device().id().update(crate::iot::registry::IoTDevice {
-        pos_config_id: Some(pos_config_id),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..device
-    });
+    ctx.db
+        .iot_device()
+        .id()
+        .update(crate::iot::registry::IoTDevice {
+            pos_config_id: Some(pos_config_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..device
+        });
 
     write_audit_log_v2(
         ctx,
@@ -219,12 +228,15 @@ pub fn link_device_to_quality_check(
         .find(&check_id)
         .ok_or("Quality check not found")?;
 
-    ctx.db.iot_device().id().update(crate::iot::registry::IoTDevice {
-        quality_check_id: Some(check_id),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..device
-    });
+    ctx.db
+        .iot_device()
+        .id()
+        .update(crate::iot::registry::IoTDevice {
+            quality_check_id: Some(check_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..device
+        });
 
     write_audit_log_v2(
         ctx,
@@ -264,15 +276,18 @@ pub fn unlink_device(
         return Err("Device does not belong to this organization".to_string());
     }
 
-    ctx.db.iot_device().id().update(crate::iot::registry::IoTDevice {
-        workcenter_id: None,
-        stock_location_id: None,
-        pos_config_id: None,
-        quality_check_id: None,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..device
-    });
+    ctx.db
+        .iot_device()
+        .id()
+        .update(crate::iot::registry::IoTDevice {
+            workcenter_id: None,
+            stock_location_id: None,
+            pos_config_id: None,
+            quality_check_id: None,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..device
+        });
 
     write_audit_log_v2(
         ctx,
