@@ -33,6 +33,7 @@ export function inventorySubscriptions(organizationId: bigint, companyId: bigint
     `SELECT * FROM inventory_adjustment WHERE organization_id = ${orgId}`,
     `SELECT * FROM stock_production_lot WHERE company_id = ${cId}`,
     `SELECT * FROM quality_check WHERE company_id = ${cId}`,
+    `SELECT * FROM warehouse_3d_zone WHERE organization_id = ${orgId}`,
   ];
 }
 
@@ -95,4 +96,25 @@ export function queryQualityChecks(): QualityCheck[] {
   return [...conn.db.quality_check.iter()].sort(
     (a, b) => Number(b.createDate ?? 0) - Number(a.createDate ?? 0),
   );
+}
+
+// ── Warehouse3DZone ────────────────────────────────────────────────────────────
+// NOTE: Warehouse3DZone bindings are generated after `spacetime publish` + `spacetime generate`.
+// Until then, this uses a dynamic accessor with eslint-disable.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Warehouse3DZone = any;
+
+export function queryWarehouse3DZones(warehouseId: bigint): Warehouse3DZone[] {
+  const conn = getStdbConnection();
+  if (!conn) return [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return [...(conn.db as any).warehouse_3d_zone.iter()].filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (z: any) => BigInt(z.warehouseId) === warehouseId && z.isActive,
+    );
+  } catch {
+    return [];
+  }
 }

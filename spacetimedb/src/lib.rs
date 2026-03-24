@@ -79,6 +79,7 @@ pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
 pub mod workflow; // Phase 13 — Workflow Engine // Dev-only — seed_dev_data reducer for local development
 
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
+use crate::proposals::proposals::proposal_presence;
 
 // ── Lifecycle reducers ────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ pub fn identity_connected(ctx: &ReducerContext) {
 }
 
 /// Called every time a client disconnects.
-/// Marks all active sessions for this identity as inactive.
+/// Marks all active sessions for this identity as inactive and cleans up presence rows.
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
     let sessions: Vec<_> = ctx
@@ -142,5 +143,18 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
             is_active: false,
             ..session
         });
+    }
+
+    // Clean up proposal presence rows for this user
+    let presence_ids: Vec<u64> = ctx
+        .db
+        .proposal_presence()
+        .presence_by_user()
+        .filter(&ctx.sender())
+        .map(|p| p.id)
+        .collect();
+
+    for id in presence_ids {
+        ctx.db.proposal_presence().id().delete(&id);
     }
 }

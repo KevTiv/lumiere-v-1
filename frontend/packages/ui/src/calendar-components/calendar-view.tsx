@@ -87,7 +87,8 @@ export function CalendarView({
       const isToday = new Date().toDateString() === date.toDateString()
 
       days.push(
-        <div
+        <button
+          type="button"
           key={day}
           onClick={() => onSelectDate(date)}
           onKeyDown={() => onSelectDate(date)}
@@ -103,7 +104,8 @@ export function CalendarView({
             {dayEvents.slice(0, 2).map((event) => {
               const conf = eventTypeConfig[event.type]
               return (
-                <div
+                <button
+                  type="button"
                   key={event.id}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -119,7 +121,7 @@ export function CalendarView({
                   )}
                 >
                   {event.title}
-                </div>
+                </button>
               )
             })}
             {dayEvents.length > 2 && (
@@ -128,7 +130,7 @@ export function CalendarView({
               </div>
             )}
           </div>
-        </div>,
+        </button>,
       )
     }
 
@@ -160,7 +162,8 @@ export function CalendarView({
           selectedDateEvents.map((event) => {
             const conf = eventTypeConfig[event.type]
             return (
-              <div
+              <button
+                type="button"
                 key={event.id}
                 onClick={() => onSelectEvent(event.id)}
                 className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
@@ -193,7 +196,7 @@ export function CalendarView({
                     {conf.label}
                   </Badge>
                 </div>
-              </div>
+              </button>
             )
           })
         ) : (

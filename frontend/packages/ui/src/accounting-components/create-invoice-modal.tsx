@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table"
 import { Plus, Trash2 } from "lucide-react"
 import type { CreateAccountMoveParams } from "../lib/accounting-types"
+import { useTranslation } from "@lumiere/i18n"
 
 interface LineItem {
   id: string
@@ -57,6 +58,7 @@ interface CreateInvoiceModalProps {
 }
 
 export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModalProps) {
+  const { t } = useTranslation()
   const today = new Date().toISOString().split("T")[0]
   const [partnerName, setPartnerName] = useState("")
   const [invoiceDate, setInvoiceDate] = useState(today)
@@ -113,16 +115,16 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { handleReset(); onClose() } }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Invoice</DialogTitle>
+          <DialogTitle>{t("accounting.forms.newInvoice.createTitle")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           {/* Customer & Dates */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label>Customer / Partner</Label>
+              <Label>{t("accounting.forms.newInvoice.fields.partner")}</Label>
               <Input
-                placeholder="Customer name"
+                placeholder={t("accounting.forms.newInvoice.fields.partnerPlaceholder")}
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
               />
@@ -130,11 +132,11 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Invoice Date</Label>
+                  <Label>{t("accounting.forms.newInvoice.fields.invoiceDate")}</Label>
                   <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Due Date</Label>
+                  <Label>{t("accounting.forms.newInvoice.fields.dueDate")}</Label>
                   <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
               </div>
@@ -144,29 +146,29 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
           {/* Line Items */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label>Line Items</Label>
+              <Label>{t("accounting.forms.newInvoice.lineItems")}</Label>
               <Button variant="outline" size="sm" onClick={addLine} className="gap-2">
-                <Plus className="h-4 w-4" />Add Item
+                <Plus className="h-4 w-4" />{t("accounting.forms.newInvoice.addItem")}
               </Button>
             </div>
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[280px]">Description</TableHead>
-                    <TableHead className="w-[80px]">Qty</TableHead>
-                    <TableHead className="w-[120px]">Unit Price</TableHead>
-                    <TableHead className="w-[80px]">Tax %</TableHead>
-                    <TableHead className="w-[80px]">Disc %</TableHead>
-                    <TableHead className="w-[120px] text-right">Total</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-70">{t("accounting.forms.newInvoice.columns.description")}</TableHead>
+                    <TableHead className="w-20">{t("accounting.forms.newInvoice.columns.qty")}</TableHead>
+                    <TableHead className="w-30">{t("accounting.forms.newInvoice.columns.unitPrice")}</TableHead>
+                    <TableHead className="w-20">{t("accounting.forms.newInvoice.columns.taxPercent")}</TableHead>
+                    <TableHead className="w-20">{t("accounting.forms.newInvoice.columns.discountPercent")}</TableHead>
+                    <TableHead className="w-30 text-right">{t("accounting.forms.newInvoice.columns.total")}</TableHead>
+                    <TableHead className="w-12.5"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lineItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
-                        <Input value={item.description} onChange={(e) => updateLine(item.id, "description", e.target.value)} placeholder="Item description" />
+                        <Input value={item.description} onChange={(e) => updateLine(item.id, "description", e.target.value)} placeholder={t("accounting.forms.newInvoice.columns.description")} />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min={1} value={item.quantity} onChange={(e) => updateLine(item.id, "quantity", parseInt(e.target.value) || 1)} />
@@ -191,24 +193,24 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right">Subtotal</TableCell>
+                    <TableCell colSpan={5} className="text-right">{t("accounting.forms.newInvoice.summary.subtotal")}</TableCell>
                     <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                     <TableCell />
                   </TableRow>
                   {totalDisc > 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-right">Discount</TableCell>
+                      <TableCell colSpan={5} className="text-right">{t("accounting.forms.newInvoice.summary.discount")}</TableCell>
                       <TableCell className="text-right text-red-600">-{formatCurrency(totalDisc)}</TableCell>
                       <TableCell />
                     </TableRow>
                   )}
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right">Tax</TableCell>
+                    <TableCell colSpan={5} className="text-right">{t("accounting.forms.newInvoice.summary.tax")}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalTax)}</TableCell>
                     <TableCell />
                   </TableRow>
                   <TableRow className="bg-muted/50">
-                    <TableCell colSpan={5} className="text-right font-bold">Total</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold">{t("accounting.forms.newInvoice.summary.total")}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
                     <TableCell />
                   </TableRow>
@@ -219,15 +221,15 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label>Notes (optional)</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes for the customer..." rows={3} />
+            <Label>{t("accounting.forms.newInvoice.notesOptional")}</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("accounting.forms.newInvoice.notesForCustomer")} rows={3} />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="secondary" onClick={() => handleSave(true)} disabled={!canSave}>Save as Draft</Button>
-          <Button onClick={() => handleSave(false)} disabled={!canSave}>Create & Send</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="secondary" onClick={() => handleSave(true)} disabled={!canSave}>{t("accounting.forms.newInvoice.saveDraft")}</Button>
+          <Button onClick={() => handleSave(false)} disabled={!canSave}>{t("accounting.forms.newInvoice.createAndSend")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

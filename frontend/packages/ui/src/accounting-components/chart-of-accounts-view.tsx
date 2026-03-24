@@ -42,16 +42,17 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AccountAccount } from "../lib/accounting-types"
+import { useTranslation } from "@lumiere/i18n"
 
 type DisplayGroup = "asset" | "liability" | "equity" | "income" | "expense" | "other"
 
-const groupConfig: Record<DisplayGroup, { label: string; icon: React.ReactNode; color: string; bgColor: string }> = {
-  asset: { label: "Assets", icon: <Wallet className="h-4 w-4" />, color: "text-blue-600", bgColor: "bg-blue-500/10" },
-  liability: { label: "Liabilities", icon: <CreditCard className="h-4 w-4" />, color: "text-red-600", bgColor: "bg-red-500/10" },
-  equity: { label: "Equity", icon: <PiggyBank className="h-4 w-4" />, color: "text-purple-600", bgColor: "bg-purple-500/10" },
-  income: { label: "Revenue", icon: <TrendingUp className="h-4 w-4" />, color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-  expense: { label: "Expenses", icon: <Receipt className="h-4 w-4" />, color: "text-amber-600", bgColor: "bg-amber-500/10" },
-  other: { label: "Other", icon: <TrendingDown className="h-4 w-4" />, color: "text-gray-600", bgColor: "bg-gray-500/10" },
+const groupConfig: Record<DisplayGroup, { labelKey: string; icon: React.ReactNode; color: string; bgColor: string }> = {
+  asset: { labelKey: "accounting.forms.newAccount.fields.options.asset", icon: <Wallet className="h-4 w-4" />, color: "text-blue-600", bgColor: "bg-blue-500/10" },
+  liability: { labelKey: "accounting.forms.newAccount.fields.options.liability", icon: <CreditCard className="h-4 w-4" />, color: "text-red-600", bgColor: "bg-red-500/10" },
+  equity: { labelKey: "accounting.forms.newAccount.fields.options.equity", icon: <PiggyBank className="h-4 w-4" />, color: "text-purple-600", bgColor: "bg-purple-500/10" },
+  income: { labelKey: "accounting.forms.newAccount.fields.options.income", icon: <TrendingUp className="h-4 w-4" />, color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
+  expense: { labelKey: "accounting.forms.newAccount.fields.options.expense", icon: <Receipt className="h-4 w-4" />, color: "text-amber-600", bgColor: "bg-amber-500/10" },
+  other: { labelKey: "accounting.forms.newAccount.fields.options.other", icon: <TrendingDown className="h-4 w-4" />, color: "text-gray-600", bgColor: "bg-gray-500/10" },
 }
 
 function getDisplayGroup(account: AccountAccount): DisplayGroup {
@@ -67,26 +68,29 @@ function getDisplayGroup(account: AccountAccount): DisplayGroup {
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
 
+type TFunction = ReturnType<typeof useTranslation>["t"]
+
 interface AccountsTableProps {
   accounts: AccountAccount[]
+  t: TFunction
 }
 
-function AccountsTable({ accounts }: AccountsTableProps) {
+function AccountsTable({ accounts, t }: AccountsTableProps) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Code</TableHead>
-          <TableHead>Account Name</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Balance</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="w-[80px]">Actions</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.code")}</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.name")}</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.type")}</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.balance")}</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.status")}</TableHead>
+          <TableHead className="w-20">{t("accounting.accounts.actions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {accounts.length === 0 ? (
-          <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No accounts found</TableCell></TableRow>
+          <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{t("accounting.accounts.noResults")}</TableCell></TableRow>
         ) : accounts.map((account) => {
           const group = getDisplayGroup(account)
           const conf = groupConfig[group]
@@ -96,13 +100,13 @@ function AccountsTable({ accounts }: AccountsTableProps) {
               <TableCell>
                 <div className="flex items-center gap-2">
                   {account.name}
-                  {account.isBankAccount && <Badge variant="outline" className="text-xs">Bank</Badge>}
-                  {!account.used && <Badge variant="outline" className="text-xs text-muted-foreground">Unused</Badge>}
+                  {account.isBankAccount && <Badge variant="outline" className="text-xs">{t("accounting.accounts.badges.bank")}</Badge>}
+                  {!account.used && <Badge variant="outline" className="text-xs text-muted-foreground">{t("accounting.accounts.badges.unused")}</Badge>}
                 </div>
               </TableCell>
               <TableCell>
                 <Badge className={cn("gap-1 bg-transparent border", conf.color)}>
-                  {conf.icon}{conf.label}
+                  {conf.icon}{t(conf.labelKey as any)}
                 </Badge>
               </TableCell>
               <TableCell className={cn("font-medium", account.openingBalance < 0 ? "text-red-600" : "")}>
@@ -110,7 +114,7 @@ function AccountsTable({ accounts }: AccountsTableProps) {
               </TableCell>
               <TableCell>
                 <Badge variant={account.deprecated ? "secondary" : "default"}>
-                  {account.deprecated ? "Deprecated" : "Active"}
+                  {account.deprecated ? t("accounting.accounts.badges.deprecated") : t("accounting.accounts.badges.active")}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -132,6 +136,7 @@ interface ChartOfAccountsViewProps {
 }
 
 export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewProps) {
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
 
@@ -151,6 +156,15 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
     other: byGroup("other").reduce((s, a) => s + a.openingBalance, 0),
   }
 
+  const tabGroups: { value: string; label: string; accounts: AccountAccount[] }[] = [
+    { value: "all", label: t("accounting.accounts.all"), accounts: filtered },
+    { value: "asset", label: t("accounting.forms.newAccount.fields.options.asset"), accounts: byGroup("asset") },
+    { value: "liability", label: t("accounting.forms.newAccount.fields.options.liability"), accounts: byGroup("liability") },
+    { value: "equity", label: t("accounting.forms.newAccount.fields.options.equity"), accounts: byGroup("equity") },
+    { value: "income", label: t("accounting.forms.newAccount.fields.options.income"), accounts: byGroup("income") },
+    { value: "expense", label: t("accounting.forms.newAccount.fields.options.expense"), accounts: byGroup("expense") },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -164,7 +178,7 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
                   <span className={conf.color}>{conf.icon}</span>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">{conf.label}</p>
+                  <p className="text-xs text-muted-foreground">{t(conf.labelKey as any)}</p>
                   <p className="text-lg font-bold">{formatCurrency(totals[g])}</p>
                 </div>
               </div>
@@ -177,30 +191,28 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle>Chart of Accounts</CardTitle>
-            <Button onClick={() => setShowCreateModal(true)} className="gap-2"><Plus className="h-4 w-4" />New Account</Button>
+            <CardTitle>{t("accounting.accounts.title")}</CardTitle>
+            <Button onClick={() => setShowCreateModal(true)} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newAccount")}</Button>
           </div>
           <div className="relative mt-4 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search accounts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+            <Input placeholder={t("accounting.accounts.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
           </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all" className={"flex flex-col"}>
             <TabsList className="mb-4">
-              <TabsTrigger value="all">All ({accounts.length})</TabsTrigger>
-              <TabsTrigger value="asset">Assets ({byGroup("asset").length})</TabsTrigger>
-              <TabsTrigger value="liability">Liabilities ({byGroup("liability").length})</TabsTrigger>
-              <TabsTrigger value="equity">Equity ({byGroup("equity").length})</TabsTrigger>
-              <TabsTrigger value="income">Revenue ({byGroup("income").length})</TabsTrigger>
-              <TabsTrigger value="expense">Expenses ({byGroup("expense").length})</TabsTrigger>
+              {tabGroups.map(({ value, label, accounts: tabAccounts }) => (
+                <TabsTrigger key={value} value={value}>
+                  {label} ({tabAccounts.length})
+                </TabsTrigger>
+              ))}
             </TabsList>
-            <TabsContent value="all"><AccountsTable accounts={filtered} /></TabsContent>
-            <TabsContent value="asset"><AccountsTable accounts={byGroup("asset")} /></TabsContent>
-            <TabsContent value="liability"><AccountsTable accounts={byGroup("liability")} /></TabsContent>
-            <TabsContent value="equity"><AccountsTable accounts={byGroup("equity")} /></TabsContent>
-            <TabsContent value="income"><AccountsTable accounts={byGroup("income")} /></TabsContent>
-            <TabsContent value="expense"><AccountsTable accounts={byGroup("expense")} /></TabsContent>
+            {tabGroups.map(({ value, accounts: tabAccounts }) => (
+              <TabsContent key={value} value={value}>
+                <AccountsTable accounts={tabAccounts} t={t} />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>
@@ -208,39 +220,39 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
       {/* Create Account Dialog */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Create New Account</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("accounting.forms.newAccount.createTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Account Code</Label>
-                <Input placeholder="e.g., 1001" />
+                <Label>{t("accounting.forms.newAccount.fields.code")}</Label>
+                <Input placeholder={t("accounting.forms.newAccount.fields.codePlaceholder")} />
               </div>
               <div className="space-y-2">
-                <Label>Account Type</Label>
+                <Label>{t("accounting.forms.newAccount.fields.internalType")}</Label>
                 <Select>
-                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("accounting.forms.newAccount.fields.accountTypePlaceholder")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Asset">Asset</SelectItem>
-                    <SelectItem value="Liability">Liability</SelectItem>
-                    <SelectItem value="Equity">Equity</SelectItem>
-                    <SelectItem value="Income">Revenue</SelectItem>
-                    <SelectItem value="Expense">Expense</SelectItem>
+                    {(["asset", "liability", "equity", "income", "expense"] as DisplayGroup[]).map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {t(groupConfig[g].labelKey as any)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Account Name</Label>
-              <Input placeholder="Account name" />
+              <Label>{t("accounting.forms.newAccount.fields.name")}</Label>
+              <Input placeholder={t("accounting.forms.newAccount.fields.namePlaceholder")} />
             </div>
             <div className="space-y-2">
-              <Label>Opening Balance</Label>
-              <Input type="number" placeholder="0.00" />
+              <Label>{t("accounting.forms.newAccount.fields.openingBalance")}</Label>
+              <Input type="number" placeholder={t("accounting.forms.newAccount.fields.openingBalancePlaceholder")} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button onClick={() => { onCreate?.({}); setShowCreateModal(false) }}>Create Account</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("common.cancel")}</Button>
+            <Button onClick={() => { onCreate?.({}); setShowCreateModal(false) }}>{t("accounting.forms.newAccount.submitLabel")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

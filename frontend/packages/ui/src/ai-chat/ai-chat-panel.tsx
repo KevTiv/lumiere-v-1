@@ -99,7 +99,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
   const [commandFilter, setCommandFilter] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
-  
+
   // Floating panel state
   const [position, setPosition] = useState<Position>({ x: -1, y: -1 })
   const [size, setSize] = useState<Size>({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
@@ -108,7 +108,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
   const [isMinimized, setIsMinimized] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
   const [prevState, setPrevState] = useState<{ position: Position; size: Size } | null>(null)
-  
+
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -197,16 +197,16 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
         const newY = Math.max(0, Math.min(window.innerHeight - 60, dragStartRef.current.posY + dy))
         setPosition({ x: newX, y: newY })
       }
-      
+
       if (isResizing) {
         const dx = e.clientX - resizeStartRef.current.x
         const dy = e.clientY - resizeStartRef.current.y
-        
+
         let newWidth = resizeStartRef.current.width
         let newHeight = resizeStartRef.current.height
         let newX = position.x
         let newY = position.y
-        
+
         if (isResizing.includes("e")) {
           newWidth = Math.max(MIN_WIDTH, resizeStartRef.current.width + dx)
         }
@@ -223,7 +223,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
           newHeight = resizeStartRef.current.height - heightDelta
           newY = resizeStartRef.current.posY + heightDelta
         }
-        
+
         setSize({ width: newWidth, height: newHeight })
         if (isResizing.includes("w") || isResizing.includes("n")) {
           setPosition({ x: newX, y: newY })
@@ -295,12 +295,12 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
     if (showCommands && filteredCommands.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
-        setSelectedCommandIndex((prev) => 
+        setSelectedCommandIndex((prev) =>
           prev < filteredCommands.length - 1 ? prev + 1 : 0
         )
       } else if (e.key === "ArrowUp") {
         e.preventDefault()
-        setSelectedCommandIndex((prev) => 
+        setSelectedCommandIndex((prev) =>
           prev > 0 ? prev - 1 : filteredCommands.length - 1
         )
       } else if (e.key === "Tab" || e.key === "Enter") {
@@ -387,6 +387,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
           {/* Drag button — floating mode only */}
           {!docked && (
             <button
+              type="button"
               title="Drag to move"
               onMouseDown={handleDragStart}
               className={cn(
@@ -457,9 +458,9 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                 <p className="text-xs text-muted-foreground max-w-[240px] mb-4">
                   {config?.welcomeMessage || "Ask questions or use @ commands for quick actions."}
                 </p>
-                
+
                 {/* Quick actions */}
-                <div className="grid grid-cols-2 gap-1.5 w-full max-w-[280px]">
+                <div className="grid grid-cols-2 gap-1.5 w-full max-w-70">
                   {[
                     { label: "Sales summary", icon: TrendingUp },
                     { label: "Check inventory", icon: Package },
@@ -467,6 +468,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                     { label: "Generate report", icon: FileText },
                   ].map((action) => (
                     <button
+                      type="button"
                       key={action.label}
                       onClick={() => setInput(action.label)}
                       className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left text-xs"
@@ -490,8 +492,8 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                     <Avatar className="h-6 w-6 shrink-0">
                       <AvatarFallback className={cn(
                         "text-[10px]",
-                        message.role === "assistant" 
-                          ? "bg-primary text-primary-foreground" 
+                        message.role === "assistant"
+                          ? "bg-primary text-primary-foreground"
                           : "bg-muted"
                       )}>
                         {message.role === "assistant" ? <Sparkles className="h-3 w-3" /> : "U"}
@@ -503,8 +505,8 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                     )}>
                       <div className={cn(
                         "rounded-xl px-3 py-2 text-xs",
-                        message.role === "user" 
-                          ? "bg-primary text-primary-foreground rounded-br-sm" 
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-sm"
                           : "bg-muted rounded-bl-sm"
                       )}>
                         <p className="whitespace-pre-wrap">{message.content}</p>
@@ -555,7 +557,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
 
           {/* Command palette */}
           {showCommands && filteredCommands.length > 0 && (
-            <div 
+            <div
               className="absolute bottom-[100px] left-3 right-3 bg-popover border border-border rounded-lg shadow-lg max-h-[200px] overflow-auto"
             >
               <div className="p-1.5 border-b border-border">
@@ -577,6 +579,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                       const globalIndex = filteredCommands.indexOf(cmd)
                       return (
                         <button
+                          type="button"
                           key={cmd.id}
                           onClick={() => insertCommand(cmd)}
                           className={cn(
@@ -651,6 +654,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                 {/* Resize button — floating mode only */}
                 {!docked && !isMaximized && (
                   <button
+                    type="button"
                     title="Drag to resize"
                     onMouseDown={handleResizeStart("se")}
                     className={cn(
@@ -704,7 +708,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
 // Mock response generator (replace with actual AI SDK integration)
 function generateMockResponse(userInput: string, context?: { activeView?: string }): string {
   const input = userInput.toLowerCase()
-  
+
   if (input.includes("@sales") || input.includes("sales summary")) {
     return `Sales summary for current period:
 
@@ -719,7 +723,7 @@ Top products:
 
 Want a detailed report?`
   }
-  
+
   if (input.includes("@inventory") || input.includes("inventory") || input.includes("stock")) {
     return `Inventory status:
 
@@ -734,7 +738,7 @@ Need attention:
 
 Generate restock list?`
   }
-  
+
   if (input.includes("@customers") || input.includes("customers")) {
     return `Customer overview:
 
@@ -749,7 +753,7 @@ Segments:
 
 Export customer list?`
   }
-  
+
   if (input.includes("@help") || input.includes("help")) {
     return `Available commands:
 
@@ -759,7 +763,7 @@ Export customer list?`
 
 Type any command or ask naturally!`
   }
-  
+
   return `I can help with "${userInput}" in the ${context?.activeView || "current"} view.
 
 Try @ commands or describe what you need.`

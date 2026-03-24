@@ -3,14 +3,16 @@
 import { useState } from "react"
 import { GitCommit, Clock, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ProposalVersion, WorkspaceAction } from "@/lib/proposal-workspace-types"
+import type { ProposalVersion } from "@/lib/proposal-workspace-types"
 import { VersionDiffModal } from "./version-diff-modal"
 
 interface VersionHistoryBarProps {
   versions: ProposalVersion[]
   activeVersionId: string | null
   currentSections: import("@/lib/proposal-workspace-types").TenderSection[]
-  dispatch: React.Dispatch<WorkspaceAction>
+  onRestoreVersion?: (versionId: string) => void
+  /** @deprecated pass onRestoreVersion instead */
+  dispatch?: React.Dispatch<import("@/lib/proposal-workspace-types").WorkspaceAction>
 }
 
 function timeAgo(date: Date): string {
@@ -23,7 +25,7 @@ function timeAgo(date: Date): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-export function VersionHistoryBar({ versions, activeVersionId, currentSections, dispatch }: VersionHistoryBarProps) {
+export function VersionHistoryBar({ versions, activeVersionId, currentSections, dispatch, onRestoreVersion }: VersionHistoryBarProps) {
   const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
@@ -57,7 +59,7 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
                 <button
                   key={version.id}
                   onClick={() => {
-                    dispatch({ type: "SET_ACTIVE_VERSION", id: version.id })
+                    dispatch?.({ type: "SET_ACTIVE_VERSION", id: version.id })
                     setExpandedVersionId(version.id)
                   }}
                   className={cn(
@@ -72,7 +74,7 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   <span className="text-muted-foreground">{timeAgo(new Date(version.createdAt))}</span>
                   {version.message && (
-                    <span className="text-muted-foreground truncate max-w-[80px]">· "{version.message}"</span>
+                    <span className="text-muted-foreground truncate max-w-20">· "{version.message}"</span>
                   )}
                   {version.diff && (
                     <span className="text-green-500 text-[10px]">
@@ -97,12 +99,16 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
           open={expandedVersionId !== null}
           onClose={() => {
             setExpandedVersionId(null)
-            dispatch({ type: "SET_ACTIVE_VERSION", id: null })
+            dispatch?.({ type: "SET_ACTIVE_VERSION", id: null })
           }}
           version={expandedVersion}
           currentSections={currentSections}
           onRestore={() => {
-            dispatch({ type: "RESTORE_VERSION", versionId: expandedVersion.id })
+            if (onRestoreVersion) {
+              onRestoreVersion(expandedVersion.id)
+            } else {
+              dispatch?.({ type: "RESTORE_VERSION", versionId: expandedVersion.id })
+            }
             setExpandedVersionId(null)
           }}
         />
@@ -112,21 +118,24 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
 }
 
 interface SaveVersionButtonProps {
-  dispatch: React.Dispatch<WorkspaceAction>
+  onSave?: (message: string) => void
+  /** @deprecated use onSave instead */
+  dispatch?: React.Dispatch<import("@/lib/proposal-workspace-types").WorkspaceAction>
   isDirty: boolean
   versionCount: number
 }
 
-export function SaveVersionButton({ dispatch, isDirty, versionCount }: SaveVersionButtonProps) {
+export function SaveVersionButton({ onSave, dispatch, isDirty, versionCount }: SaveVersionButtonProps) {
   const [message, setMessage] = useState("")
   const [showInput, setShowInput] = useState(false)
 
   const handleSave = () => {
-    dispatch({
-      type: "SAVE_VERSION",
-      message: message.trim() || `Version ${versionCount + 1}`,
-      author: "You",
-    })
+    const msg = message.trim() || `Version ${versionCount + 1}`
+    if (onSave) {
+      onSave(msg)
+    } else {
+      dispatch?.({ type: "SAVE_VERSION", message: msg, author: "You" })
+    }
     setMessage("")
     setShowInput(false)
   }

@@ -17,7 +17,15 @@
       "esbuild",
       "lightningcss",
       "unrs-resolver"
-    ]
+    ],
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "react-leaflet>react": "19",
+        "react-leaflet>react-dom": "19",
+        "@react-leaflet/core>react": "19",
+        "@react-leaflet/core>react-dom": "19"
+      }
+    }
   },
   "dependencies": {
     "@rn-primitives/alert-dialog": "^1.2.0",

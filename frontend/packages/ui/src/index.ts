@@ -206,3 +206,10 @@ export * from "./proposal-workspace/version-history-bar";
 export * from "./proposal-workspace/version-diff-modal";
 
 export * from "./pos/pos-page";
+
+// 3D Warehouse Viewer types and context (safe for SSR — no Three.js imports)
+export * from "./stock-3d/types";
+export * from "./stock-3d/warehouse-3d-context";
+// NOTE: WarehouseViewer and other Three.js components are NOT re-exported here because
+// @react-three/fiber breaks SSR. Import them directly with dynamic():
+//   dynamic(() => import("@lumiere/ui/stock-3d/warehouse-viewer").then(m => m.WarehouseViewer), { ssr: false })

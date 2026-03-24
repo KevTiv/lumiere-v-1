@@ -48,6 +48,8 @@ import AddFormFieldReducer from "./add_form_field_reducer";
 import AddLandedCostLineReducer from "./add_landed_cost_line_reducer";
 import AddMemberToQualityTeamReducer from "./add_member_to_quality_team_reducer";
 import AddOrgMemberReducer from "./add_org_member_reducer";
+import AddProposalCommentReducer from "./add_proposal_comment_reducer";
+import AddProposalLineItemReducer from "./add_proposal_line_item_reducer";
 import AddProposalSourceDocReducer from "./add_proposal_source_doc_reducer";
 import AddPurchaseOrderLineReducer from "./add_purchase_order_line_reducer";
 import AddRuleToNomenclatureReducer from "./add_rule_to_nomenclature_reducer";
@@ -97,6 +99,7 @@ import CancelWorkflowInstanceReducer from "./cancel_workflow_instance_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
 import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
 import ClaimQueueJobReducer from "./claim_queue_job_reducer";
+import ClearProposalPresenceReducer from "./clear_proposal_presence_reducer";
 import CloseAccountAssetReducer from "./close_account_asset_reducer";
 import CloseAccountPeriodReducer from "./close_account_period_reducer";
 import CloseFiscalYearReducer from "./close_fiscal_year_reducer";
@@ -215,6 +218,7 @@ import CreateManufacturingOrderReducer from "./create_manufacturing_order_reduce
 import CreateOpportunityReducer from "./create_opportunity_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
 import CreatePartnerBankReducer from "./create_partner_bank_reducer";
+import CreatePasswordResetTokenReducer from "./create_password_reset_token_reducer";
 import CreatePaymentReducer from "./create_payment_reducer";
 import CreatePaymentMethodReducer from "./create_payment_method_reducer";
 import CreatePaymentTermReducer from "./create_payment_term_reducer";
@@ -274,11 +278,13 @@ import CreateTrialBalanceEntryReducer from "./create_trial_balance_entry_reducer
 import CreateUomReducer from "./create_uom_reducer";
 import CreateUomCategoryReducer from "./create_uom_category_reducer";
 import CreateUomConversionReducer from "./create_uom_conversion_reducer";
+import CreateUserInviteReducer from "./create_user_invite_reducer";
 import CreateUserSessionReducer from "./create_user_session_reducer";
 import CreateUtmCampaignReducer from "./create_utm_campaign_reducer";
 import CreateUtmMediumReducer from "./create_utm_medium_reducer";
 import CreateUtmSourceReducer from "./create_utm_source_reducer";
 import CreateWarehouseReducer from "./create_warehouse_reducer";
+import CreateWarehouse3DZoneReducer from "./create_warehouse_3_d_zone_reducer";
 import CreateWarehouseTaskReducer from "./create_warehouse_task_reducer";
 import CreateWhatsappBusinessAccountReducer from "./create_whatsapp_business_account_reducer";
 import CreateWorkcenterReducer from "./create_workcenter_reducer";
@@ -316,6 +322,7 @@ import DeletePricelistReducer from "./delete_pricelist_reducer";
 import DeletePricelistItemReducer from "./delete_pricelist_item_reducer";
 import DeleteProductReducer from "./delete_product_reducer";
 import DeleteProductCategoryReducer from "./delete_product_category_reducer";
+import DeleteProposalLineItemReducer from "./delete_proposal_line_item_reducer";
 import DeleteProposalSectionReducer from "./delete_proposal_section_reducer";
 import DeleteProposalSourceDocReducer from "./delete_proposal_source_doc_reducer";
 import DeleteQualityAlertReasonReducer from "./delete_quality_alert_reason_reducer";
@@ -330,6 +337,7 @@ import DeleteStockRuleReducer from "./delete_stock_rule_reducer";
 import DeleteTaxDeadlineReducer from "./delete_tax_deadline_reducer";
 import DeleteUserCustomFieldReducer from "./delete_user_custom_field_reducer";
 import DeleteWarehouseReducer from "./delete_warehouse_reducer";
+import DeleteWarehouse3DZoneReducer from "./delete_warehouse_3_d_zone_reducer";
 import DeleteWhatsappBusinessAccountReducer from "./delete_whatsapp_business_account_reducer";
 import DeprecateAccountAccountReducer from "./deprecate_account_account_reducer";
 import DismissInsightReducer from "./dismiss_insight_reducer";
@@ -427,8 +435,11 @@ import LogTimesheetReducer from "./log_timesheet_reducer";
 import LogWorkcenterProductivityReducer from "./log_workcenter_productivity_reducer";
 import MarkActionSentReducer from "./mark_action_sent_reducer";
 import MarkEmbeddingSyncedReducer from "./mark_embedding_synced_reducer";
+import MarkInviteAcceptedReducer from "./mark_invite_accepted_reducer";
+import MarkResetTokenUsedReducer from "./mark_reset_token_used_reducer";
 import MatchBankLineReducer from "./match_bank_line_reducer";
 import MatchEliminationEntriesReducer from "./match_elimination_entries_reducer";
+import MigrateAllOrganizationsReducer from "./migrate_all_organizations_reducer";
 import OpenAccountPeriodReducer from "./open_account_period_reducer";
 import OpenContractReducer from "./open_contract_reducer";
 import OpenFiscalYearReducer from "./open_fiscal_year_reducer";
@@ -481,11 +492,13 @@ import RemovePurchaseOrderLineReducer from "./remove_purchase_order_line_reducer
 import RemoveRuleFromNomenclatureReducer from "./remove_rule_from_nomenclature_reducer";
 import RemoveUserFromOrganizationReducer from "./remove_user_from_organization_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
+import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
 import ReserveSerialReducer from "./reserve_serial_reducer";
 import ReserveStockQuantReducer from "./reserve_stock_quant_reducer";
 import ResetLeaveToDraftReducer from "./reset_leave_to_draft_reducer";
 import ResolveIotAlertReducer from "./resolve_iot_alert_reducer";
+import ResolveProposalCommentReducer from "./resolve_proposal_comment_reducer";
 import RestoreProductCategoryReducer from "./restore_product_category_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
 import RetryIotActionReducer from "./retry_iot_action_reducer";
@@ -495,6 +508,7 @@ import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
 import SeedDevDataReducer from "./seed_dev_data_reducer";
+import SeedOrganizationFormConfigsReducer from "./seed_organization_form_configs_reducer";
 import SendPurchaseOrderReducer from "./send_purchase_order_reducer";
 import SetAiAgentActiveReducer from "./set_ai_agent_active_reducer";
 import SetAnalyticAccountActiveReducer from "./set_analytic_account_active_reducer";
@@ -520,6 +534,7 @@ import StartTimesheetTimerReducer from "./start_timesheet_timer_reducer";
 import StartWorkflowReducer from "./start_workflow_reducer";
 import StartWorkorderReducer from "./start_workorder_reducer";
 import StopTimesheetTimerReducer from "./stop_timesheet_timer_reducer";
+import StoreUserCredentialReducer from "./store_user_credential_reducer";
 import SubmitExpenseReducer from "./submit_expense_reducer";
 import SubmitExpenseSheetReducer from "./submit_expense_sheet_reducer";
 import SubmitPurchaseRequisitionReducer from "./submit_purchase_requisition_reducer";
@@ -610,6 +625,8 @@ import UpdateProductSupplierInfoReducer from "./update_product_supplier_info_red
 import UpdateProductVariantReducer from "./update_product_variant_reducer";
 import UpdateProjectReducer from "./update_project_reducer";
 import UpdateProposalReducer from "./update_proposal_reducer";
+import UpdateProposalLineItemReducer from "./update_proposal_line_item_reducer";
+import UpdateProposalPresenceReducer from "./update_proposal_presence_reducer";
 import UpdateProposalStatusReducer from "./update_proposal_status_reducer";
 import UpdateQualityAlertReasonReducer from "./update_quality_alert_reason_reducer";
 import UpdateQualityPointReducer from "./update_quality_point_reducer";
@@ -629,13 +646,16 @@ import UpdateTaxDeadlineReducer from "./update_tax_deadline_reducer";
 import UpdateTaxJurisdictionReducer from "./update_tax_jurisdiction_reducer";
 import UpdateTaxScheduleReducer from "./update_tax_schedule_reducer";
 import UpdateTicketReducer from "./update_ticket_reducer";
+import UpdateUserEmailReducer from "./update_user_email_reducer";
 import UpdateUserOrganizationStatusReducer from "./update_user_organization_status_reducer";
+import UpdateUserPasswordReducer from "./update_user_password_reducer";
 import UpdateUserProfileReducer from "./update_user_profile_reducer";
 import UpdateUtmCampaignReducer from "./update_utm_campaign_reducer";
 import UpdateUtmMediumReducer from "./update_utm_medium_reducer";
 import UpdateUtmSourceReducer from "./update_utm_source_reducer";
 import UpdateVehiclePositionReducer from "./update_vehicle_position_reducer";
 import UpdateWarehouseReducer from "./update_warehouse_reducer";
+import UpdateWarehouse3DZoneReducer from "./update_warehouse_3_d_zone_reducer";
 import UpdateWarehouseTaskStatusReducer from "./update_warehouse_task_status_reducer";
 import UpdateWhatsappBusinessAccountReducer from "./update_whatsapp_business_account_reducer";
 import UpdateWhatsappCredentialsReducer from "./update_whatsapp_credentials_reducer";
@@ -812,6 +832,9 @@ import ProjectProjectRow from "./project_project_table";
 import ProjectTaskRow from "./project_task_table";
 import ProjectTimesheetRow from "./project_timesheet_table";
 import ProposalRow from "./proposal_table";
+import ProposalCommentRow from "./proposal_comment_table";
+import ProposalLineItemRow from "./proposal_line_item_table";
+import ProposalPresenceRow from "./proposal_presence_table";
 import ProposalSectionRow from "./proposal_section_table";
 import ProposalSourceDocRow from "./proposal_source_doc_table";
 import ProposalVersionRow from "./proposal_version_table";
@@ -877,6 +900,7 @@ import UtmCampaignRow from "./utm_campaign_table";
 import UtmMediumRow from "./utm_medium_table";
 import UtmSourceRow from "./utm_source_table";
 import WarehouseRow from "./warehouse_table";
+import Warehouse3DZoneRow from "./warehouse_3_d_zone_table";
 import WarehouseGeoRow from "./warehouse_geo_table";
 import WarehouseTaskRow from "./warehouse_task_table";
 import WhatsappBusinessAccountRow from "./whatsapp_business_account_table";
@@ -3543,6 +3567,57 @@ const tablesSchema = __schema({
       { name: 'proposal_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProposalRow),
+  proposal_comment: __table({
+    name: 'proposal_comment',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'comment_by_proposal', algorithm: 'btree', columns: [
+        'proposalId',
+      ] },
+      { name: 'comment_by_section', algorithm: 'btree', columns: [
+        'sectionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'proposal_comment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProposalCommentRow),
+  proposal_line_item: __table({
+    name: 'proposal_line_item',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'line_item_by_proposal', algorithm: 'btree', columns: [
+        'proposalId',
+      ] },
+      { name: 'line_item_by_section', algorithm: 'btree', columns: [
+        'sectionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'proposal_line_item_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProposalLineItemRow),
+  proposal_presence: __table({
+    name: 'proposal_presence',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'presence_by_proposal', algorithm: 'btree', columns: [
+        'proposalId',
+      ] },
+      { name: 'presence_by_user', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'proposal_presence_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProposalPresenceRow),
   proposal_section: __table({
     name: 'proposal_section',
     indexes: [
@@ -4697,6 +4772,26 @@ const tablesSchema = __schema({
       { name: 'warehouse_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, WarehouseRow),
+  warehouse_3d_zone: __table({
+    name: 'warehouse_3_d_zone',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'zone_3d_by_location', algorithm: 'btree', columns: [
+        'locationId',
+      ] },
+      { name: 'zone_3d_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'zone_3d_by_warehouse', algorithm: 'btree', columns: [
+        'warehouseId',
+      ] },
+    ],
+    constraints: [
+      { name: 'warehouse_3_d_zone_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, Warehouse3DZoneRow),
   warehouse_geo: __table({
     name: 'warehouse_geo',
     indexes: [
@@ -4854,6 +4949,8 @@ const reducersSchema = __reducers(
   __reducerSchema("add_landed_cost_line", AddLandedCostLineReducer),
   __reducerSchema("add_member_to_quality_team", AddMemberToQualityTeamReducer),
   __reducerSchema("add_org_member", AddOrgMemberReducer),
+  __reducerSchema("add_proposal_comment", AddProposalCommentReducer),
+  __reducerSchema("add_proposal_line_item", AddProposalLineItemReducer),
   __reducerSchema("add_proposal_source_doc", AddProposalSourceDocReducer),
   __reducerSchema("add_purchase_order_line", AddPurchaseOrderLineReducer),
   __reducerSchema("add_rule_to_nomenclature", AddRuleToNomenclatureReducer),
@@ -4903,6 +5000,7 @@ const reducersSchema = __reducers(
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
   __reducerSchema("claim_hub_with_token", ClaimHubWithTokenReducer),
   __reducerSchema("claim_queue_job", ClaimQueueJobReducer),
+  __reducerSchema("clear_proposal_presence", ClearProposalPresenceReducer),
   __reducerSchema("close_account_asset", CloseAccountAssetReducer),
   __reducerSchema("close_account_period", CloseAccountPeriodReducer),
   __reducerSchema("close_fiscal_year", CloseFiscalYearReducer),
@@ -5021,6 +5119,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_opportunity", CreateOpportunityReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
   __reducerSchema("create_partner_bank", CreatePartnerBankReducer),
+  __reducerSchema("create_password_reset_token", CreatePasswordResetTokenReducer),
   __reducerSchema("create_payment", CreatePaymentReducer),
   __reducerSchema("create_payment_method", CreatePaymentMethodReducer),
   __reducerSchema("create_payment_term", CreatePaymentTermReducer),
@@ -5080,11 +5179,13 @@ const reducersSchema = __reducers(
   __reducerSchema("create_uom", CreateUomReducer),
   __reducerSchema("create_uom_category", CreateUomCategoryReducer),
   __reducerSchema("create_uom_conversion", CreateUomConversionReducer),
+  __reducerSchema("create_user_invite", CreateUserInviteReducer),
   __reducerSchema("create_user_session", CreateUserSessionReducer),
   __reducerSchema("create_utm_campaign", CreateUtmCampaignReducer),
   __reducerSchema("create_utm_medium", CreateUtmMediumReducer),
   __reducerSchema("create_utm_source", CreateUtmSourceReducer),
   __reducerSchema("create_warehouse", CreateWarehouseReducer),
+  __reducerSchema("create_warehouse_3_d_zone", CreateWarehouse3DZoneReducer),
   __reducerSchema("create_warehouse_task", CreateWarehouseTaskReducer),
   __reducerSchema("create_whatsapp_business_account", CreateWhatsappBusinessAccountReducer),
   __reducerSchema("create_workcenter", CreateWorkcenterReducer),
@@ -5122,6 +5223,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_pricelist_item", DeletePricelistItemReducer),
   __reducerSchema("delete_product", DeleteProductReducer),
   __reducerSchema("delete_product_category", DeleteProductCategoryReducer),
+  __reducerSchema("delete_proposal_line_item", DeleteProposalLineItemReducer),
   __reducerSchema("delete_proposal_section", DeleteProposalSectionReducer),
   __reducerSchema("delete_proposal_source_doc", DeleteProposalSourceDocReducer),
   __reducerSchema("delete_quality_alert_reason", DeleteQualityAlertReasonReducer),
@@ -5136,6 +5238,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_tax_deadline", DeleteTaxDeadlineReducer),
   __reducerSchema("delete_user_custom_field", DeleteUserCustomFieldReducer),
   __reducerSchema("delete_warehouse", DeleteWarehouseReducer),
+  __reducerSchema("delete_warehouse_3_d_zone", DeleteWarehouse3DZoneReducer),
   __reducerSchema("delete_whatsapp_business_account", DeleteWhatsappBusinessAccountReducer),
   __reducerSchema("deprecate_account_account", DeprecateAccountAccountReducer),
   __reducerSchema("dismiss_insight", DismissInsightReducer),
@@ -5233,8 +5336,11 @@ const reducersSchema = __reducers(
   __reducerSchema("log_workcenter_productivity", LogWorkcenterProductivityReducer),
   __reducerSchema("mark_action_sent", MarkActionSentReducer),
   __reducerSchema("mark_embedding_synced", MarkEmbeddingSyncedReducer),
+  __reducerSchema("mark_invite_accepted", MarkInviteAcceptedReducer),
+  __reducerSchema("mark_reset_token_used", MarkResetTokenUsedReducer),
   __reducerSchema("match_bank_line", MatchBankLineReducer),
   __reducerSchema("match_elimination_entries", MatchEliminationEntriesReducer),
+  __reducerSchema("migrate_all_organizations", MigrateAllOrganizationsReducer),
   __reducerSchema("open_account_period", OpenAccountPeriodReducer),
   __reducerSchema("open_contract", OpenContractReducer),
   __reducerSchema("open_fiscal_year", OpenFiscalYearReducer),
@@ -5287,11 +5393,13 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_rule_from_nomenclature", RemoveRuleFromNomenclatureReducer),
   __reducerSchema("remove_user_from_organization", RemoveUserFromOrganizationReducer),
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
+  __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
   __reducerSchema("reserve_serial", ReserveSerialReducer),
   __reducerSchema("reserve_stock_quant", ReserveStockQuantReducer),
   __reducerSchema("reset_leave_to_draft", ResetLeaveToDraftReducer),
   __reducerSchema("resolve_iot_alert", ResolveIotAlertReducer),
+  __reducerSchema("resolve_proposal_comment", ResolveProposalCommentReducer),
   __reducerSchema("restore_product_category", RestoreProductCategoryReducer),
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
   __reducerSchema("retry_iot_action", RetryIotActionReducer),
@@ -5301,6 +5409,7 @@ const reducersSchema = __reducers(
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
   __reducerSchema("seed_dev_data", SeedDevDataReducer),
+  __reducerSchema("seed_organization_form_configs", SeedOrganizationFormConfigsReducer),
   __reducerSchema("send_purchase_order", SendPurchaseOrderReducer),
   __reducerSchema("set_ai_agent_active", SetAiAgentActiveReducer),
   __reducerSchema("set_analytic_account_active", SetAnalyticAccountActiveReducer),
@@ -5326,6 +5435,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_workflow", StartWorkflowReducer),
   __reducerSchema("start_workorder", StartWorkorderReducer),
   __reducerSchema("stop_timesheet_timer", StopTimesheetTimerReducer),
+  __reducerSchema("store_user_credential", StoreUserCredentialReducer),
   __reducerSchema("submit_expense", SubmitExpenseReducer),
   __reducerSchema("submit_expense_sheet", SubmitExpenseSheetReducer),
   __reducerSchema("submit_purchase_requisition", SubmitPurchaseRequisitionReducer),
@@ -5416,6 +5526,8 @@ const reducersSchema = __reducers(
   __reducerSchema("update_product_variant", UpdateProductVariantReducer),
   __reducerSchema("update_project", UpdateProjectReducer),
   __reducerSchema("update_proposal", UpdateProposalReducer),
+  __reducerSchema("update_proposal_line_item", UpdateProposalLineItemReducer),
+  __reducerSchema("update_proposal_presence", UpdateProposalPresenceReducer),
   __reducerSchema("update_proposal_status", UpdateProposalStatusReducer),
   __reducerSchema("update_quality_alert_reason", UpdateQualityAlertReasonReducer),
   __reducerSchema("update_quality_point", UpdateQualityPointReducer),
@@ -5435,13 +5547,16 @@ const reducersSchema = __reducers(
   __reducerSchema("update_tax_jurisdiction", UpdateTaxJurisdictionReducer),
   __reducerSchema("update_tax_schedule", UpdateTaxScheduleReducer),
   __reducerSchema("update_ticket", UpdateTicketReducer),
+  __reducerSchema("update_user_email", UpdateUserEmailReducer),
   __reducerSchema("update_user_organization_status", UpdateUserOrganizationStatusReducer),
+  __reducerSchema("update_user_password", UpdateUserPasswordReducer),
   __reducerSchema("update_user_profile", UpdateUserProfileReducer),
   __reducerSchema("update_utm_campaign", UpdateUtmCampaignReducer),
   __reducerSchema("update_utm_medium", UpdateUtmMediumReducer),
   __reducerSchema("update_utm_source", UpdateUtmSourceReducer),
   __reducerSchema("update_vehicle_position", UpdateVehiclePositionReducer),
   __reducerSchema("update_warehouse", UpdateWarehouseReducer),
+  __reducerSchema("update_warehouse_3_d_zone", UpdateWarehouse3DZoneReducer),
   __reducerSchema("update_warehouse_task_status", UpdateWarehouseTaskStatusReducer),
   __reducerSchema("update_whatsapp_business_account", UpdateWhatsappBusinessAccountReducer),
   __reducerSchema("update_whatsapp_credentials", UpdateWhatsappCredentialsReducer),

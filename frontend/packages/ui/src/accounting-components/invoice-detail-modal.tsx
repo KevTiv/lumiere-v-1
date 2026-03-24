@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AccountMove } from "../lib/accounting-types"
+import { useTranslation } from "@lumiere/i18n"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
   if (!ts) return "—"
@@ -43,20 +44,6 @@ function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = fa
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount)
 
-function getStatusBadge(move: AccountMove) {
-  const state = String(move.state)
-  const paymentState = String(move.paymentState)
-  if (state === "Cancelled") return { label: "Cancelled", cls: "bg-gray-100 text-gray-500" }
-  if (state === "Draft")     return { label: "Draft",     cls: "bg-slate-100 text-slate-700" }
-  if (paymentState === "Paid") return { label: "Paid",    cls: "bg-emerald-100 text-emerald-700" }
-  if (move.amountResidual > 0 && move.invoiceDateDue) {
-    const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
-    if (due < new Date()) return { label: "Overdue", cls: "bg-red-100 text-red-700" }
-  }
-  if (paymentState === "InPayment") return { label: "Partial", cls: "bg-purple-100 text-purple-700" }
-  return { label: "Sent", cls: "bg-blue-100 text-blue-700" }
-}
-
 interface InvoiceDetailModalProps {
   invoice: AccountMove | null
   open: boolean
@@ -64,6 +51,22 @@ interface InvoiceDetailModalProps {
 }
 
 export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModalProps) {
+  const { t } = useTranslation()
+
+  const getStatusBadge = (move: AccountMove) => {
+    const state = String(move.state)
+    const paymentState = String(move.paymentState)
+    if (state === "Cancelled") return { label: t("accounting.states.cancelled"), cls: "bg-gray-100 text-gray-500" }
+    if (state === "Draft")     return { label: t("accounting.states.draft"),     cls: "bg-slate-100 text-slate-700" }
+    if (paymentState === "Paid") return { label: t("accounting.states.paid"),    cls: "bg-emerald-100 text-emerald-700" }
+    if (move.amountResidual > 0 && move.invoiceDateDue) {
+      const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
+      if (due < new Date()) return { label: t("accounting.states.overdue"), cls: "bg-red-100 text-red-700" }
+    }
+    if (paymentState === "InPayment") return { label: t("accounting.states.partial"), cls: "bg-purple-100 text-purple-700" }
+    return { label: t("accounting.states.sent"), cls: "bg-blue-100 text-blue-700" }
+  }
+
   if (!invoice) return null
 
   const { label, cls } = getStatusBadge(invoice)
@@ -90,11 +93,11 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2 pb-4">
-          <Button variant="outline" size="sm" className="gap-2"><Send className="h-4 w-4" />Send</Button>
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Download</Button>
-          <Button variant="outline" size="sm" className="gap-2"><Printer className="h-4 w-4" />Print</Button>
+          <Button variant="outline" size="sm" className="gap-2"><Send className="h-4 w-4" />{t("accounting.invoices.invoiceActions.send")}</Button>
+          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}</Button>
+          <Button variant="outline" size="sm" className="gap-2"><Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}</Button>
           {invoice.amountResidual > 0 && (
-            <Button size="sm" className="gap-2 ml-auto"><DollarSign className="h-4 w-4" />Record Payment</Button>
+            <Button size="sm" className="gap-2 ml-auto"><DollarSign className="h-4 w-4" />{t("accounting.invoices.invoiceActions.recordPayment")}</Button>
           )}
         </div>
 
@@ -104,13 +107,13 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-blue-500/10"><DollarSign className="h-5 w-5 text-blue-600" /></div>
-                <div><p className="text-sm text-muted-foreground">Total Amount</p><p className="text-xl font-bold">{formatCurrency(invoice.amountTotal)}</p></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalAmount")}</p><p className="text-xl font-bold">{formatCurrency(invoice.amountTotal)}</p></div>
               </div>
             </CardContent></Card>
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-emerald-500/10"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
-                <div><p className="text-sm text-muted-foreground">Amount Paid</p><p className="text-xl font-bold text-emerald-600">{formatCurrency(invoice.amountTotal - invoice.amountResidual)}</p></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.amountPaid")}</p><p className="text-xl font-bold text-emerald-600">{formatCurrency(invoice.amountTotal - invoice.amountResidual)}</p></div>
               </div>
             </CardContent></Card>
             <Card><CardContent className="p-4">
@@ -119,7 +122,7 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
                   <Clock className={cn("h-5 w-5", invoice.amountResidual > 0 ? "text-amber-600" : "text-muted-foreground")} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Balance Due</p>
+                  <p className="text-sm text-muted-foreground">{t("accounting.invoices.balanceDue")}</p>
                   <p className={cn("text-xl font-bold", invoice.amountResidual > 0 ? "text-amber-600" : "text-muted-foreground")}>
                     {formatCurrency(invoice.amountResidual)}
                   </p>
@@ -131,7 +134,7 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
           {/* Partner & Dates */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">Bill To</h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.billTo")}</h4>
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
                 <Building className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
@@ -141,21 +144,23 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">Dates</h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.dates")}</h4>
               <div className="space-y-3 p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Issue Date</span>
+                  <span className="text-sm text-muted-foreground">{t("accounting.invoices.issueDate")}</span>
                   <span className="font-medium">{formatTimestamp(invoice.invoiceDate, true)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Due Date</span>
+                  <span className="text-sm text-muted-foreground">{t("accounting.invoices.dueDate")}</span>
                   <span className="font-medium">{formatTimestamp(invoice.invoiceDateDue, true)}</span>
                 </div>
                 {invoice.amountResidual > 0 && daysUntilDue !== null && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Days Until Due</span>
+                    <span className="text-sm text-muted-foreground">{t("accounting.invoices.daysUntilDue")}</span>
                     <Badge variant={daysUntilDue < 0 ? "destructive" : daysUntilDue <= 7 ? "default" : "secondary"}>
-                      {daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days overdue` : `${daysUntilDue} days`}
+                      {daysUntilDue < 0
+                        ? t("accounting.invoices.daysOverdue", { count: Math.abs(daysUntilDue) })
+                        : t("accounting.invoices.daysRemaining", { count: daysUntilDue })}
                     </Badge>
                   </div>
                 )}
@@ -165,22 +170,22 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
 
           {/* Amounts breakdown */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-2">Amounts</h4>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.amounts")}</h4>
             <div className="border rounded-lg">
               <Table>
                 <TableBody>
                   <TableRow>
-                    <TableCell className="text-muted-foreground">Subtotal (excl. tax)</TableCell>
+                    <TableCell className="text-muted-foreground">{t("accounting.invoices.subtotalExclTax")}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(invoice.amountUntaxed)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell className="text-muted-foreground">Tax</TableCell>
+                    <TableCell className="text-muted-foreground">{t("accounting.forms.newInvoice.summary.tax")}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(invoice.amountTax)}</TableCell>
                   </TableRow>
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-muted/50">
-                    <TableCell className="font-bold">Total</TableCell>
+                    <TableCell className="font-bold">{t("accounting.forms.newInvoice.summary.total")}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(invoice.amountTotal)}</TableCell>
                   </TableRow>
                 </TableFooter>
@@ -191,19 +196,19 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
           {/* Notes / Narration */}
           {invoice.invoiceOrigin && (
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">Origin</h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.origin")}</h4>
               <p className="text-sm p-3 rounded-lg bg-muted/50">{invoice.invoiceOrigin}</p>
             </div>
           )}
 
           {/* Activity */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-2">Activity</h4>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.activity")}</h4>
             <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/50">
               <div className="p-2 rounded-full bg-blue-500/10"><FileText className="h-4 w-4 text-blue-600" /></div>
               <div>
-                <p className="font-medium">Invoice created</p>
-                <p className="text-sm text-muted-foreground">Created on {formatTimestamp(invoice.createDate)}</p>
+                <p className="font-medium">{t("accounting.invoices.invoiceCreated")}</p>
+                <p className="text-sm text-muted-foreground">{t("accounting.invoices.createdOn", { date: formatTimestamp(invoice.createDate) })}</p>
               </div>
             </div>
           </div>

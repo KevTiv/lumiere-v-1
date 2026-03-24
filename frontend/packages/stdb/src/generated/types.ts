@@ -4400,6 +4400,20 @@ export const CreateUtmSourceParams = __t.object("CreateUtmSourceParams", {
 });
 export type CreateUtmSourceParams = __Infer<typeof CreateUtmSourceParams>;
 
+export const CreateWarehouse3DZoneParams = __t.object("CreateWarehouse3DZoneParams", {
+  get displayType() {
+    return ZoneDisplayType;
+  },
+  color: __t.string(),
+  width: __t.f32(),
+  height: __t.f32(),
+  depth: __t.f32(),
+  rows: __t.u32(),
+  columns: __t.u32(),
+  levels: __t.u32(),
+});
+export type CreateWarehouse3DZoneParams = __Infer<typeof CreateWarehouse3DZoneParams>;
+
 export const CreateWarehouseParams = __t.object("CreateWarehouseParams", {
   name: __t.string(),
   code: __t.string(),
@@ -6559,6 +6573,15 @@ export const PartnerType = __t.enum("PartnerType", {
 });
 export type PartnerType = __Infer<typeof PartnerType>;
 
+export const PasswordResetToken = __t.object("PasswordResetToken", {
+  id: __t.u64(),
+  identity: __t.identity(),
+  tokenHash: __t.string(),
+  expiresAt: __t.timestamp(),
+  usedAt: __t.option(__t.timestamp()),
+});
+export type PasswordResetToken = __Infer<typeof PasswordResetToken>;
+
 // The tagged union or sum type for the algebraic type `PaymentMethodType`.
 export const PaymentMethodType = __t.enum("PaymentMethodType", {
   Cash: __t.unit(),
@@ -7479,6 +7502,7 @@ export const Proposal = __t.object("Proposal", {
   versionCount: __t.u32(),
   templateId: __t.option(__t.u64()),
   partnerId: __t.option(__t.u64()),
+  documentFolderId: __t.option(__t.u64()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -7486,6 +7510,56 @@ export const Proposal = __t.object("Proposal", {
   metadata: __t.option(__t.string()),
 });
 export type Proposal = __Infer<typeof Proposal>;
+
+export const ProposalComment = __t.object("ProposalComment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  sectionId: __t.u64(),
+  authorId: __t.identity(),
+  authorName: __t.string(),
+  content: __t.string(),
+  parentId: __t.option(__t.u64()),
+  isResolved: __t.bool(),
+  resolvedBy: __t.option(__t.identity()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalComment = __Infer<typeof ProposalComment>;
+
+export const ProposalLineItem = __t.object("ProposalLineItem", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  sectionId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productName: __t.string(),
+  productVariantId: __t.option(__t.u64()),
+  description: __t.option(__t.string()),
+  quantity: __t.f64(),
+  priceUnit: __t.f64(),
+  subtotal: __t.f64(),
+  discount: __t.f64(),
+  sequence: __t.u32(),
+  notes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalLineItem = __Infer<typeof ProposalLineItem>;
+
+export const ProposalPresence = __t.object("ProposalPresence", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  proposalId: __t.u64(),
+  sectionId: __t.option(__t.u64()),
+  userId: __t.identity(),
+  userName: __t.string(),
+  cursorPosition: __t.option(__t.u32()),
+  lastSeen: __t.timestamp(),
+});
+export type ProposalPresence = __Infer<typeof ProposalPresence>;
 
 export const ProposalSection = __t.object("ProposalSection", {
   id: __t.u64(),
@@ -10534,6 +10608,20 @@ export const UpdateUtmSourceParams = __t.object("UpdateUtmSourceParams", {
 });
 export type UpdateUtmSourceParams = __Infer<typeof UpdateUtmSourceParams>;
 
+export const UpdateWarehouse3DZoneParams = __t.object("UpdateWarehouse3DZoneParams", {
+  get displayType() {
+    return __t.option(ZoneDisplayType);
+  },
+  color: __t.option(__t.string()),
+  width: __t.option(__t.f32()),
+  height: __t.option(__t.f32()),
+  depth: __t.option(__t.f32()),
+  rows: __t.option(__t.u32()),
+  columns: __t.option(__t.u32()),
+  levels: __t.option(__t.u32()),
+});
+export type UpdateWarehouse3DZoneParams = __Infer<typeof UpdateWarehouse3DZoneParams>;
+
 export const UpdateWarehouseParams = __t.object("UpdateWarehouseParams", {
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
@@ -10630,6 +10718,18 @@ export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingPara
 });
 export type UpsertSearchEmbeddingParams = __Infer<typeof UpsertSearchEmbeddingParams>;
 
+export const UserCredential = __t.object("UserCredential", {
+  id: __t.u64(),
+  email: __t.string(),
+  identity: __t.identity(),
+  passwordHash: __t.string(),
+  stdbTokenEnc: __t.string(),
+  emailVerified: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type UserCredential = __Infer<typeof UserCredential>;
+
 export const UserCustomField = __t.object("UserCustomField", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10641,6 +10741,18 @@ export const UserCustomField = __t.object("UserCustomField", {
   updatedAt: __t.timestamp(),
 });
 export type UserCustomField = __Infer<typeof UserCustomField>;
+
+export const UserInvite = __t.object("UserInvite", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  roleId: __t.u64(),
+  email: __t.string(),
+  tokenHash: __t.string(),
+  invitedBy: __t.identity(),
+  expiresAt: __t.timestamp(),
+  acceptedAt: __t.option(__t.timestamp()),
+});
+export type UserInvite = __Infer<typeof UserInvite>;
 
 export const UserOrganization = __t.object("UserOrganization", {
   id: __t.u64(),
@@ -10807,6 +10919,27 @@ export const Warehouse = __t.object("Warehouse", {
   metadata: __t.option(__t.string()),
 });
 export type Warehouse = __Infer<typeof Warehouse>;
+
+export const Warehouse3DZone = __t.object("Warehouse3DZone", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  warehouseId: __t.u64(),
+  locationId: __t.u64(),
+  get displayType() {
+    return ZoneDisplayType;
+  },
+  color: __t.string(),
+  width: __t.f32(),
+  height: __t.f32(),
+  depth: __t.f32(),
+  rows: __t.u32(),
+  columns: __t.u32(),
+  levels: __t.u32(),
+  isActive: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type Warehouse3DZone = __Infer<typeof Warehouse3DZone>;
 
 export const WarehouseGeo = __t.object("WarehouseGeo", {
   id: __t.u64(),
@@ -11037,4 +11170,12 @@ export const WorkorderState = __t.enum("WorkorderState", {
   Cancel: __t.unit(),
 });
 export type WorkorderState = __Infer<typeof WorkorderState>;
+
+// The tagged union or sum type for the algebraic type `ZoneDisplayType`.
+export const ZoneDisplayType = __t.enum("ZoneDisplayType", {
+  Rack: __t.unit(),
+  Floor: __t.unit(),
+  Bin: __t.unit(),
+});
+export type ZoneDisplayType = __Infer<typeof ZoneDisplayType>;
 

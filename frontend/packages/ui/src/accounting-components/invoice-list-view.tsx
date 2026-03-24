@@ -44,17 +44,18 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AccountMove } from "../lib/accounting-types"
+import { useTranslation } from "@lumiere/i18n"
 
 // State display mapping
 type DisplayStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "cancelled"
 
-const statusConfig: Record<DisplayStatus, { label: string; bgColor: string; color: string }> = {
-  draft:     { label: "Draft",     bgColor: "bg-slate-100",  color: "text-slate-700" },
-  sent:      { label: "Sent",      bgColor: "bg-blue-100",   color: "text-blue-700"  },
-  partial:   { label: "Partial",   bgColor: "bg-purple-100", color: "text-purple-700"},
-  paid:      { label: "Paid",      bgColor: "bg-emerald-100",color: "text-emerald-700"},
-  overdue:   { label: "Overdue",   bgColor: "bg-red-100",    color: "text-red-700"   },
-  cancelled: { label: "Cancelled", bgColor: "bg-gray-100",   color: "text-gray-500"  },
+const statusConfig: Record<DisplayStatus, { labelKey: string; bgColor: string; color: string }> = {
+  draft: { labelKey: "accounting.states.draft", bgColor: "bg-slate-100", color: "text-slate-700" },
+  sent: { labelKey: "accounting.states.sent", bgColor: "bg-blue-100", color: "text-blue-700" },
+  partial: { labelKey: "accounting.states.partial", bgColor: "bg-purple-100", color: "text-purple-700" },
+  paid: { labelKey: "accounting.states.paid", bgColor: "bg-emerald-100", color: "text-emerald-700" },
+  overdue: { labelKey: "accounting.states.overdue", bgColor: "bg-red-100", color: "text-red-700" },
+  cancelled: { labelKey: "accounting.states.cancelled", bgColor: "bg-gray-100", color: "text-gray-500" },
 }
 
 function getMoveStatus(move: AccountMove): DisplayStatus {
@@ -89,6 +90,7 @@ interface InvoiceListViewProps {
 }
 
 export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: InvoiceListViewProps) {
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
 
@@ -117,25 +119,25 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/10"><FileText className="h-5 w-5 text-blue-600" /></div>
-            <div><p className="text-sm text-muted-foreground">Total Invoices</p><p className="text-2xl font-bold">{stats.total}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalInvoices")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-500/10"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
-            <div><p className="text-sm text-muted-foreground">Paid</p><p className="text-2xl font-bold">{stats.paid}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.states.paid")}</p><p className="text-2xl font-bold">{stats.paid}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-amber-500/10"><Clock className="h-5 w-5 text-amber-600" /></div>
-            <div><p className="text-sm text-muted-foreground">Pending</p><p className="text-2xl font-bold">{stats.pending}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.states.pending")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/10"><AlertTriangle className="h-5 w-5 text-red-600" /></div>
-            <div><p className="text-sm text-muted-foreground">Overdue</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.states.overdue")}</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
           </div>
         </CardContent></Card>
       </div>
@@ -144,13 +146,13 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card><CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">Total Invoiced</p><p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalInvoiced")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p></div>
             <DollarSign className="h-8 w-8 text-muted-foreground/30" />
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">Outstanding Balance</p><p className="text-2xl font-bold text-amber-600">{formatCurrency(stats.totalDue)}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.outstandingBalance")}</p><p className="text-2xl font-bold text-amber-600">{formatCurrency(stats.totalDue)}</p></div>
             <Clock className="h-8 w-8 text-muted-foreground/30" />
           </div>
         </CardContent></Card>
@@ -160,26 +162,26 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle>Invoices</CardTitle>
-            <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />New Invoice</Button>
+            <CardTitle>{t("accounting.invoices.title")}</CardTitle>
+            <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button>
           </div>
           <div className="flex items-center gap-4 mt-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search invoices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+              <Input placeholder={t("accounting.invoices.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as DisplayStatus | "all")}>
               <SelectTrigger className="w-[150px]">
-                <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="Status" />
+                <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder={t("accounting.journalEntries.state")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="all">{t("accounting.invoices.allStatus")}</SelectItem>
+                <SelectItem value="draft">{t("accounting.states.draft")}</SelectItem>
+                <SelectItem value="sent">{t("accounting.states.sent")}</SelectItem>
+                <SelectItem value="partial">{t("accounting.states.partial")}</SelectItem>
+                <SelectItem value="paid">{t("accounting.states.paid")}</SelectItem>
+                <SelectItem value="overdue">{t("accounting.states.overdue")}</SelectItem>
+                <SelectItem value="cancelled">{t("accounting.states.cancelled")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -188,19 +190,19 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Balance Due</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead>{t("accounting.invoices.title")}</TableHead>
+                <TableHead>{t("accounting.invoices.customer")}</TableHead>
+                <TableHead>{t("accounting.invoices.issueDate")}</TableHead>
+                <TableHead>{t("accounting.invoices.dueDate")}</TableHead>
+                <TableHead>{t("accounting.invoices.amount")}</TableHead>
+                <TableHead>{t("accounting.invoices.balanceDue")}</TableHead>
+                <TableHead>{t("accounting.journalEntries.state")}</TableHead>
+                <TableHead className="w-12.5"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No invoices found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.invoices.noResults")}</TableCell></TableRow>
               ) : filtered.map((inv) => {
                 const status = getMoveStatus(inv)
                 const conf = statusConfig[status]
@@ -219,7 +221,7 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("font-medium", conf.bgColor, conf.color)}>{conf.label}</Badge>
+                      <Badge className={cn("font-medium", conf.bgColor, conf.color)}>{t(conf.labelKey as any)}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -228,12 +230,12 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectInvoice?.(inv) }}>
-                            <Eye className="h-4 w-4 mr-2" />View Details
+                            <Eye className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.viewDetails")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem><Send className="h-4 w-4 mr-2" />Send Invoice</DropdownMenuItem>
-                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />Download PDF</DropdownMenuItem>
+                          <DropdownMenuItem><Send className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.sendInvoice")}</DropdownMenuItem>
+                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.downloadPDF")}</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

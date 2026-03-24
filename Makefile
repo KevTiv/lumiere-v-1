@@ -54,7 +54,7 @@ publish:
 	spacetime publish $(DB) --module-path $(MODULE) --server local -y
 
 db-client:
-    spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path ../spacetimedb
+	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path ../spacetimedb
 
 publish-clear:
 	spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y

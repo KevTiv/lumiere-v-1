@@ -6,9 +6,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::forms::{
-    add_form_field, create_form_configuration, set_form_role_config, CreateFormConfigParams,
-    CreateFormFieldParams, CreateRoleConfigParams, FieldOption, FieldType, FieldValidation,
-    FieldWidth,
+    add_form_field, create_form_configuration, form_config, set_form_role_config,
+    CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams, FieldType,
+    FieldValidation, FieldWidth,
 };
 
 /// Seed default form configurations for an organization
@@ -256,8 +256,8 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
     for (role_id, enabled_fields, required_fields) in role_configs {
         let role_params = CreateRoleConfigParams {
             role_id: role_id.to_string(),
-            enabled_fields,
-            required_fields,
+            enabled_fields: enabled_fields.iter().map(|s| s.to_string()).collect(),
+            required_fields: required_fields.iter().map(|s| s.to_string()).collect(),
             default_prompts: vec![],
         };
 

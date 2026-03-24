@@ -1058,3 +1058,229 @@ pub fn delete_stock_rule(
 
     Ok(())
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 3.11: WAREHOUSE 3D ZONE
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Display type for a 3D zone in the warehouse viewer.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ZoneDisplayType {
+    Rack,
+    Floor,
+    Bin,
+}
+
+/// Stores 3D display metadata for a `StockLocation`, used by the warehouse
+/// 3D viewer to render zones with the correct geometry.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = warehouse_3d_zone,
+    public,
+    index(accessor = zone_3d_by_org, btree(columns = [organization_id])),
+    index(accessor = zone_3d_by_warehouse, btree(columns = [warehouse_id])),
+    index(accessor = zone_3d_by_location, btree(columns = [location_id]))
+)]
+pub struct Warehouse3DZone {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub warehouse_id: u64,
+    /// FK → StockLocation.id
+    pub location_id: u64,
+    pub display_type: ZoneDisplayType,
+    /// Hex color string, e.g. "#0e7490"
+    pub color: String,
+    pub width: f32,
+    pub height: f32,
+    pub depth: f32,
+    pub rows: u32,
+    pub columns: u32,
+    pub levels: u32,
+    pub is_active: bool,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+// ── Input Params ─────────────────────────────────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateWarehouse3DZoneParams {
+    pub display_type: ZoneDisplayType,
+    pub color: String,
+    pub width: f32,
+    pub height: f32,
+    pub depth: f32,
+    pub rows: u32,
+    pub columns: u32,
+    pub levels: u32,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateWarehouse3DZoneParams {
+    pub display_type: Option<ZoneDisplayType>,
+    pub color: Option<String>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub depth: Option<f32>,
+    pub rows: Option<u32>,
+    pub columns: Option<u32>,
+    pub levels: Option<u32>,
+}
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+
+#[reducer]
+pub fn create_warehouse_3d_zone(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    warehouse_id: u64,
+    location_id: u64,
+    params: CreateWarehouse3DZoneParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "warehouse", "write")?;
+
+    ctx.db
+        .warehouse()
+        .id()
+        .find(&warehouse_id)
+        .ok_or("Warehouse not found")?;
+
+    ctx.db
+        .stock_location()
+        .id()
+        .find(&location_id)
+        .ok_or("Stock location not found")?;
+
+    let zone = ctx.db.warehouse_3d_zone().insert(Warehouse3DZone {
+        id: 0,
+        organization_id,
+        warehouse_id,
+        location_id,
+        display_type: params.display_type,
+        color: params.color,
+        width: params.width,
+        height: params.height,
+        depth: params.depth,
+        rows: params.rows,
+        columns: params.columns,
+        levels: params.levels,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "warehouse_3d_zone",
+            record_id: zone.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "warehouse_id": warehouse_id,
+                    "location_id": location_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "warehouse_id".to_string(),
+                "location_id".to_string(),
+                "display_type".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn update_warehouse_3d_zone(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    zone_id: u64,
+    params: UpdateWarehouse3DZoneParams,
+) -> Result<(), String> {
+    let zone = ctx
+        .db
+        .warehouse_3d_zone()
+        .id()
+        .find(&zone_id)
+        .ok_or("3D zone not found")?;
+
+    check_permission(ctx, organization_id, "warehouse", "write")?;
+
+    ctx.db.warehouse_3d_zone().id().update(Warehouse3DZone {
+        display_type: params.display_type.unwrap_or_else(|| zone.display_type.clone()),
+        color: params.color.unwrap_or_else(|| zone.color.clone()),
+        width: params.width.unwrap_or(zone.width),
+        height: params.height.unwrap_or(zone.height),
+        depth: params.depth.unwrap_or(zone.depth),
+        rows: params.rows.unwrap_or(zone.rows),
+        columns: params.columns.unwrap_or(zone.columns),
+        levels: params.levels.unwrap_or(zone.levels),
+        updated_at: ctx.timestamp,
+        ..zone
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "warehouse_3d_zone",
+            record_id: zone_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["updated".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn delete_warehouse_3d_zone(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    zone_id: u64,
+) -> Result<(), String> {
+    let zone = ctx
+        .db
+        .warehouse_3d_zone()
+        .id()
+        .find(&zone_id)
+        .ok_or("3D zone not found")?;
+
+    check_permission(ctx, organization_id, "warehouse", "delete")?;
+
+    ctx.db.warehouse_3d_zone().id().update(Warehouse3DZone {
+        is_active: false,
+        updated_at: ctx.timestamp,
+        ..zone
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "warehouse_3d_zone",
+            record_id: zone_id,
+            action: "DELETE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}

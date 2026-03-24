@@ -516,7 +516,18 @@
       "name": "Name",
       "type": "Type",
       "balance": "Balance",
-      "active": "Active"
+      "active": "Active",
+      "status": "Status",
+      "actions": "Actions",
+      "all": "All",
+      "searchPlaceholder": "Search accounts...",
+      "noResults": "No accounts found",
+      "badges": {
+        "bank": "Bank",
+        "unused": "Unused",
+        "deprecated": "Deprecated",
+        "active": "Active"
+      }
     },
     "journalEntries": {
       "title": "Journal Entries",
@@ -524,7 +535,17 @@
       "date": "Date",
       "journal": "Journal",
       "state": "Status",
-      "total": "Total"
+      "total": "Total",
+      "entryNumber": "Entry #",
+      "type": "Type",
+      "searchPlaceholder": "Search entries...",
+      "noResults": "No journal entries found",
+      "totalEntries": "Total Entries",
+      "totalMovement": "Total Movement",
+      "partner": "Partner",
+      "untaxed": "Untaxed",
+      "residual": "Residual",
+      "payment": "Payment"
     },
     "invoices": {
       "title": "Invoices",
@@ -532,7 +553,54 @@
       "ap": "Vendor Bills",
       "dueDate": "Due Date",
       "paymentState": "Payment",
-      "partner": "Partner"
+      "partner": "Partner",
+      "searchPlaceholder": "Search invoices...",
+      "noResults": "No invoices found",
+      "totalInvoices": "Total Invoices",
+      "totalInvoiced": "Total Invoiced",
+      "outstandingBalance": "Outstanding Balance",
+      "allStatus": "All Status",
+      "issueDate": "Issue Date",
+      "amount": "Amount",
+      "customer": "Customer",
+      "balanceDue": "Balance Due",
+      "billTo": "Bill To",
+      "dates": "Dates",
+      "totalAmount": "Total Amount",
+      "amountPaid": "Amount Paid",
+      "subtotalExclTax": "Subtotal (excl. tax)",
+      "amounts": "Amounts",
+      "origin": "Origin",
+      "activity": "Activity",
+      "invoiceCreated": "Invoice created",
+      "createdOn": "Created on {{date}}",
+      "daysUntilDue": "Days Until Due",
+      "daysOverdue": "{{count}} days overdue",
+      "daysRemaining": "{{count}} days",
+      "invoiceActions": {
+        "viewDetails": "View Details",
+        "sendInvoice": "Send Invoice",
+        "downloadPDF": "Download PDF",
+        "send": "Send",
+        "download": "Download",
+        "print": "Print",
+        "recordPayment": "Record Payment"
+      }
+    },
+    "bills": {
+      "title": "Bills (Accounts Payable)",
+      "searchPlaceholder": "Search bills...",
+      "noResults": "No bills found",
+      "totalBills": "Total Bills",
+      "totalBilled": "Total Billed",
+      "amountOwed": "Amount Owed",
+      "billNumber": "Bill #",
+      "vendor": "Vendor",
+      "billDate": "Bill Date",
+      "billActions": {
+        "payBill": "Pay Bill",
+        "download": "Download"
+      }
     },
     "taxes": {
       "title": "Taxes",
@@ -552,7 +620,11 @@
       "cancelled": "Cancelled",
       "paid": "Paid",
       "partial": "Partial",
-      "notPaid": "Unpaid"
+      "notPaid": "Unpaid",
+      "sent": "Sent",
+      "overdue": "Overdue",
+      "pending": "Pending",
+      "approved": "Approved"
     },
     "nav": {
       "overview": "Overview",
@@ -661,8 +733,15 @@
     "forms": {
       "newInvoice": {
         "title": "New Invoice",
+        "createTitle": "Create New Invoice",
         "description": "Create a customer invoice",
         "submitLabel": "Create Invoice",
+        "lineItems": "Line Items",
+        "addItem": "Add Item",
+        "saveDraft": "Save as Draft",
+        "createAndSend": "Create & Send",
+        "notesOptional": "Notes (optional)",
+        "notesForCustomer": "Additional notes for the customer...",
         "sections": {
           "header": "Invoice Details"
         },
@@ -677,6 +756,20 @@
           "refPlaceholder": "PO number or reference",
           "notes": "Notes",
           "notesPlaceholder": "Internal notes..."
+        },
+        "columns": {
+          "description": "Description",
+          "qty": "Qty",
+          "unitPrice": "Unit Price",
+          "taxPercent": "Tax %",
+          "discountPercent": "Disc %",
+          "total": "Total"
+        },
+        "summary": {
+          "subtotal": "Subtotal",
+          "discount": "Discount",
+          "tax": "Tax",
+          "total": "Total"
         }
       },
       "newBill": {
@@ -701,8 +794,15 @@
       },
       "newJournalEntry": {
         "title": "New Journal Entry",
+        "createTitle": "Create Journal Entry",
         "description": "Create a manual journal entry",
         "submitLabel": "Create Entry",
+        "entryLines": "Entry Lines",
+        "addLine": "Add Line",
+        "saveDraft": "Save as Draft",
+        "refOptional": "Reference (optional)",
+        "descriptionPlaceholder": "Brief description of the entry",
+        "linePlaceholder": "Line description",
         "sections": {
           "header": "Entry Details"
         },
@@ -713,10 +813,22 @@
           "ref": "Reference",
           "refPlaceholder": "Optional reference",
           "notes": "Notes"
+        },
+        "columns": {
+          "description": "Description",
+          "debit": "Debit",
+          "credit": "Credit"
+        },
+        "summary": {
+          "totalDebits": "Total Debits",
+          "totalCredits": "Total Credits",
+          "difference": "Difference",
+          "balanced": "Balanced"
         }
       },
       "newAccount": {
         "title": "New Account",
+        "createTitle": "Create New Account",
         "description": "Add a general ledger account",
         "submitLabel": "Create Account",
         "sections": {
@@ -731,6 +843,9 @@
           "internalType": "Account Type",
           "reconcile": "Allow reconciliation",
           "notes": "Notes",
+          "openingBalance": "Opening Balance",
+          "openingBalancePlaceholder": "0.00",
+          "accountTypePlaceholder": "Select type",
           "options": {
             "asset": "Asset",
             "liability": "Liability",

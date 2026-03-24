@@ -137,14 +137,15 @@ export function ProposalsClient({ initialProposals, organizationId }: ProposalsC
         onSuccess: (_, variables) => {
           // Navigate to the new proposal — find it by title after creation
           const newId = `new-${Date.now()}`
-          router.push(`/proposals/${newId}?title=${encodeURIComponent(String(variables.title ?? "New Proposal"))}`)
+          router.push(`/proposals/${newId}?title=${encodeURIComponent(String(variables.title ?? "New Proposal"))}&orgId=${organizationId ?? 1}`)
         },
       })
     }
   }
 
   const handleRowClick = (_tabId: string, row: Record<string, unknown>) => {
-    router.push(`/proposals/${row.id}`)
+    const title = encodeURIComponent(String(row.title ?? ""))
+    router.push(`/proposals/${row.id}?title=${title}&orgId=${organizationId ?? 1}`)
   }
 
   return (

@@ -1,7 +1,8 @@
 "use client"
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   StdbConnectionProvider,
@@ -131,6 +132,21 @@ function StdbRBACBridge({ children }: { children: React.ReactNode }) {
       }),
     )
   }, [casbinRules, stdbRoles, connected])
+
+  // Onboarding guard: if connected + profile exists + no org membership → redirect to /onboarding
+  const pathname = usePathname()
+  const router = useRouter()
+  useEffect(() => {
+    if (
+      connected &&
+      profile &&
+      !orgMembership &&
+      pathname !== "/onboarding" &&
+      !pathname.startsWith("/api/")
+    ) {
+      router.push("/onboarding")
+    }
+  }, [connected, profile, orgMembership, pathname, router])
 
   // When connected with real data, pass it; otherwise let RBACProvider use defaults
   const hasRealData = connected && rbacUser !== null

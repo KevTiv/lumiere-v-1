@@ -7,6 +7,9 @@
 /// | **ProposalSection** | Current draft sections |
 /// | **ProposalVersion** | Saved version snapshots |
 /// | **ProposalSourceDoc** | Source documents for AI analysis |
+/// | **ProposalLineItem** | ERP products/services linked to sections |
+/// | **ProposalPresence** | Real-time collaborative presence |
+/// | **ProposalComment** | Threaded comments per section |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -93,6 +96,7 @@ pub struct Proposal {
     pub version_count: u32, // Cached version counter
     pub template_id: Option<u64>,
     pub partner_id: Option<u64>, // linked CRM partner
+    pub document_folder_id: Option<u64>, // optional link into DocumentFolder
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -172,6 +176,86 @@ pub struct ProposalSourceDoc {
     pub added_at: Timestamp,
 }
 
+/// ProposalLineItem — ERP product/service linked to a proposal (optionally to a section)
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = proposal_line_item,
+    public,
+    index(accessor = line_item_by_proposal, btree(columns = [proposal_id])),
+    index(accessor = line_item_by_section, btree(columns = [section_id]))
+)]
+pub struct ProposalLineItem {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64,
+    pub proposal_id: u64,
+    pub section_id: Option<u64>, // None = proposal-level line item
+    pub product_id: u64,
+    pub product_name: String,           // Snapshot at time of linking
+    pub product_variant_id: Option<u64>,
+    pub description: Option<String>,
+    pub quantity: f64,
+    pub price_unit: f64,
+    pub subtotal: f64, // computed: quantity * price_unit * (1 - discount/100)
+    pub discount: f64, // percentage, 0.0 = no discount
+    pub sequence: u32,
+    pub notes: Option<String>,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+}
+
+/// ProposalPresence — real-time collaborative presence (who is editing which section)
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = proposal_presence,
+    public,
+    index(accessor = presence_by_proposal, btree(columns = [proposal_id])),
+    index(accessor = presence_by_user, btree(columns = [user_id]))
+)]
+pub struct ProposalPresence {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64,
+    pub proposal_id: u64,
+    pub section_id: Option<u64>, // None = viewing top level
+    pub user_id: Identity,
+    pub user_name: String,
+    pub cursor_position: Option<u32>,
+    pub last_seen: Timestamp,
+}
+
+/// ProposalComment — threaded inline comment on a proposal section
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = proposal_comment,
+    public,
+    index(accessor = comment_by_proposal, btree(columns = [proposal_id])),
+    index(accessor = comment_by_section, btree(columns = [section_id]))
+)]
+pub struct ProposalComment {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64,
+    pub proposal_id: u64,
+    pub section_id: u64,
+    pub author_id: Identity,
+    pub author_name: String,
+    pub content: String,
+    pub parent_id: Option<u64>, // None = root comment, Some = reply
+    pub is_resolved: bool,
+    pub resolved_by: Option<Identity>,
+    pub create_date: Timestamp,
+    pub write_date: Timestamp,
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
@@ -186,6 +270,7 @@ pub fn create_proposal(
     value: f64,
     deadline: Option<Timestamp>,
     description: Option<String>,
+    document_folder_id: Option<u64>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "proposal", "create")?;
 
@@ -202,6 +287,7 @@ pub fn create_proposal(
         version_count: 0,
         template_id: None,
         partner_id: None,
+        document_folder_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -478,6 +564,310 @@ pub fn delete_proposal_source_doc(ctx: &ReducerContext, doc_id: u64) -> Result<(
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
 
     ctx.db.proposal_source_doc().id().delete(&doc_id);
+
+    Ok(())
+}
+
+// ============================================================================
+// LINE ITEM REDUCERS
+// ============================================================================
+
+/// Add an ERP product/service as a line item on a proposal section
+#[reducer]
+pub fn add_proposal_line_item(
+    ctx: &ReducerContext,
+    proposal_id: u64,
+    section_id: Option<u64>,
+    product_id: u64,
+    product_name: String,
+    quantity: f64,
+    price_unit: f64,
+    discount: f64,
+    notes: Option<String>,
+) -> Result<(), String> {
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    let subtotal = quantity * price_unit * (1.0 - discount / 100.0);
+
+    // Sequence = current max + 10
+    let sequence = ctx
+        .db
+        .proposal_line_item()
+        .line_item_by_proposal()
+        .filter(&proposal_id)
+        .map(|item| item.sequence)
+        .max()
+        .unwrap_or(0)
+        + 10;
+
+    ctx.db.proposal_line_item().insert(ProposalLineItem {
+        id: 0,
+        organization_id: proposal.organization_id,
+        proposal_id,
+        section_id,
+        product_id,
+        product_name,
+        product_variant_id: None,
+        description: None,
+        quantity,
+        price_unit,
+        subtotal,
+        discount,
+        sequence,
+        notes,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+    });
+
+    Ok(())
+}
+
+/// Update a proposal line item (quantity, price, discount, notes)
+#[reducer]
+pub fn update_proposal_line_item(
+    ctx: &ReducerContext,
+    line_item_id: u64,
+    quantity: f64,
+    price_unit: f64,
+    discount: f64,
+    notes: Option<String>,
+) -> Result<(), String> {
+    let item = ctx
+        .db
+        .proposal_line_item()
+        .id()
+        .find(&line_item_id)
+        .ok_or_else(|| format!("Line item {} not found", line_item_id))?;
+
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&item.proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", item.proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    let subtotal = quantity * price_unit * (1.0 - discount / 100.0);
+
+    ctx.db.proposal_line_item().id().update(ProposalLineItem {
+        quantity,
+        price_unit,
+        subtotal,
+        discount,
+        notes,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..item
+    });
+
+    Ok(())
+}
+
+/// Delete a proposal line item
+#[reducer]
+pub fn delete_proposal_line_item(ctx: &ReducerContext, line_item_id: u64) -> Result<(), String> {
+    let item = ctx
+        .db
+        .proposal_line_item()
+        .id()
+        .find(&line_item_id)
+        .ok_or_else(|| format!("Line item {} not found", line_item_id))?;
+
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&item.proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", item.proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    ctx.db.proposal_line_item().id().delete(&line_item_id);
+
+    Ok(())
+}
+
+/// Reorder proposal line items by assigning new sequence values
+#[reducer]
+pub fn reorder_proposal_line_items(
+    ctx: &ReducerContext,
+    proposal_id: u64,
+    ordered_ids: Vec<u64>,
+) -> Result<(), String> {
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    for (index, item_id) in ordered_ids.iter().enumerate() {
+        if let Some(item) = ctx.db.proposal_line_item().id().find(item_id) {
+            if item.proposal_id == proposal_id {
+                ctx.db.proposal_line_item().id().update(ProposalLineItem {
+                    sequence: (index as u32 + 1) * 10,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..item
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// PRESENCE REDUCERS
+// ============================================================================
+
+/// Update (upsert) the caller's presence in a proposal workspace
+#[reducer]
+pub fn update_proposal_presence(
+    ctx: &ReducerContext,
+    proposal_id: u64,
+    section_id: Option<u64>,
+    user_name: String,
+) -> Result<(), String> {
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
+
+    // Find existing presence row for this user + proposal
+    let existing = ctx
+        .db
+        .proposal_presence()
+        .presence_by_user()
+        .filter(&ctx.sender())
+        .find(|p| p.proposal_id == proposal_id);
+
+    if let Some(row) = existing {
+        ctx.db.proposal_presence().id().update(ProposalPresence {
+            section_id,
+            user_name,
+            last_seen: ctx.timestamp,
+            ..row
+        });
+    } else {
+        ctx.db.proposal_presence().insert(ProposalPresence {
+            id: 0,
+            organization_id: proposal.organization_id,
+            proposal_id,
+            section_id,
+            user_id: ctx.sender(),
+            user_name,
+            cursor_position: None,
+            last_seen: ctx.timestamp,
+        });
+    }
+
+    Ok(())
+}
+
+/// Remove the caller's presence from a proposal workspace
+#[reducer]
+pub fn clear_proposal_presence(ctx: &ReducerContext, proposal_id: u64) -> Result<(), String> {
+    let ids: Vec<u64> = ctx
+        .db
+        .proposal_presence()
+        .presence_by_user()
+        .filter(&ctx.sender())
+        .filter(|p| p.proposal_id == proposal_id)
+        .map(|p| p.id)
+        .collect();
+
+    for id in ids {
+        ctx.db.proposal_presence().id().delete(&id);
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// COMMENT REDUCERS
+// ============================================================================
+
+/// Add a threaded comment to a proposal section
+#[reducer]
+pub fn add_proposal_comment(
+    ctx: &ReducerContext,
+    proposal_id: u64,
+    section_id: u64,
+    content: String,
+    parent_id: Option<u64>,
+    author_name: String,
+) -> Result<(), String> {
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    if content.trim().is_empty() {
+        return Err("Comment content cannot be empty".to_string());
+    }
+
+    ctx.db.proposal_comment().insert(ProposalComment {
+        id: 0,
+        organization_id: proposal.organization_id,
+        proposal_id,
+        section_id,
+        author_id: ctx.sender(),
+        author_name,
+        content,
+        parent_id,
+        is_resolved: false,
+        resolved_by: None,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+    });
+
+    Ok(())
+}
+
+/// Mark a proposal comment as resolved
+#[reducer]
+pub fn resolve_proposal_comment(ctx: &ReducerContext, comment_id: u64) -> Result<(), String> {
+    let comment = ctx
+        .db
+        .proposal_comment()
+        .id()
+        .find(&comment_id)
+        .ok_or_else(|| format!("Comment {} not found", comment_id))?;
+
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&comment.proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", comment.proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    ctx.db.proposal_comment().id().update(ProposalComment {
+        is_resolved: true,
+        resolved_by: Some(ctx.sender()),
+        write_date: ctx.timestamp,
+        ..comment
+    });
 
     Ok(())
 }

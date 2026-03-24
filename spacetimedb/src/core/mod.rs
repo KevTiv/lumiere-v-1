@@ -17,6 +17,7 @@
 /// | messaging        | MailMessage · MailFollower                          |
 /// | utm              | UtmCampaign · UtmMedium · UtmSource                 |
 pub mod audit;
+pub mod auth;
 pub mod messaging;
 pub mod organization;
 pub mod permissions;

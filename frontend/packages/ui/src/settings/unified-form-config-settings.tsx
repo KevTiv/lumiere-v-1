@@ -332,7 +332,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
           </div>
 
           {formConfig && (
-            <ScrollArea className="h-[500px] border rounded-lg p-4">
+            <ScrollArea className="h-125 border rounded-lg p-4">
               <div className={viewMode === "grid" ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
                 {formConfig.fields.map((field: any, index: number) => (
                   <FieldConfigCard

@@ -144,7 +144,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
               )}
             >
               <FileText className="h-3 w-3" />
-              <span className="max-w-[80px] truncate">{src.name}</span>
+              <span className="max-w-20 truncate">{src.name}</span>
               <button
                 onClick={(e) => { e.stopPropagation(); handleRemoveSource(src.id) }}
                 className="ml-0.5 rounded hover:text-destructive"

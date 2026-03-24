@@ -29,6 +29,7 @@ export default __t.row({
   versionCount: __t.u32().name("version_count"),
   templateId: __t.option(__t.u64()).name("template_id"),
   partnerId: __t.option(__t.u64()).name("partner_id"),
+  documentFolderId: __t.option(__t.u64()).name("document_folder_id"),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

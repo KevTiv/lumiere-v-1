@@ -372,6 +372,7 @@ export function POSPage({
             <div className="space-y-1">
               {filteredProducts.map((product) => (
                 <button
+                  type="button"
                   key={product.id}
                   onClick={() => addToCart(product)}
                   className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:border-primary/50 text-left transition-colors active:scale-[0.99]"
@@ -439,6 +440,7 @@ export function POSPage({
                     <p className="text-xs text-muted-foreground">{fmt(item.product.price)} {t("pos.cart.each")}</p>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <button
+                        type="button"
                         onClick={() => updateQty(item.product.id, -1)}
                         className="w-5 h-5 rounded border flex items-center justify-center hover:bg-muted transition-colors"
                       >
@@ -446,6 +448,7 @@ export function POSPage({
                       </button>
                       <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
                       <button
+                        type="button"
                         onClick={() => updateQty(item.product.id, 1)}
                         className="w-5 h-5 rounded border flex items-center justify-center hover:bg-muted transition-colors"
                       >
@@ -454,7 +457,7 @@ export function POSPage({
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <button onClick={() => removeItem(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <button type="button" onClick={() => removeItem(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                       <X className="h-3.5 w-3.5" />
                     </button>
                     <span className="text-xs font-semibold">{fmt(item.lineTotal)}</span>

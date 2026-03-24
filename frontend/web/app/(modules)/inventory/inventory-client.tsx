@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newProductForm, newTransferForm, newInventoryAdjustmentForm } from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
@@ -18,7 +19,15 @@ import {
   useCreateProduct,
   useCreateStockPicking,
   useCreateInventoryAdjustment,
+  useWarehouse3D,
+  useMoveStockItem3D,
 } from "@lumiere/stdb"
+
+// WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
+const WarehouseViewer = dynamic(
+  () => import("@lumiere/ui/stock-3d/warehouse-viewer"),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-muted-foreground">Loading 3D viewer…</div> }
+)
 
 interface InventoryClientProps {
   initialProducts?: Record<string, unknown>[]
@@ -55,7 +64,16 @@ export function InventoryClient({
   const createStockPicking = useCreateStockPicking(orgId, companyId)
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId)
 
+  // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
+  const firstWarehouseId = warehouses[0]?.id ? BigInt(String(warehouses[0].id)) : 0n
+  const { zones, slots, items: warehouseItems } = useWarehouse3D(orgId, companyId, firstWarehouseId)
+  const moveStockItem = useMoveStockItem3D(orgId)
+
   const moduleConfig = useMemo(() => inventoryModuleConfig(t), [t])
+
+  // Only render the 3D viewer on the client to avoid SSR/hydration tree mismatches
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => setIsMounted(true), [])
 
   const liveSections = useMemo(() => {
     const totalSkus = products.length
@@ -166,14 +184,43 @@ export function InventoryClient({
     )
   }, [products, stockQuants, transfers, t, moduleConfig])
 
+  const warehouse3DTab = useMemo(
+    () => ({
+      id: "3d-view",
+      label: t("inventory.3dView", { defaultValue: "3D View" }),
+      type: "custom" as const,
+      customContent: isMounted ? (
+        <div className="h-[calc(100vh-12rem)]">
+          <WarehouseViewer
+            zones={zones}
+            slots={slots}
+            items={warehouseItems}
+            warehouseName={warehouses[0]?.name ? String(warehouses[0].name) : undefined}
+            onMoveItem={(itemId, targetSlotId) => {
+              moveStockItem.mutate({
+                quantId: BigInt(itemId),
+                targetLocationId: BigInt(targetSlotId),
+                quantity: 1,
+              })
+            }}
+          />
+        </div>
+      ) : null,
+    }),
+    [zones, slots, warehouseItems, warehouses, moveStockItem, t, isMounted]
+  )
+
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-      ),
+      tabs: [
+        ...moduleConfig.tabs.map((tab) =>
+          tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
+        ),
+        warehouse3DTab,
+      ],
     }) as ModuleConfig,
-    [moduleConfig, liveSections]
+    [moduleConfig, liveSections, warehouse3DTab]
   )
 
   const data = useMemo(

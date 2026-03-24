@@ -17,4 +17,5 @@ export default {
   value: __t.f64(),
   deadline: __t.option(__t.timestamp()),
   description: __t.option(__t.string()),
+  documentFolderId: __t.option(__t.u64()),
 };
