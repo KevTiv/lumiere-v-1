@@ -3,8 +3,14 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useTranslation } from "@lumiere/i18n"
+import { Button } from "@lumiere/ui"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@lumiere/ui/components/card"
+import { Input } from "@lumiere/ui/components/input"
+import { Label } from "@lumiere/ui/components/label"
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
@@ -16,13 +22,15 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-4 text-center">
-        <h2 className="text-xl font-semibold">Invalid reset link</h2>
-        <p className="text-sm text-muted-foreground">This reset link is missing or invalid.</p>
-        <Link href="/forgot-password" className="text-sm font-medium hover:underline">
-          Request a new link
-        </Link>
-      </div>
+      <Card>
+        <CardContent className="pt-8 pb-6 text-center space-y-4">
+          <p className="text-base font-medium">{t("auth.resetPassword.invalidTitle")}</p>
+          <p className="text-sm text-muted-foreground">{t("auth.resetPassword.invalidDescription")}</p>
+          <Link href="/forgot-password" className="text-sm font-medium hover:underline">
+            {t("auth.resetPassword.requestNewLink")}
+          </Link>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -30,7 +38,7 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError(null)
     if (password !== confirm) {
-      setError("Passwords do not match")
+      setError(t("auth.errors.passwordMismatch"))
       return
     }
     setLoading(true)
@@ -42,65 +50,68 @@ export default function ResetPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? "Reset failed")
+        setError(data.error ?? t("auth.errors.resetFailed"))
         return
       }
       router.push(data.redirectTo ?? "/overview")
     } catch {
-      setError("Something went wrong. Please try again.")
+      setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold">Reset your password</h2>
-        <p className="text-sm text-muted-foreground">Enter your new password below.</p>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("auth.resetPassword.title")}</CardTitle>
+        <CardDescription>{t("auth.resetPassword.description")}</CardDescription>
+      </CardHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">New password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="At least 8 characters"
-          />
-        </div>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="password">{t("auth.fields.newPassword")}</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder={t("auth.fields.passwordPlaceholder")}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="confirm" className="text-sm font-medium">Confirm new password</label>
-          <input
-            id="confirm"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-            autoComplete="new-password"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm">{t("auth.fields.confirmNewPassword")}</Label>
+            <Input
+              id="confirm"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+          </div>
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex w-full items-center justify-center rounded-md bg-primary text-primary-foreground shadow h-9 px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Resetting…" : "Reset password"}
-        </button>
-      </form>
-    </div>
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+            {loading ? t("auth.resetPassword.submitting") : t("auth.resetPassword.submit")}
+          </Button>
+        </form>
+      </CardContent>
+
+      <CardFooter className="justify-center">
+        <p className="text-sm text-muted-foreground">
+          {t("auth.resetPassword.linkNotWorking")}{" "}
+          <Link href="/forgot-password" className="font-medium text-foreground hover:underline">
+            {t("auth.resetPassword.requestNew")}
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   )
 }

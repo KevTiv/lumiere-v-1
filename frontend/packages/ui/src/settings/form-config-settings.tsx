@@ -63,6 +63,7 @@ import {
   defaultForensicFormConfig
 } from "@/lib/form-config-types"
 import { defaultRoles } from "@/lib/rbac-defaults"
+import { useTranslation } from "@lumiere/i18n"
 
 const fieldTypeOptions: { value: FieldType; label: string; description: string }[] = [
   { value: "text", label: "Text", description: "Single line text input" },
@@ -87,6 +88,7 @@ interface FormConfigSettingsProps {
 }
 
 export function FormConfigSettings({ className }: FormConfigSettingsProps) {
+  const { t } = useTranslation()
   const { isAdmin } = useRBAC()
   const [activeTab, setActiveTab] = useState<"journal" | "forensic">("journal")
   const [journalConfig, setJournalConfig] = useState<FormConfiguration>(defaultJournalFormConfig)
@@ -230,15 +232,15 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Form Configuration</h3>
+          <h3 className="text-lg font-semibold">{t("settings.formConfigSettings.title")}</h3>
           <p className="text-sm text-muted-foreground">
-            Configure input fields for Journal and Forensic Reports
+            {t("settings.formConfigSettings.description")}
           </p>
         </div>
         {hasChanges && (
           <Button onClick={handleSaveChanges} className="gap-2">
             <Save className="h-4 w-4" />
-            Save Changes
+            {t("settings.formConfigSettings.saveChanges")}
           </Button>
         )}
       </div>
@@ -248,11 +250,11 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="journal" className="gap-2">
             <BookMarked className="h-4 w-4" />
-            Journal Fields
+            {t("settings.formConfigSettings.journalFields")}
           </TabsTrigger>
           <TabsTrigger value="forensic" className="gap-2">
             <FileSearch className="h-4 w-4" />
-            Forensic Fields
+            {t("settings.formConfigSettings.forensicFields")}
           </TabsTrigger>
         </TabsList>
 
@@ -266,7 +268,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   <CardDescription>{activeConfig.description}</CardDescription>
                 </div>
                 <Badge variant="outline" className="gap-1">
-                  {activeConfig.fields.filter(f => f.isEnabled).length} active fields
+                  {t("settings.formConfigSettings.activeFields", { count: activeConfig.fields.filter(f => f.isEnabled).length })}
                 </Badge>
               </div>
             </CardHeader>
@@ -276,10 +278,10 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Form Fields</CardTitle>
+                <CardTitle className="text-base">{t("settings.formConfigSettings.formFields")}</CardTitle>
                 <Button size="sm" onClick={handleAddField} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Field
+                  {t("settings.formConfigSettings.addField")}
                 </Button>
               </div>
             </CardHeader>
@@ -304,10 +306,10 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{field.label}</span>
                             {field.isSystem && (
-                              <Badge variant="secondary" className="text-xs">System</Badge>
+                              <Badge variant="secondary" className="text-xs">{t("settings.formConfigSettings.system")}</Badge>
                             )}
                             {field.validation?.required && (
-                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">Required</Badge>
+                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">{t("settings.formConfigSettings.required")}</Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -336,11 +338,11 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleEditField(field)}>
                               <Pencil className="h-4 w-4 mr-2" />
-                              Edit
+                              {t("settings.formConfigSettings.edit")}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDuplicateField(field)}>
                               <Copy className="h-4 w-4 mr-2" />
-                              Duplicate
+                              {t("settings.formConfigSettings.duplicate")}
                             </DropdownMenuItem>
                             {!field.isSystem && (
                               <DropdownMenuItem
@@ -348,7 +350,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                                 className="text-red-600"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                {t("settings.formConfigSettings.delete")}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -366,8 +368,8 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <CardTitle className="text-base">Role-based Field Visibility</CardTitle>
-                  <CardDescription>Configure which fields each role can see and which are required</CardDescription>
+                  <CardTitle className="text-base">{t("settings.formConfigSettings.roleVisibility.title")}</CardTitle>
+                  <CardDescription>{t("settings.formConfigSettings.roleVisibility.description")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -379,7 +381,8 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   const requiredCount = roleConfig?.requiredFields?.length || 0
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={role.id}
                       className="flex items-center justify-between p-3 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
                       onClick={() => setEditingRoleConfig(editingRoleConfig === role.id ? null : role.id)}
@@ -392,7 +395,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                         <div>
                           <p className="font-medium text-sm">{role.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {enabledCount} fields enabled · {requiredCount} required
+                            {t("settings.formConfigSettings.roleVisibility.fieldsEnabled", { count: enabledCount, required: requiredCount })}
                           </p>
                         </div>
                       </div>
@@ -402,7 +405,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           editingRoleConfig === role.id && "rotate-90"
                         )}
                       />
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -411,7 +414,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               {editingRoleConfig && (
                 <div className="mt-4 p-4 rounded-lg border bg-muted/30">
                   <h4 className="font-medium mb-3">
-                    Configure fields for {defaultRoles.find(r => r.id === editingRoleConfig)?.name}
+                    {t("settings.formConfigSettings.roleVisibility.configureFor", { name: defaultRoles.find(r => r.id === editingRoleConfig)?.name })}
                   </h4>
                   <div className="grid gap-2 max-h-[300px] overflow-y-auto">
                     {activeConfig.fields.filter(f => f.isEnabled).map((field) => {
@@ -434,7 +437,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                                 }
                                 className="scale-75"
                               />
-                              <span className="text-muted-foreground">Visible</span>
+                              <span className="text-muted-foreground">{t("settings.formConfigSettings.roleVisibility.visible")}</span>
                             </label>
                             <label className="flex items-center gap-2 text-xs">
                               <Switch
@@ -445,7 +448,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                                 disabled={!isEnabled}
                                 className="scale-75"
                               />
-                              <span className="text-muted-foreground">Required</span>
+                              <span className="text-muted-foreground">{t("settings.formConfigSettings.roleVisibility.requiredLabel")}</span>
                             </label>
                           </div>
                         </div>
@@ -463,8 +466,8 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
                 <div>
-                  <CardTitle className="text-base">AI Suggestions</CardTitle>
-                  <CardDescription>Configure AI-powered suggestions for each field</CardDescription>
+                  <CardTitle className="text-base">{t("settings.formConfigSettings.aiSuggestions.title")}</CardTitle>
+                  <CardDescription>{t("settings.formConfigSettings.aiSuggestions.description")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -493,7 +496,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                           onClick={() => handleEditField(field)}
                         >
                           <Plus className="h-3 w-3 mr-1" />
-                          Add
+                          {t("settings.formConfigSettings.aiSuggestions.add")}
                         </Button>
                       </div>
                     </div>
@@ -508,9 +511,9 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
       <Dialog open={isFieldDialogOpen} onOpenChange={setIsFieldDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isNewField ? "Add New Field" : "Edit Field"}</DialogTitle>
+            <DialogTitle>{isNewField ? t("settings.formConfigSettings.dialog.addTitle") : t("settings.formConfigSettings.dialog.editTitle")}</DialogTitle>
             <DialogDescription>
-              Configure the field properties and validation rules
+              {t("settings.formConfigSettings.dialog.description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -519,7 +522,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               {/* Basic Info */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="field-label">Label</Label>
+                  <Label htmlFor="field-label">{t("settings.formConfigSettings.dialog.label")}</Label>
                   <Input
                     id="field-label"
                     value={selectedField.label}
@@ -528,11 +531,11 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       label: e.target.value,
                       name: e.target.value.toLowerCase().replace(/\s+/g, "_"),
                     })}
-                    placeholder="Field label"
+                    placeholder={t("settings.formConfigSettings.dialog.labelPlaceholder")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="field-type">Type</Label>
+                  <Label htmlFor="field-type">{t("settings.formConfigSettings.dialog.type")}</Label>
                   <Select
                     value={selectedField.type}
                     onValueChange={(value) => setSelectedField({
@@ -558,7 +561,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="field-description">Description</Label>
+                <Label htmlFor="field-description">{t("settings.formConfigSettings.dialog.fieldDescription")}</Label>
                 <Input
                   id="field-description"
                   value={selectedField.description || ""}
@@ -566,12 +569,12 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                     ...selectedField,
                     description: e.target.value
                   })}
-                  placeholder="Help text shown to users"
+                  placeholder={t("settings.formConfigSettings.dialog.descriptionPlaceholder")}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="field-placeholder">Placeholder</Label>
+                <Label htmlFor="field-placeholder">{t("settings.formConfigSettings.dialog.fieldPlaceholder")}</Label>
                 <Input
                   id="field-placeholder"
                   value={selectedField.placeholder || ""}
@@ -579,14 +582,14 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                     ...selectedField,
                     placeholder: e.target.value
                   })}
-                  placeholder="Placeholder text"
+                  placeholder={t("settings.formConfigSettings.dialog.placeholderText")}
                 />
               </div>
 
               {/* Options for select/radio/multiselect */}
               {["select", "multiselect", "radio"].includes(selectedField.type) && (
                 <div className="space-y-2">
-                  <Label>Options</Label>
+                  <Label>{t("settings.formConfigSettings.dialog.options")}</Label>
                   <div className="space-y-2">
                     {(selectedField.options || []).map((option, idx) => (
                       <div key={idx} className="flex items-center gap-2">
@@ -601,7 +604,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                             }
                             setSelectedField({ ...selectedField, options: newOptions })
                           }}
-                          placeholder="Option label"
+                          placeholder={t("settings.formConfigSettings.dialog.optionPlaceholder")}
                           className="flex-1"
                         />
                         <Button
@@ -628,7 +631,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Option
+                      {t("settings.formConfigSettings.dialog.addOption")}
                     </Button>
                   </div>
                 </div>
@@ -637,28 +640,28 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
               {/* AI Suggestions */}
               {["text", "textarea"].includes(selectedField.type) && (
                 <div className="space-y-2">
-                  <Label>AI Suggestions</Label>
+                  <Label>{t("settings.formConfigSettings.dialog.aiSuggestions")}</Label>
                   <Textarea
                     value={selectedField.aiSuggestions?.join("\n") || ""}
                     onChange={(e) => setSelectedField({
                       ...selectedField,
                       aiSuggestions: e.target.value.split("\n").filter(Boolean)
                     })}
-                    placeholder="Enter one suggestion per line"
+                    placeholder={t("settings.formConfigSettings.dialog.aiSuggestionsPlaceholder")}
                     rows={4}
                   />
                   <p className="text-xs text-muted-foreground">
-                    These suggestions will appear as clickable chips when users focus on the field
+                    {t("settings.formConfigSettings.dialog.aiSuggestionsHint")}
                   </p>
                 </div>
               )}
 
               {/* Validation */}
               <div className="space-y-4">
-                <Label className="text-base">Validation</Label>
+                <Label className="text-base">{t("settings.formConfigSettings.dialog.validation")}</Label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="field-required" className="font-normal">Required</Label>
+                    <Label htmlFor="field-required" className="font-normal">{t("settings.formConfigSettings.dialog.validationRequired")}</Label>
                     <Switch
                       id="field-required"
                       checked={selectedField.validation?.required || false}
@@ -672,7 +675,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   {["text", "textarea"].includes(selectedField.type) && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="min-length">Min Length</Label>
+                        <Label htmlFor="min-length">{t("settings.formConfigSettings.dialog.minLength")}</Label>
                         <Input
                           id="min-length"
                           type="number"
@@ -687,7 +690,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="max-length">Max Length</Label>
+                        <Label htmlFor="max-length">{t("settings.formConfigSettings.dialog.maxLength")}</Label>
                         <Input
                           id="max-length"
                           type="number"
@@ -707,7 +710,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   {["number", "slider", "rating"].includes(selectedField.type) && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="min-value">Min Value</Label>
+                        <Label htmlFor="min-value">{t("settings.formConfigSettings.dialog.minValue")}</Label>
                         <Input
                           id="min-value"
                           type="number"
@@ -722,7 +725,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="max-value">Max Value</Label>
+                        <Label htmlFor="max-value">{t("settings.formConfigSettings.dialog.maxValue")}</Label>
                         <Input
                           id="max-value"
                           type="number"
@@ -745,10 +748,10 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveField}>
-              {isNewField ? "Add Field" : "Save Changes"}
+              {isNewField ? t("settings.formConfigSettings.dialog.addField") : t("settings.formConfigSettings.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>

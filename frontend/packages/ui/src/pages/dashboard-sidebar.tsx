@@ -36,7 +36,7 @@ import {
   GitBranch,
   MessageSquare,
   ClipboardList,
-  Map,
+  Map as MapIcon,
 } from "lucide-react"
 import type { Resource } from "@/lib/rbac-types"
 
@@ -98,7 +98,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
       items: [
         { label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
         { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
-        { label: t("nav.map"), href: "/map", icon: Map, resource: "module:map" },
+        { label: t("nav.map"), href: "/map", icon: MapIcon, resource: "module:map" },
         { label: t("nav.helpdesk"), href: "/helpdesk", icon: HelpCircle, resource: "module:helpdesk" },
         { label: t("nav.workflows"), href: "/workflows", icon: GitBranch, resource: "module:workflows" },
       ],
@@ -159,7 +159,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
 
       <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
         {navGroups.map((group, groupIndex) => (
-          <div key={`sidebar-option-${groupIndex}`}>
+          <div key={`sidebar-option-${String(groupIndex)}`}>
             {!isCollapsed && group.label && (
               <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
@@ -220,11 +220,12 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
       <div className="flex flex-col gap-2 px-2 pb-2">
         {onOpenJournal && (
           <button
+            type="button"
             onClick={onOpenJournal}
             title="Open Journal"
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20",
+              "bg-linear-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20",
               "text-sidebar-foreground hover:border-amber-500/40",
               isCollapsed && "justify-center"
             )}
@@ -238,11 +239,12 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
 
         {onOpenNotebook && (
           <button
+            type="button"
             onClick={onOpenNotebook}
             title="Open Notebook"
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-gradient-to-r from-orange-500/10 to-orange-600/10 border border-orange-500/20",
+              "bg-linear-to-r from-orange-500/10 to-orange-600/10 border border-orange-500/20",
               "text-sidebar-foreground hover:border-orange-500/40",
               isCollapsed && "justify-center"
             )}
@@ -256,11 +258,12 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
 
         {onOpenAIChat && (
           <button
+            type="button"
             onClick={onOpenAIChat}
             title="Open AI Assistant"
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20",
+              "bg-linear-to-r from-primary/10 to-primary/5 border border-primary/20",
               "text-sidebar-foreground hover:border-primary/40",
               isCollapsed && "justify-center"
             )}

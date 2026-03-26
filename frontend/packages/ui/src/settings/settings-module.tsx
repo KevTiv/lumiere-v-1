@@ -17,7 +17,8 @@ import {
   ScrollText,
   ChevronRight,
   Settings2,
-  BookMarked
+  BookMarked,
+  Lock
 } from "lucide-react"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"

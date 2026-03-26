@@ -52,10 +52,10 @@ export function CalendarClient({ initialEvents, organizationId }: CalendarClient
             ...w,
             data: {
               stats: [
-                { label: "Total Events", value: String(events.length), icon: "Calendar" },
-                { label: "Confirmed", value: String(confirmed), icon: "CheckCircle" },
-                { label: "All-Day Events", value: String(allDay), icon: "Sun" },
-                { label: "Draft Events", value: String(events.length - confirmed), icon: "Clock" },
+                { label: t("calendar.dashboard.totalEvents"), value: String(events.length), icon: "Calendar" },
+                { label: t("calendar.dashboard.confirmed"), value: String(confirmed), icon: "CheckCircle" },
+                { label: t("calendar.dashboard.allDayEvents"), value: String(allDay), icon: "Sun" },
+                { label: t("calendar.dashboard.draftEvents"), value: String(events.length - confirmed), icon: "Clock" },
               ],
             },
           }

@@ -49,10 +49,10 @@ export function MessagesClient({ initialMessages, organizationId }: MessagesClie
             ...w,
             data: {
               stats: [
-                { label: "Total Messages", value: String(messages.length), icon: "MessageSquare" },
-                { label: "Emails", value: String(emails), icon: "Mail" },
-                { label: "Comments", value: String(comments), icon: "MessageCircle" },
-                { label: "Notifications", value: String(notifications), icon: "Bell" },
+                { label: t("messages.dashboard.totalMessages"), value: String(messages.length), icon: "MessageSquare" },
+                { label: t("messages.dashboard.emails"), value: String(emails), icon: "Mail" },
+                { label: t("messages.dashboard.comments"), value: String(comments), icon: "MessageCircle" },
+                { label: t("messages.dashboard.notifications"), value: String(notifications), icon: "Bell" },
               ],
             },
           }

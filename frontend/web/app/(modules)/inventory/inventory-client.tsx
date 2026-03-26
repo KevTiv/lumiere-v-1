@@ -94,10 +94,10 @@ export function InventoryClient({
                 ...w,
                 data: {
                   stats: [
-                    { label: "Total SKUs", value: totalSkus.toString(), icon: "Package" },
-                    { label: "Stock Value", value: `$${stockValue.toLocaleString()}`, icon: "DollarSign" },
-                    { label: "Zero Stock Alerts", value: zeroStock.toString(), icon: "AlertTriangle" },
-                    { label: "Pending Transfers", value: pendingTransfers.toString(), icon: "Truck" },
+                    { label: t("inventory.dashboard.totalSKUs"), value: totalSkus.toString(), icon: "Package" },
+                    { label: t("inventory.dashboard.stockValue"), value: `$${stockValue.toLocaleString()}`, icon: "DollarSign" },
+                    { label: t("inventory.dashboard.zeroStockAlerts"), value: zeroStock.toString(), icon: "AlertTriangle" },
+                    { label: t("inventory.dashboard.pendingTransfers"), value: pendingTransfers.toString(), icon: "Truck" },
                   ],
                 },
               }
@@ -167,8 +167,8 @@ export function InventoryClient({
                 .map((q) => {
                   const product = products.find((p) => p.id === q.productId)
                   return {
-                    sku: String(product?.defaultCode ?? `SKU-${String(q.productId).slice(-4)}`),
-                    name: String(product?.name ?? `Product ${String(q.productId).slice(-4)}`),
+                    sku: String(product?.defaultCode ?? t("inventory.dashboard.skuFallback", { id: String(q.productId).slice(-4) })),
+                    name: String(product?.name ?? t("inventory.dashboard.productFallback", { id: String(q.productId).slice(-4) })),
                     qty: Math.round(Number(q.availableQuantity ?? 0)),
                     reorder: "—",
                     status: "Critical",
@@ -187,7 +187,7 @@ export function InventoryClient({
   const warehouse3DTab = useMemo(
     () => ({
       id: "3d-view",
-      label: t("inventory.3dView", { defaultValue: "3D View" }),
+      label: t("inventory.3dView"),
       type: "custom" as const,
       customContent: isMounted ? (
         <div className="h-[calc(100vh-12rem)]">

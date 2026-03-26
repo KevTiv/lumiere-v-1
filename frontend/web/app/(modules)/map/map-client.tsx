@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { MapLayerLegend } from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
 import type { MapPinData } from "@lumiere/ui/lib/map-types"
@@ -56,6 +57,7 @@ export function MapClient({ organizationId }: MapClientProps) {
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )
+  const { t } = useTranslation()
   const { connected } = useStdbConnection()
 
   useEffect(() => {
@@ -111,9 +113,9 @@ export function MapClient({ organizationId }: MapClientProps) {
       layerId: "warehouse",
       lat: Number(wg.latitude),
       lng: Number(wg.longitude),
-      label: wg.city ?? `Warehouse ${wg.warehouseId}`,
+      label: wg.city ?? t("map.warehouseFallback", { id: wg.warehouseId }),
       data: {
-        name: wg.city ?? `Warehouse ${wg.warehouseId}`,
+        name: wg.city ?? t("map.warehouseFallback", { id: wg.warehouseId }),
         city: wg.city ?? "—",
         manager: wg.managerName ?? "—",
         stock_value: 0,
@@ -123,7 +125,7 @@ export function MapClient({ organizationId }: MapClientProps) {
 
     const allLive = [...vehiclePins, ...posPins, ...warehousePins]
     return allLive.length > 0 ? allLive : DEMO_PINS
-  }, [vehicles, posTerminals, warehouseGeos])
+  }, [t, vehicles, posTerminals, warehouseGeos])
 
   const toggleLayer = (id: string) =>
     setVisibleLayers((prev) => {
@@ -163,7 +165,7 @@ export function MapClient({ organizationId }: MapClientProps) {
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2.5">
         <div className="flex items-center gap-2">
           <MapPin className="size-4 text-muted-foreground" />
-          <h1 className="text-sm font-semibold">Map Overview</h1>
+          <h1 className="text-sm font-semibold">{t("map.title")}</h1>
         </div>
         <MapLayerLegend
           layers={defaultMapLayers}
@@ -189,7 +191,7 @@ export function MapClient({ organizationId }: MapClientProps) {
         {/* Stats sidebar */}
         <aside className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Summary
+            {t("map.summary")}
           </p>
 
           {/* Layer counts */}
@@ -223,7 +225,7 @@ export function MapClient({ organizationId }: MapClientProps) {
             <div className="rounded-lg border border-border px-3 py-2.5">
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <Package className="size-3" />
-                Total Stock Value
+                {t("map.totalStockValue")}
               </div>
               <p className="mt-0.5 text-sm font-semibold">
                 {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalStockValue)}
@@ -233,7 +235,7 @@ export function MapClient({ organizationId }: MapClientProps) {
             <div className="rounded-lg border border-border px-3 py-2.5">
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <Truck className="size-3" />
-                Active Vehicles
+                {t("map.activeVehicles")}
               </div>
               <p className="mt-0.5 text-sm font-semibold">{activeVehicles} / {livePins.filter(p => p.layerId === "vehicle").length}</p>
             </div>
@@ -241,7 +243,7 @@ export function MapClient({ organizationId }: MapClientProps) {
             <div className="rounded-lg border border-border px-3 py-2.5">
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <TrendingUp className="size-3" />
-                Open POS
+                {t("map.openPOS")}
               </div>
               <p className="mt-0.5 text-sm font-semibold">{openPos} / {livePins.filter(p => p.layerId === "pos").length}</p>
             </div>
@@ -249,8 +251,8 @@ export function MapClient({ organizationId }: MapClientProps) {
 
           <div className="mt-auto rounded-md bg-muted/50 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
             {isLiveData
-              ? "Live data from SpacetimeDB. Use fleet reducers to update GPS positions."
-              : "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates."}
+              ? t("map.liveDataHint")
+              : t("map.demoDataHint")}
           </div>
         </aside>
       </div>

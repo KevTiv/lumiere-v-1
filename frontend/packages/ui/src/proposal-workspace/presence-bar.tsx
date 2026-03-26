@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import type { ProposalPresence } from "@lumiere/stdb"
 
@@ -20,6 +21,7 @@ interface PresenceBarProps {
 }
 
 export function PresenceBar({ presenceRows, sections, currentUserId }: PresenceBarProps) {
+  const { t } = useTranslation()
   if (presenceRows.length === 0) return null
 
   const getSectionTitle = (sectionId: bigint | null | undefined): string | null => {
@@ -29,15 +31,15 @@ export function PresenceBar({ presenceRows, sections, currentUserId }: PresenceB
   }
 
   return (
-    <div className="flex items-center gap-1" title="Active collaborators">
+    <div className="flex items-center gap-1" title={t("proposalWorkspace.presenceBar.activeCollaborators")}>
       {presenceRows.map((p) => {
         const userId = String(p.userId)
         const isSelf = userId === currentUserId
         const sectionTitle = getSectionTitle(p.sectionId)
         const initials = String(p.userName ?? "?").slice(0, 2).toUpperCase()
         const tooltip = isSelf
-          ? `You${sectionTitle ? ` — ${sectionTitle}` : ""}`
-          : `${p.userName}${sectionTitle ? ` — ${sectionTitle}` : ""}`
+          ? (sectionTitle ? t("proposalWorkspace.presenceBar.youWithSection", { section: sectionTitle }) : t("proposalWorkspace.presenceBar.you"))
+          : (sectionTitle ? t("proposalWorkspace.presenceBar.userWithSection", { name: p.userName, section: sectionTitle }) : String(p.userName ?? ""))
 
         return (
           <div

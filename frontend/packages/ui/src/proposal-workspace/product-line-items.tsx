@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Trash2, GripVertical } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ interface LineItemRowProps {
 }
 
 function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
+  const { t } = useTranslation()
   const [qty, setQty] = useState(item.quantity ?? 1)
   const [price, setPrice] = useState(item.priceUnit ?? 0)
   const [discount, setDiscount] = useState(item.discount ?? 0)
@@ -67,7 +69,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
 
         {/* Qty */}
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-muted-foreground">Qty</span>
+          <span className="text-[10px] text-muted-foreground">{t("proposalWorkspace.productLineItems.qty")}</span>
           <input
             type="number"
             min={0}
@@ -81,7 +83,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
 
         {/* Unit price */}
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-muted-foreground">@</span>
+          <span className="text-[10px] text-muted-foreground">{t("proposalWorkspace.productLineItems.unitPrice")}</span>
           <input
             type="number"
             min={0}
@@ -104,7 +106,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
             onClick={() => setExpanded((v) => !v)}
             className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1"
           >
-            {expanded ? "▲" : "▼"}
+            {expanded ? t("proposalWorkspace.productLineItems.collapse") : t("proposalWorkspace.productLineItems.expand")}
           </button>
           <button
             onClick={() => onDelete(item.id)}
@@ -119,7 +121,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
       {expanded && (
         <div className="border-t border-border px-3 py-2 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground w-16 shrink-0">Discount %</span>
+            <span className="text-[10px] text-muted-foreground w-16 shrink-0">{t("proposalWorkspace.productLineItems.discountPercent")}</span>
             <input
               type="number"
               min={0}
@@ -132,18 +134,18 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
             />
             {discount > 0 && (
               <span className="text-[10px] text-muted-foreground">
-                = {formatCurrency(subtotal)} (saved {formatCurrency(qty * price * discount / 100)})
+                = {formatCurrency(subtotal)} ({t("proposalWorkspace.productLineItems.saved", { amount: formatCurrency(qty * price * discount / 100) })})
               </span>
             )}
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[10px] text-muted-foreground w-16 shrink-0 pt-1">Notes</span>
+            <span className="text-[10px] text-muted-foreground w-16 shrink-0 pt-1">{t("proposalWorkspace.productLineItems.notes")}</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onBlur={handleSave}
               rows={2}
-              placeholder="Additional notes..."
+              placeholder={t("proposalWorkspace.productLineItems.additionalNotes")}
               className="flex-1 text-xs border border-border rounded px-1.5 py-0.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
@@ -154,6 +156,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
 }
 
 export function ProductLineItems({ items, products, onUpdate, onDelete }: ProductLineItemsProps) {
+  const { t } = useTranslation()
   if (items.length === 0) return null
 
   const total = items.reduce((sum, item) => {
@@ -164,7 +167,7 @@ export function ProductLineItems({ items, products, onUpdate, onDelete }: Produc
   return (
     <div className="mt-3 space-y-1.5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-medium text-muted-foreground">Products &amp; Services</span>
+        <span className="text-xs font-medium text-muted-foreground">{t("proposalWorkspace.productLineItems.productsAndServices")}</span>
         <span className="text-xs font-semibold text-foreground">{formatCurrency(total)}</span>
       </div>
       {items.map((item) => {

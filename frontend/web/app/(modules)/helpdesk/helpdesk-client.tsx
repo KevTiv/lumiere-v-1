@@ -47,10 +47,10 @@ export function HelpdeskClient({ initialTickets, organizationId }: HelpdeskClien
             ...w,
             data: {
               stats: [
-                { label: "Total Tickets", value: String(tickets.length), icon: "HelpCircle" },
-                { label: "Open", value: String(open), icon: "AlertCircle" },
-                { label: "Solved", value: String(solved), icon: "CheckCircle" },
-                { label: "Urgent", value: String(urgent), icon: "Zap" },
+                { label: t("helpdesk.dashboard.totalTickets"), value: String(tickets.length), icon: "HelpCircle" },
+                { label: t("helpdesk.dashboard.open"), value: String(open), icon: "AlertCircle" },
+                { label: t("helpdesk.dashboard.solved"), value: String(solved), icon: "CheckCircle" },
+                { label: t("helpdesk.dashboard.urgent"), value: String(urgent), icon: "Zap" },
               ],
             },
           }

@@ -50,10 +50,10 @@ export function ExpensesClient({ initialExpenses, initialSheets, organizationId 
             ...w,
             data: {
               stats: [
-                { label: "Total Expenses", value: String(expenses.length), icon: "Receipt" },
-                { label: "Pending Approval", value: String(pending), icon: "Clock" },
-                { label: "Approved", value: String(approved), icon: "CheckCircle" },
-                { label: "Total Amount", value: `$${totalAmount.toLocaleString()}`, icon: "DollarSign" },
+                { label: t("expenses.dashboard.totalExpenses"), value: String(expenses.length), icon: "Receipt" },
+                { label: t("expenses.dashboard.pendingApproval"), value: String(pending), icon: "Clock" },
+                { label: t("expenses.dashboard.approved"), value: String(approved), icon: "CheckCircle" },
+                { label: t("expenses.dashboard.totalAmount"), value: `$${totalAmount.toLocaleString()}`, icon: "DollarSign" },
               ],
             },
           }

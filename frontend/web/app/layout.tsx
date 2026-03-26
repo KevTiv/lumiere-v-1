@@ -8,6 +8,8 @@ import {
   serverQueryRoles,
 } from '@lumiere/stdb/server'
 import './globals.css'
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -61,6 +63,9 @@ export default async function RootLayout({
       // No session yet — user hasn't connected via WebSocket
     }
   }
+
+  const store = await cookies()
+  if (!Boolean(store.get("stdb_token")?.value)) redirect("/sign-in")
 
   return (
     <html lang="en">

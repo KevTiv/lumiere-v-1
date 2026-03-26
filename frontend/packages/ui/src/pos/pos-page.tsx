@@ -115,6 +115,7 @@ function PaymentDialog({
             <div className="flex gap-2">
               {paymentMethods.map(({ id, label, icon: Icon }) => (
                 <button
+                  type="button"
                   key={id}
                   onClick={() => setMethod(id)}
                   className={cn(
@@ -143,6 +144,7 @@ function PaymentDialog({
                 <div className="flex gap-2">
                   {quickAmounts.map((amt) => (
                     <button
+                      type="button"
                       key={amt}
                       onClick={() => setTendered(String(amt))}
                       className="flex-1 py-2 rounded-md bg-muted hover:bg-muted/80 text-sm font-medium transition-colors"

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { ArrowLeft, Download, ChevronDown, Upload } from "lucide-react"
 import Link from "next/link"
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -73,14 +74,16 @@ function simpleLineDiff(
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: { value: ProposalStatus; label: string }[] = [
-  { value: "draft", label: "Draft" },
-  { value: "review", label: "In Review" },
-  { value: "submitted", label: "Submitted" },
-  { value: "awarded", label: "Awarded" },
-  { value: "rejected", label: "Rejected" },
-  { value: "archived", label: "Archived" },
-]
+function getStatusOptions(t: (key: string) => string): { value: ProposalStatus; label: string }[] {
+  return [
+    { value: "draft", label: t("proposalWorkspace.status.draft") },
+    { value: "review", label: t("proposalWorkspace.status.review") },
+    { value: "submitted", label: t("proposalWorkspace.status.submitted") },
+    { value: "awarded", label: t("proposalWorkspace.status.awarded") },
+    { value: "rejected", label: t("proposalWorkspace.status.rejected") },
+    { value: "archived", label: t("proposalWorkspace.status.archived") },
+  ]
+}
 
 const STATUS_VARIANT: Record<ProposalStatus, "secondary" | "outline" | "default" | "destructive"> = {
   draft: "secondary",
@@ -111,9 +114,11 @@ export function ProposalWorkspace({
   organizationId,
   initialStatus = "draft",
   currentUserId,
-  currentUserName = "You",
+  currentUserName,
   onAnalyze,
 }: ProposalWorkspaceProps) {
+  const { t } = useTranslation()
+  const effectiveUserName = currentUserName ?? t("proposalWorkspace.you")
   const proposalIdBig = BigInt(proposalId)
 
   // ── Local UI state ──────────────────────────────────────────────────────────
@@ -202,7 +207,7 @@ export function ProposalWorkspace({
       if (presenceDebounceRef.current) clearTimeout(presenceDebounceRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposalId])
+  }, [proposalId, clearPresence.mutate])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -211,9 +216,9 @@ export function ProposalWorkspace({
     // Debounced presence update
     if (presenceDebounceRef.current) clearTimeout(presenceDebounceRef.current)
     presenceDebounceRef.current = setTimeout(() => {
-      updatePresence.mutate({ proposalId: proposalIdBig, sectionId: id, userName: currentUserName })
+      updatePresence.mutate({ proposalId: proposalIdBig, sectionId: id, userName: effectiveUserName })
     }, 500)
-  }, [proposalIdBig, currentUserName, updatePresence])
+  }, [proposalIdBig, effectiveUserName, updatePresence])
 
   const handleEditorFocus = useCallback(() => {
     if (!effectiveActiveSectionId) return
@@ -222,10 +227,10 @@ export function ProposalWorkspace({
       updatePresence.mutate({
         proposalId: proposalIdBig,
         sectionId: BigInt(String(effectiveActiveSectionId)),
-        userName: currentUserName,
+        userName: effectiveUserName,
       })
     }, 500)
-  }, [proposalIdBig, effectiveActiveSectionId, currentUserName, updatePresence])
+  }, [proposalIdBig, effectiveActiveSectionId, effectiveUserName, updatePresence])
 
   const handleAddSection = useCallback((title: string) => {
     const sequence = proposalSections.length > 0
@@ -301,7 +306,7 @@ export function ProposalWorkspace({
       const result = await onAnalyze(combinedText)
       setAnalysis(result)
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : "Analysis failed")
+      setAnalyzeError(err instanceof Error ? err.message : t("proposalWorkspace.analysisFailed"))
     } finally {
       setIsAnalyzing(false)
     }
@@ -408,13 +413,15 @@ export function ProposalWorkspace({
           <div className="relative group">
             <button className="flex items-center gap-1.5">
               <Badge variant={STATUS_VARIANT[status]} className="text-xs cursor-pointer">
-                {STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status}
+                {getStatusOptions(t).find((o) => o.value === status)?.label ?? status}
               </Badge>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
+
             <div className="absolute top-full right-0 mt-1 z-20 rounded-lg border border-border bg-popover shadow-lg hidden group-hover:block min-w-[130px]">
-              {STATUS_OPTIONS.map((opt) => (
+              {getStatusOptions(t).map((opt) => (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => handleStatusChange(opt.value)}
                   className={cn(
@@ -439,13 +446,13 @@ export function ProposalWorkspace({
           <div className="relative group">
             <Button size="sm" variant="outline" className="gap-1.5 text-xs">
               <Download className="h-3.5 w-3.5" />
-              Export
+              {t("proposalWorkspace.export")}
               <ChevronDown className="h-3 w-3" />
             </Button>
             <div className="absolute top-full right-0 mt-1 z-20 rounded-lg border border-border bg-popover shadow-lg hidden group-hover:block min-w-[160px]">
-              <button onClick={() => window.print()} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">Export as PDF</button>
-              <button onClick={handleExportMarkdown} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">Export as Markdown</button>
-              <button onClick={handleExportText} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">Copy as Plain Text</button>
+              <button type="button" onClick={() => window.print()} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportPdf")}</button>
+              <button type="button" onClick={handleExportMarkdown} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportMarkdown")}</button>
+              <button type="button" onClick={handleExportText} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportText")}</button>
             </div>
           </div>
         </header>
@@ -500,7 +507,7 @@ export function ProposalWorkspace({
                 sectionId: BigInt(String(effectiveActiveSectionId)),
                 content,
                 parentId,
-                authorName: currentUserName,
+                authorName: effectiveUserName,
               })
             }}
             onResolveComment={(id) => resolveComment.mutate(id)}
@@ -525,9 +532,10 @@ export function ProposalWorkspace({
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Upload className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-semibold">Add Source Document</h2>
+                  <h2 className="text-sm font-semibold">{t("proposalWorkspace.addSourceDocument")}</h2>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowDocInput(false)}
                   className="text-muted-foreground hover:text-foreground text-lg leading-none"
                 >

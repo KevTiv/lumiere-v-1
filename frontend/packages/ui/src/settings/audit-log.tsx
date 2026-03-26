@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   CheckCircle
 } from "lucide-react"
+import { useTranslation } from "@lumiere/i18n"
 import type { AuditLogEntry } from "@/lib/rbac-types"
 
 // Mock audit log data
@@ -132,6 +133,7 @@ const actionColors: Record<string, string> = {
 }
 
 export function AuditLog() {
+  const { t } = useTranslation()
   const [logs] = useState<AuditLogEntry[]>(mockAuditLogs)
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState<string>("all")
@@ -185,7 +187,7 @@ export function AuditLog() {
           <div className="relative flex-1 sm:flex-none sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search logs..."
+              placeholder={t("settings.auditLog.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -194,21 +196,21 @@ export function AuditLog() {
           <Select value={actionFilter} onValueChange={setActionFilter}>
             <SelectTrigger className="w-40">
               <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter" />
+              <SelectValue placeholder={t("settings.auditLog.filter")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Actions</SelectItem>
-              <SelectItem value="user">User Actions</SelectItem>
-              <SelectItem value="role">Role Changes</SelectItem>
-              <SelectItem value="order">Orders</SelectItem>
-              <SelectItem value="product">Products</SelectItem>
-              <SelectItem value="permission">Access Events</SelectItem>
+              <SelectItem value="all">{t("settings.auditLog.allActions")}</SelectItem>
+              <SelectItem value="user">{t("settings.auditLog.userActions")}</SelectItem>
+              <SelectItem value="role">{t("settings.auditLog.roleChanges")}</SelectItem>
+              <SelectItem value="order">{t("settings.auditLog.orders")}</SelectItem>
+              <SelectItem value="product">{t("settings.auditLog.products")}</SelectItem>
+              <SelectItem value="permission">{t("settings.auditLog.accessEvents")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <Button variant="outline" onClick={handleExport} className="gap-2">
           <Download className="h-4 w-4" />
-          Export CSV
+          {t("settings.auditLog.exportCsv")}
         </Button>
       </div>
 
@@ -216,7 +218,7 @@ export function AuditLog() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
-            Activity Log ({filteredLogs.length} entries)
+            {t("settings.auditLog.activityLog", { count: filteredLogs.length })}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">

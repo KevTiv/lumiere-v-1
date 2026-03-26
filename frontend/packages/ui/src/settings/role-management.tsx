@@ -35,6 +35,7 @@ import {
   X
 } from "lucide-react"
 import type { Role, PolicyRule, Resource, Action } from "@/lib/rbac-types"
+import { useTranslation } from "@lumiere/i18n"
 
 const roleColors = [
   { value: "blue", label: "Blue", class: "bg-blue-500" },
@@ -46,6 +47,7 @@ const roleColors = [
 ] as const
 
 export function RoleManagement() {
+  const { t } = useTranslation()
   const { roles, setRoles, checkPermission } = useRBAC()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -192,10 +194,10 @@ export function RoleManagement() {
   const handleDeleteRole = (roleId: string) => {
     const role = roles.find(r => r.id === roleId)
     if (role?.isSystem) {
-      alert("System roles cannot be deleted")
+      alert(t("settings.roles.systemCannotDelete"))
       return
     }
-    if (confirm("Are you sure you want to delete this role?")) {
+    if (confirm(t("settings.roles.deleteConfirm"))) {
       setRoles(prev => prev.filter(r => r.id !== roleId))
     }
   }
@@ -225,15 +227,15 @@ export function RoleManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium">Roles</h3>
+          <h3 className="text-lg font-medium">{t("settings.roles.title")}</h3>
           <p className="text-sm text-muted-foreground">
-            Configure roles and their associated permissions using Casbin-style policies
+            {t("settings.roles.description")}
           </p>
         </div>
         {canCreate && (
           <Button onClick={handleCreateRole} className="gap-2">
             <Plus className="h-4 w-4" />
-            Create Role
+            {t("settings.roles.createRole")}
           </Button>
         )}
       </div>
@@ -247,7 +249,7 @@ export function RoleManagement() {
                 className="absolute top-3 right-3 gap-1 text-xs"
               >
                 <Lock className="h-3 w-3" />
-                System
+                {t("settings.roles.system")}
               </Badge>
             )}
             <CardHeader>
@@ -266,7 +268,7 @@ export function RoleManagement() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  {countPermissions(role)} permissions
+                  {t("settings.roles.permissionsCount", { count: countPermissions(role) })}
                 </div>
                 <div className="flex gap-2">
                   {canEdit && (
@@ -276,7 +278,7 @@ export function RoleManagement() {
                       onClick={() => handleEditRole(role)}
                     >
                       <Pencil className="h-4 w-4 mr-1" />
-                      Edit
+                      {t("settings.roles.edit")}
                     </Button>
                   )}
                   {canDelete && !role.isSystem && (
@@ -300,16 +302,16 @@ export function RoleManagement() {
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingRole ? `Edit Role: ${editingRole.name}` : "Create New Role"}
+              {editingRole ? t("settings.roles.editTitle", { name: editingRole.name }) : t("settings.roles.createTitle")}
             </DialogTitle>
             <DialogDescription>
-              Define the role and configure its access permissions
+              {t("settings.roles.createDescription")}
             </DialogDescription>
           </DialogHeader>
           <form action={handleSaveRole} className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Role Name</Label>
+                <Label htmlFor="name">{t("settings.roles.roleName")}</Label>
                 <Input 
                   id="name" 
                   name="name"
@@ -319,7 +321,7 @@ export function RoleManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Color</Label>
+                <Label>{t("settings.roles.color")}</Label>
                 <div className="flex gap-2">
                   {roleColors.map(color => (
                     <button
@@ -339,7 +341,7 @@ export function RoleManagement() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("settings.roles.roleDescription")}</Label>
               <Textarea 
                 id="description" 
                 name="description"
@@ -349,7 +351,7 @@ export function RoleManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label>Permissions</Label>
+              <Label>{t("settings.roles.permissions")}</Label>
               <Card>
                 <CardContent className="p-0">
                   <Accordion type="multiple" className="w-full">
@@ -408,10 +410,10 @@ export function RoleManagement() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit">
-                {editingRole ? "Save Changes" : "Create Role"}
+                {editingRole ? t("settings.roles.saveChanges") : t("settings.roles.createRole")}
               </Button>
             </DialogFooter>
           </form>

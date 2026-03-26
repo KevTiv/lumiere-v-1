@@ -12,8 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown, User, Shield } from "lucide-react"
+import { useTranslation } from "@lumiere/i18n"
 
 export function UserSwitcher() {
+  const { t } = useTranslation()
   const { currentUser, setCurrentUser, allUsers, roles } = useRBAC()
 
   const getRoleName = (roleId: string): string => {
@@ -38,14 +40,14 @@ export function UserSwitcher() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="gap-2">
           <User className="h-4 w-4" />
-          <span className="max-w-[150px] truncate">{currentUser?.name || "Select User"}</span>
+          <span className="max-w-[150px] truncate">{currentUser?.name || t("settings.userSwitcher.selectUser")}</span>
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex items-center gap-2">
           <Shield className="h-4 w-4" />
-          Switch User (Demo)
+          {t("settings.userSwitcher.switchUser")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {allUsers.map(user => (
@@ -63,7 +65,7 @@ export function UserSwitcher() {
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
               {currentUser?.id === user.id && (
-                <Badge variant="outline" className="text-xs">Current</Badge>
+                <Badge variant="outline" className="text-xs">{t("settings.userSwitcher.current")}</Badge>
               )}
             </div>
             <div className="flex gap-1 ml-10">

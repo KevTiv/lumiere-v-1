@@ -72,10 +72,10 @@ export function HrClient({
                 ...w,
                 data: {
                   stats: [
-                    { label: "Total Headcount", value: activeEmployees.length.toString(), icon: "Users" },
-                    { label: "Open Positions", value: openPositions.toString(), icon: "UserPlus" },
-                    { label: "Pending Leave Requests", value: pendingLeaves.toString(), icon: "Calendar" },
-                    { label: "Running Contracts", value: runningContracts.toString(), icon: "FileText" },
+                    { label: t("hr.dashboard.totalHeadcount"), value: activeEmployees.length.toString(), icon: "Users" },
+                    { label: t("hr.dashboard.openPositions"), value: openPositions.toString(), icon: "UserPlus" },
+                    { label: t("hr.dashboard.pendingLeaveRequests"), value: pendingLeaves.toString(), icon: "Calendar" },
+                    { label: t("hr.dashboard.runningContracts"), value: runningContracts.toString(), icon: "FileText" },
                   ],
                 },
               }

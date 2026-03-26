@@ -28,6 +28,7 @@ export type Resource =
   | "module:workflows"
   | "module:messages"
   | "entries:products"
+  | "module:map"
   | "entries:customers"
   | "entries:orders"
   | "forms:new-order"

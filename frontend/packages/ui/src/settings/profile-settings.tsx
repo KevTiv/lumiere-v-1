@@ -24,12 +24,14 @@ import {
   Monitor,
   Globe
 } from "lucide-react"
+import { useTranslation } from "@lumiere/i18n"
 
 interface ProfileSettingsProps {
   section: "profile" | "notifications" | "appearance"
 }
 
 export function ProfileSettings({ section }: ProfileSettingsProps) {
+  const { t } = useTranslation()
   const { currentUser } = useRBAC()
 
   if (section === "profile") {
@@ -37,8 +39,8 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Personal Information</CardTitle>
-            <CardDescription>Update your personal details</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.personalInfo")}</CardTitle>
+            <CardDescription>{t("settings.profile.personalInfoDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-6">
@@ -46,9 +48,9 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
                 {currentUser?.name.split(" ").map(n => n[0]).join("")}
               </div>
               <div>
-                <Button variant="outline" size="sm">Change Avatar</Button>
+                <Button variant="outline" size="sm">{t("settings.profile.changeAvatar")}</Button>
                 <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG or GIF. Max 2MB.
+                  {t("settings.profile.avatarHint")}
                 </p>
               </div>
             </div>
@@ -57,71 +59,71 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Full Name
+                  {t("settings.profile.fullName")}
                 </Label>
                 <Input id="name" defaultValue={currentUser?.name} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  Email
+                  {t("settings.profile.email")}
                 </Label>
                 <Input id="email" type="email" defaultValue={currentUser?.email} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="department" className="flex items-center gap-2">
                   <Building className="h-4 w-4" />
-                  Department
+                  {t("settings.profile.department")}
                 </Label>
                 <Input id="department" defaultValue={currentUser?.department} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="timezone" className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  Timezone
+                  {t("settings.profile.timezone")}
                 </Label>
                 <Select defaultValue="utc-5">
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="utc-8">Pacific Time (UTC-8)</SelectItem>
-                    <SelectItem value="utc-5">Eastern Time (UTC-5)</SelectItem>
-                    <SelectItem value="utc">UTC</SelectItem>
-                    <SelectItem value="utc+1">Central European (UTC+1)</SelectItem>
+                    <SelectItem value="utc-8">{t("settings.profile.timezones.pacific")}</SelectItem>
+                    <SelectItem value="utc-5">{t("settings.profile.timezones.eastern")}</SelectItem>
+                    <SelectItem value="utc">{t("settings.profile.timezones.utc")}</SelectItem>
+                    <SelectItem value="utc+1">{t("settings.profile.timezones.centralEuropean")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="flex justify-end">
-              <Button>Save Changes</Button>
+              <Button>{t("settings.profile.saveChanges")}</Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Security</CardTitle>
-            <CardDescription>Manage your password and security settings</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.security")}</CardTitle>
+            <CardDescription>{t("settings.profile.securityDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
+                <Label htmlFor="current-password">{t("settings.profile.currentPassword")}</Label>
                 <Input id="current-password" type="password" />
               </div>
               <div></div>
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password">{t("settings.profile.newPassword")}</Label>
                 <Input id="new-password" type="password" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Label htmlFor="confirm-password">{t("settings.profile.confirmPassword")}</Label>
                 <Input id="confirm-password" type="password" />
               </div>
             </div>
             <div className="flex justify-end">
-              <Button variant="outline">Update Password</Button>
+              <Button variant="outline">{t("settings.profile.updatePassword")}</Button>
             </div>
           </CardContent>
         </Card>
@@ -136,16 +138,16 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              Email Notifications
+              {t("settings.profile.emailNotifications")}
             </CardTitle>
-            <CardDescription>Choose what updates you receive via email</CardDescription>
+            <CardDescription>{t("settings.profile.emailNotificationsDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { id: "orders", label: "New Orders", description: "Get notified when new orders are placed" },
-              { id: "inventory", label: "Low Stock Alerts", description: "Alert when products are running low" },
-              { id: "reports", label: "Weekly Reports", description: "Receive weekly performance summaries" },
-              { id: "security", label: "Security Alerts", description: "Important security notifications" },
+              { id: "orders", label: t("settings.profile.emailItems.orders.label"), description: t("settings.profile.emailItems.orders.description") },
+              { id: "inventory", label: t("settings.profile.emailItems.inventory.label"), description: t("settings.profile.emailItems.inventory.description") },
+              { id: "reports", label: t("settings.profile.emailItems.reports.label"), description: t("settings.profile.emailItems.reports.description") },
+              { id: "security", label: t("settings.profile.emailItems.security.label"), description: t("settings.profile.emailItems.security.description") },
             ].map(item => (
               <div key={item.id} className="flex items-center justify-between py-2">
                 <div>
@@ -160,14 +162,14 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">In-App Notifications</CardTitle>
-            <CardDescription>Configure dashboard notification preferences</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.inAppNotifications")}</CardTitle>
+            <CardDescription>{t("settings.profile.inAppNotificationsDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { id: "push", label: "Push Notifications", description: "Browser push notifications" },
-              { id: "sound", label: "Sound", description: "Play sound for new notifications" },
-              { id: "badge", label: "Badge Count", description: "Show unread count on icon" },
+              { id: "push", label: t("settings.profile.inAppItems.push.label"), description: t("settings.profile.inAppItems.push.description") },
+              { id: "sound", label: t("settings.profile.inAppItems.sound.label"), description: t("settings.profile.inAppItems.sound.description") },
+              { id: "badge", label: t("settings.profile.inAppItems.badge.label"), description: t("settings.profile.inAppItems.badge.description") },
             ].map(item => (
               <div key={item.id} className="flex items-center justify-between py-2">
                 <div>
@@ -188,15 +190,15 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Theme</CardTitle>
-            <CardDescription>Select your preferred color theme</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.theme")}</CardTitle>
+            <CardDescription>{t("settings.profile.themeDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { id: "light", label: "Light", icon: Sun },
-                { id: "dark", label: "Dark", icon: Moon },
-                { id: "system", label: "System", icon: Monitor },
+                { id: "light", label: t("settings.profile.themes.light"), icon: Sun },
+                { id: "dark", label: t("settings.profile.themes.dark"), icon: Moon },
+                { id: "system", label: t("settings.profile.themes.system"), icon: Monitor },
               ].map(theme => {
                 const Icon = theme.icon
                 return (
@@ -219,28 +221,28 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Dashboard Layout</CardTitle>
-            <CardDescription>Customize your dashboard experience</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.dashboardLayout")}</CardTitle>
+            <CardDescription>{t("settings.profile.dashboardLayoutDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="font-medium text-sm">Compact Mode</p>
-                <p className="text-sm text-muted-foreground">Reduce spacing between elements</p>
+                <p className="font-medium text-sm">{t("settings.profile.layout.compactMode.label")}</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.compactMode.description")}</p>
               </div>
               <Switch />
             </div>
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="font-medium text-sm">Sidebar Collapsed</p>
-                <p className="text-sm text-muted-foreground">Start with sidebar collapsed</p>
+                <p className="font-medium text-sm">{t("settings.profile.layout.sidebarCollapsed.label")}</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.sidebarCollapsed.description")}</p>
               </div>
               <Switch />
             </div>
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="font-medium text-sm">Show Quick Actions</p>
-                <p className="text-sm text-muted-foreground">Display quick action buttons on dashboard</p>
+                <p className="font-medium text-sm">{t("settings.profile.layout.showQuickActions.label")}</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.showQuickActions.description")}</p>
               </div>
               <Switch defaultChecked />
             </div>
@@ -249,21 +251,21 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Accessibility</CardTitle>
-            <CardDescription>Adjust accessibility options</CardDescription>
+            <CardTitle className="text-base">{t("settings.profile.accessibility")}</CardTitle>
+            <CardDescription>{t("settings.profile.accessibilityDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="font-medium text-sm">Reduce Motion</p>
-                <p className="text-sm text-muted-foreground">Minimize animations</p>
+                <p className="font-medium text-sm">{t("settings.profile.a11y.reduceMotion.label")}</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.a11y.reduceMotion.description")}</p>
               </div>
               <Switch />
             </div>
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="font-medium text-sm">High Contrast</p>
-                <p className="text-sm text-muted-foreground">Increase color contrast</p>
+                <p className="font-medium text-sm">{t("settings.profile.a11y.highContrast.label")}</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.a11y.highContrast.description")}</p>
               </div>
               <Switch />
             </div>

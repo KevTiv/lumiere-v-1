@@ -77,10 +77,10 @@ export function ManufacturingClient({
                 ...w,
                 data: {
                   stats: [
-                    { label: "Active Orders", value: activeOrders.length.toString(), icon: "Factory" },
-                    { label: "On-Time Rate", value: `${onTimeRate}%`, icon: "CheckCircle" },
-                    { label: "OEE Efficiency", value: `${avgOee}%`, icon: "Settings" },
-                    { label: "Ready Work Orders", value: readyWorkorders.toString(), icon: "Wrench" },
+                    { label: t("manufacturing.dashboard.activeOrders"), value: activeOrders.length.toString(), icon: "Factory" },
+                    { label: t("manufacturing.dashboard.onTimeRate"), value: `${onTimeRate}%`, icon: "CheckCircle" },
+                    { label: t("manufacturing.dashboard.oeeEfficiency"), value: `${avgOee}%`, icon: "Settings" },
+                    { label: t("manufacturing.dashboard.readyWorkOrders"), value: readyWorkorders.toString(), icon: "Wrench" },
                   ],
                 },
               }
@@ -102,7 +102,7 @@ export function ManufacturingClient({
             if (w.id === "mfg-work-centers") {
               const colors = ["#22c55e", "#6366f1", "#22c55e", "#f59e0b", "#f59e0b"]
               const metrics = workcenters.slice(0, 5).map((wc, i) => ({
-                label: String(wc.name ?? `Work Center ${i + 1}`),
+                label: String(wc.name ?? t("manufacturing.dashboard.workCenterFallback", { number: i + 1 })),
                 value: Math.round(Number(wc.oee ?? 0)),
                 max: 100,
                 color: colors[i] ?? "#6366f1",
@@ -128,7 +128,7 @@ export function ManufacturingClient({
                       : "—"
                   return {
                     ref: `MO-${String(p.id).slice(-6)}`,
-                    product: `Product ${String(p.productId ?? "?").slice(-4)}`,
+                    product: t("manufacturing.dashboard.productFallback", { id: String(p.productId ?? "?").slice(-4) }),
                     qty: Math.round(Number(p.qtyProducing ?? 0)),
                     progress,
                     due: dueStr,

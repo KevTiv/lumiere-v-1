@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -70,6 +71,7 @@ const rootCauseCategoryIcons: Record<RootCause["category"], React.ReactNode> = {
 }
 
 export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: ReportDetailModalProps) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState("overview")
 
   if (!report) return null
@@ -150,10 +152,10 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               <p className="text-sm text-muted-foreground mt-1">{report.summary}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" title="Print Report">
+              <Button variant="outline" size="icon" title={t("forensics.detailModal.printReport")}>
                 <Printer className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" title="Download PDF">
+              <Button variant="outline" size="icon" title={t("forensics.detailModal.downloadPdf")}>
                 <Download className="h-4 w-4" />
               </Button>
             </div>
@@ -164,28 +166,28 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">Incident Date</p>
+                <p className="text-xs text-muted-foreground">{t("forensics.detailModal.incidentDate")}</p>
                 <p className="text-sm font-medium">{formatShortDate(report.incidentDate)}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">Assigned To</p>
+                <p className="text-xs text-muted-foreground">{t("forensics.detailModal.assignedTo")}</p>
                 <p className="text-sm font-medium">{report.assignedTo}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">Department</p>
+                <p className="text-xs text-muted-foreground">{t("forensics.detailModal.department")}</p>
                 <p className="text-sm font-medium">{report.department}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Tag className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">Category</p>
+                <p className="text-xs text-muted-foreground">{t("forensics.detailModal.category")}</p>
                 <p className="text-sm font-medium">{category.label}</p>
               </div>
             </div>
@@ -197,19 +199,19 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
           <div className="border-b border-border px-6">
             <TabsList className="h-12 bg-transparent p-0 w-full justify-start gap-6">
               <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
-                Overview
+                {t("forensics.detailModal.tabOverview")}
               </TabsTrigger>
               <TabsTrigger value="timeline" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
-                Timeline
+                {t("forensics.detailModal.tabTimeline")}
               </TabsTrigger>
               <TabsTrigger value="analysis" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
-                Root Cause
+                {t("forensics.detailModal.tabRootCause")}
               </TabsTrigger>
               <TabsTrigger value="actions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
-                Actions
+                {t("forensics.detailModal.tabActions")}
               </TabsTrigger>
               <TabsTrigger value="impact" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
-                Impact
+                {t("forensics.detailModal.tabImpact")}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -219,13 +221,13 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               {/* Overview Tab */}
               <TabsContent value="overview" className="mt-0 space-y-6">
                 <div>
-                  <h4 className="text-sm font-semibold mb-2">Description</h4>
+                  <h4 className="text-sm font-semibold mb-2">{t("forensics.detailModal.description")}</h4>
                   <p className="text-sm text-muted-foreground leading-relaxed">{report.description}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <h4 className="text-sm font-semibold mb-3">Team Members</h4>
+                    <h4 className="text-sm font-semibold mb-3">{t("forensics.detailModal.teamMembers")}</h4>
                     <div className="space-y-2">
                       {report.teamMembers.map((member, idx) => (
                         <div key={idx} className="flex items-center gap-2">
@@ -234,7 +236,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                           </Avatar>
                           <span className="text-sm">{member}</span>
                           {member === report.assignedTo && (
-                            <Badge variant="secondary" className="text-xs">Lead</Badge>
+                            <Badge variant="secondary" className="text-xs">{t("forensics.detailModal.lead")}</Badge>
                           )}
                         </div>
                       ))}
@@ -242,7 +244,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-semibold mb-3">Tags</h4>
+                    <h4 className="text-sm font-semibold mb-3">{t("forensics.detailModal.tags")}</h4>
                     <div className="flex flex-wrap gap-2">
                       {report.tags.map((tag, idx) => (
                         <Badge key={idx} variant="outline">{tag}</Badge>
@@ -253,7 +255,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
 
                 {report.immediateActions.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold mb-2">Immediate Actions Taken</h4>
+                    <h4 className="text-sm font-semibold mb-2">{t("forensics.detailModal.immediateActions")}</h4>
                     <ul className="space-y-1.5">
                       {report.immediateActions.map((action, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -286,7 +288,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs text-muted-foreground">{formatDate(event.timestamp)}</span>
                             {event.actor && (
-                              <span className="text-xs font-medium">by {event.actor}</span>
+                              <span className="text-xs font-medium">{t("forensics.detailModal.byActor", { actor: event.actor })}</span>
                             )}
                           </div>
                           <p className="text-sm">{event.description}</p>
@@ -300,7 +302,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               {/* Root Cause Tab */}
               <TabsContent value="analysis" className="mt-0 space-y-6">
                 <div>
-                  <h4 className="text-sm font-semibold mb-3">Root Causes Identified</h4>
+                  <h4 className="text-sm font-semibold mb-3">{t("forensics.detailModal.rootCausesIdentified")}</h4>
                   <div className="space-y-3">
                     {report.rootCauses.map((cause) => (
                       <Card key={cause.id}>
@@ -316,13 +318,13 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                               <div className="flex items-center gap-2 mb-1">
                                 <Badge variant="outline" className="capitalize">{cause.category}</Badge>
                                 {cause.contributing && (
-                                  <Badge variant="destructive" className="text-xs">Primary</Badge>
+                                  <Badge variant="destructive" className="text-xs">{t("forensics.detailModal.primary")}</Badge>
                                 )}
                               </div>
                               <p className="text-sm">{cause.description}</p>
                               {cause.evidence && (
                                 <p className="text-xs text-muted-foreground mt-2">
-                                  Evidence: {cause.evidence}
+                                  {t("forensics.detailModal.evidence", { evidence: cause.evidence })}
                                 </p>
                               )}
                             </div>
@@ -337,7 +339,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   <div>
                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                       <Lightbulb className="h-4 w-4 text-yellow-500" />
-                      Lessons Learned
+                      {t("forensics.detailModal.lessonsLearned")}
                     </h4>
                     <ul className="space-y-2">
                       {report.lessonsLearned.map((lesson, idx) => (
@@ -355,9 +357,9 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               <TabsContent value="actions" className="mt-0 space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold">Corrective Actions Progress</h4>
+                    <h4 className="text-sm font-semibold">{t("forensics.detailModal.correctiveActionsProgress")}</h4>
                     <span className="text-sm text-muted-foreground">
-                      {completedActions} of {report.correctiveActions.length} completed
+                      {t("forensics.detailModal.actionsCompleted", { completed: completedActions, total: report.correctiveActions.length })}
                     </span>
                   </div>
                   <Progress value={actionProgress} className="h-2 mb-4" />
@@ -376,7 +378,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  Due: {formatShortDate(action.dueDate)}
+                                  {t("forensics.detailModal.due", { date: formatShortDate(action.dueDate) })}
                                 </span>
                               </div>
                             </div>
@@ -392,7 +394,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
 
                 {report.preventiveActions.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold mb-3">Preventive Actions</h4>
+                    <h4 className="text-sm font-semibold mb-3">{t("forensics.detailModal.preventiveActions")}</h4>
                     <ul className="space-y-2">
                       {report.preventiveActions.map((action, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -413,20 +415,20 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-green-500" />
-                          Financial Impact
+                          {t("forensics.detailModal.financialImpact")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Estimated</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.estimated")}</span>
                             <span className="text-sm font-medium">
                               {report.impact.financial.currency} {report.impact.financial.estimated.toLocaleString()}
                             </span>
                           </div>
                           {report.impact.financial.actual !== undefined && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">Actual</span>
+                              <span className="text-sm text-muted-foreground">{t("forensics.detailModal.actual")}</span>
                               <span className="text-sm font-medium">
                                 {report.impact.financial.currency} {report.impact.financial.actual.toLocaleString()}
                               </span>
@@ -442,23 +444,23 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-blue-500" />
-                          Operational Impact
+                          {t("forensics.detailModal.operationalImpact")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
                           {report.impact.operational.downtime && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">Downtime</span>
+                              <span className="text-sm text-muted-foreground">{t("forensics.detailModal.downtime")}</span>
                               <span className="text-sm font-medium">{report.impact.operational.downtime}</span>
                             </div>
                           )}
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Users Affected</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.usersAffected")}</span>
                             <span className="text-sm font-medium">{report.impact.operational.affectedUsers}</span>
                           </div>
                           <div>
-                            <span className="text-sm text-muted-foreground">Processes:</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.processes")}</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {report.impact.operational.affectedProcesses.map((proc, idx) => (
                                 <Badge key={idx} variant="secondary" className="text-xs">{proc}</Badge>
@@ -475,18 +477,18 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <Users className="h-4 w-4 text-orange-500" />
-                          Reputational Impact
+                          {t("forensics.detailModal.reputationalImpact")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Customer Affected</span>
-                            <span className="text-sm font-medium">{report.impact.reputational.customerAffected ? "Yes" : "No"}</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.customerAffected")}</span>
+                            <span className="text-sm font-medium">{report.impact.reputational.customerAffected ? t("forensics.detailModal.yes") : t("forensics.detailModal.no")}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Public Exposure</span>
-                            <span className="text-sm font-medium">{report.impact.reputational.publicExposure ? "Yes" : "No"}</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.publicExposure")}</span>
+                            <span className="text-sm font-medium">{report.impact.reputational.publicExposure ? t("forensics.detailModal.yes") : t("forensics.detailModal.no")}</span>
                           </div>
                           {report.impact.reputational.description && (
                             <p className="text-sm text-muted-foreground">{report.impact.reputational.description}</p>
@@ -501,18 +503,18 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <Shield className="h-4 w-4 text-purple-500" />
-                          Compliance Impact
+                          {t("forensics.detailModal.complianceImpact")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Regulatory Impact</span>
-                            <span className="text-sm font-medium">{report.impact.compliance.regulatoryImpact ? "Yes" : "No"}</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.regulatoryImpact")}</span>
+                            <span className="text-sm font-medium">{report.impact.compliance.regulatoryImpact ? t("forensics.detailModal.yes") : t("forensics.detailModal.no")}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Reporting Required</span>
-                            <span className="text-sm font-medium">{report.impact.compliance.reportingRequired ? "Yes" : "No"}</span>
+                            <span className="text-sm text-muted-foreground">{t("forensics.detailModal.reportingRequired")}</span>
+                            <span className="text-sm font-medium">{report.impact.compliance.reportingRequired ? t("forensics.detailModal.yes") : t("forensics.detailModal.no")}</span>
                           </div>
                           {report.impact.compliance.regulations && report.impact.compliance.regulations.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -534,7 +536,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
         {/* Footer */}
         <div className="border-t border-border p-4 flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            Last updated: {formatDate(report.updatedAt)}
+            {t("forensics.detailModal.lastUpdated", { date: formatDate(report.updatedAt) })}
           </div>
           <div className="flex items-center gap-2">
             {onUpdateStatus && report.status !== "closed" && (
@@ -547,11 +549,11 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   onUpdateStatus(report.id, nextStatus)
                 }}
               >
-                Move to {report.status === "open" ? "Investigating" : report.status === "investigating" ? "Resolved" : "Closed"}
+                {t("forensics.detailModal.moveTo", { status: report.status === "open" ? t("forensics.view.filterStatusInvestigating") : report.status === "investigating" ? t("forensics.view.filterStatusResolved") : t("forensics.view.filterStatusClosed") })}
               </Button>
             )}
             <Button variant="default" size="sm" onClick={onClose}>
-              Close
+              {t("forensics.detailModal.close")}
             </Button>
           </div>
         </div>

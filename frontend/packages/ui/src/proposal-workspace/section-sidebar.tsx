@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Plus, FileText, ChevronDown, ChevronRight, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,11 +13,11 @@ import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Section = Record<string, any>
 
-const STATUS_BADGE: Record<SectionStatus, { label: string; variant: "secondary" | "outline" | "default" | "destructive" }> = {
-  empty: { label: "Empty", variant: "outline" },
-  draft: { label: "Draft", variant: "secondary" },
-  complete: { label: "Done", variant: "default" },
-  reviewed: { label: "Reviewed", variant: "default" },
+const STATUS_BADGE_VARIANT: Record<SectionStatus, "secondary" | "outline" | "default" | "destructive"> = {
+  empty: "outline",
+  draft: "secondary",
+  complete: "default",
+  reviewed: "default",
 }
 
 function avatarColor(userId: string): string {
@@ -51,8 +52,19 @@ export function SectionSidebar({
   onAddSourceDoc,
   onDeleteSourceDoc,
 }: SectionSidebarProps) {
+  const { t } = useTranslation()
   const [showTemplates, setShowTemplates] = useState(false)
   const [showDocs, setShowDocs] = useState(true)
+
+  const getStatusLabel = (status: SectionStatus): string => {
+    const map: Record<SectionStatus, string> = {
+      empty: t("proposalWorkspace.sectionEditor.statusEmpty"),
+      draft: t("proposalWorkspace.sectionEditor.statusDraft"),
+      complete: t("proposalWorkspace.sectionEditor.statusComplete"),
+      reviewed: t("proposalWorkspace.sectionEditor.statusReviewed"),
+    }
+    return map[status]
+  }
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(val)
@@ -61,11 +73,11 @@ export function SectionSidebar({
     <aside className="flex flex-col h-full overflow-y-auto bg-muted/30">
       {/* Sections header */}
       <div className="px-3 pt-3 pb-1 flex items-center justify-between shrink-0">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sections</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("proposalWorkspace.sectionSidebar.sections")}</span>
         <button
           onClick={() => setShowTemplates((v) => !v)}
           className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Add section"
+          title={t("proposalWorkspace.sectionSidebar.addSection")}
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -74,7 +86,7 @@ export function SectionSidebar({
       {/* Template picker */}
       {showTemplates && (
         <div className="mx-2 mb-2 rounded-md border border-border bg-popover shadow-md z-10">
-          <p className="px-3 pt-2 pb-1 text-xs text-muted-foreground font-medium">Choose template</p>
+          <p className="px-3 pt-2 pb-1 text-xs text-muted-foreground font-medium">{t("proposalWorkspace.sectionSidebar.chooseTemplate")}</p>
           <div className="max-h-48 overflow-y-auto">
             {SECTION_TEMPLATES.map((t) => (
               <button
@@ -93,7 +105,7 @@ export function SectionSidebar({
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
               >
-                + Custom section...
+                {t("proposalWorkspace.sectionSidebar.customSection")}
               </button>
             </div>
           </div>
@@ -104,19 +116,20 @@ export function SectionSidebar({
       <ul className="flex-1 px-2 pb-2 space-y-0.5">
         {sections.length === 0 && (
           <li className="px-2 py-4 text-center">
-            <p className="text-xs text-muted-foreground">No sections yet.</p>
+            <p className="text-xs text-muted-foreground">{t("proposalWorkspace.sectionSidebar.noSectionsYet")}</p>
             <button
               onClick={() => setShowTemplates(true)}
               className="mt-1 text-xs text-primary hover:underline"
             >
-              Add from template
+              {t("proposalWorkspace.sectionSidebar.addFromTemplate")}
             </button>
           </li>
         )}
         {sections.map((section) => {
           const sectionId: bigint = section.id
           const status: SectionStatus = (section.status as string)?.toLowerCase() as SectionStatus ?? "empty"
-          const badge = STATUS_BADGE[status] ?? STATUS_BADGE.empty
+          const badgeVariant = STATUS_BADGE_VARIANT[status] ?? STATUS_BADGE_VARIANT.empty
+          const badgeLabel = getStatusLabel(status)
           const presenceRows = presenceBySection.get(String(sectionId)) ?? []
           const isActive = activeSectionId === sectionId
 
@@ -133,7 +146,7 @@ export function SectionSidebar({
               >
                 <div className="flex items-start justify-between gap-1">
                   <span className="truncate font-medium leading-tight flex-1">
-                    {section.title || "Untitled"}
+                    {section.title || t("proposalWorkspace.sectionSidebar.untitled")}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
                     {/* Presence avatars */}
@@ -156,8 +169,8 @@ export function SectionSidebar({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <Badge variant={badge.variant} className="text-[10px] px-1 py-0 h-4">
-                    {badge.label}
+                  <Badge variant={badgeVariant} className="text-[10px] px-1 py-0 h-4">
+                    {badgeLabel}
                   </Badge>
                   {section.wordCount > 0 && (
                     <span className="text-[10px] text-muted-foreground">{section.wordCount}w</span>
@@ -177,7 +190,7 @@ export function SectionSidebar({
         >
           <span className="flex items-center gap-1.5">
             <FileText className="h-3 w-3" />
-            Source Docs ({sourceDocs.length})
+            {t("proposalWorkspace.sectionSidebar.sourceDocs", { count: sourceDocs.length })}
           </span>
           {showDocs ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
@@ -202,7 +215,7 @@ export function SectionSidebar({
               onClick={onAddSourceDoc}
             >
               <Upload className="h-3 w-3" />
-              Add document
+              {t("proposalWorkspace.sectionSidebar.addDocument")}
             </Button>
           </div>
         )}
@@ -212,7 +225,7 @@ export function SectionSidebar({
       {totalValue > 0 && (
         <div className="border-t border-border px-3 py-2 shrink-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Proposal value</span>
+            <span className="text-xs text-muted-foreground">{t("proposalWorkspace.sectionSidebar.proposalValue")}</span>
             <span className="text-xs font-semibold text-foreground">{formatCurrency(totalValue)}</span>
           </div>
         </div>

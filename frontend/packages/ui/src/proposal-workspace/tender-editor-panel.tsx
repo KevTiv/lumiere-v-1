@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Plus, ChevronUp, ChevronDown, Copy, Trash2, Lightbulb, ChevronRight, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,11 +15,11 @@ interface TenderEditorPanelProps {
   analysis: AIAnalysis | null
 }
 
-const STATUS_BADGE: Record<SectionStatus, { label: string; variant: "secondary" | "outline" | "default" | "destructive" }> = {
-  empty: { label: "Empty", variant: "secondary" },
-  draft: { label: "Draft", variant: "outline" },
-  complete: { label: "Complete", variant: "default" },
-  reviewed: { label: "Reviewed", variant: "default" },
+const STATUS_BADGE_VARIANT: Record<SectionStatus, "secondary" | "outline" | "default" | "destructive"> = {
+  empty: "secondary",
+  draft: "outline",
+  complete: "default",
+  reviewed: "default",
 }
 
 function countWords(text: string) {
@@ -40,6 +41,7 @@ interface SectionCardProps {
 }
 
 function SectionCard({ section, index, total, dispatch, analysis }: SectionCardProps) {
+  const { t } = useTranslation()
   const [showSuggestion, setShowSuggestion] = useState(false)
   const [titleEditing, setTitleEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -83,7 +85,14 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
     )?.excerpt ?? null
   )
 
-  const badge = STATUS_BADGE[section.status]
+  const badgeVariant = STATUS_BADGE_VARIANT[section.status]
+  const statusLabels: Record<SectionStatus, string> = {
+    empty: t("proposalWorkspace.tenderEditorPanel.statusEmpty"),
+    draft: t("proposalWorkspace.tenderEditorPanel.statusDraft"),
+    complete: t("proposalWorkspace.tenderEditorPanel.statusComplete"),
+    reviewed: t("proposalWorkspace.tenderEditorPanel.statusReviewed"),
+  }
+  const badgeLabel = statusLabels[section.status]
 
   return (
     <div className={cn(
@@ -98,7 +107,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
 
         {titleEditing ? (
           <input
-            autoFocus
+
             value={section.title}
             onChange={(e) => handleTitleChange(e.target.value)}
             onBlur={() => setTitleEditing(false)}
@@ -107,6 +116,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
           />
         ) : (
           <button
+            type="button"
             onClick={() => setTitleEditing(true)}
             className="flex-1 text-left text-xs font-semibold text-foreground hover:text-primary truncate"
           >
@@ -116,13 +126,14 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
 
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-muted-foreground">{section.wordCount}w</span>
-          <button onClick={handleMarkComplete}>
-            <Badge variant={badge.variant} className="text-[10px] px-1.5 py-0 cursor-pointer hover:opacity-80">
-              {badge.label}
+          <button type="button" onClick={handleMarkComplete}>
+            <Badge variant={badgeVariant} className="text-[10px] px-1.5 py-0 cursor-pointer hover:opacity-80">
+              {badgeLabel}
             </Badge>
           </button>
           {suggestion && (
             <button
+              type="button"
               onClick={() => setShowSuggestion(!showSuggestion)}
               className={cn("p-0.5 rounded transition-colors", showSuggestion ? "text-amber-500" : "text-muted-foreground hover:text-amber-500")}
               title="AI suggestion"
@@ -131,6 +142,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
             </button>
           )}
           <button
+            type="button"
             onClick={() => dispatch({ type: "MOVE_SECTION", id: section.id, direction: "up" })}
             disabled={index === 0}
             className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
@@ -138,6 +150,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
             <ChevronUp className="h-3.5 w-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => dispatch({ type: "MOVE_SECTION", id: section.id, direction: "down" })}
             disabled={index === total - 1}
             className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
@@ -145,12 +158,14 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => dispatch({ type: "DUPLICATE_SECTION", id: section.id })}
             className="p-0.5 text-muted-foreground hover:text-foreground"
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => dispatch({ type: "REMOVE_SECTION", id: section.id })}
             className="p-0.5 text-muted-foreground hover:text-destructive"
           >
@@ -165,14 +180,15 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
           <div className="flex items-start gap-1.5">
             <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 mb-0.5">AI Suggestion</p>
+              <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 mb-0.5">{t("proposalWorkspace.tenderEditorPanel.aiSuggestion")}</p>
               <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed italic line-clamp-3">"{suggestion}"</p>
             </div>
             <button
+              type="button"
               onClick={() => handleContentChange(section.content + (section.content ? "\n\n" : "") + suggestion)}
               className="text-[10px] text-amber-600 hover:underline shrink-0"
             >
-              Insert
+              {t("proposalWorkspace.tenderEditorPanel.insert")}
             </button>
           </div>
         </div>
@@ -184,8 +200,8 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
         value={section.content}
         onChange={(e) => handleContentChange(e.target.value)}
         placeholder={
-          SECTION_TEMPLATES.find((t) => t.title.toLowerCase() === section.title.toLowerCase())?.placeholder
-          ?? `Write content for "${section.title}"…`
+          SECTION_TEMPLATES.find((tmpl) => tmpl.title.toLowerCase() === section.title.toLowerCase())?.placeholder
+          ?? t("proposalWorkspace.tenderEditorPanel.contentPlaceholder", { title: section.title })
         }
         className="w-full resize-none p-3 text-xs leading-relaxed text-foreground bg-transparent outline-none min-h-[80px]"
         rows={3}
@@ -195,6 +211,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
 }
 
 function AddSectionMenu({ onAdd }: { onAdd: (title: string) => void }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -206,29 +223,31 @@ function AddSectionMenu({ onAdd }: { onAdd: (title: string) => void }) {
         onClick={() => setOpen(!open)}
       >
         <Plus className="h-3.5 w-3.5" />
-        Add Section
+        {t("proposalWorkspace.tenderEditorPanel.addSection")}
         <ChevronRight className={cn("h-3.5 w-3.5 ml-auto transition-transform", open && "rotate-90")} />
       </Button>
 
       {open && (
         <div className="absolute bottom-full mb-1 left-0 right-0 z-10 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
           <div className="p-1.5 grid grid-cols-1 gap-0.5 max-h-52 overflow-y-auto">
-            {SECTION_TEMPLATES.map((t) => (
+            {SECTION_TEMPLATES.map((tmpl) => (
               <button
-                key={t.id}
-                onClick={() => { onAdd(t.title); setOpen(false) }}
+                type="button"
+                key={tmpl.id}
+                onClick={() => { onAdd(tmpl.title); setOpen(false) }}
                 className="flex items-center gap-2 px-2.5 py-2 rounded text-xs text-left hover:bg-muted transition-colors text-foreground"
               >
-                {t.title}
+                {tmpl.title}
               </button>
             ))}
             <div className="border-t border-border my-0.5" />
             <button
+              type="button"
               onClick={() => { onAdd("Custom Section"); setOpen(false) }}
               className="flex items-center gap-2 px-2.5 py-2 rounded text-xs text-left hover:bg-muted transition-colors text-muted-foreground"
             >
               <Plus className="h-3 w-3" />
-              Custom section…
+              {t("proposalWorkspace.tenderEditorPanel.customSection")}
             </button>
           </div>
         </div>
@@ -238,6 +257,7 @@ function AddSectionMenu({ onAdd }: { onAdd: (title: string) => void }) {
 }
 
 export function TenderEditorPanel({ sections, dispatch, analysis }: TenderEditorPanelProps) {
+  const { t } = useTranslation()
   const totalWords = sections.reduce((sum, s) => sum + s.wordCount, 0)
   const completedCount = sections.filter((s) => s.status === "complete" || s.status === "reviewed").length
 
@@ -259,11 +279,11 @@ export function TenderEditorPanel({ sections, dispatch, analysis }: TenderEditor
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Tender Draft</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("proposalWorkspace.tenderEditorPanel.tenderDraft")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {sections.length === 0
-              ? "No sections yet"
-              : `${sections.length} sections · ${completedCount} complete · ${totalWords.toLocaleString()} words`}
+              ? t("proposalWorkspace.tenderEditorPanel.noSectionsYet")
+              : t("proposalWorkspace.tenderEditorPanel.stats", { sections: sections.length, completed: completedCount, words: totalWords.toLocaleString() })}
           </p>
         </div>
         {sections.length > 0 && (
@@ -286,9 +306,9 @@ export function TenderEditorPanel({ sections, dispatch, analysis }: TenderEditor
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
               <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-foreground">No sections yet</p>
+            <p className="text-sm font-medium text-foreground">{t("proposalWorkspace.tenderEditorPanel.emptyTitle")}</p>
             <p className="text-xs text-muted-foreground">
-              Add a section below, or run AI analysis and click "Apply Structure to Draft"
+              {t("proposalWorkspace.tenderEditorPanel.helpText")}
             </p>
           </div>
         ) : (

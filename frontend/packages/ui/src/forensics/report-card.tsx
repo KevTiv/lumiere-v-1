@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -41,6 +42,7 @@ const statusIcons: Record<string, React.ReactNode> = {
 }
 
 export function ReportCard({ report, onClick, compact = false }: ReportCardProps) {
+  const { t } = useTranslation()
   const severity = severityConfig[report.severity]
   const status = statusConfig[report.status]
   const category = incidentCategories[report.category]
@@ -189,7 +191,9 @@ export function ReportCard({ report, onClick, compact = false }: ReportCardProps
               )}
             </div>
             <div className="text-xs text-muted-foreground">
-              {report.correctiveActions.length} action{report.correctiveActions.length !== 1 ? "s" : ""}
+              {report.correctiveActions.length !== 1
+                ? t("forensics.reportCard.actionsCountPlural", { count: report.correctiveActions.length })
+                : t("forensics.reportCard.actionsCount", { count: report.correctiveActions.length })}
             </div>
           </div>
         )}

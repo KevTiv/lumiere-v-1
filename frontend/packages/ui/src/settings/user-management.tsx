@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { User, Role } from "@/lib/rbac-types"
+import { useTranslation } from "@lumiere/i18n"
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -50,6 +51,7 @@ const statusColors: Record<string, string> = {
 }
 
 export function UserManagement() {
+  const { t } = useTranslation()
   const { roles, checkPermission } = useRBAC()
   const [users, setUsers] = useState<User[]>(defaultUsers)
   const [searchQuery, setSearchQuery] = useState("")
@@ -107,7 +109,7 @@ export function UserManagement() {
   }
 
   const handleDeleteUser = (userId: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
+    if (confirm(t("settings.users.deleteConfirm"))) {
       setUsers(prev => prev.filter(u => u.id !== userId))
     }
   }
@@ -143,7 +145,7 @@ export function UserManagement() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search users..."
+            placeholder={t("settings.users.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -152,14 +154,14 @@ export function UserManagement() {
         {canCreate && (
           <Button onClick={handleCreateUser} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add User
+            {t("settings.users.addUser")}
           </Button>
         )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Users ({filteredUsers.length})</CardTitle>
+          <CardTitle className="text-base">{t("settings.users.usersCount", { count: filteredUsers.length })}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
@@ -215,7 +217,7 @@ export function UserManagement() {
                       {canEdit && (
                         <DropdownMenuItem onClick={() => handleEditUser(user)}>
                           <Pencil className="h-4 w-4 mr-2" />
-                          Edit User
+                          {t("settings.users.actions.edit")}
                         </DropdownMenuItem>
                       )}
                       {canEdit && (
@@ -223,12 +225,12 @@ export function UserManagement() {
                           {user.status === "active" ? (
                             <>
                               <UserX className="h-4 w-4 mr-2" />
-                              Deactivate
+                              {t("settings.users.actions.deactivate")}
                             </>
                           ) : (
                             <>
                               <UserCheck className="h-4 w-4 mr-2" />
-                              Activate
+                              {t("settings.users.actions.activate")}
                             </>
                           )}
                         </DropdownMenuItem>
@@ -241,7 +243,7 @@ export function UserManagement() {
                             className="text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Delete User
+                            {t("settings.users.actions.delete")}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -258,19 +260,19 @@ export function UserManagement() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingUser ? "Edit User" : "Create New User"}
+              {editingUser ? t("settings.users.editUser") : t("settings.users.createUser")}
             </DialogTitle>
             <DialogDescription>
-              {editingUser 
-                ? "Update user information and role assignments"
-                : "Add a new user to the system"
+              {editingUser
+                ? t("settings.users.editDescription")
+                : t("settings.users.createDescription")
               }
             </DialogDescription>
           </DialogHeader>
           <form action={handleSaveUser} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">{t("settings.users.fullName")}</Label>
                 <Input 
                   id="name" 
                   name="name"
@@ -279,7 +281,7 @@ export function UserManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("settings.users.email")}</Label>
                 <Input 
                   id="email" 
                   name="email"
@@ -291,7 +293,7 @@ export function UserManagement() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department">{t("settings.users.department")}</Label>
                 <Input 
                   id="department" 
                   name="department"
@@ -299,21 +301,21 @@ export function UserManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{t("settings.users.status")}</Label>
                 <Select name="status" defaultValue={editingUser?.status || "pending"}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="active">{t("settings.users.statuses.active")}</SelectItem>
+                    <SelectItem value="inactive">{t("settings.users.statuses.inactive")}</SelectItem>
+                    <SelectItem value="pending">{t("settings.users.statuses.pending")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Roles</Label>
+              <Label>{t("settings.users.roles")}</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {roles.map((role) => (
                   <div key={role.id} className="flex items-center gap-2">
@@ -337,10 +339,10 @@ export function UserManagement() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit">
-                {editingUser ? "Save Changes" : "Create User"}
+                {editingUser ? t("settings.users.saveChanges") : t("settings.users.createUser")}
               </Button>
             </DialogFooter>
           </form>

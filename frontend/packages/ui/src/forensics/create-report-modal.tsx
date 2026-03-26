@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,9 +38,10 @@ interface CreateReportModalProps {
 }
 
 export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModalProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<"template" | "details">("template")
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
-  
+
   const [formData, setFormData] = useState<Partial<ForensicReport>>({
     title: "",
     summary: "",
@@ -137,7 +139,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
         <DialogHeader className="p-6 pb-4 border-b border-border">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            {step === "template" ? "Create Incident Report" : "Report Details"}
+            {step === "template" ? t("forensics.createModal.titleTemplate") : t("forensics.createModal.titleDetails")}
           </DialogTitle>
         </DialogHeader>
 
@@ -145,15 +147,16 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
           {step === "template" ? (
             <div className="p-6 space-y-6">
               <div>
-                <h3 className="text-sm font-semibold mb-1">Start from a Template</h3>
+                <h3 className="text-sm font-semibold mb-1">{t("forensics.createModal.startFromTemplate")}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Choose a template to pre-fill common fields, or start from scratch
+                  {t("forensics.createModal.templateHint")}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {reportTemplates.map((template) => {
                     const categoryConfig = incidentCategories[template.category]
                     return (
                       <button
+                        type="button"
                         key={template.id}
                         onClick={() => handleTemplateSelect(template.id)}
                         className={cn(
@@ -186,12 +189,12 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                   <span className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                  <span className="bg-background px-2 text-muted-foreground">{t("forensics.createModal.or")}</span>
                 </div>
               </div>
 
               <Button variant="outline" className="w-full" onClick={handleSkipTemplate}>
-                Start from Scratch
+                {t("forensics.createModal.startFromScratch")}
               </Button>
             </div>
           ) : (
@@ -200,7 +203,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 mb-4">
                   <div className="flex items-center gap-2 text-sm">
                     <Lightbulb className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Using template: {template.name}</span>
+                    <span className="font-medium">{t("forensics.createModal.usingTemplate", { name: template.name })}</span>
                   </div>
                 </div>
               )}
@@ -208,10 +211,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               {/* Basic Info */}
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title *</Label>
+                  <Label htmlFor="title">{t("forensics.createModal.labelTitle")}</Label>
                   <Input
                     id="title"
-                    placeholder="Brief description of the incident"
+                    placeholder={t("forensics.createModal.placeholderTitle")}
                     value={formData.title}
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     className="mt-1.5"
@@ -219,10 +222,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label htmlFor="summary">Summary *</Label>
+                  <Label htmlFor="summary">{t("forensics.createModal.labelSummary")}</Label>
                   <Textarea
                     id="summary"
-                    placeholder="One-line summary of what happened"
+                    placeholder={t("forensics.createModal.placeholderSummary")}
                     value={formData.summary}
                     onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
                     className="mt-1.5"
@@ -231,10 +234,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Full Description</Label>
+                  <Label htmlFor="description">{t("forensics.createModal.labelDescription")}</Label>
                   <Textarea
                     id="description"
-                    placeholder="Detailed description of the incident, including context and circumstances"
+                    placeholder={t("forensics.createModal.placeholderDescription")}
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     className="mt-1.5"
@@ -246,7 +249,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               {/* Classification */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>Category</Label>
+                  <Label>{t("forensics.createModal.labelCategory")}</Label>
                   <Select
                     value={formData.category}
                     onValueChange={(value: IncidentCategory) => setFormData(prev => ({ ...prev, category: value }))}
@@ -263,7 +266,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label>Severity</Label>
+                  <Label>{t("forensics.createModal.labelSeverity")}</Label>
                   <Select
                     value={formData.severity}
                     onValueChange={(value: IncidentSeverity) => setFormData(prev => ({ ...prev, severity: value }))}
@@ -280,7 +283,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label htmlFor="incidentDate">Incident Date</Label>
+                  <Label htmlFor="incidentDate">{t("forensics.createModal.labelIncidentDate")}</Label>
                   <Input
                     id="incidentDate"
                     type="date"
@@ -294,10 +297,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               {/* Assignment */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="reportedBy">Reported By</Label>
+                  <Label htmlFor="reportedBy">{t("forensics.createModal.labelReportedBy")}</Label>
                   <Input
                     id="reportedBy"
-                    placeholder="Your name"
+                    placeholder={t("forensics.createModal.placeholderReportedBy")}
                     value={formData.reportedBy}
                     onChange={(e) => setFormData(prev => ({ ...prev, reportedBy: e.target.value }))}
                     className="mt-1.5"
@@ -305,10 +308,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label htmlFor="assignedTo">Assign To</Label>
+                  <Label htmlFor="assignedTo">{t("forensics.createModal.labelAssignTo")}</Label>
                   <Input
                     id="assignedTo"
-                    placeholder="Lead investigator"
+                    placeholder={t("forensics.createModal.placeholderAssignTo")}
                     value={formData.assignedTo}
                     onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                     className="mt-1.5"
@@ -316,10 +319,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 </div>
 
                 <div>
-                  <Label htmlFor="department">Department</Label>
+                  <Label htmlFor="department">{t("forensics.createModal.labelDepartment")}</Label>
                   <Input
                     id="department"
-                    placeholder="e.g., Operations"
+                    placeholder={t("forensics.createModal.placeholderDepartment")}
                     value={formData.department}
                     onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
                     className="mt-1.5"
@@ -329,10 +332,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
 
               {/* Tags */}
               <div>
-                <Label>Tags</Label>
+                <Label>{t("forensics.createModal.labelTags")}</Label>
                 <div className="flex items-center gap-2 mt-1.5">
                   <Input
-                    placeholder="Add a tag"
+                    placeholder={t("forensics.createModal.placeholderTag")}
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
@@ -347,7 +350,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                     {formData.tags.map((tag) => (
                       <Badge key={tag} variant="secondary" className="gap-1">
                         {tag}
-                        <button onClick={() => handleRemoveTag(tag)} className="ml-1 hover:text-destructive">
+                        <button type="button" onClick={() => handleRemoveTag(tag)} className="ml-1 hover:text-destructive">
                           <X className="h-3 w-3" />
                         </button>
                       </Badge>
@@ -356,17 +359,17 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 )}
                 {template && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    Suggested tags for this template: {template.suggestedActions.slice(0, 3).join(", ")}
+                    {t("forensics.createModal.suggestedTags", { tags: template.suggestedActions.slice(0, 3).join(", ") })}
                   </p>
                 )}
               </div>
 
               {/* Immediate Actions */}
               <div>
-                <Label>Immediate Actions Taken</Label>
+                <Label>{t("forensics.createModal.labelImmediateActions")}</Label>
                 <div className="flex items-center gap-2 mt-1.5">
                   <Input
-                    placeholder="Describe action taken"
+                    placeholder={t("forensics.createModal.placeholderAction")}
                     value={newAction}
                     onChange={(e) => setNewAction(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddAction())}
@@ -379,9 +382,9 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 {formData.immediateActions && formData.immediateActions.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {formData.immediateActions.map((action, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-sm bg-muted px-3 py-2 rounded-lg">
+                      <li key={Number(idx)} className="flex items-center gap-2 text-sm bg-muted px-3 py-2 rounded-lg">
                         <span className="flex-1">{action}</span>
-                        <button onClick={() => handleRemoveAction(action)} className="text-muted-foreground hover:text-destructive">
+                        <button type="button" onClick={() => handleRemoveAction(action)} className="text-muted-foreground hover:text-destructive">
                           <X className="h-4 w-4" />
                         </button>
                       </li>
@@ -390,11 +393,11 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                 )}
                 {template && (
                   <div className="mt-2">
-                    <p className="text-xs text-muted-foreground mb-1">Suggested actions:</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t("forensics.createModal.suggestedActions")}</p>
                     <div className="flex flex-wrap gap-1">
                       {template.suggestedActions.map((action, idx) => (
                         <button
-                          key={idx}
+                          key={Number(idx)}
                           type="button"
                           onClick={() => {
                             if (!formData.immediateActions?.includes(action)) {
@@ -420,18 +423,18 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
         <DialogFooter className="p-4 border-t border-border">
           {step === "details" && (
             <Button variant="ghost" onClick={() => setStep("template")}>
-              Back
+              {t("forensics.createModal.back")}
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t("forensics.createModal.cancel")}
           </Button>
           {step === "details" && (
             <Button
               onClick={handleSubmit}
               disabled={!formData.title || !formData.summary}
             >
-              Create Report
+              {t("forensics.createModal.createReport")}
             </Button>
           )}
         </DialogFooter>

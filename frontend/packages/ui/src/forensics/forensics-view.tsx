@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +52,7 @@ interface ForensicsViewProps {
 }
 
 export function ForensicsView({ className }: ForensicsViewProps) {
+  const { t } = useTranslation()
   const [reports, setReports] = useState<ForensicReport[]>(sampleForensicReports)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedReport, setSelectedReport] = useState<ForensicReport | null>(null)
@@ -190,9 +192,9 @@ export function ForensicsView({ className }: ForensicsViewProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Forensic Reports</h2>
+          <h2 className="text-2xl font-bold text-foreground">{t("forensics.view.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Incident analysis and process improvement tracking
+            {t("forensics.view.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -200,19 +202,19 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                {t("forensics.view.export")}
                 <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem>Export as PDF</DropdownMenuItem>
-              <DropdownMenuItem>Export as CSV</DropdownMenuItem>
-              <DropdownMenuItem>Export as Excel</DropdownMenuItem>
+              <DropdownMenuItem>{t("forensics.view.exportPdf")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("forensics.view.exportCsv")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("forensics.view.exportExcel")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            New Report
+            {t("forensics.view.newReport")}
           </Button>
         </div>
       </div>
@@ -223,7 +225,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Reports</p>
+                <p className="text-sm text-muted-foreground">{t("forensics.view.totalReports")}</p>
                 <p className="text-2xl font-bold">{analytics.totalReports}</p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -237,7 +239,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Open Issues</p>
+                <p className="text-sm text-muted-foreground">{t("forensics.view.openIssues")}</p>
                 <p className="text-2xl font-bold">{analytics.openReports}</p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
@@ -251,7 +253,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Resolution</p>
+                <p className="text-sm text-muted-foreground">{t("forensics.view.avgResolution")}</p>
                 <p className="text-2xl font-bold">{analytics.avgResolutionTime}h</p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -265,7 +267,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Critical</p>
+                <p className="text-sm text-muted-foreground">{t("forensics.view.critical")}</p>
                 <p className="text-2xl font-bold">{analytics.bySeverity.critical || 0}</p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
@@ -281,11 +283,11 @@ export function ForensicsView({ className }: ForensicsViewProps) {
         <TabsList className="w-fit mb-4">
           <TabsTrigger value="reports" className="gap-2">
             <FileText className="h-4 w-4" />
-            Reports
+            {t("forensics.view.tabReports")}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2">
             <BarChart3 className="h-4 w-4" />
-            Analytics
+            {t("forensics.view.tabAnalytics")}
           </TabsTrigger>
         </TabsList>
 
@@ -296,7 +298,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search reports..."
+                placeholder={t("forensics.view.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -305,36 +307,36 @@ export function ForensicsView({ className }: ForensicsViewProps) {
 
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t("forensics.view.filterStatus")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="investigating">Investigating</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="all">{t("forensics.view.filterStatusAll")}</SelectItem>
+                <SelectItem value="open">{t("forensics.view.filterStatusOpen")}</SelectItem>
+                <SelectItem value="investigating">{t("forensics.view.filterStatusInvestigating")}</SelectItem>
+                <SelectItem value="resolved">{t("forensics.view.filterStatusResolved")}</SelectItem>
+                <SelectItem value="closed">{t("forensics.view.filterStatusClosed")}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={filterSeverity} onValueChange={setFilterSeverity}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Severity" />
+                <SelectValue placeholder={t("forensics.view.filterSeverity")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Severity</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="all">{t("forensics.view.filterSeverityAll")}</SelectItem>
+                <SelectItem value="critical">{t("forensics.view.filterSeverityCritical")}</SelectItem>
+                <SelectItem value="high">{t("forensics.view.filterSeverityHigh")}</SelectItem>
+                <SelectItem value="medium">{t("forensics.view.filterSeverityMedium")}</SelectItem>
+                <SelectItem value="low">{t("forensics.view.filterSeverityLow")}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={filterCategory} onValueChange={setFilterCategory}>
               <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder={t("forensics.view.filterCategory")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t("forensics.view.filterCategoryAll")}</SelectItem>
                 {Object.entries(incidentCategories).map(([key, { label }]) => (
                   <SelectItem key={key} value={key}>{label}</SelectItem>
                 ))}
@@ -366,8 +368,8 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {filteredReports.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <FileText className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg font-medium">No reports found</p>
-                <p className="text-sm">Try adjusting your filters or create a new report</p>
+                <p className="text-lg font-medium">{t("forensics.view.noReportsFound")}</p>
+                <p className="text-sm">{t("forensics.view.noReportsHint")}</p>
               </div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-3 gap-4">
@@ -400,7 +402,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {/* By Status */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reports by Status</CardTitle>
+                <CardTitle className="text-base">{t("forensics.view.chartByStatus")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -434,7 +436,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {/* By Severity */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reports by Severity</CardTitle>
+                <CardTitle className="text-base">{t("forensics.view.chartBySeverity")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -468,7 +470,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {/* By Category */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reports by Category</CardTitle>
+                <CardTitle className="text-base">{t("forensics.view.chartByCategory")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -491,7 +493,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {/* Top Root Causes */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Top Root Cause Categories</CardTitle>
+                <CardTitle className="text-base">{t("forensics.view.chartTopRootCauses")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -502,7 +504,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                     </div>
                   ))}
                   {analytics.topRootCauses.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No root causes identified yet</p>
+                    <p className="text-sm text-muted-foreground">{t("forensics.view.noRootCauses")}</p>
                   )}
                 </div>
               </CardContent>
@@ -511,7 +513,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
             {/* By Department */}
             <Card className="col-span-2">
               <CardHeader>
-                <CardTitle className="text-base">Reports by Department</CardTitle>
+                <CardTitle className="text-base">{t("forensics.view.chartByDepartment")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-4">

@@ -68,10 +68,10 @@ export function CrmClient({
             ...w,
             data: {
               stats: [
-                { label: "Active Leads", value: String(activeLeads), icon: "Users" },
-                { label: "Pipeline Value", value: `$${pipelineValue.toLocaleString()}`, icon: "TrendingUp" },
-                { label: "Open Opportunities", value: String(opportunities.length), icon: "Target" },
-                { label: "Total Contacts", value: String(contacts.length), icon: "BookUser" },
+                { label: t("crm.dashboard.activeLeads"), value: String(activeLeads), icon: "Users" },
+                { label: t("crm.dashboard.pipelineValue"), value: `$${pipelineValue.toLocaleString()}`, icon: "TrendingUp" },
+                { label: t("crm.dashboard.openOpportunities"), value: String(opportunities.length), icon: "Target" },
+                { label: t("crm.dashboard.totalContacts"), value: String(contacts.length), icon: "BookUser" },
               ],
             },
           }

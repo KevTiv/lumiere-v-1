@@ -69,10 +69,10 @@ export function PurchasingClient({
             ...w,
             data: {
               stats: [
-                { label: "Open POs", value: openOrders.length.toString(), icon: "FileText" },
-                { label: "Spend MTD", value: `$${spendMtd.toLocaleString()}`, icon: "DollarSign" },
-                { label: "Pending Receipt", value: pendingReceipt.toString(), icon: "Truck" },
-                { label: "Awaiting Approval", value: toApprove.toString(), icon: "Clock" },
+                { label: t("purchasing.dashboard.openPOs"), value: openOrders.length.toString(), icon: "FileText" },
+                { label: t("purchasing.dashboard.spendMTD"), value: `$${spendMtd.toLocaleString()}`, icon: "DollarSign" },
+                { label: t("purchasing.dashboard.pendingReceipt"), value: pendingReceipt.toString(), icon: "Truck" },
+                { label: t("purchasing.dashboard.awaitingApproval"), value: toApprove.toString(), icon: "Clock" },
               ],
             },
           }
@@ -94,7 +94,7 @@ export function PurchasingClient({
           const byVendor = groupBy(orders, (o) => String(o.partnerId ?? "Unknown"))
           const vendorValues = Object.entries(byVendor)
             .map(([partnerId, vendOrders]) => ({
-              vendor: `Vendor ${partnerId.slice(-4)}`,
+              vendor: t("purchasing.dashboard.vendorLabel", { id: partnerId.slice(-4) }),
               Spend: Math.round(vendOrders.reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)),
             }))
             .sort((a, b) => b.Spend - a.Spend)
@@ -113,7 +113,7 @@ export function PurchasingClient({
               const dateStr = dateMs > 0 ? new Date(dateMs).toLocaleDateString("en", { month: "short", day: "numeric" }) : "—"
               return {
                 po: String(o.name ?? `PO-${String(o.id).slice(-6)}`),
-                vendor: `Vendor ${String(o.partnerId ?? "?").slice(-4)}`,
+                vendor: t("purchasing.dashboard.vendorLabel", { id: String(o.partnerId ?? "?").slice(-4) }),
                 amount: `$${Number(o.amountTotal ?? 0).toLocaleString()}`,
                 ordered: dateStr,
                 expected: "—",

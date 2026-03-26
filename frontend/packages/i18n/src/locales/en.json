@@ -252,6 +252,10 @@
         }
       },
       "trackers": {
+        "page": {
+          "title": "Trackers",
+          "description": "KPI and metric tracking"
+        },
         "title": "Activity Trackers",
         "description": "iOS-inspired widgets for monitoring key metrics",
         "sections": {
@@ -510,6 +514,12 @@
   },
   "accounting": {
     "title": "Accounting",
+    "dashboard": {
+      "accountsReceivable": "Accounts Receivable",
+      "accountsPayable": "Accounts Payable",
+      "cashBalance": "Cash Balance",
+      "revenueMTD": "Revenue MTD"
+    },
     "accounts": {
       "title": "Chart of Accounts",
       "code": "Code",
@@ -910,6 +920,12 @@
     }
   },
   "crm": {
+    "dashboard": {
+      "activeLeads": "Active Leads",
+      "pipelineValue": "Pipeline Value",
+      "openOpportunities": "Open Opportunities",
+      "totalContacts": "Total Contacts"
+    },
     "leads": {
       "title": "Leads",
       "description": "Incoming leads and prospects",
@@ -1079,6 +1095,12 @@
     }
   },
   "hr": {
+    "dashboard": {
+      "totalHeadcount": "Total Headcount",
+      "openPositions": "Open Positions",
+      "pendingLeaveRequests": "Pending Leave Requests",
+      "runningContracts": "Running Contracts"
+    },
     "employees": {
       "title": "Employees",
       "description": "All employees and their details",
@@ -1347,6 +1369,15 @@
     }
   },
   "inventory": {
+    "3dView": "3D View",
+    "dashboard": {
+      "totalSKUs": "Total SKUs",
+      "stockValue": "Stock Value",
+      "zeroStockAlerts": "Zero Stock Alerts",
+      "pendingTransfers": "Pending Transfers",
+      "skuFallback": "SKU-{{id}}",
+      "productFallback": "Product {{id}}"
+    },
     "products": {
       "title": "Products",
       "description": "Product catalog",
@@ -1581,6 +1612,13 @@
     }
   },
   "purchasing": {
+    "dashboard": {
+      "openPOs": "Open POs",
+      "spendMTD": "Spend MTD",
+      "pendingReceipt": "Pending Receipt",
+      "awaitingApproval": "Awaiting Approval",
+      "vendorLabel": "Vendor {{id}}"
+    },
     "purchaseOrders": {
       "title": "Purchase Orders",
       "description": "All purchase orders",
@@ -1874,6 +1912,14 @@
     }
   },
   "manufacturing": {
+    "dashboard": {
+      "activeOrders": "Active Orders",
+      "onTimeRate": "On-Time Rate",
+      "oeeEfficiency": "OEE Efficiency",
+      "readyWorkOrders": "Ready Work Orders",
+      "workCenterFallback": "Work Center {{number}}",
+      "productFallback": "Product {{id}}"
+    },
     "manufacturingOrders": {
       "title": "Manufacturing Orders",
       "description": "Production orders and their status",
@@ -2056,6 +2102,13 @@
     }
   },
   "projects": {
+    "dashboard": {
+      "activeProjects": "Active Projects",
+      "openTasks": "Open Tasks",
+      "overdueTasks": "Overdue Tasks",
+      "hoursLogged": "Hours Logged",
+      "projectFallback": "Project {{number}}"
+    },
     "projects": {
       "title": "Projects",
       "description": "All active and completed projects",
@@ -2087,6 +2140,10 @@
       }
     },
     "tasks": {
+      "page": {
+        "title": "Tasks",
+        "description": "Manage sprints and workitems"
+      },
       "title": "Tasks",
       "description": "All project tasks",
       "searchPlaceholder": "Search tasks…",
@@ -2186,6 +2243,12 @@
     }
   },
   "calendar": {
+    "dashboard": {
+      "totalEvents": "Total Events",
+      "confirmed": "Confirmed",
+      "allDayEvents": "All-Day Events",
+      "draftEvents": "Draft Events"
+    },
     "events": {
       "title": "Calendar Events",
       "description": "Meetings, appointments, and scheduled events",
@@ -2336,6 +2399,12 @@
     }
   },
   "helpdesk": {
+    "dashboard": {
+      "totalTickets": "Total Tickets",
+      "open": "Open",
+      "solved": "Solved",
+      "urgent": "Urgent"
+    },
     "tickets": {
       "title": "Helpdesk Tickets",
       "description": "Customer support and internal IT tickets",
@@ -2514,6 +2583,12 @@
     }
   },
   "expenses": {
+    "dashboard": {
+      "totalExpenses": "Total Expenses",
+      "pendingApproval": "Pending Approval",
+      "approved": "Approved",
+      "totalAmount": "Total Amount"
+    },
     "expenses": {
       "title": "Expenses",
       "description": "Employee expense reports and receipts",
@@ -2705,6 +2780,12 @@
           "stateFieldPlaceholder": "e.g. state"
         }
       }
+    },
+    "dashboard": {
+      "totalWorkflows": "Total Workflows",
+      "active": "Active",
+      "runningInstances": "Running Instances",
+      "completed": "Completed"
     }
   },
   "proposals": {
@@ -2787,6 +2868,12 @@
     }
   },
   "messages": {
+    "dashboard": {
+      "totalMessages": "Total Messages",
+      "emails": "Emails",
+      "comments": "Comments",
+      "notifications": "Notifications"
+    },
     "forms": {
       "newMessage": {
         "title": "New Message",
@@ -2860,7 +2947,57 @@
       "discountApplied": "Discount applied: {{pct}}% off"
     }
   },
+  "aiChat": {
+    "title": "AI Assistant",
+    "subtitle": "Type @ for commands",
+    "dragToMove": "Drag to move",
+    "dragToResize": "Drag to resize",
+    "undock": "Undock to floating",
+    "dock": "Dock to sidebar",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "clearHistory": "Clear history",
+    "emptyState": {
+      "heading": "How can I help?",
+      "welcome": "Ask questions or use @ commands for quick actions."
+    },
+    "quickActions": {
+      "salesSummary": "Sales summary",
+      "checkInventory": "Check inventory",
+      "listCustomers": "List customers",
+      "generateReport": "Generate report"
+    },
+    "commands": "Commands",
+    "thinking": "Thinking...",
+    "placeholder": "Ask anything... @ for commands",
+    "hints": {
+      "cmds": "cmds",
+      "send": "send"
+    }
+  },
+  "map": {
+    "loading": "Loading map…",
+    "title": "Map Overview",
+    "summary": "Summary",
+    "totalStockValue": "Total Stock Value",
+    "activeVehicles": "Active Vehicles",
+    "openPOS": "Open POS",
+    "warehouseFallback": "Warehouse {{id}}",
+    "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
+    "demoDataHint": "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates."
+  },
+  "overview": {
+    "page": {
+      "title": "Overview",
+      "description": "Your business at a glance"
+    }
+  },
   "settings": {
+    "page": {
+      "title": "Settings",
+      "description": "Manage your account and system configuration"
+    },
     "backToSettings": "Back to Settings",
     "adminAccess": "Admin Access",
     "configure": "Configure",
@@ -2939,6 +3076,198 @@
         "duplicate": "Duplicate",
         "delete": "Delete"
       }
+    },
+    "auditLog": {
+      "searchPlaceholder": "Search logs...",
+      "filter": "Filter",
+      "allActions": "All Actions",
+      "userActions": "User Actions",
+      "roleChanges": "Role Changes",
+      "orders": "Orders",
+      "products": "Products",
+      "accessEvents": "Access Events",
+      "exportCsv": "Export CSV",
+      "activityLog": "Activity Log ({{count}} entries)"
+    },
+    "userSwitcher": {
+      "switchUser": "Switch User (Demo)",
+      "current": "Current",
+      "selectUser": "Select User"
+    },
+    "users": {
+      "searchPlaceholder": "Search users...",
+      "addUser": "Add User",
+      "usersCount": "Users ({{count}})",
+      "editUser": "Edit User",
+      "createUser": "Create New User",
+      "editDescription": "Update user information and role assignments",
+      "createDescription": "Add a new user to the system",
+      "fullName": "Full Name",
+      "email": "Email",
+      "department": "Department",
+      "status": "Status",
+      "statuses": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "pending": "Pending"
+      },
+      "roles": "Roles",
+      "actions": {
+        "edit": "Edit User",
+        "deactivate": "Deactivate",
+        "activate": "Activate",
+        "delete": "Delete User"
+      },
+      "deleteConfirm": "Are you sure you want to delete this user?",
+      "saveChanges": "Save Changes"
+    },
+    "roles": {
+      "title": "Roles",
+      "description": "Configure roles and their associated permissions using Casbin-style policies",
+      "createRole": "Create Role",
+      "system": "System",
+      "permissionsCount": "{{count}} permissions",
+      "edit": "Edit",
+      "editTitle": "Edit Role: {{name}}",
+      "createTitle": "Create New Role",
+      "createDescription": "Define the role and configure its access permissions",
+      "roleName": "Role Name",
+      "color": "Color",
+      "roleDescription": "Description",
+      "permissions": "Permissions",
+      "saveChanges": "Save Changes",
+      "systemCannotDelete": "System roles cannot be deleted",
+      "deleteConfirm": "Are you sure you want to delete this role?"
+    },
+    "profile": {
+      "personalInfo": "Personal Information",
+      "personalInfoDesc": "Update your personal details",
+      "changeAvatar": "Change Avatar",
+      "avatarHint": "JPG, PNG or GIF. Max 2MB.",
+      "fullName": "Full Name",
+      "email": "Email",
+      "department": "Department",
+      "timezone": "Timezone",
+      "timezones": {
+        "pacific": "Pacific Time (UTC-8)",
+        "eastern": "Eastern Time (UTC-5)",
+        "utc": "UTC",
+        "centralEuropean": "Central European (UTC+1)"
+      },
+      "saveChanges": "Save Changes",
+      "security": "Security",
+      "securityDesc": "Manage your password and security settings",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm Password",
+      "updatePassword": "Update Password",
+      "emailNotifications": "Email Notifications",
+      "emailNotificationsDesc": "Choose what updates you receive via email",
+      "emailItems": {
+        "orders": { "label": "New Orders", "description": "Get notified when new orders are placed" },
+        "inventory": { "label": "Low Stock Alerts", "description": "Alert when products are running low" },
+        "reports": { "label": "Weekly Reports", "description": "Receive weekly performance summaries" },
+        "security": { "label": "Security Alerts", "description": "Important security notifications" }
+      },
+      "inAppNotifications": "In-App Notifications",
+      "inAppNotificationsDesc": "Configure dashboard notification preferences",
+      "inAppItems": {
+        "push": { "label": "Push Notifications", "description": "Browser push notifications" },
+        "sound": { "label": "Sound", "description": "Play sound for new notifications" },
+        "badge": { "label": "Badge Count", "description": "Show unread count on icon" }
+      },
+      "theme": "Theme",
+      "themeDesc": "Select your preferred color theme",
+      "themes": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      },
+      "dashboardLayout": "Dashboard Layout",
+      "dashboardLayoutDesc": "Customize your dashboard experience",
+      "layout": {
+        "compactMode": { "label": "Compact Mode", "description": "Reduce spacing between elements" },
+        "sidebarCollapsed": { "label": "Sidebar Collapsed", "description": "Start with sidebar collapsed" },
+        "showQuickActions": { "label": "Show Quick Actions", "description": "Display quick action buttons on dashboard" }
+      },
+      "accessibility": "Accessibility",
+      "accessibilityDesc": "Adjust accessibility options",
+      "a11y": {
+        "reduceMotion": { "label": "Reduce Motion", "description": "Minimize animations" },
+        "highContrast": { "label": "High Contrast", "description": "Increase color contrast" }
+      }
+    },
+    "customFields": {
+      "title": "My Custom Journal Fields",
+      "description": "Add personal tracking fields to extend your daily journal",
+      "addField": "Add Field",
+      "noFields": "No custom fields yet",
+      "noFieldsHint": "Add fields to track metrics specific to your role",
+      "suggestedTitle": "Suggested fields for your role",
+      "editTitle": "Edit Custom Field",
+      "addTitle": "Add Custom Field",
+      "createDescription": "Create a personal tracking field for your daily journal",
+      "fieldLabel": "Field Label",
+      "fieldLabelPlaceholder": "e.g., Calls Made, Focus Hours",
+      "fieldType": "Field Type",
+      "descriptionOptional": "Description (optional)",
+      "descriptionPlaceholder": "Help text for this field",
+      "minValue": "Min Value",
+      "maxValue": "Max Value",
+      "saveChanges": "Save Changes"
+    },
+    "formConfigSettings": {
+      "title": "Form Configuration",
+      "description": "Configure input fields for Journal and Forensic Reports",
+      "saveChanges": "Save Changes",
+      "journalFields": "Journal Fields",
+      "forensicFields": "Forensic Fields",
+      "activeFields": "{{count}} active fields",
+      "formFields": "Form Fields",
+      "addField": "Add Field",
+      "system": "System",
+      "required": "Required",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "roleVisibility": {
+        "title": "Role-based Field Visibility",
+        "description": "Configure which fields each role can see and which are required",
+        "fieldsEnabled": "{{count}} fields enabled · {{required}} required",
+        "configureFor": "Configure fields for {{name}}",
+        "visible": "Visible",
+        "requiredLabel": "Required"
+      },
+      "aiSuggestions": {
+        "title": "AI Suggestions",
+        "description": "Configure AI-powered suggestions for each field",
+        "add": "Add"
+      },
+      "dialog": {
+        "addTitle": "Add New Field",
+        "editTitle": "Edit Field",
+        "description": "Configure the field properties and validation rules",
+        "label": "Label",
+        "labelPlaceholder": "Field label",
+        "type": "Type",
+        "fieldDescription": "Description",
+        "descriptionPlaceholder": "Help text shown to users",
+        "fieldPlaceholder": "Placeholder",
+        "placeholderText": "Placeholder text",
+        "options": "Options",
+        "addOption": "Add Option",
+        "optionPlaceholder": "Option label",
+        "aiSuggestions": "AI Suggestions",
+        "aiSuggestionsPlaceholder": "Enter one suggestion per line",
+        "aiSuggestionsHint": "These suggestions will appear as clickable chips when users focus on the field",
+        "validation": "Validation",
+        "validationRequired": "Required",
+        "minLength": "Min Length",
+        "maxLength": "Max Length",
+        "minValue": "Min Value",
+        "maxValue": "Max Value",
+        "addField": "Add Field"
+      }
     }
   },
   "reports": {
@@ -2964,6 +3293,394 @@
           }
         }
       }
+    }
+  },
+  "proposalWorkspace": {
+    "status": {
+      "draft": "Draft",
+      "review": "In Review",
+      "submitted": "Submitted",
+      "awarded": "Awarded",
+      "rejected": "Rejected",
+      "archived": "Archived"
+    },
+    "you": "You",
+    "export": "Export",
+    "exportPdf": "Export as PDF",
+    "exportMarkdown": "Export as Markdown",
+    "exportText": "Export as Text",
+    "addSourceDocument": "Add Source Document",
+    "analysisFailed": "Analysis failed",
+    "sectionSidebar": {
+      "sections": "Sections",
+      "addSection": "Add section",
+      "chooseTemplate": "Choose template",
+      "customSection": "+ Custom section...",
+      "noSectionsYet": "No sections yet.",
+      "addFromTemplate": "Add from template",
+      "untitled": "Untitled",
+      "sourceDocs": "Source Docs ({{count}})",
+      "addDocument": "Add document",
+      "proposalValue": "Proposal value"
+    },
+    "sectionEditor": {
+      "statusEmpty": "Empty",
+      "statusDraft": "Draft",
+      "statusComplete": "Complete",
+      "statusReviewed": "Reviewed",
+      "selectSection": "Select a section to begin editing",
+      "addFromSidebar": "Add a new section from the left sidebar",
+      "sectionTitle": "Section Title",
+      "contentPlaceholder": "Write content for \"{{sectionName}}\"…",
+      "sectionDefaultName": "Section",
+      "linkProductService": "Link a product or service",
+      "noProductsFound": "No products found",
+      "dismissEsc": "Press Esc to dismiss",
+      "saving": "Saving…"
+    },
+    "commentThread": {
+      "resolved": "Resolved",
+      "reply": "Reply",
+      "resolve": "Resolve",
+      "replyingToComment": "Replying to comment",
+      "writeReply": "Write a reply...",
+      "cancel": "Cancel",
+      "comments": "Comments",
+      "commentsCount": "{{count}} comment",
+      "commentsCountPlural": "{{count}} comments",
+      "addComment": "Add a comment... (⌘Enter to submit)",
+      "comment": "Comment"
+    },
+    "productLineItems": {
+      "productsAndServices": "Products & Services",
+      "qty": "Qty",
+      "unitPrice": "@",
+      "collapse": "▲",
+      "expand": "▼",
+      "discountPercent": "Discount %",
+      "saved": "saved {{amount}}",
+      "notes": "Notes",
+      "additionalNotes": "Additional notes..."
+    },
+    "presenceBar": {
+      "activeCollaborators": "Active collaborators",
+      "you": "You",
+      "youWithSection": "You — {{section}}",
+      "userWithSection": "{{name}} — {{section}}"
+    },
+    "documentInputPanel": {
+      "sourceDocuments": "Source Documents",
+      "pasteOrUploadRfp": "Paste or upload your RFP / brief",
+      "docCount": "{{count}} doc · {{words}} words",
+      "docCountPlural": "{{count}} docs · {{words}} words",
+      "addDoc": "Add Doc",
+      "documentName": "Document {{count}}",
+      "pasteOrDropDocument": "Paste or drop your document",
+      "supportedFormats": "Supports .txt, .md files or paste plain text — PDFs and Word docs: extract text first",
+      "pasteFromClipboard": "Paste from clipboard",
+      "uploadFile": "Upload file",
+      "wordCount": "{{count}} words",
+      "pasteRfp": "Paste your RFP, tender brief, or source document here…",
+      "analysing": "Analysing…",
+      "analyseWithAI": "Analyse with AI"
+    },
+    "versionHistoryBar": {
+      "title": "Version History",
+      "noSavedVersions": "No saved versions",
+      "versionCount": "{{count}} version",
+      "versionCountPlural": "{{count}} versions",
+      "collapse": "↑",
+      "expand": "↓",
+      "versionNumber": "v{{count}}",
+      "describeVersion": "Describe your changes...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveVersion": "Save Version v{{count}}",
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "versionDiffModal": {
+      "noDescription": "No description",
+      "by": "by {{author}} · {{date}}",
+      "noDifferences": "No differences — this version matches the current draft.",
+      "newSection": "+ New section: {{title}}",
+      "restoreWarning": "Restoring will replace the current draft with this version.",
+      "close": "Close",
+      "restore": "Restore v{{number}}"
+    },
+    "aiPanel": {
+      "expandPanel": "Expand AI panel",
+      "aiAnalysis": "AI Analysis",
+      "collapsePanel": "Collapse panel",
+      "analysingContent": "Analysing document content...",
+      "helpText": "Upload an appel d'offre and click Analyze to extract requirements and structure.",
+      "analysedAt": "Analysed {{date}}",
+      "applySuggestedStructure": "Apply suggested structure ({{count}} sections)",
+      "requirements": "Requirements ({{addressed}}/{{total}})",
+      "keyFindings": "Key Findings",
+      "evaluationCriteria": "Evaluation Criteria",
+      "keyConcepts": "Key Concepts",
+      "required": "Required"
+    },
+    "aiAnalysisPanel": {
+      "aiAnalysis": "AI Analysis",
+      "findingsRequirements": "{{findings}} findings · {{requirements}} requirements",
+      "analysisFailed": "Analysis failed",
+      "noAnalysisYet": "No analysis yet",
+      "helpText": "Paste your source document, then click \"Analyse with AI\" to extract findings, requirements, and concepts.",
+      "summary": "Summary",
+      "keyFindings": "Key Findings",
+      "requirements": "Requirements",
+      "evaluationCriteria": "Evaluation Criteria",
+      "keyConcepts": "Key Concepts",
+      "insertIntoDraft": "Insert into draft",
+      "mandatory": "Mandatory",
+      "applyStructureToDraft": "Apply Structure to Draft",
+      "prefillsNote": "Pre-fills draft with suggested sections based on the analysis"
+    },
+    "tenderEditorPanel": {
+      "statusEmpty": "Empty",
+      "statusDraft": "Draft",
+      "statusComplete": "Complete",
+      "statusReviewed": "Reviewed",
+      "tenderDraft": "Tender Draft",
+      "noSectionsYet": "No sections yet",
+      "stats": "{{sections}} sections · {{completed}} complete · {{words}} words",
+      "emptyTitle": "No sections yet",
+      "helpText": "Add a section below, or run AI analysis and click \"Apply Structure to Draft\"",
+      "addSection": "Add Section",
+      "customSection": "Custom section…",
+      "contentPlaceholder": "Write content for \"{{title}}\"…",
+      "aiSuggestion": "AI Suggestion",
+      "insert": "Insert"
+    }
+  },
+  "forensics": {
+    "page": {
+      "title": "Forensics",
+      "description": "Incident tracking and analysis"
+    },
+    "view": {
+      "title": "Forensic Reports",
+      "subtitle": "Incident analysis and process improvement tracking",
+      "export": "Export",
+      "exportPdf": "Export as PDF",
+      "exportCsv": "Export as CSV",
+      "exportExcel": "Export as Excel",
+      "newReport": "New Report",
+      "totalReports": "Total Reports",
+      "openIssues": "Open Issues",
+      "avgResolution": "Avg Resolution",
+      "critical": "Critical",
+      "tabReports": "Reports",
+      "tabAnalytics": "Analytics",
+      "searchPlaceholder": "Search reports...",
+      "filterStatus": "Status",
+      "filterStatusAll": "All Status",
+      "filterStatusOpen": "Open",
+      "filterStatusInvestigating": "Investigating",
+      "filterStatusResolved": "Resolved",
+      "filterStatusClosed": "Closed",
+      "filterSeverity": "Severity",
+      "filterSeverityAll": "All Severity",
+      "filterSeverityCritical": "Critical",
+      "filterSeverityHigh": "High",
+      "filterSeverityMedium": "Medium",
+      "filterSeverityLow": "Low",
+      "filterCategory": "Category",
+      "filterCategoryAll": "All Categories",
+      "noReportsFound": "No reports found",
+      "noReportsHint": "Try adjusting your filters or create a new report",
+      "chartByStatus": "Reports by Status",
+      "chartBySeverity": "Reports by Severity",
+      "chartByCategory": "Reports by Category",
+      "chartTopRootCauses": "Top Root Cause Categories",
+      "noRootCauses": "No root causes identified yet",
+      "chartByDepartment": "Reports by Department"
+    },
+    "createModal": {
+      "titleTemplate": "Create Incident Report",
+      "titleDetails": "Report Details",
+      "startFromTemplate": "Start from a Template",
+      "templateHint": "Choose a template to pre-fill common fields, or start from scratch",
+      "or": "or",
+      "startFromScratch": "Start from Scratch",
+      "usingTemplate": "Using template: {{name}}",
+      "labelTitle": "Title *",
+      "placeholderTitle": "Brief description of the incident",
+      "labelSummary": "Summary *",
+      "placeholderSummary": "One-line summary of what happened",
+      "labelDescription": "Full Description",
+      "placeholderDescription": "Detailed description of the incident, including context and circumstances",
+      "labelCategory": "Category",
+      "labelSeverity": "Severity",
+      "labelIncidentDate": "Incident Date",
+      "labelReportedBy": "Reported By",
+      "placeholderReportedBy": "Your name",
+      "labelAssignTo": "Assign To",
+      "placeholderAssignTo": "Lead investigator",
+      "labelDepartment": "Department",
+      "placeholderDepartment": "e.g., Operations",
+      "labelTags": "Tags",
+      "placeholderTag": "Add a tag",
+      "suggestedTags": "Suggested tags for this template: {{tags}}",
+      "labelImmediateActions": "Immediate Actions Taken",
+      "placeholderAction": "Describe action taken",
+      "suggestedActions": "Suggested actions:",
+      "back": "Back",
+      "cancel": "Cancel",
+      "createReport": "Create Report"
+    },
+    "reportCard": {
+      "actionsCount": "{{count}} action",
+      "actionsCountPlural": "{{count}} actions"
+    },
+    "detailModal": {
+      "printReport": "Print Report",
+      "downloadPdf": "Download PDF",
+      "incidentDate": "Incident Date",
+      "assignedTo": "Assigned To",
+      "department": "Department",
+      "category": "Category",
+      "tabOverview": "Overview",
+      "tabTimeline": "Timeline",
+      "tabRootCause": "Root Cause",
+      "tabActions": "Actions",
+      "tabImpact": "Impact",
+      "description": "Description",
+      "teamMembers": "Team Members",
+      "lead": "Lead",
+      "tags": "Tags",
+      "immediateActions": "Immediate Actions Taken",
+      "rootCausesIdentified": "Root Causes Identified",
+      "primary": "Primary",
+      "evidence": "Evidence: {{evidence}}",
+      "lessonsLearned": "Lessons Learned",
+      "correctiveActionsProgress": "Corrective Actions Progress",
+      "actionsCompleted": "{{completed}} of {{total}} completed",
+      "due": "Due: {{date}}",
+      "preventiveActions": "Preventive Actions",
+      "financialImpact": "Financial Impact",
+      "estimated": "Estimated",
+      "actual": "Actual",
+      "operationalImpact": "Operational Impact",
+      "downtime": "Downtime",
+      "usersAffected": "Users Affected",
+      "processes": "Processes:",
+      "reputationalImpact": "Reputational Impact",
+      "customerAffected": "Customer Affected",
+      "publicExposure": "Public Exposure",
+      "yes": "Yes",
+      "no": "No",
+      "complianceImpact": "Compliance Impact",
+      "regulatoryImpact": "Regulatory Impact",
+      "reportingRequired": "Reporting Required",
+      "lastUpdated": "Last updated: {{date}}",
+      "moveTo": "Move to {{status}}",
+      "close": "Close",
+      "byActor": "by {{actor}}"
+    }
+  },
+  "auth": {
+    "appName": "Lumiere ERP",
+    "fields": {
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "confirmNewPassword": "Confirm new password",
+      "passwordPlaceholder": "At least 8 characters"
+    },
+    "errors": {
+      "signInFailed": "Sign in failed",
+      "signUpFailed": "Sign up failed",
+      "resetFailed": "Reset failed",
+      "inviteFailed": "Failed to accept invitation",
+      "generic": "Something went wrong. Please try again.",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "signIn": {
+      "title": "Sign in",
+      "description": "Enter your email and password",
+      "submit": "Sign in",
+      "submitting": "Signing in\u2026",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "createOne": "Create one"
+    },
+    "signUp": {
+      "title": "Create an account",
+      "description": "Set up your Lumiere ERP account",
+      "submit": "Create account",
+      "submitting": "Creating account\u2026",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in"
+    },
+    "forgotPassword": {
+      "title": "Forgot your password?",
+      "description": "Enter your email and we'll send you a reset link.",
+      "submit": "Send reset link",
+      "submitting": "Sending\u2026",
+      "backToSignIn": "Back to sign in",
+      "successTitle": "Check your email",
+      "successDescription": "If an account exists for <bold>{{email}}</bold>, we sent a password reset link. Check your spam folder if you don't see it."
+    },
+    "resetPassword": {
+      "title": "Reset your password",
+      "description": "Enter your new password below.",
+      "submit": "Reset password",
+      "submitting": "Resetting\u2026",
+      "invalidTitle": "Invalid reset link",
+      "invalidDescription": "This reset link is missing or invalid.",
+      "requestNewLink": "Request a new link",
+      "linkNotWorking": "Link not working?",
+      "requestNew": "Request a new one"
+    },
+    "acceptInvite": {
+      "title": "Accept your invitation",
+      "description": "Create a password to complete your account setup.",
+      "emailPlaceholder": "The email your invite was sent to",
+      "submit": "Join organization",
+      "submitting": "Joining\u2026",
+      "invalidTitle": "Invalid invitation",
+      "invalidDescription": "This invitation link is missing or invalid.",
+      "goToSignIn": "Go to sign in",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in"
+    },
+    "onboarding": {
+      "title": "Set up your organization",
+      "description": "You are the first user \u2014 create your organization to get started.",
+      "submit": "Create organization",
+      "submitting": "Creating\u2026",
+      "connectingToServer": "Connecting to server\u2026",
+      "orgName": "Organization name",
+      "orgNamePlaceholder": "Acme Inc.",
+      "shortCode": "Short code",
+      "shortCodePlaceholder": "ACME",
+      "shortCodeHint": "Uppercase letters and numbers, max 8 characters",
+      "timezone": "Timezone",
+      "currency": "Currency",
+      "currencies": {
+        "USD": "USD \u2014 US Dollar",
+        "EUR": "EUR \u2014 Euro",
+        "GBP": "GBP \u2014 British Pound",
+        "CAD": "CAD \u2014 Canadian Dollar",
+        "AUD": "AUD \u2014 Australian Dollar",
+        "JPY": "JPY \u2014 Japanese Yen"
+      },
+      "errors": {
+        "notConnected": "Not connected to server. Please wait a moment and try again.",
+        "noConnection": "No connection",
+        "failedToCreate": "Failed to create organization"
+      }
+    },
+    "nav": {
+      "backToSignIn": "Back to sign in",
+      "requestNewLink": "Request a new link"
     }
   }
 }

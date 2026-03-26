@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { CheckCheck, MessageSquare, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ function avatarColor(userId: string): string {
 }
 
 function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: CommentCardProps) {
+  const { t } = useTranslation()
   const isResolved = comment.isResolved
   const initials = String(comment.authorName ?? "?").slice(0, 2).toUpperCase()
   const userId = String(comment.authorId)
@@ -54,7 +56,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
             <span className="text-[10px] text-muted-foreground">{formatDate(comment.createDate)}</span>
             {isResolved && (
               <span className="text-[10px] text-green-600 flex items-center gap-0.5">
-                <CheckCheck className="h-2.5 w-2.5" /> Resolved
+                <CheckCheck className="h-2.5 w-2.5" /> {t("proposalWorkspace.commentThread.resolved")}
               </span>
             )}
           </div>
@@ -68,7 +70,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
                 className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
               >
                 <Reply className="h-2.5 w-2.5" />
-                Reply
+                {t("proposalWorkspace.commentThread.reply")}
               </button>
               {(userId === currentUserId || !currentUserId) && (
                 <button
@@ -76,7 +78,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
                   className="text-[10px] text-muted-foreground hover:text-green-600 flex items-center gap-0.5 transition-colors"
                 >
                   <CheckCheck className="h-2.5 w-2.5" />
-                  Resolve
+                  {t("proposalWorkspace.commentThread.resolve")}
                 </button>
               )}
             </div>
@@ -111,6 +113,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
 }
 
 export function CommentThread({ comments, currentUserId, onAdd, onResolve }: CommentThreadProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [replyingTo, setReplyingTo] = useState<bigint | null>(null)
@@ -140,7 +143,7 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <MessageSquare className="h-3.5 w-3.5" />
-        <span>{openCount > 0 ? `${openCount} comment${openCount !== 1 ? "s" : ""}` : "Comments"}</span>
+        <span>{openCount > 0 ? (openCount === 1 ? t("proposalWorkspace.commentThread.commentsCount", { count: openCount }) : t("proposalWorkspace.commentThread.commentsCountPlural", { count: openCount })) : t("proposalWorkspace.commentThread.comments")}</span>
         {openCount > 0 && (
           <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-medium">
             {openCount}
@@ -173,20 +176,20 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
           {/* Reply input */}
           {replyingTo && (
             <div className="ml-8 space-y-1">
-              <p className="text-[10px] text-muted-foreground">Replying to comment</p>
+              <p className="text-[10px] text-muted-foreground">{t("proposalWorkspace.commentThread.replyingToComment")}</p>
               <textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="Write a reply..."
+                placeholder={t("proposalWorkspace.commentThread.writeReply")}
                 rows={2}
                 className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <div className="flex gap-1.5">
                 <Button size="sm" className="h-6 text-xs px-2" onClick={handleAddReply}>
-                  Reply
+                  {t("proposalWorkspace.commentThread.reply")}
                 </Button>
                 <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setReplyingTo(null)}>
-                  Cancel
+                  {t("proposalWorkspace.commentThread.cancel")}
                 </Button>
               </div>
             </div>
@@ -198,7 +201,7 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddRoot() }}
-              placeholder="Add a comment... (⌘Enter to submit)"
+              placeholder={t("proposalWorkspace.commentThread.addComment")}
               rows={2}
               className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
             />
@@ -208,7 +211,7 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
               onClick={handleAddRoot}
               disabled={!newComment.trim()}
             >
-              Comment
+              {t("proposalWorkspace.commentThread.comment")}
             </Button>
           </div>
         </div>

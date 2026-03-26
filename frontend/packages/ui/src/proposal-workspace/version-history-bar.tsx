@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { GitCommit, Clock, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ProposalVersion } from "@/lib/proposal-workspace-types"
@@ -15,17 +16,18 @@ interface VersionHistoryBarProps {
   dispatch?: React.Dispatch<import("@/lib/proposal-workspace-types").WorkspaceAction>
 }
 
-function timeAgo(date: Date): string {
+function timeAgo(date: Date, t: (key: string, options?: Record<string, unknown>) => string): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (seconds < 60) return "just now"
+  if (seconds < 60) return t("proposalWorkspace.versionHistoryBar.justNow")
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return t("proposalWorkspace.versionHistoryBar.minutesAgo", { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  if (hours < 24) return t("proposalWorkspace.versionHistoryBar.hoursAgo", { count: hours })
+  return t("proposalWorkspace.versionHistoryBar.daysAgo", { count: Math.floor(hours / 24) })
 }
 
 export function VersionHistoryBar({ versions, activeVersionId, currentSections, dispatch, onRestoreVersion }: VersionHistoryBarProps) {
+  const { t } = useTranslation()
   const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
@@ -36,17 +38,18 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
       <div className="border-t border-border bg-muted/20 shrink-0">
         {/* Toggle bar */}
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/40 transition-colors"
         >
           <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">Version History</span>
+          <span className="text-xs font-medium text-foreground">{t("proposalWorkspace.versionHistoryBar.title")}</span>
           <span className="text-xs text-muted-foreground">
-            {versions.length === 0 ? "No saved versions" : `${versions.length} version${versions.length > 1 ? "s" : ""}`}
+            {versions.length === 0 ? t("proposalWorkspace.versionHistoryBar.noSavedVersions") : t("proposalWorkspace.versionHistoryBar.versionCount", { count: versions.length })}
           </span>
           {versions.length > 0 && (
             <span className="ml-auto text-xs text-muted-foreground">
-              {expanded ? "▲" : "▼"}
+              {expanded ? t("proposalWorkspace.versionHistoryBar.collapse") : t("proposalWorkspace.versionHistoryBar.expand")}
             </span>
           )}
         </button>
@@ -57,6 +60,7 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {[...versions].reverse().map((version) => (
                 <button
+                  type="button"
                   key={version.id}
                   onClick={() => {
                     dispatch?.({ type: "SET_ACTIVE_VERSION", id: version.id })
@@ -72,9 +76,9 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
                   <GitCommit className="h-3 w-3" />
                   <span className="font-medium">v{version.versionNumber}</span>
                   <Clock className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">{timeAgo(new Date(version.createdAt))}</span>
+                  <span className="text-muted-foreground">{timeAgo(new Date(version.createdAt), t)}</span>
                   {version.message && (
-                    <span className="text-muted-foreground truncate max-w-20">· "{version.message}"</span>
+                    <span className="text-muted-foreground truncate max-w-20">· &quot;{version.message}&quot;</span>
                   )}
                   {version.diff && (
                     <span className="text-green-500 text-[10px]">
@@ -126,11 +130,12 @@ interface SaveVersionButtonProps {
 }
 
 export function SaveVersionButton({ onSave, dispatch, isDirty, versionCount }: SaveVersionButtonProps) {
+  const { t } = useTranslation()
   const [message, setMessage] = useState("")
   const [showInput, setShowInput] = useState(false)
 
   const handleSave = () => {
-    const msg = message.trim() || `Version ${versionCount + 1}`
+    const msg = message.trim() || t("proposalWorkspace.versionHistoryBar.versionNumber", { count: versionCount + 1 })
     if (onSave) {
       onSave(msg)
     } else {
@@ -148,14 +153,14 @@ export function SaveVersionButton({ onSave, dispatch, isDirty, versionCount }: S
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setShowInput(false) }}
-          placeholder="Describe this version…"
+          placeholder={t("proposalWorkspace.versionHistoryBar.describeVersion")}
           className="text-xs px-2 py-1 rounded border border-border bg-background outline-none ring-1 ring-primary w-40"
         />
-        <button onClick={handleSave} className="text-xs text-primary font-medium hover:underline">
-          Save
+        <button type="button" onClick={handleSave} className="text-xs text-primary font-medium hover:underline">
+          {t("proposalWorkspace.versionHistoryBar.save")}
         </button>
-        <button onClick={() => setShowInput(false)} className="text-xs text-muted-foreground hover:text-foreground">
-          ✕
+        <button type="button" onClick={() => setShowInput(false)} className="text-xs text-muted-foreground hover:text-foreground">
+          {t("proposalWorkspace.versionHistoryBar.cancel")}
         </button>
       </div>
     )
@@ -163,6 +168,7 @@ export function SaveVersionButton({ onSave, dispatch, isDirty, versionCount }: S
 
   return (
     <button
+      type="button"
       onClick={() => setShowInput(true)}
       disabled={!isDirty}
       className={cn(
@@ -173,7 +179,7 @@ export function SaveVersionButton({ onSave, dispatch, isDirty, versionCount }: S
       )}
     >
       <RotateCcw className="h-3.5 w-3.5" />
-      Save v{versionCount + 1}
+      {t("proposalWorkspace.versionHistoryBar.saveVersion", { count: versionCount + 1 })}
     </button>
   )
 }

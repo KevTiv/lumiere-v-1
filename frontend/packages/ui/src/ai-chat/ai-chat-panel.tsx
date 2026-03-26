@@ -40,6 +40,7 @@ import {
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
+import { useTranslation } from "@lumiere/i18n"
 
 interface Position {
   x: number
@@ -92,6 +93,7 @@ const DEFAULT_WIDTH = 400
 const DEFAULT_HEIGHT = 500
 
 export function AIChatPanel({ open, onClose, docked = false, onDockToggle, config, context }: AIChatPanelProps) {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -388,7 +390,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
           {!docked && (
             <button
               type="button"
-              title="Drag to move"
+              title={t("aiChat.dragToMove")}
               onMouseDown={handleDragStart}
               className={cn(
                 "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0",
@@ -404,9 +406,9 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
             <Sparkles className="h-3 w-3 text-primary-foreground" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold truncate">{config?.title || "AI Assistant"}</h2>
+            <h2 className="text-sm font-semibold truncate">{config?.title || t("aiChat.title")}</h2>
             {!isMinimized && (
-              <p className="text-[10px] text-muted-foreground truncate">Type @ for commands</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t("aiChat.subtitle")}</p>
             )}
           </div>
         </div>
@@ -419,7 +421,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
               size="icon"
               onClick={onDockToggle}
               className="h-7 w-7"
-              title={docked ? "Undock to floating" : "Dock to sidebar"}
+              title={docked ? t("aiChat.undock") : t("aiChat.dock")}
             >
               {docked ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
             </Button>
@@ -427,18 +429,18 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
           {/* Minimize / maximize only in floating mode */}
           {!docked && (
             <>
-              <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title="Minimize">
+              <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title={t("aiChat.minimize")}>
                 <Minus className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? "Restore" : "Maximize"}>
+              <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? t("aiChat.restore") : t("aiChat.maximize")}>
                 {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
               </Button>
             </>
           )}
-          <Button variant="ghost" size="icon" onClick={handleClearHistory} className="h-7 w-7" title="Clear history">
+          <Button variant="ghost" size="icon" onClick={handleClearHistory} className="h-7 w-7" title={t("aiChat.clearHistory")}>
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title={t("common.close")}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -454,27 +456,27 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3">
                   <Sparkles className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-sm font-medium mb-1">How can I help?</h3>
+                <h3 className="text-sm font-medium mb-1">{t("aiChat.emptyState.heading")}</h3>
                 <p className="text-xs text-muted-foreground max-w-[240px] mb-4">
-                  {config?.welcomeMessage || "Ask questions or use @ commands for quick actions."}
+                  {config?.welcomeMessage || t("aiChat.emptyState.welcome")}
                 </p>
 
                 {/* Quick actions */}
                 <div className="grid grid-cols-2 gap-1.5 w-full max-w-70">
-                  {[
-                    { label: "Sales summary", icon: TrendingUp },
-                    { label: "Check inventory", icon: Package },
-                    { label: "List customers", icon: Users },
-                    { label: "Generate report", icon: FileText },
-                  ].map((action) => (
+                  {([
+                    { labelKey: "aiChat.quickActions.salesSummary", icon: TrendingUp },
+                    { labelKey: "aiChat.quickActions.checkInventory", icon: Package },
+                    { labelKey: "aiChat.quickActions.listCustomers", icon: Users },
+                    { labelKey: "aiChat.quickActions.generateReport", icon: FileText },
+                  ] as const).map((action) => (
                     <button
                       type="button"
-                      key={action.label}
-                      onClick={() => setInput(action.label)}
+                      key={action.labelKey}
+                      onClick={() => setInput(t(action.labelKey))}
                       className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left text-xs"
                     >
                       <action.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">{action.label}</span>
+                      <span className="truncate">{t(action.labelKey)}</span>
                     </button>
                   ))}
                 </div>
@@ -546,7 +548,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                     <div className="bg-muted rounded-xl rounded-bl-sm px-3 py-2">
                       <div className="flex items-center gap-1.5">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        <span className="text-xs text-muted-foreground">Thinking...</span>
+                        <span className="text-xs text-muted-foreground">{t("aiChat.thinking")}</span>
                       </div>
                     </div>
                   </div>
@@ -563,7 +565,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
               <div className="p-1.5 border-b border-border">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-1.5">
                   <AtSign className="h-2.5 w-2.5" />
-                  <span>Commands</span>
+                  <span>{t("aiChat.commands")}</span>
                   <span className="ml-auto flex items-center gap-1">
                     <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Tab</kbd>
                   </span>
@@ -617,7 +619,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={config?.placeholder || "Ask anything... @ for commands"}
+                  placeholder={config?.placeholder || t("aiChat.placeholder")}
                   rows={1}
                   className={cn(
                     "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 pr-10",
@@ -639,10 +641,10 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
             <div className="flex items-center justify-between mt-1.5 px-0.5">
               <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
                 <kbd className="px-1 py-0.5 bg-muted rounded">@</kbd>
-                <span>cmds</span>
+                <span>{t("aiChat.hints.cmds")}</span>
                 <span className="mx-0.5">|</span>
                 <kbd className="px-1 py-0.5 bg-muted rounded">Enter</kbd>
-                <span>send</span>
+                <span>{t("aiChat.hints.send")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 {context?.activeView && (
@@ -655,7 +657,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                 {!docked && !isMaximized && (
                   <button
                     type="button"
-                    title="Drag to resize"
+                    title={t("aiChat.dragToResize")}
                     onMouseDown={handleResizeStart("se")}
                     className={cn(
                       "flex items-center justify-center h-5 w-5 rounded transition-colors",

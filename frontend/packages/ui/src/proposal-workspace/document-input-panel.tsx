@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Plus, Clipboard, X, FileText, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -18,6 +19,7 @@ function countWords(text: string): number {
 }
 
 export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }: DocumentInputPanelProps) {
+  const { t } = useTranslation()
   const [activeSourceId, setActiveSourceId] = useState<string | null>(
     sources.length > 0 ? sources[0].id : null
   )
@@ -30,7 +32,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
     const id = `src-${Date.now()}`
     const newSource: SourceDocument = {
       id,
-      name: `Document ${sources.length + 1}`,
+      name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }),
       content: "",
       type: "pasted",
       wordCount: 0,
@@ -47,7 +49,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
         const id = `src-${Date.now()}`
         dispatch({
           type: "ADD_SOURCE",
-          source: { id, name: `Document ${sources.length + 1}`, content: text, type: "pasted", wordCount: countWords(text), addedAt: new Date() },
+          source: { id, name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }), content: text, type: "pasted", wordCount: countWords(text), addedAt: new Date() },
         })
         setActiveSourceId(id)
       } else {
@@ -116,16 +118,18 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Source Documents</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("proposalWorkspace.documentInputPanel.sourceDocuments")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {sources.length === 0
-              ? "Paste or upload your RFP / brief"
-              : `${sources.length} doc${sources.length > 1 ? "s" : ""} · ${totalWords.toLocaleString()} words`}
+              ? t("proposalWorkspace.documentInputPanel.pasteOrUploadRfp")
+              : (sources.length === 1
+                ? t("proposalWorkspace.documentInputPanel.docCount", { count: sources.length, words: totalWords.toLocaleString() })
+                : t("proposalWorkspace.documentInputPanel.docCountPlural", { count: sources.length, words: totalWords.toLocaleString() }))}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={addBlankSource} className="h-7 gap-1.5 text-xs">
           <Plus className="h-3.5 w-3.5" />
-          Add Doc
+          {t("proposalWorkspace.documentInputPanel.addDoc")}
         </Button>
       </div>
 
@@ -173,19 +177,19 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 <FileText className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium text-foreground">Paste or drop your document</p>
+              <p className="text-sm font-medium text-foreground">{t("proposalWorkspace.documentInputPanel.pasteOrDropDocument")}</p>
               <p className="text-xs text-muted-foreground">
-                Supports .txt, .md files or paste plain text — PDFs and Word docs: extract text first
+                {t("proposalWorkspace.documentInputPanel.supportedFormats")}
               </p>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={handlePasteFromClipboard} className="gap-1.5 text-xs">
                 <Clipboard className="h-3.5 w-3.5" />
-                Paste from clipboard
+                {t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5 text-xs">
                 <Plus className="h-3.5 w-3.5" />
-                Upload file
+                {t("proposalWorkspace.documentInputPanel.uploadFile")}
               </Button>
             </div>
             <input ref={fileInputRef} type="file" accept=".txt,.md,.csv" className="hidden" onChange={handleFileInput} />
@@ -208,16 +212,16 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
                 className="flex-1 text-xs font-medium bg-transparent border-0 outline-none text-foreground"
               />
               <span className="text-xs text-muted-foreground shrink-0">
-                {activeSource.wordCount.toLocaleString()} words
+                {t("proposalWorkspace.documentInputPanel.wordCount", { count: activeSource.wordCount.toLocaleString() })}
               </span>
-              <Button size="sm" variant="ghost" onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title="Paste from clipboard">
+              <Button size="sm" variant="ghost" onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
                 <Clipboard className="h-3.5 w-3.5" />
               </Button>
             </div>
             <textarea
               value={activeSource.content}
               onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="Paste your RFP, tender brief, or source document here…"
+              placeholder={t("proposalWorkspace.documentInputPanel.pasteRfp")}
               className="flex-1 resize-none p-3 text-xs leading-relaxed text-foreground bg-background outline-none font-mono"
               spellCheck={false}
             />
@@ -236,12 +240,12 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
           {isAnalyzing ? (
             <>
               <ChevronDown className="h-4 w-4 animate-bounce" />
-              Analysing…
+              {t("proposalWorkspace.documentInputPanel.analysing")}
             </>
           ) : (
             <>
               <ChevronDown className="h-4 w-4" />
-              Analyse with AI
+              {t("proposalWorkspace.documentInputPanel.analyseWithAI")}
             </>
           )}
         </Button>

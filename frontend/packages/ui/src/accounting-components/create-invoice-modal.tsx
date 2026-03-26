@@ -12,13 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import {
   Table,
   TableBody,
@@ -91,6 +85,7 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
 
   const handleSave = (asDraft: boolean) => {
     onSave?.({
+      type: asDraft ? "invoice-draft" : "invoice",
       moveType: "OutInvoice",
       invoicePartnerDisplayName: partnerName,
       amountUntaxed: subtotal - totalDisc,

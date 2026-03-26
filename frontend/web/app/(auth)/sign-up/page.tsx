@@ -3,8 +3,14 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useTranslation } from "@lumiere/i18n"
+import { Button } from "@lumiere/ui"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@lumiere/ui/components/card"
+import { Input } from "@lumiere/ui/components/input"
+import { Label } from "@lumiere/ui/components/label"
 
 export default function SignUpPage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -16,7 +22,7 @@ export default function SignUpPage() {
     e.preventDefault()
     setError(null)
     if (password !== confirm) {
-      setError("Passwords do not match")
+      setError(t("auth.errors.passwordMismatch"))
       return
     }
     setLoading(true)
@@ -28,86 +34,81 @@ export default function SignUpPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? "Sign up failed")
+        setError(data.error ?? t("auth.errors.signUpFailed"))
         return
       }
       router.push(data.redirectTo ?? "/onboarding")
     } catch {
-      setError("Something went wrong. Please try again.")
+      setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold">Create an account</h2>
-        <p className="text-sm text-muted-foreground">Set up your Lumiere ERP account</p>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("auth.signUp.title")}</CardTitle>
+        <CardDescription>{t("auth.signUp.description")}</CardDescription>
+      </CardHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">Email</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="you@company.com"
-          />
-        </div>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="email">{t("auth.fields.email")}</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              placeholder={t("auth.fields.emailPlaceholder")}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="At least 8 characters"
-          />
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">{t("auth.fields.password")}</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder={t("auth.fields.passwordPlaceholder")}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="confirm" className="text-sm font-medium">Confirm password</label>
-          <input
-            id="confirm"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-            autoComplete="new-password"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm">{t("auth.fields.confirmPassword")}</Label>
+            <Input
+              id="confirm"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+          </div>
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex w-full items-center justify-center rounded-md bg-primary text-primary-foreground shadow h-9 px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Creating account…" : "Create account"}
-        </button>
-      </form>
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+            {loading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
+          </Button>
+        </form>
+      </CardContent>
 
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link href="/sign-in" className="font-medium text-foreground hover:underline">
-          Sign in
-        </Link>
-      </p>
-    </div>
+      <CardFooter className="justify-center">
+        <p className="text-sm text-muted-foreground">
+          {t("auth.signUp.hasAccount")}{" "}
+          <Link href="/sign-in" className="font-medium text-foreground hover:underline">
+            {t("auth.signUp.signIn")}
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   )
 }

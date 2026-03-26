@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { GitCommit, RotateCcw, X, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -90,6 +91,7 @@ function DiffLineView({ lines }: { lines: VersionLine[] }) {
 }
 
 export function VersionDiffModal({ open, onClose, version, currentSections, onRestore }: VersionDiffModalProps) {
+  const { t } = useTranslation()
   if (!open) return null
 
   const totalAdded = version.diff?.totalLinesAdded ?? 0
@@ -119,10 +121,10 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
           <GitCommit className="h-5 w-5 text-primary" />
           <div className="flex-1">
             <h2 className="text-sm font-semibold text-foreground">
-              v{version.versionNumber} — {version.message || "No description"}
+              v{version.versionNumber} — {version.message || t("proposalWorkspace.versionDiffModal.noDescription")}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              by {version.author} · {new Date(version.createdAt).toLocaleString()}
+              {t("proposalWorkspace.versionDiffModal.by", { author: version.author, date: new Date(version.createdAt).toLocaleString() })}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -146,7 +148,7 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {changedSections.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">No differences — this version matches the current draft.</p>
+              <p className="text-sm text-muted-foreground">{t("proposalWorkspace.versionDiffModal.noDifferences")}</p>
             </div>
           ) : (
             changedSections.map(({ section, lines }) => (
@@ -166,7 +168,7 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
               <div key={cs.id} className="rounded-lg border border-green-200 dark:border-green-800 overflow-hidden">
                 <div className="px-3 py-2 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">
                   <p className="text-xs font-semibold text-green-700 dark:text-green-400">
-                    + New section: {cs.title}
+                    {t("proposalWorkspace.versionDiffModal.newSection", { title: cs.title })}
                   </p>
                 </div>
                 <DiffLineView lines={cs.content.split("\n").map((text) => ({ type: "added" as const, text }))} />
@@ -177,15 +179,15 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border shrink-0">
           <p className="text-xs text-muted-foreground">
-            Restoring will replace the current draft with this version.
+            {t("proposalWorkspace.versionDiffModal.restoreWarning")}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>
-              Close
+              {t("proposalWorkspace.versionDiffModal.close")}
             </Button>
             <Button size="sm" variant="destructive" onClick={onRestore} className="gap-1.5">
               <RotateCcw className="h-3.5 w-3.5" />
-              Restore v{version.versionNumber}
+              {t("proposalWorkspace.versionDiffModal.restore", { number: version.versionNumber })}
             </Button>
           </div>
         </div>

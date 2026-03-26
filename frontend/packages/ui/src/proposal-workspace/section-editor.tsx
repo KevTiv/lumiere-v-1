@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -14,11 +15,11 @@ type Section = Record<string, any>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Product = Record<string, any>
 
-const STATUS_OPTIONS: { value: SectionStatus; label: string }[] = [
-  { value: "empty", label: "Empty" },
-  { value: "draft", label: "Draft" },
-  { value: "complete", label: "Complete" },
-  { value: "reviewed", label: "Reviewed" },
+const getStatusOptions = (t: (key: string) => string): { value: SectionStatus; label: string }[] => [
+  { value: "empty", label: t("proposalWorkspace.sectionEditor.statusEmpty") },
+  { value: "draft", label: t("proposalWorkspace.sectionEditor.statusDraft") },
+  { value: "complete", label: t("proposalWorkspace.sectionEditor.statusComplete") },
+  { value: "reviewed", label: t("proposalWorkspace.sectionEditor.statusReviewed") },
 ]
 
 const STATUS_VARIANT: Record<SectionStatus, "secondary" | "outline" | "default"> = {
@@ -66,6 +67,7 @@ export function SectionEditor({
   onResolveComment,
   onFocus,
 }: SectionEditorProps) {
+  const { t } = useTranslation()
   const [localContent, setLocalContent] = useState<string | null>(null)
   const [localTitle, setLocalTitle] = useState<string | null>(null)
   const [status, setStatus] = useState<SectionStatus>("empty")
@@ -155,8 +157,8 @@ export function SectionEditor({
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center">
-          <p className="text-sm">Select a section to start editing</p>
-          <p className="text-xs mt-1">Or add a new section from the sidebar</p>
+          <p className="text-sm">{t("proposalWorkspace.sectionEditor.selectSection")}</p>
+          <p className="text-xs mt-1">{t("proposalWorkspace.sectionEditor.addFromSidebar")}</p>
         </div>
       </div>
     )
@@ -170,17 +172,18 @@ export function SectionEditor({
           value={title}
           onChange={(e) => setLocalTitle(e.target.value)}
           onBlur={handleTitleBlur}
-          placeholder="Section title..."
+          placeholder={t("proposalWorkspace.sectionEditor.sectionTitle")}
           className="flex-1 text-lg font-semibold bg-transparent border-none outline-none focus:outline-none placeholder:text-muted-foreground/50 text-foreground"
         />
         {/* Status selector */}
         <div className="relative group shrink-0">
           <Badge variant={STATUS_VARIANT[status]} className="cursor-pointer text-xs">
-            {STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status}
+            {getStatusOptions(t).find((o) => o.value === status)?.label ?? status}
           </Badge>
           <div className="absolute top-full right-0 mt-1 z-20 rounded-lg border border-border bg-popover shadow-lg hidden group-hover:block min-w-[120px]">
-            {STATUS_OPTIONS.map((opt) => (
+            {getStatusOptions(t).map((opt) => (
               <button
+                type="button"
                 key={opt.value}
                 onClick={() => handleStatusChange(opt.value)}
                 className={cn(
@@ -209,7 +212,7 @@ export function SectionEditor({
           ref={textareaRef}
           value={content}
           onChange={handleContentChange}
-          placeholder={`Write your ${title || "section"} content here...\n\nType @ to link a product or service from your catalogue.`}
+          placeholder={t("proposalWorkspace.sectionEditor.contentPlaceholder", { sectionName: title || t("proposalWorkspace.sectionEditor.sectionDefaultName") })}
           className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground/40 leading-relaxed"
           style={{ fieldSizing: "content" } as React.CSSProperties}
         />
@@ -218,18 +221,19 @@ export function SectionEditor({
         {mention && (
           <div className="absolute left-0 z-30 w-64 rounded-lg border border-border bg-popover shadow-lg" style={{ top: "2rem" }}>
             <div className="px-3 py-2 border-b border-border">
-              <p className="text-xs text-muted-foreground">Link a product or service</p>
+              <p className="text-xs text-muted-foreground">{t("proposalWorkspace.sectionEditor.linkProductService")}</p>
               {mentionSearch && (
-                <p className="text-xs font-medium mt-0.5">"{mentionSearch}"</p>
+                <p className="text-xs font-medium mt-0.5">&quot;{mentionSearch}&quot;</p>
               )}
             </div>
             {filteredProducts.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">No products found</p>
+              <p className="px-3 py-2 text-xs text-muted-foreground">{t("proposalWorkspace.sectionEditor.noProductsFound")}</p>
             ) : (
               <ul className="max-h-48 overflow-y-auto">
                 {filteredProducts.map((product) => (
                   <li key={String(product.id)}>
                     <button
+                      type="button"
                       onClick={() => handleSelectProduct(product)}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center justify-between gap-2"
                     >
@@ -251,10 +255,11 @@ export function SectionEditor({
             )}
             <div className="border-t border-border px-3 py-1.5">
               <button
+                type="button"
                 onClick={() => setMention(null)}
                 className="text-[10px] text-muted-foreground hover:text-foreground"
               >
-                Dismiss (Esc)
+                {t("proposalWorkspace.sectionEditor.dismissEsc")}
               </button>
             </div>
           </div>
@@ -263,7 +268,7 @@ export function SectionEditor({
 
       {/* Saving indicator */}
       {isSaving && (
-        <p className="text-[10px] text-muted-foreground mb-2">Saving...</p>
+        <p className="text-[10px] text-muted-foreground mb-2">{t("proposalWorkspace.sectionEditor.saving")}</p>
       )}
 
       {/* Product line items */}

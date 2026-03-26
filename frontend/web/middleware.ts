@@ -7,7 +7,7 @@ const AUTH_PATHS = ['/sign-in', '/sign-up', '/forgot-password', '/reset-password
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const stdbToken = request.cookies.get('stdb_token')?.value
-  const isLoggedIn = Boolean(stdbToken)
+  const _isLoggedIn = Boolean(stdbToken)
 
   // Let API routes, static assets, and Next.js internals through
   if (
@@ -18,22 +18,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const _isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 
-  if (!isLoggedIn && !isAuthPage) {
-    // No session → redirect to sign-in, preserve intended destination
-    const url = request.nextUrl.clone()
-    url.pathname = '/sign-in'
-    if (pathname !== '/') {
-      url.searchParams.set('callbackUrl', pathname)
-    }
-    return NextResponse.redirect(url)
-  }
+  // if (!isLoggedIn && !isAuthPage) {
+  //   // No session → redirect to sign-in, preserve intended destination
+  //   const url = request.nextUrl.clone()
+  //   url.pathname = '/sign-in'
+  //   if (pathname !== '/') {
+  //     url.searchParams.set('callbackUrl', pathname)
+  //   }
+  //   return NextResponse.redirect(url)
+  // }
 
-  if (isLoggedIn && isAuthPage && pathname !== '/onboarding') {
-    // Already logged in → redirect away from auth pages
-    return NextResponse.redirect(new URL('/overview', request.url))
-  }
+  // if (isLoggedIn && isAuthPage && pathname !== '/onboarding') {
+  //   // Already logged in → redirect away from auth pages
+  //   return NextResponse.redirect(new URL('/overview', request.url))
+  // }
 
   return NextResponse.next()
 }

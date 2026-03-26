@@ -37,6 +37,7 @@ import {
   Star,
 } from "lucide-react"
 import type { UserCustomField, ConfigurableField, FieldType } from "@/lib/form-config-types"
+import { useTranslation } from "@lumiere/i18n"
 import { sampleUserCustomFields } from "@/lib/form-config-types"
 
 const simpleFieldTypes: { value: FieldType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -53,6 +54,7 @@ interface UserCustomFieldsProps {
 }
 
 export function UserCustomFields({ className }: UserCustomFieldsProps) {
+  const { t } = useTranslation()
   const { currentUser } = useRBAC()
   const [customFields, setCustomFields] = useState<UserCustomField[]>(
     sampleUserCustomFields.filter(f => f.userId === currentUser?.id)
@@ -137,14 +139,14 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
               <BookMarked className="h-5 w-5 text-amber-500" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-base">My Custom Journal Fields</CardTitle>
+              <CardTitle className="text-base">{t("settings.customFields.title")}</CardTitle>
               <CardDescription>
-                Add personal tracking fields to extend your daily journal
+                {t("settings.customFields.description")}
               </CardDescription>
             </div>
             <Button size="sm" onClick={handleAddField} className="gap-2">
               <Plus className="h-4 w-4" />
-              Add Field
+              {t("settings.customFields.addField")}
             </Button>
           </div>
         </CardHeader>
@@ -152,8 +154,8 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
           {customFields.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Sparkles className="h-8 w-8 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No custom fields yet</p>
-              <p className="text-xs mt-1">Add fields to track metrics specific to your role</p>
+              <p className="text-sm">{t("settings.customFields.noFields")}</p>
+              <p className="text-xs mt-1">{t("settings.customFields.noFieldsHint")}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -217,7 +219,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
 
           {/* Suggestions */}
           <div className="mt-6 pt-6 border-t">
-            <p className="text-sm font-medium mb-3">Suggested fields for your role</p>
+            <p className="text-sm font-medium mb-3">{t("settings.customFields.suggestedTitle")}</p>
             <div className="flex flex-wrap gap-2">
               {currentUser?.roles.includes("role-sales") && (
                 <>
@@ -322,25 +324,25 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingField ? "Edit Custom Field" : "Add Custom Field"}</DialogTitle>
+            <DialogTitle>{editingField ? t("settings.customFields.editTitle") : t("settings.customFields.addTitle")}</DialogTitle>
             <DialogDescription>
-              Create a personal tracking field for your daily journal
+              {t("settings.customFields.createDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="field-label">Field Label</Label>
+              <Label htmlFor="field-label">{t("settings.customFields.fieldLabel")}</Label>
               <Input
                 id="field-label"
                 value={newField.label || ""}
                 onChange={(e) => setNewField({ ...newField, label: e.target.value })}
-                placeholder="e.g., Calls Made, Focus Hours"
+                placeholder={t("settings.customFields.fieldLabelPlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="field-type">Field Type</Label>
+              <Label htmlFor="field-type">{t("settings.customFields.fieldType")}</Label>
               <Select
                 value={newField.type}
                 onValueChange={(value) => setNewField({ ...newField, type: value as FieldType })}
@@ -365,19 +367,19 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="field-description">Description (optional)</Label>
+              <Label htmlFor="field-description">{t("settings.customFields.descriptionOptional")}</Label>
               <Input
                 id="field-description"
                 value={newField.description || ""}
                 onChange={(e) => setNewField({ ...newField, description: e.target.value })}
-                placeholder="Help text for this field"
+                placeholder={t("settings.customFields.descriptionPlaceholder")}
               />
             </div>
 
             {(newField.type === "slider" || newField.type === "number") && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="min-value">Min Value</Label>
+                  <Label htmlFor="min-value">{t("settings.customFields.minValue")}</Label>
                   <Input
                     id="min-value"
                     type="number"
@@ -389,7 +391,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="max-value">Max Value</Label>
+                  <Label htmlFor="max-value">{t("settings.customFields.maxValue")}</Label>
                   <Input
                     id="max-value"
                     type="number"
@@ -406,10 +408,10 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveField} disabled={!newField.label}>
-              {editingField ? "Save Changes" : "Add Field"}
+              {editingField ? t("settings.customFields.saveChanges") : t("settings.customFields.addField")}
             </Button>
           </DialogFooter>
         </DialogContent>

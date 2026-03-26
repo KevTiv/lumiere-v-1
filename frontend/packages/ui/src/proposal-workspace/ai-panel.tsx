@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, AlertCircle, PanelRightClose, PanelRightOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -76,7 +77,7 @@ function RequirementRow({ req, onToggle }: { req: Requirement; onToggle: () => v
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[10px] text-muted-foreground">{req.category}</span>
           {req.mandatory && (
-            <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">Required</span>
+            <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">{t("proposalWorkspace.aiPanel.required")}</span>
           )}
         </div>
       </div>
@@ -102,6 +103,7 @@ function CriterionRow({ criterion }: { criterion: EvaluationCriterion }) {
 }
 
 export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure, collapsed, onToggleCollapse }: AIPanelProps) {
+  const { t } = useTranslation()
   const [requirements, setRequirements] = useState<Requirement[]>(analysis?.requirements ?? [])
 
   // sync requirements when analysis changes
@@ -121,14 +123,14 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
         <button
           onClick={onToggleCollapse}
           className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          title="Expand AI panel"
+          title={t("proposalWorkspace.aiPanel.expandPanel")}
         >
           <PanelRightOpen className="h-4 w-4" />
         </button>
         {analysis && (
           <div className="flex flex-col items-center gap-1 mt-1">
             <span className="text-[10px] text-muted-foreground writing-vertical-lr rotate-180 tracking-wider" style={{ writingMode: "vertical-lr" }}>
-              AI Analysis
+              {t("proposalWorkspace.aiPanel.aiAnalysis")}
             </span>
             <Sparkles className="h-3.5 w-3.5 text-primary" />
           </div>
@@ -143,12 +145,12 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-semibold text-foreground">AI Analysis</span>
+          <span className="text-xs font-semibold text-foreground">{t("proposalWorkspace.aiPanel.aiAnalysis")}</span>
         </div>
         <button
           onClick={onToggleCollapse}
           className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          title="Collapse panel"
+          title={t("proposalWorkspace.aiPanel.collapsePanel")}
         >
           <PanelRightClose className="h-3.5 w-3.5" />
         </button>
@@ -159,7 +161,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
         {isAnalyzing && (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <Sparkles className="h-6 w-6 text-primary animate-pulse" />
-            <p className="text-xs text-muted-foreground text-center px-4">Analysing document content...</p>
+            <p className="text-xs text-muted-foreground text-center px-4">{t("proposalWorkspace.aiPanel.analysingContent")}</p>
           </div>
         )}
 
@@ -174,7 +176,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
           <div className="flex flex-col items-center justify-center py-12 gap-3 px-4">
             <Sparkles className="h-8 w-8 text-muted-foreground/40" />
             <p className="text-xs text-muted-foreground text-center">
-              Upload an appel d&apos;offre and click Analyze to extract requirements and structure.
+              {t("proposalWorkspace.aiPanel.helpText")}
             </p>
           </div>
         )}
@@ -185,7 +187,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
             <div className="rounded-lg bg-muted/40 px-3 py-2.5">
               <p className="text-xs leading-relaxed text-foreground">{analysis.summary}</p>
               <p className="text-[10px] text-muted-foreground mt-1.5">
-                Analysed {analysis.analyzedAt instanceof Date ? analysis.analyzedAt.toLocaleDateString() : ""}
+                {t("proposalWorkspace.aiPanel.analysedAt", { date: analysis.analyzedAt instanceof Date ? analysis.analyzedAt.toLocaleDateString() : "" })}
               </p>
             </div>
 
@@ -193,14 +195,14 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
             {analysis.suggestedSections.length > 0 && (
               <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={onApplyStructure}>
                 <Sparkles className="h-3 w-3" />
-                Apply suggested structure ({analysis.suggestedSections.length} sections)
+                {t("proposalWorkspace.aiPanel.applySuggestedStructure", { count: analysis.suggestedSections.length })}
               </Button>
             )}
 
             {/* Requirements checklist */}
             {requirements.length > 0 && (
               <SectionToggle
-                title={`Requirements (${addressedCount}/${requirements.length})`}
+                title={t("proposalWorkspace.aiPanel.requirements", { addressed: addressedCount, total: requirements.length })}
                 count={requirements.length}
               >
                 {requirements.map((req) => (
@@ -215,7 +217,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
 
             {/* Key findings */}
             {analysis.keyFindings.length > 0 && (
-              <SectionToggle title="Key Findings" count={analysis.keyFindings.length}>
+              <SectionToggle title={t("proposalWorkspace.aiPanel.keyFindings")} count={analysis.keyFindings.length}>
                 {analysis.keyFindings.map((f) => (
                   <FindingCard key={f.id} finding={f} />
                 ))}
@@ -224,7 +226,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
 
             {/* Evaluation criteria */}
             {analysis.evaluationCriteria.length > 0 && (
-              <SectionToggle title="Evaluation Criteria" count={analysis.evaluationCriteria.length}>
+              <SectionToggle title={t("proposalWorkspace.aiPanel.evaluationCriteria")} count={analysis.evaluationCriteria.length}>
                 {analysis.evaluationCriteria.map((c) => (
                   <CriterionRow key={c.id} criterion={c} />
                 ))}
@@ -233,7 +235,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
 
             {/* Concepts */}
             {analysis.concepts.length > 0 && (
-              <SectionToggle title="Key Concepts" count={analysis.concepts.length}>
+              <SectionToggle title={t("proposalWorkspace.aiPanel.keyConcepts")} count={analysis.concepts.length}>
                 {analysis.concepts.map((c) => (
                   <div key={c.id} className="px-3 py-2 hover:bg-muted/20">
                     <div className="flex items-center justify-between mb-0.5">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, ArrowRight, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -49,6 +50,7 @@ function SectionToggle({ title, count, children }: { title: string; count: numbe
 }
 
 function FindingCard({ finding, onInsert }: { finding: Finding; onInsert: (text: string) => void }) {
+  const { t } = useTranslation()
   return (
     <div className="px-3 py-2.5 hover:bg-muted/20 group">
       <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -63,7 +65,7 @@ function FindingCard({ finding, onInsert }: { finding: Finding; onInsert: (text:
         className="mt-1.5 hidden group-hover:flex items-center gap-1 text-[10px] text-primary hover:underline"
       >
         <ArrowRight className="h-3 w-3" />
-        Insert into draft
+        {t("proposalWorkspace.aiAnalysisPanel.insertIntoDraft")}
       </button>
     </div>
   )
@@ -76,6 +78,7 @@ function RequirementItem({
   req: Requirement
   onToggle: (id: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-2.5 px-3 py-2 hover:bg-muted/20">
       <button onClick={() => onToggle(req.id)} className="mt-0.5 shrink-0">
@@ -90,7 +93,7 @@ function RequirementItem({
           {req.text}
         </p>
         {req.mandatory && (
-          <span className="text-[10px] text-destructive font-medium">Mandatory</span>
+          <span className="text-[10px] text-destructive font-medium">{t("proposalWorkspace.aiAnalysisPanel.mandatory")}</span>
         )}
       </div>
     </div>
@@ -152,6 +155,7 @@ function AnalysisSkeleton() {
 }
 
 export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch, onApplyStructure }: AIAnalysisPanelProps) {
+  const { t } = useTranslation()
   const handleToggleRequirement = (id: string) => {
     if (!analysis) return
     const updated = {
@@ -166,7 +170,7 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
   const handleInsertFinding = (_text: string) => {
     // The tender editor panel handles insertion via a shared callback if needed
     // For now, copy to clipboard as a convenience
-    navigator.clipboard.writeText(_text).catch(() => {})
+    navigator.clipboard.writeText(_text).catch(() => { })
   }
 
   return (
@@ -175,10 +179,10 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background shrink-0">
         <Sparkles className="h-4 w-4 text-primary" />
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-foreground">AI Analysis</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("proposalWorkspace.aiAnalysisPanel.aiAnalysis")}</h3>
           {analysis && (
             <p className="text-xs text-muted-foreground mt-0.5">
-              {analysis.keyFindings.length} findings · {analysis.requirements.length} requirements
+              {t("proposalWorkspace.aiAnalysisPanel.findingsRequirements", { findings: analysis.keyFindings.length, requirements: analysis.requirements.length })}
             </p>
           )}
         </div>
@@ -197,7 +201,7 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
           <div className="m-4 p-3 rounded-lg border border-destructive/30 bg-destructive/10 flex gap-2">
             <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-medium text-destructive">Analysis failed</p>
+              <p className="text-xs font-medium text-destructive">{t("proposalWorkspace.aiAnalysisPanel.analysisFailed")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{analyzeError}</p>
             </div>
           </div>
@@ -208,9 +212,9 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
               <Sparkles className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-foreground">No analysis yet</p>
+            <p className="text-sm font-medium text-foreground">{t("proposalWorkspace.aiAnalysisPanel.noAnalysisYet")}</p>
             <p className="text-xs text-muted-foreground">
-              Paste your source document, then click "Analyse with AI" to extract findings, requirements, and concepts.
+              {t("proposalWorkspace.aiAnalysisPanel.helpText")}
             </p>
           </div>
         )}
@@ -219,19 +223,19 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
           <div className="p-3 space-y-3">
             {/* Summary */}
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1.5">Summary</p>
+              <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1.5">{t("proposalWorkspace.aiAnalysisPanel.summary")}</p>
               <p className="text-xs text-foreground leading-relaxed">{analysis.summary}</p>
             </div>
 
             {/* Key findings */}
-            <SectionToggle title="Key Findings" count={analysis.keyFindings.length}>
+            <SectionToggle title={t("proposalWorkspace.aiAnalysisPanel.keyFindings")} count={analysis.keyFindings.length}>
               {analysis.keyFindings.map((f) => (
                 <FindingCard key={f.id} finding={f} onInsert={handleInsertFinding} />
               ))}
             </SectionToggle>
 
             {/* Requirements checklist */}
-            <SectionToggle title="Requirements" count={analysis.requirements.length}>
+            <SectionToggle title={t("proposalWorkspace.aiAnalysisPanel.requirements")} count={analysis.requirements.length}>
               {analysis.requirements.map((r) => (
                 <RequirementItem key={r.id} req={r} onToggle={handleToggleRequirement} />
               ))}
@@ -239,7 +243,7 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
 
             {/* Evaluation criteria */}
             {analysis.evaluationCriteria.length > 0 && (
-              <SectionToggle title="Evaluation Criteria" count={analysis.evaluationCriteria.length}>
+              <SectionToggle title={t("proposalWorkspace.aiAnalysisPanel.evaluationCriteria")} count={analysis.evaluationCriteria.length}>
                 {analysis.evaluationCriteria.map((c) => (
                   <CriterionBar key={c.id} criterion={c} />
                 ))}
@@ -250,7 +254,7 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
             {analysis.concepts.length > 0 && (
               <div className="border border-border rounded-lg overflow-hidden">
                 <div className="px-3 py-2.5 bg-muted/30">
-                  <p className="text-xs font-semibold text-foreground">Key Concepts</p>
+                  <p className="text-xs font-semibold text-foreground">{t("proposalWorkspace.aiAnalysisPanel.keyConcepts")}</p>
                 </div>
                 <div className="p-3 flex flex-wrap gap-1.5">
                   {analysis.concepts.map((c) => (
@@ -268,10 +272,10 @@ export function AIAnalysisPanel({ analysis, isAnalyzing, analyzeError, dispatch,
         <div className="px-4 py-3 border-t border-border bg-background shrink-0">
           <Button className="w-full gap-2" size="sm" variant="default" onClick={onApplyStructure}>
             <ArrowRight className="h-4 w-4" />
-            Apply Structure to Draft
+            {t("proposalWorkspace.aiAnalysisPanel.applyStructureToDraft")}
           </Button>
           <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-            Pre-fills draft with suggested sections based on the analysis
+            {t("proposalWorkspace.aiAnalysisPanel.prefillsNote")}
           </p>
         </div>
       )}

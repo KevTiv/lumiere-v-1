@@ -49,10 +49,10 @@ export function WorkflowsClient({ initialWorkflows, initialInstances, organizati
             ...w,
             data: {
               stats: [
-                { label: "Total Workflows", value: String(workflows.length), icon: "GitBranch" },
-                { label: "Active", value: String(active), icon: "CheckCircle" },
-                { label: "Running Instances", value: String(running), icon: "Play" },
-                { label: "Completed", value: String(done), icon: "Flag" },
+                { label: t("workflows.dashboard.totalWorkflows"), value: String(workflows.length), icon: "GitBranch" },
+                { label: t("workflows.dashboard.active"), value: String(active), icon: "CheckCircle" },
+                { label: t("workflows.dashboard.runningInstances"), value: String(running), icon: "Play" },
+                { label: t("workflows.dashboard.completed"), value: String(done), icon: "Flag" },
               ],
             },
           }

@@ -74,10 +74,10 @@ export function ProjectsClient({
             ...w,
             data: {
               stats: [
-                { label: "Active Projects", value: String(activeProjects), icon: "FolderKanban" },
-                { label: "Open Tasks", value: String(openTasks), icon: "CheckSquare" },
-                { label: "Overdue Tasks", value: String(overdueTasks), icon: "AlertCircle" },
-                { label: "Hours Logged", value: `${Math.round(totalHoursSpent)}h`, icon: "Clock" },
+                { label: t("projects.dashboard.activeProjects"), value: String(activeProjects), icon: "FolderKanban" },
+                { label: t("projects.dashboard.openTasks"), value: String(openTasks), icon: "CheckSquare" },
+                { label: t("projects.dashboard.overdueTasks"), value: String(overdueTasks), icon: "AlertCircle" },
+                { label: t("projects.dashboard.hoursLogged"), value: `${Math.round(totalHoursSpent)}h`, icon: "Clock" },
               ],
             },
           }
@@ -102,7 +102,7 @@ export function ProjectsClient({
             const closed = Number(p.taskCountClosed ?? 0)
             const progress = total > 0 ? Math.round((closed / total) * 100) : 0
             return {
-              label: String(p.name ?? `Project ${i + 1}`),
+              label: String(p.name ?? t("projects.dashboard.projectFallback", { number: i + 1 })),
               value: progress,
               max: 100,
               color: colors[i] ?? "#6366f1",

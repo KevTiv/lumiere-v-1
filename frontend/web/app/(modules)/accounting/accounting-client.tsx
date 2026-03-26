@@ -112,10 +112,10 @@ export function AccountingClient({
             ...w,
             data: {
               stats: [
-                { label: "Accounts Receivable", value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
-                { label: "Accounts Payable", value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
-                { label: "Cash Balance", value: `$${cash.toLocaleString()}`, icon: "DollarSign" },
-                { label: "Revenue MTD", value: `$${revenue.toLocaleString()}`, icon: "BarChart2" },
+                { label: t("accounting.dashboard.accountsReceivable"), value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
+                { label: t("accounting.dashboard.accountsPayable"), value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
+                { label: t("accounting.dashboard.cashBalance"), value: `$${cash.toLocaleString()}`, icon: "DollarSign" },
+                { label: t("accounting.dashboard.revenueMTD"), value: `$${revenue.toLocaleString()}`, icon: "BarChart2" },
               ],
             },
           }
