@@ -68,6 +68,7 @@ export type AccountAccountType = __Infer<typeof AccountAccountType>;
 
 export const AccountAnalyticAccount = __t.object("AccountAnalyticAccount", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   code: __t.option(__t.string()),
   active: __t.bool(),
@@ -102,6 +103,7 @@ export type AccountAnalyticAccount = __Infer<typeof AccountAnalyticAccount>;
 
 export const AccountAnalyticDistributionModel = __t.object("AccountAnalyticDistributionModel", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.option(__t.string()),
   partnerCategoryId: __t.option(__t.u64()),
   productId: __t.option(__t.u64()),
@@ -120,6 +122,7 @@ export type AccountAnalyticDistributionModel = __Infer<typeof AccountAnalyticDis
 
 export const AccountAnalyticLine = __t.object("AccountAnalyticLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   amount: __t.f64(),
@@ -1235,7 +1238,7 @@ export type BillTimesheetsParams = __Infer<typeof BillTimesheetsParams>;
 
 export const BomExplosionResult = __t.object("BomExplosionResult", {
   id: __t.u64(),
-  companyId: __t.u64(),
+  organizationId: __t.u64(),
   rootBomId: __t.u64(),
   parentBomId: __t.u64(),
   bomId: __t.u64(),
@@ -1275,6 +1278,7 @@ export type BomType = __Infer<typeof BomType>;
 
 export const BudgetPost = __t.object("BudgetPost", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   code: __t.option(__t.string()),
   description: __t.option(__t.string()),
@@ -2732,6 +2736,9 @@ export const CreateFinancialReportParams = __t.object("CreateFinancialReportPara
   showHierarchy: __t.bool(),
   showPercentage: __t.bool(),
   showDebitCredit: __t.bool(),
+  reportData: __t.option(__t.string()),
+  exportFormat: __t.option(__t.string()),
+  exportedFileUrl: __t.option(__t.string()),
   resultCurrencyId: __t.u64(),
   metadata: __t.option(__t.string()),
 });
@@ -4581,6 +4588,7 @@ export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
 
 export const CrossoveredBudget = __t.object("CrossoveredBudget", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   dateFrom: __t.timestamp(),
@@ -4604,6 +4612,7 @@ export type CrossoveredBudget = __Infer<typeof CrossoveredBudget>;
 
 export const CrossoveredBudgetLines = __t.object("CrossoveredBudgetLines", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   generalBudgetId: __t.u64(),
   analyticAccountId: __t.option(__t.u64()),
   dateFrom: __t.timestamp(),
@@ -6191,6 +6200,7 @@ export type MoveType = __Infer<typeof MoveType>;
 
 export const MrpBom = __t.object("MrpBom", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   get type() {
     return BomType;
   },
@@ -6224,6 +6234,7 @@ export type MrpBom = __Infer<typeof MrpBom>;
 
 export const MrpBomLine = __t.object("MrpBomLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   bomId: __t.u64(),
   productId: __t.u64(),
   productTmplId: __t.u64(),
@@ -6249,6 +6260,7 @@ export type MrpBomLine = __Infer<typeof MrpBomLine>;
 
 export const MrpProduction = __t.object("MrpProduction", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   origin: __t.option(__t.string()),
   productId: __t.u64(),
   productTmplId: __t.u64(),
@@ -6322,6 +6334,7 @@ export type MrpProduction = __Infer<typeof MrpProduction>;
 
 export const MrpRoutingWorkcenter = __t.object("MrpRoutingWorkcenter", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   workcenterId: __t.u64(),
   name: __t.string(),
   worksheet: __t.option(__t.string()),
@@ -6345,6 +6358,7 @@ export type MrpRoutingWorkcenter = __Infer<typeof MrpRoutingWorkcenter>;
 
 export const MrpWorkcenter = __t.object("MrpWorkcenter", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   active: __t.bool(),
   code: __t.option(__t.string()),
@@ -6383,6 +6397,7 @@ export type MrpWorkcenter = __Infer<typeof MrpWorkcenter>;
 
 export const MrpWorkcenterProductivity = __t.object("MrpWorkcenterProductivity", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   workcenterId: __t.u64(),
   workorderId: __t.u64(),
   description: __t.option(__t.string()),
@@ -6402,6 +6417,7 @@ export type MrpWorkcenterProductivity = __Infer<typeof MrpWorkcenterProductivity
 
 export const MrpWorkorder = __t.object("MrpWorkorder", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   workcenterId: __t.u64(),
   productionId: __t.u64(),
   productId: __t.u64(),
@@ -7337,6 +7353,7 @@ export type ProfitLossLine = __Infer<typeof ProfitLossLine>;
 
 export const ProjectProject = __t.object("ProjectProject", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   active: __t.bool(),
@@ -7396,6 +7413,7 @@ export type ProjectProject = __Infer<typeof ProjectProject>;
 
 export const ProjectTask = __t.object("ProjectTask", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
   priority: __t.string(),
@@ -7452,6 +7470,7 @@ export type ProjectTask = __Infer<typeof ProjectTask>;
 
 export const ProjectTimesheet = __t.object("ProjectTimesheet", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   projectId: __t.u64(),
   taskId: __t.option(__t.u64()),
@@ -8270,6 +8289,7 @@ export type SaleOrder = __Infer<typeof SaleOrder>;
 
 export const SaleOrderLine = __t.object("SaleOrderLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   orderId: __t.u64(),
   name: __t.string(),
   sequence: __t.u32(),

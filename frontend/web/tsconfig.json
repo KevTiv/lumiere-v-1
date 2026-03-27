@@ -49,6 +49,9 @@
       "@lumiere/stdb": [
         "../packages/stdb/src/index.ts"
       ],
+      "@lumiere/stdb/server": [
+        "../packages/stdb/src/server.ts"
+      ],
       "@lumiere/stdb/*": [
         "../packages/stdb/src/*"
       ]

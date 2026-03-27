@@ -2,11 +2,11 @@
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
 import { useTranslation } from "@lumiere/i18n"
-import type { CreateCalendarEventParams } from "@lumiere/stdb"
-import { calendarSubscriptions, getStdbConnection, useCalendarEvents, useCreateCalendarEvent, useStdbConnection } from "@lumiere/stdb"
+import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/calendar"
+import type { CreateCalendarEventParams } from "@/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm } from "@lumiere/ui"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 
 interface CalendarClientProps {
@@ -24,16 +24,6 @@ export function CalendarClient({ initialEvents, organizationId }: CalendarClient
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] calendar subscription error", err))
-      .subscribe(calendarSubscriptions(orgId))
-  }, [connected, orgId])
-
   const { data: events = [] } = useCalendarEvents(orgId, initialEvents)
   const createCalendarEvent = useCreateCalendarEvent(orgId)
 

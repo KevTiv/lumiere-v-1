@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newExpenseForm, newExpenseSheetForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
-import { useExpenses, useExpenseSheets, useCreateExpense, useCreateExpenseSheet, useStdbConnection, getStdbConnection, expensesSubscriptions } from "@lumiere/stdb"
-import type { CreateExpenseParams, CreateExpenseSheetParams } from "@lumiere/stdb"
+import { useExpenses, useExpenseSheets, useCreateExpense, useCreateExpenseSheet } from "@/hooks/expenses"
+import type { CreateExpenseParams, CreateExpenseSheetParams } from "@/hooks/expenses"
 
 interface ExpensesClientProps {
   initialExpenses?: Record<string, unknown>[]
@@ -19,16 +19,6 @@ export function ExpensesClient({ initialExpenses, initialSheets, organizationId 
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] expenses subscription error", err))
-      .subscribe(expensesSubscriptions(orgId))
-  }, [connected, orgId])
-
   const { data: expenses = [] } = useExpenses(orgId, initialExpenses)
   const { data: sheets = [] } = useExpenseSheets(orgId, initialSheets)
   const createExpense = useCreateExpense(orgId, orgId)

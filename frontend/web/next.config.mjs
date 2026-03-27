@@ -11,22 +11,23 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["@lumiere/ui"],
+  transpilePackages: ["@lumiere/ui", "@lumiere/stdb"],
   // Force a single React instance across all workspace packages.
   // @react-three/fiber inside @lumiere/ui would otherwise resolve React from
   // packages/ui/node_modules, causing "ReactCurrentOwner" undefined errors.
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      react: './node_modules/react',
+      'react-dom': './node_modules/react-dom',
     }
     return config
   },
   turbopack: {
+    root: path.resolve(__dirname, '../..'),
     resolveAlias: {
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      react: './frontend/web/node_modules/react',
+      'react-dom': './frontend/web/node_modules/react-dom',
     },
   },
 }

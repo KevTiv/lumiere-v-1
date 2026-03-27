@@ -1,5 +1,5 @@
-import FinancialReportRow from "../generated/financial_report_table";
-import TrialBalanceRow from "../generated/trial_balance_table";
+import type FinancialReportRow from "../generated/financial_report_table";
+import type TrialBalanceRow from "../generated/trial_balance_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

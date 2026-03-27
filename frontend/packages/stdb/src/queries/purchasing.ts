@@ -1,6 +1,6 @@
-import PurchaseOrderRow from "../generated/purchase_order_table";
-import PurchaseOrderLineRow from "../generated/purchase_order_line_table";
-import PurchaseRequisitionRow from "../generated/purchase_requisition_table";
+import type PurchaseOrderRow from "../generated/purchase_order_table";
+import type PurchaseOrderLineRow from "../generated/purchase_order_line_table";
+import type PurchaseRequisitionRow from "../generated/purchase_requisition_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

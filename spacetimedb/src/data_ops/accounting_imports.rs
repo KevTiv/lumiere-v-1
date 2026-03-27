@@ -464,6 +464,7 @@ pub fn import_budget_csv(
 
         ctx.db.crossovered_budget().insert(CrossoveredBudget {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             date_from,
@@ -539,6 +540,7 @@ pub fn import_budget_line_csv(
             .crossovered_budget_lines()
             .insert(CrossoveredBudgetLines {
                 id: 0,
+                organization_id,
                 general_budget_id,
                 analytic_account_id: opt_u64(col(&headers, row, "analytic_account_id")),
                 date_from,
@@ -607,6 +609,7 @@ pub fn import_analytic_account_csv(
             .account_analytic_account()
             .insert(AccountAnalyticAccount {
                 id: 0,
+                organization_id,
                 name,
                 code: opt_str(col(&headers, row, "code")),
                 active: true,

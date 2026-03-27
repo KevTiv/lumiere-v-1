@@ -22,6 +22,7 @@ use serde_json;
 #[spacetimedb::table(
     accessor = mrp_bom,
     public,
+    index(accessor = mrp_bom_by_org, btree(columns = [organization_id])),
     index(accessor = mrp_bom_by_product, btree(columns = [product_id])),
     index(accessor = mrp_bom_by_company, btree(columns = [company_id]))
 )]
@@ -30,6 +31,7 @@ pub struct MrpBom {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub type_: BomType,
     pub product_id: u64,
     pub product_tmpl_id: u64,
@@ -63,6 +65,7 @@ pub struct MrpBom {
 #[spacetimedb::table(
     accessor = mrp_bom_line,
     public,
+    index(accessor = mrp_bom_line_by_org, btree(columns = [organization_id])),
     index(accessor = mrp_bom_line_by_bom, btree(columns = [bom_id]))
 )]
 pub struct MrpBomLine {
@@ -70,6 +73,7 @@ pub struct MrpBomLine {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub bom_id: u64,
     pub product_id: u64,
     pub product_tmpl_id: u64,
@@ -97,6 +101,7 @@ pub struct MrpBomLine {
 #[spacetimedb::table(
     accessor = mrp_routing_workcenter,
     public,
+    index(accessor = mrp_routing_by_org, btree(columns = [organization_id])),
     index(accessor = mrp_routing_by_workcenter, btree(columns = [workcenter_id]))
 )]
 pub struct MrpRoutingWorkcenter {
@@ -104,6 +109,7 @@ pub struct MrpRoutingWorkcenter {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub workcenter_id: u64,
     pub name: String,
     pub worksheet: Option<String>,
@@ -148,7 +154,7 @@ pub struct BomExplosionResult {
     #[auto_inc]
     pub id: u64,
 
-    pub company_id: u64,
+    pub organization_id: u64,
     pub root_bom_id: u64,
     pub parent_bom_id: u64,
     pub bom_id: u64,
@@ -253,7 +259,7 @@ fn clear_bom_explosion_cache(ctx: &ReducerContext, root_bom_id: u64) {
 
 fn explode_bom_recursive(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     root_bom_id: u64,
     parent_bom_id: u64,
     bom_id: u64,
@@ -266,8 +272,8 @@ fn explode_bom_recursive(
     }
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
-    if bom.company_id != company_id {
-        return Err("BOM does not belong to this company".to_string());
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
     }
 
     visited.push(bom_id);
@@ -275,7 +281,7 @@ fn explode_bom_recursive(
     // Emit header row
     ctx.db.bom_explosion_result().insert(BomExplosionResult {
         id: 0,
-        company_id,
+        organization_id,
         root_bom_id,
         parent_bom_id,
         bom_id,
@@ -299,7 +305,7 @@ fn explode_bom_recursive(
 
         ctx.db.bom_explosion_result().insert(BomExplosionResult {
             id: 0,
-            company_id,
+            organization_id,
             root_bom_id,
             parent_bom_id: bom_id,
             bom_id,
@@ -314,7 +320,7 @@ fn explode_bom_recursive(
         if let Some(child_bom_id) = line.child_bom_id {
             explode_bom_recursive(
                 ctx,
-                company_id,
+                organization_id,
                 root_bom_id,
                 bom_id,
                 child_bom_id,
@@ -346,6 +352,7 @@ pub fn create_bom(
     // Create BOM header
     let bom = ctx.db.mrp_bom().insert(MrpBom {
         id: 0,
+        organization_id,
         type_: params.type_,
         product_id: params.product_id,
         product_tmpl_id: params.product_tmpl_id,
@@ -386,6 +393,7 @@ pub fn create_bom(
 
         let line = ctx.db.mrp_bom_line().insert(MrpBomLine {
             id: 0,
+            organization_id,
             bom_id: bom.id,
             product_id: line_input.product_id,
             product_tmpl_id: product.id,
@@ -458,8 +466,8 @@ pub fn update_bom(
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
 
-    if bom.company_id != company_id {
-        return Err("BOM does not belong to this company".to_string());
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
     }
 
     ctx.db.mrp_bom().id().update(MrpBom {
@@ -515,8 +523,8 @@ pub fn delete_bom(
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
 
-    if bom.company_id != company_id {
-        return Err("BOM does not belong to this company".to_string());
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
     }
 
     // Delete associated BOM lines
@@ -579,6 +587,7 @@ pub fn create_routing_workcenter(
         .mrp_routing_workcenter()
         .insert(MrpRoutingWorkcenter {
             id: 0,
+            organization_id,
             workcenter_id: params.workcenter_id,
             name: params.name.clone(),
             worksheet: params.worksheet,
@@ -639,8 +648,8 @@ pub fn compute_bom_cost(
     check_permission(ctx, organization_id, "mrp_bom", "write")?;
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
-    if bom.company_id != company_id {
-        return Err("BOM does not belong to this company".to_string());
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
     }
 
     let lines: Vec<MrpBomLine> = ctx
@@ -697,8 +706,8 @@ pub fn explode_bom(
     check_permission(ctx, organization_id, "mrp_bom", "read")?;
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
-    if bom.company_id != company_id {
-        return Err("BOM does not belong to this company".to_string());
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
     }
 
     clear_bom_explosion_cache(ctx, bom_id);
@@ -706,7 +715,7 @@ pub fn explode_bom(
     let mut visited = Vec::new();
     explode_bom_recursive(
         ctx,
-        company_id,
+        organization_id,
         bom_id,
         bom_id,
         bom_id,

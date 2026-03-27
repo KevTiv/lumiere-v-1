@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newSubscriptionForm, newSubscriptionPlanForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useSubscriptions, useSubscriptionPlans, useStdbConnection, getStdbConnection, subscriptionsSubscriptions } from "@lumiere/stdb"
+import { useSubscriptions, useSubscriptionPlans } from "@/hooks/subscriptions"
 
 interface SubscriptionsClientProps {
   initialSubscriptions?: Record<string, unknown>[]
@@ -18,15 +18,6 @@ export function SubscriptionsClient({ initialSubscriptions, initialPlans, organi
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] subscriptions subscription error", err))
-      .subscribe(subscriptionsSubscriptions(orgId))
-  }, [connected, orgId])
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)

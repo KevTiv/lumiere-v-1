@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQueryMailMessages } from "@lumiere/stdb/server"
 import { MessagesClient } from "./messages-client"
 

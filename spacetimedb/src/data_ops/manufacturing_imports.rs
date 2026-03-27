@@ -42,6 +42,7 @@ pub fn import_workcenter_csv(
 
         ctx.db.mrp_workcenter().insert(MrpWorkcenter {
             id: 0,
+            organization_id,
             name,
             active: parse_bool(col(&headers, row, "active")),
             code: opt_str(col(&headers, row, "code")),
@@ -147,6 +148,7 @@ pub fn import_bom_csv(
 
         ctx.db.mrp_bom().insert(MrpBom {
             id: 0,
+            organization_id,
             type_: bom_type,
             product_id: if product_id != 0 {
                 product_id
@@ -241,6 +243,7 @@ pub fn import_bom_line_csv(
 
         ctx.db.mrp_bom_line().insert(MrpBomLine {
             id: 0,
+            organization_id,
             bom_id,
             product_id,
             product_tmpl_id: if product_tmpl_id != 0 {
@@ -336,6 +339,7 @@ pub fn import_manufacturing_order_csv(
 
         ctx.db.mrp_production().insert(MrpProduction {
             id: 0,
+            organization_id,
             origin: opt_str(col(&headers, row, "origin")),
             product_id,
             product_tmpl_id: parse_u64(col(&headers, row, "product_tmpl_id")),

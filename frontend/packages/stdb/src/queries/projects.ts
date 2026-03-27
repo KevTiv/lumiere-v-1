@@ -1,6 +1,6 @@
-import ProjectRow from "../generated/project_project_table";
-import TaskRow from "../generated/project_task_table";
-import TimesheetRow from "../generated/project_timesheet_table";
+import type ProjectRow from "../generated/project_project_table";
+import type TaskRow from "../generated/project_task_table";
+import type TimesheetRow from "../generated/project_timesheet_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

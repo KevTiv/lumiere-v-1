@@ -205,12 +205,14 @@ pub struct SaleOrder {
 #[spacetimedb::table(
     accessor = sale_order_line,
     public,
+    index(accessor = order_line_by_org, btree(columns = [organization_id])),
     index(accessor = order_line_by_order, btree(columns = [order_id]))
 )]
 pub struct SaleOrderLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub order_id: u64,
     pub name: String,
     pub sequence: u32,
@@ -331,6 +333,7 @@ fn create_sale_order_line_internal(
     order_id: u64,
     params: CreateSaleOrderLineParams,
     currency_id: u64,
+    organization_id: u64,
     company_id: u64,
     partner_id: u64,
 ) -> Result<SaleOrderLine, String> {
@@ -357,6 +360,7 @@ fn create_sale_order_line_internal(
 
     let line = ctx.db.sale_order_line().insert(SaleOrderLine {
         id: 0,
+        organization_id,
         order_id,
         name: params.name.unwrap_or_else(|| {
             product_name.unwrap_or_else(|| format!("Product {}", params.product_id))
@@ -592,6 +596,7 @@ pub fn create_sale_order(
             order.id,
             line_params,
             params.currency_id,
+            organization_id,
             company_id,
             params.partner_id,
         )?;

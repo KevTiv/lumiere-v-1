@@ -12,7 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  companyId: __t.u64().name("company_id"),
+  organizationId: __t.u64().name("organization_id"),
   rootBomId: __t.u64().name("root_bom_id"),
   parentBomId: __t.u64().name("parent_bom_id"),
   bomId: __t.u64().name("bom_id"),

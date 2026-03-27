@@ -1,4 +1,4 @@
-import MailMessageRow from "../generated/mail_message_table";
+import type MailMessageRow from "../generated/mail_message_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

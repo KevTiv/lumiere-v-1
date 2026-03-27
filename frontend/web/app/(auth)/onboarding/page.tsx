@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useStdbConnection, getStdbConnection } from "@lumiere/stdb"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@lumiere/ui/components/card"
@@ -20,7 +19,6 @@ const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"] as const
 export default function OnboardingPage() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { connected } = useStdbConnection()
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
   const [timezone, setTimezone] = useState("UTC")
@@ -30,32 +28,25 @@ export default function OnboardingPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!connected) {
-      setError(t("auth.onboarding.errors.notConnected"))
-      return
-    }
     setError(null)
     setLoading(true)
     try {
-      const conn = getStdbConnection()
-      if (!conn) throw new Error(t("auth.onboarding.errors.noConnection"))
-      conn.reducers.createOrganization({
-        params: {
+      const r = await fetch('/api/call/create_organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{
           name,
           code,
           timezone,
           dateFormat: "YYYY-MM-DD",
           language: "en",
           isActive: true,
-          description: undefined,
-          logoUrl: undefined,
-          website: undefined,
-          email: undefined,
-          phone: undefined,
-          currencyId: undefined,
-          metadata: undefined,
-        },
+        }]),
       })
+      if (!r.ok) {
+        const json = await r.json().catch(() => ({})) as Record<string, unknown>
+        throw new Error((json.error as string | undefined) ?? t("auth.onboarding.errors.failedToCreate"))
+      }
       router.push("/overview")
     } catch (err) {
       setError(err instanceof Error ? err.message : t("auth.onboarding.errors.failedToCreate"))
@@ -134,11 +125,7 @@ export default function OnboardingPage() {
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          {!connected && (
-            <p className="text-sm text-muted-foreground">{t("auth.onboarding.connectingToServer")}</p>
-          )}
-
-          <Button type="submit" size="lg" className="w-full" disabled={loading || !connected}>
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? t("auth.onboarding.submitting") : t("auth.onboarding.submit")}
           </Button>
         </form>

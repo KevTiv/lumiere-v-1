@@ -19,6 +19,7 @@ use crate::types::BudgetState;
 #[spacetimedb::table(
     accessor = crossovered_budget,
     public,
+    index(accessor = budget_by_org, btree(columns = [organization_id])),
     index(accessor = budget_by_company, btree(columns = [company_id])),
     index(accessor = budget_by_state, btree(columns = [state])),
     index(accessor = budget_by_date_range, btree(columns = [date_from, date_to]))
@@ -28,6 +29,7 @@ pub struct CrossoveredBudget {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub date_from: Timestamp,
@@ -49,6 +51,7 @@ pub struct CrossoveredBudget {
 #[spacetimedb::table(
     accessor = crossovered_budget_lines,
     public,
+    index(accessor = budget_line_by_org, btree(columns = [organization_id])),
     index(accessor = budget_line_by_budget, btree(columns = [general_budget_id])),
     index(accessor = budget_line_by_analytic, btree(columns = [analytic_account_id])),
     index(accessor = budget_line_by_date, btree(columns = [date_from, date_to]))
@@ -58,6 +61,7 @@ pub struct CrossoveredBudgetLines {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub general_budget_id: u64,
     pub analytic_account_id: Option<u64>,
     pub date_from: Timestamp,
@@ -81,6 +85,7 @@ pub struct CrossoveredBudgetLines {
 #[spacetimedb::table(
     accessor = budget_post,
     public,
+    index(accessor = budget_post_by_org, btree(columns = [organization_id])),
     index(accessor = budget_post_by_company, btree(columns = [company_id]))
 )]
 #[derive(Clone)]
@@ -88,6 +93,7 @@ pub struct BudgetPost {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub code: Option<String>,
     pub description: Option<String>,
@@ -200,6 +206,7 @@ pub fn create_crossovered_budget(
 
     let budget = ctx.db.crossovered_budget().insert(CrossoveredBudget {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description,
         date_from: params.date_from,
@@ -265,8 +272,8 @@ pub fn update_crossovered_budget(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state != BudgetState::Draft {
@@ -362,8 +369,8 @@ pub fn create_budget_line(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state != BudgetState::Draft {
@@ -387,6 +394,7 @@ pub fn create_budget_line(
         .crossovered_budget_lines()
         .insert(CrossoveredBudgetLines {
             id: 0,
+            organization_id,
             general_budget_id: budget_id,
             analytic_account_id: params.analytic_account_id,
             date_from: params.date_from,
@@ -453,8 +461,8 @@ pub fn update_budget_line(
         .find(&line_id)
         .ok_or("Budget line not found")?;
 
-    if line.company_id != company_id {
-        return Err("Budget line does not belong to this company".to_string());
+    if line.organization_id != organization_id {
+        return Err("Budget line does not belong to this organization".to_string());
     }
 
     let mut budget = ctx
@@ -567,8 +575,8 @@ pub fn update_budget_line_actuals(
         .find(&line_id)
         .ok_or("Budget line not found")?;
 
-    if line.company_id != company_id {
-        return Err("Budget line does not belong to this company".to_string());
+    if line.organization_id != organization_id {
+        return Err("Budget line does not belong to this organization".to_string());
     }
 
     let budget = ctx
@@ -636,8 +644,8 @@ pub fn confirm_budget(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state != BudgetState::Draft {
@@ -690,8 +698,8 @@ pub fn validate_budget(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state != BudgetState::Confirm {
@@ -740,8 +748,8 @@ pub fn done_budget(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state != BudgetState::Validate {
@@ -790,8 +798,8 @@ pub fn cancel_budget(
         .find(&budget_id)
         .ok_or("Budget not found")?;
 
-    if budget.company_id != company_id {
-        return Err("Budget does not belong to this company".to_string());
+    if budget.organization_id != organization_id {
+        return Err("Budget does not belong to this organization".to_string());
     }
 
     if budget.state == BudgetState::Done {
@@ -839,6 +847,7 @@ pub fn create_budget_post(
 
     let post = ctx.db.budget_post().insert(BudgetPost {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         code: params.code,
         description: params.description,
@@ -888,8 +897,8 @@ pub fn update_budget_post(
         .find(&post_id)
         .ok_or("Budget post not found")?;
 
-    if post.company_id != company_id {
-        return Err("Budget post does not belong to this company".to_string());
+    if post.organization_id != organization_id {
+        return Err("Budget post does not belong to this organization".to_string());
     }
 
     let mut changed_fields = Vec::new();
@@ -967,8 +976,8 @@ pub fn delete_budget_line(
         .find(&line_id)
         .ok_or("Budget line not found")?;
 
-    if line.company_id != company_id {
-        return Err("Budget line does not belong to this company".to_string());
+    if line.organization_id != organization_id {
+        return Err("Budget line does not belong to this organization".to_string());
     }
 
     let mut budget = ctx

@@ -21,7 +21,7 @@ import {
   useCreateInventoryAdjustment,
   useWarehouse3D,
   useMoveStockItem3D,
-} from "@lumiere/stdb"
+} from "@/hooks/inventory"
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(

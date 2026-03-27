@@ -214,6 +214,7 @@ pub fn import_sale_order_line_csv(
 
         ctx.db.sale_order_line().insert(SaleOrderLine {
             id: 0,
+            organization_id,
             order_id,
             name: col(&headers, row, "name").to_string(),
             sequence: parse_u32(col(&headers, row, "sequence")),

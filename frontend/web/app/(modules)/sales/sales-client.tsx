@@ -13,11 +13,11 @@ import {
   usePickingBatches,
   useCreateSaleOrder,
   useCreatePricelist,
-} from "@lumiere/stdb"
+} from "@/hooks/sales"
 import type {
   CreateSaleOrderParams,
   CreatePricelistParams,
-} from "@lumiere/stdb"
+} from "@/hooks/sales"
 
 interface SalesClientProps {
   initialOrders?: Record<string, unknown>[]

@@ -17,6 +17,7 @@ use serde_json;
 #[spacetimedb::table(
     accessor = mrp_workcenter,
     public,
+    index(accessor = mrp_workcenter_by_org, btree(columns = [organization_id])),
     index(accessor = mrp_workcenter_by_company, btree(columns = [company_id]))
 )]
 pub struct MrpWorkcenter {
@@ -24,6 +25,7 @@ pub struct MrpWorkcenter {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub name: String,
     pub active: bool,
     pub code: Option<String>,
@@ -63,6 +65,7 @@ pub struct MrpWorkcenter {
 #[spacetimedb::table(
     accessor = mrp_workcenter_productivity,
     public,
+    index(accessor = mrp_productivity_by_org, btree(columns = [organization_id])),
     index(name = "by_workorder", accessor = mrp_productivity_by_workorder, btree(columns = [workorder_id])),
     index(accessor = mrp_productivity_by_workcenter, btree(columns = [workcenter_id]))
 )]
@@ -71,6 +74,7 @@ pub struct MrpWorkcenterProductivity {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub workcenter_id: u64,
     pub workorder_id: u64,
     pub description: Option<String>,
@@ -173,6 +177,7 @@ pub fn create_workcenter(
 
     let wc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
+        organization_id,
         name: params.name,
         active: params.active,
         code: params.code,
@@ -247,8 +252,8 @@ pub fn update_workcenter(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
 
-    if wc.company_id != company_id {
-        return Err("Work center does not belong to this company".to_string());
+    if wc.organization_id != organization_id {
+        return Err("Work center does not belong to this organization".to_string());
     }
 
     if let Some(ref ws) = params.working_state {
@@ -321,8 +326,8 @@ pub fn block_workcenter(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
 
-    if wc.company_id != company_id {
-        return Err("Work center does not belong to this company".to_string());
+    if wc.organization_id != organization_id {
+        return Err("Work center does not belong to this organization".to_string());
     }
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
@@ -370,8 +375,8 @@ pub fn unblock_workcenter(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
 
-    if wc.company_id != company_id {
-        return Err("Work center does not belong to this company".to_string());
+    if wc.organization_id != organization_id {
+        return Err("Work center does not belong to this organization".to_string());
     }
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
@@ -423,8 +428,8 @@ pub fn log_workcenter_productivity(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
 
-    if wc.company_id != company_id {
-        return Err("Work center does not belong to this company".to_string());
+    if wc.organization_id != organization_id {
+        return Err("Work center does not belong to this organization".to_string());
     }
 
     let productivity = ctx
@@ -432,6 +437,7 @@ pub fn log_workcenter_productivity(
         .mrp_workcenter_productivity()
         .insert(MrpWorkcenterProductivity {
             id: 0,
+            organization_id,
             workcenter_id,
             workorder_id: params.workorder_id,
             description: params.description,
@@ -513,8 +519,8 @@ pub fn complete_productivity_log(
         .find(&log_id)
         .ok_or("Productivity log not found")?;
 
-    if log_entry.company_id != company_id {
-        return Err("Log does not belong to this company".to_string());
+    if log_entry.organization_id != organization_id {
+        return Err("Log does not belong to this organization".to_string());
     }
 
     ctx.db

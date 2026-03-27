@@ -14,7 +14,7 @@ import {
   useCreateManufacturingOrder,
   useCreateBom,
   useCreateWorkcenter,
-} from "@lumiere/stdb"
+} from "@/hooks/manufacturing"
 
 interface ManufacturingClientProps {
   initialProductions?: Record<string, unknown>[]

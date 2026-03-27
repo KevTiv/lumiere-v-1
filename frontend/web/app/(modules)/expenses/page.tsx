@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQueryExpenses, serverQueryExpenseSheets } from "@lumiere/stdb/server"
 import { ExpensesClient } from "./expenses-client"
 

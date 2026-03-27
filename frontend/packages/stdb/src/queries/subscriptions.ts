@@ -1,6 +1,6 @@
-import SubscriptionRow from "../generated/subscription_table";
-import SubscriptionPlanRow from "../generated/subscription_plan_table";
-import SubscriptionLineRow from "../generated/subscription_line_table";
+import type SubscriptionRow from "../generated/subscription_table";
+import type SubscriptionPlanRow from "../generated/subscription_plan_table";
+import type SubscriptionLineRow from "../generated/subscription_line_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

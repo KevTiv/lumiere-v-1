@@ -16,6 +16,7 @@ use crate::types::{BillType, PricingType};
 #[spacetimedb::table(
     accessor = project_project,
     public,
+    index(accessor = project_by_org, btree(columns = [organization_id])),
     index(accessor = project_by_company, btree(columns = [company_id])),
     index(name = "by_user", accessor = project_by_user, btree(columns = [user_id]))
 )]
@@ -24,6 +25,7 @@ pub struct ProjectProject {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub active: bool,
@@ -247,6 +249,7 @@ fn project_audit_json(project: &ProjectProject) -> Value {
     );
     values.insert("active".to_string(), Value::from(project.active));
     values.insert("sequence".to_string(), Value::from(project.sequence));
+    values.insert("organization_id".to_string(), Value::from(project.organization_id));
     values.insert("company_id".to_string(), Value::from(project.company_id));
     values.insert("currency_id".to_string(), Value::from(project.currency_id));
     values.insert(
@@ -392,10 +395,10 @@ fn project_audit_json(project: &ProjectProject) -> Value {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-/// Validate that a project name is unique within a company.
+/// Validate that a project name is unique within an organization.
 fn validate_project_name_unique(
     ctx: &ReducerContext,
-    company_id: u64,
+    organization_id: u64,
     name: &str,
     exclude_project_id: Option<u64>,
 ) -> Result<(), String> {
@@ -405,14 +408,14 @@ fn validate_project_name_unique(
     }
 
     let exists = ctx.db.project_project().iter().any(|p| {
-        p.company_id == company_id
+        p.organization_id == organization_id
             && p.active
             && p.name.trim().to_lowercase() == normalized
             && exclude_project_id.map(|id| p.id != id).unwrap_or(true)
     });
 
     if exists {
-        return Err("A project with this name already exists in this company".to_string());
+        return Err("A project with this name already exists in this organization".to_string());
     }
 
     Ok(())
@@ -427,13 +430,14 @@ pub fn create_project(
     params: CreateProjectParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_project", "create")?;
-    validate_project_name_unique(ctx, company_id, &params.name, None)?;
+    validate_project_name_unique(ctx, organization_id, &params.name, None)?;
 
     BillType::from_str(&params.bill_type)?;
     PricingType::from_str(&params.pricing_type)?;
 
     let project = ctx.db.project_project().insert(ProjectProject {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description.clone(),
         active: params.active,
@@ -576,8 +580,8 @@ pub fn update_project(
         .find(&project_id)
         .ok_or("Project not found")?;
 
-    if project.company_id != company_id {
-        return Err("Project does not belong to this company".to_string());
+    if project.organization_id != organization_id {
+        return Err("Project does not belong to this organization".to_string());
     }
 
     let old_values = project_audit_json(&project);
@@ -585,7 +589,7 @@ pub fn update_project(
     let mut changed_fields = Vec::new();
 
     if let Some(name) = params.name {
-        validate_project_name_unique(ctx, company_id, &name, Some(project_id))?;
+        validate_project_name_unique(ctx, organization_id, &name, Some(project_id))?;
         project.name = name;
         changed_fields.push("name".to_string());
     }
@@ -852,8 +856,8 @@ pub fn set_project_active(
         .find(&project_id)
         .ok_or("Project not found")?;
 
-    if project.company_id != company_id {
-        return Err("Project does not belong to this company".to_string());
+    if project.organization_id != organization_id {
+        return Err("Project does not belong to this organization".to_string());
     }
 
     let old_values = serde_json::json!({ "active": project.active });
@@ -904,8 +908,8 @@ pub fn toggle_project_favorite(
         .find(&project_id)
         .ok_or("Project not found")?;
 
-    if project.company_id != company_id {
-        return Err("Project does not belong to this company".to_string());
+    if project.organization_id != organization_id {
+        return Err("Project does not belong to this organization".to_string());
     }
 
     let old_values = serde_json::json!({ "is_favorite": project.is_favorite });

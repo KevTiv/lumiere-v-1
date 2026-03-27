@@ -1,4 +1,4 @@
-import CalendarEventRow from "../generated/calendar_event_table";
+import type CalendarEventRow from "../generated/calendar_event_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

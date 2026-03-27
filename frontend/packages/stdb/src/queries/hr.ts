@@ -1,9 +1,9 @@
-import HrEmployeeRow from "../generated/hr_employee_table";
-import HrDepartmentRow from "../generated/hr_department_table";
-import HrLeaveRow from "../generated/hr_leave_table";
-import HrContractRow from "../generated/hr_contract_table";
-import HrPayslipRow from "../generated/hr_payslip_table";
-import HrJobPositionRow from "../generated/hr_job_position_table";
+import type HrEmployeeRow from "../generated/hr_employee_table";
+import type HrDepartmentRow from "../generated/hr_department_table";
+import type HrLeaveRow from "../generated/hr_leave_table";
+import type HrContractRow from "../generated/hr_contract_table";
+import type HrPayslipRow from "../generated/hr_payslip_table";
+import type HrJobPositionRow from "../generated/hr_job_position_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

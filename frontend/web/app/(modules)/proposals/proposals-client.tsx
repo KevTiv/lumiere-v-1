@@ -1,19 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newProposalForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
-import {
-  useProposals,
-  useCreateProposal,
-  useStdbConnection,
-  getStdbConnection,
-  proposalsSubscriptions,
-} from "@lumiere/stdb"
-import type { CreateProposalParams } from "@lumiere/stdb"
+import { useProposals, useCreateProposal } from "@/hooks/proposals"
+import type { CreateProposalParams } from "@/hooks/proposals"
 
 interface ProposalsClientProps {
   initialProposals?: Record<string, unknown>[]
@@ -26,16 +20,6 @@ export function ProposalsClient({ initialProposals, organizationId }: ProposalsC
   const moduleConfig = useMemo(() => proposalsModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] proposals subscription error", err))
-      .subscribe(proposalsSubscriptions(orgId))
-  }, [connected, orgId])
-
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
   const createProposal = useCreateProposal()
 

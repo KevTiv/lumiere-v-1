@@ -44,6 +44,7 @@ pub fn import_project_csv(
 
         ctx.db.project_project().insert(ProjectProject {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             active: true,
@@ -165,6 +166,7 @@ pub fn import_task_csv(
 
         ctx.db.project_task().insert(ProjectTask {
             id: 0,
+            organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
             priority: {
@@ -287,6 +289,7 @@ pub fn import_timesheet_csv(
 
         ctx.db.project_timesheet().insert(ProjectTimesheet {
             id: 0,
+            organization_id,
             name: col(&headers, row, "name").to_string(),
             project_id,
             task_id: opt_u64(col(&headers, row, "task_id")),

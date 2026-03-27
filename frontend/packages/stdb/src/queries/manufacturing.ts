@@ -1,7 +1,7 @@
-import MrpProductionRow from "../generated/mrp_production_table";
-import MrpBomRow from "../generated/mrp_bom_table";
-import MrpBomLineRow from "../generated/mrp_bom_line_table";
-import MrpWorkorderRow from "../generated/mrp_workorder_table";
+import type MrpProductionRow from "../generated/mrp_production_table";
+import type MrpBomRow from "../generated/mrp_bom_table";
+import type MrpBomLineRow from "../generated/mrp_bom_line_table";
+import type MrpWorkorderRow from "../generated/mrp_workorder_table";
 import MrpWorkcenterRow from "../generated/mrp_workcenter_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";

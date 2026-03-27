@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newMailMessageForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
-import { useMailMessages, usePostMessage, useStdbConnection, getStdbConnection, messagesSubscriptions } from "@lumiere/stdb"
-import type { PostMessageParams } from "@lumiere/stdb"
+import { useMailMessages, usePostMessage } from "@/hooks/messages"
+import type { PostMessageParams } from "@/hooks/messages"
 
 interface MessagesClientProps {
   initialMessages?: Record<string, unknown>[]
@@ -18,16 +18,6 @@ export function MessagesClient({ initialMessages, organizationId }: MessagesClie
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] messages subscription error", err))
-      .subscribe(messagesSubscriptions(orgId))
-  }, [connected, orgId])
-
   const { data: messages = [] } = useMailMessages(orgId, initialMessages)
   const postMessage = usePostMessage(orgId)
 

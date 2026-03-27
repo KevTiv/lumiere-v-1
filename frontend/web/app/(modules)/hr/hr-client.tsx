@@ -17,7 +17,7 @@ import {
   useCreateLeaveRequest,
   useCreateContract,
   useCreatePayslip,
-} from "@lumiere/stdb"
+} from "@/hooks/hr"
 
 interface HrClientProps {
   initialEmployees?: Record<string, unknown>[]

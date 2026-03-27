@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQueryCalendarEvents } from "@lumiere/stdb/server"
 import { CalendarClient } from "./calendar-client"
 

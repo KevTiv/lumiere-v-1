@@ -1,8 +1,8 @@
-import UserProfileRow from "../generated/user_profile_table";
-import CasbinRuleRow from "../generated/casbin_rule_table";
-import RoleRow from "../generated/role_table";
-import UserRoleAssignmentRow from "../generated/user_role_assignment_table";
-import UserOrganizationRow from "../generated/user_organization_table";
+import type UserProfileRow from "../generated/user_profile_table";
+import type CasbinRuleRow from "../generated/casbin_rule_table";
+import type RoleRow from "../generated/role_table";
+import type UserRoleAssignmentRow from "../generated/user_role_assignment_table";
+import type UserOrganizationRow from "../generated/user_organization_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQuerySubscriptions, serverQuerySubscriptionPlans } from "@lumiere/stdb/server"
 import { SubscriptionsClient } from "./subscriptions-client"
 

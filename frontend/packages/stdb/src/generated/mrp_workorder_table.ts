@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   workcenterId: __t.u64().name("workcenter_id"),
   productionId: __t.u64().name("production_id"),
   productId: __t.u64().name("product_id"),

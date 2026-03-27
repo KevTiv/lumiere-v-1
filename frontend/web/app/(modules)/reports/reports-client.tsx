@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newFinancialReportForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useFinancialReports, useTrialBalances, useStdbConnection, getStdbConnection, reportsSubscriptions } from "@lumiere/stdb"
+import { useFinancialReports, useTrialBalances } from "@/hooks/reports"
 
 interface ReportsClientProps {
   initialReports?: Record<string, unknown>[]
@@ -18,15 +18,6 @@ export function ReportsClient({ initialReports, initialBalances, organizationId 
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   const companyId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] reports subscription error", err))
-      .subscribe(reportsSubscriptions([companyId]))
-  }, [connected, companyId])
 
   const { data: reports = [] } = useFinancialReports(companyId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(companyId, initialBalances)

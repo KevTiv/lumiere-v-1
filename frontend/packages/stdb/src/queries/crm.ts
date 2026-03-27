@@ -1,7 +1,7 @@
-import LeadRow from "../generated/lead_table";
-import OpportunityRow from "../generated/opportunity_table";
-import ContactRow from "../generated/contact_table";
-import ActivityRow from "../generated/activity_table";
+import type LeadRow from "../generated/lead_table";
+import type OpportunityRow from "../generated/opportunity_table";
+import type ContactRow from "../generated/contact_table";
+import type ActivityRow from "../generated/activity_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

@@ -1,7 +1,7 @@
-import HelpdeskTicketRow from "../generated/helpdesk_ticket_table";
-import HelpdeskTeamRow from "../generated/helpdesk_team_table";
-import HelpdeskStageRow from "../generated/helpdesk_stage_table";
-import HelpdeskSlaRow from "../generated/helpdesk_sla_table";
+import type HelpdeskTicketRow from "../generated/helpdesk_ticket_table";
+import type HelpdeskTeamRow from "../generated/helpdesk_team_table";
+import type HelpdeskStageRow from "../generated/helpdesk_stage_table";
+import type HelpdeskSlaRow from "../generated/helpdesk_sla_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

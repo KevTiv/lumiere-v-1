@@ -1,7 +1,7 @@
-import SaleOrderRow from "../generated/sale_order_table";
-import SaleOrderLineRow from "../generated/sale_order_line_table";
-import ProductPricelistRow from "../generated/product_pricelist_table";
-import StockPickingBatchRow from "../generated/stock_picking_batch_table";
+import type SaleOrderRow from "../generated/sale_order_table";
+import type SaleOrderLineRow from "../generated/sale_order_line_table";
+import type ProductPricelistRow from "../generated/product_pricelist_table";
+import type StockPickingBatchRow from "../generated/stock_picking_batch_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQueryWorkflows, serverQueryWorkflowInstances } from "@lumiere/stdb/server"
 import { WorkflowsClient } from "./workflows-client"
 

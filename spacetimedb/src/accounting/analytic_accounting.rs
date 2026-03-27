@@ -19,6 +19,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[spacetimedb::table(
     accessor = account_analytic_account,
     public,
+    index(accessor = analytic_account_by_org, btree(columns = [organization_id])),
     index(accessor = analytic_account_by_code, btree(columns = [company_id, code])),
     index(accessor = analytic_account_by_company, btree(columns = [company_id])),
     index(accessor = analytic_account_by_partner, btree(columns = [partner_id])),
@@ -29,6 +30,7 @@ pub struct AccountAnalyticAccount {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub code: Option<String>,
     pub active: bool,
@@ -63,6 +65,7 @@ pub struct AccountAnalyticAccount {
 #[spacetimedb::table(
     accessor = account_analytic_line,
     public,
+    index(accessor = analytic_line_by_org, btree(columns = [organization_id])),
     index(accessor = analytic_line_by_account, btree(columns = [account_id])),
     index(accessor = analytic_line_by_date, btree(columns = [date])),
     index(accessor = analytic_line_by_company, btree(columns = [company_id])),
@@ -73,6 +76,7 @@ pub struct AccountAnalyticLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub amount: f64,
@@ -109,6 +113,7 @@ pub struct AccountAnalyticLine {
 #[spacetimedb::table(
     accessor = account_analytic_distribution_model,
     public,
+    index(accessor = analytic_dist_by_org, btree(columns = [organization_id])),
     index(accessor = analytic_dist_by_partner_category, btree(columns = [partner_category_id])),
     index(accessor = analytic_dist_by_product, btree(columns = [product_id])),
     index(accessor = analytic_dist_by_product_categ, btree(columns = [product_categ_id]))
@@ -118,6 +123,7 @@ pub struct AccountAnalyticDistributionModel {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: Option<String>,
     pub partner_category_id: Option<u64>,
     pub product_id: Option<u64>,
@@ -259,6 +265,7 @@ pub fn create_analytic_account(
         .account_analytic_account()
         .insert(AccountAnalyticAccount {
             id: 0,
+            organization_id,
             name: params.name.clone(),
             code: params.code,
             active: params.active,
@@ -336,8 +343,8 @@ pub fn update_analytic_account(
         .find(&account_id)
         .ok_or("Analytic account not found")?;
 
-    if account.company_id != company_id {
-        return Err("Analytic account does not belong to this company".to_string());
+    if account.organization_id != organization_id {
+        return Err("Analytic account does not belong to this organization".to_string());
     }
 
     let old_values = serde_json::json!({
@@ -439,12 +446,13 @@ pub fn create_analytic_line(
         .find(&params.account_id)
         .ok_or("Analytic account not found")?;
 
-    if account.company_id != company_id {
-        return Err("Analytic account does not belong to this company".to_string());
+    if account.organization_id != organization_id {
+        return Err("Analytic account does not belong to this organization".to_string());
     }
 
     let line = ctx.db.account_analytic_line().insert(AccountAnalyticLine {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         description: params.description,
         amount: params.amount,
@@ -539,8 +547,8 @@ pub fn update_analytic_line(
         .find(&line_id)
         .ok_or("Analytic line not found")?;
 
-    if line.company_id != company_id {
-        return Err("Analytic line does not belong to this company".to_string());
+    if line.organization_id != organization_id {
+        return Err("Analytic line does not belong to this organization".to_string());
     }
 
     let old_amount = line.amount;
@@ -665,8 +673,8 @@ pub fn delete_analytic_line(
         .find(&line_id)
         .ok_or("Analytic line not found")?;
 
-    if line.company_id != company_id {
-        return Err("Analytic line does not belong to this company".to_string());
+    if line.organization_id != organization_id {
+        return Err("Analytic line does not belong to this organization".to_string());
     }
 
     // Update account balance
@@ -755,6 +763,7 @@ pub fn create_analytic_distribution_model(
             .account_analytic_distribution_model()
             .insert(AccountAnalyticDistributionModel {
                 id: 0,
+                organization_id,
                 name: params.name.clone(),
                 partner_category_id: params.partner_category_id,
                 product_id: params.product_id,
@@ -817,8 +826,8 @@ pub fn update_analytic_distribution_model(
         .find(&model_id)
         .ok_or("Distribution model not found")?;
 
-    if model.company_id != company_id {
-        return Err("Distribution model does not belong to this company".to_string());
+    if model.organization_id != organization_id {
+        return Err("Distribution model does not belong to this organization".to_string());
     }
 
     let mut changed_fields = Vec::new();
@@ -930,8 +939,8 @@ pub fn set_analytic_account_active(
         .find(&account_id)
         .ok_or("Analytic account not found")?;
 
-    if account.company_id != company_id {
-        return Err("Analytic account does not belong to this company".to_string());
+    if account.organization_id != organization_id {
+        return Err("Analytic account does not belong to this organization".to_string());
     }
 
     account.active = active;

@@ -1335,6 +1335,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // SO1 line: 2 × Laptop
     ctx.db.sale_order_line().insert(SaleOrderLine {
         id: 0,
+        organization_id: org_id,
         order_id: so1.id,
         name: "Lumiere Dev Laptop".to_string(),
         sequence: 1,
@@ -2399,6 +2400,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .account_analytic_account()
         .insert(AccountAnalyticAccount {
             id: 0,
+            organization_id: org_id,
             name: "Sales Department".to_string(),
             code: Some("SALES".to_string()),
             active: true,
@@ -2435,6 +2437,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             .account_analytic_account()
             .insert(AccountAnalyticAccount {
                 id: 0,
+                organization_id: org_id,
                 name: "Marketing Campaigns".to_string(),
                 code: Some("MKTG".to_string()),
                 active: true,
@@ -2468,6 +2471,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let _analytic_line1 = ctx.db.account_analytic_line().insert(AccountAnalyticLine {
         id: 0,
+        organization_id: org_id,
         name: "Sales Commission Q1".to_string(),
         description: Some("Quarterly sales commission".to_string()),
         amount: 500.0,
@@ -2506,6 +2510,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             .account_analytic_distribution_model()
             .insert(AccountAnalyticDistributionModel {
             id: 0,
+            organization_id: org_id,
             name: Some("Sales & Marketing Split".to_string()),
             partner_category_id: None,
             product_id: Some(product_laptop.id),
@@ -2826,6 +2831,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 5.12 Budgeting ────────────────────────────────────────────────────────
     let _budget_post_sales = ctx.db.budget_post().insert(BudgetPost {
         id: 0,
+        organization_id: org_id,
         name: "Sales & Marketing".to_string(),
         code: Some("SALES-MKT".to_string()),
         description: Some("Sales and marketing expenses".to_string()),
@@ -2841,6 +2847,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let budget_2026 = ctx.db.crossovered_budget().insert(CrossoveredBudget {
         id: 0,
+        organization_id: org_id,
         name: "Annual Budget 2026".to_string(),
         description: Some("Company-wide annual budget".to_string()),
         date_from: ctx.timestamp,
@@ -2864,6 +2871,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .crossovered_budget_lines()
         .insert(CrossoveredBudgetLines {
             id: 0,
+            organization_id: org_id,
             general_budget_id: budget_2026.id,
             analytic_account_id: Some(analytic_account_sales.id),
             date_from: ctx.timestamp,
@@ -2889,6 +2897,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .crossovered_budget_lines()
         .insert(CrossoveredBudgetLines {
             id: 0,
+            organization_id: org_id,
             general_budget_id: budget_2026.id,
             analytic_account_id: Some(analytic_account_marketing.id),
             date_from: ctx.timestamp,
@@ -3049,6 +3058,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ProjectProject has no organization_id — scoped by company_id only
     let proj_crm = ctx.db.project_project().insert(ProjectProject {
         id: 0,
+        organization_id: org_id,
         name: "CRM Integration Q1".to_string(),
         description: Some("Integrate CRM with external marketing platform".to_string()),
         active: true,
@@ -3123,6 +3133,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     ] {
         ctx.db.project_task().insert(ProjectTask {
             id: 0,
+            organization_id: org_id,
             name: name.to_string(),
             description: None,
             priority: priority.to_string(),
@@ -3178,6 +3189,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // Second project
     let proj_infra = ctx.db.project_project().insert(ProjectProject {
         id: 0,
+        organization_id: org_id,
         name: "ERP Dashboard Redesign".to_string(),
         description: Some("Redesign the main dashboard with new KPI widgets".to_string()),
         active: true,
@@ -3241,6 +3253,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     ] {
         ctx.db.project_task().insert(ProjectTask {
             id: 0,
+            organization_id: org_id,
             name: name.to_string(),
             description: None,
             priority: "normal".to_string(),
@@ -3411,6 +3424,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 7.1 Work Centers ──────────────────────────────────────────────────────
     let _wc_assembly = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
+        organization_id: org_id,
         name: "Assembly Line A".to_string(),
         active: true,
         code: Some("WC-ASM-01".to_string()),
@@ -3448,6 +3462,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let _wc_qc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
+        organization_id: org_id,
         name: "QC Station".to_string(),
         active: true,
         code: Some("WC-QC-01".to_string()),
@@ -3486,6 +3501,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 7.2 Bill of Materials ─────────────────────────────────────────────────
     let bom_laptop = ctx.db.mrp_bom().insert(MrpBom {
         id: 0,
+        organization_id: org_id,
         type_: BomType::Manufacture,
         product_id: product_laptop.id,
         product_tmpl_id: product_laptop.id,
@@ -3517,6 +3533,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // BOM Lines - Note: using mouse as placeholder for components (screen, motherboard, keyboard)
     let bom_line1 = ctx.db.mrp_bom_line().insert(MrpBomLine {
         id: 0,
+        organization_id: org_id,
         bom_id: bom_laptop.id,
         product_id: product_mouse.id, // Using mouse as placeholder for "Screen"
         product_tmpl_id: product_mouse.id,
@@ -3541,6 +3558,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let bom_line2 = ctx.db.mrp_bom_line().insert(MrpBomLine {
         id: 0,
+        organization_id: org_id,
         bom_id: bom_laptop.id,
         product_id: product_mouse.id, // Using mouse as placeholder for "Motherboard"
         product_tmpl_id: product_mouse.id,
@@ -3565,6 +3583,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let bom_line3 = ctx.db.mrp_bom_line().insert(MrpBomLine {
         id: 0,
+        organization_id: org_id,
         bom_id: bom_laptop.id,
         product_id: product_mouse.id, // Using mouse as placeholder for "Keyboard"
         product_tmpl_id: product_mouse.id,
@@ -4065,6 +4084,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 11.1 Timesheet Entries ────────────────────────────────────────────────
     ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
+        organization_id: org_id,
         name: "API contract definition".to_string(),
         project_id: proj_crm.id,
         task_id: task_api_contract,
@@ -4101,6 +4121,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
+        organization_id: org_id,
         name: "Endpoint development".to_string(),
         project_id: proj_crm.id,
         task_id: task_build_endpoint,
@@ -4137,6 +4158,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
+        organization_id: org_id,
         name: "Testing and QA".to_string(),
         project_id: proj_crm.id,
         task_id: task_build_endpoint,

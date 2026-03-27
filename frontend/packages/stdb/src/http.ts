@@ -66,7 +66,7 @@ function resolveHost(override?: string): string {
   const raw =
     override ??
     (typeof process !== 'undefined'
-      ? process.env['NEXT_PUBLIC_STDB_HOST'] ?? process.env['VITE_STDB_HOST']
+      ? process.env['STDB_HOST'] ?? process.env['NEXT_PUBLIC_STDB_HOST'] ?? process.env['VITE_STDB_HOST']
       : undefined) ??
     'https://maincloud.spacetimedb.com'
   return raw.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://')
@@ -76,7 +76,7 @@ function resolveModule(override?: string): string {
   return (
     override ??
     (typeof process !== 'undefined'
-      ? process.env['NEXT_PUBLIC_STDB_MODULE'] ?? process.env['VITE_STDB_MODULE']
+      ? process.env['STDB_MODULE'] ?? process.env['NEXT_PUBLIC_STDB_MODULE'] ?? process.env['VITE_STDB_MODULE']
       : undefined) ??
     'lumiere-v1'
   )

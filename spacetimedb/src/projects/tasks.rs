@@ -18,6 +18,7 @@ use crate::types::TaskState;
 #[spacetimedb::table(
     accessor = project_task,
     public,
+    index(accessor = task_by_org, btree(columns = [organization_id])),
     index(name = "by_project", accessor = task_by_project, btree(columns = [project_id])),
     index(accessor = task_by_company, btree(columns = [company_id])),
     index(accessor = task_by_state, btree(columns = [state]))
@@ -27,6 +28,7 @@ pub struct ProjectTask {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub priority: String,
@@ -370,8 +372,8 @@ pub fn create_task(
             .id()
             .find(&pid)
             .ok_or("Project not found")?;
-        if project.company_id != company_id {
-            return Err("Project does not belong to this company".to_string());
+        if project.organization_id != organization_id {
+            return Err("Project does not belong to this organization".to_string());
         }
     }
 
@@ -383,8 +385,8 @@ pub fn create_task(
             .find(&pid)
             .ok_or("Parent task not found")?;
 
-        if parent.company_id != company_id {
-            return Err("Parent task does not belong to this company".to_string());
+        if parent.organization_id != organization_id {
+            return Err("Parent task does not belong to this organization".to_string());
         }
 
         if let (Some(task_project_id), Some(parent_project_id)) =
@@ -414,6 +416,7 @@ pub fn create_task(
         date_start: params.date_start,
         date_end: params.date_end,
         color: params.color,
+        organization_id,
         company_id,
         project_id: params.project_id,
         user_ids: params.user_ids.clone(),
@@ -605,8 +608,8 @@ pub fn update_task_state(
         .find(&task_id)
         .ok_or("Task not found")?;
 
-    if task.company_id != company_id {
-        return Err("Task does not belong to this company".to_string());
+    if task.organization_id != organization_id {
+        return Err("Task does not belong to this organization".to_string());
     }
 
     let mut old_values = Map::new();
@@ -749,8 +752,8 @@ pub fn update_task(
         .find(&task_id)
         .ok_or("Task not found")?;
 
-    if task.company_id != company_id {
-        return Err("Task does not belong to this company".to_string());
+    if task.organization_id != organization_id {
+        return Err("Task does not belong to this organization".to_string());
     }
 
     let old_values = task_update_old_values(&task);
@@ -1064,8 +1067,8 @@ pub fn set_task_parent(
         .find(&task_id)
         .ok_or("Task not found")?;
 
-    if task.company_id != company_id {
-        return Err("Task does not belong to this company".to_string());
+    if task.organization_id != organization_id {
+        return Err("Task does not belong to this organization".to_string());
     }
 
     let mut old_values = Map::new();
@@ -1084,8 +1087,8 @@ pub fn set_task_parent(
             .find(&pid)
             .ok_or("Parent task not found")?;
 
-        if parent.company_id != company_id {
-            return Err("Parent task does not belong to this company".to_string());
+        if parent.organization_id != organization_id {
+            return Err("Parent task does not belong to this organization".to_string());
         }
 
         if let (Some(task_project), Some(parent_project)) = (task.project_id, parent.project_id) {
@@ -1216,8 +1219,8 @@ pub fn assign_task_users(
         .find(&task_id)
         .ok_or("Task not found")?;
 
-    if task.company_id != company_id {
-        return Err("Task does not belong to this company".to_string());
+    if task.organization_id != organization_id {
+        return Err("Task does not belong to this organization".to_string());
     }
 
     let mut old_values = Map::new();

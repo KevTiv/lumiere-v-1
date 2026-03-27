@@ -338,7 +338,12 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                     placeholder={t("forensics.createModal.placeholderTag")}
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
                     className="flex-1"
                   />
                   <Button type="button" variant="secondary" size="icon" onClick={handleAddTag}>
@@ -372,7 +377,12 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
                     placeholder={t("forensics.createModal.placeholderAction")}
                     value={newAction}
                     onChange={(e) => setNewAction(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddAction())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddAction();
+                      }
+                    }}
                     className="flex-1"
                   />
                   <Button type="button" variant="secondary" size="icon" onClick={handleAddAction}>

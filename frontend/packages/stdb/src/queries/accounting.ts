@@ -1,11 +1,11 @@
-import AccountAccountRow from "../generated/account_account_table";
-import AccountMoveRow from "../generated/account_move_table";
-import AccountJournalRow from "../generated/account_journal_table";
-import AccountTaxRow from "../generated/account_tax_table";
-import CrossoveredBudgetRow from "../generated/crossovered_budget_table";
-import AccountAnalyticAccountRow from "../generated/account_analytic_account_table";
-import AccountBankStatementRow from "../generated/account_bank_statement_table";
-import AccountAssetRow from "../generated/account_asset_table";
+import type AccountAccountRow from "../generated/account_account_table";
+import type AccountMoveRow from "../generated/account_move_table";
+import type AccountJournalRow from "../generated/account_journal_table";
+import type AccountTaxRow from "../generated/account_tax_table";
+import type CrossoveredBudgetRow from "../generated/crossovered_budget_table";
+import type AccountAnalyticAccountRow from "../generated/account_analytic_account_table";
+import type AccountBankStatementRow from "../generated/account_bank_statement_table";
+import type AccountAssetRow from "../generated/account_asset_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

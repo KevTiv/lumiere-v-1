@@ -17,15 +17,14 @@ import {
   useCreateMove,
   useCreateTax,
   useCreateBudget,
-} from "@lumiere/stdb"
+} from "@/hooks/accounting"
 import type {
   AccountMove,
-  CreateAccountAccountParams,
   CreateAccountMoveParams,
+  CreateAccountAccountParams,
   CreateAccountTaxParams,
   CreateCrossoveredBudgetParams,
-} from "@lumiere/stdb"
-
+} from "@/hooks/accounting"
 import {
   InvoiceListView,
   InvoiceDetailModal,

@@ -18,6 +18,7 @@ use crate::types::TimesheetInvoiceType;
 #[spacetimedb::table(
     accessor = project_timesheet,
     public,
+    index(accessor = timesheet_by_org, btree(columns = [organization_id])),
     index(accessor = timesheet_by_project, btree(columns = [project_id])),
     index(accessor = timesheet_by_employee, btree(columns = [employee_id])),
     index(accessor = timesheet_by_company, btree(columns = [company_id]))
@@ -27,6 +28,7 @@ pub struct ProjectTimesheet {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub name: String,
     pub project_id: u64,
     pub task_id: Option<u64>,
@@ -157,6 +159,7 @@ pub fn log_timesheet(
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
+        organization_id,
         name: params.name,
         project_id: params.project_id,
         task_id: params.task_id,
@@ -274,6 +277,7 @@ pub fn start_timesheet_timer(
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
+        organization_id,
         name: params.name,
         project_id: params.project_id,
         task_id: params.task_id,
@@ -344,8 +348,8 @@ pub fn stop_timesheet_timer(
         .find(&timesheet_id)
         .ok_or("Timesheet entry not found")?;
 
-    if entry.company_id != company_id {
-        return Err("Timesheet does not belong to this company".to_string());
+    if entry.organization_id != organization_id {
+        return Err("Timesheet does not belong to this organization".to_string());
     }
 
     if !entry.is_timer_running {

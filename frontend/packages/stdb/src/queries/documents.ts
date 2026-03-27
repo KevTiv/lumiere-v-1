@@ -1,5 +1,5 @@
-import DocumentRow from "../generated/document_table";
-import KnowledgeArticleRow from "../generated/knowledge_article_table";
+import type DocumentRow from "../generated/document_table";
+import type KnowledgeArticleRow from "../generated/knowledge_article_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

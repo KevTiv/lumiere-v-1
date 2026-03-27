@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newHelpdeskTicketForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { helpdeskModuleConfig } from "@/lib/module-dashboard-configs"
-import { useHelpdeskTickets, useCreateTicket, useStdbConnection, getStdbConnection, helpdeskSubscriptions } from "@lumiere/stdb"
-import type { CreateTicketParams } from "@lumiere/stdb"
+import { useHelpdeskTickets, useCreateTicket } from "@/hooks/helpdesk"
+import type { CreateTicketParams } from "@/hooks/helpdesk"
 
 interface HelpdeskClientProps {
   initialTickets?: Record<string, unknown>[]
@@ -18,15 +18,6 @@ export function HelpdeskClient({ initialTickets, organizationId }: HelpdeskClien
   const moduleConfig = useMemo(() => helpdeskModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] helpdesk subscription error", err))
-      .subscribe(helpdeskSubscriptions(orgId))
-  }, [connected, orgId])
 
   const { data: tickets = [] } = useHelpdeskTickets(orgId, initialTickets)
   const createTicket = useCreateTicket(orgId)

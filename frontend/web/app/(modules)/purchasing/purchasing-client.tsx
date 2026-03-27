@@ -10,10 +10,10 @@ import {
   usePurchaseOrders,
   usePurchaseOrderLines,
   usePurchaseRequisitions,
-  useContacts,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
-} from "@lumiere/stdb"
+  useContacts,
+} from "@/hooks/purchasing"
 
 interface PurchasingClientProps {
   initialOrders?: Record<string, unknown>[]

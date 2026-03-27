@@ -9,14 +9,14 @@ import {
   useProjects,
   useTasks,
   useTimesheets,
-  useEmployees,
   useCreateProject,
   useCreateTask,
-} from "@lumiere/stdb"
+  useEmployees,
+} from "@/hooks/projects"
 import type {
   CreateProjectParams,
   CreateTaskParams,
-} from "@lumiere/stdb"
+} from "@/hooks/projects"
 
 interface ProjectsClientProps {
   initialProjects?: Record<string, unknown>[]

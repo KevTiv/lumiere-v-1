@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Providers } from './providers'
-import { getStdbSession } from '@/lib/stdb-session'
+import { getStdbSession } from '@/lib/api-session'
 import {
   serverQueryUserRoleAssignments,
   serverQueryRoles,
@@ -42,7 +42,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const { identityHex, opts } = await getStdbSession()
+  const session = await getStdbSession()
+  const identityHex = session?.identityHex
+  const opts = session?.opts ?? {}
 
   let serverRoleNames: string[] = []
   if (identityHex) {
@@ -60,7 +62,7 @@ export default async function RootLayout({
         .filter((r) => assignedIds.has(String(r['id'])))
         .map((r) => String(r['name']))
     } catch {
-      // No session yet — user hasn't connected via WebSocket
+      // Session token present but role query failed — render with empty role list
     }
   }
 

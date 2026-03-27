@@ -1,20 +1,13 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { MapLayerLegend } from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
 import type { MapPinData } from "@lumiere/ui/lib/map-types"
 import { Warehouse, Truck, Monitor, Package, TrendingUp, MapPin } from "lucide-react"
-import {
-  useFleetVehicles,
-  usePosTerminals,
-  useWarehouseGeo,
-  useStdbConnection,
-  getStdbConnection,
-  fleetSubscriptions,
-} from "@lumiere/stdb"
+import { useFleetVehicles, usePosTerminals, useWarehouseGeo } from "@/hooks/map"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
 const MapView = dynamic(
@@ -58,16 +51,6 @@ export function MapClient({ organizationId }: MapClientProps) {
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )
   const { t } = useTranslation()
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] fleet subscription error", err))
-      .subscribe(fleetSubscriptions(orgId))
-  }, [connected, orgId])
-
   const { data: vehicles = [] } = useFleetVehicles(orgId)
   const { data: posTerminals = [] } = usePosTerminals(orgId)
   const { data: warehouseGeos = [] } = useWarehouseGeo(orgId)

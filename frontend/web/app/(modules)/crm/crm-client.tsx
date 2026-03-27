@@ -7,7 +7,7 @@ import type {
   CreateContactParams,
   CreateLeadParams,
   CreateOpportunityParams,
-} from "@lumiere/stdb"
+} from "@/hooks/crm"
 import {
   useActivities,
   useContacts,
@@ -16,7 +16,7 @@ import {
   useCreateOpportunity,
   useLeads,
   useOpportunities,
-} from "@lumiere/stdb"
+} from "@/hooks/crm"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { FormModal, ModuleView, newActivityForm, newContactForm, newLeadForm, newOpportunityForm } from "@lumiere/ui"
 import { useMemo, useState } from "react"

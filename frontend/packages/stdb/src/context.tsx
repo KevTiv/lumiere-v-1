@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { DbConnection } from "./generated";
+import type React from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { setStdbConnection } from "./connection";
+import { DbConnection } from "./generated";
 import { authSubscriptions } from "./queries/auth";
 
 interface StdbConnectionState {
@@ -60,12 +61,12 @@ export function StdbConnectionProvider({
 
   useEffect(() => {
     const uri =
-      host ??
-      process.env.NEXT_PUBLIC_STDB_HOST ??
+      host ||
+      process.env.NEXT_PUBLIC_STDB_HOST ||
       "ws://localhost:3000";
     const mod =
-      moduleName ??
-      process.env.NEXT_PUBLIC_STDB_MODULE ??
+      moduleName ||
+      process.env.NEXT_PUBLIC_STDB_MODULE ||
       "lumiere-v1";
 
     // Load persisted token for seamless reconnection (SSR-safe)
@@ -132,8 +133,8 @@ export function StdbConnectionProvider({
         // ignore
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [host, moduleName, onTokenPersisted, serverIdentity, serverRoleNames, token]);
 
   return (
     <StdbConnectionContext.Provider value={state}>

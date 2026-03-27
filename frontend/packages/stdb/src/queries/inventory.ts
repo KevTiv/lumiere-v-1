@@ -1,11 +1,11 @@
-import ProductRow from "../generated/product_table";
-import StockQuantRow from "../generated/stock_quant_table";
-import StockPickingRow from "../generated/stock_picking_table";
-import WarehouseRow from "../generated/warehouse_table";
-import InventoryAdjustmentRow from "../generated/inventory_adjustment_table";
-import StockLocationRow from "../generated/stock_location_table";
-import StockProductionLotRow from "../generated/stock_production_lot_table";
-import QualityCheckRow from "../generated/quality_check_table";
+import type ProductRow from "../generated/product_table";
+import type StockQuantRow from "../generated/stock_quant_table";
+import type StockPickingRow from "../generated/stock_picking_table";
+import type WarehouseRow from "../generated/warehouse_table";
+import type InventoryAdjustmentRow from "../generated/inventory_adjustment_table";
+import type StockLocationRow from "../generated/stock_location_table";
+import type StockProductionLotRow from "../generated/stock_production_lot_table";
+import type QualityCheckRow from "../generated/quality_check_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import type { AIAnalysis, Finding, Requirement, EvaluationCriterion, Concept } from "@lumiere/ui"
 
 const AI_GATEWAY_URL = process.env.AI_GATEWAY_URL ?? "http://localhost:3001"

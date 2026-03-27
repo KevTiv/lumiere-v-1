@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newWorkflowForm } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { workflowsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useWorkflows, useWorkflowInstances, useCreateWorkflow, useStdbConnection, getStdbConnection, workflowsSubscriptions } from "@lumiere/stdb"
-import type { CreateWorkflowParams } from "@lumiere/stdb"
+import { useWorkflows, useWorkflowInstances, useCreateWorkflow } from "@/hooks/workflows"
+import type { CreateWorkflowParams } from "@/hooks/workflows"
 
 interface WorkflowsClientProps {
   initialWorkflows?: Record<string, unknown>[]
@@ -19,15 +19,6 @@ export function WorkflowsClient({ initialWorkflows, initialInstances, organizati
   const moduleConfig = useMemo(() => workflowsModuleConfig(t), [t])
   const orgId = BigInt(organizationId ?? 1)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { connected } = useStdbConnection()
-
-  useEffect(() => {
-    const conn = getStdbConnection()
-    if (!conn || !connected) return
-    conn.subscriptionBuilder()
-      .onError((err) => console.error("[stdb] workflows subscription error", err))
-      .subscribe(workflowsSubscriptions(orgId))
-  }, [connected, orgId])
 
   const { data: workflows = [] } = useWorkflows(orgId, initialWorkflows)
   const { data: instances = [] } = useWorkflowInstances(orgId, initialInstances)

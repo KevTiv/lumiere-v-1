@@ -485,7 +485,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {field.aiSuggestions?.map((suggestion, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-xs">
+                          <Badge key={`${field.id}-suggestion-${idx}`} variant="secondary" className="text-xs">
                             {suggestion}
                           </Badge>
                         ))}
@@ -592,7 +592,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   <Label>{t("settings.formConfigSettings.dialog.options")}</Label>
                   <div className="space-y-2">
                     {(selectedField.options || []).map((option, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={`${selectedField.id}-option-${idx}`} className="flex items-center gap-2">
                         <Input
                           value={option.label}
                           onChange={(e) => {

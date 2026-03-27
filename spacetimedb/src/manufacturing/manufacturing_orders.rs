@@ -27,6 +27,7 @@ use serde_json;
 #[spacetimedb::table(
     accessor = mrp_production,
     public,
+    index(accessor = mrp_production_by_org, btree(columns = [organization_id])),
     index(accessor = mrp_production_by_product, btree(columns = [product_id])),
     index(accessor = mrp_production_by_company, btree(columns = [company_id])),
     index(accessor = mrp_production_by_state, btree(columns = [state]))
@@ -36,6 +37,7 @@ pub struct MrpProduction {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub origin: Option<String>,
     pub product_id: u64,
     pub product_tmpl_id: u64,
@@ -109,6 +111,7 @@ pub struct MrpProduction {
 #[spacetimedb::table(
     accessor = mrp_workorder,
     public,
+    index(accessor = mrp_workorder_by_org, btree(columns = [organization_id])),
     index(name = "by_production", accessor = mrp_workorder_by_production, btree(columns = [production_id])),
     index(accessor = mrp_workorder_by_workcenter, btree(columns = [workcenter_id]))
 )]
@@ -117,6 +120,7 @@ pub struct MrpWorkorder {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub workcenter_id: u64,
     pub production_id: u64,
     pub product_id: u64,
@@ -341,6 +345,7 @@ pub fn create_manufacturing_order(
 
     let mo = ctx.db.mrp_production().insert(MrpProduction {
         id: 0,
+        organization_id,
         origin: params.origin,
         product_id: params.product_id,
         product_tmpl_id: product.id,
@@ -448,8 +453,8 @@ pub fn confirm_manufacturing_order(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     match mo.state {
@@ -500,8 +505,8 @@ pub fn check_mo_availability(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     let availability = "available".to_string();
@@ -552,8 +557,8 @@ pub fn start_manufacturing_order(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     match mo.state {
@@ -606,8 +611,8 @@ pub fn produce_manufacturing_order(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     if qty_producing <= 0.0 {
@@ -673,8 +678,8 @@ pub fn consume_mo_materials(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     if mo.state != MoState::Progress && mo.state != MoState::ToClose {
@@ -840,8 +845,8 @@ pub fn finish_manufacturing_order(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     match mo.state {
@@ -1071,8 +1076,8 @@ pub fn cancel_manufacturing_order(
         .find(&mo_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     match mo.state {
@@ -1127,8 +1132,8 @@ pub fn create_workorder(
         .find(&params.production_id)
         .ok_or("Manufacturing order not found")?;
 
-    if mo.company_id != company_id {
-        return Err("MO does not belong to this company".to_string());
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
     }
 
     // Resolve capacity: use supplied value, fall back to work center's capacity, then 1.0
@@ -1143,6 +1148,7 @@ pub fn create_workorder(
 
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
+        organization_id,
         workcenter_id: params.workcenter_id,
         production_id: params.production_id,
         product_id: mo.product_id,
@@ -1236,8 +1242,8 @@ pub fn start_workorder(
         .find(&workorder_id)
         .ok_or("Work order not found")?;
 
-    if wo.company_id != company_id {
-        return Err("Work order does not belong to this company".to_string());
+    if wo.organization_id != organization_id {
+        return Err("Work order does not belong to this organization".to_string());
     }
 
     match wo.state {
@@ -1290,8 +1296,8 @@ pub fn finish_workorder(
         .find(&workorder_id)
         .ok_or("Work order not found")?;
 
-    if wo.company_id != company_id {
-        return Err("Work order does not belong to this company".to_string());
+    if wo.organization_id != organization_id {
+        return Err("Work order does not belong to this organization".to_string());
     }
 
     match wo.state {

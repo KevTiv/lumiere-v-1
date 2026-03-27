@@ -4,24 +4,58 @@ import type { NextRequest } from 'next/server'
 // Auth pages that don't require a session
 const AUTH_PATHS = ['/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/accept-invite']
 
+/**
+ * Extracts Bearer token from Authorization header.
+ * Supports: Authorization: Bearer <token>
+ * Returns the token or undefined if not found/invalid.
+ */
+function extractBearerToken(request: NextRequest): string | undefined {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.toLowerCase().startsWith('bearer ')) {
+    return authHeader.slice(7).trim()
+  }
+  return undefined
+}
+
+/**
+ * Checks if request is authenticated via either:
+ * - HTTP-only cookie (web browsers)
+ * - Authorization: Bearer header (Expo/mobile)
+ */
+function isAuthenticated(request: NextRequest): boolean {
+  const cookieToken = request.cookies.get('stdb_token')?.value
+  if (cookieToken) return true
+
+  const bearerToken = extractBearerToken(request)
+  if (bearerToken) return true
+
+  return false
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const stdbToken = request.cookies.get('stdb_token')?.value
-  const _isLoggedIn = Boolean(stdbToken)
 
-  // Let API routes, static assets, and Next.js internals through
+  // Allow all API routes - authentication is handled in route handlers
+  // This supports both cookies (web) and Bearer tokens (Expo/mobile)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
+  // Allow static assets and Next.js internals
   if (
-    pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
-    pathname.startsWith('/public/')
+    pathname.startsWith('/public/') ||
+    pathname === '/favicon.ico'
   ) {
     return NextResponse.next()
   }
 
+  const _isLoggedIn = isAuthenticated(request)
   const _isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 
+  // Redirect unauthenticated users to sign-in (excluding auth pages)
+  // Currently disabled - uncomment when ready to enforce auth
   // if (!isLoggedIn && !isAuthPage) {
-  //   // No session → redirect to sign-in, preserve intended destination
   //   const url = request.nextUrl.clone()
   //   url.pathname = '/sign-in'
   //   if (pathname !== '/') {
@@ -30,8 +64,9 @@ export function middleware(request: NextRequest) {
   //   return NextResponse.redirect(url)
   // }
 
+  // Redirect authenticated users away from auth pages
+  // Currently disabled - uncomment when ready to enforce auth
   // if (isLoggedIn && isAuthPage && pathname !== '/onboarding') {
-  //   // Already logged in → redirect away from auth pages
   //   return NextResponse.redirect(new URL('/overview', request.url))
   // }
 

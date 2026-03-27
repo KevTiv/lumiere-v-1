@@ -1,4 +1,4 @@
-import { getStdbSession } from "@/lib/stdb-session"
+import { getStdbSession } from "@/lib/api-session"
 import { serverQueryDocuments, serverQueryKnowledgeArticles } from "@lumiere/stdb/server"
 import { DocumentsClient } from "./documents-client"
 

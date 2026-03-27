@@ -1,7 +1,7 @@
-import WorkflowRow from "../generated/workflow_table";
-import WorkflowInstanceRow from "../generated/workflow_instance_table";
-import WorkflowActivityRow from "../generated/workflow_activity_table";
-import WorkflowTransitionRow from "../generated/workflow_transition_table";
+import type WorkflowRow from "../generated/workflow_table";
+import type WorkflowInstanceRow from "../generated/workflow_instance_table";
+import type WorkflowActivityRow from "../generated/workflow_activity_table";
+import type WorkflowTransitionRow from "../generated/workflow_transition_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

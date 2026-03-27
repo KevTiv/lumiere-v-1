@@ -1,5 +1,5 @@
-import HrExpenseRow from "../generated/hr_expense_table";
-import ExpenseSheetRow from "../generated/expense_sheet_table";
+import type HrExpenseRow from "../generated/hr_expense_table";
+import type ExpenseSheetRow from "../generated/expense_sheet_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
 

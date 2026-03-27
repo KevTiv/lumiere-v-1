@@ -272,7 +272,7 @@ export function CalendarView({
 
       {selectedEventId && (
         <EventDetailPanel
-          event={events.find((e) => e.id === selectedEventId)!}
+          event={events.find((e) => e.id === selectedEventId)}
           onClose={() => onSelectEvent(null)}
         />
       )}

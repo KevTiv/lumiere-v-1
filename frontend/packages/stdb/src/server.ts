@@ -9,16 +9,58 @@
  *
  * ## Scoping model
  * All public query functions accept `organizationId` as the top-level tenant scope.
- * - Tables that have `organization_id` directly use it as a WHERE filter.
- * - Tables that only have `company_id` resolve company IDs via the `company` table
- *   first (two HTTP calls), then filter with `WHERE company_id IN (...)`.
- *
- * This ensures multi-tenant isolation at the organization level regardless of
- * how individual tables are keyed internally.
+ * All tables have `organization_id` directly — queries use `WHERE organization_id = X`.
+ * `resolveCompanyIds` is exported for mutation route handlers whose Rust reducers
+ * still accept a `company_id` argument for validation.
  */
 
 import { stdbSql, type StdbHttpOptions } from './http'
 export type { StdbHttpOptions }
+
+// ── Entity type re-exports for API route handlers ────────────────────────────
+// Import from "@lumiere/stdb/server" in route handlers — avoids pulling in
+// React/WebSocket dependencies from the main package entry point.
+export type {
+  // CRM
+  Lead, Contact, Opportunity, Activity,
+  CreateLeadParams, CreateContactParams, CreateOpportunityParams,
+  // Sales
+  SaleOrder, SaleOrderLine, ProductPricelist,
+  CreateSaleOrderParams, CreateSaleOrderLineParams, CreatePricelistParams,
+  // Accounting
+  AccountAccount, AccountJournal, AccountMove, AccountTax,
+  AccountAnalyticAccount,
+  AccountMoveState,
+  CreateAccountMoveParams, CreateAccountAccountParams, CreateAccountTaxParams,
+  CreateCrossoveredBudgetParams,
+  MoveType,
+  // Inventory
+  Product, StockQuant, StockPicking, Warehouse, InventoryAdjustment,
+  // Purchasing
+  PurchaseOrder, PurchaseOrderLine, PurchaseRequisition,
+  CreatePurchaseOrderParams, CreatePurchaseRequisitionParams,
+  // Manufacturing
+  MrpProduction, MrpBom, MrpWorkorder, MrpWorkcenter,
+  CreateMrpProductionParams,
+  // HR
+  HrEmployee, HrDepartment, HrLeave, HrContract, HrPayslip,
+  CreateEmployeeParams,
+  EmploymentType,
+  // Projects
+  ProjectProject, ProjectTask, ProjectTimesheet,
+  CreateProjectParams, CreateTaskParams,
+  // Documents
+  Document, KnowledgeArticle,
+  CreateDocumentParams,
+  // Helpdesk
+  HelpdeskTicket,
+  CreateTicketParams,
+  TicketPriority,
+  // Calendar / Expenses
+  CalendarEvent, HrExpense,
+  // Settings / Auth
+  UserProfile, Role, UserRoleAssignment,
+} from './generated/types'
 
 // ── Query key helpers (must match the keys used in client hooks) ─────────────
 // All business data keys are scoped by organization_id — the top-level tenant.
@@ -152,8 +194,11 @@ export const userOrganizationKey = (identityHex: string) =>
  * Resolves the company IDs that belong to the given organization.
  * Used to translate organization-level scoping into company-level SQL filters
  * for tables that link data via `company_id`.
+ *
+ * Exported so API route handlers can resolve companyId when calling reducers
+ * that still require it — clients never pass companyId directly.
  */
-async function resolveCompanyIds(
+export async function resolveCompanyIds(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ): Promise<number[]> {
@@ -164,120 +209,84 @@ async function resolveCompanyIds(
   return rows.map((r) => Number(r.id))
 }
 
-/**
- * Builds a WHERE clause that scopes a table by company_id.
- * Returns null if the org has no companies — callers should return [] immediately.
- */
-async function companyWhere(
-  organizationId: bigint | number,
-  opts?: StdbHttpOptions,
-): Promise<string | null> {
-  const ids = await resolveCompanyIds(organizationId, opts)
-  if (ids.length === 0) return null
-  return ids.length === 1
-    ? `WHERE company_id = ${ids[0]}`
-    : `WHERE company_id IN (${ids.join(', ')})`
-}
-
 // ── Server query functions ───────────────────────────────────────────────────
 // All public functions accept organizationId as the tenant scoping value.
-// Tables with organization_id use it directly; tables with company_id use
-// companyWhere() to resolve from the company table.
+// All tables now have organization_id directly — no company lookup needed.
 
 // ACCOUNTING
 
-export async function serverQueryAccountAccounts(
+export function serverQueryAccountAccounts(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM account_account ${where} ORDER BY code`, opts)
+  return stdbSql(`SELECT * FROM account_account WHERE organization_id = ${organizationId} ORDER BY code`, opts)
 }
 
-export async function serverQueryAccountJournals(
+export function serverQueryAccountJournals(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM account_journal ${where}`, opts)
+  return stdbSql(`SELECT * FROM account_journal WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryAccountMoves(
+export function serverQueryAccountMoves(
   organizationId: bigint | number,
   moveType?: string,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
   const filter = moveType ? ` AND move_type = '${moveType}'` : ''
-  return stdbSql(`SELECT * FROM account_move ${where}${filter}`, opts)
+  return stdbSql(`SELECT * FROM account_move WHERE organization_id = ${organizationId}${filter}`, opts)
 }
 
-export async function serverQueryAccountTaxes(
+export function serverQueryAccountTaxes(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM account_tax ${where}`, opts)
+  return stdbSql(`SELECT * FROM account_tax WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryBudgets(
+export function serverQueryBudgets(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM crossovered_budget ${where}`, opts)
+  return stdbSql(`SELECT * FROM crossovered_budget WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryAnalyticAccounts(
+export function serverQueryAnalyticAccounts(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM account_analytic_account ${where}`, opts)
+  return stdbSql(`SELECT * FROM account_analytic_account WHERE organization_id = ${organizationId}`, opts)
 }
 
 // SALES
 
-export async function serverQuerySaleOrders(
+export function serverQuerySaleOrders(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM sale_order ${where}`, opts)
+  return stdbSql(`SELECT * FROM sale_order WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQuerySaleOrderLines(
+export function serverQuerySaleOrderLines(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM sale_order_line ${where}`, opts)
+  return stdbSql(`SELECT * FROM sale_order_line WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryPricelists(
+export function serverQueryPricelists(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM product_pricelist ${where}`, opts)
+  return stdbSql(`SELECT * FROM product_pricelist WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryPickingBatches(
+export function serverQueryPickingBatches(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM stock_picking_batch ${where}`, opts)
+  return stdbSql(`SELECT * FROM stock_picking_batch WHERE organization_id = ${organizationId}`, opts)
 }
 
 // CRM — tables have organization_id directly, no company lookup needed
@@ -287,6 +296,18 @@ export function serverQueryLeads(
   opts?: StdbHttpOptions,
 ) {
   return stdbSql(`SELECT * FROM lead WHERE organization_id = ${organizationId}`, opts)
+}
+
+export async function serverQueryLeadById(
+  id: number,
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  const rows = await stdbSql<{ id: number }>(
+    `SELECT * FROM lead WHERE id = ${id} AND organization_id = ${organizationId} LIMIT 1`,
+    opts,
+  )
+  return rows[0] ?? null
 }
 
 export function serverQueryOpportunities(
@@ -308,31 +329,25 @@ export function serverQueryContacts(
 
 // PROJECTS
 
-export async function serverQueryProjects(
+export function serverQueryProjects(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM project_project ${where}`, opts)
+  return stdbSql(`SELECT * FROM project_project WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryTasks(
+export function serverQueryTasks(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM project_task ${where}`, opts)
+  return stdbSql(`SELECT * FROM project_task WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryTimesheets(
+export function serverQueryTimesheets(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM project_timesheet ${where}`, opts)
+  return stdbSql(`SELECT * FROM project_timesheet WHERE organization_id = ${organizationId}`, opts)
 }
 
 // INVENTORY — products/adjustments have organization_id directly; others via company
@@ -344,31 +359,25 @@ export function serverQueryProducts(
   return stdbSql(`SELECT * FROM product WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryStockQuants(
+export function serverQueryStockQuants(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM stock_quant ${where}`, opts)
+  return stdbSql(`SELECT * FROM stock_quant WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryStockPickings(
+export function serverQueryStockPickings(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM stock_picking ${where}`, opts)
+  return stdbSql(`SELECT * FROM stock_picking WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryWarehouses(
+export function serverQueryWarehouses(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM warehouse ${where}`, opts)
+  return stdbSql(`SELECT * FROM warehouse WHERE organization_id = ${organizationId}`, opts)
 }
 
 export function serverQueryInventoryAdjustments(
@@ -383,116 +392,92 @@ export function serverQueryInventoryAdjustments(
 
 // PURCHASING
 
-export async function serverQueryPurchaseOrders(
+export function serverQueryPurchaseOrders(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM purchase_order ${where}`, opts)
+  return stdbSql(`SELECT * FROM purchase_order WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryPurchaseOrderLines(
+export function serverQueryPurchaseOrderLines(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM purchase_order_line ${where}`, opts)
+  return stdbSql(`SELECT * FROM purchase_order_line WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryPurchaseRequisitions(
+export function serverQueryPurchaseRequisitions(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM purchase_requisition ${where}`, opts)
+  return stdbSql(`SELECT * FROM purchase_requisition WHERE organization_id = ${organizationId}`, opts)
 }
 
 // MANUFACTURING
 
-export async function serverQueryMrpProductions(
+export function serverQueryMrpProductions(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM mrp_production ${where}`, opts)
+  return stdbSql(`SELECT * FROM mrp_production WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryMrpBoms(
+export function serverQueryMrpBoms(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM mrp_bom ${where}`, opts)
+  return stdbSql(`SELECT * FROM mrp_bom WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryMrpWorkorders(
+export function serverQueryMrpWorkorders(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM mrp_workorder ${where}`, opts)
+  return stdbSql(`SELECT * FROM mrp_workorder WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryMrpWorkcenters(
+export function serverQueryMrpWorkcenters(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM mrp_workcenter ${where}`, opts)
+  return stdbSql(`SELECT * FROM mrp_workcenter WHERE organization_id = ${organizationId}`, opts)
 }
 
 // HR
 
-export async function serverQueryEmployees(
+export function serverQueryEmployees(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM hr_employee ${where}`, opts)
+  return stdbSql(`SELECT * FROM hr_employee WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryDepartments(
+export function serverQueryDepartments(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM hr_department ${where}`, opts)
+  return stdbSql(`SELECT * FROM hr_department WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryLeaveRequests(
+export function serverQueryLeaveRequests(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM hr_leave ${where}`, opts)
+  return stdbSql(`SELECT * FROM hr_leave WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryContracts(
+export function serverQueryContracts(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM hr_contract ${where}`, opts)
+  return stdbSql(`SELECT * FROM hr_contract WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryPayslips(
+export function serverQueryPayslips(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM hr_payslip ${where}`, opts)
+  return stdbSql(`SELECT * FROM hr_payslip WHERE organization_id = ${organizationId}`, opts)
 }
 
 // CALENDAR — organization_id scoped
@@ -577,22 +562,18 @@ export function serverQueryMailMessages(
 
 // REPORTS — company_id scoped
 
-export async function serverQueryFinancialReports(
+export function serverQueryFinancialReports(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM financial_report ${where}`, opts)
+  return stdbSql(`SELECT * FROM financial_report WHERE organization_id = ${organizationId}`, opts)
 }
 
-export async function serverQueryTrialBalances(
+export function serverQueryTrialBalances(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
 ) {
-  const where = await companyWhere(organizationId, opts)
-  if (!where) return []
-  return stdbSql(`SELECT * FROM trial_balance ${where} ORDER BY account_code ASC`, opts)
+  return stdbSql(`SELECT * FROM trial_balance WHERE organization_id = ${organizationId} ORDER BY account_code ASC`, opts)
 }
 
 // SUBSCRIPTIONS — organization_id scoped
@@ -703,6 +684,26 @@ export function serverQueryUserOrganization(
 ) {
   return stdbSql(
     `SELECT * FROM user_organization WHERE user_identity = '${identityHex}' AND is_active = true`,
+    opts,
+  )
+}
+
+/**
+ * Lists all active users in an organization by joining user_organization → user_profile.
+ * user_organization already has organization_id directly.
+ */
+export async function serverQueryOrgUsers(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  const memberships = await stdbSql<{ userIdentity: string }>(
+    `SELECT * FROM user_organization WHERE organization_id = ${organizationId} AND is_active = true`,
+    opts,
+  )
+  if (memberships.length === 0) return []
+  const identities = memberships.map((m) => `'${m.userIdentity}'`).join(', ')
+  return stdbSql(
+    `SELECT * FROM user_profile WHERE identity IN (${identities})`,
     opts,
   )
 }
