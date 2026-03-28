@@ -72,7 +72,7 @@ export function FormFieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             disabled={disabled}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "border-destructive")}
           />
         )
 
@@ -84,7 +84,7 @@ export function FormFieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             disabled={disabled}
-            className={cn(error && "border-red-500", "min-h-[100px]")}
+            className={cn(error && "border-destructive", "min-h-[100px]")}
           />
         )
 
@@ -97,7 +97,7 @@ export function FormFieldRenderer({
             onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
             onBlur={onBlur}
             disabled={disabled}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "border-destructive")}
           />
         )
 
@@ -108,7 +108,7 @@ export function FormFieldRenderer({
             onValueChange={onChange}
             disabled={disabled}
           >
-            <SelectTrigger className={cn(error && "border-red-500")}>
+            <SelectTrigger className={cn(error && "border-destructive")}>
               <SelectValue placeholder={field.placeholder || "Select..."} />
             </SelectTrigger>
             <SelectContent>
@@ -281,7 +281,7 @@ export function FormFieldRenderer({
           onSelect={(suggestion) => onChange(suggestion)}
         />
       )}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }
@@ -456,7 +456,7 @@ function RatingField({
           disabled={disabled}
           className={cn(
             "text-2xl transition-colors",
-            star <= value ? "text-yellow-400" : "text-gray-300",
+            star <= value ? "text-warning" : "text-muted-foreground",
             disabled && "cursor-not-allowed"
           )}
           onClick={() => onChange(star)}

@@ -81,7 +81,7 @@ export function EmptySlot({ slot, size = [0.8, 0.8, 0.8] }: EmptySlotProps) {
             <p className="text-muted-foreground text-xs">
               Row {slot.row + 1}, Col {slot.column + 1}, Level {slot.level + 1}
             </p>
-            <p className="text-xs text-green-500 mt-1">Click to add item</p>
+            <p className="text-xs text-success mt-1">Click to add item</p>
           </div>
         </Html>
       )}

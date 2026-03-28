@@ -1,0 +1,20 @@
+/* Optional ambient background — scoped to data-shell="css-art" */
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-shell="css-art"] body {
+    position: relative;
+  }
+
+  :root[data-shell="css-art"] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.35;
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -15%, hsl(var(--primary) / 0.12), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 50%, hsl(var(--chart-2) / 0.06), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 0% 80%, hsl(var(--chart-4) / 0.05), transparent 45%);
+  }
+}

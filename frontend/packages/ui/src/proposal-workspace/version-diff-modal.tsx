@@ -62,14 +62,14 @@ function DiffLineView({ lines }: { lines: VersionLine[] }) {
           key={idx}
           className={cn(
             "flex gap-2 px-2 py-0.5",
-            line.type === "added" && "bg-green-50 dark:bg-green-900/20",
-            line.type === "removed" && "bg-red-50 dark:bg-red-900/20",
+            line.type === "added" && "bg-success/10 dark:bg-success/20",
+            line.type === "removed" && "bg-destructive/10 dark:bg-destructive/20",
           )}
         >
           <span className={cn(
             "w-4 shrink-0 text-center",
-            line.type === "added" && "text-green-600",
-            line.type === "removed" && "text-red-600",
+            line.type === "added" && "text-success",
+            line.type === "removed" && "text-destructive",
             line.type === "unchanged" && "text-muted-foreground/40",
           )}>
             {line.type === "added" && "+"}
@@ -78,8 +78,8 @@ function DiffLineView({ lines }: { lines: VersionLine[] }) {
           </span>
           <span className={cn(
             "flex-1 whitespace-pre-wrap break-words",
-            line.type === "added" && "text-green-800 dark:text-green-300",
-            line.type === "removed" && "text-red-700 dark:text-red-400 line-through opacity-70",
+            line.type === "added" && "text-foreground",
+            line.type === "removed" && "text-destructive line-through opacity-70",
             line.type === "unchanged" && "text-muted-foreground",
           )}>
             {line.text || " "}
@@ -129,12 +129,12 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
           </div>
           <div className="flex items-center gap-2">
             {totalAdded > 0 && (
-              <span className="flex items-center gap-0.5 text-xs text-green-600">
+              <span className="flex items-center gap-0.5 text-xs text-success">
                 <Plus className="h-3 w-3" />{totalAdded}
               </span>
             )}
             {totalRemoved > 0 && (
-              <span className="flex items-center gap-0.5 text-xs text-red-500">
+              <span className="flex items-center gap-0.5 text-xs text-destructive">
                 <Minus className="h-3 w-3" />{totalRemoved}
               </span>
             )}
@@ -165,9 +165,9 @@ export function VersionDiffModal({ open, onClose, version, currentSections, onRe
           {currentSections
             .filter((cs) => !version.sections.find((vs) => vs.id === cs.id))
             .map((cs) => (
-              <div key={cs.id} className="rounded-lg border border-green-200 dark:border-green-800 overflow-hidden">
-                <div className="px-3 py-2 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">
-                  <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+              <div key={cs.id} className="rounded-lg border border-success/35 overflow-hidden">
+                <div className="px-3 py-2 bg-success/10 border-b border-success/25">
+                  <p className="text-xs font-semibold text-success">
                     {t("proposalWorkspace.versionDiffModal.newSection", { title: cs.title })}
                   </p>
                 </div>

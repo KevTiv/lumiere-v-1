@@ -7,6 +7,7 @@
 use serde_json::{Map, Value};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::projects::{project_project, ProjectProject};
 use crate::types::TaskState;
@@ -84,6 +85,7 @@ pub struct ProjectTask {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateTaskParams {
+    pub company_id: Option<u64>,
     pub project_id: Option<u64>,
     pub name: String,
     pub description: Option<String>,
@@ -131,6 +133,7 @@ pub struct CreateTaskParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateTaskParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub description: Option<Option<String>>,
     pub priority: Option<String>,
@@ -356,10 +359,11 @@ fn task_update_old_values(task: &ProjectTask) -> Value {
 pub fn create_task(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateTaskParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_task", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.trim().is_empty() {
         return Err("Task name cannot be empty".to_string());
@@ -375,6 +379,9 @@ pub fn create_task(
         if project.organization_id != organization_id {
             return Err("Project does not belong to this organization".to_string());
         }
+        if project.company_id != company_id {
+            return Err("Project does not belong to this company".to_string());
+        }
     }
 
     if let Some(pid) = params.parent_id {
@@ -387,6 +394,9 @@ pub fn create_task(
 
         if parent.organization_id != organization_id {
             return Err("Parent task does not belong to this organization".to_string());
+        }
+        if parent.company_id != company_id {
+            return Err("Parent task does not belong to this company".to_string());
         }
 
         if let (Some(task_project_id), Some(parent_project_id)) =
@@ -595,7 +605,6 @@ pub fn create_task(
 pub fn update_task_state(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     task_id: u64,
     state: TaskState,
 ) -> Result<(), String> {
@@ -611,6 +620,8 @@ pub fn update_task_state(
     if task.organization_id != organization_id {
         return Err("Task does not belong to this organization".to_string());
     }
+
+    let company_id = task.company_id;
 
     let mut old_values = Map::new();
     old_values.insert(
@@ -739,7 +750,6 @@ pub fn update_task_state(
 pub fn update_task(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     task_id: u64,
     params: UpdateTaskParams,
 ) -> Result<(), String> {
@@ -754,6 +764,11 @@ pub fn update_task(
 
     if task.organization_id != organization_id {
         return Err("Task does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if task.company_id != company_id {
+        return Err("Task does not belong to this company".to_string());
     }
 
     let old_values = task_update_old_values(&task);
@@ -1054,7 +1069,6 @@ pub fn update_task(
 pub fn set_task_parent(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     task_id: u64,
     parent_id: Option<u64>,
 ) -> Result<(), String> {
@@ -1070,6 +1084,8 @@ pub fn set_task_parent(
     if task.organization_id != organization_id {
         return Err("Task does not belong to this organization".to_string());
     }
+
+    let company_id = task.company_id;
 
     let mut old_values = Map::new();
     old_values.insert("parent_id".to_string(), serde_json::json!(task.parent_id));
@@ -1206,7 +1222,6 @@ pub fn set_task_parent(
 pub fn assign_task_users(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     task_id: u64,
     user_ids: Vec<Identity>,
 ) -> Result<(), String> {
@@ -1222,6 +1237,8 @@ pub fn assign_task_users(
     if task.organization_id != organization_id {
         return Err("Task does not belong to this organization".to_string());
     }
+
+    let company_id = task.company_id;
 
     let mut old_values = Map::new();
     old_values.insert("user_ids".to_string(), identity_vec_to_json(&task.user_ids));

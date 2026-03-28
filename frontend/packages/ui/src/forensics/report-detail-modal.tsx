@@ -39,6 +39,11 @@ import {
 } from "lucide-react"
 import type { ForensicReport, TimelineEvent, CorrectiveAction, RootCause } from "@/lib/forensic-report-types"
 import { severityConfig, statusConfig, incidentCategories } from "@/lib/forensic-report-types"
+import {
+  correctiveActionStatusPillClass,
+  severityBadgeClass,
+  statusBadgeClass,
+} from "@/lib/theme-colors"
 
 interface ReportDetailModalProps {
   report: ForensicReport | null
@@ -104,14 +109,8 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
   const completedActions = report.correctiveActions.filter(a => a.status === "completed").length
   const actionProgress = (completedActions / report.correctiveActions.length) * 100
 
-  const getActionStatusColor = (status: CorrectiveAction["status"]) => {
-    switch (status) {
-      case "completed": return "text-green-600 bg-green-500/10"
-      case "in-progress": return "text-blue-600 bg-blue-500/10"
-      case "overdue": return "text-red-600 bg-red-500/10"
-      default: return "text-muted-foreground bg-muted"
-    }
-  }
+  const getActionStatusColor = (actionStatus: CorrectiveAction["status"]) =>
+    correctiveActionStatusPillClass[actionStatus] ?? "text-muted-foreground bg-muted"
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
@@ -126,10 +125,9 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   variant="outline"
                   className={cn(
                     "gap-1",
-                    severity.color === "red" && "border-red-500/50 bg-red-500/10 text-red-600",
-                    severity.color === "orange" && "border-orange-500/50 bg-orange-500/10 text-orange-600",
-                    severity.color === "yellow" && "border-yellow-500/50 bg-yellow-500/10 text-yellow-600",
-                    severity.color === "green" && "border-green-500/50 bg-green-500/10 text-green-600"
+                    severity.color in severityBadgeClass
+                      ? severityBadgeClass[severity.color as keyof typeof severityBadgeClass]
+                      : undefined,
                   )}
                 >
                   {severityIcons[report.severity]}
@@ -139,10 +137,9 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   variant="outline"
                   className={cn(
                     "gap-1",
-                    status.color === "red" && "border-red-500/50 bg-red-500/10 text-red-600",
-                    status.color === "yellow" && "border-yellow-500/50 bg-yellow-500/10 text-yellow-600",
-                    status.color === "blue" && "border-blue-500/50 bg-blue-500/10 text-blue-600",
-                    status.color === "green" && "border-green-500/50 bg-green-500/10 text-green-600"
+                    status.color in statusBadgeClass
+                      ? statusBadgeClass[status.color as keyof typeof statusBadgeClass]
+                      : undefined,
                   )}
                 >
                   {status.label}
@@ -259,7 +256,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <ul className="space-y-1.5">
                       {report.immediateActions.map((action, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                          <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                           {action}
                         </li>
                       ))}
@@ -277,9 +274,9 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                       <div key={event.id} className="relative pl-10">
                         <div className={cn(
                           "absolute left-2 w-5 h-5 rounded-full flex items-center justify-center -translate-x-1/2",
-                          event.type === "resolution" ? "bg-green-500/20 text-green-600" :
-                          event.type === "discovery" ? "bg-red-500/20 text-red-600" :
-                          event.type === "escalation" ? "bg-orange-500/20 text-orange-600" :
+                          event.type === "resolution" ? "bg-success/20 text-success" :
+                          event.type === "discovery" ? "bg-destructive/20 text-destructive" :
+                          event.type === "escalation" ? "bg-warning/20 text-warning" :
                           "bg-muted text-muted-foreground"
                         )}>
                           {timelineTypeIcons[event.type]}
@@ -310,7 +307,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                           <div className="flex items-start gap-3">
                             <div className={cn(
                               "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                              cause.contributing ? "bg-red-500/10 text-red-600" : "bg-muted text-muted-foreground"
+                              cause.contributing ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
                             )}>
                               {rootCauseCategoryIcons[cause.category]}
                             </div>
@@ -338,7 +335,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                 {report.lessonsLearned.length > 0 && (
                   <div>
                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                      <Lightbulb className="h-4 w-4 text-yellow-500" />
+                      <Lightbulb className="h-4 w-4 text-warning" />
                       {t("forensics.detailModal.lessonsLearned")}
                     </h4>
                     <ul className="space-y-2">
@@ -398,7 +395,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <ul className="space-y-2">
                       {report.preventiveActions.map((action, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <Shield className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                          <Shield className="h-4 w-4 text-info mt-0.5 shrink-0" />
                           {action}
                         </li>
                       ))}
@@ -414,7 +411,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-green-500" />
+                          <DollarSign className="h-4 w-4 text-success" />
                           {t("forensics.detailModal.financialImpact")}
                         </CardTitle>
                       </CardHeader>
@@ -443,7 +440,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-blue-500" />
+                          <Building2 className="h-4 w-4 text-info" />
                           {t("forensics.detailModal.operationalImpact")}
                         </CardTitle>
                       </CardHeader>
@@ -476,7 +473,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Users className="h-4 w-4 text-orange-500" />
+                          <Users className="h-4 w-4 text-warning" />
                           {t("forensics.detailModal.reputationalImpact")}
                         </CardTitle>
                       </CardHeader>
@@ -502,7 +499,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-purple-500" />
+                          <Shield className="h-4 w-4 text-category-3" />
                           {t("forensics.detailModal.complianceImpact")}
                         </CardTitle>
                       </CardHeader>

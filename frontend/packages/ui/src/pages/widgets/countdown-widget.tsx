@@ -1,6 +1,12 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import {
+  widgetCountdownGradientClass,
+  widgetCountdownBarClass,
+  widgetAccentTileClass,
+  type WidgetAccentKey,
+} from "@/lib/theme-colors"
 
 export interface CountdownData {
   items: CountdownItem[]
@@ -13,29 +19,11 @@ export interface CountdownItem {
   value: number
   unit: string
   maxValue?: number
-  color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
-}
-
-const colorVariants = {
-  blue: "from-blue-500/20 to-blue-600/5 border-blue-500/30",
-  green: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/30",
-  orange: "from-orange-500/20 to-orange-600/5 border-orange-500/30",
-  red: "from-red-500/20 to-red-600/5 border-red-500/30",
-  purple: "from-purple-500/20 to-purple-600/5 border-purple-500/30",
-  teal: "from-teal-500/20 to-teal-600/5 border-teal-500/30",
-}
-
-const textVariants = {
-  blue: "text-blue-400",
-  green: "text-emerald-400",
-  orange: "text-orange-400",
-  red: "text-red-400",
-  purple: "text-purple-400",
-  teal: "text-teal-400",
+  color?: WidgetAccentKey
 }
 
 function CountdownCard({ item }: { item: CountdownItem }) {
-  const color = item.color || "blue"
+  const color: WidgetAccentKey = item.color || "blue"
   const progress = item.maxValue ? (item.value / item.maxValue) * 100 : undefined
 
   return (
@@ -44,13 +32,13 @@ function CountdownCard({ item }: { item: CountdownItem }) {
         "relative flex flex-col items-center justify-center p-4 rounded-2xl",
         "bg-gradient-to-b border backdrop-blur-sm",
         "transition-all duration-300 hover:scale-105",
-        colorVariants[color]
+        widgetCountdownGradientClass[color]
       )}
     >
       {/* Value */}
       <span className={cn(
         "text-4xl font-bold tabular-nums tracking-tighter",
-        textVariants[color]
+        widgetAccentTileClass[color].ringText
       )}>
         {String(item.value).padStart(2, '0')}
       </span>
@@ -64,7 +52,7 @@ function CountdownCard({ item }: { item: CountdownItem }) {
       {progress !== undefined && (
         <div className="absolute bottom-2 left-3 right-3 h-1 rounded-full bg-muted/20 overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all", `bg-${color}-500`)}
+            className={cn("h-full rounded-full transition-all", widgetCountdownBarClass[color])}
             style={{ width: `${progress}%` }}
           />
         </div>

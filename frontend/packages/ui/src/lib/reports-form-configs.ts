@@ -12,6 +12,7 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("reports.forms.generateReport.fields.name"),
           placeholder: t("reports.forms.generateReport.fields.namePlaceholder"),
@@ -20,6 +21,7 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "dateFrom",
+          name: "dateFrom",
           type: "date",
           label: t("reports.forms.generateReport.fields.dateFrom"),
           required: true,
@@ -27,6 +29,7 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "dateTo",
+          name: "dateTo",
           type: "date",
           label: t("reports.forms.generateReport.fields.dateTo"),
           required: true,
@@ -34,6 +37,7 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "targetMove",
+          name: "targetMove",
           type: "select",
           label: t("reports.forms.generateReport.fields.targetMove"),
           width: "1/2",
@@ -44,18 +48,21 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "showZeroLines",
+          name: "showZeroLines",
           type: "checkbox",
           label: t("reports.forms.generateReport.fields.showZeroLines"),
           width: "1/2",
         },
         {
           id: "showHierarchy",
+          name: "showHierarchy",
           type: "checkbox",
           label: t("reports.forms.generateReport.fields.showHierarchy"),
           width: "1/2",
         },
         {
           id: "showPercentage",
+          name: "showPercentage",
           type: "checkbox",
           label: t("reports.forms.generateReport.fields.showPercentage"),
           width: "1/2",

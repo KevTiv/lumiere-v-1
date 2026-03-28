@@ -25,6 +25,8 @@ import {
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import type { AuditLogEntry } from "@/lib/rbac-types"
+import { cn } from "@/lib/utils"
+import { auditActionPillClass } from "@/lib/theme-colors"
 
 // Mock audit log data
 const mockAuditLogs: AuditLogEntry[] = [
@@ -121,15 +123,8 @@ const actionIcons: Record<string, React.ReactNode> = {
   "permission.deny": <AlertTriangle className="h-4 w-4" />,
 }
 
-const actionColors: Record<string, string> = {
-  "user.login": "bg-green-500/10 text-green-400",
-  "user.create": "bg-blue-500/10 text-blue-400",
-  "role.update": "bg-purple-500/10 text-purple-400",
-  "order.create": "bg-teal-500/10 text-teal-400",
-  "customer.update": "bg-blue-500/10 text-blue-400",
-  "product.update": "bg-orange-500/10 text-orange-400",
-  "report.generate": "bg-teal-500/10 text-teal-400",
-  "permission.deny": "bg-red-500/10 text-red-400",
+function actionPillClass(action: string): string {
+  return auditActionPillClass[action] ?? "bg-muted text-muted-foreground"
 }
 
 export function AuditLog() {
@@ -229,7 +224,7 @@ export function AuditLog() {
                 className="flex items-start justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-lg ${actionColors[log.action] || "bg-muted"}`}>
+                  <div className={cn("p-2 rounded-lg", actionPillClass(log.action))}>
                     {actionIcons[log.action] || <Settings className="h-4 w-4" />}
                   </div>
                   <div className="space-y-1">

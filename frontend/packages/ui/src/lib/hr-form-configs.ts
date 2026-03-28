@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newEmployeeForm = (t: TFunction): FormConfig => ({
   id: "new-employee",
   title: t("hr.forms.newEmployee.title"),
@@ -43,11 +45,12 @@ export const newEmployeeForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "emp-department",
-          type: "number",
+          type: "select",
           name: "departmentId",
           label: t("hr.forms.newEmployee.fields.departmentId"),
           placeholder: t("hr.forms.newEmployee.fields.departmentPlaceholder"),
           width: "1/2",
+          options: emptySelect,
         },
       ],
     },
@@ -102,21 +105,23 @@ export const newLeaveRequestForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "leave-emp-id",
-          type: "number",
+          type: "select",
           name: "employeeId",
           label: t("hr.forms.newLeaveRequest.fields.employeeId"),
           placeholder: t("hr.forms.newLeaveRequest.fields.employeePlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "leave-type-id",
-          type: "number",
+          type: "select",
           name: "leaveTypeId",
           label: t("hr.forms.newLeaveRequest.fields.leaveTypeId"),
           placeholder: t("hr.forms.newLeaveRequest.fields.leaveTypePlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "leave-date-from",
@@ -176,12 +181,13 @@ export const newContractForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "contract-emp-id",
-          type: "number",
+          type: "select",
           name: "employeeId",
           label: t("hr.forms.newContract.fields.employeeId"),
           placeholder: t("hr.forms.newContract.fields.employeePlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "contract-wage",
@@ -193,13 +199,14 @@ export const newContractForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
-          id: "contract-currency",
-          type: "number",
-          name: "currencyId",
-          label: t("hr.forms.newContract.fields.currencyId"),
-          placeholder: t("hr.forms.newContract.fields.currencyPlaceholder"),
+          id: "contract-pricelist",
+          type: "select",
+          name: "pricelistId",
+          label: t("hr.forms.newContract.fields.pricelistId"),
+          placeholder: t("hr.forms.newContract.fields.pricelistPlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "contract-date-start",
@@ -306,11 +313,12 @@ export const newJobPositionForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "job-department",
-          type: "number",
+          type: "select",
           name: "departmentId",
           label: t("hr.forms.newJobPosition.fields.departmentId"),
           placeholder: t("hr.forms.newJobPosition.fields.departmentPlaceholder"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "job-expected-employees",

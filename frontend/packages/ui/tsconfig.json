@@ -10,11 +10,8 @@
       "@/hooks/*": ["./src/hooks/*"]
     },
     "jsx": "react-jsx",
-    "typeRoots": ["./node_modules/@types", "../mobile/node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"]
   },
   "include": ["."],
-  "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../mobile" }
-  ]
+  "exclude": ["node_modules", "dist"]
 }

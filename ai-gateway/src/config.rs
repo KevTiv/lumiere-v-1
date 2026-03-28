@@ -25,6 +25,40 @@ pub struct Config {
     pub dataset_cache_dir: String,
     /// Kaggle search cache TTL in seconds
     pub kaggle_cache_ttl_secs: u64,
+
+    // ── Context / Activity Layer (Rig-rs) ────────────────────────────────────
+    /// Embedding provider for context layer: "ollama" (default) | "mistral"
+    pub context_embedding_provider: String,
+    /// Ollama base URL
+    pub ollama_url: String,
+    /// Ollama embedding model (default: nomic-embed-text)
+    pub ollama_embed_model: String,
+    /// Ollama chat/completion model (default: mistral)
+    pub ollama_chat_model: String,
+    /// Ollama vision model for image OCR (default: llava)
+    pub ollama_vision_model: String,
+    /// Mistral API key (required if context_embedding_provider = "mistral" or vision_provider = "mistral")
+    pub mistral_api_key: Option<String>,
+    /// Vision provider: "ollama" (default) | "mistral"
+    pub vision_provider: String,
+    /// Document text parser: "plaintext" (default) | "unstructured"
+    pub document_parser: String,
+    /// Unstructured.io endpoint (local Docker or hosted)
+    pub unstructured_url: String,
+    /// Unstructured.io hosted API key (optional)
+    pub unstructured_api_key: Option<String>,
+    /// Qdrant collection for ERP activities (separate from embeddings collection)
+    pub activities_collection: String,
+    /// How often the activity ingester polls SpacetimeDB tables (seconds)
+    pub activity_ingest_interval_secs: u64,
+    /// Max multipart upload size in bytes (default: 20 MB)
+    pub max_upload_bytes: usize,
+
+    // ── Scaleway S3 stub (Phase 2) ────────────────────────────────────────────
+    pub scaleway_bucket: Option<String>,
+    pub scaleway_region: Option<String>,
+    /// S3-compatible endpoint URL (e.g. https://s3.nl-ams.scw.cloud)
+    pub scaleway_endpoint: Option<String>,
 }
 
 impl Config {
@@ -71,6 +105,41 @@ impl Config {
                 .unwrap_or_else(|_| "3600".to_string())
                 .parse()
                 .context("KAGGLE_CACHE_TTL_SECS must be a valid number")?,
+
+            // Context / Activity Layer
+            context_embedding_provider: std::env::var("CONTEXT_EMBEDDING_PROVIDER")
+                .unwrap_or_else(|_| "ollama".to_string()),
+            ollama_url: std::env::var("OLLAMA_URL")
+                .unwrap_or_else(|_| "http://localhost:11434".to_string()),
+            ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
+                .unwrap_or_else(|_| "nomic-embed-text".to_string()),
+            ollama_chat_model: std::env::var("OLLAMA_CHAT_MODEL")
+                .unwrap_or_else(|_| "mistral".to_string()),
+            ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
+                .unwrap_or_else(|_| "llava".to_string()),
+            mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
+            vision_provider: std::env::var("VISION_PROVIDER")
+                .unwrap_or_else(|_| "ollama".to_string()),
+            document_parser: std::env::var("DOCUMENT_PARSER")
+                .unwrap_or_else(|_| "plaintext".to_string()),
+            unstructured_url: std::env::var("UNSTRUCTURED_URL")
+                .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            unstructured_api_key: std::env::var("UNSTRUCTURED_API_KEY").ok(),
+            activities_collection: std::env::var("QDRANT_ACTIVITIES_COLLECTION")
+                .unwrap_or_else(|_| "lumiere_erp_activities".to_string()),
+            activity_ingest_interval_secs: std::env::var("ACTIVITY_INGEST_INTERVAL_SECS")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .context("ACTIVITY_INGEST_INTERVAL_SECS must be a valid number")?,
+            max_upload_bytes: std::env::var("MAX_UPLOAD_BYTES")
+                .unwrap_or_else(|_| "20971520".to_string()) // 20 MB
+                .parse()
+                .context("MAX_UPLOAD_BYTES must be a valid number")?,
+
+            // Scaleway S3 stub
+            scaleway_bucket: std::env::var("SCALEWAY_BUCKET").ok(),
+            scaleway_region: std::env::var("SCALEWAY_REGION").ok(),
+            scaleway_endpoint: std::env::var("SCALEWAY_ENDPOINT").ok(),
         })
     }
 }

@@ -12,6 +12,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("documents.forms.newDocument.fields.name"),
           placeholder: t("documents.forms.newDocument.fields.namePlaceholder"),
@@ -20,6 +21,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "fileName",
+          name: "fileName",
           type: "text",
           label: t("documents.forms.newDocument.fields.fileName"),
           placeholder: t("documents.forms.newDocument.fields.fileNamePlaceholder"),
@@ -28,6 +30,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "mimetype",
+          name: "mimetype",
           type: "select",
           label: t("documents.forms.newDocument.fields.mimetype"),
           width: "1/2",
@@ -42,6 +45,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("documents.forms.newDocument.fields.description"),
           placeholder: t("documents.forms.newDocument.fields.descriptionPlaceholder"),
@@ -50,12 +54,14 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "isFavorite",
+          name: "isFavorite",
           type: "checkbox",
           label: t("documents.forms.newDocument.fields.isFavorite"),
           width: "1/2",
         },
         {
           id: "isShared",
+          name: "isShared",
           type: "checkbox",
           label: t("documents.forms.newDocument.fields.isShared"),
           width: "1/2",
@@ -76,6 +82,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("documents.forms.newArticle.fields.name"),
           placeholder: t("documents.forms.newArticle.fields.namePlaceholder"),
@@ -84,6 +91,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("documents.forms.newArticle.fields.description"),
           placeholder: t("documents.forms.newArticle.fields.descriptionPlaceholder"),
@@ -92,6 +100,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "body",
+          name: "body",
           type: "textarea",
           label: t("documents.forms.newArticle.fields.body"),
           placeholder: t("documents.forms.newArticle.fields.bodyPlaceholder"),
@@ -100,6 +109,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "isPublished",
+          name: "isPublished",
           type: "checkbox",
           label: t("documents.forms.newArticle.fields.isPublished"),
           width: "1/2",

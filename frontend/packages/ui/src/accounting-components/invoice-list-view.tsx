@@ -43,19 +43,20 @@ import {
   Filter,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 
 // State display mapping
 type DisplayStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "cancelled"
 
-const statusConfig: Record<DisplayStatus, { labelKey: string; bgColor: string; color: string }> = {
-  draft: { labelKey: "accounting.states.draft", bgColor: "bg-slate-100", color: "text-slate-700" },
-  sent: { labelKey: "accounting.states.sent", bgColor: "bg-blue-100", color: "text-blue-700" },
-  partial: { labelKey: "accounting.states.partial", bgColor: "bg-purple-100", color: "text-purple-700" },
-  paid: { labelKey: "accounting.states.paid", bgColor: "bg-emerald-100", color: "text-emerald-700" },
-  overdue: { labelKey: "accounting.states.overdue", bgColor: "bg-red-100", color: "text-red-700" },
-  cancelled: { labelKey: "accounting.states.cancelled", bgColor: "bg-gray-100", color: "text-gray-500" },
+const statusConfig: Record<DisplayStatus, { labelKey: string; pillClass: string }> = {
+  draft: { labelKey: "accounting.states.draft", pillClass: accountingListStatusBadgeClass.draft },
+  sent: { labelKey: "accounting.states.sent", pillClass: accountingListStatusBadgeClass.sent },
+  partial: { labelKey: "accounting.states.partial", pillClass: accountingListStatusBadgeClass.partial },
+  paid: { labelKey: "accounting.states.paid", pillClass: accountingListStatusBadgeClass.paid },
+  overdue: { labelKey: "accounting.states.overdue", pillClass: accountingListStatusBadgeClass.overdue },
+  cancelled: { labelKey: "accounting.states.cancelled", pillClass: accountingListStatusBadgeClass.cancelled },
 }
 
 function getMoveStatus(move: AccountMove): DisplayStatus {
@@ -118,25 +119,25 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10"><FileText className="h-5 w-5 text-blue-600" /></div>
+            <div className="p-2 rounded-lg bg-info/10"><FileText className="h-5 w-5 text-info" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalInvoices")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
+            <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.states.paid")}</p><p className="text-2xl font-bold">{stats.paid}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10"><Clock className="h-5 w-5 text-amber-600" /></div>
+            <div className="p-2 rounded-lg bg-warning/10"><Clock className="h-5 w-5 text-warning" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.states.pending")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-500/10"><AlertTriangle className="h-5 w-5 text-red-600" /></div>
+            <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.states.overdue")}</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
           </div>
         </CardContent></Card>
@@ -152,7 +153,7 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.outstandingBalance")}</p><p className="text-2xl font-bold text-amber-600">{formatCurrency(stats.totalDue)}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.outstandingBalance")}</p><p className="text-2xl font-bold text-warning">{formatCurrency(stats.totalDue)}</p></div>
             <Clock className="h-8 w-8 text-muted-foreground/30" />
           </div>
         </CardContent></Card>
@@ -216,12 +217,12 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(inv.amountTotal)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", inv.amountResidual > 0 ? "text-amber-600" : "text-emerald-600")}>
+                      <span className={cn("font-medium", inv.amountResidual > 0 ? "text-warning" : "text-success")}>
                         {formatCurrency(inv.amountResidual)}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("font-medium", conf.bgColor, conf.color)}>{t(conf.labelKey as any)}</Badge>
+                      <Badge className={cn("font-medium", conf.pillClass)}>{t(conf.labelKey as any)}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

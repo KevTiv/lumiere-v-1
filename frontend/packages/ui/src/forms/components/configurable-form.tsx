@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useForm } from "react-hook-form"
+import { useForm, type FieldValues, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { cn } from "@/lib/utils"
@@ -150,8 +150,8 @@ export function ConfigurableForm({
     return z.object(schemaFields)
   }, [config, t])
 
-  // Initialize form with react-hook-form
-  const form = useForm({
+  // Initialize form with react-hook-form (explicit FieldValues so Control matches FormField / zodResolver)
+  const form = useForm<FieldValues>({
     resolver: zodResolver(formSchema),
     defaultValues: buildDefaultValues(config?.fields || [], defaultValues),
   })
@@ -272,7 +272,7 @@ export function ConfigurableForm({
 
 interface FormFieldsGridProps {
   fields: ParsedFormField[]
-  form: ReturnType<typeof useForm>
+  form: UseFormReturn<FieldValues>
   disabled?: boolean
   layout?: "vertical" | "horizontal"
 }
@@ -311,7 +311,7 @@ const FormFieldsGrid = React.memo(function FormFieldsGrid({
               <FormItem>
                 <FormLabel>
                   {field.label}
-                  {field.validation?.required && <span className="text-red-500 ml-1">*</span>}
+                  {field.validation?.required && <span className="text-destructive ml-1">*</span>}
                 </FormLabel>
                 <FormControl>
                   <FormFieldRenderer

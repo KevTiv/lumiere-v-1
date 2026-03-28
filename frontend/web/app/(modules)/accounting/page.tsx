@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import {
   serverQueryAccountAccounts,
+  serverQueryAccountJournals,
   serverQueryAccountMoves,
   serverQueryAccountTaxes,
   serverQueryBudgets,
@@ -15,13 +16,14 @@ export default async function AccountingPage() {
     return <AccountingClient />
   }
 
-  const [accounts, moves, taxes, budgets, analytic] = await Promise.all([
+  const [accounts, moves, taxes, budgets, analytic, journals] = await Promise.all([
     serverQueryAccountAccounts(organizationId, opts),
     serverQueryAccountMoves(organizationId, undefined, opts),
     serverQueryAccountTaxes(organizationId, opts),
     serverQueryBudgets(organizationId, opts),
     serverQueryAnalyticAccounts(organizationId, opts),
-  ]).catch(() => [[], [], [], [], []])
+    serverQueryAccountJournals(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], []])
 
   return (
     <AccountingClient
@@ -30,6 +32,7 @@ export default async function AccountingPage() {
       initialTaxes={taxes as Record<string, unknown>[]}
       initialBudgets={budgets as Record<string, unknown>[]}
       initialAnalytic={analytic as Record<string, unknown>[]}
+      initialJournals={journals as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

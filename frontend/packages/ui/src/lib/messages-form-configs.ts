@@ -12,6 +12,7 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "messageType",
+          name: "messageType",
           type: "select",
           label: t("messages.forms.newMessage.fields.messageType"),
           width: "1/2",
@@ -23,6 +24,7 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "model",
+          name: "model",
           type: "text",
           label: t("messages.forms.newMessage.fields.model"),
           placeholder: t("messages.forms.newMessage.fields.modelPlaceholder"),
@@ -30,6 +32,7 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "resId",
+          name: "resId",
           type: "number",
           label: t("messages.forms.newMessage.fields.resId"),
           placeholder: "1",
@@ -37,6 +40,7 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "subtype",
+          name: "subtype",
           type: "text",
           label: t("messages.forms.newMessage.fields.subtype"),
           placeholder: t("messages.forms.newMessage.fields.subtypePlaceholder"),
@@ -44,6 +48,7 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "body",
+          name: "body",
           type: "textarea",
           label: t("messages.forms.newMessage.fields.body"),
           placeholder: t("messages.forms.newMessage.fields.bodyPlaceholder"),

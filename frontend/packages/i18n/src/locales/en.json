@@ -21,6 +21,32 @@
     "success": "Success",
     "warning": "Warning",
     "noData": "No data available",
+    "noOrganization": {
+      "title": "No organization selected",
+      "description": "You need to belong to an organization to use this area. Complete onboarding or ask an administrator to invite you.",
+      "goToOnboarding": "Go to onboarding"
+    },
+    "lookup": {
+      "noJournals": "No journals available — create journals in accounting settings first.",
+      "noPartners": "No customers yet — add contacts in CRM first.",
+      "noPricelists": "No pricelists available — create a pricelist first.",
+      "noWarehouses": "No warehouses available — create a warehouse in Inventory first.",
+      "noVendors": "No vendors yet — mark contacts as vendors in CRM or add supplier info.",
+      "noStockMoves": "No operation types or locations found — create stock moves or quants first.",
+      "noProducts": "No products in catalog — create a product first.",
+      "noCategories": "No product categories — create categories in Inventory settings first.",
+      "noUoms": "No units of measure — configure UOMs for your organization first.",
+      "noSaleOrders": "No sale orders — create a confirmed sale order first.",
+      "noSubscriptionPlans": "No subscription plans — create a plan first.",
+      "noEmployees": "No employees — add employees in HR first.",
+      "noTeams": "No helpdesk teams — configure teams first.",
+      "noStages": "No pipeline stages — configure helpdesk stages first.",
+      "noProjects": "No projects — create a project first.",
+      "noBoms": "No bills of materials — create a BOM first.",
+      "noTaskStages": "No task stages yet — create a task with a stage first, or leave stage empty.",
+      "noLeaveTypes": "No leave types in history — configure leave types or submit a first request with a type id.",
+      "noDepartments": "No departments — create departments first."
+    },
     "validation": {
       "required": "This field is required",
       "minLength": "Must be at least {{min}} characters",
@@ -1043,6 +1069,9 @@
         "fields": {
           "name": "Opportunity Name",
           "namePlaceholder": "Enterprise deal — Acme Corp",
+          "stage": "Pipeline stage",
+          "stageId": "Stage ID",
+          "stageIdPlaceholder": "e.g. 1",
           "expectedRevenue": "Expected Revenue",
           "probability": "Win Probability %",
           "probabilityPlaceholder": "20",
@@ -1276,7 +1305,7 @@
           "jobTitle": "Job Title",
           "jobTitlePlaceholder": "e.g. Software Engineer",
           "departmentId": "Department",
-          "departmentPlaceholder": "Department ID",
+          "departmentPlaceholder": "Select department",
           "workEmail": "Work Email",
           "workEmailPlaceholder": "jane@company.com",
           "workPhone": "Work Phone",
@@ -1300,9 +1329,9 @@
         },
         "fields": {
           "employeeId": "Employee",
-          "employeePlaceholder": "Employee ID",
+          "employeePlaceholder": "Select employee",
           "leaveTypeId": "Leave Type",
-          "leaveTypePlaceholder": "Leave Type ID",
+          "leaveTypePlaceholder": "Select leave type",
           "dateFrom": "From",
           "dateTo": "To",
           "numberOfDays": "Number of Days",
@@ -1320,10 +1349,10 @@
           "name": "Contract Reference",
           "namePlaceholder": "e.g. EMP-001-2024",
           "employeeId": "Employee",
-          "employeePlaceholder": "Employee ID",
+          "employeePlaceholder": "Select employee",
           "wage": "Monthly Wage",
-          "currencyId": "Currency",
-          "currencyPlaceholder": "Currency ID",
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
           "dateStart": "Start Date",
           "dateEnd": "End Date"
         }
@@ -1356,7 +1385,7 @@
           "name": "Job Title",
           "namePlaceholder": "e.g. Senior Software Engineer",
           "departmentId": "Department",
-          "departmentPlaceholder": "Department ID",
+          "departmentPlaceholder": "Select department",
           "expectedEmployees": "Expected Headcount",
           "expectedEmployeesPlaceholder": "1",
           "state": "Status",
@@ -1563,6 +1592,7 @@
         "description": "Add a product to the catalog",
         "sections": {
           "identity": "Identity",
+          "classification": "Category & units",
           "pricing": "Pricing"
         },
         "fields": {
@@ -1579,7 +1609,16 @@
             "product": "Storable Product",
             "consu": "Consumable",
             "service": "Service"
-          }
+          },
+          "categId": "Product category",
+          "categIdPlaceholder": "Select a category…",
+          "uomId": "Unit of measure (sales / stock)",
+          "uomIdPlaceholder": "Select UOM…",
+          "uomPoId": "Purchase UOM",
+          "uomPoPlaceholder": "Same as sales UOM",
+          "uomPoSameAsSales": "Same as sales UOM",
+          "pricelistId": "Pricelist (currency)",
+          "pricelistPlaceholder": "Select pricelist…"
         }
       },
       "newTransfer": {
@@ -1589,9 +1628,9 @@
           "transferDetails": "Transfer Details"
         },
         "fields": {
-          "pickingTypeId": "Operation Type ID",
-          "locationId": "Source Location ID",
-          "locationDestId": "Destination Location ID",
+          "pickingTypeId": "Operation type",
+          "locationId": "Source location",
+          "locationDestId": "Destination location",
           "scheduledDate": "Scheduled Date",
           "origin": "Source Document",
           "originPlaceholder": "SO-001"
@@ -1606,7 +1645,12 @@
         "fields": {
           "name": "Reference",
           "namePlaceholder": "INV/2026/001",
-          "date": "Inventory Date"
+          "date": "Inventory Date",
+          "productId": "Product",
+          "productPlaceholder": "Select product…",
+          "locationId": "Location",
+          "locationPlaceholder": "Select location…",
+          "inventoryQuantity": "Counted quantity"
         }
       }
     }
@@ -1734,10 +1778,10 @@
         "fields": {
           "partnerId": "Vendor",
           "partnerPlaceholder": "Select a vendor…",
+          "pricelistId": "Pricelist (currency)",
+          "pricelistPlaceholder": "Select pricelist…",
           "partnerRef": "Vendor Reference",
           "partnerRefPlaceholder": "Vendor PO number",
-          "currencyId": "Currency",
-          "currencyPlaceholder": "Select currency…",
           "paymentTermId": "Payment Terms",
           "paymentTermPlaceholder": "Select payment terms…",
           "datePlanned": "Expected Arrival",
@@ -1883,6 +1927,8 @@
           "clientOrderRefPlaceholder": "Your PO number",
           "pricelistId": "Pricelist",
           "pricelistPlaceholder": "Select pricelist…",
+          "warehouseId": "Warehouse",
+          "warehousePlaceholder": "Select warehouse…",
           "paymentTermId": "Payment Terms",
           "paymentTermPlaceholder": "Select payment terms…",
           "validityDate": "Expiration Date",
@@ -2038,6 +2084,7 @@
         "description": "Create a new production order",
         "sections": {
           "product": "Product",
+          "routing": "Warehouse & locations",
           "scheduling": "Scheduling",
           "other": "Other"
         },
@@ -2047,9 +2094,14 @@
           "productQty": "Quantity",
           "productQtyPlaceholder": "0",
           "bomId": "Bill of Materials",
-          "bomIdPlaceholder": "BOM ID",
-          "productUomId": "Unit of Measure",
-          "productUomIdPlaceholder": "UOM ID",
+          "bomIdPlaceholder": "Optional BOM",
+          "warehouseId": "Warehouse",
+          "warehousePlaceholder": "Select a warehouse",
+          "pickingTypeId": "Operation type",
+          "pickingTypePlaceholder": "Select picking / operation type",
+          "locationSrcId": "Source location",
+          "locationDestId": "Destination location",
+          "locationPlaceholder": "Select location",
           "datePlannedStart": "Scheduled Start",
           "datePlannedFinished": "Scheduled End",
           "origin": "Source Document",
@@ -2205,8 +2257,10 @@
         "fields": {
           "name": "Project Name",
           "namePlaceholder": "Website Redesign",
-          "partnerId": "Customer ID",
-          "partnerIdPlaceholder": "Partner ID",
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
+          "partnerId": "Customer",
+          "partnerIdPlaceholder": "Select a customer",
           "allocatedHours": "Budget (hours)",
           "allocatedHoursPlaceholder": "0",
           "dateStart": "Start Date",
@@ -2224,8 +2278,10 @@
         "fields": {
           "name": "Task Name",
           "namePlaceholder": "Design homepage mockup",
-          "projectId": "Project ID",
-          "projectIdPlaceholder": "Project ID",
+          "projectId": "Project",
+          "projectIdPlaceholder": "Select a project",
+          "stageId": "Stage",
+          "stagePlaceholder": "Reuse a stage from this project",
           "priority": "Priority",
           "plannedHours": "Planned Hours",
           "plannedHoursPlaceholder": "0",
@@ -2466,6 +2522,9 @@
           "partnerId": "Customer",
           "partnerPlaceholder": "Customer ID",
           "teamId": "Support Team",
+          "teamPlaceholder": "Select a team",
+          "stageId": "Stage",
+          "stagePlaceholder": "Select a stage",
           "priority": "Priority",
           "description": "Description",
           "descriptionPlaceholder": "Detailed description of the issue…",
@@ -2529,12 +2588,22 @@
         "title": "New Subscription",
         "description": "Create a customer subscription",
         "sections": {
-          "subscriptionDetails": "Subscription Details"
+          "subscriptionDetails": "Subscription Details",
+          "billing": "Billing & recurrence"
         },
         "fields": {
+          "recurringInvoiceDay": "Invoice day of month",
+          "isTrial": "Trial subscription",
+          "recurringRuleType": "Recurrence",
+          "recurringInterval": "Every (interval)",
+          "state": "Status",
+          "health": "Health",
+          "saleOrderId": "Sale order",
+          "saleOrderPlaceholder": "Select a sale order",
           "partnerId": "Customer",
           "partnerPlaceholder": "Customer ID",
           "planId": "Subscription Plan",
+          "planPlaceholder": "Select a plan",
           "productId": "Plan",
           "productPlaceholder": "Product ID",
           "code": "Reference",
@@ -2546,7 +2615,23 @@
           "paymentMode": "Payment Mode",
           "options": {
             "automatic": "Automatic",
-            "manual": "Manual"
+            "manual": "Manual",
+            "recurring": {
+              "daily": "Daily",
+              "weekly": "Weekly",
+              "monthly": "Monthly",
+              "yearly": "Yearly"
+            },
+            "state": {
+              "draft": "Draft",
+              "open": "Open",
+              "pending": "Pending"
+            },
+            "health": {
+              "normal": "Normal",
+              "good": "Good",
+              "bad": "At risk"
+            }
           }
         }
       },
@@ -2557,6 +2642,10 @@
           "planDetails": "Plan Details"
         },
         "fields": {
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
+          "journalId": "Invoice journal",
+          "journalPlaceholder": "Select a journal",
           "name": "Plan Name",
           "namePlaceholder": "e.g. Premium Monthly",
           "code": "Plan Code",
@@ -2660,6 +2749,8 @@
           "expenseDetails": "Expense Details"
         },
         "fields": {
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
           "name": "Description",
           "namePlaceholder": "e.g. Client dinner",
           "description": "Details",
@@ -2668,7 +2759,7 @@
           "totalAmount": "Amount",
           "quantity": "Quantity",
           "employeeId": "Employee",
-          "employeePlaceholder": "Employee ID",
+          "employeePlaceholder": "Select an employee",
           "productId": "Category",
           "productPlaceholder": "Product ID"
         }
@@ -2680,10 +2771,12 @@
           "sheetDetails": "Report Details"
         },
         "fields": {
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
           "name": "Report Name",
           "namePlaceholder": "e.g. March 2024 Expenses",
           "employeeId": "Employee",
-          "employeePlaceholder": "Employee ID"
+          "employeePlaceholder": "Select an employee"
         }
       },
       "newExpenseReport": {
@@ -2693,6 +2786,8 @@
           "reportDetails": "Report Details"
         },
         "fields": {
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
           "name": "Report Name",
           "namePlaceholder": "e.g. March 2024 Expenses",
           "employeeId": "Employee",
@@ -3182,6 +3277,18 @@
         "light": "Light",
         "dark": "Dark",
         "system": "System"
+      },
+      "palette": "Color palette",
+      "paletteDesc": "Accent colors and charts. Mistral uses beige, red, and orange tones.",
+      "palettes": {
+        "default": "Mistral",
+        "ocean": "Ocean"
+      },
+      "shell": "Layout surface",
+      "shellDesc": "Background treatment for the app shell",
+      "shells": {
+        "default": "Standard",
+        "cssArt": "Ambient art"
       },
       "dashboardLayout": "Dashboard Layout",
       "dashboardLayoutDesc": "Customize your dashboard experience",

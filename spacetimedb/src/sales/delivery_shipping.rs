@@ -13,6 +13,7 @@
 ///   - Shipping cost calculation
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::check_permission;
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
@@ -21,6 +22,7 @@ use crate::types::BatchState;
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePickingBatchParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub picking_type_id: Option<u64>,
     pub scheduled_date: Option<Timestamp>,
@@ -338,10 +340,11 @@ pub fn calculate_shipping_cost_internal(
 pub fn create_picking_batch(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreatePickingBatchParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_picking_batch", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     for picking_id in &params.picking_ids {
         let picking = ctx

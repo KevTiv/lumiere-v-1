@@ -41,18 +41,56 @@ import {
   Receipt,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  accountTypeBadgeClass,
+  accountTypeIconSurfaceClass,
+  type AccountTypeGroup,
+} from "../lib/theme-colors"
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 
-type DisplayGroup = "asset" | "liability" | "equity" | "income" | "expense" | "other"
+type DisplayGroup = AccountTypeGroup
 
-const groupConfig: Record<DisplayGroup, { labelKey: string; icon: React.ReactNode; color: string; bgColor: string }> = {
-  asset: { labelKey: "accounting.forms.newAccount.fields.options.asset", icon: <Wallet className="h-4 w-4" />, color: "text-blue-600", bgColor: "bg-blue-500/10" },
-  liability: { labelKey: "accounting.forms.newAccount.fields.options.liability", icon: <CreditCard className="h-4 w-4" />, color: "text-red-600", bgColor: "bg-red-500/10" },
-  equity: { labelKey: "accounting.forms.newAccount.fields.options.equity", icon: <PiggyBank className="h-4 w-4" />, color: "text-purple-600", bgColor: "bg-purple-500/10" },
-  income: { labelKey: "accounting.forms.newAccount.fields.options.income", icon: <TrendingUp className="h-4 w-4" />, color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-  expense: { labelKey: "accounting.forms.newAccount.fields.options.expense", icon: <Receipt className="h-4 w-4" />, color: "text-amber-600", bgColor: "bg-amber-500/10" },
-  other: { labelKey: "accounting.forms.newAccount.fields.options.other", icon: <TrendingDown className="h-4 w-4" />, color: "text-gray-600", bgColor: "bg-gray-500/10" },
+const groupConfig: Record<
+  DisplayGroup,
+  { labelKey: string; icon: React.ReactNode; badgeClass: string; iconSurfaceClass: string }
+> = {
+  asset: {
+    labelKey: "accounting.forms.newAccount.fields.options.asset",
+    icon: <Wallet className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.asset,
+    iconSurfaceClass: accountTypeIconSurfaceClass.asset,
+  },
+  liability: {
+    labelKey: "accounting.forms.newAccount.fields.options.liability",
+    icon: <CreditCard className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.liability,
+    iconSurfaceClass: accountTypeIconSurfaceClass.liability,
+  },
+  equity: {
+    labelKey: "accounting.forms.newAccount.fields.options.equity",
+    icon: <PiggyBank className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.equity,
+    iconSurfaceClass: accountTypeIconSurfaceClass.equity,
+  },
+  income: {
+    labelKey: "accounting.forms.newAccount.fields.options.income",
+    icon: <TrendingUp className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.income,
+    iconSurfaceClass: accountTypeIconSurfaceClass.income,
+  },
+  expense: {
+    labelKey: "accounting.forms.newAccount.fields.options.expense",
+    icon: <Receipt className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.expense,
+    iconSurfaceClass: accountTypeIconSurfaceClass.expense,
+  },
+  other: {
+    labelKey: "accounting.forms.newAccount.fields.options.other",
+    icon: <TrendingDown className="h-4 w-4" />,
+    badgeClass: accountTypeBadgeClass.other,
+    iconSurfaceClass: accountTypeIconSurfaceClass.other,
+  },
 }
 
 function getDisplayGroup(account: AccountAccount): DisplayGroup {
@@ -105,11 +143,11 @@ function AccountsTable({ accounts, t }: AccountsTableProps) {
                 </div>
               </TableCell>
               <TableCell>
-                <Badge className={cn("gap-1 bg-transparent border", conf.color)}>
+                <Badge className={cn("gap-1 border", conf.badgeClass)}>
                   {conf.icon}{t(conf.labelKey as any)}
                 </Badge>
               </TableCell>
-              <TableCell className={cn("font-medium", account.openingBalance < 0 ? "text-red-600" : "")}>
+              <TableCell className={cn("font-medium", account.openingBalance < 0 ? "text-destructive" : "")}>
                 {formatCurrency(account.openingBalance)}
               </TableCell>
               <TableCell>
@@ -139,6 +177,10 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newCode, setNewCode] = useState("")
+  const [newName, setNewName] = useState("")
+  const [newGroup, setNewGroup] = useState<DisplayGroup>("asset")
+  const [newOpening, setNewOpening] = useState("")
 
   const filtered = accounts.filter((a) =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -174,9 +216,7 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
           return (
             <Card key={g}><CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", conf.bgColor)}>
-                  <span className={conf.color}>{conf.icon}</span>
-                </div>
+                <div className={cn("p-2 rounded-lg", conf.iconSurfaceClass)}>{conf.icon}</div>
                 <div>
                   <p className="text-xs text-muted-foreground">{t(conf.labelKey as any)}</p>
                   <p className="text-lg font-bold">{formatCurrency(totals[g])}</p>
@@ -225,11 +265,15 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t("accounting.forms.newAccount.fields.code")}</Label>
-                <Input placeholder={t("accounting.forms.newAccount.fields.codePlaceholder")} />
+                <Input
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  placeholder={t("accounting.forms.newAccount.fields.codePlaceholder")}
+                />
               </div>
               <div className="space-y-2">
-                <Label>{t("accounting.forms.newAccount.fields.internalType")}</Label>
-                <Select>
+                <Label>{t("accounting.forms.newAccount.fields.internalGroup")}</Label>
+                <Select value={newGroup} onValueChange={(v) => setNewGroup(v as DisplayGroup)}>
                   <SelectTrigger><SelectValue placeholder={t("accounting.forms.newAccount.fields.accountTypePlaceholder")} /></SelectTrigger>
                   <SelectContent>
                     {(["asset", "liability", "equity", "income", "expense"] as DisplayGroup[]).map((g) => (
@@ -243,16 +287,45 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
             </div>
             <div className="space-y-2">
               <Label>{t("accounting.forms.newAccount.fields.name")}</Label>
-              <Input placeholder={t("accounting.forms.newAccount.fields.namePlaceholder")} />
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder={t("accounting.forms.newAccount.fields.namePlaceholder")}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("accounting.forms.newAccount.fields.openingBalance")}</Label>
-              <Input type="number" placeholder={t("accounting.forms.newAccount.fields.openingBalancePlaceholder")} />
+              <Input
+                type="number"
+                value={newOpening}
+                onChange={(e) => setNewOpening(e.target.value)}
+                placeholder={t("accounting.forms.newAccount.fields.openingBalancePlaceholder")}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("common.cancel")}</Button>
-            <Button onClick={() => { onCreate?.({}); setShowCreateModal(false) }}>{t("accounting.forms.newAccount.submitLabel")}</Button>
+            <Button
+              onClick={() => {
+                const bal = Number(newOpening) || 0
+                onCreate?.({
+                  code: newCode.trim(),
+                  name: newName.trim(),
+                  internalGroup: newGroup,
+                  internalType: "other",
+                  reconcile: false,
+                  openingDebit: bal >= 0 ? bal : 0,
+                  openingCredit: bal < 0 ? -bal : 0,
+                })
+                setNewCode("")
+                setNewName("")
+                setNewGroup("asset")
+                setNewOpening("")
+                setShowCreateModal(false)
+              }}
+            >
+              {t("accounting.forms.newAccount.submitLabel")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

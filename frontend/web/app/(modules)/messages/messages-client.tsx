@@ -2,21 +2,33 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newMailMessageForm } from "@lumiere/ui"
+import { ModuleView, FormModal, newMailMessageForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
 import { useMailMessages, usePostMessage } from "@/hooks/messages"
 import type { PostMessageParams } from "@/hooks/messages"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface MessagesClientProps {
   initialMessages?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function MessagesClient({ initialMessages, organizationId }: MessagesClientProps) {
+type MessagesClientLoadedProps = Omit<MessagesClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function MessagesClient(props: MessagesClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <MessagesClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const { data: messages = [] } = useMailMessages(orgId, initialMessages)
   const postMessage = usePostMessage(orgId)
@@ -87,13 +99,19 @@ export function MessagesClient({ initialMessages, organizationId }: MessagesClie
     formData: Record<string, unknown>,
   ) => {
     if (action === "createMessage") {
+      const body = String(formData.body ?? "").trim()
+      if (!body) return
+      const resRaw = formData.resId
+      if (resRaw === "" || resRaw == null) return
+      const resNum = Number(resRaw)
+      if (!Number.isFinite(resNum) || resNum <= 0) return
       postMessage.mutate({
-        model: (formData.model as string) ?? "mail.message",
-        resId: BigInt(formData.resId as number ?? 0),
-        body: formData.body as string,
+        model: formData.model ? String(formData.model) : "mail.message",
+        resId: BigInt(Math.floor(resNum)),
+        body,
         parentId: undefined,
         attachmentIds: [],
-      } as unknown as PostMessageParams)
+      })
     }
   }
 

@@ -81,12 +81,12 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
                     <span className="text-muted-foreground truncate max-w-20">· &quot;{version.message}&quot;</span>
                   )}
                   {version.diff && (
-                    <span className="text-green-500 text-[10px]">
+                    <span className="text-success text-[10px]">
                       +{version.diff.totalLinesAdded}
                     </span>
                   )}
                   {version.diff && version.diff.totalLinesRemoved > 0 && (
-                    <span className="text-red-500 text-[10px]">
+                    <span className="text-destructive text-[10px]">
                       -{version.diff.totalLinesRemoved}
                     </span>
                   )}

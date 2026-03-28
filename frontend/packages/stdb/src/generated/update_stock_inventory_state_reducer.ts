@@ -12,7 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   inventoryId: __t.u64(),
   newState: __t.string(),
 };

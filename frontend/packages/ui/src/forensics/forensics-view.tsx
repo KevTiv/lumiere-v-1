@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
+import { severitySolidBarClass, statusSolidBarClass } from "@/lib/theme-colors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -242,8 +243,8 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                 <p className="text-sm text-muted-foreground">{t("forensics.view.openIssues")}</p>
                 <p className="text-2xl font-bold">{analytics.openReports}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-red-500" />
+              <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-destructive" />
               </div>
             </div>
           </CardContent>
@@ -256,8 +257,8 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                 <p className="text-sm text-muted-foreground">{t("forensics.view.avgResolution")}</p>
                 <p className="text-2xl font-bold">{analytics.avgResolutionTime}h</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-blue-500" />
+              <div className="h-10 w-10 rounded-lg bg-info/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-info" />
               </div>
             </div>
           </CardContent>
@@ -270,8 +271,8 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                 <p className="text-sm text-muted-foreground">{t("forensics.view.critical")}</p>
                 <p className="text-2xl font-bold">{analytics.bySeverity.critical || 0}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
+              <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-warning" />
               </div>
             </div>
           </CardContent>
@@ -417,10 +418,9 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                           <div
                             className={cn(
                               "h-full rounded-full transition-all",
-                              config.color === "red" && "bg-red-500",
-                              config.color === "yellow" && "bg-yellow-500",
-                              config.color === "blue" && "bg-blue-500",
-                              config.color === "green" && "bg-green-500"
+                              config.color in statusSolidBarClass
+                                ? statusSolidBarClass[config.color as keyof typeof statusSolidBarClass]
+                                : "bg-muted-foreground",
                             )}
                             style={{ width: `${percentage}%` }}
                           />
@@ -451,10 +451,9 @@ export function ForensicsView({ className }: ForensicsViewProps) {
                           <div
                             className={cn(
                               "h-full rounded-full transition-all",
-                              config.color === "red" && "bg-red-500",
-                              config.color === "orange" && "bg-orange-500",
-                              config.color === "yellow" && "bg-yellow-500",
-                              config.color === "green" && "bg-green-500"
+                              config.color in severitySolidBarClass
+                                ? severitySolidBarClass[config.color as keyof typeof severitySolidBarClass]
+                                : "bg-muted-foreground",
                             )}
                             style={{ width: `${percentage}%` }}
                           />

@@ -9,43 +9,30 @@
 
 import { useQuery } from '@tanstack/react-query'
 
+import { fetchQueryListAllowEmpty, type QueryRows } from '@/lib/query-fetch'
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function useFleetVehicles(organizationId: bigint) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['fleet-vehicles', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/fleet-vehicles')
-      if (!r.ok) return [] // resource may not exist yet; fall back to demo data
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryListAllowEmpty('/api/query/fleet-vehicles'),
     staleTime: 15_000,
   })
 }
 
 export function usePosTerminals(organizationId: bigint) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['pos-terminals', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/pos-terminals')
-      if (!r.ok) return []
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryListAllowEmpty('/api/query/pos-terminals'),
     staleTime: 30_000,
   })
 }
 
 export function useWarehouseGeo(organizationId: bigint) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['warehouse-geo', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/warehouses')
-      if (!r.ok) return []
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryListAllowEmpty('/api/query/warehouses'),
     staleTime: 60_000,
   })
 }

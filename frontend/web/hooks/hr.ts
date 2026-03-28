@@ -10,20 +10,18 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { fetchQueryList, emptyQueryRows, type QueryRows } from '@/lib/query-fetch'
+import { withCompanyScope } from '@/lib/org-scoped'
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useEmployees(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['hr-employees', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/employees')
-      if (!r.ok) throw new Error('Failed to fetch employees')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/employees', 'Failed to fetch employees'),
     staleTime: 30_000,
     initialData,
   })
@@ -31,16 +29,11 @@ export function useEmployees(
 
 export function useDepartments(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['hr-departments', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/departments')
-      if (!r.ok) throw new Error('Failed to fetch departments')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/departments', 'Failed to fetch departments'),
     staleTime: 30_000,
     initialData,
   })
@@ -48,16 +41,11 @@ export function useDepartments(
 
 export function useLeaveRequests(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['hr-leave-requests', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/leave-requests')
-      if (!r.ok) throw new Error('Failed to fetch leave requests')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/leave-requests', 'Failed to fetch leave requests'),
     staleTime: 30_000,
     initialData,
   })
@@ -65,16 +53,11 @@ export function useLeaveRequests(
 
 export function useContracts(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['hr-contracts', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/contracts')
-      if (!r.ok) throw new Error('Failed to fetch contracts')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/contracts', 'Failed to fetch contracts'),
     staleTime: 30_000,
     initialData,
   })
@@ -82,16 +65,11 @@ export function useContracts(
 
 export function usePayslips(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['hr-payslips', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/payslips')
-      if (!r.ok) throw new Error('Failed to fetch payslips')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/payslips', 'Failed to fetch payslips'),
     staleTime: 30_000,
     initialData,
   })
@@ -100,11 +78,11 @@ export function usePayslips(
 // TODO: No route yet — returns empty array until job_position table/route is added
 export function useJobPositions(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['job-positions', organizationId.toString()],
-    queryFn: async () => [] as Record<string, unknown>[],
+    queryFn: emptyQueryRows,
     staleTime: 30_000,
     initialData: initialData ?? [],
   })
@@ -112,14 +90,46 @@ export function useJobPositions(
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateEmployee(organizationId: bigint, _companyId?: bigint) {
+export function useCreateDepartment(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_hr_employee?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_department', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+      })
+      if (!r.ok) throw new Error('Failed to create department')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId.toString()] }),
+  })
+}
+
+export function useCreateJobPosition(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_job_position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+      })
+      if (!r.ok) throw new Error('Failed to create job position')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['job-positions', organizationId.toString()] }),
+  })
+}
+
+export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create employee')
     },
@@ -130,8 +140,8 @@ export function useCreateEmployee(organizationId: bigint, _companyId?: bigint) {
 
 export function useCreateLeaveRequest(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
       const r = await fetch('/api/call/create_leave_request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,14 +154,14 @@ export function useCreateLeaveRequest(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useCreateContract(organizationId: bigint, _companyId?: bigint) {
+export function useCreateContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_hr_contract?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create contract')
     },
@@ -160,14 +170,14 @@ export function useCreateContract(organizationId: bigint, _companyId?: bigint) {
   })
 }
 
-export function useCreatePayslip(organizationId: bigint, _companyId?: bigint) {
+export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_hr_payslip?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_payslip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create payslip')
     },
@@ -175,3 +185,6 @@ export function useCreatePayslip(organizationId: bigint, _companyId?: bigint) {
       qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
   })
 }
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type { CreateJobPositionParams } from '@lumiere/stdb'

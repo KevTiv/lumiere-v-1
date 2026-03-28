@@ -12,7 +12,7 @@
 ///   - Audit logging for all mutations
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
+use crate::core::organization::company_id_from_scope;
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -46,6 +46,7 @@ pub struct CreateSaleOrderLineParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateSaleOrderParams {
+    pub company_id: Option<u64>,
     pub partner_id: u64,
     pub partner_invoice_id: u64,
     pub partner_shipping_id: u64,
@@ -299,24 +300,6 @@ pub struct SaleOrderOption {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn resolve_organization_id_from_company(
-    ctx: &ReducerContext,
-    company_id: u64,
-) -> Result<u64, String> {
-    let comp = ctx
-        .db
-        .company()
-        .id()
-        .find(&company_id)
-        .ok_or("Company not found")?;
-
-    if comp.deleted_at.is_some() {
-        return Err("Company is archived".to_string());
-    }
-
-    Ok(comp.organization_id)
-}
-
 fn validate_order_org_scope(order: &SaleOrder, organization_id: u64) -> Result<(), String> {
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
@@ -439,13 +422,9 @@ fn create_sale_order_line_internal(
 pub fn create_sale_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateSaleOrderParams,
 ) -> Result<(), String> {
-    let resolved_org = resolve_organization_id_from_company(ctx, company_id)?;
-    if resolved_org != organization_id {
-        return Err("Company does not belong to this organization".to_string());
-    }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     check_permission(ctx, organization_id, "sale_order", "create")?;
 
     let partner = ctx

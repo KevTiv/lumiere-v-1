@@ -8,7 +8,7 @@
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
+use crate::core::organization::company_id_from_scope;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -186,6 +186,7 @@ pub struct PurchaseRequisition {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePurchaseOrderParams {
+    pub company_id: Option<u64>,
     pub partner_id: u64,
     pub currency_id: u64,
     pub origin: Option<String>,
@@ -226,6 +227,7 @@ pub struct AddPurchaseOrderLineParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePurchaseRequisitionParams {
+    pub company_id: Option<u64>,
     pub description: Option<String>,
     pub ordering_date: Option<Timestamp>,
     pub date_end: Option<Timestamp>,
@@ -243,29 +245,6 @@ pub struct CreatePurchaseRequisitionParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn validate_company_in_organization(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-) -> Result<(), String> {
-    let comp = ctx
-        .db
-        .company()
-        .id()
-        .find(&company_id)
-        .ok_or("Company not found")?;
-
-    if comp.organization_id != organization_id {
-        return Err("Company does not belong to this organization".to_string());
-    }
-
-    if comp.deleted_at.is_some() {
-        return Err("Company is archived".to_string());
-    }
-
-    Ok(())
-}
 
 fn validate_order_in_organization(
     ctx: &ReducerContext,
@@ -292,7 +271,6 @@ fn validate_order_in_organization(
 pub fn create_purchase_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreatePurchaseOrderParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
@@ -301,7 +279,7 @@ pub fn create_purchase_order(
         IsQuantityCopy::from_str(iqc)?;
     }
 
-    validate_company_in_organization(ctx, organization_id, company_id)?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let vendor = ctx
         .db
@@ -959,12 +937,11 @@ pub fn invoice_po_line(
 pub fn create_purchase_requisition(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreatePurchaseRequisitionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "create")?;
 
-    validate_company_in_organization(ctx, organization_id, company_id)?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if let Some(ref excl) = params.exclusive {
         ExclusiveMode::from_str(excl)?;

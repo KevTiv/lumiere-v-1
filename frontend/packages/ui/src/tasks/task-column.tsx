@@ -68,7 +68,7 @@ export function TaskColumn({ column, tasks, onTaskClick, onAddTask }: TaskColumn
 
       {/* Column WIP Limit */}
       {column.limit && tasks.length >= column.limit && (
-        <div className="mt-2 px-2 py-1 text-xs text-amber-600 bg-amber-500/10 rounded">
+        <div className="mt-2 px-2 py-1 text-xs text-warning bg-warning/10 rounded">
           WIP limit reached ({column.limit})
         </div>
       )}

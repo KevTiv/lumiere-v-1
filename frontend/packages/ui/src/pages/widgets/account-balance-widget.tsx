@@ -32,7 +32,7 @@ export function AccountBalanceWidget({ data }: { data: AccountBalanceData }) {
             <span className="text-sm font-medium truncate">{a.name}</span>
           </div>
           <span
-            className={`text-sm font-semibold tabular-nums shrink-0 ${a.balance < 0 ? "text-red-500" : ""}`}
+            className={`text-sm font-semibold tabular-nums shrink-0 ${a.balance < 0 ? "text-destructive" : ""}`}
           >
             {fmt.format(a.balance)}
           </span>

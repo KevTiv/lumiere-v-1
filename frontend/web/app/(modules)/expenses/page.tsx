@@ -1,5 +1,10 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryExpenses, serverQueryExpenseSheets } from "@lumiere/stdb/server"
+import {
+  serverQueryExpenses,
+  serverQueryExpenseSheets,
+  serverQueryPricelists,
+  serverQueryEmployees,
+} from "@lumiere/stdb/server"
 import { ExpensesClient } from "./expenses-client"
 
 export default async function ExpensesPage() {
@@ -9,15 +14,19 @@ export default async function ExpensesPage() {
     return <ExpensesClient />
   }
 
-  const [expenses, sheets] = await Promise.all([
+  const [expenses, sheets, pricelists, employees] = await Promise.all([
     serverQueryExpenses(organizationId, opts),
     serverQueryExpenseSheets(organizationId, opts),
-  ]).catch(() => [[], []])
+    serverQueryPricelists(organizationId, opts),
+    serverQueryEmployees(organizationId, opts),
+  ]).catch(() => [[], [], [], []])
 
   return (
     <ExpensesClient
       initialExpenses={expenses as Record<string, unknown>[]}
       initialSheets={sheets as Record<string, unknown>[]}
+      initialPricelists={pricelists as Record<string, unknown>[]}
+      initialEmployees={employees as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

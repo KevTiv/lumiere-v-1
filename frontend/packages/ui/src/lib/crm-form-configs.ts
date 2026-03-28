@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next"
-import type { FormConfig } from "./form-types"
+import type { FormConfig, FormField } from "./form-types"
+
+export type OpportunityStageOption = { value: string; label: string }
 
 export const newLeadForm = (t: TFunction): FormConfig => ({
   id: "new-lead",
@@ -12,32 +14,36 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "contactName",
+          name: "contactName",
           type: "text",
           label: t("crm.forms.newLead.fields.contactName"),
           placeholder: t("crm.forms.newLead.fields.contactNamePlaceholder"),
           required: true,
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "partnerName",
+          name: "partnerName",
           type: "text",
           label: t("crm.forms.newLead.fields.partnerName"),
           placeholder: t("crm.forms.newLead.fields.partnerNamePlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "emailFrom",
+          name: "emailFrom",
           type: "text",
           label: t("crm.forms.newLead.fields.emailFrom"),
           placeholder: t("crm.forms.newLead.fields.emailFromPlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "phone",
+          name: "phone",
           type: "text",
           label: t("crm.forms.newLead.fields.phone"),
           placeholder: t("crm.forms.newLead.fields.phonePlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
       ],
     },
@@ -47,20 +53,23 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "expectedRevenue",
+          name: "expectedRevenue",
           type: "number",
           label: t("crm.forms.newLead.fields.expectedRevenue"),
           placeholder: "0",
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "probability",
+          name: "probability",
           type: "number",
           label: t("crm.forms.newLead.fields.probability"),
           placeholder: t("crm.forms.newLead.fields.probabilityPlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("crm.forms.newLead.fields.description"),
           placeholder: t("crm.forms.newLead.fields.descriptionPlaceholder"),
@@ -72,58 +81,90 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
   ],
 })
 
-export const newOpportunityForm = (t: TFunction): FormConfig => ({
-  id: "new-opportunity",
-  title: t("crm.forms.newOpportunity.title"),
-  description: t("crm.forms.newOpportunity.description"),
-  sections: [
-    {
-      id: "opp-info",
-      title: t("crm.forms.newOpportunity.sections.opportunity"),
-      fields: [
-        {
-          id: "name",
-          type: "text",
-          label: t("crm.forms.newOpportunity.fields.name"),
-          placeholder: t("crm.forms.newOpportunity.fields.namePlaceholder"),
+export const newOpportunityForm = (
+  t: TFunction,
+  stageOptions: OpportunityStageOption[] = [],
+): FormConfig => {
+  const stageField: FormField =
+    stageOptions.length > 0
+      ? {
+          id: "stageId",
+          name: "stageId",
+          type: "select",
+          label: t("crm.forms.newOpportunity.fields.stage"),
           required: true,
           width: "full",
-        },
-        {
-          id: "expectedRevenue",
+          options: stageOptions,
+        }
+      : {
+          id: "stageId",
+          name: "stageId",
           type: "number",
-          label: t("crm.forms.newOpportunity.fields.expectedRevenue"),
-          placeholder: "0",
-          width: "1/2",
-        },
-        {
-          id: "probability",
-          type: "number",
-          label: t("crm.forms.newOpportunity.fields.probability"),
-          placeholder: t("crm.forms.newOpportunity.fields.probabilityPlaceholder"),
-          width: "1/2",
-        },
-        {
-          id: "dateDeadline",
-          type: "date",
-          label: t("crm.forms.newOpportunity.fields.dateDeadline"),
-          width: "1/2",
-        },
-        {
-          id: "priority",
-          type: "select",
-          label: t("crm.forms.newOpportunity.fields.priority"),
-          width: "1/2",
-          options: [
-            { value: "Low", label: t("crm.forms.newOpportunity.fields.options.Low") },
-            { value: "Medium", label: t("crm.forms.newOpportunity.fields.options.Medium") },
-            { value: "High", label: t("crm.forms.newOpportunity.fields.options.High") },
-          ],
-        },
-      ],
-    },
-  ],
-})
+          label: t("crm.forms.newOpportunity.fields.stageId"),
+          placeholder: t("crm.forms.newOpportunity.fields.stageIdPlaceholder"),
+          required: true,
+          width: "full",
+        }
+
+  return {
+    id: "new-opportunity",
+    title: t("crm.forms.newOpportunity.title"),
+    description: t("crm.forms.newOpportunity.description"),
+    sections: [
+      {
+        id: "opp-info",
+        title: t("crm.forms.newOpportunity.sections.opportunity"),
+        fields: [
+          {
+            id: "name",
+            name: "name",
+            type: "text",
+            label: t("crm.forms.newOpportunity.fields.name"),
+            placeholder: t("crm.forms.newOpportunity.fields.namePlaceholder"),
+            required: true,
+            width: "full",
+          },
+          stageField,
+          {
+            id: "expectedRevenue",
+            name: "expectedRevenue",
+            type: "number",
+            label: t("crm.forms.newOpportunity.fields.expectedRevenue"),
+            placeholder: "0",
+            // width: "1/2",
+          },
+          {
+            id: "probability",
+            name: "probability",
+            type: "number",
+            label: t("crm.forms.newOpportunity.fields.probability"),
+            placeholder: t("crm.forms.newOpportunity.fields.probabilityPlaceholder"),
+            // width: "1/2",
+          },
+          {
+            id: "dateDeadline",
+            name: "dateDeadline",
+            type: "date",
+            label: t("crm.forms.newOpportunity.fields.dateDeadline"),
+            // width: "1/2",
+          },
+          {
+            id: "priority",
+            name: "priority",
+            type: "select",
+            label: t("crm.forms.newOpportunity.fields.priority"),
+            // width: "1/2",
+            options: [
+              { value: "Low", label: t("crm.forms.newOpportunity.fields.options.Low") },
+              { value: "Medium", label: t("crm.forms.newOpportunity.fields.options.Medium") },
+              { value: "High", label: t("crm.forms.newOpportunity.fields.options.High") },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
 
 export const newContactForm = (t: TFunction): FormConfig => ({
   id: "new-contact",
@@ -136,6 +177,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("crm.forms.newContact.fields.name"),
           placeholder: t("crm.forms.newContact.fields.namePlaceholder"),
@@ -144,9 +186,10 @@ export const newContactForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "isCompany",
+          name: "isCompany",
           type: "checkbox",
           label: t("crm.forms.newContact.fields.isCompany"),
-          width: "1/2",
+          // width: "1/2",
         },
       ],
     },
@@ -156,29 +199,33 @@ export const newContactForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "email",
+          name: "email",
           type: "text",
           label: t("crm.forms.newContact.fields.email"),
           placeholder: t("crm.forms.newContact.fields.emailPlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "phone",
+          name: "phone",
           type: "text",
           label: t("crm.forms.newContact.fields.phone"),
           placeholder: t("crm.forms.newContact.fields.phonePlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "city",
+          name: "city",
           type: "text",
           label: t("crm.forms.newContact.fields.city"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "zip",
+          name: "zip",
           type: "text",
           label: t("crm.forms.newContact.fields.zip"),
-          width: "1/2",
+          // width: "1/2",
         },
       ],
     },
@@ -196,6 +243,7 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "summary",
+          name: "summary",
           type: "text",
           label: t("crm.forms.newActivity.fields.summary"),
           placeholder: t("crm.forms.newActivity.fields.summaryPlaceholder"),
@@ -204,32 +252,36 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "activityTypeId",
+          name: "activityTypeId",
           type: "number",
           label: t("crm.forms.newActivity.fields.activityTypeId"),
           placeholder: t("crm.forms.newActivity.fields.activityTypePlaceholder"),
           required: true,
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "dateDeadline",
+          name: "dateDeadline",
           type: "date",
           label: t("crm.forms.newActivity.fields.dateDeadline"),
           required: true,
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "userId",
+          name: "userId",
           type: "number",
           label: t("crm.forms.newActivity.fields.userId"),
           placeholder: t("crm.forms.newActivity.fields.userIdPlaceholder"),
-          width: "1/2",
+          // width: "1/2",
         },
         {
           id: "note",
+          name: "note",
           type: "textarea",
           label: t("crm.forms.newActivity.fields.note"),
           placeholder: t("crm.forms.newActivity.fields.notePlaceholder"),
-          width: "full",
+          // width: "full",
           rows: 3,
         },
       ],

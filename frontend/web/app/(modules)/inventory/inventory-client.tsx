@@ -3,12 +3,22 @@
 import { useMemo, useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newProductForm, newTransferForm, newInventoryAdjustmentForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newProductForm,
+  newTransferForm,
+  newInventoryAdjustmentForm,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
 import {
   useProducts,
+  useProductCategories,
+  useUoms,
   useStockQuants,
   useStockPickings,
   useWarehouses,
@@ -22,6 +32,16 @@ import {
   useWarehouse3D,
   useMoveStockItem3D,
 } from "@/hooks/inventory"
+import { usePricelists } from "@/hooks/sales"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  pricelistRowsToSelectOptions,
+  pickingTypeOptionsFromTransfers,
+  locationOptionsFromQuantsAndTransfers,
+  productRowsToSelectOptions,
+  productCategoryRowsToSelectOptions,
+  uomRowsToSelectOptions,
+} from "@/lib/form-lookup"
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -35,23 +55,41 @@ interface InventoryClientProps {
   initialTransfers?: Record<string, unknown>[]
   initialWarehouses?: Record<string, unknown>[]
   initialAdjustments?: Record<string, unknown>[]
+  initialPricelists?: Record<string, unknown>[]
+  initialProductCategories?: Record<string, unknown>[]
+  initialUoms?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function InventoryClient({
+type InventoryClientLoadedProps = Omit<InventoryClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function InventoryClient(props: InventoryClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <InventoryClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function InventoryClientLoaded({
   initialProducts,
   initialStockQuants,
   initialTransfers,
   initialWarehouses,
   initialAdjustments,
+  initialPricelists,
+  initialProductCategories,
+  initialUoms,
   organizationId,
-}: InventoryClientProps) {
+}: InventoryClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
+  const { data: uoms = [] } = useUoms(orgId, initialUoms)
   const { data: stockQuants = [] } = useStockQuants(companyId, initialStockQuants)
   const { data: transfers = [] } = useStockPickings(companyId, initialTransfers)
   const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses)
@@ -59,6 +97,86 @@ export function InventoryClient({
   const { data: locations = [] } = useStockLocations(companyId)
   const { data: lots = [] } = useProductionLots(companyId)
   const { data: qualityChecks = [] } = useQualityChecks(companyId)
+  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+
+  const pricelistFieldOptions = useMemo(() => {
+    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+  }, [pricelists, t])
+
+  const categoryFieldOptions = useMemo(() => {
+    const fromApi = productCategoryRowsToSelectOptions(productCategories)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noCategories"), disabled: true }]
+  }, [productCategories, t])
+
+  const uomFieldOptions = useMemo(() => {
+    const fromApi = uomRowsToSelectOptions(uoms)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
+  }, [uoms, t])
+
+  const uomPoFieldOptions = useMemo(() => {
+    const base = uomRowsToSelectOptions(uoms)
+    if (base.length === 0) return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
+    return [
+      { value: "", label: t("inventory.forms.newProduct.fields.uomPoSameAsSales") },
+      ...base,
+    ]
+  }, [uoms, t])
+
+  const productFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProductForm(t), {
+        pricelistId: pricelistFieldOptions,
+        categId: categoryFieldOptions,
+        uomId: uomFieldOptions,
+        uomPoId: uomPoFieldOptions,
+      }),
+    [t, pricelistFieldOptions, categoryFieldOptions, uomFieldOptions, uomPoFieldOptions],
+  )
+
+  const transferFieldOptions = useMemo(() => {
+    const picking = pickingTypeOptionsFromTransfers(transfers)
+    const locs = locationOptionsFromQuantsAndTransfers(stockQuants, transfers)
+    const emptyPicking =
+      picking.length > 0
+        ? picking
+        : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
+    const emptyLocs =
+      locs.length > 0 ? locs : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
+    return { picking, locs, emptyPicking, emptyLocs }
+  }, [transfers, stockQuants, t])
+
+  const transferFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newTransferForm(t), {
+        pickingTypeId: transferFieldOptions.emptyPicking,
+        locationId: transferFieldOptions.emptyLocs,
+        locationDestId: transferFieldOptions.emptyLocs,
+      }),
+    [t, transferFieldOptions],
+  )
+
+  const adjustmentFieldOptions = useMemo(() => {
+    const prod = productRowsToSelectOptions(products)
+    const locs = locationOptionsFromQuantsAndTransfers(stockQuants, transfers)
+    return {
+      product: prod.length > 0 ? prod : [{ value: "", label: t("common.lookup.noProducts"), disabled: true }],
+      location:
+        locs.length > 0 ? locs : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }],
+    }
+  }, [products, stockQuants, transfers, t])
+
+  const adjustmentFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newInventoryAdjustmentForm(t), {
+        productId: adjustmentFieldOptions.product,
+        locationId: adjustmentFieldOptions.location,
+      }),
+    [t, adjustmentFieldOptions],
+  )
 
   const createProduct = useCreateProduct(orgId)
   const createStockPicking = useCreateStockPicking(orgId, companyId)
@@ -104,9 +222,10 @@ export function InventoryClient({
             }
             if (w.type === "quick-actions") {
               const handlers: Record<string, () => void> = {
-                create_product: () => setQuickActionForm({ form: newProductForm(t), action: "createProduct" }),
-                create_transfer: () => setQuickActionForm({ form: newTransferForm(t), action: "createTransfer" }),
-                create_adjustment: () => setQuickActionForm({ form: newInventoryAdjustmentForm(t), action: "createAdjustment" }),
+                create_product: () => setQuickActionForm({ form: productFormConfig, action: "createProduct" }),
+                create_transfer: () => setQuickActionForm({ form: transferFormConfig, action: "createStockPicking" }),
+                create_adjustment: () =>
+                  setQuickActionForm({ form: adjustmentFormConfig, action: "createInventoryAdjustment" }),
               }
               return {
                 ...w,
@@ -182,7 +301,16 @@ export function InventoryClient({
       moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
       []
     )
-  }, [products, stockQuants, transfers, t, moduleConfig])
+  }, [
+    products,
+    stockQuants,
+    transfers,
+    t,
+    moduleConfig,
+    productFormConfig,
+    transferFormConfig,
+    adjustmentFormConfig,
+  ])
 
   const warehouse3DTab = useMemo(
     () => ({
@@ -211,16 +339,28 @@ export function InventoryClient({
   )
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: [
-        ...moduleConfig.tabs.map((tab) =>
-          tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-        ),
-        warehouse3DTab,
-      ],
-    }) as ModuleConfig,
-    [moduleConfig, liveSections, warehouse3DTab]
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: [
+          ...moduleConfig.tabs.map((tab) => {
+            if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+            if (tab.id === "products") return { ...tab, createForm: productFormConfig }
+            if (tab.id === "transfers") return { ...tab, createForm: transferFormConfig }
+            if (tab.id === "adjustments") return { ...tab, createForm: adjustmentFormConfig }
+            return tab
+          }),
+          warehouse3DTab,
+        ],
+      }) as ModuleConfig,
+    [
+      moduleConfig,
+      liveSections,
+      warehouse3DTab,
+      productFormConfig,
+      transferFormConfig,
+      adjustmentFormConfig,
+    ]
   )
 
   const data = useMemo(
@@ -242,9 +382,176 @@ export function InventoryClient({
     action: string,
     formData: Record<string, unknown>
   ) => {
-    if (action === "createProduct") createProduct.mutate(formData as never)
-    else if (action === "createTransfer") createStockPicking.mutate(formData as never)
-    else if (action === "createAdjustment") createInventoryAdjustment.mutate(formData as never)
+    if (action === "createProduct") {
+      const categRaw = formData.categId
+      const uomRaw = formData.uomId
+      if (categRaw === "" || categRaw == null || uomRaw === "" || uomRaw == null) return
+      const categId = Number(categRaw)
+      const uomId = Number(uomRaw)
+      const uomPoRaw = formData.uomPoId
+      const uomPoId =
+        uomPoRaw !== "" && uomPoRaw != null && String(uomPoRaw).trim() !== ""
+          ? Number(uomPoRaw)
+          : uomId
+      const pricelistRaw = formData.pricelistId
+      if (pricelistRaw === "" || pricelistRaw == null) return
+      const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
+      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
+      const currencyId = Number(pl.currencyId)
+      createProduct.mutate({
+        name: String(formData.name ?? ""),
+        categId,
+        type: String(formData.type ?? "product"),
+        uomId,
+        uomPoId,
+        standardPrice: Number(formData.standardPrice ?? 0),
+        listPrice: Number(formData.listPrice ?? formData.standardPrice ?? 0),
+        currencyId,
+        defaultCode: formData.defaultCode ? String(formData.defaultCode) : undefined,
+        barcode: formData.barcode ? String(formData.barcode) : undefined,
+        description: formData.description ? String(formData.description) : undefined,
+        saleOk: formData.saleOk == null ? true : Boolean(formData.saleOk),
+        purchaseOk: formData.purchaseOk == null ? true : Boolean(formData.purchaseOk),
+        displayName: formData.name ? String(formData.name) : undefined,
+        costMethod: String(formData.costMethod ?? "standard"),
+        valuation: String(formData.valuation ?? "manual_periodic"),
+        volume: formData.volume != null ? Number(formData.volume) : undefined,
+        weight: formData.weight != null ? Number(formData.weight) : undefined,
+        canBeExpensed: formData.canBeExpensed != null ? Boolean(formData.canBeExpensed) : undefined,
+        availableInPos: formData.availableInPos != null ? Boolean(formData.availableInPos) : undefined,
+        invoicingPolicy: formData.invoicingPolicy ? String(formData.invoicingPolicy) : undefined,
+        expensePolicy: formData.expensePolicy ? String(formData.expensePolicy) : undefined,
+        priority: formData.priority ? String(formData.priority) : undefined,
+        isPublished: formData.isPublished != null ? Boolean(formData.isPublished) : undefined,
+        descriptionPurchase: formData.descriptionPurchase ? String(formData.descriptionPurchase) : undefined,
+        descriptionSale: formData.descriptionSale ? String(formData.descriptionSale) : undefined,
+        serviceType: formData.serviceType ? String(formData.serviceType) : undefined,
+        serviceTracking: formData.serviceTracking ? String(formData.serviceTracking) : undefined,
+        image1920Url: formData.image1920Url ? String(formData.image1920Url) : undefined,
+        image128Url: formData.image128Url ? String(formData.image128Url) : undefined,
+        color: formData.color ? String(formData.color) : undefined,
+        responsibleId: undefined,
+        pricelistId: formData.pricelistId != null ? Number(formData.pricelistId) : undefined,
+        descriptionPicking: formData.descriptionPicking ? String(formData.descriptionPicking) : undefined,
+        descriptionPickingout: formData.descriptionPickingout ? String(formData.descriptionPickingout) : undefined,
+        descriptionPickingin: formData.descriptionPickingin ? String(formData.descriptionPickingin) : undefined,
+        locationId: formData.locationId != null ? Number(formData.locationId) : undefined,
+        warehouseId: formData.warehouseId != null ? Number(formData.warehouseId) : undefined,
+        tracking: formData.tracking ? String(formData.tracking) : undefined,
+        hasConfigurableAttributes: formData.hasConfigurableAttributes != null ? Boolean(formData.hasConfigurableAttributes) : undefined,
+        taxesId: formData.taxesId != null ? (formData.taxesId as number[]).map((id) => Number(id)) : undefined,
+        supplierTaxesId: formData.supplierTaxesId != null ? (formData.supplierTaxesId as number[]).map((id) => Number(id)) : undefined,
+        routeIds: formData.routeIds != null ? (formData.routeIds as number[]).map((id) => Number(id)) : undefined,
+        routeFromCategIds: formData.routeFromCategIds != null ? (formData.routeFromCategIds as number[]).map((id) => Number(id)) : undefined,
+        propertyAccountIncomeId: formData.propertyAccountIncomeId != null ? Number(formData.propertyAccountIncomeId) : undefined,
+        propertyAccountExpenseId: formData.propertyAccountExpenseId != null ? Number(formData.propertyAccountExpenseId) : undefined,
+        variantAttributeIds: formData.variantAttributeIds != null ? (formData.variantAttributeIds as number[]).map((id) => Number(id)) : undefined,
+        attributeLineIds: formData.attributeLineIds != null ? (formData.attributeLineIds as number[]).map((id) => Number(id)) : undefined,
+        metadata: undefined,
+      } as never)
+    }
+    else if (action === "createTransfer" || action === "createStockPicking") {
+      const pickingRaw = formData.pickingTypeId
+      const locFrom = formData.locationId
+      const locTo = formData.locationDestId
+      if (
+        pickingRaw === "" ||
+        pickingRaw == null ||
+        locFrom === "" ||
+        locFrom == null ||
+        locTo === "" ||
+        locTo == null
+      ) {
+        return
+      }
+      createStockPicking.mutate({
+        name: String(formData.name ?? formData.origin ?? "New Transfer"),
+        pickingTypeId: Number(pickingRaw),
+        locationId: Number(locFrom),
+        locationDestId: Number(locTo),
+        moveType: String(formData.moveType ?? "direct"),
+        priority: String(formData.priority ?? "0"),
+        partnerId: formData.partnerId != null ? Number(formData.partnerId) : undefined,
+        contactId: formData.contactId != null ? Number(formData.contactId) : undefined,
+        scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
+        origin: formData.origin ? String(formData.origin) : undefined,
+        note: formData.note ? String(formData.note) : undefined,
+        userId: undefined,
+        saleId: formData.saleId != null ? Number(formData.saleId) : undefined,
+        purchaseId: formData.purchaseId != null ? Number(formData.purchaseId) : undefined,
+        groupId: formData.groupId != null ? Number(formData.groupId) : undefined,
+        isLocked: false,
+        immediateTransfer: false,
+        isPrinted: false,
+        isReturn: false,
+        hasScrapMove: false,
+        hasTracking: false,
+        date: undefined,
+        dateDone: undefined,
+        backorderId: undefined,
+        backorderIds: [],
+        showOperations: true,
+        showLotsText: false,
+        showReserved: true,
+        showCheckAvailability: true,
+        showValidate: true,
+        showMarkAsTodo: false,
+        showSetQtyButton: false,
+        showClearQtyButton: false,
+        showLotsM2O: false,
+        productId: formData.productId != null ? Number(formData.productId) : undefined,
+        lotId: formData.lotId != null ? Number(formData.lotId) : undefined,
+        packageId: formData.packageId != null ? Number(formData.packageId) : undefined,
+        resultPackageId: formData.resultPackageId != null ? Number(formData.resultPackageId) : undefined,
+        ownerId: formData.ownerId != null ? Number(formData.ownerId) : undefined,
+        displayLotId: formData.displayLotId != null ? Number(formData.displayLotId) : undefined,
+        locationIdName: undefined,
+        locationDestIdName: undefined,
+        pickingCode: formData.pickingCode ? String(formData.pickingCode) : undefined,
+        productTracking: formData.productTracking ? String(formData.productTracking) : undefined,
+        productBarcode: formData.productBarcode ? String(formData.productBarcode) : undefined,
+        moveLineExist: false,
+        hasPackages: false,
+        hasMoveLines: false,
+        hasPackage: false,
+        hasLot: false,
+        hasOwner: false,
+        hasEntirePackageSrc: false,
+        hasEntirePackageDest: false,
+        packageLevelIds: [],
+        batchId: formData.batchId != null ? Number(formData.batchId) : undefined,
+        metadata: undefined,
+      } as never)
+    }
+    else if (action === "createAdjustment" || action === "createInventoryAdjustment") {
+      const productRaw = formData.productId
+      const locRaw = formData.locationId
+      if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return
+      const productRow = products.find((p) => String(p.id) === String(productRaw))
+      const uomFromProduct =
+        productRow?.uomId != null
+          ? Number(productRow.uomId)
+          : productRow?.uomPoId != null
+            ? Number(productRow.uomPoId)
+            : undefined
+      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
+      createInventoryAdjustment.mutate({
+        name: String(formData.name ?? "Inventory Adjustment"),
+        productId: Number(productRaw),
+        locationId: Number(locRaw),
+        productUomId: uomFromProduct,
+        inventoryQuantity: Number(formData.inventoryQuantity ?? 0),
+        countQty: Number(formData.countQty ?? formData.inventoryQuantity ?? 0),
+        differenceQty: Number(formData.differenceQty ?? 0),
+        standardPrice: Number(formData.standardPrice ?? 0),
+        date: formData.date ? new Date(String(formData.date)) : new Date(),
+        reasonNotes: formData.reasonNotes ? String(formData.reasonNotes) : undefined,
+        metadata: JSON.stringify({
+          source: "inventory-ui",
+          originalForm: formData,
+        }),
+      } as never)
+    }
   }
 
   return (
@@ -257,7 +564,7 @@ export function InventoryClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newProductForm(t)}
+        config={quickActionForm?.form ?? productFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

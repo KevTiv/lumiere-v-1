@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
   id: "new-helpdesk-ticket",
   title: t("helpdesk.forms.newTicket.title"),
@@ -12,6 +14,7 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("helpdesk.forms.newTicket.fields.name"),
           placeholder: t("helpdesk.forms.newTicket.fields.namePlaceholder"),
@@ -19,7 +22,28 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
           width: "full",
         },
         {
+          id: "teamId",
+          name: "teamId",
+          type: "select",
+          label: t("helpdesk.forms.newTicket.fields.teamId"),
+          placeholder: t("helpdesk.forms.newTicket.fields.teamPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "stageId",
+          name: "stageId",
+          type: "select",
+          label: t("helpdesk.forms.newTicket.fields.stageId"),
+          placeholder: t("helpdesk.forms.newTicket.fields.stagePlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
           id: "partnerName",
+          name: "partnerName",
           type: "text",
           label: t("helpdesk.forms.newTicket.fields.partnerName"),
           placeholder: t("helpdesk.forms.newTicket.fields.partnerNamePlaceholder"),
@@ -27,6 +51,7 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "partnerEmail",
+          name: "partnerEmail",
           type: "text",
           label: t("helpdesk.forms.newTicket.fields.partnerEmail"),
           placeholder: t("helpdesk.forms.newTicket.fields.partnerEmailPlaceholder"),
@@ -34,6 +59,7 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "priority",
+          name: "priority",
           type: "select",
           label: t("helpdesk.forms.newTicket.fields.priority"),
           width: "1/2",
@@ -45,15 +71,8 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
           ],
         },
         {
-          id: "teamId",
-          type: "number",
-          label: t("helpdesk.forms.newTicket.fields.teamId"),
-          placeholder: "1",
-          required: true,
-          width: "1/2",
-        },
-        {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("helpdesk.forms.newTicket.fields.description"),
           placeholder: t("helpdesk.forms.newTicket.fields.descriptionPlaceholder"),

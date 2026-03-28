@@ -69,42 +69,42 @@ export const eventTypeConfig: Record<EventType, EventCategory> = {
   meeting: {
     type: "meeting",
     label: "Meeting",
-    color: "bg-blue-500",
+    color: "bg-info",
     icon: "Users",
     description: "Team or one-on-one meetings"
   },
   task: {
     type: "task",
     label: "Task",
-    color: "bg-purple-500",
+    color: "bg-category-3",
     icon: "CheckCircle",
     description: "Work tasks and activities"
   },
   deadline: {
     type: "deadline",
     label: "Deadline",
-    color: "bg-red-500",
+    color: "bg-destructive",
     icon: "AlertCircle",
     description: "Important deadlines"
   },
   reminder: {
     type: "reminder",
     label: "Reminder",
-    color: "bg-amber-500",
+    color: "bg-warning",
     icon: "Bell",
     description: "Reminders and notifications"
   },
   system: {
     type: "system",
     label: "System Event",
-    color: "bg-green-500",
+    color: "bg-success",
     icon: "Zap",
     description: "ERP system events (invoices, orders)"
   },
   shared: {
     type: "shared",
     label: "Shared Event",
-    color: "bg-indigo-500",
+    color: "bg-category-1",
     icon: "Share2",
     description: "Events shared by team members"
   }
@@ -123,7 +123,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     createdBy: "John Manager",
     attendees: ["john@company.com", "jane@company.com", "bob@company.com"],
     location: "Conference Room A",
-    color: "bg-blue-500",
+    color: "bg-info",
     visibility: "team",
     reminders: [15]
   },
@@ -138,7 +138,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     createdBy: "Sarah Director",
     attendees: ["sarah@company.com", "john@company.com"],
     location: "Main Office",
-    color: "bg-blue-500",
+    color: "bg-info",
     visibility: "team",
     reminders: [30]
   },
@@ -152,7 +152,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     status: "scheduled",
     createdBy: "System",
     attendees: ["finance@company.com"],
-    color: "bg-red-500",
+    color: "bg-destructive",
     relatedTo: { type: "invoice", id: "INV-2026-001" },
     visibility: "public",
     reminders: [60, 1440]
@@ -168,7 +168,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     createdBy: "Mike Sales",
     attendees: ["mike@company.com", "client@external.com"],
     location: "Virtual - Zoom Link",
-    color: "bg-blue-500",
+    color: "bg-info",
     visibility: "team",
     reminders: [24 * 60, 60]
   },
@@ -182,7 +182,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     status: "scheduled",
     createdBy: "Warehouse Manager",
     attendees: ["warehouse@company.com"],
-    color: "bg-purple-500",
+    color: "bg-category-3",
     relatedTo: { type: "task", id: "TASK-458" },
     visibility: "team",
     reminders: [120]
@@ -197,7 +197,7 @@ export const sampleCalendarEvents: CalendarEvent[] = [
     status: "completed",
     createdBy: "System",
     attendees: ["procurement@company.com"],
-    color: "bg-green-500",
+    color: "bg-success",
     relatedTo: { type: "order", id: "PO-2026-082" },
     visibility: "public"
   }
@@ -208,7 +208,7 @@ export const sampleCalendars: Calendar[] = [
     id: "cal-1",
     name: "My Calendar",
     userId: "user-1",
-    color: "bg-blue-500",
+    color: "bg-info",
     isHidden: false,
     description: "Personal calendar"
   },
@@ -216,7 +216,7 @@ export const sampleCalendars: Calendar[] = [
     id: "cal-2",
     name: "Team Calendar",
     userId: "user-1",
-    color: "bg-green-500",
+    color: "bg-success",
     isHidden: false,
     description: "Shared team events"
   },
@@ -224,7 +224,7 @@ export const sampleCalendars: Calendar[] = [
     id: "cal-3",
     name: "Company Events",
     userId: "user-1",
-    color: "bg-purple-500",
+    color: "bg-category-3",
     isHidden: false,
     description: "Company-wide events"
   }

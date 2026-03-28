@@ -55,7 +55,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
             <span className="text-xs font-medium">{comment.authorName}</span>
             <span className="text-[10px] text-muted-foreground">{formatDate(comment.createDate)}</span>
             {isResolved && (
-              <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+              <span className="text-[10px] text-success flex items-center gap-0.5">
                 <CheckCheck className="h-2.5 w-2.5" /> {t("proposalWorkspace.commentThread.resolved")}
               </span>
             )}
@@ -75,7 +75,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
               {(userId === currentUserId || !currentUserId) && (
                 <button
                   onClick={() => onResolve(comment.id)}
-                  className="text-[10px] text-muted-foreground hover:text-green-600 flex items-center gap-0.5 transition-colors"
+                  className="text-[10px] text-muted-foreground hover:text-success flex items-center gap-0.5 transition-colors"
                 >
                   <CheckCheck className="h-2.5 w-2.5" />
                   {t("proposalWorkspace.commentThread.resolve")}

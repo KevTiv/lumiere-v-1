@@ -10,8 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  ValidateTimesheetsParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
-  timesheetIds: __t.array(__t.u64()),
+  get params() {
+    return ValidateTimesheetsParams;
+  },
 };

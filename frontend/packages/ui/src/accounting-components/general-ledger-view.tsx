@@ -99,25 +99,25 @@ export function GeneralLedgerView({ moves, onCreate }: GeneralLedgerViewProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10"><FileText className="h-5 w-5 text-blue-600" /></div>
+            <div className="p-2 rounded-lg bg-info/10"><FileText className="h-5 w-5 text-info" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.journalEntries.totalEntries")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
+            <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.states.posted")}</p><p className="text-2xl font-bold">{stats.posted}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10"><Clock className="h-5 w-5 text-amber-600" /></div>
+            <div className="p-2 rounded-lg bg-warning/10"><Clock className="h-5 w-5 text-warning" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.states.draft")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
           </div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10"><ArrowUpRight className="h-5 w-5 text-purple-600" /></div>
+            <div className="p-2 rounded-lg bg-category-3/10"><ArrowUpRight className="h-5 w-5 text-category-3" /></div>
             <div><p className="text-sm text-muted-foreground">{t("accounting.journalEntries.totalMovement")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalMovement)}</p></div>
           </div>
         </CardContent></Card>
@@ -301,11 +301,11 @@ export function GeneralLedgerView({ moves, onCreate }: GeneralLedgerViewProps) {
                 <div className="flex justify-end gap-8 p-4 border-t bg-muted/30">
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.totalDebits")}</p>
-                    <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalDebits)}</p>
+                    <p className="text-lg font-bold text-success">{formatCurrency(totalDebits)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.totalCredits")}</p>
-                    <p className="text-lg font-bold text-red-600">{formatCurrency(totalCredits)}</p>
+                    <p className="text-lg font-bold text-destructive">{formatCurrency(totalCredits)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.difference")}</p>

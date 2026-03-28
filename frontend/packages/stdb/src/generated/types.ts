@@ -1067,6 +1067,12 @@ export const AssignRoleParams = __t.object("AssignRoleParams", {
 });
 export type AssignRoleParams = __Infer<typeof AssignRoleParams>;
 
+export const AssignUserToPickingParams = __t.object("AssignUserToPickingParams", {
+  companyId: __t.option(__t.u64()),
+  userId: __t.option(__t.identity()),
+});
+export type AssignUserToPickingParams = __Infer<typeof AssignUserToPickingParams>;
+
 export const AssignmentRule = __t.object("AssignmentRule", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1228,6 +1234,7 @@ export const BatchState = __t.enum("BatchState", {
 export type BatchState = __Infer<typeof BatchState>;
 
 export const BillTimesheetsParams = __t.object("BillTimesheetsParams", {
+  companyId: __t.option(__t.u64()),
   timesheetIds: __t.array(__t.u64()),
   journalId: __t.u64(),
   incomeAccountId: __t.u64(),
@@ -1429,6 +1436,11 @@ export const Company = __t.object("Company", {
 });
 export type Company = __Infer<typeof Company>;
 
+export const CompanyScopeParams = __t.object("CompanyScopeParams", {
+  companyId: __t.option(__t.u64()),
+});
+export type CompanyScopeParams = __Infer<typeof CompanyScopeParams>;
+
 export const CompleteDocumentProcessingJobParams = __t.object("CompleteDocumentProcessingJobParams", {
   extractedData: __t.option(__t.string()),
   confidenceScore: __t.option(__t.f64()),
@@ -1448,6 +1460,7 @@ export const ComputePrice = __t.enum("ComputePrice", {
 export type ComputePrice = __Infer<typeof ComputePrice>;
 
 export const ConfirmPayslipParams = __t.object("ConfirmPayslipParams", {
+  companyId: __t.option(__t.u64()),
   grossWage: __t.f64(),
   netWage: __t.f64(),
 });
@@ -1723,6 +1736,7 @@ export const Country = __t.object("Country", {
 export type Country = __Infer<typeof Country>;
 
 export const CreateAccountAccountParams = __t.object("CreateAccountAccountParams", {
+  companyId: __t.option(__t.u64()),
   code: __t.string(),
   name: __t.string(),
   userTypeId: __t.u64(),
@@ -1856,11 +1870,13 @@ export const CreateAccountGroupParams = __t.object("CreateAccountGroupParams", {
   codePrefixEnd: __t.option(__t.string()),
   level: __t.u32(),
   parentId: __t.option(__t.u64()),
+  companyId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type CreateAccountGroupParams = __Infer<typeof CreateAccountGroupParams>;
 
 export const CreateAccountJournalParams = __t.object("CreateAccountJournalParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   code: __t.string(),
   get type() {
@@ -1897,6 +1913,7 @@ export const CreateAccountJournalParams = __t.object("CreateAccountJournalParams
 export type CreateAccountJournalParams = __Infer<typeof CreateAccountJournalParams>;
 
 export const CreateAccountMoveParams = __t.object("CreateAccountMoveParams", {
+  companyId: __t.option(__t.u64()),
   journalId: __t.u64(),
   get moveType() {
     return MoveType;
@@ -2086,6 +2103,7 @@ export const CreateAiTeamMemberParams = __t.object("CreateAiTeamMemberParams", {
 export type CreateAiTeamMemberParams = __Infer<typeof CreateAiTeamMemberParams>;
 
 export const CreateAnalyticAccountParams = __t.object("CreateAnalyticAccountParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   code: __t.option(__t.string()),
   active: __t.bool(),
@@ -2112,6 +2130,7 @@ export const CreateAnalyticAccountParams = __t.object("CreateAnalyticAccountPara
 export type CreateAnalyticAccountParams = __Infer<typeof CreateAnalyticAccountParams>;
 
 export const CreateAnalyticDistributionModelParams = __t.object("CreateAnalyticDistributionModelParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   partnerCategoryId: __t.option(__t.u64()),
   productId: __t.option(__t.u64()),
@@ -2203,6 +2222,7 @@ export const CreateBarcodeRuleParams = __t.object("CreateBarcodeRuleParams", {
 export type CreateBarcodeRuleParams = __Infer<typeof CreateBarcodeRuleParams>;
 
 export const CreateBomParams = __t.object("CreateBomParams", {
+  companyId: __t.option(__t.u64()),
   get type() {
     return BomType;
   },
@@ -2227,6 +2247,7 @@ export const CreateBomParams = __t.object("CreateBomParams", {
 export type CreateBomParams = __Infer<typeof CreateBomParams>;
 
 export const CreateBudgetPostParams = __t.object("CreateBudgetPostParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   code: __t.option(__t.string()),
   description: __t.option(__t.string()),
@@ -2372,6 +2393,7 @@ export const CreateContactTagParams = __t.object("CreateContactTagParams", {
 export type CreateContactTagParams = __Infer<typeof CreateContactTagParams>;
 
 export const CreateContractParams = __t.object("CreateContractParams", {
+  companyId: __t.option(__t.u64()),
   employeeId: __t.u64(),
   name: __t.string(),
   dateStart: __t.timestamp(),
@@ -2414,6 +2436,7 @@ export const CreateCrossoveredBudgetLineParams = __t.object("CreateCrossoveredBu
 export type CreateCrossoveredBudgetLineParams = __Infer<typeof CreateCrossoveredBudgetLineParams>;
 
 export const CreateCrossoveredBudgetParams = __t.object("CreateCrossoveredBudgetParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   description: __t.option(__t.string()),
   dateFrom: __t.timestamp(),
@@ -2581,6 +2604,7 @@ export const CreateDeliveryPriceRuleParams = __t.object("CreateDeliveryPriceRule
 export type CreateDeliveryPriceRuleParams = __Infer<typeof CreateDeliveryPriceRuleParams>;
 
 export const CreateDepartmentParams = __t.object("CreateDepartmentParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   parentId: __t.option(__t.u64()),
   completeName: __t.option(__t.string()),
@@ -2663,6 +2687,7 @@ export const CreateEliminationEntryParams = __t.object("CreateEliminationEntryPa
 export type CreateEliminationEntryParams = __Infer<typeof CreateEliminationEntryParams>;
 
 export const CreateEmployeeParams = __t.object("CreateEmployeeParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   jobId: __t.option(__t.u64()),
   departmentId: __t.option(__t.u64()),
@@ -2693,6 +2718,7 @@ export const CreateEmployeeParams = __t.object("CreateEmployeeParams", {
 export type CreateEmployeeParams = __Infer<typeof CreateEmployeeParams>;
 
 export const CreateExpenseParams = __t.object("CreateExpenseParams", {
+  companyId: __t.option(__t.u64()),
   employeeId: __t.u64(),
   name: __t.string(),
   date: __t.timestamp(),
@@ -2709,6 +2735,7 @@ export const CreateExpenseParams = __t.object("CreateExpenseParams", {
 export type CreateExpenseParams = __Infer<typeof CreateExpenseParams>;
 
 export const CreateExpenseSheetParams = __t.object("CreateExpenseSheetParams", {
+  companyId: __t.option(__t.u64()),
   employeeId: __t.u64(),
   name: __t.string(),
   currencyId: __t.u64(),
@@ -2883,6 +2910,7 @@ export const CreateInventoryAdjustmentParams = __t.object("CreateInventoryAdjust
 export type CreateInventoryAdjustmentParams = __Infer<typeof CreateInventoryAdjustmentParams>;
 
 export const CreateJobPositionParams = __t.object("CreateJobPositionParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   departmentId: __t.option(__t.u64()),
   expectedEmployees: __t.u32(),
@@ -2894,6 +2922,7 @@ export const CreateJobPositionParams = __t.object("CreateJobPositionParams", {
 export type CreateJobPositionParams = __Infer<typeof CreateJobPositionParams>;
 
 export const CreateKnowledgeArticleParams = __t.object("CreateKnowledgeArticleParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   description: __t.option(__t.string()),
   body: __t.option(__t.string()),
@@ -2912,6 +2941,7 @@ export const CreateKnowledgeArticleParams = __t.object("CreateKnowledgeArticlePa
 export type CreateKnowledgeArticleParams = __Infer<typeof CreateKnowledgeArticleParams>;
 
 export const CreateKnowledgeCategoryParams = __t.object("CreateKnowledgeCategoryParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   description: __t.option(__t.string()),
   parentId: __t.option(__t.u64()),
@@ -3010,6 +3040,7 @@ export const CreateLoyaltyProgramParams = __t.object("CreateLoyaltyProgramParams
 export type CreateLoyaltyProgramParams = __Infer<typeof CreateLoyaltyProgramParams>;
 
 export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams", {
+  companyId: __t.option(__t.u64()),
   productId: __t.u64(),
   productQty: __t.f64(),
   productUomId: __t.u64(),
@@ -3173,6 +3204,7 @@ export const CreatePayrollStructureParams = __t.object("CreatePayrollStructurePa
 export type CreatePayrollStructureParams = __Infer<typeof CreatePayrollStructureParams>;
 
 export const CreatePayslipParams = __t.object("CreatePayslipParams", {
+  companyId: __t.option(__t.u64()),
   employeeId: __t.u64(),
   structId: __t.u64(),
   dateFrom: __t.timestamp(),
@@ -3184,6 +3216,7 @@ export const CreatePayslipParams = __t.object("CreatePayslipParams", {
 export type CreatePayslipParams = __Infer<typeof CreatePayslipParams>;
 
 export const CreatePickingBatchParams = __t.object("CreatePickingBatchParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   pickingTypeId: __t.option(__t.u64()),
   scheduledDate: __t.option(__t.timestamp()),
@@ -3418,6 +3451,7 @@ export const CreateProductVariantParams = __t.object("CreateProductVariantParams
 export type CreateProductVariantParams = __Infer<typeof CreateProductVariantParams>;
 
 export const CreateProjectParams = __t.object("CreateProjectParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   description: __t.option(__t.string()),
   active: __t.bool(),
@@ -3470,6 +3504,7 @@ export const CreateProjectParams = __t.object("CreateProjectParams", {
 export type CreateProjectParams = __Infer<typeof CreateProjectParams>;
 
 export const CreatePurchaseOrderParams = __t.object("CreatePurchaseOrderParams", {
+  companyId: __t.option(__t.u64()),
   partnerId: __t.u64(),
   currencyId: __t.u64(),
   origin: __t.option(__t.string()),
@@ -3492,6 +3527,7 @@ export const CreatePurchaseOrderParams = __t.object("CreatePurchaseOrderParams",
 export type CreatePurchaseOrderParams = __Infer<typeof CreatePurchaseOrderParams>;
 
 export const CreatePurchaseRequisitionParams = __t.object("CreatePurchaseRequisitionParams", {
+  companyId: __t.option(__t.u64()),
   description: __t.option(__t.string()),
   orderingDate: __t.option(__t.timestamp()),
   dateEnd: __t.option(__t.timestamp()),
@@ -3703,6 +3739,7 @@ export const CreateSaleOrderLineParams = __t.object("CreateSaleOrderLineParams",
 export type CreateSaleOrderLineParams = __Infer<typeof CreateSaleOrderLineParams>;
 
 export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
+  companyId: __t.option(__t.u64()),
   partnerId: __t.u64(),
   partnerInvoiceId: __t.u64(),
   partnerShippingId: __t.u64(),
@@ -3814,6 +3851,7 @@ export const CreateStockInventoryLineParams = __t.object("CreateStockInventoryLi
 export type CreateStockInventoryLineParams = __Infer<typeof CreateStockInventoryLineParams>;
 
 export const CreateStockInventoryParams = __t.object("CreateStockInventoryParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   locationIds: __t.array(__t.u64()),
   productIds: __t.array(__t.u64()),
@@ -3864,6 +3902,7 @@ export const CreateStockLocationParams = __t.object("CreateStockLocationParams",
 export type CreateStockLocationParams = __Infer<typeof CreateStockLocationParams>;
 
 export const CreateStockMoveParams = __t.object("CreateStockMoveParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   productId: __t.u64(),
   productTmplId: __t.u64(),
@@ -3919,6 +3958,7 @@ export const CreateStockMoveParams = __t.object("CreateStockMoveParams", {
 export type CreateStockMoveParams = __Infer<typeof CreateStockMoveParams>;
 
 export const CreateStockPickingParams = __t.object("CreateStockPickingParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   pickingTypeId: __t.u64(),
   locationId: __t.u64(),
@@ -3979,6 +4019,7 @@ export const CreateStockPickingParams = __t.object("CreateStockPickingParams", {
 export type CreateStockPickingParams = __Infer<typeof CreateStockPickingParams>;
 
 export const CreateStockProductionLotParams = __t.object("CreateStockProductionLotParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   productId: __t.u64(),
   productVariantId: __t.option(__t.u64()),
@@ -3999,6 +4040,7 @@ export const CreateStockProductionLotParams = __t.object("CreateStockProductionL
 export type CreateStockProductionLotParams = __Infer<typeof CreateStockProductionLotParams>;
 
 export const CreateStockProductionSerialParams = __t.object("CreateStockProductionSerialParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   productId: __t.u64(),
   productVariantId: __t.option(__t.u64()),
@@ -4026,6 +4068,7 @@ export const CreateStockProductionSerialParams = __t.object("CreateStockProducti
 export type CreateStockProductionSerialParams = __Infer<typeof CreateStockProductionSerialParams>;
 
 export const CreateStockQuantParams = __t.object("CreateStockQuantParams", {
+  companyId: __t.option(__t.u64()),
   productId: __t.u64(),
   productVariantId: __t.option(__t.u64()),
   locationId: __t.u64(),
@@ -4110,6 +4153,7 @@ export const CreateStockTraceabilityReportParams = __t.object("CreateStockTracea
 export type CreateStockTraceabilityReportParams = __Infer<typeof CreateStockTraceabilityReportParams>;
 
 export const CreateSubscriptionFromSaleOrderParams = __t.object("CreateSubscriptionFromSaleOrderParams", {
+  companyId: __t.option(__t.u64()),
   saleOrderId: __t.u64(),
   code: __t.option(__t.string()),
   planId: __t.u64(),
@@ -4152,6 +4196,7 @@ export const CreateSubscriptionFromSaleOrderParams = __t.object("CreateSubscript
 export type CreateSubscriptionFromSaleOrderParams = __Infer<typeof CreateSubscriptionFromSaleOrderParams>;
 
 export const CreateSubscriptionPlanParams = __t.object("CreateSubscriptionPlanParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   code: __t.string(),
   description: __t.option(__t.string()),
@@ -4184,6 +4229,7 @@ export const CreateSubscriptionPlanParams = __t.object("CreateSubscriptionPlanPa
 export type CreateSubscriptionPlanParams = __Infer<typeof CreateSubscriptionPlanParams>;
 
 export const CreateTaskParams = __t.object("CreateTaskParams", {
+  companyId: __t.option(__t.u64()),
   projectId: __t.option(__t.u64()),
   name: __t.string(),
   description: __t.option(__t.string()),
@@ -4509,6 +4555,7 @@ export const CreateWhatsAppBusinessAccountParams = __t.object("CreateWhatsAppBus
 export type CreateWhatsAppBusinessAccountParams = __Infer<typeof CreateWhatsAppBusinessAccountParams>;
 
 export const CreateWorkcenterParams = __t.object("CreateWorkcenterParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   active: __t.bool(),
   code: __t.option(__t.string()),
@@ -4785,6 +4832,11 @@ export const DeferredRevenueSchedule = __t.object("DeferredRevenueSchedule", {
 });
 export type DeferredRevenueSchedule = __Infer<typeof DeferredRevenueSchedule>;
 
+export const DeleteAccountMoveLineParams = __t.object("DeleteAccountMoveLineParams", {
+  companyId: __t.option(__t.u64()),
+});
+export type DeleteAccountMoveLineParams = __Infer<typeof DeleteAccountMoveLineParams>;
+
 export const DeliveryCarrier = __t.object("DeliveryCarrier", {
   id: __t.u64(),
   name: __t.string(),
@@ -4838,6 +4890,12 @@ export const DeliveryPriceRule = __t.object("DeliveryPriceRule", {
   metadata: __t.option(__t.string()),
 });
 export type DeliveryPriceRule = __Infer<typeof DeliveryPriceRule>;
+
+export const DeprecateAccountAccountParams = __t.object("DeprecateAccountAccountParams", {
+  companyId: __t.option(__t.u64()),
+  deprecated: __t.bool(),
+});
+export type DeprecateAccountAccountParams = __Infer<typeof DeprecateAccountAccountParams>;
 
 // The tagged union or sum type for the algebraic type `DepreciationMethod`.
 export const DepreciationMethod = __t.enum("DepreciationMethod", {
@@ -4969,6 +5027,12 @@ export const DocumentVersion = __t.object("DocumentVersion", {
   metadata: __t.option(__t.string()),
 });
 export type DocumentVersion = __Infer<typeof DocumentVersion>;
+
+export const DoneStockMoveParams = __t.object("DoneStockMoveParams", {
+  companyId: __t.option(__t.u64()),
+  quantityDone: __t.f64(),
+});
+export type DoneStockMoveParams = __Infer<typeof DoneStockMoveParams>;
 
 // The tagged union or sum type for the algebraic type `EmploymentType`.
 export const EmploymentType = __t.enum("EmploymentType", {
@@ -6093,6 +6157,7 @@ export const LogAuditEventParams = __t.object("LogAuditEventParams", {
 export type LogAuditEventParams = __Infer<typeof LogAuditEventParams>;
 
 export const LogTimesheetParams = __t.object("LogTimesheetParams", {
+  companyId: __t.option(__t.u64()),
   projectId: __t.u64(),
   taskId: __t.option(__t.u64()),
   employeeId: __t.u64(),
@@ -8492,6 +8557,7 @@ export const SessionState = __t.enum("SessionState", {
 export type SessionState = __Infer<typeof SessionState>;
 
 export const SetArticlePublishedParams = __t.object("SetArticlePublishedParams", {
+  companyId: __t.option(__t.u64()),
   isPublished: __t.bool(),
   websiteUrl: __t.option(__t.string()),
 });
@@ -8541,6 +8607,7 @@ export const SplitMethod = __t.enum("SplitMethod", {
 export type SplitMethod = __Infer<typeof SplitMethod>;
 
 export const StartTimesheetTimerParams = __t.object("StartTimesheetTimerParams", {
+  companyId: __t.option(__t.u64()),
   projectId: __t.u64(),
   taskId: __t.option(__t.u64()),
   employeeId: __t.u64(),
@@ -9094,6 +9161,18 @@ export const StockQuant = __t.object("StockQuant", {
 });
 export type StockQuant = __Infer<typeof StockQuant>;
 
+export const StockQuantReserveParams = __t.object("StockQuantReserveParams", {
+  companyId: __t.option(__t.u64()),
+  reserveQty: __t.f64(),
+});
+export type StockQuantReserveParams = __Infer<typeof StockQuantReserveParams>;
+
+export const StockQuantUnreserveParams = __t.object("StockQuantUnreserveParams", {
+  companyId: __t.option(__t.u64()),
+  unreserveQty: __t.f64(),
+});
+export type StockQuantUnreserveParams = __Infer<typeof StockQuantUnreserveParams>;
+
 export const StockReorderGroup = __t.object("StockReorderGroup", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -9626,6 +9705,7 @@ export const UomConversion = __t.object("UomConversion", {
 export type UomConversion = __Infer<typeof UomConversion>;
 
 export const UpdateAccountAccountParams = __t.object("UpdateAccountAccountParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
   deprecated: __t.option(__t.bool()),
@@ -9647,6 +9727,7 @@ export const UpdateAccountAccountParams = __t.object("UpdateAccountAccountParams
 export type UpdateAccountAccountParams = __Infer<typeof UpdateAccountAccountParams>;
 
 export const UpdateAccountAccountTypeParams = __t.object("UpdateAccountAccountTypeParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   type: __t.option(__t.string()),
   get internalGroup() {
@@ -9729,6 +9810,7 @@ export const UpdateAccountBankStatementParams = __t.object("UpdateAccountBankSta
 export type UpdateAccountBankStatementParams = __Infer<typeof UpdateAccountBankStatementParams>;
 
 export const UpdateAccountGroupParams = __t.object("UpdateAccountGroupParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   codePrefixStart: __t.option(__t.string()),
   codePrefixEnd: __t.option(__t.string()),
@@ -9739,6 +9821,7 @@ export const UpdateAccountGroupParams = __t.object("UpdateAccountGroupParams", {
 export type UpdateAccountGroupParams = __Infer<typeof UpdateAccountGroupParams>;
 
 export const UpdateAccountJournalParams = __t.object("UpdateAccountJournalParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
   active: __t.option(__t.bool()),
@@ -9758,6 +9841,7 @@ export const UpdateAccountJournalParams = __t.object("UpdateAccountJournalParams
 export type UpdateAccountJournalParams = __Infer<typeof UpdateAccountJournalParams>;
 
 export const UpdateAccountMoveLineParams = __t.object("UpdateAccountMoveLineParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   debit: __t.option(__t.f64()),
   credit: __t.option(__t.f64()),
@@ -9831,6 +9915,7 @@ export const UpdateAiAgentParams = __t.object("UpdateAiAgentParams", {
 export type UpdateAiAgentParams = __Infer<typeof UpdateAiAgentParams>;
 
 export const UpdateAnalyticAccountParams = __t.object("UpdateAnalyticAccountParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
   partnerId: __t.option(__t.u64()),
@@ -9843,6 +9928,7 @@ export const UpdateAnalyticAccountParams = __t.object("UpdateAnalyticAccountPara
 export type UpdateAnalyticAccountParams = __Infer<typeof UpdateAnalyticAccountParams>;
 
 export const UpdateAnalyticDistributionModelParams = __t.object("UpdateAnalyticDistributionModelParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   partnerCategoryId: __t.option(__t.u64()),
   productId: __t.option(__t.u64()),
@@ -9920,6 +10006,7 @@ export const UpdateBudgetLineActualsParams = __t.object("UpdateBudgetLineActuals
 export type UpdateBudgetLineActualsParams = __Infer<typeof UpdateBudgetLineActualsParams>;
 
 export const UpdateBudgetPostParams = __t.object("UpdateBudgetPostParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   code: __t.option(__t.option(__t.string())),
   description: __t.option(__t.option(__t.string())),
@@ -10019,6 +10106,7 @@ export const UpdateContactDetailsParams = __t.object("UpdateContactDetailsParams
 export type UpdateContactDetailsParams = __Infer<typeof UpdateContactDetailsParams>;
 
 export const UpdateContractParams = __t.object("UpdateContractParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   wage: __t.option(__t.f64()),
   dateEnd: __t.option(__t.timestamp()),
@@ -10038,6 +10126,7 @@ export const UpdateCrossoveredBudgetLineParams = __t.object("UpdateCrossoveredBu
 export type UpdateCrossoveredBudgetLineParams = __Infer<typeof UpdateCrossoveredBudgetLineParams>;
 
 export const UpdateCrossoveredBudgetParams = __t.object("UpdateCrossoveredBudgetParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   description: __t.option(__t.option(__t.string())),
   dateFrom: __t.option(__t.timestamp()),
@@ -10053,6 +10142,7 @@ export const UpdateDashboardShareParams = __t.object("UpdateDashboardShareParams
 export type UpdateDashboardShareParams = __Infer<typeof UpdateDashboardShareParams>;
 
 export const UpdateDepartmentParams = __t.object("UpdateDepartmentParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   parentId: __t.option(__t.u64()),
   managerId: __t.option(__t.u64()),
@@ -10092,6 +10182,7 @@ export const UpdateEmployeeParams = __t.object("UpdateEmployeeParams", {
 export type UpdateEmployeeParams = __Infer<typeof UpdateEmployeeParams>;
 
 export const UpdateExpenseParams = __t.object("UpdateExpenseParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   unitAmount: __t.option(__t.f64()),
   quantity: __t.option(__t.f64()),
@@ -10168,6 +10259,7 @@ export const UpdateIntercompanyRuleParams = __t.object("UpdateIntercompanyRulePa
 export type UpdateIntercompanyRuleParams = __Infer<typeof UpdateIntercompanyRuleParams>;
 
 export const UpdateJobPositionParams = __t.object("UpdateJobPositionParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   departmentId: __t.option(__t.u64()),
   description: __t.option(__t.string()),
@@ -10179,6 +10271,7 @@ export const UpdateJobPositionParams = __t.object("UpdateJobPositionParams", {
 export type UpdateJobPositionParams = __Infer<typeof UpdateJobPositionParams>;
 
 export const UpdateKnowledgeArticleParams = __t.object("UpdateKnowledgeArticleParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   description: __t.option(__t.string()),
   body: __t.option(__t.string()),
@@ -10194,6 +10287,7 @@ export const UpdateKnowledgeArticleParams = __t.object("UpdateKnowledgeArticlePa
 export type UpdateKnowledgeArticleParams = __Infer<typeof UpdateKnowledgeArticleParams>;
 
 export const UpdateKnowledgeCategoryParams = __t.object("UpdateKnowledgeCategoryParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   description: __t.option(__t.string()),
   color: __t.option(__t.u8()),
@@ -10336,6 +10430,7 @@ export const UpdateProductVariantParams = __t.object("UpdateProductVariantParams
 export type UpdateProductVariantParams = __Infer<typeof UpdateProductVariantParams>;
 
 export const UpdateProjectParams = __t.object("UpdateProjectParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   description: __t.option(__t.option(__t.string())),
   active: __t.option(__t.bool()),
@@ -10445,6 +10540,7 @@ export const UpdateStockLocationParams = __t.object("UpdateStockLocationParams",
 export type UpdateStockLocationParams = __Infer<typeof UpdateStockLocationParams>;
 
 export const UpdateStockProductionLotParams = __t.object("UpdateStockProductionLotParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   ref: __t.option(__t.string()),
   note: __t.option(__t.string()),
@@ -10460,6 +10556,7 @@ export const UpdateStockProductionLotParams = __t.object("UpdateStockProductionL
 export type UpdateStockProductionLotParams = __Infer<typeof UpdateStockProductionLotParams>;
 
 export const UpdateStockProductionSerialParams = __t.object("UpdateStockProductionSerialParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   ref: __t.option(__t.string()),
   note: __t.option(__t.string()),
@@ -10477,6 +10574,12 @@ export const UpdateStockProductionSerialParams = __t.object("UpdateStockProducti
   metadata: __t.option(__t.string()),
 });
 export type UpdateStockProductionSerialParams = __Infer<typeof UpdateStockProductionSerialParams>;
+
+export const UpdateStockQuantQuantityParams = __t.object("UpdateStockQuantQuantityParams", {
+  companyId: __t.option(__t.u64()),
+  quantity: __t.f64(),
+});
+export type UpdateStockQuantQuantityParams = __Infer<typeof UpdateStockQuantQuantityParams>;
 
 export const UpdateStockRouteParams = __t.object("UpdateStockRouteParams", {
   name: __t.option(__t.string()),
@@ -10503,6 +10606,7 @@ export const UpdateStockRuleParams = __t.object("UpdateStockRuleParams", {
 export type UpdateStockRuleParams = __Infer<typeof UpdateStockRuleParams>;
 
 export const UpdateTaskParams = __t.object("UpdateTaskParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   description: __t.option(__t.option(__t.string())),
   priority: __t.option(__t.string()),
@@ -10700,6 +10804,7 @@ export const UpdateWidgetLayoutParams = __t.object("UpdateWidgetLayoutParams", {
 export type UpdateWidgetLayoutParams = __Infer<typeof UpdateWidgetLayoutParams>;
 
 export const UpdateWorkcenterParams = __t.object("UpdateWorkcenterParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
   active: __t.option(__t.bool()),
   code: __t.option(__t.string()),
@@ -10869,6 +10974,12 @@ export const UtmSource = __t.object("UtmSource", {
   createdAt: __t.timestamp(),
 });
 export type UtmSource = __Infer<typeof UtmSource>;
+
+export const ValidateTimesheetsParams = __t.object("ValidateTimesheetsParams", {
+  companyId: __t.option(__t.u64()),
+  timesheetIds: __t.array(__t.u64()),
+});
+export type ValidateTimesheetsParams = __Infer<typeof ValidateTimesheetsParams>;
 
 // The tagged union or sum type for the algebraic type `VehicleStatus`.
 export const VehicleStatus = __t.enum("VehicleStatus", {

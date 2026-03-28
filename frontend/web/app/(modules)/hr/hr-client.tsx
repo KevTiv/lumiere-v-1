@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newEmployeeForm, newLeaveRequestForm, newContractForm, newPayslipForm, newJobPositionForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newEmployeeForm,
+  newLeaveRequestForm,
+  newContractForm,
+  newPayslipForm,
+  newJobPositionForm,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
@@ -17,7 +27,16 @@ import {
   useCreateLeaveRequest,
   useCreateContract,
   useCreatePayslip,
+  useCreateJobPosition,
 } from "@/hooks/hr"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { usePricelists } from "@/hooks/sales"
+import {
+  pricelistRowsToSelectOptions,
+  employeeRowsToSelectOptions,
+  departmentRowsToSelectOptions,
+  leaveTypeOptionsFromLeaveRequests,
+} from "@/lib/form-lookup"
 
 interface HrClientProps {
   initialEmployees?: Record<string, unknown>[]
@@ -25,20 +44,32 @@ interface HrClientProps {
   initialLeaves?: Record<string, unknown>[]
   initialContracts?: Record<string, unknown>[]
   initialPayslips?: Record<string, unknown>[]
+  initialPricelists?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function HrClient({
+type HrClientLoadedProps = Omit<HrClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function HrClient(props: HrClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <HrClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function HrClientLoaded({
   initialEmployees,
   initialDepartments,
   initialLeaves,
   initialContracts,
   initialPayslips,
+  initialPricelists,
   organizationId,
-}: HrClientProps) {
+}: HrClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: employees = [] } = useEmployees(companyId, initialEmployees)
@@ -47,13 +78,73 @@ export function HrClient({
   const { data: contracts = [] } = useContracts(companyId, initialContracts)
   const { data: payslips = [] } = usePayslips(companyId, initialPayslips)
   const { data: jobPositions = [] } = useJobPositions(companyId)
+  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
 
   const createEmployee = useCreateEmployee(orgId, companyId)
   const createLeaveRequest = useCreateLeaveRequest(orgId, companyId)
   const createContract = useCreateContract(orgId, companyId)
   const createPayslip = useCreatePayslip(orgId, companyId)
+  const createJobPosition = useCreateJobPosition(orgId, companyId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])
+
+  const pricelistFieldOptions = useMemo(() => {
+    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+  }, [pricelists, t])
+
+  const employeeFieldOptions = useMemo(() => {
+    const fromApi = employeeRowsToSelectOptions(employees as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
+  }, [employees, t])
+
+  const departmentFieldOptions = useMemo(() => {
+    const fromApi = departmentRowsToSelectOptions(departments as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noDepartments"), disabled: true }]
+  }, [departments, t])
+
+  const leaveTypeFieldOptions = useMemo(() => {
+    const fromApi = leaveTypeOptionsFromLeaveRequests(leaves as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noLeaveTypes"), disabled: true }]
+  }, [leaves, t])
+
+  const employeeFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newEmployeeForm(t), {
+        departmentId: departmentFieldOptions,
+      }),
+    [t, departmentFieldOptions],
+  )
+
+  const leaveFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newLeaveRequestForm(t), {
+        employeeId: employeeFieldOptions,
+        leaveTypeId: leaveTypeFieldOptions,
+      }),
+    [t, employeeFieldOptions, leaveTypeFieldOptions],
+  )
+
+  const contractFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newContractForm(t), {
+        pricelistId: pricelistFieldOptions,
+        employeeId: employeeFieldOptions,
+      }),
+    [t, pricelistFieldOptions, employeeFieldOptions],
+  )
+
+  const jobFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newJobPositionForm(t), {
+        departmentId: departmentFieldOptions,
+      }),
+    [t, departmentFieldOptions],
+  )
 
   const liveSections = useMemo(() => {
     const activeEmployees = employees.filter((e) => e.isActive)
@@ -82,10 +173,11 @@ export function HrClient({
             }
             if (w.type === "quick-actions") {
               const handlers: Record<string, () => void> = {
-                create_employee: () => setQuickActionForm({ form: newEmployeeForm(t), action: "createEmployee" }),
-                create_leave: () => setQuickActionForm({ form: newLeaveRequestForm(t), action: "createLeaveRequest" }),
-                create_contract: () => setQuickActionForm({ form: newContractForm(t), action: "createContract" }),
+                create_employee: () => setQuickActionForm({ form: employeeFormConfig, action: "createEmployee" }),
+                create_leave: () => setQuickActionForm({ form: leaveFormConfig, action: "createLeaveRequest" }),
+                create_contract: () => setQuickActionForm({ form: contractFormConfig, action: "createContract" }),
                 create_payslip: () => setQuickActionForm({ form: newPayslipForm(t), action: "createPayslip" }),
+                create_job_position: () => setQuickActionForm({ form: jobFormConfig, action: "createJobPosition" }),
               }
               return {
                 ...w,
@@ -148,16 +240,34 @@ export function HrClient({
       moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
       []
     )
-  }, [employees, departments, leaves, contracts, jobPositions, moduleConfig, t])
+  }, [
+    employees,
+    departments,
+    leaves,
+    contracts,
+    jobPositions,
+    moduleConfig,
+    t,
+    employeeFormConfig,
+    leaveFormConfig,
+    contractFormConfig,
+    jobFormConfig,
+  ])
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-      ),
-    }) as ModuleConfig,
-    [moduleConfig, liveSections]
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: moduleConfig.tabs.map((tab) => {
+          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "employees") return { ...tab, createForm: employeeFormConfig }
+          if (tab.id === "leaves") return { ...tab, createForm: leaveFormConfig }
+          if (tab.id === "contracts") return { ...tab, createForm: contractFormConfig }
+          if (tab.id === "job-positions") return { ...tab, createForm: jobFormConfig }
+          return tab
+        }),
+      }) as ModuleConfig,
+    [moduleConfig, liveSections, employeeFormConfig, leaveFormConfig, contractFormConfig, jobFormConfig],
   )
 
   const data = useMemo(
@@ -177,10 +287,89 @@ export function HrClient({
     action: string,
     formData: Record<string, unknown>
   ) => {
-    if (action === "createEmployee") createEmployee.mutate(formData as never)
-    else if (action === "createLeaveRequest") createLeaveRequest.mutate(formData as never)
-    else if (action === "createContract") createContract.mutate(formData as never)
-    else if (action === "createPayslip") createPayslip.mutate(formData as never)
+    if (action === "createEmployee") {
+      const deptRaw = formData.departmentId
+      createEmployee.mutate({
+        name: String(formData.name ?? ""),
+        jobId: undefined,
+        departmentId:
+          deptRaw !== "" && deptRaw != null ? Number(deptRaw) : undefined,
+        employmentType: String(formData.employmentType ?? "FullTime"),
+        workEmail: formData.workEmail ? String(formData.workEmail) : undefined,
+        employeeNumber: undefined,
+        jobTitle: formData.jobTitle ? String(formData.jobTitle) : undefined,
+        parentId: undefined,
+        coachId: undefined,
+        workPhone: formData.workPhone ? String(formData.workPhone) : undefined,
+        mobilePhone: undefined,
+        workLocation: formData.workLocation ? String(formData.workLocation) : undefined,
+        dateHired: formData.dateHired ? new Date(String(formData.dateHired)) : undefined,
+        gender: undefined,
+        birthday: undefined,
+        marital: undefined,
+        emergencyContact: undefined,
+        emergencyPhone: undefined,
+        barcode: undefined,
+        pin: undefined,
+        imageUrl: undefined,
+        color: undefined,
+        isActive: true,
+        metadata: undefined,
+      } as never)
+    } else if (action === "createLeaveRequest") {
+      const empRaw = formData.employeeId
+      const ltRaw = formData.leaveTypeId
+      if (empRaw === "" || empRaw == null || ltRaw === "" || ltRaw == null) return
+      createLeaveRequest.mutate({
+        employeeId: Number(empRaw),
+        leaveTypeId: Number(ltRaw),
+        dateFrom: new Date(String(formData.dateFrom)),
+        dateTo: new Date(String(formData.dateTo)),
+        numberOfDays: Number(formData.numberOfDays ?? 0),
+        notes: formData.notes ? String(formData.notes) : undefined,
+        name: undefined,
+        managerId: undefined,
+      } as never)
+    } else if (action === "createContract") {
+      const plRaw = formData.pricelistId
+      const empRaw = formData.employeeId
+      if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
+      const pl = pricelists.find((p) => String(p.id) === String(plRaw))
+      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
+      createContract.mutate({
+        employeeId: Number(empRaw),
+        name: String(formData.name ?? ""),
+        dateStart: new Date(String(formData.dateStart)),
+        wage: Number(formData.wage ?? 0),
+        currencyId: Number(pl.currencyId),
+        jobId: undefined,
+        departmentId: undefined,
+        dateEnd: formData.dateEnd ? new Date(String(formData.dateEnd)) : undefined,
+        notes: undefined,
+      } as never)
+    } else if (action === "createPayslip") {
+      createPayslip.mutate({
+        employeeId: Number(formData.employeeId),
+        structId: Number(formData.structId),
+        dateFrom: new Date(String(formData.dateFrom)),
+        dateTo: new Date(String(formData.dateTo)),
+        basicWage: Number(formData.basicWage ?? 0),
+        contractId: formData.contractId != null ? Number(formData.contractId) : undefined,
+        notes: undefined,
+      } as never)
+    } else if (action === "createJobPosition") {
+      const deptRaw = formData.departmentId
+      createJobPosition.mutate({
+        name: String(formData.name ?? ""),
+        departmentId:
+          deptRaw !== "" && deptRaw != null ? BigInt(Number(deptRaw)) : undefined,
+        expectedEmployees: Number(formData.expectedEmployees ?? 1),
+        description: formData.description as string | undefined,
+        requirements: formData.requirements as string | undefined,
+        state: String(formData.state ?? "recruit"),
+        isActive: formData.isActive == null ? true : Boolean(formData.isActive),
+      } as never)
+    }
   }
 
   return (
@@ -193,7 +382,7 @@ export function HrClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newEmployeeForm(t)}
+        config={quickActionForm?.form ?? employeeFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

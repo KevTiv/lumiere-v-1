@@ -1,0 +1,56 @@
+/* Ocean — cool accent; HSL channels (same convention as tokens-base) */
+
+:root.light[data-palette="ocean"] {
+  --primary: 250 55% 46%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar-primary: 250 55% 46%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --ring: 248 60% 52%;
+  --chart-1: 250 58% 52%;
+  --chart-2: 220 50% 48%;
+  --chart-3: 200 45% 45%;
+  --chart-4: 265 55% 58%;
+  --chart-5: 235 48% 50%;
+
+  /* Cooler neutrals + semantic/category alignment for contrast checks */
+  --neutral-300: 230 18% 72%;
+  --neutral-500: 235 14% 44%;
+  --neutral-700: 240 12% 28%;
+  --success: 165 55% 36%;
+  --warning: 38 88% 44%;
+  --info: 250 58% 50%;
+  --category-1: 250 58% 50%;
+  --category-2: 350 72% 48%;
+  --category-3: 280 60% 50%;
+  --category-4: 165 55% 36%;
+  --category-5: 38 88% 44%;
+  --category-6: 230 18% 42%;
+  --category-7: 195 55% 40%;
+}
+
+.dark[data-palette="ocean"] {
+  --primary: 250 65% 62%;
+  --primary-foreground: 260 30% 8%;
+  --sidebar-primary: 250 55% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --ring: 248 58% 58%;
+  --chart-1: 250 60% 58%;
+  --chart-2: 220 50% 55%;
+  --chart-3: 200 42% 50%;
+  --chart-4: 265 55% 62%;
+  --chart-5: 235 48% 56%;
+
+  --neutral-300: 235 12% 22%;
+  --neutral-500: 240 14% 52%;
+  --neutral-700: 230 22% 72%;
+  --success: 165 50% 50%;
+  --warning: 38 88% 54%;
+  --info: 250 62% 60%;
+  --category-1: 250 62% 60%;
+  --category-2: 350 65% 58%;
+  --category-3: 280 58% 62%;
+  --category-4: 165 48% 52%;
+  --category-5: 38 85% 55%;
+  --category-6: 230 22% 68%;
+  --category-7: 195 52% 52%;
+}

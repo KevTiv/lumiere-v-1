@@ -13,6 +13,13 @@ use crate::helpers::check_permission;
 // PARAMS TYPES
 // ============================================================================
 
+/// Optional company scope for reducers that no longer take `company_id` as a flat argument.
+/// When `company_id` is `None`, the default legal entity for the organization is used.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CompanyScopeParams {
+    pub company_id: Option<u64>,
+}
+
 /// Params for creating an organization.
 /// Scope: no scope param (any authenticated user can create an org).
 #[derive(SpacetimeType, Clone, Debug)]
@@ -496,4 +503,61 @@ pub fn delete_company(ctx: &ReducerContext, company_id: u64) -> Result<(), Strin
     });
 
     Ok(())
+}
+
+// ── Company scope (tenant org → legal entity) ─────────────────────────────────
+
+/// Pick a deterministic default company for an organization: non-deleted rows only,
+/// prefer `is_parent`, then lowest `id`.
+pub(crate) fn default_company_id_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<u64, String> {
+    let mut candidates: Vec<Company> = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&organization_id)
+        .filter(|c| c.deleted_at.is_none())
+        .collect();
+    if candidates.is_empty() {
+        return Err("No company found for organization".to_string());
+    }
+    candidates.sort_by(|a, b| b.is_parent.cmp(&a.is_parent).then_with(|| a.id.cmp(&b.id)));
+    Ok(candidates[0].id)
+}
+
+pub(crate) fn require_company_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    if company.organization_id != organization_id {
+        return Err("Company does not belong to this organization".to_string());
+    }
+    if company.deleted_at.is_some() {
+        return Err("Company is deleted".to_string());
+    }
+    Ok(())
+}
+
+/// Resolve `company_id` for reducers: explicit id (validated) or default company.
+pub(crate) fn company_id_from_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+) -> Result<u64, String> {
+    match company_id {
+        Some(id) => {
+            require_company_in_organization(ctx, organization_id, id)?;
+            Ok(id)
+        }
+        None => default_company_id_for_organization(ctx, organization_id),
+    }
 }

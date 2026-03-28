@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 # HTTP server
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
@@ -18,13 +18,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # HTTP client (Voyage AI, Claude API, Kaggle)
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart"], default-features = false }
 
 # Concurrent in-memory maps (job tracking, search cache)
 dashmap = "6"
 
-# UUIDs for download job IDs
-uuid = { version = "1", features = ["v4"] }
+# UUIDs for download job IDs + deterministic point IDs (v5)
+uuid = { version = "1", features = ["v4", "v5"] }
 
 # Async stream utilities (Kaggle download progress)
 futures = "0.3"
@@ -42,6 +42,16 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Error handling
 anyhow = "1"
 thiserror = "1"
+
+# Rig-rs AI framework + Qdrant adapter
+rig-core = "0.9"
+rig-qdrant = "0.2"
+
+# Async trait support for provider traits
+async-trait = "0.1"
+
+# Base64 encoding for vision payloads
+base64 = "0.22"
 
 [profile.release]
 opt-level = 3

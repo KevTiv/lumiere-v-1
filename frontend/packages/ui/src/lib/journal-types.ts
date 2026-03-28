@@ -56,63 +56,63 @@ export const noteTypeConfig: Record<NoteType, { label: string; icon: string; col
   observation: {
     label: "Observation",
     icon: "eye",
-    color: "text-blue-600",
-    bgColor: "bg-blue-500/10 border-blue-500/20"
+    color: "text-info",
+    bgColor: "bg-info/10 border-info/20"
   },
   "task-update": {
     label: "Task Update",
     icon: "check-circle",
-    color: "text-green-600",
-    bgColor: "bg-green-500/10 border-green-500/20"
+    color: "text-success",
+    bgColor: "bg-success/10 border-success/20"
   },
   blocker: {
     label: "Blocker",
     icon: "alert-triangle",
-    color: "text-red-600",
-    bgColor: "bg-red-500/10 border-red-500/20"
+    color: "text-destructive",
+    bgColor: "bg-destructive/10 border-destructive/20"
   },
   idea: {
     label: "Idea",
     icon: "lightbulb",
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-500/10 border-yellow-500/20"
+    color: "text-warning",
+    bgColor: "bg-warning/10 border-warning/20"
   },
   "meeting-note": {
     label: "Meeting Note",
     icon: "users",
-    color: "text-purple-600",
-    bgColor: "bg-purple-500/10 border-purple-500/20"
+    color: "text-category-3",
+    bgColor: "bg-category-3/10 border-category-3/20"
   },
   reminder: {
     label: "Reminder",
     icon: "bell",
-    color: "text-orange-600",
-    bgColor: "bg-orange-500/10 border-orange-500/20"
+    color: "text-warning",
+    bgColor: "bg-warning/10 border-warning/20"
   },
   question: {
     label: "Question",
     icon: "help-circle",
-    color: "text-teal-600",
-    bgColor: "bg-teal-500/10 border-teal-500/20"
+    color: "text-category-7",
+    bgColor: "bg-category-7/10 border-category-7/20"
   },
   decision: {
     label: "Decision",
     icon: "git-branch",
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-500/10 border-indigo-500/20"
+    color: "text-category-1",
+    bgColor: "bg-category-1/10 border-category-1/20"
   },
 }
 
 export const priorityConfig: Record<NotePriority, { label: string; color: string; dotColor: string }> = {
   low: { label: "Low", color: "text-muted-foreground", dotColor: "bg-muted-foreground" },
   normal: { label: "Normal", color: "text-foreground", dotColor: "bg-foreground" },
-  high: { label: "High", color: "text-orange-600", dotColor: "bg-orange-500" },
-  urgent: { label: "Urgent", color: "text-red-600", dotColor: "bg-red-500" },
+  high: { label: "High", color: "text-warning", dotColor: "bg-warning" },
+  urgent: { label: "Urgent", color: "text-destructive", dotColor: "bg-destructive" },
 }
 
 export const statusConfig: Record<NoteStatus, { label: string; color: string }> = {
-  active: { label: "Active", color: "text-blue-600" },
-  resolved: { label: "Resolved", color: "text-green-600" },
+  active: { label: "Active", color: "text-info" },
+  resolved: { label: "Resolved", color: "text-success" },
   archived: { label: "Archived", color: "text-muted-foreground" },
 }
 
@@ -126,9 +126,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "admin-obs", type: "observation", label: "System Observation", placeholder: "Noticed something about the system...", icon: "eye", color: "text-blue-600", suggestedTags: ["system", "monitoring"] },
-      { id: "admin-dec", type: "decision", label: "Policy Decision", placeholder: "Decision made regarding...", icon: "git-branch", color: "text-indigo-600", suggestedTags: ["policy", "security"] },
-      { id: "admin-block", type: "blocker", label: "Critical Issue", placeholder: "Blocking issue identified...", icon: "alert-triangle", color: "text-red-600", suggestedTags: ["urgent", "escalation"] },
+      { id: "admin-obs", type: "observation", label: "System Observation", placeholder: "Noticed something about the system...", icon: "eye", color: "text-info", suggestedTags: ["system", "monitoring"] },
+      { id: "admin-dec", type: "decision", label: "Policy Decision", placeholder: "Decision made regarding...", icon: "git-branch", color: "text-category-1", suggestedTags: ["policy", "security"] },
+      { id: "admin-block", type: "blocker", label: "Critical Issue", placeholder: "Blocking issue identified...", icon: "alert-triangle", color: "text-destructive", suggestedTags: ["urgent", "escalation"] },
     ]
   },
   "role-manager": {
@@ -139,9 +139,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "mgr-meeting", type: "meeting-note", label: "Meeting Note", placeholder: "Key points from meeting...", icon: "users", color: "text-purple-600", suggestedTags: ["meeting", "team"] },
-      { id: "mgr-update", type: "task-update", label: "Team Update", placeholder: "Team progress update...", icon: "check-circle", color: "text-green-600", suggestedTags: ["progress", "milestone"] },
-      { id: "mgr-decision", type: "decision", label: "Project Decision", placeholder: "Decided to...", icon: "git-branch", color: "text-indigo-600", suggestedTags: ["project", "planning"] },
+      { id: "mgr-meeting", type: "meeting-note", label: "Meeting Note", placeholder: "Key points from meeting...", icon: "users", color: "text-category-3", suggestedTags: ["meeting", "team"] },
+      { id: "mgr-update", type: "task-update", label: "Team Update", placeholder: "Team progress update...", icon: "check-circle", color: "text-success", suggestedTags: ["progress", "milestone"] },
+      { id: "mgr-decision", type: "decision", label: "Project Decision", placeholder: "Decided to...", icon: "git-branch", color: "text-category-1", suggestedTags: ["project", "planning"] },
     ]
   },
   "role-sales": {
@@ -152,9 +152,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "sales-obs", type: "observation", label: "Customer Insight", placeholder: "Customer mentioned...", icon: "eye", color: "text-blue-600", suggestedTags: ["customer", "insight"] },
-      { id: "sales-update", type: "task-update", label: "Deal Update", placeholder: "Deal status changed...", icon: "check-circle", color: "text-green-600", suggestedTags: ["deal", "pipeline"] },
-      { id: "sales-remind", type: "reminder", label: "Follow-up Reminder", placeholder: "Remember to follow up on...", icon: "bell", color: "text-orange-600", suggestedTags: ["follow-up", "call"] },
+      { id: "sales-obs", type: "observation", label: "Customer Insight", placeholder: "Customer mentioned...", icon: "eye", color: "text-info", suggestedTags: ["customer", "insight"] },
+      { id: "sales-update", type: "task-update", label: "Deal Update", placeholder: "Deal status changed...", icon: "check-circle", color: "text-success", suggestedTags: ["deal", "pipeline"] },
+      { id: "sales-remind", type: "reminder", label: "Follow-up Reminder", placeholder: "Remember to follow up on...", icon: "bell", color: "text-warning", suggestedTags: ["follow-up", "call"] },
     ]
   },
   "role-warehouse": {
@@ -165,9 +165,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "wh-obs", type: "observation", label: "Inventory Note", placeholder: "Noticed in warehouse...", icon: "eye", color: "text-blue-600", suggestedTags: ["inventory", "stock"] },
-      { id: "wh-block", type: "blocker", label: "Issue Report", placeholder: "Problem with...", icon: "alert-triangle", color: "text-red-600", suggestedTags: ["safety", "equipment"] },
-      { id: "wh-update", type: "task-update", label: "Task Complete", placeholder: "Completed...", icon: "check-circle", color: "text-green-600", suggestedTags: ["shipment", "processing"] },
+      { id: "wh-obs", type: "observation", label: "Inventory Note", placeholder: "Noticed in warehouse...", icon: "eye", color: "text-info", suggestedTags: ["inventory", "stock"] },
+      { id: "wh-block", type: "blocker", label: "Issue Report", placeholder: "Problem with...", icon: "alert-triangle", color: "text-destructive", suggestedTags: ["safety", "equipment"] },
+      { id: "wh-update", type: "task-update", label: "Task Complete", placeholder: "Completed...", icon: "check-circle", color: "text-success", suggestedTags: ["shipment", "processing"] },
     ]
   },
   "role-viewer": {
@@ -178,9 +178,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: false,
     defaultPriority: "low",
     quickTemplates: [
-      { id: "view-obs", type: "observation", label: "Data Observation", placeholder: "Noticed in the data...", icon: "eye", color: "text-blue-600", suggestedTags: ["data", "trend"] },
-      { id: "view-question", type: "question", label: "Question", placeholder: "Need clarification on...", icon: "help-circle", color: "text-teal-600", suggestedTags: ["question", "clarify"] },
-      { id: "view-idea", type: "idea", label: "Suggestion", placeholder: "It would be helpful if...", icon: "lightbulb", color: "text-yellow-600", suggestedTags: ["suggestion", "improvement"] },
+      { id: "view-obs", type: "observation", label: "Data Observation", placeholder: "Noticed in the data...", icon: "eye", color: "text-info", suggestedTags: ["data", "trend"] },
+      { id: "view-question", type: "question", label: "Question", placeholder: "Need clarification on...", icon: "help-circle", color: "text-category-7", suggestedTags: ["question", "clarify"] },
+      { id: "view-idea", type: "idea", label: "Suggestion", placeholder: "It would be helpful if...", icon: "lightbulb", color: "text-warning", suggestedTags: ["suggestion", "improvement"] },
     ]
   },
 }
@@ -193,9 +193,9 @@ export const defaultWorkNotesConfig: WorkNotesConfig = {
   enableTaskLinking: true,
   defaultPriority: "normal",
   quickTemplates: [
-    { id: "def-obs", type: "observation", label: "Observation", placeholder: "I noticed...", icon: "eye", color: "text-blue-600", suggestedTags: ["observation"] },
-    { id: "def-update", type: "task-update", label: "Task Update", placeholder: "Progress on...", icon: "check-circle", color: "text-green-600", suggestedTags: ["progress"] },
-    { id: "def-idea", type: "idea", label: "Idea", placeholder: "What if we...", icon: "lightbulb", color: "text-yellow-600", suggestedTags: ["idea"] },
+    { id: "def-obs", type: "observation", label: "Observation", placeholder: "I noticed...", icon: "eye", color: "text-info", suggestedTags: ["observation"] },
+    { id: "def-update", type: "task-update", label: "Task Update", placeholder: "Progress on...", icon: "check-circle", color: "text-success", suggestedTags: ["progress"] },
+    { id: "def-idea", type: "idea", label: "Idea", placeholder: "What if we...", icon: "lightbulb", color: "text-warning", suggestedTags: ["idea"] },
   ]
 }
 

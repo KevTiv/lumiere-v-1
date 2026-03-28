@@ -4,6 +4,7 @@
 /// payslips are generated per employee per pay period.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::PayslipState;
 
@@ -104,6 +105,7 @@ pub struct CreateSalaryRuleParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePayslipParams {
+    pub company_id: Option<u64>,
     pub employee_id: u64,
     pub struct_id: u64,
     pub date_from: Timestamp,
@@ -115,6 +117,7 @@ pub struct CreatePayslipParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct ConfirmPayslipParams {
+    pub company_id: Option<u64>,
     pub gross_wage: f64,
     pub net_wage: f64,
 }
@@ -215,10 +218,10 @@ pub fn create_salary_rule(
 pub fn create_payslip(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreatePayslipParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     let payslip = ctx.db.hr_payslip().insert(HrPayslip {
         id: 0,
         organization_id,
@@ -258,7 +261,6 @@ pub fn create_payslip(
 pub fn confirm_payslip(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     payslip_id: u64,
     params: ConfirmPayslipParams,
 ) -> Result<(), String> {
@@ -272,6 +274,7 @@ pub fn confirm_payslip(
     if payslip.organization_id != organization_id {
         return Err("Payslip belongs to a different organization".to_string());
     }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if payslip.company_id != company_id {
         return Err("Payslip does not belong to this company".to_string());
     }

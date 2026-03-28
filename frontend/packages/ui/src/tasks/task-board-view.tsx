@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { taskPriorityOutlineBadgeClass } from "@/lib/theme-colors"
 import {
   Search,
   Filter,
@@ -197,8 +198,8 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
         {/* Sprint Stats */}
         <div className="grid grid-cols-4 gap-4">
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-blue-500/10 rounded-lg">
-              <Target className="h-5 w-5 text-blue-500" />
+            <div className="p-2 bg-info/10 rounded-lg">
+              <Target className="h-5 w-5 text-info" />
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.total}</p>
@@ -206,8 +207,8 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-amber-500/10 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-amber-500" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-warning" />
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.inProgress}</p>
@@ -215,8 +216,8 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-green-500/10 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <div className="p-2 bg-success/10 rounded-lg">
+              <CheckCircle2 className="h-5 w-5 text-success" />
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.done}</p>
@@ -224,8 +225,8 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-purple-500/10 rounded-lg">
-              <Calendar className="h-5 w-5 text-purple-500" />
+            <div className="p-2 bg-category-3/10 rounded-lg">
+              <Calendar className="h-5 w-5 text-category-3" />
             </div>
             <div>
               <p className="text-2xl font-bold">
@@ -399,8 +400,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                       variant="outline"
                       className={cn(
                         "capitalize",
-                        task.priority === "urgent" && "border-red-500 text-red-500",
-                        task.priority === "high" && "border-orange-500 text-orange-500"
+                        taskPriorityOutlineBadgeClass[task.priority]
                       )}
                     >
                       {task.priority}

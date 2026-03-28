@@ -1,0 +1,96 @@
+/*
+  Extended theme tokens — all Tailwind color utilities that should respond to
+  palette / contrast live here (neutral scale, semantic status, category hues).
+  Prefer `bg-neutral-*`, `text-success`, `border-category-3`, etc. over raw
+  `bg-blue-500` so contrast can be corrected in one place.
+*/
+
+:root {
+  /* Warm neutral ramp (Mistral) — use for surfaces and type outside core semantic tokens */
+  --neutral-50: 47 100% 96%;
+  --neutral-100: 45 40% 92%;
+  --neutral-200: 40 22% 80%;
+  --neutral-300: 38 18% 72%;
+  --neutral-400: 35 14% 58%;
+  --neutral-500: 32 12% 46%;
+  --neutral-600: 28 10% 36%;
+  --neutral-700: 22 10% 28%;
+  --neutral-800: 18 10% 18%;
+  --neutral-900: 12 12% 12%;
+  --neutral-950: 0 0% 5%;
+
+  /* Status (success / warning / info) — tune for contrast vs --background */
+  --success: 152 60% 36%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 44%;
+  --warning-foreground: 0 0% 5%;
+  --info: 221 83% 48%;
+  --info-foreground: 0 0% 100%;
+
+  /* Distinct category hues (badges, account types, roles) — palette can retune */
+  --category-1: 221 83% 48%;
+  --category-2: 0 72% 50%;
+  --category-3: 280 65% 52%;
+  --category-4: 152 60% 36%;
+  --category-5: 38 92% 44%;
+  --category-6: 215 20% 40%;
+  --category-7: 175 55% 38%;
+}
+
+.dark {
+  --neutral-50: 0 0% 5%;
+  --neutral-100: 0 0% 8%;
+  --neutral-200: 40 10% 14%;
+  --neutral-300: 38 10% 20%;
+  --neutral-400: 36 12% 38%;
+  --neutral-500: 40 14% 52%;
+  --neutral-600: 45 18% 62%;
+  --neutral-700: 48 22% 72%;
+  --neutral-800: 48 28% 84%;
+  --neutral-900: 48 35% 90%;
+  --neutral-950: 48 100% 96%;
+
+  --success: 152 55% 48%;
+  --success-foreground: 0 0% 5%;
+  --warning: 38 92% 52%;
+  --warning-foreground: 0 0% 5%;
+  --info: 221 75% 58%;
+  --info-foreground: 0 0% 5%;
+
+  --category-1: 221 75% 58%;
+  --category-2: 0 72% 58%;
+  --category-3: 280 60% 62%;
+  --category-4: 152 50% 52%;
+  --category-5: 38 90% 55%;
+  --category-6: 215 25% 70%;
+  --category-7: 175 50% 50%;
+}
+
+@theme inline {
+  --color-neutral-50: hsl(var(--neutral-50));
+  --color-neutral-100: hsl(var(--neutral-100));
+  --color-neutral-200: hsl(var(--neutral-200));
+  --color-neutral-300: hsl(var(--neutral-300));
+  --color-neutral-400: hsl(var(--neutral-400));
+  --color-neutral-500: hsl(var(--neutral-500));
+  --color-neutral-600: hsl(var(--neutral-600));
+  --color-neutral-700: hsl(var(--neutral-700));
+  --color-neutral-800: hsl(var(--neutral-800));
+  --color-neutral-900: hsl(var(--neutral-900));
+  --color-neutral-950: hsl(var(--neutral-950));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  --color-category-1: hsl(var(--category-1));
+  --color-category-2: hsl(var(--category-2));
+  --color-category-3: hsl(var(--category-3));
+  --color-category-4: hsl(var(--category-4));
+  --color-category-5: hsl(var(--category-5));
+  --color-category-6: hsl(var(--category-6));
+  --color-category-7: hsl(var(--category-7));
+}

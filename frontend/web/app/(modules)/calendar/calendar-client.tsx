@@ -5,19 +5,31 @@ import { useTranslation } from "@lumiere/i18n"
 import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/calendar"
 import type { CreateCalendarEventParams } from "@/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
-import { FormModal, ModuleView, newCalendarEventForm } from "@lumiere/ui"
+import { FormModal, ModuleView, newCalendarEventForm, MissingOrganization } from "@lumiere/ui"
 import { useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface CalendarClientProps {
   initialEvents?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function CalendarClient({ initialEvents, organizationId }: CalendarClientProps) {
+type CalendarClientLoadedProps = Omit<CalendarClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function CalendarClient(props: CalendarClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <CalendarClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => calendarModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("month")
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
@@ -129,10 +141,15 @@ export function CalendarClient({ initialEvents, organizationId }: CalendarClient
     formData: Record<string, unknown>,
   ) => {
     if (action === "createEvent") {
+      const title = String(formData.name ?? "").trim()
+      if (!title) return
+      const start = new Date(String(formData.start ?? ""))
+      const stop = new Date(String(formData.stop ?? ""))
+      if (Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return
       createCalendarEvent.mutate({
-        name: formData.name as string,
-        start: new Date(formData.start as string) as unknown as CreateCalendarEventParams["start"],
-        stop: new Date(formData.stop as string) as unknown as CreateCalendarEventParams["stop"],
+        name: title,
+        start: start as unknown as CreateCalendarEventParams["start"],
+        stop: stop as unknown as CreateCalendarEventParams["stop"],
         allday: Boolean(formData.allday),
         privacy: (formData.privacy as string) ?? "public",
         showAs: "busy",

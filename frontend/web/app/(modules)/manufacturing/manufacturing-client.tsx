@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newManufacturingOrderForm, newBomForm, newWorkcenterForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newManufacturingOrderForm,
+  newBomForm,
+  newWorkcenterForm,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
@@ -15,25 +23,57 @@ import {
   useCreateBom,
   useCreateWorkcenter,
 } from "@/hooks/manufacturing"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  useProducts,
+  useStockQuants,
+  useStockPickings,
+  useWarehouses,
+} from "@/hooks/inventory"
+import {
+  productRowsToSelectOptions,
+  warehouseRowsToSelectOptions,
+  pickingTypeOptionsFromTransfers,
+  locationOptionsFromQuantsAndTransfers,
+  mrpBomRowsToSelectOptions,
+} from "@/lib/form-lookup"
 
 interface ManufacturingClientProps {
   initialProductions?: Record<string, unknown>[]
   initialBoms?: Record<string, unknown>[]
   initialWorkorders?: Record<string, unknown>[]
   initialWorkcenters?: Record<string, unknown>[]
+  initialProducts?: Record<string, unknown>[]
+  initialWarehouses?: Record<string, unknown>[]
+  initialStockPickings?: Record<string, unknown>[]
+  initialStockQuants?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function ManufacturingClient({
+type ManufacturingClientLoadedProps = Omit<ManufacturingClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function ManufacturingClient(props: ManufacturingClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <ManufacturingClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function ManufacturingClientLoaded({
   initialProductions,
   initialBoms,
   initialWorkorders,
   initialWorkcenters,
+  initialProducts,
+  initialWarehouses,
+  initialStockPickings,
+  initialStockQuants,
   organizationId,
-}: ManufacturingClientProps) {
+}: ManufacturingClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: productions = [] } = useMrpProductions(companyId, initialProductions)
@@ -41,12 +81,69 @@ export function ManufacturingClient({
   const { data: workorders = [] } = useMrpWorkorders(companyId, initialWorkorders)
   const { data: workcenters = [] } = useMrpWorkcenters(companyId, initialWorkcenters)
   const { data: qualityChecks = [] } = useQualityChecks(companyId)
+  const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses)
+  const { data: transfers = [] } = useStockPickings(companyId, initialStockPickings)
+  const { data: stockQuants = [] } = useStockQuants(companyId, initialStockQuants)
 
   const createManufacturingOrder = useCreateManufacturingOrder(orgId, companyId)
   const createBom = useCreateBom(orgId, companyId)
   const createWorkcenter = useCreateWorkcenter(orgId, companyId)
 
   const moduleConfig = useMemo(() => manufacturingModuleConfig(t), [t])
+
+  const productFieldOptions = useMemo(() => {
+    const fromApi = productRowsToSelectOptions(products)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
+  }, [products, t])
+
+  const bomFieldOptions = useMemo(() => {
+    const fromApi = mrpBomRowsToSelectOptions(boms)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noBoms"), disabled: true }]
+  }, [boms, t])
+
+  const warehouseFieldOptions = useMemo(() => {
+    const fromApi = warehouseRowsToSelectOptions(warehouses)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noWarehouses"), disabled: true }]
+  }, [warehouses, t])
+
+  const pickingAndLocations = useMemo(() => {
+    const picking = pickingTypeOptionsFromTransfers(transfers)
+    const locs = locationOptionsFromQuantsAndTransfers(stockQuants, transfers)
+    const emptyPicking =
+      picking.length > 0
+        ? picking
+        : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
+    const emptyLocs =
+      locs.length > 0 ? locs : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
+    return { picking: emptyPicking, locs: emptyLocs }
+  }, [transfers, stockQuants, t])
+
+  const moFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newManufacturingOrderForm(t), {
+        productId: productFieldOptions,
+        bomId: bomFieldOptions,
+        warehouseId: warehouseFieldOptions,
+        pickingTypeId: pickingAndLocations.picking,
+        locationSrcId: pickingAndLocations.locs,
+        locationDestId: pickingAndLocations.locs,
+      }),
+    [t, productFieldOptions, bomFieldOptions, warehouseFieldOptions, pickingAndLocations],
+  )
+
+  const bomFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newBomForm(t), {
+        productTmplId: productFieldOptions,
+      }),
+    [t, productFieldOptions],
+  )
+
+  const workcenterFormConfig = useMemo(() => newWorkcenterForm(t), [t])
 
   const liveSections = useMemo(() => {
     const activeOrders = productions.filter(
@@ -60,8 +157,8 @@ export function ManufacturingClient({
     const avgOee =
       workcenters.length > 0
         ? Math.round(
-            workcenters.reduce((s, wc) => s + Number(wc.oee ?? 0), 0) / workcenters.length
-          )
+          workcenters.reduce((s, wc) => s + Number(wc.oee ?? 0), 0) / workcenters.length
+        )
         : 0
 
     const readyWorkorders = workorders.filter((wo) => String(wo.state) === "Ready").length
@@ -87,9 +184,9 @@ export function ManufacturingClient({
             }
             if (w.type === "quick-actions") {
               const handlers: Record<string, () => void> = {
-                create_mo: () => setQuickActionForm({ form: newManufacturingOrderForm(t), action: "createManufacturingOrder" }),
-                create_bom: () => setQuickActionForm({ form: newBomForm(t), action: "createBom" }),
-                create_workcenter: () => setQuickActionForm({ form: newWorkcenterForm(t), action: "createWorkcenter" }),
+                create_mo: () => setQuickActionForm({ form: moFormConfig, action: "createManufacturingOrder" }),
+                create_bom: () => setQuickActionForm({ form: bomFormConfig, action: "createBom" }),
+                create_workcenter: () => setQuickActionForm({ form: workcenterFormConfig, action: "createWorkcenter" }),
               }
               return {
                 ...w,
@@ -110,7 +207,7 @@ export function ManufacturingClient({
               return { ...w, data: { metrics } }
             }
             if (w.id === "mfg-orders-table") {
-              const activeOrders = productions
+              const activeOrdersRows = productions
                 .filter((p) => {
                   const s = String(p.state ?? "")
                   return s === "Confirmed" || s === "Progress" || s === "InProgress"
@@ -135,7 +232,7 @@ export function ManufacturingClient({
                     status: String(p.state ?? "Draft"),
                   }
                 })
-              return { ...w, data: { ...(w.data as Record<string, unknown>), rows: activeOrders } }
+              return { ...w, data: { ...(w.data as Record<string, unknown>), rows: activeOrdersRows } }
             }
             return w
           }),
@@ -143,16 +240,21 @@ export function ManufacturingClient({
       moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
       []
     )
-  }, [productions, workorders, workcenters, t, moduleConfig])
+  }, [productions, workorders, workcenters, t, moduleConfig, moFormConfig, bomFormConfig, workcenterFormConfig])
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-      ),
-    }) as ModuleConfig,
-    [moduleConfig, liveSections]
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: moduleConfig.tabs.map((tab) => {
+          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "orders") return { ...tab, createForm: moFormConfig }
+          if (tab.id === "boms") return { ...tab, createForm: bomFormConfig }
+          if (tab.id === "workcenters") return { ...tab, createForm: workcenterFormConfig }
+          return tab
+        }),
+      }) as ModuleConfig,
+    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig]
   )
 
   const data = useMemo(
@@ -171,9 +273,140 @@ export function ManufacturingClient({
     action: string,
     formData: Record<string, unknown>
   ) => {
-    if (action === "createManufacturingOrder") createManufacturingOrder.mutate(formData as never)
-    else if (action === "createBom") createBom.mutate(formData as never)
-    else if (action === "createWorkcenter") createWorkcenter.mutate(formData as never)
+    if (action === "createManufacturingOrder") {
+      const prodRaw = formData.productId
+      const whRaw = formData.warehouseId
+      const pickRaw = formData.pickingTypeId
+      const srcRaw = formData.locationSrcId
+      const destRaw = formData.locationDestId
+      if (
+        prodRaw === "" ||
+        prodRaw == null ||
+        whRaw === "" ||
+        whRaw == null ||
+        pickRaw === "" ||
+        pickRaw == null ||
+        srcRaw === "" ||
+        srcRaw == null ||
+        destRaw === "" ||
+        destRaw == null
+      ) {
+        return
+      }
+      const productRow = products.find((p) => String(p.id) === String(prodRaw))
+      const uomFromProduct =
+        productRow?.uomId != null
+          ? Number(productRow.uomId)
+          : productRow?.uomPoId != null
+            ? Number(productRow.uomPoId)
+            : undefined
+      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
+      createManufacturingOrder.mutate({
+        productId: Number(prodRaw),
+        productQty: Number(formData.productQty ?? 1),
+        productUomId: uomFromProduct,
+        datePlannedStart: new Date(String(formData.datePlannedStart ?? new Date().toISOString())),
+        datePlannedFinished: new Date(
+          String(formData.datePlannedFinished ?? formData.datePlannedStart ?? new Date().toISOString())
+        ),
+        locationSrcId: Number(srcRaw),
+        locationDestId: Number(destRaw),
+        warehouseId: Number(whRaw),
+        pickingTypeId: Number(pickRaw),
+        consumption: formData.consumption ? String(formData.consumption) : undefined,
+        state: "Draft",
+        availability: "available",
+        reservationState: "confirmed",
+        componentsAvailability: "available",
+        componentsAvailabilityState: "available",
+        isPlanned: true,
+        isLocked: false,
+        isWorkorder: true,
+        delayAlert: false,
+        lotProducingCount: 0,
+        qtyProducing: 0,
+        qtyProduced: 0,
+        productUomQtyProducing: 0,
+        bomId:
+          formData.bomId != null && String(formData.bomId) !== ""
+            ? Number(formData.bomId)
+            : undefined,
+        routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
+        procGroupId: undefined,
+        procurementGroupId: undefined,
+        dateDeadline: formData.datePlannedFinished
+          ? new Date(String(formData.datePlannedFinished))
+          : undefined,
+        origin: formData.origin ? String(formData.origin) : undefined,
+        responsibleUserId: undefined,
+        metadata: undefined,
+      } as never)
+    } else if (action === "createBom") {
+      const tmplRaw = formData.productTmplId
+      if (tmplRaw === "" || tmplRaw == null) return
+      const productRow = products.find((p) => String(p.id) === String(tmplRaw))
+      const uomFromProduct =
+        productRow?.uomId != null
+          ? Number(productRow.uomId)
+          : productRow?.uomPoId != null
+            ? Number(productRow.uomPoId)
+            : undefined
+      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
+      const pid = Number(tmplRaw)
+      createBom.mutate({
+        type: String(formData.type ?? "Normal"),
+        productId: pid,
+        productTmplId: pid,
+        productQty: Number(formData.productQty ?? 1),
+        productUomId: uomFromProduct,
+        readyToProduce: "asap",
+        consumption: "flexible",
+        sequence: 1,
+        estimatedCost: Number(formData.estimatedCost ?? 0),
+        lines: [],
+        pickingTypeId: formData.pickingTypeId != null ? Number(formData.pickingTypeId) : undefined,
+        locationSrcId: formData.locationSrcId != null ? Number(formData.locationSrcId) : undefined,
+        locationDestId: formData.locationDestId != null ? Number(formData.locationDestId) : undefined,
+        warehouseId: formData.warehouseId != null ? Number(formData.warehouseId) : undefined,
+        routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
+        metadata: undefined,
+      } as never)
+    } else if (action === "createWorkcenter") {
+      const oeeTarget = Number(formData.oeeTarget ?? 85)
+      const timeEfficiency = Number(formData.timeEfficiency ?? 100)
+      const capacity = Number(formData.capacity ?? 1)
+
+      createWorkcenter.mutate({
+        name: String(formData.name ?? ""),
+        active: formData.active == null ? true : Boolean(formData.active),
+        code: formData.code ? String(formData.code) : undefined,
+        workingState: "normal",
+        oeeTarget,
+        timeEfficiency,
+        capacity,
+        capacityIds: [],
+        oee: 0,
+        performance: 0,
+        blockedTime: 0,
+        productiveTime: 0,
+        productivityIds: [],
+        orderIds: [],
+        workorderCount: 0,
+        workorderReadyCount: 0,
+        workorderProgressCount: 0,
+        workorderPendingCount: 0,
+        workorderLateCount: 0,
+        alternativeWorkcenterIds: [],
+        color: undefined,
+        resourceCalendarId: undefined,
+        tagIds: [],
+        defaultCapacityParentId: undefined,
+        defaultTimeEfficiency: timeEfficiency,
+        defaultOeeTarget: oeeTarget,
+        sequence: 1,
+        metadata: undefined,
+      } as never)
+    }
   }
 
   return (
@@ -186,7 +419,7 @@ export function ManufacturingClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newManufacturingOrderForm(t)}
+        config={quickActionForm?.form ?? moFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

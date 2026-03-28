@@ -12,6 +12,7 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("workflows.forms.newWorkflow.fields.name"),
           placeholder: t("workflows.forms.newWorkflow.fields.namePlaceholder"),
@@ -20,6 +21,7 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "model",
+          name: "model",
           type: "text",
           label: t("workflows.forms.newWorkflow.fields.model"),
           placeholder: t("workflows.forms.newWorkflow.fields.modelPlaceholder"),
@@ -28,6 +30,7 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "stateField",
+          name: "stateField",
           type: "text",
           label: t("workflows.forms.newWorkflow.fields.stateField"),
           placeholder: t("workflows.forms.newWorkflow.fields.stateFieldPlaceholder"),
@@ -36,6 +39,7 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("workflows.forms.newWorkflow.fields.description"),
           placeholder: t("workflows.forms.newWorkflow.fields.descriptionPlaceholder"),
@@ -44,12 +48,14 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "isActive",
+          name: "isActive",
           type: "checkbox",
           label: t("workflows.forms.newWorkflow.fields.isActive"),
           width: "1/2",
         },
         {
           id: "onCreate",
+          name: "onCreate",
           type: "checkbox",
           label: t("workflows.forms.newWorkflow.fields.onCreate"),
           width: "1/2",

@@ -12,7 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   serialId: __t.u64(),
   reason: __t.option(__t.string()),
 };

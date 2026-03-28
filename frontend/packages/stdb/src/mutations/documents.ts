@@ -18,13 +18,16 @@ export function useCreateDocument(organizationId: bigint) {
   });
 }
 
-export function useCreateKnowledgeArticle(organizationId: bigint, companyId: bigint) {
+export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateKnowledgeArticleParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createKnowledgeArticle({ organizationId, companyId, params });
+      return conn.reducers.createKnowledgeArticle({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["knowledgeArticles"] });

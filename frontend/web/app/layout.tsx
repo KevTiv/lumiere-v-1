@@ -44,7 +44,9 @@ export default async function RootLayout({
 }>) {
   const session = await getStdbSession()
   const identityHex = session?.identityHex
+  const organizationId = session?.organizationId
   const opts = session?.opts ?? {}
+  const stdbModule = process.env.STDB_MODULE ?? process.env.NEXT_PUBLIC_STDB_MODULE ?? 'lumiere-v1'
 
   let serverRoleNames: string[] = []
   if (identityHex) {
@@ -70,9 +72,14 @@ export default async function RootLayout({
   if (!Boolean(store.get("stdb_token")?.value)) redirect("/sign-in")
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <Providers serverIdentity={identityHex} serverRoleNames={serverRoleNames}>
+        <Providers
+          serverIdentity={identityHex}
+          serverRoleNames={serverRoleNames}
+          organizationId={organizationId}
+          stdbModule={stdbModule}
+        >
           {children}
         </Providers>
         <Analytics />

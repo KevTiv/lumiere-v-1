@@ -12,7 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   taskId: __t.u64(),
   parentId: __t.option(__t.u64()),
 };

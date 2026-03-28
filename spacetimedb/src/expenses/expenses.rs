@@ -4,6 +4,7 @@
 /// Sheets can be submitted for approval and then posted as an AccountMove.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{ExpenseSheetState, ExpenseState};
 
@@ -71,6 +72,7 @@ pub struct HrExpenseSheet {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateExpenseParams {
+    pub company_id: Option<u64>,
     pub employee_id: u64,
     pub name: String,
     pub date: Timestamp,
@@ -87,6 +89,7 @@ pub struct CreateExpenseParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateExpenseParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub unit_amount: Option<f64>,
     pub quantity: Option<f64>,
@@ -96,6 +99,7 @@ pub struct UpdateExpenseParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateExpenseSheetParams {
+    pub company_id: Option<u64>,
     pub employee_id: u64,
     pub name: String,
     pub currency_id: u64,
@@ -114,10 +118,12 @@ pub struct SubmitExpenseSheetParams {
 pub fn create_expense(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateExpenseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     if params.name.is_empty() {
         return Err("Expense description cannot be empty".to_string());
     }
@@ -169,7 +175,6 @@ pub fn create_expense(
 pub fn update_expense(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     expense_id: u64,
     params: UpdateExpenseParams,
 ) -> Result<(), String> {
@@ -183,6 +188,7 @@ pub fn update_expense(
     if expense.organization_id != organization_id {
         return Err("Expense belongs to a different organization".to_string());
     }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if expense.company_id != company_id {
         return Err("Expense does not belong to this company".to_string());
     }
@@ -266,10 +272,12 @@ pub fn submit_expense(
 pub fn create_expense_sheet(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateExpenseSheetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     if params.name.is_empty() {
         return Err("Expense sheet name cannot be empty".to_string());
     }

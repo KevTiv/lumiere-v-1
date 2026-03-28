@@ -5,6 +5,9 @@
 /// Tables for managing the chart of accounts, account types, groups, and journals.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::{
+    company_id_from_scope, default_company_id_for_organization, require_company_in_organization,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 
@@ -169,6 +172,8 @@ pub struct CreateAccountAccountTypeParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountAccountTypeParams {
+    /// When set, must match the account type’s company; when omitted, default company for the org is used.
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub type_: Option<String>,
     pub internal_group: Option<AccountInternalGroup>,
@@ -184,11 +189,15 @@ pub struct CreateAccountGroupParams {
     pub code_prefix_end: Option<String>,
     pub level: u32,
     pub parent_id: Option<u64>,
+    /// Legal entity within the org; default when omitted.
+    pub company_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountGroupParams {
+    /// Company scope for the update (must match the group’s company).
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub code_prefix_start: Option<String>,
     pub code_prefix_end: Option<String>,
@@ -199,6 +208,8 @@ pub struct UpdateAccountGroupParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAccountAccountParams {
+    /// Legal entity; default company for the org when omitted.
+    pub company_id: Option<u64>,
     pub code: String,
     pub name: String,
     pub user_type_id: u64,
@@ -219,6 +230,8 @@ pub struct CreateAccountAccountParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountAccountParams {
+    /// Company scope (must match the account’s company).
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub code: Option<String>,
     pub deprecated: Option<bool>,
@@ -236,6 +249,8 @@ pub struct UpdateAccountAccountParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAccountJournalParams {
+    /// Legal entity; default company when omitted.
+    pub company_id: Option<u64>,
     pub name: String,
     pub code: String,
     pub type_: JournalType,
@@ -270,6 +285,7 @@ pub struct CreateAccountJournalParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountJournalParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub code: Option<String>,
     pub active: Option<bool>,
@@ -287,16 +303,29 @@ pub struct UpdateAccountJournalParams {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct DeprecateAccountAccountParams {
+    pub company_id: Option<u64>,
+    pub deprecated: bool,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
 pub fn create_account_account_type(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: Option<u64>,
     params: CreateAccountAccountTypeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "create")?;
+
+    let company_id: Option<u64> = match params.company_id {
+        Some(id) => {
+            require_company_in_organization(ctx, organization_id, id)?;
+            Some(id)
+        }
+        None => Some(default_company_id_for_organization(ctx, organization_id)?),
+    };
 
     let account_type = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
@@ -338,11 +367,12 @@ pub fn create_account_account_type(
 pub fn update_account_account_type(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: Option<u64>,
     type_id: u64,
     params: UpdateAccountAccountTypeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "write")?;
+
+    let scope_company = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let account_type = ctx
         .db
@@ -352,7 +382,7 @@ pub fn update_account_account_type(
         .ok_or("Account type not found")?;
 
     if let Some(cid) = account_type.company_id {
-        if Some(cid) != company_id {
+        if cid != scope_company {
             return Err("Account type does not belong to this company".to_string());
         }
     }
@@ -396,10 +426,11 @@ pub fn update_account_account_type(
 pub fn create_account_group(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAccountGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if let Some(pid) = params.parent_id {
         ctx.db
@@ -449,11 +480,12 @@ pub fn create_account_group(
 pub fn update_account_group(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     group_id: u64,
     params: UpdateAccountGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let group = ctx
         .db
@@ -508,10 +540,11 @@ pub fn update_account_group(
 pub fn create_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAccountAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     ctx.db
         .account_account_type()
@@ -579,11 +612,12 @@ pub fn create_account_account(
 pub fn update_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     account_id: u64,
     params: UpdateAccountAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let account = ctx
         .db
@@ -646,10 +680,11 @@ pub fn update_account_account(
 pub fn create_account_journal(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAccountJournalParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     for maybe_id in [
         params.default_account_id,
@@ -731,11 +766,12 @@ pub fn create_account_journal(
 pub fn update_account_journal(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     journal_id: u64,
     params: UpdateAccountJournalParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let journal = ctx
         .db
@@ -819,11 +855,12 @@ pub fn update_account_journal(
 pub fn deprecate_account_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     account_id: u64,
-    deprecated: bool,
+    params: DeprecateAccountAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let account = ctx
         .db
@@ -837,7 +874,7 @@ pub fn deprecate_account_account(
     }
 
     ctx.db.account_account().id().update(AccountAccount {
-        deprecated,
+        deprecated: params.deprecated,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         ..account
@@ -850,7 +887,7 @@ pub fn deprecate_account_account(
             company_id: Some(account.company_id),
             table_name: "account_account",
             record_id: account_id,
-            action: if deprecated {
+            action: if params.deprecated {
                 "SET_ACTIVE"
             } else {
                 "SET_ACTIVE"

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown, User, Shield } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
+import { rolePillClassForColor } from "@/lib/theme-colors"
 
 export function UserSwitcher() {
   const { t } = useTranslation()
@@ -24,15 +25,7 @@ export function UserSwitcher() {
 
   const getRoleColor = (roleId: string): string => {
     const role = roles.find(r => r.id === roleId)
-    const colors: Record<string, string> = {
-      red: "bg-red-500/10 text-red-400",
-      purple: "bg-purple-500/10 text-purple-400",
-      blue: "bg-blue-500/10 text-blue-400",
-      orange: "bg-orange-500/10 text-orange-400",
-      teal: "bg-teal-500/10 text-teal-400",
-      green: "bg-green-500/10 text-green-400",
-    }
-    return colors[role?.color || "blue"] || colors.blue
+    return rolePillClassForColor(role?.color)
   }
 
   return (

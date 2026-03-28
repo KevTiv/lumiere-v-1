@@ -95,9 +95,9 @@ export function NotebookCellComponent({
 
   const getStatusColor = () => {
     switch (cell.status) {
-      case "running": return "bg-blue-500"
-      case "success": return "bg-green-500"
-      case "error": return "bg-red-500"
+      case "running": return "bg-info"
+      case "success": return "bg-success"
+      case "error": return "bg-destructive"
       default: return "bg-muted-foreground/30"
     }
   }
@@ -112,7 +112,7 @@ export function NotebookCellComponent({
         )
       case "error":
         return (
-          <pre className="text-xs text-red-400 whitespace-pre-wrap font-mono bg-red-500/10 p-2 rounded">
+          <pre className="text-xs text-destructive whitespace-pre-wrap font-mono bg-destructive/10 p-2 rounded">
             {output.content}
           </pre>
         )

@@ -7,6 +7,7 @@
 /// | **MrpWorkcenterProductivity** | Work center productivity tracking |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::WorkingState;
 use serde_json;
@@ -97,6 +98,7 @@ pub struct MrpWorkcenterProductivity {
 /// except id (auto_inc) and audit fields (from ctx).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWorkcenterParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub active: bool,
     pub code: Option<String>,
@@ -132,6 +134,7 @@ pub struct CreateWorkcenterParams {
 /// productivity_ids, order_ids) are omitted — they are managed by domain logic.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateWorkcenterParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub active: Option<bool>,
     pub code: Option<String>,
@@ -168,10 +171,11 @@ pub struct CreateWorkcenterProductivityParams {
 pub fn create_workcenter(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateWorkcenterParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workcenter", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     WorkingState::from_str(&params.working_state)?;
 
@@ -239,7 +243,6 @@ pub fn create_workcenter(
 pub fn update_workcenter(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workcenter_id: u64,
     params: UpdateWorkcenterParams,
 ) -> Result<(), String> {
@@ -254,6 +257,11 @@ pub fn update_workcenter(
 
     if wc.organization_id != organization_id {
         return Err("Work center does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if wc.company_id != company_id {
+        return Err("Work center does not belong to this company".to_string());
     }
 
     if let Some(ref ws) = params.working_state {
@@ -313,7 +321,6 @@ pub fn update_workcenter(
 pub fn block_workcenter(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workcenter_id: u64,
     reason: String,
 ) -> Result<(), String> {
@@ -329,6 +336,8 @@ pub fn block_workcenter(
     if wc.organization_id != organization_id {
         return Err("Work center does not belong to this organization".to_string());
     }
+
+    let company_id = wc.company_id;
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         working_state: "blocked".to_string(),
@@ -363,7 +372,6 @@ pub fn block_workcenter(
 pub fn unblock_workcenter(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workcenter_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workcenter", "write")?;
@@ -378,6 +386,8 @@ pub fn unblock_workcenter(
     if wc.organization_id != organization_id {
         return Err("Work center does not belong to this organization".to_string());
     }
+
+    let company_id = wc.company_id;
 
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         working_state: "normal".to_string(),

@@ -7,6 +7,7 @@
 ///   - StockTraceabilityReport
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
 
@@ -168,6 +169,7 @@ pub struct StockTraceabilityReport {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockProductionLotParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub product_id: u64,
     pub product_variant_id: Option<u64>,
@@ -188,6 +190,7 @@ pub struct CreateStockProductionLotParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateStockProductionLotParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub ref_: Option<String>,
     pub note: Option<String>,
@@ -203,6 +206,7 @@ pub struct UpdateStockProductionLotParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockProductionSerialParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub product_id: u64,
     pub product_variant_id: Option<u64>,
@@ -230,6 +234,7 @@ pub struct CreateStockProductionSerialParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateStockProductionSerialParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub ref_: Option<String>,
     pub note: Option<String>,
@@ -291,10 +296,11 @@ pub struct CreateStockTraceabilityReportParams {
 pub fn create_stock_production_lot(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockProductionLotParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_production_lot", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Lot name cannot be empty".to_string());
@@ -348,7 +354,6 @@ pub fn create_stock_production_lot(
 pub fn update_stock_production_lot(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     lot_id: u64,
     params: UpdateStockProductionLotParams,
 ) -> Result<(), String> {
@@ -361,6 +366,11 @@ pub fn update_stock_production_lot(
 
     check_permission(ctx, organization_id, "stock_production_lot", "write")?;
 
+    if lot.organization_id != organization_id {
+        return Err("Lot does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if lot.company_id != company_id {
         return Err("Lot does not belong to this company".to_string());
     }
@@ -406,7 +416,6 @@ pub fn update_stock_production_lot(
 pub fn delete_stock_production_lot(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     lot_id: u64,
 ) -> Result<(), String> {
     let lot = ctx
@@ -418,8 +427,8 @@ pub fn delete_stock_production_lot(
 
     check_permission(ctx, organization_id, "stock_production_lot", "delete")?;
 
-    if lot.company_id != company_id {
-        return Err("Lot does not belong to this company".to_string());
+    if lot.organization_id != organization_id {
+        return Err("Lot does not belong to this organization".to_string());
     }
 
     ctx.db.stock_production_lot().id().delete(&lot_id);
@@ -428,7 +437,7 @@ pub fn delete_stock_production_lot(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(lot.company_id),
             table_name: "stock_production_lot",
             record_id: lot_id,
             action: "DELETE",
@@ -450,10 +459,11 @@ pub fn delete_stock_production_lot(
 pub fn create_stock_production_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockProductionSerialParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_production_serial", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Serial name cannot be empty".to_string());
@@ -518,7 +528,6 @@ pub fn create_stock_production_serial(
 pub fn update_stock_production_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     serial_id: u64,
     params: UpdateStockProductionSerialParams,
 ) -> Result<(), String> {
@@ -531,6 +540,11 @@ pub fn update_stock_production_serial(
 
     check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if serial.company_id != company_id {
         return Err("Serial does not belong to this company".to_string());
     }
@@ -587,7 +601,6 @@ pub fn update_stock_production_serial(
 pub fn reserve_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     serial_id: u64,
 ) -> Result<(), String> {
     let serial = ctx
@@ -599,8 +612,8 @@ pub fn reserve_serial(
 
     check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
-    if serial.company_id != company_id {
-        return Err("Serial does not belong to this company".to_string());
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
     }
 
     if serial.state != "free" {
@@ -609,6 +622,8 @@ pub fn reserve_serial(
             serial.state
         ));
     }
+
+    let serial_company_id = serial.company_id;
 
     ctx.db
         .stock_production_serial()
@@ -623,7 +638,7 @@ pub fn reserve_serial(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
             record_id: serial_id,
             action: "UPDATE",
@@ -641,7 +656,6 @@ pub fn reserve_serial(
 pub fn use_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     serial_id: u64,
 ) -> Result<(), String> {
     let serial = ctx
@@ -653,8 +667,8 @@ pub fn use_serial(
 
     check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
-    if serial.company_id != company_id {
-        return Err("Serial does not belong to this company".to_string());
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
     }
 
     if serial.state != "reserved" {
@@ -663,6 +677,8 @@ pub fn use_serial(
             serial.state
         ));
     }
+
+    let serial_company_id = serial.company_id;
 
     ctx.db
         .stock_production_serial()
@@ -677,7 +693,7 @@ pub fn use_serial(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
             record_id: serial_id,
             action: "UPDATE",
@@ -695,7 +711,6 @@ pub fn use_serial(
 pub fn block_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     serial_id: u64,
     reason: Option<String>,
 ) -> Result<(), String> {
@@ -708,11 +723,12 @@ pub fn block_serial(
 
     check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
-    if serial.company_id != company_id {
-        return Err("Serial does not belong to this company".to_string());
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
     }
 
     let old_state = serial.state.clone();
+    let serial_company_id = serial.company_id;
 
     ctx.db
         .stock_production_serial()
@@ -729,7 +745,7 @@ pub fn block_serial(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
             record_id: serial_id,
             action: "UPDATE",
@@ -749,7 +765,6 @@ pub fn block_serial(
 pub fn delete_stock_production_serial(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     serial_id: u64,
 ) -> Result<(), String> {
     let serial = ctx
@@ -761,9 +776,12 @@ pub fn delete_stock_production_serial(
 
     check_permission(ctx, organization_id, "stock_production_serial", "delete")?;
 
-    if serial.company_id != company_id {
-        return Err("Serial does not belong to this company".to_string());
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
     }
+
+    let serial_company_id = serial.company_id;
+    let serial_name = serial.name.clone();
 
     ctx.db.stock_production_serial().id().delete(&serial_id);
 
@@ -771,11 +789,11 @@ pub fn delete_stock_production_serial(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
             record_id: serial_id,
             action: "DELETE",
-            old_values: Some(serde_json::json!({ "name": serial.name }).to_string()),
+            old_values: Some(serde_json::json!({ "name": serial_name }).to_string()),
             new_values: None,
             changed_fields: vec!["deleted".to_string()],
             metadata: None,

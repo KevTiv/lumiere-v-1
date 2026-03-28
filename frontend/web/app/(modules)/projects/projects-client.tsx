@@ -2,8 +2,20 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newProjectForm, newTaskForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newProjectForm,
+  newTaskForm,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import {
+  projectsParamsToJson,
+  toCreateProjectParams,
+  toCreateTaskParams,
+} from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useProjects,
@@ -13,38 +25,106 @@ import {
   useCreateTask,
   useEmployees,
 } from "@/hooks/projects"
-import type {
-  CreateProjectParams,
-  CreateTaskParams,
-} from "@/hooks/projects"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { usePricelists } from "@/hooks/sales"
+import { useContacts } from "@/hooks/crm"
+import {
+  pricelistRowsToSelectOptions,
+  contactRowsToPartnerSelectOptions,
+  projectRowsToSelectOptions,
+  taskStagePairOptionsFromTasks,
+} from "@/lib/form-lookup"
 
 interface ProjectsClientProps {
   initialProjects?: Record<string, unknown>[]
   initialTasks?: Record<string, unknown>[]
   initialTimesheets?: Record<string, unknown>[]
+  initialPricelists?: Record<string, unknown>[]
+  initialContacts?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function ProjectsClient({
+type ProjectsClientLoadedProps = Omit<ProjectsClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function ProjectsClient(props: ProjectsClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <ProjectsClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function ProjectsClientLoaded({
   initialProjects,
   initialTasks,
   initialTimesheets,
+  initialPricelists,
+  initialContacts,
   organizationId,
-}: ProjectsClientProps) {
+}: ProjectsClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: projects = [] } = useProjects(companyId, initialProjects)
   const { data: tasks = [] } = useTasks(companyId, initialTasks)
   const { data: timesheets = [] } = useTimesheets(companyId, initialTimesheets)
   const { data: employees = [] } = useEmployees(companyId)
+  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+  const { data: contacts = [] } = useContacts(companyId, initialContacts)
 
   const createProject = useCreateProject(orgId, companyId)
   const createTask = useCreateTask(orgId, companyId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
+
+  const pricelistFieldOptions = useMemo(() => {
+    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+  }, [pricelists, t])
+
+  const partnerFieldOptions = useMemo(() => {
+    const fromApi = contactRowsToPartnerSelectOptions(contacts)
+    const optional = { value: "", label: "—" }
+    if (fromApi.length > 0) return [optional, ...fromApi]
+    return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
+  }, [contacts, t])
+
+  const projectFieldOptions = useMemo(() => {
+    const fromApi = projectRowsToSelectOptions(projects)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noProjects"), disabled: true }]
+  }, [projects, t])
+
+  const taskStageFieldOptions = useMemo(() => {
+    const optional = { value: "", label: "—" }
+    const fromPairs = taskStagePairOptionsFromTasks(
+      tasks as Record<string, unknown>[],
+      projects as Record<string, unknown>[],
+    )
+    if (fromPairs.length > 0) return [optional, ...fromPairs]
+    return [{ value: "", label: t("common.lookup.noTaskStages"), disabled: true }]
+  }, [tasks, projects, t])
+
+  const projectFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectForm(t), {
+        pricelistId: pricelistFieldOptions,
+        partnerId: partnerFieldOptions,
+      }),
+    [t, pricelistFieldOptions, partnerFieldOptions],
+  )
+
+  const taskFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newTaskForm(t), {
+        projectId: projectFieldOptions,
+        stageId: taskStageFieldOptions,
+      }),
+    [t, projectFieldOptions, taskStageFieldOptions],
+  )
 
   // Live KPI overrides
   const liveSections = useMemo(() => {
@@ -84,8 +164,8 @@ export function ProjectsClient({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            create_project: () => setQuickActionForm({ form: newProjectForm(t), action: "createProject" }),
-            create_task: () => setQuickActionForm({ form: newTaskForm(t), action: "createTask" }),
+            create_project: () => setQuickActionForm({ form: projectFormConfig, action: "createProject" }),
+            create_task: () => setQuickActionForm({ form: taskFormConfig, action: "createTask" }),
           }
           return {
             ...w,
@@ -114,23 +194,23 @@ export function ProjectsClient({
           const nowMs = Date.now()
           const fourteenDaysMs = nowMs + 14 * 86400000
           const upcomingTasks = tasks
-            .filter((t) => {
-              if (t.isClosed) return false
-              const deadlineMs = Number(t.dateDeadline ?? 0) / 1000
+            .filter((tk) => {
+              if (tk.isClosed) return false
+              const deadlineMs = Number(tk.dateDeadline ?? 0) / 1000
               return deadlineMs > nowMs && deadlineMs <= fourteenDaysMs
             })
             .sort((a, b) => Number(a.dateDeadline ?? 0) - Number(b.dateDeadline ?? 0))
             .slice(0, 5)
-            .map((t) => {
-              const deadlineMs = Number(t.dateDeadline ?? 0) / 1000
+            .map((tk) => {
+              const deadlineMs = Number(tk.dateDeadline ?? 0) / 1000
               const dueStr = new Date(deadlineMs).toLocaleDateString("en", { month: "short", day: "numeric" })
-              const proj = projects.find((p) => p.id === t.projectId)
+              const proj = projects.find((p) => p.id === tk.projectId)
               return {
-                milestone: String(t.name ?? ""),
+                milestone: String(tk.name ?? ""),
                 project: String(proj?.name ?? "—"),
                 owner: "—",
                 due: dueStr,
-                status: String(t.state ?? "Open"),
+                status: String(tk.state ?? "Open"),
               }
             })
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: upcomingTasks } }
@@ -138,16 +218,20 @@ export function ProjectsClient({
         return w
       }),
     }))
-  }, [projects, tasks, timesheets, t, moduleConfig])
+  }, [projects, tasks, timesheets, t, moduleConfig, projectFormConfig, taskFormConfig])
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
-      ),
-    }) as ModuleConfig,
-    [moduleConfig, liveSections],
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: moduleConfig.tabs.map((tab) => {
+          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "projects") return { ...tab, createForm: projectFormConfig }
+          if (tab.id === "tasks") return { ...tab, createForm: taskFormConfig }
+          return tab
+        }),
+      }) as ModuleConfig,
+    [moduleConfig, liveSections, projectFormConfig, taskFormConfig],
   )
 
   const data = useMemo(
@@ -166,9 +250,11 @@ export function ProjectsClient({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createProject") {
-      createProject.mutate(formData as unknown as CreateProjectParams)
+      const p = toCreateProjectParams(formData, pricelists, companyId)
+      if (p) createProject.mutate(projectsParamsToJson(p))
     } else if (action === "createTask") {
-      createTask.mutate(formData as unknown as CreateTaskParams)
+      const p = toCreateTaskParams(formData, companyId)
+      if (p) createTask.mutate(projectsParamsToJson(p))
     }
   }
 
@@ -182,7 +268,7 @@ export function ProjectsClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newProjectForm(t)}
+        config={quickActionForm?.form ?? projectFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

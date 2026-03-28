@@ -10,20 +10,18 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { fetchQueryList, emptyQueryRows, type QueryRows } from '@/lib/query-fetch'
+import { withCompanyScope } from '@/lib/org-scoped'
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useMrpProductions(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['mrp-productions', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/mrp-productions')
-      if (!r.ok) throw new Error('Failed to fetch manufacturing orders')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/mrp-productions', 'Failed to fetch manufacturing orders'),
     staleTime: 30_000,
     initialData,
   })
@@ -31,16 +29,11 @@ export function useMrpProductions(
 
 export function useMrpBoms(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['mrp-boms', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/mrp-boms')
-      if (!r.ok) throw new Error('Failed to fetch BOMs')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/mrp-boms', 'Failed to fetch BOMs'),
     staleTime: 30_000,
     initialData,
   })
@@ -48,16 +41,11 @@ export function useMrpBoms(
 
 export function useMrpWorkorders(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['mrp-workorders', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/mrp-workorders')
-      if (!r.ok) throw new Error('Failed to fetch workorders')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/mrp-workorders', 'Failed to fetch workorders'),
     staleTime: 30_000,
     initialData,
   })
@@ -65,16 +53,11 @@ export function useMrpWorkorders(
 
 export function useMrpWorkcenters(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['mrp-workcenters', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/mrp-workcenters')
-      if (!r.ok) throw new Error('Failed to fetch workcenters')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/mrp-workcenters', 'Failed to fetch workcenters'),
     staleTime: 30_000,
     initialData,
   })
@@ -83,11 +66,11 @@ export function useMrpWorkcenters(
 // TODO: No route yet — returns empty array until quality_check table/route is added
 export function useQualityChecks(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['quality-checks', organizationId.toString()],
-    queryFn: async () => [] as Record<string, unknown>[],
+    queryFn: emptyQueryRows,
     staleTime: 30_000,
     initialData: initialData ?? [],
   })
@@ -95,14 +78,14 @@ export function useQualityChecks(
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateManufacturingOrder(organizationId: bigint, _companyId?: bigint) {
+export function useCreateManufacturingOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_mrp_production?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
@@ -111,14 +94,14 @@ export function useCreateManufacturingOrder(organizationId: bigint, _companyId?:
   })
 }
 
-export function useCreateBom(organizationId: bigint, _companyId?: bigint) {
+export function useCreateBom(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_mrp_bom?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create BOM')
     },
@@ -126,16 +109,150 @@ export function useCreateBom(organizationId: bigint, _companyId?: bigint) {
   })
 }
 
-export function useCreateWorkcenter(organizationId: bigint, _companyId?: bigint) {
+export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_mrp_workcenter?withCompany=true', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create workcenter')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+  })
+}
+
+export function useConfirmManufacturingOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (productionId: string | number | bigint) => {
+      const r = await fetch('/api/call/confirm_manufacturing_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to confirm manufacturing order')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+  })
+}
+
+export function useStartManufacturingOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (productionId: string | number | bigint) => {
+      const r = await fetch('/api/call/start_manufacturing_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to start manufacturing order')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+  })
+}
+
+export function useFinishManufacturingOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (productionId: string | number | bigint) => {
+      const r = await fetch('/api/call/finish_manufacturing_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to finish manufacturing order')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+  })
+}
+
+export function useCancelManufacturingOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (productionId: string | number | bigint) => {
+      const r = await fetch('/api/call/cancel_manufacturing_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to cancel manufacturing order')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+  })
+}
+
+export function useStartWorkorder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (workorderId: string | number | bigint) => {
+      const r = await fetch('/api/call/start_workorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), workorderId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to start workorder')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId.toString()] }),
+  })
+}
+
+export function useFinishWorkorder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (workorderId: string | number | bigint) => {
+      const r = await fetch('/api/call/finish_workorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), workorderId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to finish workorder')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId.toString()] }),
+  })
+}
+
+export function useBlockWorkcenter(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      workcenterId,
+      reason,
+    }: {
+      workcenterId: string | number | bigint
+      reason: string
+    }) => {
+      const r = await fetch('/api/call/block_workcenter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), workcenterId.toString(), reason]),
+      })
+      if (!r.ok) throw new Error('Failed to block workcenter')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+  })
+}
+
+export function useUnblockWorkcenter(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (workcenterId: string | number | bigint) => {
+      const r = await fetch('/api/call/unblock_workcenter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), workcenterId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to unblock workcenter')
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),

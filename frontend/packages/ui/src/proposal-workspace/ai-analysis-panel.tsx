@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, ArrowRight, 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { riskLevelBadgeClass } from "@/lib/theme-colors"
 import type {
   AIAnalysis,
   Finding,
@@ -25,9 +26,7 @@ interface AIAnalysisPanelProps {
 }
 
 function relevanceBadgeClass(r: FindingRelevance) {
-  if (r === "high") return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-  if (r === "medium") return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-  return "bg-muted text-muted-foreground"
+  return riskLevelBadgeClass(r)
 }
 
 function SectionToggle({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
@@ -83,7 +82,7 @@ function RequirementItem({
     <div className="flex items-start gap-2.5 px-3 py-2 hover:bg-muted/20">
       <button onClick={() => onToggle(req.id)} className="mt-0.5 shrink-0">
         {req.addressed ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-success" />
         ) : (
           <Circle className="h-4 w-4 text-muted-foreground" />
         )}

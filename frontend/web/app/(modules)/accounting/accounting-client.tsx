@@ -2,8 +2,23 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newJournalEntryForm, newTaxForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newJournalEntryForm,
+  newTaxForm,
+  MissingOrganization,
+  mergeSelectOptionsByFieldName,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import {
+  accountingParamsToJson,
+  toCreateAccountAccountParams,
+  toCreateAccountMoveFromInvoiceModal,
+  toCreateAccountTaxParams,
+  toCreateCrossoveredBudgetParams,
+  toCreateJournalEntryMoveParams,
+} from "@/lib/accounting-create-params"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useAccountAccounts,
@@ -17,14 +32,10 @@ import {
   useCreateMove,
   useCreateTax,
   useCreateBudget,
+  useAccountJournals,
 } from "@/hooks/accounting"
-import type {
-  AccountMove,
-  CreateAccountMoveParams,
-  CreateAccountAccountParams,
-  CreateAccountTaxParams,
-  CreateCrossoveredBudgetParams,
-} from "@/hooks/accounting"
+import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
+import type { AccountMove } from "@/hooks/accounting"
 import {
   InvoiceListView,
   InvoiceDetailModal,
@@ -33,6 +44,7 @@ import {
   ChartOfAccountsView,
   GeneralLedgerView,
 } from "@lumiere/ui"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface AccountingClientProps {
   initialAccounts?: Record<string, unknown>[]
@@ -40,21 +52,33 @@ interface AccountingClientProps {
   initialTaxes?: Record<string, unknown>[]
   initialBudgets?: Record<string, unknown>[]
   initialAnalytic?: Record<string, unknown>[]
+  initialJournals?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function AccountingClient({
+type AccountingClientLoadedProps = Omit<AccountingClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function AccountingClient(props: AccountingClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <AccountingClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function AccountingClientLoaded({
   initialAccounts,
   initialMoves,
   initialTaxes,
   initialBudgets,
   initialAnalytic,
+  initialJournals,
   organizationId,
-}: AccountingClientProps) {
+}: AccountingClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => accountingModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
 
   // Quick-action form modal (dashboard tab)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -72,6 +96,23 @@ export function AccountingClient({
   const { data: analytic = [] } = useAnalyticAccounts(companyId, initialAnalytic)
   const { data: bankStatements = [] } = useBankStatements(companyId)
   const { data: fixedAssets = [] } = useFixedAssets(companyId)
+  const { data: journals = [] } = useAccountJournals(companyId, initialJournals)
+
+  const journalRowsAsSelectOptions = useMemo(
+    () => accountJournalRowsToSelectOptions(journals),
+    [journals],
+  )
+
+  const journalFieldOptionsForModularForm = useMemo(() => {
+    if (journalRowsAsSelectOptions.length > 0) return journalRowsAsSelectOptions
+    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
+  }, [journalRowsAsSelectOptions, t])
+
+  const journalEntryFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsByFieldName(newJournalEntryForm(t), "journalId", journalFieldOptionsForModularForm),
+    [t, journalFieldOptionsForModularForm],
+  )
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const createAccount = useCreateAccount(orgId, companyId)
@@ -126,7 +167,7 @@ export function AccountingClient({
           const handlers: Record<string, () => void> = {
             create_invoice: () => setShowCreateInvoice(true),
             create_bill: () => setShowCreateBill(true),
-            journal_entry: () => setQuickActionForm({ form: newJournalEntryForm(t), action: "createMove" }),
+            journal_entry: () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }),
             create_tax: () => setQuickActionForm({ form: newTaxForm(t), action: "createTax" }),
           }
 
@@ -171,7 +212,7 @@ export function AccountingClient({
         return w
       }),
     }))
-  }, [accounts, invoices, bills, budgets, moduleConfig, t])
+  }, [accounts, invoices, bills, budgets, moduleConfig, t, journalEntryFormConfig])
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
   const handleFormSubmit = (
@@ -180,13 +221,15 @@ export function AccountingClient({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createAccount") {
-      createAccount.mutate(formData as unknown as CreateAccountAccountParams)
+      const p = toCreateAccountAccountParams(formData)
+      if (p) createAccount.mutate(accountingParamsToJson(p))
     } else if (action === "createMove") {
-      createMove.mutate(formData as unknown as CreateAccountMoveParams)
+      const p = toCreateJournalEntryMoveParams(formData)
+      if (p) createMove.mutate(accountingParamsToJson(p))
     } else if (action === "createTax") {
-      createTax.mutate(formData as unknown as CreateAccountTaxParams)
+      createTax.mutate(accountingParamsToJson(toCreateAccountTaxParams(formData)))
     } else if (action === "createBudget") {
-      createBudget.mutate(formData as unknown as CreateCrossoveredBudgetParams)
+      createBudget.mutate(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData)))
     }
   }
 
@@ -204,7 +247,7 @@ export function AccountingClient({
             type: "custom" as const,
             customContent: (
               <InvoiceListView
-                invoices={invoices}
+                invoices={invoices as unknown as AccountMove[]}
                 onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
                 onCreateInvoice={() => setShowCreateInvoice(true)}
               />
@@ -217,7 +260,7 @@ export function AccountingClient({
             type: "custom" as const,
             customContent: (
               <BillsListView
-                bills={bills}
+                bills={bills as unknown as AccountMove[]}
                 onCreateBill={() => setShowCreateBill(true)}
               />
             ),
@@ -229,8 +272,11 @@ export function AccountingClient({
             type: "custom" as const,
             customContent: (
               <ChartOfAccountsView
-                accounts={accounts}
-                onCreate={(data) => createAccount.mutate(data as unknown as CreateAccountAccountParams)}
+                accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
+                onCreate={(data) => {
+                  const p = toCreateAccountAccountParams(data as Record<string, unknown>)
+                  if (p) createAccount.mutate(accountingParamsToJson(p))
+                }}
               />
             ),
           }
@@ -241,8 +287,8 @@ export function AccountingClient({
             type: "custom" as const,
             customContent: (
               <GeneralLedgerView
-                moves={allMoves}
-                onCreate={() => setQuickActionForm({ form: newJournalEntryForm(t), action: "createMove" })}
+                moves={allMoves as unknown as AccountMove[]}
+                onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
               />
             ),
           }
@@ -250,7 +296,7 @@ export function AccountingClient({
         return tab
       }),
     }) as ModuleConfig,
-    [liveSections, invoices, bills, accounts, allMoves, createAccount.mutate, t, moduleConfig],
+    [liveSections, invoices, bills, accounts, allMoves, createAccount.mutate, t, moduleConfig, journalEntryFormConfig],
   )
 
   // Entity tab data (taxes, budgets, analytic, etc. — non-rich tabs)
@@ -284,11 +330,19 @@ export function AccountingClient({
       <CreateInvoiceModal
         open={showCreateInvoice}
         onClose={() => setShowCreateInvoice(false)}
+        journalOptions={journalRowsAsSelectOptions.length > 0 ? journalRowsAsSelectOptions : undefined}
         onSave={(params) => {
-          createMove.mutate({
-            ...params,
-            moveType: "OutInvoice",
-          } as unknown as CreateAccountMoveParams)
+          if (journals.length === 0) return
+          const jid = params.journalId
+          if (jid == null) return
+          const journalId = typeof jid === "bigint" ? jid : BigInt(String(jid))
+          const p = toCreateAccountMoveFromInvoiceModal(
+            params as Record<string, unknown>,
+            "OutInvoice",
+            journalId,
+            "Customer Invoice",
+          )
+          createMove.mutate(accountingParamsToJson(p))
         }}
       />
 
@@ -296,11 +350,19 @@ export function AccountingClient({
       <CreateInvoiceModal
         open={showCreateBill}
         onClose={() => setShowCreateBill(false)}
+        journalOptions={journalRowsAsSelectOptions.length > 0 ? journalRowsAsSelectOptions : undefined}
         onSave={(params) => {
-          createMove.mutate({
-            ...params,
-            moveType: "InInvoice",
-          } as unknown as CreateAccountMoveParams)
+          if (journals.length === 0) return
+          const jid = params.journalId
+          if (jid == null) return
+          const journalId = typeof jid === "bigint" ? jid : BigInt(String(jid))
+          const p = toCreateAccountMoveFromInvoiceModal(
+            params as Record<string, unknown>,
+            "InInvoice",
+            journalId,
+            "Vendor Bill",
+          )
+          createMove.mutate(accountingParamsToJson(p))
         }}
       />
 
@@ -308,7 +370,7 @@ export function AccountingClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newJournalEntryForm(t)}
+        config={quickActionForm?.form ?? journalEntryFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

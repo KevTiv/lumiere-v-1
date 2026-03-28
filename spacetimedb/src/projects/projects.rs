@@ -7,6 +7,7 @@
 use serde_json::{Map, Value};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{BillType, PricingType};
 
@@ -86,6 +87,7 @@ pub struct ProjectProject {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateProjectParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub description: Option<String>,
     pub active: bool,
@@ -138,6 +140,7 @@ pub struct CreateProjectParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateProjectParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub description: Option<Option<String>>,
     pub active: Option<bool>,
@@ -426,10 +429,10 @@ fn validate_project_name_unique(
 pub fn create_project(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateProjectParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_project", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     validate_project_name_unique(ctx, organization_id, &params.name, None)?;
 
     BillType::from_str(&params.bill_type)?;
@@ -567,7 +570,6 @@ pub fn create_project(
 pub fn update_project(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     project_id: u64,
     params: UpdateProjectParams,
 ) -> Result<(), String> {
@@ -582,6 +584,11 @@ pub fn update_project(
 
     if project.organization_id != organization_id {
         return Err("Project does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if project.company_id != company_id {
+        return Err("Project does not belong to this company".to_string());
     }
 
     let old_values = project_audit_json(&project);
@@ -843,7 +850,6 @@ pub fn update_project(
 pub fn set_project_active(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     project_id: u64,
     active: bool,
 ) -> Result<(), String> {
@@ -859,6 +865,8 @@ pub fn set_project_active(
     if project.organization_id != organization_id {
         return Err("Project does not belong to this organization".to_string());
     }
+
+    let company_id = project.company_id;
 
     let old_values = serde_json::json!({ "active": project.active });
 
@@ -896,7 +904,6 @@ pub fn set_project_active(
 pub fn toggle_project_favorite(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     project_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_project", "write")?;
@@ -911,6 +918,8 @@ pub fn toggle_project_favorite(
     if project.organization_id != organization_id {
         return Err("Project does not belong to this organization".to_string());
     }
+
+    let company_id = project.company_id;
 
     let old_values = serde_json::json!({ "is_favorite": project.is_favorite });
     let is_favorite = !project.is_favorite;

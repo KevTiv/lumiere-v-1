@@ -7,6 +7,7 @@
 /// | **KnowledgeArticle** | Wiki articles with hierarchy and access control |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -102,9 +103,9 @@ pub struct KnowledgeArticle {
 // ============================================================================
 
 /// Params for creating a knowledge article category.
-/// Scope: `company_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateKnowledgeCategoryParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub description: Option<String>,
     pub parent_id: Option<u64>,
@@ -114,9 +115,9 @@ pub struct CreateKnowledgeCategoryParams {
 }
 
 /// Params for updating a knowledge article category.
-/// Scope: `company_id` and `category_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateKnowledgeCategoryParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub description: Option<String>,
     pub color: Option<u8>,
@@ -124,9 +125,9 @@ pub struct UpdateKnowledgeCategoryParams {
 }
 
 /// Params for creating a knowledge article.
-/// Scope: `company_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateKnowledgeArticleParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub description: Option<String>,
     pub body: Option<String>,
@@ -144,9 +145,9 @@ pub struct CreateKnowledgeArticleParams {
 }
 
 /// Params for updating a knowledge article.
-/// Scope: `company_id` and `article_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateKnowledgeArticleParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub description: Option<String>,
     pub body: Option<String>,
@@ -161,9 +162,9 @@ pub struct UpdateKnowledgeArticleParams {
 }
 
 /// Params for setting article published status.
-/// Scope: `company_id` and `article_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct SetArticlePublishedParams {
+    pub company_id: Option<u64>,
     pub is_published: bool,
     pub website_url: Option<String>,
 }
@@ -177,10 +178,11 @@ pub struct SetArticlePublishedParams {
 pub fn create_knowledge_category(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateKnowledgeCategoryParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article_category", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let cat = ctx.db.kb_category().insert(KnowledgeArticleCategory {
         id: 0,
@@ -222,11 +224,12 @@ pub fn create_knowledge_category(
 pub fn update_knowledge_category(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     category_id: u64,
     params: UpdateKnowledgeCategoryParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article_category", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let cat = ctx
         .db
@@ -290,10 +293,11 @@ pub fn update_knowledge_category(
 pub fn create_knowledge_article(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateKnowledgeArticleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let is_root = params.parent_id.is_none();
 
@@ -403,11 +407,12 @@ pub fn create_knowledge_article(
 pub fn update_knowledge_article(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
     params: UpdateKnowledgeArticleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let article = ctx
         .db
@@ -505,10 +510,11 @@ pub fn update_knowledge_article(
 pub fn lock_knowledge_article(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let article = ctx
         .db
@@ -558,10 +564,11 @@ pub fn lock_knowledge_article(
 pub fn unlock_knowledge_article(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let article = ctx
         .db
@@ -611,11 +618,12 @@ pub fn unlock_knowledge_article(
 pub fn set_article_published(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
     params: SetArticlePublishedParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "publish")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let article = ctx
         .db
@@ -670,11 +678,12 @@ pub fn set_article_published(
 pub fn add_article_member(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
     member: Identity,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let article = ctx
         .db
@@ -731,11 +740,12 @@ pub fn add_article_member(
 pub fn remove_article_member(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
     member: Identity,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let article = ctx
         .db
@@ -796,10 +806,11 @@ pub fn remove_article_member(
 pub fn delete_knowledge_article(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     article_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "delete")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let article = ctx
         .db
@@ -883,10 +894,11 @@ pub fn delete_knowledge_article(
 pub fn delete_knowledge_category(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     category_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article_category", "delete")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
 
     let cat = ctx
         .db

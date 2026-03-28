@@ -10,12 +10,12 @@
  * ## Scoping model
  * All public query functions accept `organizationId` as the top-level tenant scope.
  * All tables have `organization_id` directly — queries use `WHERE organization_id = X`.
- * `resolveCompanyIds` is exported for mutation route handlers whose Rust reducers
- * still accept a `company_id` argument for validation.
+ * Company scope for mutations is resolved inside SpacetimeDB reducers (`company_id` on params).
  */
 
 import { stdbSql, type StdbHttpOptions } from './http'
 export type { StdbHttpOptions }
+export { stdbSql }
 
 // ── Entity type re-exports for API route handlers ────────────────────────────
 // Import from "@lumiere/stdb/server" in route handlers — avoids pulling in
@@ -188,30 +188,8 @@ export const userRoleAssignmentsKey = (identityHex: string) =>
 export const userOrganizationKey = (identityHex: string) =>
   ['user-organization', identityHex] as const
 
-// ── Internal helpers ─────────────────────────────────────────────────────────
-
-/**
- * Resolves the company IDs that belong to the given organization.
- * Used to translate organization-level scoping into company-level SQL filters
- * for tables that link data via `company_id`.
- *
- * Exported so API route handlers can resolve companyId when calling reducers
- * that still require it — clients never pass companyId directly.
- */
-export async function resolveCompanyIds(
-  organizationId: bigint | number,
-  opts?: StdbHttpOptions,
-): Promise<number[]> {
-  const rows = await stdbSql<{ id: number }>(
-    `SELECT id FROM company WHERE organization_id = ${organizationId}`,
-    opts,
-  )
-  return rows.map((r) => Number(r.id))
-}
-
 // ── Server query functions ───────────────────────────────────────────────────
 // All public functions accept organizationId as the tenant scoping value.
-// All tables now have organization_id directly — no company lookup needed.
 
 // ACCOUNTING
 
@@ -320,6 +298,16 @@ export function serverQueryOpportunities(
   )
 }
 
+export function serverQueryOpportunityStages(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM opp_stage WHERE organization_id = ${organizationId} ORDER BY sequence ASC`,
+    opts,
+  )
+}
+
 export function serverQueryContacts(
   organizationId: bigint | number,
   opts?: StdbHttpOptions,
@@ -357,6 +345,23 @@ export function serverQueryProducts(
   opts?: StdbHttpOptions,
 ) {
   return stdbSql(`SELECT * FROM product WHERE organization_id = ${organizationId}`, opts)
+}
+
+export function serverQueryProductCategories(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM product_category WHERE organization_id = ${organizationId} AND deleted_at IS NULL`,
+    opts,
+  )
+}
+
+export function serverQueryUoms(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(`SELECT * FROM uom WHERE organization_id = ${organizationId}`, opts)
 }
 
 export function serverQueryStockQuants(
@@ -544,6 +549,26 @@ export function serverQueryHelpdeskTickets(
 ) {
   return stdbSql(
     `SELECT * FROM helpdesk_ticket WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQueryHelpdeskTeams(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM helpdesk_team WHERE organization_id = ${organizationId}`,
+    opts,
+  )
+}
+
+export function serverQueryHelpdeskStages(
+  organizationId: bigint | number,
+  opts?: StdbHttpOptions,
+) {
+  return stdbSql(
+    `SELECT * FROM helpdesk_stage WHERE organization_id = ${organizationId}`,
     opts,
   )
 }

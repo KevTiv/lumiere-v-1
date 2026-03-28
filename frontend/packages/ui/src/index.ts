@@ -1,4 +1,5 @@
 // Web components (shadcn/ui based)
+export * from "./components/missing-organization";
 export * from "./components/button";
 export * from "./components/theme-provider";
 // form.tsx: exclude FormField (conflicts with lib/form-types FormField type)
@@ -7,6 +8,7 @@ export * from "./components/toast";
 export * from "./components/toaster";
 export * from "./components/use-mobile";
 export * from "./lib/utils";
+export * from "./lib/theme-colors";
 
 // Entity views (config-driven table + detail)
 export * from "./entity-views/entity-view";
@@ -38,6 +40,7 @@ export type {
   FormConfig,
 } from "./lib/form-types";
 export { fieldWidthClasses } from "./lib/form-types";
+export * from "./lib/form-config-merge";
 export * from "./lib/form-configs";
 export * from "./lib/accounting-form-configs";
 export * from "./lib/accounting-entity-configs";

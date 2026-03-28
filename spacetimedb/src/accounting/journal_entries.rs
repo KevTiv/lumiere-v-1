@@ -10,7 +10,7 @@ use crate::accounting::budgeting::{
     CrossoveredBudgetLines,
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
-use crate::core::organization::company;
+use crate::core::organization::{company, company_id_from_scope};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
@@ -186,6 +186,8 @@ pub struct AccountMoveLine {
 /// (state, payment_state, amounts, posted_before) are initialized by the reducer.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAccountMoveParams {
+    /// Legal entity; default company for the org when omitted.
+    pub company_id: Option<u64>,
     pub journal_id: u64,
     pub move_type: MoveType,
     pub date: Timestamp,
@@ -264,6 +266,7 @@ pub struct AddAccountMoveLineParams {
 /// `None` means "no change"; `Some(None)` clears a nullable field.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountMoveLineParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub debit: Option<f64>,
     pub credit: Option<f64>,
@@ -276,11 +279,17 @@ pub struct UpdateAccountMoveLineParams {
 /// Creates a draft OutInvoice for a set of validated, billable timesheets.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct BillTimesheetsParams {
+    pub company_id: Option<u64>,
     pub timesheet_ids: Vec<u64>,
     pub journal_id: u64,
     pub income_account_id: u64,
     pub partner_id: u64,
     pub invoice_date: Option<Timestamp>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct DeleteAccountMoveLineParams {
+    pub company_id: Option<u64>,
 }
 
 // ── Accounting helpers and invoice posting ───────────────────────────────────
@@ -828,10 +837,11 @@ pub fn post_invoice(
 pub fn create_account_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAccountMoveParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     // Validate journal exists and belongs to company
     let journal = ctx
@@ -1320,11 +1330,12 @@ pub fn cancel_account_move(
 pub fn update_account_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
     params: UpdateAccountMoveLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "write")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let line = ctx
         .db
@@ -1427,10 +1438,12 @@ pub fn update_account_move_line(
 pub fn delete_account_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
+    params: DeleteAccountMoveLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "delete")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let line = ctx
         .db
@@ -2275,10 +2288,11 @@ pub fn reconcile_payment_with_invoice(
 pub fn bill_timesheets(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: BillTimesheetsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.timesheet_ids.is_empty() {
         return Err("No timesheets provided".to_string());

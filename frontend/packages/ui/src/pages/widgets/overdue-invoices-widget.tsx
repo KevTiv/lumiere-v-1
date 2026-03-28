@@ -10,13 +10,13 @@ export function OverdueInvoicesWidget({ data }: { data: OverdueInvoicesData }) {
   const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
   const status = data.count === 0 ? "green" : data.oldestDays > 60 ? "red" : "amber"
   const colorClass =
-    status === "green" ? "text-emerald-600" : status === "red" ? "text-red-500" : "text-amber-500"
+    status === "green" ? "text-success" : status === "red" ? "text-destructive" : "text-warning"
   const bgClass =
     status === "green"
-      ? "bg-emerald-50 dark:bg-emerald-950/30"
+      ? "bg-success/10"
       : status === "red"
-        ? "bg-red-50 dark:bg-red-950/30"
-        : "bg-amber-50 dark:bg-amber-950/30"
+        ? "bg-destructive/10"
+        : "bg-warning/10"
 
   return (
     <div className={`rounded-lg p-4 ${bgClass}`}>

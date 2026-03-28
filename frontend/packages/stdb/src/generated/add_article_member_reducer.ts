@@ -12,7 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   articleId: __t.u64(),
   member: __t.identity(),
 };

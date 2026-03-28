@@ -3,22 +3,34 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newProposalForm } from "@lumiere/ui"
+import { ModuleView, FormModal, newProposalForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useProposals, useCreateProposal } from "@/hooks/proposals"
 import type { CreateProposalParams } from "@/hooks/proposals"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface ProposalsClientProps {
   initialProposals?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function ProposalsClient({ initialProposals, organizationId }: ProposalsClientProps) {
+type ProposalsClientLoadedProps = Omit<ProposalsClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function ProposalsClient(props: ProposalsClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <ProposalsClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsClientLoadedProps) {
   const router = useRouter()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => proposalsModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
   const createProposal = useCreateProposal()
@@ -110,10 +122,12 @@ export function ProposalsClient({ initialProposals, organizationId }: ProposalsC
     formData: Record<string, unknown>,
   ) => {
     if (action === "createProposal") {
+      const title = String(formData.title ?? "").trim()
+      if (!title) return
       createProposal.mutate({
         organizationId: orgId,
-        title: formData.title as string,
-        clientName: (formData.clientName as string) ?? "",
+        title,
+        clientName: String(formData.clientName ?? "").trim(),
         value: Number(formData.value ?? 0),
         deadline: formData.deadline ? new Date(formData.deadline as string) : undefined,
         description: formData.description as string | undefined,
@@ -121,7 +135,7 @@ export function ProposalsClient({ initialProposals, organizationId }: ProposalsC
         onSuccess: (_, variables) => {
           // Navigate to the new proposal — find it by title after creation
           const newId = `new-${Date.now()}`
-          router.push(`/proposals/${newId}?title=${encodeURIComponent(String(variables.title ?? "New Proposal"))}&orgId=${organizationId ?? 1}`)
+          router.push(`/proposals/${newId}?title=${encodeURIComponent(String(variables.title ?? "New Proposal"))}&orgId=${organizationId}`)
         },
       })
     }
@@ -129,7 +143,7 @@ export function ProposalsClient({ initialProposals, organizationId }: ProposalsC
 
   const handleRowClick = (_tabId: string, row: Record<string, unknown>) => {
     const title = encodeURIComponent(String(row.title ?? ""))
-    router.push(`/proposals/${row.id}?title=${title}&orgId=${organizationId ?? 1}`)
+    router.push(`/proposals/${row.id}?title=${title}&orgId=${organizationId}`)
   }
 
   return (

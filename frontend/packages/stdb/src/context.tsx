@@ -4,7 +4,7 @@ import type React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { setStdbConnection } from "./connection";
 import { DbConnection } from "./generated";
-import { authSubscriptions } from "./queries/auth";
+import { createClientSubscriptions } from "./queries/erp-subscriptions";
 
 interface StdbConnectionState {
   identity: string | null;
@@ -43,6 +43,19 @@ interface StdbConnectionProviderProps {
    * Combined with serverIdentity to build the casbin_rule WHERE IN filter.
    */
   serverRoleNames?: string[];
+  /**
+   * Active organization (from server session). Required for org-scoped resource keys.
+   */
+  organizationId?: number;
+  /**
+   * Resource keys to subscribe to (see {@link SUBSCRIPTION_RESOURCE_KEYS}).
+   * Pass an empty array for no subscriptions; there is no implicit “subscribe to everything”.
+   */
+  subscriptionResources: string[];
+  /**
+   * Use `ws(s)://<current-host>/api/stdb` (Next.js custom server proxy). Overrides `host` when true.
+   */
+  sameOriginStdbProxy?: boolean;
 }
 
 export function StdbConnectionProvider({
@@ -53,6 +66,9 @@ export function StdbConnectionProvider({
   onTokenPersisted,
   serverIdentity,
   serverRoleNames,
+  organizationId,
+  subscriptionResources,
+  sameOriginStdbProxy,
 }: StdbConnectionProviderProps) {
   const [state, setState] = useState<StdbConnectionState>({
     identity: null,
@@ -60,10 +76,15 @@ export function StdbConnectionProvider({
   });
 
   useEffect(() => {
-    const uri =
-      host ||
-      process.env.NEXT_PUBLIC_STDB_HOST ||
-      "ws://localhost:3000";
+    let uri = host;
+    if (sameOriginStdbProxy && typeof window !== "undefined") {
+      uri = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/stdb`;
+    }
+    if (!uri) {
+      uri =
+        process.env.NEXT_PUBLIC_STDB_HOST ||
+        "ws://localhost:3000";
+    }
     const mod =
       moduleName ||
       process.env.NEXT_PUBLIC_STDB_MODULE ||
@@ -112,7 +133,13 @@ export function StdbConnectionProvider({
             .onError((err) => {
               console.error("[stdb] subscription error", err);
             })
-            .subscribe(authSubscriptions(serverIdentity, serverRoleNames));
+            .subscribe(
+              createClientSubscriptions(subscriptionResources, {
+                identityHex: serverIdentity,
+                roleNames: serverRoleNames,
+                organizationId,
+              }),
+            );
         })
         .onConnectError((_ctx, err) => {
           console.error("[stdb] connection error", err);
@@ -134,7 +161,17 @@ export function StdbConnectionProvider({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, moduleName, onTokenPersisted, serverIdentity, serverRoleNames, token]);
+  }, [
+    host,
+    moduleName,
+    onTokenPersisted,
+    organizationId,
+    subscriptionResources,
+    sameOriginStdbProxy,
+    serverIdentity,
+    serverRoleNames,
+    token,
+  ]);
 
   return (
     <StdbConnectionContext.Provider value={state}>

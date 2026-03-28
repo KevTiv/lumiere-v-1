@@ -310,6 +310,7 @@ pub fn convert_opportunity_to_sale_order(
         .collect();
 
     let so_params = CreateSaleOrderParams {
+        company_id: Some(opp_company_id),
         partner_id,
         partner_invoice_id: partner_id,
         partner_shipping_id: partner_id,
@@ -349,7 +350,7 @@ pub fn convert_opportunity_to_sale_order(
         metadata: None,
     };
 
-    create_sale_order(ctx, organization_id, opp_company_id, so_params)?;
+    create_sale_order(ctx, organization_id, so_params)?;
 
     write_audit_log_v2(
         ctx,

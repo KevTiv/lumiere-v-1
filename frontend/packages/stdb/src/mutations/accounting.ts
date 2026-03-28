@@ -4,13 +4,16 @@ import { getStdbConnection } from "../connection";
 
 export type { CreateAccountAccountParams, CreateAccountMoveParams, CreateAccountTaxParams, CreateCrossoveredBudgetParams };
 
-export function useCreateAccount(organizationId: bigint, companyId: bigint) {
+export function useCreateAccount(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateAccountAccountParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createAccountAccount({ organizationId, companyId, params });
+      return conn.reducers.createAccountAccount({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-accounts"] });
@@ -18,13 +21,16 @@ export function useCreateAccount(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useCreateMove(organizationId: bigint, companyId: bigint) {
+export function useCreateMove(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateAccountMoveParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createAccountMove({ organizationId, companyId, params });
+      return conn.reducers.createAccountMove({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["account-moves"] });
@@ -74,13 +80,16 @@ export function useCreateTax(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useCreateBudget(organizationId: bigint, companyId: bigint) {
+export function useCreateBudget(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateCrossoveredBudgetParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createCrossoveredBudget({ organizationId, companyId, params });
+      return conn.reducers.createCrossoveredBudget({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });

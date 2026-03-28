@@ -3,6 +3,7 @@
 /// Employment contracts linking employees to their salary and terms.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::ContractState;
 
@@ -39,6 +40,7 @@ pub struct HrContract {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateContractParams {
+    pub company_id: Option<u64>,
     pub employee_id: u64,
     pub name: String,
     pub date_start: Timestamp,
@@ -52,6 +54,7 @@ pub struct CreateContractParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateContractParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub wage: Option<f64>,
     pub date_end: Option<Timestamp>,
@@ -66,10 +69,10 @@ pub struct UpdateContractParams {
 pub fn create_contract(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateContractParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if params.name.is_empty() {
         return Err("Contract name cannot be empty".to_string());
     }
@@ -113,7 +116,6 @@ pub fn create_contract(
 pub fn update_contract(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     contract_id: u64,
     params: UpdateContractParams,
 ) -> Result<(), String> {
@@ -127,6 +129,7 @@ pub fn update_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if contract.company_id != company_id {
         return Err("Contract does not belong to this company".to_string());
     }
@@ -160,7 +163,6 @@ pub fn update_contract(
 pub fn open_contract(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -173,9 +175,7 @@ pub fn open_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    if contract.company_id != company_id {
-        return Err("Contract does not belong to this company".to_string());
-    }
+    let company_id = contract.company_id;
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Open,
         ..contract
@@ -201,7 +201,6 @@ pub fn open_contract(
 pub fn expire_contract(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -214,9 +213,7 @@ pub fn expire_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    if contract.company_id != company_id {
-        return Err("Contract does not belong to this company".to_string());
-    }
+    let company_id = contract.company_id;
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Expired,
         ..contract
@@ -242,7 +239,6 @@ pub fn expire_contract(
 pub fn cancel_contract(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -255,9 +251,7 @@ pub fn cancel_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    if contract.company_id != company_id {
-        return Err("Contract does not belong to this company".to_string());
-    }
+    let company_id = contract.company_id;
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Cancelled,
         ..contract

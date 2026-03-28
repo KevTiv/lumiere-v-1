@@ -372,8 +372,8 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             variant="outline"
             className={cn(
               "text-[9px] h-4",
-              kernel.status === "busy" && "bg-blue-500/20 text-blue-400 border-blue-500/50",
-              kernel.status === "idle" && "bg-green-500/20 text-green-400 border-green-500/50"
+              kernel.status === "busy" && "bg-info/20 text-info border-info/50",
+              kernel.status === "idle" && "bg-success/20 text-success border-success/50"
             )}
           >
             <Cpu className="h-2.5 w-2.5 mr-1" />
@@ -575,7 +575,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                     key={file}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
                   >
-                    <File className="h-3.5 w-3.5 text-orange-500" />
+                    <File className="h-3.5 w-3.5 text-warning" />
                     <span className="text-xs">{file}</span>
                   </div>
                 ))}
@@ -586,7 +586,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                     key={file}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
                   >
-                    <Database className="h-3.5 w-3.5 text-blue-500" />
+                    <Database className="h-3.5 w-3.5 text-info" />
                     <span className="text-xs">{file}</span>
                   </div>
                 ))}
@@ -600,19 +600,19 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                 <p className="text-xs font-medium text-muted-foreground mb-3">Kernel Variables</p>
                 <div className="text-xs space-y-1 font-mono">
                   <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-blue-400">df</span>
+                    <span className="text-info">df</span>
                     <span className="text-muted-foreground">DataFrame (30 rows)</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-blue-400">model</span>
+                    <span className="text-info">model</span>
                     <span className="text-muted-foreground">LinearRegression</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-green-400">X_train</span>
+                    <span className="text-success">X_train</span>
                     <span className="text-muted-foreground">ndarray (24, 3)</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-green-400">y_train</span>
+                    <span className="text-success">y_train</span>
                     <span className="text-muted-foreground">ndarray (24,)</span>
                   </div>
                 </div>
@@ -638,7 +638,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
       <div className="flex items-center justify-between px-3 py-1 border-t border-border bg-muted/30 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-green-500" : "bg-blue-500")} />
+            <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-success" : "bg-info")} />
             Python 3.11
           </span>
           <span>{notebook.cells.length} cells</span>

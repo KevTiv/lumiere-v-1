@@ -6,20 +6,17 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function useCalendarEvents(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['calendar-events', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/calendar-events')
-      if (!r.ok) throw new Error('Failed to fetch calendar events')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch calendar events'),
     staleTime: 30_000,
     initialData,
   })
@@ -29,8 +26,8 @@ export function useCalendarEvents(
 
 export function useCreateCalendarEvent(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
       const r = await fetch('/api/call/create_calendar_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -2,10 +2,13 @@ mod config;
 mod embeddings;
 mod error;
 mod kaggle;
+mod providers;
 mod qdrant_client;
+mod rig_agent;
 mod routes;
 mod state;
 mod stdb_client;
+mod context_worker;
 mod worker;
 
 use std::sync::Arc;
@@ -23,7 +26,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use config::Config;
 use embeddings::EmbeddingClient;
+use providers::build as build_providers;
 use qdrant_client::VectorStore;
+use rig_agent::RigContext;
 use state::AppState;
 use stdb_client::StdbClient;
 
@@ -67,19 +72,26 @@ async fn main() -> anyhow::Result<()> {
         config.stdb_token.clone(),
     );
 
+    let providers = build_providers(&config)?;
+    let rig = RigContext::new(&config, providers).await?;
+    rig.ensure_collection().await?;
+
     let config = Arc::new(config);
     let embedder = Arc::new(embedder);
     let vector_store = Arc::new(vector_store);
     let stdb = Arc::new(stdb);
+    let rig = Arc::new(rig);
 
     let state = AppState {
         config: config.clone(),
         embedder: embedder.clone(),
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
+        rig: rig.clone(),
         http: Arc::new(reqwest::Client::new()),
         download_jobs: Arc::new(DashMap::new()),
         kaggle_search_cache: Arc::new(DashMap::new()),
+        activity_watermarks: Arc::new(DashMap::new()),
     };
 
     // Spawn background queue worker
@@ -89,6 +101,9 @@ async fn main() -> anyhow::Result<()> {
         vector_store.clone(),
         stdb.clone(),
     ));
+
+    // Spawn org-context activity ingester
+    tokio::spawn(context_worker::run(state.clone()));
 
     // Build Axum router
     let cors = CorsLayer::new()
@@ -102,6 +117,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/embed", delete(routes::embed::delete_embed))
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
+        .route("/v1/context/search", post(routes::context::post_search))
+        .route("/v1/context/ingest", post(routes::context::post_ingest))
+        .route("/v1/context/document", post(routes::context::post_document))
         // Kaggle dataset proxy
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))

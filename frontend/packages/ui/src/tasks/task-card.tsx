@@ -19,6 +19,7 @@ import {
   MessageSquare,
 } from "lucide-react"
 import type { Task, TaskType, TaskPriority } from "@/lib/task-board-types"
+import { taskPriorityIconClass, taskTypeIconClass } from "@/lib/theme-colors"
 
 interface TaskCardProps {
   task: Task
@@ -34,26 +35,11 @@ const typeIcons: Record<TaskType, React.ReactNode> = {
   epic: <Layers className="h-3.5 w-3.5" />,
 }
 
-const typeColors: Record<TaskType, string> = {
-  task: "text-blue-500",
-  bug: "text-red-500",
-  feature: "text-green-500",
-  story: "text-purple-500",
-  epic: "text-violet-500",
-}
-
 const priorityIcons: Record<TaskPriority, React.ReactNode> = {
   low: <ArrowDown className="h-3.5 w-3.5" />,
   medium: <Minus className="h-3.5 w-3.5" />,
   high: <ArrowUp className="h-3.5 w-3.5" />,
   urgent: <AlertTriangle className="h-3.5 w-3.5" />,
-}
-
-const priorityColors: Record<TaskPriority, string> = {
-  low: "text-slate-400",
-  medium: "text-blue-500",
-  high: "text-orange-500",
-  urgent: "text-red-500",
 }
 
 export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
@@ -85,11 +71,16 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
     >
       {/* Type and Key */}
       <div className="flex items-center gap-2 mb-2">
-        <span className={cn("shrink-0", typeColors[task.type])}>
+        <span className={cn("shrink-0", taskTypeIconClass[task.type] ?? "text-muted-foreground")}>
           {typeIcons[task.type]}
         </span>
         <span className="text-xs font-mono text-muted-foreground">{task.key}</span>
-        <span className={cn("ml-auto shrink-0", priorityColors[task.priority])}>
+        <span
+          className={cn(
+            "ml-auto shrink-0",
+            taskPriorityIconClass[task.priority] ?? "text-muted-foreground"
+          )}
+        >
           {priorityIcons[task.priority]}
         </span>
       </div>
@@ -134,7 +125,7 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
             <div
               className={cn(
                 "flex items-center gap-1 text-[10px]",
-                isOverdue ? "text-red-500" : "text-muted-foreground"
+                isOverdue ? "text-destructive" : "text-muted-foreground"
               )}
             >
               <Calendar className="h-3 w-3" />

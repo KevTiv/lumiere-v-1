@@ -24,10 +24,10 @@ export function TaxDeadlineWidget({ data }: { data: TaxDeadlineData }) {
         const isOverdue = d.daysUntil < 0
         const isSoon = d.daysUntil >= 0 && d.daysUntil <= 7
         const pillClass = isOverdue
-          ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+          ? "bg-destructive/15 text-destructive dark:bg-destructive/20"
           : isSoon
-            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-            : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+            ? "bg-warning/15 text-warning dark:bg-warning/20"
+            : "bg-info/15 text-info dark:bg-info/20"
         const label =
           isOverdue
             ? `${Math.abs(d.daysUntil)}d overdue`

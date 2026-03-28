@@ -21,8 +21,8 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { resolveApiSession } from '@/lib/api-session'
+import { fetchDefaultCompanyId } from '@/lib/default-company-id'
 import { callReducer } from '@/lib/stdb-reducer'
-import { resolveCompanyIds } from '@lumiere/stdb/server'
 
 export async function POST(
   request: NextRequest,
@@ -48,8 +48,8 @@ export async function POST(
   }
 
   if (withCompany) {
-    const [companyId] = await resolveCompanyIds(session.organizationId, session.opts)
-    if (!companyId) {
+    const companyId = await fetchDefaultCompanyId(session.organizationId, session.opts)
+    if (companyId == null) {
       return NextResponse.json({ error: 'No company found for organization' }, { status: 422 })
     }
     args = [session.organizationId, companyId, ...args]

@@ -40,11 +40,7 @@ impl AppState {
     /// SpacetimeDB exposes reducers at:
     ///   POST /database/call/<module>/<reducer>
     /// with the token in the Authorization header.
-    pub async fn call_reducer(
-        &self,
-        reducer: &str,
-        args: serde_json::Value,
-    ) -> anyhow::Result<()> {
+    pub async fn call_reducer(&self, reducer: &str, args: serde_json::Value) -> anyhow::Result<()> {
         let url = format!(
             "{}/database/call/{}/{}",
             self.config.stdb_host, self.config.stdb_module, reducer
@@ -67,16 +63,16 @@ impl AppState {
     }
 
     /// Query a SpacetimeDB table via the REST API.
-    pub async fn query_table(
-        &self,
-        table: &str,
-    ) -> anyhow::Result<Vec<serde_json::Value>> {
+    pub async fn query_table(&self, table: &str) -> anyhow::Result<Vec<serde_json::Value>> {
+        self.query_sql(&format!("SELECT * FROM {}", table)).await
+    }
+
+    /// Run an arbitrary SQL query against SpacetimeDB's REST API.
+    pub async fn query_sql(&self, sql: &str) -> anyhow::Result<Vec<serde_json::Value>> {
         let url = format!(
             "{}/database/sql/{}",
             self.config.stdb_host, self.config.stdb_module
         );
-
-        let sql = format!("SELECT * FROM {}", table);
 
         let resp = self
             .http
@@ -88,7 +84,7 @@ impl AppState {
 
         if !resp.status().is_success() {
             let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Query '{}' failed: {}", table, body);
+            anyhow::bail!("SQL query failed: {}", body);
         }
 
         let rows: Vec<serde_json::Value> = resp.json().await?;

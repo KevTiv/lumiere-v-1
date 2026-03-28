@@ -225,12 +225,12 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
             title="Open Journal"
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-linear-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20",
-              "text-sidebar-foreground hover:border-amber-500/40",
+              "bg-linear-to-r from-accent/10 to-warning/10 border border-accent/25",
+              "text-sidebar-foreground hover:border-accent/40",
               isCollapsed && "justify-center"
             )}
           >
-            <BookMarked className="h-5 w-5 shrink-0 text-amber-500" />
+            <BookMarked className="h-5 w-5 shrink-0 text-accent" />
             {!isCollapsed && (
               <span className="text-sm font-medium">{t("nav.journal")}</span>
             )}
@@ -244,12 +244,12 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
             title="Open Notebook"
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-linear-to-r from-orange-500/10 to-orange-600/10 border border-orange-500/20",
-              "text-sidebar-foreground hover:border-orange-500/40",
+              "bg-linear-to-r from-primary/10 to-accent/10 border border-primary/20",
+              "text-sidebar-foreground hover:border-primary/35",
               isCollapsed && "justify-center"
             )}
           >
-            <BookOpen className="h-5 w-5 shrink-0 text-orange-500" />
+            <BookOpen className="h-5 w-5 shrink-0 text-primary" />
             {!isCollapsed && (
               <span className="text-sm font-medium">{t("nav.notebook")}</span>
             )}

@@ -7,11 +7,12 @@
 /// | **MrpWorkorder** | Work order operations |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    create_stock_move, done_stock_move, stock_move, stock_quant, CreateStockMoveParams, StockMove,
-    StockQuant,
+    create_stock_move, done_stock_move, stock_move, stock_quant, CreateStockMoveParams,
+    DoneStockMoveParams, StockMove, StockQuant,
 };
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
 use crate::manufacturing::work_centers::mrp_workcenter;
@@ -165,6 +166,7 @@ pub struct MrpWorkorder {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateMrpProductionParams {
+    pub company_id: Option<u64>,
     pub product_id: u64,
     pub product_qty: f64,
     pub product_uom_id: u64,
@@ -323,10 +325,11 @@ fn upsert_stock_quant(
 pub fn create_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateMrpProductionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     // Validate consumption mode (default to "use_created" if not provided)
     let consumption_str = params
@@ -441,7 +444,6 @@ pub fn create_manufacturing_order(
 pub fn confirm_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -456,6 +458,8 @@ pub fn confirm_manufacturing_order(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     match mo.state {
         MoState::Draft => {
@@ -493,7 +497,6 @@ pub fn confirm_manufacturing_order(
 pub fn check_mo_availability(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -508,6 +511,8 @@ pub fn check_mo_availability(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     let availability = "available".to_string();
 
@@ -545,7 +550,6 @@ pub fn check_mo_availability(
 pub fn start_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -560,6 +564,8 @@ pub fn start_manufacturing_order(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     match mo.state {
         MoState::Confirmed | MoState::Planned => {
@@ -598,7 +604,6 @@ pub fn start_manufacturing_order(
 pub fn produce_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
     qty_producing: f64,
 ) -> Result<(), String> {
@@ -614,6 +619,8 @@ pub fn produce_manufacturing_order(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     if qty_producing <= 0.0 {
         return Err("Quantity must be greater than 0".to_string());
@@ -666,7 +673,6 @@ pub fn produce_manufacturing_order(
 pub fn consume_mo_materials(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -681,6 +687,8 @@ pub fn consume_mo_materials(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     if mo.state != MoState::Progress && mo.state != MoState::ToClose {
         return Err(
@@ -707,8 +715,8 @@ pub fn consume_mo_materials(
             create_stock_move(
                 ctx,
                 organization_id,
-                company_id,
                 CreateStockMoveParams {
+                    company_id: Some(company_id),
                     name: format!("MO {} consume component {}", mo.id, line.product_id),
                     product_id: line.product_id,
                     product_tmpl_id: line.product_tmpl_id,
@@ -788,7 +796,15 @@ pub fn consume_mo_materials(
                 });
             }
 
-            done_stock_move(ctx, organization_id, company_id, move_id, required_qty)?;
+            done_stock_move(
+                ctx,
+                organization_id,
+                move_id,
+                DoneStockMoveParams {
+                    company_id: Some(company_id),
+                    quantity_done: required_qty,
+                },
+            )?;
             upsert_stock_quant(
                 ctx,
                 organization_id,
@@ -833,7 +849,6 @@ pub fn consume_mo_materials(
 pub fn finish_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -849,6 +864,8 @@ pub fn finish_manufacturing_order(
         return Err("MO does not belong to this organization".to_string());
     }
 
+    let company_id = mo.company_id;
+
     match mo.state {
         MoState::Progress | MoState::ToClose => {
             let dest_location_id = get_stock_location(&mo);
@@ -861,8 +878,8 @@ pub fn finish_manufacturing_order(
             create_stock_move(
                 ctx,
                 organization_id,
-                company_id,
                 CreateStockMoveParams {
+                    company_id: Some(company_id),
                     name: format!("MO {} finished product {}", mo.id, mo.product_id),
                     product_id: mo.product_id,
                     product_tmpl_id: mo.product_tmpl_id,
@@ -945,9 +962,11 @@ pub fn finish_manufacturing_order(
             done_stock_move(
                 ctx,
                 organization_id,
-                company_id,
                 finished_move_id,
-                finished_qty,
+                DoneStockMoveParams {
+                    company_id: Some(company_id),
+                    quantity_done: finished_qty,
+                },
             )?;
             upsert_stock_quant(
                 ctx,
@@ -1003,8 +1022,16 @@ pub fn finish_manufacturing_order(
                                 });
                             }
                             // done_stock_move re-fetches the move internally
-                            if done_stock_move(ctx, organization_id, company_id, *raw_move_id, qty)
-                                .is_ok()
+                            if done_stock_move(
+                                ctx,
+                                organization_id,
+                                *raw_move_id,
+                                DoneStockMoveParams {
+                                    company_id: Some(company_id),
+                                    quantity_done: qty,
+                                },
+                            )
+                            .is_ok()
                             {
                                 upsert_stock_quant(
                                     ctx,
@@ -1064,7 +1091,6 @@ pub fn finish_manufacturing_order(
 pub fn cancel_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
@@ -1079,6 +1105,8 @@ pub fn cancel_manufacturing_order(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     match mo.state {
         MoState::Done => Err("Cannot cancel a completed manufacturing order".to_string()),
@@ -1120,7 +1148,6 @@ pub fn cancel_manufacturing_order(
 pub fn create_workorder(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateWorkorderParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "create")?;
@@ -1135,6 +1162,8 @@ pub fn create_workorder(
     if mo.organization_id != organization_id {
         return Err("MO does not belong to this organization".to_string());
     }
+
+    let company_id = mo.company_id;
 
     // Resolve capacity: use supplied value, fall back to work center's capacity, then 1.0
     let resolved_capacity = params.capacity.unwrap_or_else(|| {
@@ -1230,7 +1259,6 @@ pub fn create_workorder(
 pub fn start_workorder(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
@@ -1245,6 +1273,8 @@ pub fn start_workorder(
     if wo.organization_id != organization_id {
         return Err("Work order does not belong to this organization".to_string());
     }
+
+    let company_id = wo.company_id;
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
@@ -1284,7 +1314,6 @@ pub fn start_workorder(
 pub fn finish_workorder(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
@@ -1299,6 +1328,8 @@ pub fn finish_workorder(
     if wo.organization_id != organization_id {
         return Err("Work order does not belong to this organization".to_string());
     }
+
+    let company_id = wo.company_id;
 
     match wo.state {
         WorkorderState::Progress => {

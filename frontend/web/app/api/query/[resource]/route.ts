@@ -13,14 +13,15 @@
  *   Accounting: account-accounts, account-journals, account-moves, account-taxes,
  *               budgets, analytic-accounts
  *   Sales:      sale-orders, sale-order-lines, pricelists, picking-batches
- *   CRM:        leads, opportunities, contacts
+ *   CRM:        leads, opportunities, opportunity-stages, contacts
  *   Projects:   projects, tasks, timesheets
- *   Inventory:  products, stock-quants, stock-pickings, warehouses, inventory-adjustments
+ *   Inventory:  products, product-categories, uoms, stock-quants, stock-pickings, warehouses, inventory-adjustments
  *   Purchasing: purchase-orders, purchase-order-lines, purchase-requisitions
  *   Manufacturing: mrp-productions, mrp-boms, mrp-workorders, mrp-workcenters
  *   HR:         employees, departments, leave-requests, contracts, payslips
  *   Reports:    financial-reports, trial-balances
- *   Other:      documents, knowledge-articles, helpdesk-tickets, subscriptions,
+ *   Other:      documents, knowledge-articles, helpdesk-tickets, helpdesk-teams,
+ *               helpdesk-stages, subscriptions,
  *               subscription-plans, workflows, workflow-instances, proposals,
  *               calendar-events, mail-messages, expenses, expense-sheets,
  *               roles, user-roles
@@ -41,11 +42,14 @@ import {
   serverQueryPickingBatches,
   serverQueryLeads,
   serverQueryOpportunities,
+  serverQueryOpportunityStages,
   serverQueryContacts,
   serverQueryProjects,
   serverQueryTasks,
   serverQueryTimesheets,
   serverQueryProducts,
+  serverQueryProductCategories,
+  serverQueryUoms,
   serverQueryStockQuants,
   serverQueryStockPickings,
   serverQueryWarehouses,
@@ -68,6 +72,8 @@ import {
   serverQueryExpenses,
   serverQueryExpenseSheets,
   serverQueryHelpdeskTickets,
+  serverQueryHelpdeskTeams,
+  serverQueryHelpdeskStages,
   serverQueryMailMessages,
   serverQueryFinancialReports,
   serverQueryTrialBalances,
@@ -99,6 +105,7 @@ const QUERY_MAP: Record<string, QueryFn> = {
   // CRM
   'leads': (orgId, opts) => serverQueryLeads(orgId, opts),
   'opportunities': (orgId, opts) => serverQueryOpportunities(orgId, opts),
+  'opportunity-stages': (orgId, opts) => serverQueryOpportunityStages(orgId, opts),
   'contacts': (orgId, opts) => serverQueryContacts(orgId, opts),
   // Projects
   'projects': (orgId, opts) => serverQueryProjects(orgId, opts),
@@ -106,6 +113,8 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'timesheets': (orgId, opts) => serverQueryTimesheets(orgId, opts),
   // Inventory
   'products': (orgId, opts) => serverQueryProducts(orgId, opts),
+  'product-categories': (orgId, opts) => serverQueryProductCategories(orgId, opts),
+  'uoms': (orgId, opts) => serverQueryUoms(orgId, opts),
   'stock-quants': (orgId, opts) => serverQueryStockQuants(orgId, opts),
   'stock-pickings': (orgId, opts) => serverQueryStockPickings(orgId, opts),
   'warehouses': (orgId, opts) => serverQueryWarehouses(orgId, opts),
@@ -132,6 +141,8 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'documents': (orgId, opts) => serverQueryDocuments(orgId, opts),
   'knowledge-articles': (orgId, opts) => serverQueryKnowledgeArticles(orgId, opts),
   'helpdesk-tickets': (orgId, opts) => serverQueryHelpdeskTickets(orgId, opts),
+  'helpdesk-teams': (orgId, opts) => serverQueryHelpdeskTeams(orgId, opts),
+  'helpdesk-stages': (orgId, opts) => serverQueryHelpdeskStages(orgId, opts),
   'subscriptions': (orgId, opts) => serverQuerySubscriptions(orgId, opts),
   'subscription-plans': (orgId, opts) => serverQuerySubscriptionPlans(orgId, opts),
   'workflows': (orgId, opts) => serverQueryWorkflows(orgId, opts),

@@ -5,6 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, AlertCircle, PanelRightClose, PanelRightOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { riskLevelBadgeClass } from "@/lib/theme-colors"
 import type {
   AIAnalysis,
   Finding,
@@ -23,9 +24,7 @@ interface AIPanelProps {
 }
 
 function relevanceBadgeClass(r: FindingRelevance) {
-  if (r === "high") return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-  if (r === "medium") return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-  return "bg-muted text-muted-foreground"
+  return riskLevelBadgeClass(r)
 }
 
 function SectionToggle({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
@@ -62,11 +61,12 @@ function FindingCard({ finding }: { finding: Finding }) {
 }
 
 function RequirementRow({ req, onToggle }: { req: Requirement; onToggle: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-2 px-3 py-2 hover:bg-muted/20 group">
       <button onClick={onToggle} className="mt-0.5 shrink-0">
         {req.addressed
-          ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+          ? <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           : <Circle className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground" />
         }
       </button>
@@ -77,7 +77,7 @@ function RequirementRow({ req, onToggle }: { req: Requirement; onToggle: () => v
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[10px] text-muted-foreground">{req.category}</span>
           {req.mandatory && (
-            <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">{t("proposalWorkspace.aiPanel.required")}</span>
+            <span className="text-[10px] bg-destructive/10 text-destructive px-1 rounded">{t("proposalWorkspace.aiPanel.required")}</span>
           )}
         </div>
       </div>

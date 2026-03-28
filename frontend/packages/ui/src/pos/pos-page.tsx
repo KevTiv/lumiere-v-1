@@ -95,10 +95,10 @@ function PaymentDialog({
 
         {done ? (
           <div className="flex flex-col items-center py-10 gap-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-9 w-9 text-emerald-500" />
+            <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+              <CheckCircle2 className="h-9 w-9 text-success" />
             </div>
-            <p className="text-2xl font-bold text-emerald-600">{t("pos.payment.complete")}</p>
+            <p className="text-2xl font-bold text-success">{t("pos.payment.complete")}</p>
             {method === "cash" && change > 0 && (
               <p className="text-lg text-muted-foreground">{t("pos.payment.change")}: <strong>{fmt(change)}</strong></p>
             )}
@@ -156,7 +156,7 @@ function PaymentDialog({
                 {tenderedNum > 0 && (
                   <div className="flex justify-between text-sm font-medium p-3 rounded-lg bg-muted">
                     <span>{t("pos.payment.change")}</span>
-                    <span className={cn(change >= 0 ? "text-emerald-600" : "text-red-500")}>
+                    <span className={cn(change >= 0 ? "text-success" : "text-destructive")}>
                       {fmt(change)}
                     </span>
                   </div>
@@ -215,7 +215,7 @@ function ReceiptDialog({ order, onClose }: { order: POSOrder | null; onClose: ()
             <div className="flex justify-between text-muted-foreground"><span>{t("pos.receipt.tax")}</span><span>{fmt(order.taxTotal)}</span></div>
             <div className="flex justify-between font-bold text-base"><span>{t("pos.receipt.total")}</span><span>{fmt(order.total)}</span></div>
             {order.paymentMethod === "cash" && order.change > 0 && (
-              <div className="flex justify-between text-emerald-600"><span>{t("pos.receipt.change")}</span><span>{fmt(order.change)}</span></div>
+              <div className="flex justify-between text-success"><span>{t("pos.receipt.change")}</span><span>{fmt(order.change)}</span></div>
             )}
           </div>
           <Separator />
@@ -489,7 +489,7 @@ export function POSPage({
               </Button>
             </div>
             {orderDiscount > 0 && (
-              <p className="text-xs text-emerald-600 mt-1 pl-1">{t("pos.cart.discountApplied", { pct: orderDiscount })}</p>
+              <p className="text-xs text-success mt-1 pl-1">{t("pos.cart.discountApplied", { pct: orderDiscount })}</p>
             )}
           </div>
         )}
@@ -503,7 +503,7 @@ export function POSPage({
             <span>{t("pos.cart.tax")}</span><span>{fmt(taxTotal)}</span>
           </div>
           {orderDiscount > 0 && (
-            <div className="flex justify-between text-sm text-emerald-600">
+            <div className="flex justify-between text-sm text-success">
               <span>{t("pos.cart.discount", { pct: orderDiscount })}</span><span>-{fmt(discountTotal)}</span>
             </div>
           )}

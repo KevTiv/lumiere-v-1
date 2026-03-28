@@ -29,6 +29,7 @@ import {
   CheckCircle2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 
@@ -56,15 +57,25 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
   const getStatusBadge = (move: AccountMove) => {
     const state = String(move.state)
     const paymentState = String(move.paymentState)
-    if (state === "Cancelled") return { label: t("accounting.states.cancelled"), cls: "bg-gray-100 text-gray-500" }
-    if (state === "Draft")     return { label: t("accounting.states.draft"),     cls: "bg-slate-100 text-slate-700" }
-    if (paymentState === "Paid") return { label: t("accounting.states.paid"),    cls: "bg-emerald-100 text-emerald-700" }
+    if (state === "Cancelled") {
+      return { label: t("accounting.states.cancelled"), cls: invoiceStatusBadgeClass.cancelled }
+    }
+    if (state === "Draft") {
+      return { label: t("accounting.states.draft"), cls: invoiceStatusBadgeClass.draft }
+    }
+    if (paymentState === "Paid") {
+      return { label: t("accounting.states.paid"), cls: invoiceStatusBadgeClass.paid }
+    }
     if (move.amountResidual > 0 && move.invoiceDateDue) {
       const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
-      if (due < new Date()) return { label: t("accounting.states.overdue"), cls: "bg-red-100 text-red-700" }
+      if (due < new Date()) {
+        return { label: t("accounting.states.overdue"), cls: invoiceStatusBadgeClass.overdue }
+      }
     }
-    if (paymentState === "InPayment") return { label: t("accounting.states.partial"), cls: "bg-purple-100 text-purple-700" }
-    return { label: t("accounting.states.sent"), cls: "bg-blue-100 text-blue-700" }
+    if (paymentState === "InPayment") {
+      return { label: t("accounting.states.partial"), cls: invoiceStatusBadgeClass.partial }
+    }
+    return { label: t("accounting.states.sent"), cls: invoiceStatusBadgeClass.sent }
   }
 
   if (!invoice) return null
@@ -106,24 +117,24 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
           <div className="grid grid-cols-3 gap-4">
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10"><DollarSign className="h-5 w-5 text-blue-600" /></div>
+                <div className="p-2 rounded-lg bg-info/10"><DollarSign className="h-5 w-5 text-info" /></div>
                 <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalAmount")}</p><p className="text-xl font-bold">{formatCurrency(invoice.amountTotal)}</p></div>
               </div>
             </CardContent></Card>
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-emerald-500/10"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
-                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.amountPaid")}</p><p className="text-xl font-bold text-emerald-600">{formatCurrency(invoice.amountTotal - invoice.amountResidual)}</p></div>
+                <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.amountPaid")}</p><p className="text-xl font-bold text-success">{formatCurrency(invoice.amountTotal - invoice.amountResidual)}</p></div>
               </div>
             </CardContent></Card>
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", invoice.amountResidual > 0 ? "bg-amber-500/10" : "bg-muted")}>
-                  <Clock className={cn("h-5 w-5", invoice.amountResidual > 0 ? "text-amber-600" : "text-muted-foreground")} />
+                <div className={cn("p-2 rounded-lg", invoice.amountResidual > 0 ? "bg-warning/10" : "bg-muted")}>
+                  <Clock className={cn("h-5 w-5", invoice.amountResidual > 0 ? "text-warning" : "text-muted-foreground")} />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{t("accounting.invoices.balanceDue")}</p>
-                  <p className={cn("text-xl font-bold", invoice.amountResidual > 0 ? "text-amber-600" : "text-muted-foreground")}>
+                  <p className={cn("text-xl font-bold", invoice.amountResidual > 0 ? "text-warning" : "text-muted-foreground")}>
                     {formatCurrency(invoice.amountResidual)}
                   </p>
                 </div>
@@ -205,7 +216,7 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.activity")}</h4>
             <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/50">
-              <div className="p-2 rounded-full bg-blue-500/10"><FileText className="h-4 w-4 text-blue-600" /></div>
+              <div className="p-2 rounded-full bg-info/10"><FileText className="h-4 w-4 text-info" /></div>
               <div>
                 <p className="font-medium">{t("accounting.invoices.invoiceCreated")}</p>
                 <p className="text-sm text-muted-foreground">{t("accounting.invoices.createdOn", { date: formatTimestamp(invoice.createDate) })}</p>

@@ -11,6 +11,7 @@
 /// - `BudgetPost` — Budget positions for categorization
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::BudgetState;
 
@@ -111,6 +112,7 @@ pub struct BudgetPost {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateCrossoveredBudgetParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub description: Option<String>,
     pub date_from: Timestamp,
@@ -126,6 +128,7 @@ pub struct CreateCrossoveredBudgetParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateCrossoveredBudgetParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub description: Option<Option<String>>,
     pub date_from: Option<Timestamp>,
@@ -166,6 +169,7 @@ pub struct UpdateBudgetLineActualsParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateBudgetPostParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub code: Option<String>,
     pub description: Option<String>,
@@ -176,6 +180,7 @@ pub struct CreateBudgetPostParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateBudgetPostParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub code: Option<Option<String>>,
     pub description: Option<Option<String>>,
@@ -191,10 +196,11 @@ pub struct UpdateBudgetPostParams {
 pub fn create_crossovered_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateCrossoveredBudgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Budget name is required".to_string());
@@ -259,7 +265,6 @@ pub fn create_crossovered_budget(
 pub fn update_crossovered_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
     params: UpdateCrossoveredBudgetParams,
 ) -> Result<(), String> {
@@ -274,6 +279,11 @@ pub fn update_crossovered_budget(
 
     if budget.organization_id != organization_id {
         return Err("Budget does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if budget.company_id != company_id {
+        return Err("Budget does not belong to this company".to_string());
     }
 
     if budget.state != BudgetState::Draft {
@@ -337,7 +347,7 @@ pub fn update_crossovered_budget(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
             record_id: budget.id,
             action: "UPDATE",
@@ -356,7 +366,6 @@ pub fn update_crossovered_budget(
 pub fn create_budget_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
     params: CreateCrossoveredBudgetLineParams,
 ) -> Result<(), String> {
@@ -389,6 +398,8 @@ pub fn create_budget_line(
         return Err("Planned amount cannot be negative".to_string());
     }
 
+    let budget_company_id = budget.company_id;
+
     let line = ctx
         .db
         .crossovered_budget_lines()
@@ -404,7 +415,7 @@ pub fn create_budget_line(
             practical_amount: params.practical_amount,
             theoretical_amount: params.theoretical_amount,
             achieve_percentage: params.achieve_percentage,
-            company_id,
+            company_id: budget.company_id,
             is_above_budget: params.is_above_budget,
             variance: params.variance,
             variance_percentage: params.variance_percentage,
@@ -426,7 +437,7 @@ pub fn create_budget_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget_company_id),
             table_name: "crossovered_budget_lines",
             record_id: line.id,
             action: "CREATE",
@@ -448,7 +459,6 @@ pub fn create_budget_line(
 pub fn update_budget_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
     params: UpdateCrossoveredBudgetLineParams,
 ) -> Result<(), String> {
@@ -541,7 +551,7 @@ pub fn update_budget_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(line.company_id),
             table_name: "crossovered_budget_lines",
             record_id: line_id,
             action: "UPDATE",
@@ -562,7 +572,6 @@ pub fn update_budget_line(
 pub fn update_budget_line_actuals(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
     params: UpdateBudgetLineActualsParams,
 ) -> Result<(), String> {
@@ -632,7 +641,6 @@ pub fn update_budget_line_actuals(
 pub fn confirm_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
@@ -667,7 +675,7 @@ pub fn confirm_budget(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
             record_id: budget_id,
             action: "CONFIRM",
@@ -686,7 +694,6 @@ pub fn confirm_budget(
 pub fn validate_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
@@ -717,7 +724,7 @@ pub fn validate_budget(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
             record_id: budget_id,
             action: "VALIDATE",
@@ -736,7 +743,6 @@ pub fn validate_budget(
 pub fn done_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
@@ -767,7 +773,7 @@ pub fn done_budget(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
             record_id: budget_id,
             action: "DONE",
@@ -786,7 +792,6 @@ pub fn done_budget(
 pub fn cancel_budget(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     budget_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "write")?;
@@ -817,7 +822,7 @@ pub fn cancel_budget(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
             record_id: budget_id,
             action: "CANCEL",
@@ -836,10 +841,11 @@ pub fn cancel_budget(
 pub fn create_budget_post(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateBudgetPostParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "budget_post", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Budget post name is required".to_string());
@@ -884,7 +890,6 @@ pub fn create_budget_post(
 pub fn update_budget_post(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     post_id: u64,
     params: UpdateBudgetPostParams,
 ) -> Result<(), String> {
@@ -899,6 +904,11 @@ pub fn update_budget_post(
 
     if post.organization_id != organization_id {
         return Err("Budget post does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if post.company_id != company_id {
+        return Err("Budget post does not belong to this company".to_string());
     }
 
     let mut changed_fields = Vec::new();
@@ -945,7 +955,7 @@ pub fn update_budget_post(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(post.company_id),
             table_name: "budget_post",
             record_id: post_id,
             action: "UPDATE",
@@ -964,7 +974,6 @@ pub fn update_budget_post(
 pub fn delete_budget_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "delete")?;
@@ -1005,7 +1014,7 @@ pub fn delete_budget_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(line.company_id),
             table_name: "crossovered_budget_lines",
             record_id: line_id,
             action: "DELETE",

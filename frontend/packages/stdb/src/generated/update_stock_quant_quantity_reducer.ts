@@ -10,9 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  UpdateStockQuantQuantityParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   quantId: __t.u64(),
-  quantity: __t.f64(),
+  get params() {
+    return UpdateStockQuantQuantityParams;
+  },
 };

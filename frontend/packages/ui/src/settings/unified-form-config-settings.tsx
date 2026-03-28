@@ -294,9 +294,9 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
       </div>
 
       {hasChanges && (
-        <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-yellow-600" />
-          <span className="text-sm text-yellow-800">{t("settings.formConfig.unsavedChanges")}</span>
+        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/25 rounded-md">
+          <AlertCircle className="h-4 w-4 text-warning" />
+          <span className="text-sm text-warning">{t("settings.formConfig.unsavedChanges")}</span>
         </div>
       )}
 

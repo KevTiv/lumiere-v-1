@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newProjectForm = (t: TFunction): FormConfig => ({
   id: "new-project",
   title: t("projects.forms.newProject.title"),
@@ -12,6 +14,7 @@ export const newProjectForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("projects.forms.newProject.fields.name"),
           placeholder: t("projects.forms.newProject.fields.namePlaceholder"),
@@ -19,14 +22,27 @@ export const newProjectForm = (t: TFunction): FormConfig => ({
           width: "full",
         },
         {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("projects.forms.newProject.fields.pricelistId"),
+          placeholder: t("projects.forms.newProject.fields.pricelistPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
           id: "partnerId",
-          type: "number",
+          name: "partnerId",
+          type: "select",
           label: t("projects.forms.newProject.fields.partnerId"),
           placeholder: t("projects.forms.newProject.fields.partnerIdPlaceholder"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "allocatedHours",
+          name: "allocatedHours",
           type: "number",
           label: t("projects.forms.newProject.fields.allocatedHours"),
           placeholder: t("projects.forms.newProject.fields.allocatedHoursPlaceholder"),
@@ -34,18 +50,21 @@ export const newProjectForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "dateStart",
+          name: "dateStart",
           type: "date",
           label: t("projects.forms.newProject.fields.dateStart"),
           width: "1/2",
         },
         {
           id: "dateEnd",
+          name: "dateEnd",
           type: "date",
           label: t("projects.forms.newProject.fields.dateEnd"),
           width: "1/2",
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("projects.forms.newProject.fields.description"),
           placeholder: t("projects.forms.newProject.fields.descriptionPlaceholder"),
@@ -68,6 +87,7 @@ export const newTaskForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("projects.forms.newTask.fields.name"),
           placeholder: t("projects.forms.newTask.fields.namePlaceholder"),
@@ -76,14 +96,26 @@ export const newTaskForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "projectId",
-          type: "number",
+          name: "projectId",
+          type: "select",
           label: t("projects.forms.newTask.fields.projectId"),
           placeholder: t("projects.forms.newTask.fields.projectIdPlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "stageId",
+          name: "stageId",
+          type: "select",
+          label: t("projects.forms.newTask.fields.stageId"),
+          placeholder: t("projects.forms.newTask.fields.stagePlaceholder"),
+          width: "1/2",
+          options: emptySelect,
         },
         {
           id: "priority",
+          name: "priority",
           type: "select",
           label: t("projects.forms.newTask.fields.priority"),
           width: "1/2",
@@ -96,6 +128,7 @@ export const newTaskForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "plannedHours",
+          name: "plannedHours",
           type: "number",
           label: t("projects.forms.newTask.fields.plannedHours"),
           placeholder: t("projects.forms.newTask.fields.plannedHoursPlaceholder"),
@@ -103,12 +136,14 @@ export const newTaskForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "dateDeadline",
+          name: "dateDeadline",
           type: "date",
           label: t("projects.forms.newTask.fields.dateDeadline"),
           width: "1/2",
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("projects.forms.newTask.fields.description"),
           placeholder: t("projects.forms.newTask.fields.descriptionPlaceholder"),

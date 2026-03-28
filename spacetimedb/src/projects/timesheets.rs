@@ -6,6 +6,7 @@
 /// | **ProjectTimesheet** | Time log entries against tasks and projects |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::projects::project_project;
 use crate::projects::tasks::{project_task, ProjectTask};
@@ -67,6 +68,7 @@ pub struct ProjectTimesheet {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct LogTimesheetParams {
+    pub company_id: Option<u64>,
     pub project_id: u64,
     pub task_id: Option<u64>,
     pub employee_id: u64,
@@ -88,6 +90,7 @@ pub struct LogTimesheetParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct StartTimesheetTimerParams {
+    pub company_id: Option<u64>,
     pub project_id: u64,
     pub task_id: Option<u64>,
     pub employee_id: u64,
@@ -105,6 +108,12 @@ pub struct StartTimesheetTimerParams {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ValidateTimesheetsParams {
+    pub company_id: Option<u64>,
+    pub timesheet_ids: Vec<u64>,
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 /// Log hours against a task
@@ -112,13 +121,27 @@ pub struct StartTimesheetTimerParams {
 pub fn log_timesheet(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: LogTimesheetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "create")?;
 
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     if params.unit_amount <= 0.0 {
         return Err("Hours must be greater than 0".to_string());
+    }
+
+    let project = ctx
+        .db
+        .project_project()
+        .id()
+        .find(&params.project_id)
+        .ok_or("Project not found")?;
+    if project.organization_id != organization_id {
+        return Err("Project does not belong to this organization".to_string());
+    }
+    if project.company_id != company_id {
+        return Err("Project does not belong to this company".to_string());
     }
 
     // Validate or derive timesheet_invoice_type
@@ -128,14 +151,7 @@ pub fn log_timesheet(
             t.clone()
         }
         None => {
-            let bill_type = ctx
-                .db
-                .project_project()
-                .id()
-                .find(&params.project_id)
-                .map(|p| p.bill_type)
-                .unwrap_or_else(|| "no".to_string());
-            TimesheetInvoiceType::default_for_bill_type(&bill_type)
+            TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
                 .as_str()
                 .to_string()
         }
@@ -151,6 +167,9 @@ pub fn log_timesheet(
             .ok_or("Task not found")?;
         if task.project_id != Some(params.project_id) {
             return Err("Task does not belong to this project".to_string());
+        }
+        if task.company_id != company_id {
+            return Err("Task does not belong to this company".to_string());
         }
     }
 
@@ -250,10 +269,24 @@ pub fn log_timesheet(
 pub fn start_timesheet_timer(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: StartTimesheetTimerParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    let project = ctx
+        .db
+        .project_project()
+        .id()
+        .find(&params.project_id)
+        .ok_or("Project not found")?;
+    if project.organization_id != organization_id {
+        return Err("Project does not belong to this organization".to_string());
+    }
+    if project.company_id != company_id {
+        return Err("Project does not belong to this company".to_string());
+    }
 
     // Validate or derive timesheet_invoice_type
     let resolved_invoice_type = match params.timesheet_invoice_type {
@@ -262,18 +295,26 @@ pub fn start_timesheet_timer(
             t.clone()
         }
         None => {
-            let bill_type = ctx
-                .db
-                .project_project()
-                .id()
-                .find(&params.project_id)
-                .map(|p| p.bill_type)
-                .unwrap_or_else(|| "no".to_string());
-            TimesheetInvoiceType::default_for_bill_type(&bill_type)
+            TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
                 .as_str()
                 .to_string()
         }
     };
+
+    if let Some(tid) = params.task_id {
+        let task = ctx
+            .db
+            .project_task()
+            .id()
+            .find(&tid)
+            .ok_or("Task not found")?;
+        if task.project_id != Some(params.project_id) {
+            return Err("Task does not belong to this project".to_string());
+        }
+        if task.company_id != company_id {
+            return Err("Task does not belong to this company".to_string());
+        }
+    }
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
@@ -336,7 +377,6 @@ pub fn start_timesheet_timer(
 pub fn stop_timesheet_timer(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     timesheet_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "write")?;
@@ -351,6 +391,8 @@ pub fn stop_timesheet_timer(
     if entry.organization_id != organization_id {
         return Err("Timesheet does not belong to this organization".to_string());
     }
+
+    let company_id = entry.company_id;
 
     if !entry.is_timer_running {
         return Err("Timer is not running".to_string());
@@ -430,10 +472,12 @@ pub fn stop_timesheet_timer(
 pub fn validate_timesheets(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
-    timesheet_ids: Vec<u64>,
+    params: ValidateTimesheetsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "validate")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let timesheet_ids = params.timesheet_ids;
 
     for tid in &timesheet_ids {
         let entry = ctx

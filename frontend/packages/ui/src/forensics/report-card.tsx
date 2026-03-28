@@ -20,6 +20,11 @@ import {
 } from "lucide-react"
 import type { ForensicReport } from "@/lib/forensic-report-types"
 import { severityConfig, statusConfig, incidentCategories } from "@/lib/forensic-report-types"
+import {
+  severityBadgeClass,
+  severitySolidBarClass,
+  statusBadgeClass,
+} from "@/lib/theme-colors"
 
 interface ReportCardProps {
   report: ForensicReport
@@ -67,13 +72,14 @@ export function ReportCard({ report, onClick, compact = false }: ReportCardProps
           "flex items-center gap-4 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
         )}
       >
-        <div className={cn(
-          "w-2 h-10 rounded-full shrink-0",
-          severity.color === "red" && "bg-red-500",
-          severity.color === "orange" && "bg-orange-500",
-          severity.color === "yellow" && "bg-yellow-500",
-          severity.color === "green" && "bg-green-500"
-        )} />
+        <div
+          className={cn(
+            "w-2 h-10 rounded-full shrink-0",
+            severity.color in severitySolidBarClass
+              ? severitySolidBarClass[severity.color as keyof typeof severitySolidBarClass]
+              : "bg-muted",
+          )}
+        />
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -108,10 +114,9 @@ export function ReportCard({ report, onClick, compact = false }: ReportCardProps
               variant="outline"
               className={cn(
                 "gap-1",
-                severity.color === "red" && "border-red-500/50 bg-red-500/10 text-red-600",
-                severity.color === "orange" && "border-orange-500/50 bg-orange-500/10 text-orange-600",
-                severity.color === "yellow" && "border-yellow-500/50 bg-yellow-500/10 text-yellow-600",
-                severity.color === "green" && "border-green-500/50 bg-green-500/10 text-green-600"
+                severity.color in severityBadgeClass
+                  ? severityBadgeClass[severity.color as keyof typeof severityBadgeClass]
+                  : undefined,
               )}
             >
               {severityIcons[report.severity]}
@@ -121,10 +126,9 @@ export function ReportCard({ report, onClick, compact = false }: ReportCardProps
               variant="outline"
               className={cn(
                 "gap-1",
-                status.color === "red" && "border-red-500/50 bg-red-500/10 text-red-600",
-                status.color === "yellow" && "border-yellow-500/50 bg-yellow-500/10 text-yellow-600",
-                status.color === "blue" && "border-blue-500/50 bg-blue-500/10 text-blue-600",
-                status.color === "green" && "border-green-500/50 bg-green-500/10 text-green-600"
+                status.color in statusBadgeClass
+                  ? statusBadgeClass[status.color as keyof typeof statusBadgeClass]
+                  : undefined,
               )}
             >
               {statusIcons[report.status]}

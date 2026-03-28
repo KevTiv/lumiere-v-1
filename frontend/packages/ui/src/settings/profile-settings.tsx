@@ -14,17 +14,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { 
-  User, 
-  Mail, 
-  Building, 
-  Bell, 
-  Moon, 
+import {
+  User,
+  Mail,
+  Building,
+  Bell,
+  Moon,
   Sun,
   Monitor,
-  Globe
+  Globe,
+  Palette,
+  Sparkles,
+  LayoutTemplate,
+  Circle,
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
+import { useTheme } from "../components/theme-provider"
+import { cn } from "../lib/utils"
 
 interface ProfileSettingsProps {
   section: "profile" | "notifications" | "appearance"
@@ -33,6 +39,7 @@ interface ProfileSettingsProps {
 export function ProfileSettings({ section }: ProfileSettingsProps) {
   const { t } = useTranslation()
   const { currentUser } = useRBAC()
+  const { theme, setTheme, palette, setPalette, shell, setShell } = useTheme()
 
   if (section === "profile") {
     return (
@@ -196,22 +203,94 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { id: "light", label: t("settings.profile.themes.light"), icon: Sun },
-                { id: "dark", label: t("settings.profile.themes.dark"), icon: Moon },
-                { id: "system", label: t("settings.profile.themes.system"), icon: Monitor },
-              ].map(theme => {
-                const Icon = theme.icon
+                { id: "light" as const, label: t("settings.profile.themes.light"), icon: Sun },
+                { id: "dark" as const, label: t("settings.profile.themes.dark"), icon: Moon },
+                { id: "system" as const, label: t("settings.profile.themes.system"), icon: Monitor },
+              ].map((opt) => {
+                const Icon = opt.icon
+                const active = theme === opt.id
                 return (
                   <button
-                    key={theme.id}
-                    className={`p-4 rounded-lg border-2 transition-colors ${
-                      theme.id === "dark" 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover:border-primary/50"
-                    }`}
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTheme(opt.id)}
+                    className={cn(
+                      "p-4 rounded-lg border-2 transition-colors text-center",
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50",
+                    )}
                   >
                     <Icon className="h-6 w-6 mx-auto mb-2" />
-                    <p className="text-sm font-medium">{theme.label}</p>
+                    <p className="text-sm font-medium">{opt.label}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("settings.profile.palette")}</CardTitle>
+            <CardDescription>{t("settings.profile.paletteDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+              {[
+                { id: "default" as const, label: t("settings.profile.palettes.default"), icon: Circle },
+                { id: "ocean" as const, label: t("settings.profile.palettes.ocean"), icon: Palette },
+              ].map((opt) => {
+                const Icon = opt.icon
+                const active = palette === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setPalette(opt.id)}
+                    className={cn(
+                      "p-4 rounded-lg border-2 transition-colors text-center",
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50",
+                    )}
+                  >
+                    <Icon className="h-6 w-6 mx-auto mb-2" />
+                    <p className="text-sm font-medium">{opt.label}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("settings.profile.shell")}</CardTitle>
+            <CardDescription>{t("settings.profile.shellDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { id: "default" as const, label: t("settings.profile.shells.default"), icon: LayoutTemplate },
+                { id: "css-art" as const, label: t("settings.profile.shells.cssArt"), icon: Sparkles },
+              ].map((opt) => {
+                const Icon = opt.icon
+                const active = shell === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setShell(opt.id)}
+                    className={cn(
+                      "p-4 rounded-lg border-2 transition-colors text-center",
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50",
+                    )}
+                  >
+                    <Icon className="h-6 w-6 mx-auto mb-2" />
+                    <p className="text-sm font-medium">{opt.label}</p>
                   </button>
                 )
               })}

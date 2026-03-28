@@ -8,6 +8,7 @@
 ///   - StockCountSheet
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
 
@@ -165,6 +166,7 @@ pub struct AdjustmentReason {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockInventoryParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub location_ids: Vec<u64>,
     pub product_ids: Vec<u64>,
@@ -254,10 +256,11 @@ pub struct CreateAdjustmentReasonParams {
 pub fn create_stock_inventory(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockInventoryParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_inventory", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Inventory name cannot be empty".to_string());
@@ -407,7 +410,6 @@ pub fn create_inventory_adjustment(
 pub fn create_stock_inventory_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     inventory_id: u64,
     params: CreateStockInventoryLineParams,
 ) -> Result<(), String> {
@@ -422,9 +424,6 @@ pub fn create_stock_inventory_line(
 
     if inventory.organization_id != organization_id {
         return Err("Inventory does not belong to this organization".to_string());
-    }
-    if inventory.company_id != company_id {
-        return Err("Inventory does not belong to this company".to_string());
     }
 
     let line = ctx.db.stock_inventory_line().insert(StockInventoryLine {
@@ -469,7 +468,7 @@ pub fn create_stock_inventory_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(inventory.company_id),
             table_name: "stock_inventory_line",
             record_id: line.id,
             action: "CREATE",
@@ -568,7 +567,6 @@ pub fn create_adjustment_reason(
 pub fn update_stock_inventory_state(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     inventory_id: u64,
     new_state: String,
 ) -> Result<(), String> {
@@ -584,11 +582,9 @@ pub fn update_stock_inventory_state(
     if inventory.organization_id != organization_id {
         return Err("Inventory does not belong to this organization".to_string());
     }
-    if inventory.company_id != company_id {
-        return Err("Inventory does not belong to this company".to_string());
-    }
 
     let old_state = inventory.state.clone();
+    let inventory_company_id = inventory.company_id;
 
     ctx.db.stock_inventory().id().update(StockInventory {
         state: new_state.clone(),
@@ -600,7 +596,7 @@ pub fn update_stock_inventory_state(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(inventory_company_id),
             table_name: "stock_inventory",
             record_id: inventory_id,
             action: "UPDATE",

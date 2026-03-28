@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newWorkflowForm } from "@lumiere/ui"
+import { ModuleView, FormModal, newWorkflowForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { workflowsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useWorkflows, useWorkflowInstances, useCreateWorkflow } from "@/hooks/workflows"
 import type { CreateWorkflowParams } from "@/hooks/workflows"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface WorkflowsClientProps {
   initialWorkflows?: Record<string, unknown>[]
@@ -14,10 +15,21 @@ interface WorkflowsClientProps {
   organizationId?: number
 }
 
-export function WorkflowsClient({ initialWorkflows, initialInstances, organizationId }: WorkflowsClientProps) {
+type WorkflowsClientLoadedProps = Omit<WorkflowsClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function WorkflowsClient(props: WorkflowsClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <WorkflowsClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizationId }: WorkflowsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => workflowsModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: workflows = [] } = useWorkflows(orgId, initialWorkflows)
@@ -89,10 +101,14 @@ export function WorkflowsClient({ initialWorkflows, initialInstances, organizati
     formData: Record<string, unknown>,
   ) => {
     if (action === "createWorkflow") {
+      const name = String(formData.name ?? "").trim()
+      const model = String(formData.model ?? "").trim()
+      const stateField = String(formData.stateField ?? "").trim()
+      if (!name || !model || !stateField) return
       createWorkflow.mutate({
-        name: formData.name as string,
-        model: formData.model as string,
-        stateField: formData.stateField as string,
+        name,
+        model,
+        stateField,
         description: formData.description as string | undefined,
         metadata: undefined,
       } as unknown as CreateWorkflowParams)

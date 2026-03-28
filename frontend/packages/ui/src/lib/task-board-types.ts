@@ -96,28 +96,28 @@ export interface TaskBoardConfig {
 
 // Default columns configuration
 export const defaultColumns: TaskColumn[] = [
-  { id: "backlog", title: "Backlog", color: "bg-slate-500" },
-  { id: "todo", title: "To Do", color: "bg-blue-500" },
-  { id: "in-progress", title: "In Progress", color: "bg-amber-500" },
-  { id: "review", title: "Review", color: "bg-purple-500" },
-  { id: "done", title: "Done", color: "bg-green-500" },
+  { id: "backlog", title: "Backlog", color: "bg-muted-foreground" },
+  { id: "todo", title: "To Do", color: "bg-info" },
+  { id: "in-progress", title: "In Progress", color: "bg-warning" },
+  { id: "review", title: "Review", color: "bg-category-3" },
+  { id: "done", title: "Done", color: "bg-success" },
 ]
 
 // Priority configuration
 export const priorityConfig: Record<TaskPriority, { label: string; color: string; icon: string }> = {
-  low: { label: "Low", color: "text-slate-500", icon: "arrow-down" },
-  medium: { label: "Medium", color: "text-blue-500", icon: "minus" },
-  high: { label: "High", color: "text-orange-500", icon: "arrow-up" },
-  urgent: { label: "Urgent", color: "text-red-500", icon: "alert-triangle" },
+  low: { label: "Low", color: "text-muted-foreground", icon: "arrow-down" },
+  medium: { label: "Medium", color: "text-info", icon: "minus" },
+  high: { label: "High", color: "text-warning", icon: "arrow-up" },
+  urgent: { label: "Urgent", color: "text-destructive", icon: "alert-triangle" },
 }
 
 // Task type configuration
 export const taskTypeConfig: Record<TaskType, { label: string; color: string; icon: string }> = {
-  task: { label: "Task", color: "bg-blue-500", icon: "check-square" },
-  bug: { label: "Bug", color: "bg-red-500", icon: "bug" },
-  feature: { label: "Feature", color: "bg-green-500", icon: "zap" },
-  story: { label: "Story", color: "bg-purple-500", icon: "book-open" },
-  epic: { label: "Epic", color: "bg-violet-500", icon: "layers" },
+  task: { label: "Task", color: "bg-info", icon: "check-square" },
+  bug: { label: "Bug", color: "bg-destructive", icon: "bug" },
+  feature: { label: "Feature", color: "bg-success", icon: "zap" },
+  story: { label: "Story", color: "bg-category-3", icon: "book-open" },
+  epic: { label: "Epic", color: "bg-category-1", icon: "layers" },
 }
 
 // Sample data

@@ -135,8 +135,8 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10">
-              <BookMarked className="h-5 w-5 text-amber-500" />
+            <div className="p-2 rounded-lg bg-warning/10">
+              <BookMarked className="h-5 w-5 text-warning" />
             </div>
             <div className="flex-1">
               <CardTitle className="text-base">{t("settings.customFields.title")}</CardTitle>
@@ -206,7 +206,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-red-500 hover:text-red-600"
+                      className="h-8 w-8 text-destructive hover:text-destructive/90"
                       onClick={() => handleDeleteField(customField.id)}
                     >
                       <Trash2 className="h-4 w-4" />

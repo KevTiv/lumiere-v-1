@@ -11,6 +11,7 @@
 
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::sales::sales_core::sale_order;
 use crate::subscriptions::tables::*;
@@ -20,9 +21,9 @@ use crate::subscriptions::tables::*;
 // ============================================================================
 
 /// Params for creating a subscription plan.
-/// Scope: `company_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateSubscriptionPlanParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub code: String,
     pub description: Option<String>,
@@ -54,9 +55,9 @@ pub struct CreateSubscriptionPlanParams {
 }
 
 /// Params for creating a subscription from sale order.
-/// Scope: `company_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateSubscriptionFromSaleOrderParams {
+    pub company_id: Option<u64>,
     pub sale_order_id: u64,
     pub code: Option<String>,
     pub plan_id: u64,
@@ -261,10 +262,11 @@ pub struct UpdateRevenueRecognitionRuleParams {
 pub fn create_subscription_plan(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateSubscriptionPlanParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription_plan", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     // Validate required fields
     if params.name.is_empty() {
@@ -370,7 +372,6 @@ pub fn create_subscription_plan(
 pub fn create_subscription_from_sale_order(
     ctx: &ReducerContext,
     organization_id: u64,
-    _company_id: u64,
     params: CreateSubscriptionFromSaleOrderParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "create")?;
@@ -382,6 +383,13 @@ pub fn create_subscription_from_sale_order(
         .id()
         .find(&params.sale_order_id)
         .ok_or("Sale order not found")?;
+
+    if let Some(cid) = params.company_id {
+        let resolved = company_id_from_scope(ctx, organization_id, Some(cid))?;
+        if resolved != order.company_id {
+            return Err("Selected company does not match the sale order".to_string());
+        }
+    }
 
     use crate::types::SaleState;
     if order.state != SaleState::Sale && order.state != SaleState::Done {

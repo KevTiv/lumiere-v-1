@@ -3,11 +3,12 @@
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { MapLayerLegend } from "@lumiere/ui"
+import { MapLayerLegend, MissingOrganization } from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
 import type { MapPinData } from "@lumiere/ui/lib/map-types"
 import { Warehouse, Truck, Monitor, Package, TrendingUp, MapPin } from "lucide-react"
 import { useFleetVehicles, usePosTerminals, useWarehouseGeo } from "@/hooks/map"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
 const MapView = dynamic(
@@ -45,8 +46,15 @@ interface MapClientProps {
   organizationId?: number
 }
 
-export function MapClient({ organizationId }: MapClientProps) {
-  const orgId = BigInt(organizationId ?? 1)
+export function MapClient(props: MapClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <MapClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function MapClientLoaded({ organizationId }: { organizationId: number }) {
+  const { orgId } = orgBigInts(organizationId)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )

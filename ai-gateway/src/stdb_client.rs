@@ -40,6 +40,40 @@ struct SqlRequest {
 }
 
 impl StdbClient {
+    /// Run an arbitrary SQL query against SpacetimeDB's SQL HTTP API.
+    ///
+    /// This helper is intended for generic table/activity polling flows where
+    /// callers need direct access to raw row values.
+    pub async fn query_sql(&self, sql: &str) -> Result<Vec<Value>> {
+        let url = format!("{}/v1/sql/{}", self.base_url, self.module);
+
+        let resp = self
+            .http
+            .post(&url)
+            .bearer_auth(&self.token)
+            .header("Content-Type", "application/json")
+            .json(&SqlRequest {
+                query: sql.to_string(),
+            })
+            .send()
+            .await
+            .with_context(|| format!("Failed to execute SQL query: {}", sql))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("SQL query failed {}: {}", status, body);
+        }
+
+        resp.json()
+            .await
+            .context("Failed to parse SQL query response")
+    }
+
+    /// Query an entire table via `SELECT * FROM <table>`.
+    pub async fn query_table(&self, table: &str) -> Result<Vec<Value>> {
+        self.query_sql(&format!("SELECT * FROM {}", table)).await
+    }
     pub fn new(base_url: String, module: String, token: String) -> Self {
         StdbClient {
             http: reqwest::Client::new(),

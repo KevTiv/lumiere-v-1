@@ -98,7 +98,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
     <div className={cn(
       "group rounded-lg border transition-colors",
       section.status === "complete"
-        ? "border-green-200 bg-green-50/30 dark:border-green-900/40 dark:bg-green-900/10"
+        ? "border-success/35 bg-success/10 dark:border-success/40 dark:bg-success/15"
         : "border-border bg-card hover:border-primary/30"
     )}>
       {/* Section header */}
@@ -135,7 +135,7 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
             <button
               type="button"
               onClick={() => setShowSuggestion(!showSuggestion)}
-              className={cn("p-0.5 rounded transition-colors", showSuggestion ? "text-amber-500" : "text-muted-foreground hover:text-amber-500")}
+              className={cn("p-0.5 rounded transition-colors", showSuggestion ? "text-warning" : "text-muted-foreground hover:text-warning")}
               title="AI suggestion"
             >
               <Lightbulb className="h-3.5 w-3.5" />
@@ -176,17 +176,17 @@ function SectionCard({ section, index, total, dispatch, analysis }: SectionCardP
 
       {/* AI suggestion strip */}
       {showSuggestion && suggestion && (
-        <div className="px-3 py-2 bg-amber-50/60 dark:bg-amber-900/10 border-b border-amber-200/50 dark:border-amber-900/30">
+        <div className="px-3 py-2 bg-warning/10 border-b border-warning/25">
           <div className="flex items-start gap-1.5">
-            <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <Lightbulb className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 mb-0.5">{t("proposalWorkspace.tenderEditorPanel.aiSuggestion")}</p>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed italic line-clamp-3">"{suggestion}"</p>
+              <p className="text-[10px] font-semibold text-warning mb-0.5">{t("proposalWorkspace.tenderEditorPanel.aiSuggestion")}</p>
+              <p className="text-[11px] text-foreground/80 leading-relaxed italic line-clamp-3">"{suggestion}"</p>
             </div>
             <button
               type="button"
               onClick={() => handleContentChange(section.content + (section.content ? "\n\n" : "") + suggestion)}
-              className="text-[10px] text-amber-600 hover:underline shrink-0"
+              className="text-[10px] text-warning hover:underline shrink-0"
             >
               {t("proposalWorkspace.tenderEditorPanel.insert")}
             </button>

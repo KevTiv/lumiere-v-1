@@ -12,6 +12,5 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   timesheetId: __t.u64(),
 };

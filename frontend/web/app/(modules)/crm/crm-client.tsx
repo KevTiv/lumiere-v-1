@@ -1,25 +1,30 @@
 "use client"
 
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
+import {
+  crmParamsToJson,
+  toCreateActivityParams,
+  toCreateContactParams,
+  toCreateLeadParams,
+  toCreateOpportunityParams,
+} from "@/lib/crm-create-params"
 import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
-import type {
-  CreateContactParams,
-  CreateLeadParams,
-  CreateOpportunityParams,
-} from "@/hooks/crm"
 import {
   useActivities,
   useContacts,
+  useCreateActivity,
   useCreateContact,
   useCreateLead,
   useCreateOpportunity,
   useLeads,
   useOpportunities,
+  useOpportunityStages,
 } from "@/hooks/crm"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
-import { FormModal, ModuleView, newActivityForm, newContactForm, newLeadForm, newOpportunityForm } from "@lumiere/ui"
+import { FormModal, ModuleView, newActivityForm, newContactForm, newLeadForm, newOpportunityForm, MissingOrganization } from "@lumiere/ui"
 import { useMemo, useState } from "react"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface CrmClientProps {
   initialLeads?: Record<string, unknown>[]
@@ -28,24 +33,55 @@ interface CrmClientProps {
   organizationId?: number
 }
 
-export function CrmClient({
+type CrmClientLoadedProps = Omit<CrmClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function CrmClient(props: CrmClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <CrmClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function CrmClientLoaded({
   initialLeads,
   initialOpportunities,
   initialContacts,
   organizationId,
-}: CrmClientProps) {
+}: CrmClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: leads = [] } = useLeads(orgId, initialLeads)
   const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: activities = [] } = useActivities(orgId)
+  const { data: opportunityStages = [] } = useOpportunityStages(orgId)
+
+  const opportunityStageOptions = useMemo(
+    () =>
+      [...opportunityStages]
+        .sort(
+          (a, b) =>
+            Number((a as Record<string, unknown>).sequence ?? 0) -
+            Number((b as Record<string, unknown>).sequence ?? 0),
+        )
+        .map((s) => {
+          const row = s as Record<string, unknown>
+          return {
+            value: String(row.id ?? ""),
+            label: String(row.name ?? row.id ?? ""),
+          }
+        }),
+    [opportunityStages],
+  )
 
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId)
   const createContact = useCreateContact(orgId)
+  const createActivity = useCreateActivity(orgId)
 
   const moduleConfig = useMemo(() => crmModuleConfig(t), [t])
 
@@ -79,7 +115,11 @@ export function CrmClient({
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             create_lead: () => setQuickActionForm({ form: newLeadForm(t), action: "createLead" }),
-            create_opportunity: () => setQuickActionForm({ form: newOpportunityForm(t), action: "createOpportunity" }),
+            create_opportunity: () =>
+              setQuickActionForm({
+                form: newOpportunityForm(t, opportunityStageOptions),
+                action: "createOpportunity",
+              }),
             create_contact: () => setQuickActionForm({ form: newContactForm(t), action: "createContact" }),
             log_activity: () => setQuickActionForm({ form: newActivityForm(t), action: "createActivity" }),
           }
@@ -127,7 +167,7 @@ export function CrmClient({
         return w
       }),
     }))
-  }, [leads, opportunities, contacts, moduleConfig, t])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, t])
 
   const config = useMemo(
     () => ({
@@ -155,11 +195,17 @@ export function CrmClient({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createLead") {
-      createLead.mutate(formData as unknown as CreateLeadParams)
+      const p = toCreateLeadParams(formData)
+      if (p) createLead.mutate(crmParamsToJson(p))
     } else if (action === "createOpportunity") {
-      createOpportunity.mutate(formData as unknown as CreateOpportunityParams)
+      const p = toCreateOpportunityParams(formData)
+      if (p) createOpportunity.mutate(crmParamsToJson(p))
     } else if (action === "createContact") {
-      createContact.mutate(formData as unknown as CreateContactParams)
+      const p = toCreateContactParams(formData)
+      if (p) createContact.mutate(crmParamsToJson(p))
+    } else if (action === "createActivity") {
+      const p = toCreateActivityParams(formData)
+      if (p) createActivity.mutate(crmParamsToJson(p))
     }
   }
 

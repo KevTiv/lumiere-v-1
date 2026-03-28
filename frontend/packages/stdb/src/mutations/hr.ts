@@ -15,7 +15,9 @@ export function useCreateEmployee(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateEmployeeParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createEmployee({ organizationId, companyId, params });
+      const scoped: CreateEmployeeParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createEmployee({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-employees"] });
@@ -29,7 +31,9 @@ export function useCreateContract(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateContractParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createContract({ organizationId, companyId, params });
+      const scoped: CreateContractParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createContract({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-contracts"] });
@@ -85,7 +89,9 @@ export function useCreatePayslip(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreatePayslipParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createPayslip({ organizationId, companyId, params });
+      const scoped: CreatePayslipParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createPayslip({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-payslips"] });

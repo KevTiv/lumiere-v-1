@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newProductForm = (t: TFunction): FormConfig => ({
   id: "new-product",
   title: t("inventory.forms.newProduct.title"),
@@ -12,6 +14,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("inventory.forms.newProduct.fields.name"),
           placeholder: t("inventory.forms.newProduct.fields.namePlaceholder"),
@@ -20,6 +23,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "defaultCode",
+          name: "defaultCode",
           type: "text",
           label: t("inventory.forms.newProduct.fields.defaultCode"),
           placeholder: t("inventory.forms.newProduct.fields.defaultCodePlaceholder"),
@@ -27,6 +31,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "type",
+          name: "type",
           type: "select",
           label: t("inventory.forms.newProduct.fields.type"),
           required: true,
@@ -40,11 +45,58 @@ export const newProductForm = (t: TFunction): FormConfig => ({
       ],
     },
     {
+      id: "product-classification",
+      title: t("inventory.forms.newProduct.sections.classification"),
+      fields: [
+        {
+          id: "categId",
+          name: "categId",
+          type: "select",
+          label: t("inventory.forms.newProduct.fields.categId"),
+          placeholder: t("inventory.forms.newProduct.fields.categIdPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("inventory.forms.newProduct.fields.uomId"),
+          placeholder: t("inventory.forms.newProduct.fields.uomIdPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "uomPoId",
+          name: "uomPoId",
+          type: "select",
+          label: t("inventory.forms.newProduct.fields.uomPoId"),
+          placeholder: t("inventory.forms.newProduct.fields.uomPoPlaceholder"),
+          required: false,
+          width: "1/2",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
       id: "product-pricing",
       title: t("inventory.forms.newProduct.sections.pricing"),
       fields: [
         {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("inventory.forms.newProduct.fields.pricelistId"),
+          placeholder: t("inventory.forms.newProduct.fields.pricelistPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
           id: "standardPrice",
+          name: "standardPrice",
           type: "number",
           label: t("inventory.forms.newProduct.fields.standardPrice"),
           placeholder: t("inventory.forms.newProduct.fields.standardPricePlaceholder"),
@@ -52,12 +104,14 @@ export const newProductForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "saleOk",
+          name: "saleOk",
           type: "checkbox",
           label: t("inventory.forms.newProduct.fields.saleOk"),
           width: "1/2",
         },
         {
           id: "purchaseOk",
+          name: "purchaseOk",
           type: "checkbox",
           label: t("inventory.forms.newProduct.fields.purchaseOk"),
           width: "1/2",
@@ -78,33 +132,41 @@ export const newTransferForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "pickingTypeId",
-          type: "number",
+          name: "pickingTypeId",
+          type: "select",
           label: t("inventory.forms.newTransfer.fields.pickingTypeId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "locationId",
-          type: "number",
+          name: "locationId",
+          type: "select",
           label: t("inventory.forms.newTransfer.fields.locationId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "locationDestId",
-          type: "number",
+          name: "locationDestId",
+          type: "select",
           label: t("inventory.forms.newTransfer.fields.locationDestId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "scheduledDate",
+          name: "scheduledDate",
           type: "date",
           label: t("inventory.forms.newTransfer.fields.scheduledDate"),
           width: "1/2",
         },
         {
           id: "origin",
+          name: "origin",
           type: "text",
           label: t("inventory.forms.newTransfer.fields.origin"),
           placeholder: t("inventory.forms.newTransfer.fields.originPlaceholder"),
@@ -126,6 +188,7 @@ export const newInventoryAdjustmentForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("inventory.forms.newInventoryAdjustment.fields.name"),
           placeholder: t("inventory.forms.newInventoryAdjustment.fields.namePlaceholder"),
@@ -134,8 +197,37 @@ export const newInventoryAdjustmentForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "date",
+          name: "date",
           type: "date",
           label: t("inventory.forms.newInventoryAdjustment.fields.date"),
+          width: "1/2",
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("inventory.forms.newInventoryAdjustment.fields.productId"),
+          placeholder: t("inventory.forms.newInventoryAdjustment.fields.productPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "locationId",
+          name: "locationId",
+          type: "select",
+          label: t("inventory.forms.newInventoryAdjustment.fields.locationId"),
+          placeholder: t("inventory.forms.newInventoryAdjustment.fields.locationPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "inventoryQuantity",
+          name: "inventoryQuantity",
+          type: "number",
+          label: t("inventory.forms.newInventoryAdjustment.fields.inventoryQuantity"),
+          required: true,
           width: "1/2",
         },
       ],

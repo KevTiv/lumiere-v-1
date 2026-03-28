@@ -1,6 +1,11 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import {
+  widgetAccentTileClass,
+  widgetRingGlowFilter,
+  type WidgetAccentKey,
+} from "@/lib/theme-colors"
 
 export interface ActivityRingData {
   rings: ActivityRing[]
@@ -13,35 +18,8 @@ export interface ActivityRing {
   label: string
   value: number
   max: number
-  color: "red" | "green" | "blue" | "orange" | "purple" | "teal"
+  color: WidgetAccentKey
   unit?: string
-}
-
-const ringColors = {
-  red: "stroke-red-500",
-  green: "stroke-emerald-500",
-  blue: "stroke-blue-500",
-  orange: "stroke-orange-500",
-  purple: "stroke-purple-500",
-  teal: "stroke-teal-500",
-}
-
-const textColors = {
-  red: "text-red-400",
-  green: "text-emerald-400",
-  blue: "text-blue-400",
-  orange: "text-orange-400",
-  purple: "text-purple-400",
-  teal: "text-teal-400",
-}
-
-const bgColors = {
-  red: "bg-red-500",
-  green: "bg-emerald-500",
-  blue: "bg-blue-500",
-  orange: "bg-orange-500",
-  purple: "bg-purple-500",
-  teal: "bg-teal-500",
 }
 
 export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
@@ -85,10 +63,10 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
                   strokeDashoffset={offset}
                   className={cn(
                     "transition-all duration-700 ease-out",
-                    ringColors[ring.color]
+                    widgetAccentTileClass[ring.color].stroke
                   )}
                   style={{
-                    filter: `drop-shadow(0 0 6px ${ring.color === 'red' ? '#ef4444' : ring.color === 'green' ? '#10b981' : ring.color === 'blue' ? '#3b82f6' : ring.color === 'orange' ? '#f97316' : ring.color === 'purple' ? '#a855f7' : '#14b8a6'}40)`,
+                    filter: widgetRingGlowFilter[ring.color],
                   }}
                 />
               </g>
@@ -112,18 +90,21 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
             const percentage = Math.round((ring.value / ring.max) * 100)
             return (
               <div key={ring.id} className="flex items-center gap-3">
-                <div className={cn("w-3 h-3 rounded-full", bgColors[ring.color])} />
+                <div className={cn("w-3 h-3 rounded-full", widgetAccentTileClass[ring.color].bar)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-medium truncate">{ring.label}</span>
-                    <span className={cn("text-sm font-semibold", textColors[ring.color])}>
+                    <span className={cn("text-sm font-semibold", widgetAccentTileClass[ring.color].ringText)}>
                       {ring.value}{ring.unit || ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 h-1.5 rounded-full bg-muted/30 overflow-hidden">
                       <div
-                        className={cn("h-full rounded-full transition-all duration-500", bgColors[ring.color])}
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          widgetAccentTileClass[ring.color].bar
+                        )}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>

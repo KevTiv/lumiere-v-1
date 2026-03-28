@@ -10,7 +10,9 @@ export function useCreateSaleOrder(organizationId: bigint, companyId: bigint) {
     mutationFn: (params: CreateSaleOrderParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createSaleOrder({ organizationId, companyId, params });
+      const scoped: CreateSaleOrderParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createSaleOrder({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sale-orders"] });

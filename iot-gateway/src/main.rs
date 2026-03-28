@@ -22,7 +22,10 @@
 ///    - GET /v1/ws?hub_id=<id>
 use std::time::Duration;
 
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use tokio::time;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -59,11 +62,8 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // ── MQTT client ───────────────────────────────────────────────────────
-    let mut mqtt_options = MqttOptions::new(
-        &config.mqtt_client_id,
-        &config.mqtt_host,
-        config.mqtt_port,
-    );
+    let mut mqtt_options =
+        MqttOptions::new(&config.mqtt_client_id, &config.mqtt_host, config.mqtt_port);
     mqtt_options.set_keep_alive(Duration::from_secs(30));
     mqtt_options.set_clean_session(true);
 
@@ -211,7 +211,11 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
         }
 
         other => {
-            tracing::debug!("Unhandled MQTT event type '{}' for device {}", other, device_id);
+            tracing::debug!(
+                "Unhandled MQTT event type '{}' for device {}",
+                other,
+                device_id
+            );
         }
     }
 }
@@ -372,12 +376,7 @@ async fn deliver_via_mqtt(
             }
         }
         Err(e) => {
-            tracing::error!(
-                "Failed to publish action {} to {}: {}",
-                action_id,
-                topic,
-                e
-            );
+            tracing::error!("Failed to publish action {} to {}: {}", action_id, topic, e);
         }
     }
 }

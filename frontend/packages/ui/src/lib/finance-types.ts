@@ -183,21 +183,21 @@ export interface FinancialSummary {
 // Status configurations
 export const invoiceStatusConfig: Record<InvoiceStatus, { label: string; color: string; bgColor: string }> = {
   draft: { label: "Draft", color: "text-muted-foreground", bgColor: "bg-muted" },
-  sent: { label: "Sent", color: "text-blue-600", bgColor: "bg-blue-500/10" },
-  viewed: { label: "Viewed", color: "text-purple-600", bgColor: "bg-purple-500/10" },
-  partial: { label: "Partial", color: "text-amber-600", bgColor: "bg-amber-500/10" },
-  paid: { label: "Paid", color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-  overdue: { label: "Overdue", color: "text-red-600", bgColor: "bg-red-500/10" },
+  sent: { label: "Sent", color: "text-info", bgColor: "bg-info/10" },
+  viewed: { label: "Viewed", color: "text-category-3", bgColor: "bg-category-3/10" },
+  partial: { label: "Partial", color: "text-warning", bgColor: "bg-warning/10" },
+  paid: { label: "Paid", color: "text-success", bgColor: "bg-success/10" },
+  overdue: { label: "Overdue", color: "text-destructive", bgColor: "bg-destructive/10" },
   cancelled: { label: "Cancelled", color: "text-muted-foreground", bgColor: "bg-muted" },
 }
 
 export const billStatusConfig: Record<BillStatus, { label: string; color: string; bgColor: string }> = {
   draft: { label: "Draft", color: "text-muted-foreground", bgColor: "bg-muted" },
-  pending: { label: "Pending", color: "text-blue-600", bgColor: "bg-blue-500/10" },
-  approved: { label: "Approved", color: "text-purple-600", bgColor: "bg-purple-500/10" },
-  partial: { label: "Partial", color: "text-amber-600", bgColor: "bg-amber-500/10" },
-  paid: { label: "Paid", color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-  overdue: { label: "Overdue", color: "text-red-600", bgColor: "bg-red-500/10" },
+  pending: { label: "Pending", color: "text-info", bgColor: "bg-info/10" },
+  approved: { label: "Approved", color: "text-category-3", bgColor: "bg-category-3/10" },
+  partial: { label: "Partial", color: "text-warning", bgColor: "bg-warning/10" },
+  paid: { label: "Paid", color: "text-success", bgColor: "bg-success/10" },
+  overdue: { label: "Overdue", color: "text-destructive", bgColor: "bg-destructive/10" },
   cancelled: { label: "Cancelled", color: "text-muted-foreground", bgColor: "bg-muted" },
 }
 
@@ -211,11 +211,11 @@ export const paymentMethodConfig: Record<PaymentMethod, { label: string; icon: s
 }
 
 export const accountTypeConfig: Record<AccountType, { label: string; color: string; normalBalance: TransactionType }> = {
-  asset: { label: "Asset", color: "text-blue-600", normalBalance: "debit" },
-  liability: { label: "Liability", color: "text-red-600", normalBalance: "credit" },
-  equity: { label: "Equity", color: "text-purple-600", normalBalance: "credit" },
-  revenue: { label: "Revenue", color: "text-emerald-600", normalBalance: "credit" },
-  expense: { label: "Expense", color: "text-amber-600", normalBalance: "debit" },
+  asset: { label: "Asset", color: "text-category-1", normalBalance: "debit" },
+  liability: { label: "Liability", color: "text-category-2", normalBalance: "credit" },
+  equity: { label: "Equity", color: "text-category-3", normalBalance: "credit" },
+  revenue: { label: "Revenue", color: "text-category-4", normalBalance: "credit" },
+  expense: { label: "Expense", color: "text-category-5", normalBalance: "debit" },
 }
 
 // Sample Data
@@ -632,18 +632,18 @@ export interface POSOrder {
 }
 
 export const posProducts: POSProduct[] = [
-  { id: "pos-1", name: "Wireless Keyboard", sku: "WKB-001", price: 79.99, taxRate: 8, category: "Electronics", stock: 24, imageColor: "bg-blue-500" },
-  { id: "pos-2", name: "USB-C Hub (7-in-1)", sku: "UCH-007", price: 49.99, taxRate: 8, category: "Electronics", stock: 41, imageColor: "bg-indigo-500" },
-  { id: "pos-3", name: "Ergonomic Mouse", sku: "EM-003", price: 59.99, taxRate: 8, category: "Electronics", stock: 18, imageColor: "bg-violet-500" },
-  { id: "pos-4", name: "Monitor Stand", sku: "MS-002", price: 34.99, taxRate: 8, category: "Accessories", stock: 32, imageColor: "bg-slate-500" },
-  { id: "pos-5", name: "Desk Organizer", sku: "DO-005", price: 19.99, taxRate: 6, category: "Office", stock: 55, imageColor: "bg-amber-500" },
-  { id: "pos-6", name: "Notebook (A5)", sku: "NB-A5", price: 9.99, taxRate: 0, category: "Stationery", stock: 120, imageColor: "bg-emerald-500" },
-  { id: "pos-7", name: "HDMI Cable 2m", sku: "HDMI-2M", price: 14.99, taxRate: 8, category: "Cables", stock: 78, imageColor: "bg-orange-500" },
-  { id: "pos-8", name: "Webcam 1080p", sku: "WC-1080", price: 89.99, taxRate: 8, category: "Electronics", stock: 12, imageColor: "bg-cyan-500" },
-  { id: "pos-9", name: "Mechanical Pencil", sku: "MP-05", price: 4.99, taxRate: 0, category: "Stationery", stock: 200, imageColor: "bg-rose-500" },
-  { id: "pos-10", name: "Cable Organizer Kit", sku: "COK-01", price: 12.99, taxRate: 6, category: "Accessories", stock: 65, imageColor: "bg-teal-500" },
-  { id: "pos-11", name: "LED Desk Lamp", sku: "LDL-03", price: 44.99, taxRate: 8, category: "Lighting", stock: 29, imageColor: "bg-yellow-500" },
-  { id: "pos-12", name: "Sticky Notes Pack", sku: "SNP-100", price: 6.99, taxRate: 0, category: "Stationery", stock: 300, imageColor: "bg-pink-500" },
+  { id: "pos-1", name: "Wireless Keyboard", sku: "WKB-001", price: 79.99, taxRate: 8, category: "Electronics", stock: 24, imageColor: "bg-info" },
+  { id: "pos-2", name: "USB-C Hub (7-in-1)", sku: "UCH-007", price: 49.99, taxRate: 8, category: "Electronics", stock: 41, imageColor: "bg-category-1" },
+  { id: "pos-3", name: "Ergonomic Mouse", sku: "EM-003", price: 59.99, taxRate: 8, category: "Electronics", stock: 18, imageColor: "bg-category-3" },
+  { id: "pos-4", name: "Monitor Stand", sku: "MS-002", price: 34.99, taxRate: 8, category: "Accessories", stock: 32, imageColor: "bg-neutral-500" },
+  { id: "pos-5", name: "Desk Organizer", sku: "DO-005", price: 19.99, taxRate: 6, category: "Office", stock: 55, imageColor: "bg-warning" },
+  { id: "pos-6", name: "Notebook (A5)", sku: "NB-A5", price: 9.99, taxRate: 0, category: "Stationery", stock: 120, imageColor: "bg-success" },
+  { id: "pos-7", name: "HDMI Cable 2m", sku: "HDMI-2M", price: 14.99, taxRate: 8, category: "Cables", stock: 78, imageColor: "bg-accent" },
+  { id: "pos-8", name: "Webcam 1080p", sku: "WC-1080", price: 89.99, taxRate: 8, category: "Electronics", stock: 12, imageColor: "bg-category-7" },
+  { id: "pos-9", name: "Mechanical Pencil", sku: "MP-05", price: 4.99, taxRate: 0, category: "Stationery", stock: 200, imageColor: "bg-destructive" },
+  { id: "pos-10", name: "Cable Organizer Kit", sku: "COK-01", price: 12.99, taxRate: 6, category: "Accessories", stock: 65, imageColor: "bg-category-7" },
+  { id: "pos-11", name: "LED Desk Lamp", sku: "LDL-03", price: 44.99, taxRate: 8, category: "Lighting", stock: 29, imageColor: "bg-primary" },
+  { id: "pos-12", name: "Sticky Notes Pack", sku: "SNP-100", price: 6.99, taxRate: 0, category: "Stationery", stock: 300, imageColor: "bg-category-5" },
 ]
 
 // ── Financial summary calculation ────────────────────────────────────────────

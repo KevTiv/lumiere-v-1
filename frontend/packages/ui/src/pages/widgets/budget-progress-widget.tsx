@@ -28,9 +28,9 @@ export function BudgetProgressWidget({ data }: { data: BudgetProgressData }) {
     <div className="space-y-3">
       {data.budgets.map((b, i) => {
         const pct = b.planned > 0 ? Math.min((b.actual / b.planned) * 100, 150) : 0
-        const barColor = pct <= 90 ? "bg-emerald-500" : pct <= 100 ? "bg-amber-500" : "bg-red-500"
+        const barColor = pct <= 90 ? "bg-success" : pct <= 100 ? "bg-warning" : "bg-destructive"
         const textColor =
-          pct <= 90 ? "text-emerald-600" : pct <= 100 ? "text-amber-500" : "text-red-500"
+          pct <= 90 ? "text-success" : pct <= 100 ? "text-warning" : "text-destructive"
         return (
           <div key={i} className="space-y-1">
             <div className="flex justify-between text-xs">

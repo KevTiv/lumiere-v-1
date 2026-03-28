@@ -21,7 +21,7 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true })
 
 httpServer.on('upgrade', (req, socket, head) => {
-  const { pathname } = parse(req.url)
+  const pathname = new URL(req.url || '/', 'http://localhost').pathname
 
   // Only handle WebSocket upgrades for our proxy path
   if (pathname !== WS_PATH) {
@@ -38,10 +38,16 @@ httpServer.on('upgrade', (req, socket, head) => {
       return [key, value.join('=')]
     })
   )
-  const userToken = cookies['stdb_token']
+  let userToken = cookies['stdb_token']
+  if (!userToken) {
+    const auth = req.headers.authorization
+    if (auth?.startsWith('Bearer ')) {
+      userToken = auth.slice(7)
+    }
+  }
 
   if (!userToken) {
-    console.warn('[WS Proxy] Rejected connection: no stdb_token cookie')
+    console.warn('[WS Proxy] Rejected connection: no stdb_token cookie or Authorization header')
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
     socket.destroy()
     return

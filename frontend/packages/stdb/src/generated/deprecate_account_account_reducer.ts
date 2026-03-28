@@ -10,9 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  DeprecateAccountAccountParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   accountId: __t.u64(),
-  deprecated: __t.bool(),
+  get params() {
+    return DeprecateAccountAccountParams;
+  },
 };

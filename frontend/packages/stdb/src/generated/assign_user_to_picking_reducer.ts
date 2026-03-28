@@ -10,9 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  AssignUserToPickingParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   pickingId: __t.u64(),
-  userId: __t.option(__t.identity()),
+  get params() {
+    return AssignUserToPickingParams;
+  },
 };

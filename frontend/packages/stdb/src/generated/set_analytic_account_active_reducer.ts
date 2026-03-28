@@ -12,7 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  companyId: __t.u64(),
   accountId: __t.u64(),
   active: __t.bool(),
 };

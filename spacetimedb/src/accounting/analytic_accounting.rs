@@ -12,6 +12,7 @@
 /// - `AccountAnalyticDistributionModel` — Auto-distribution rules for analytic accounts
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ pub struct AccountAnalyticDistributionModel {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAnalyticAccountParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub code: Option<String>,
     pub active: bool,
@@ -169,6 +171,7 @@ pub struct CreateAnalyticAccountParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAnalyticAccountParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub code: Option<String>,
     pub partner_id: Option<u64>,
@@ -223,6 +226,7 @@ pub struct UpdateAnalyticLineParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAnalyticDistributionModelParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub partner_category_id: Option<u64>,
     pub product_id: Option<u64>,
@@ -234,6 +238,7 @@ pub struct CreateAnalyticDistributionModelParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAnalyticDistributionModelParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub partner_category_id: Option<u64>,
     pub product_id: Option<u64>,
@@ -251,10 +256,11 @@ pub struct UpdateAnalyticDistributionModelParams {
 pub fn create_analytic_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAnalyticAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_analytic_account", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Analytic account name is required".to_string());
@@ -330,7 +336,6 @@ pub fn create_analytic_account(
 pub fn update_analytic_account(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     account_id: u64,
     params: UpdateAnalyticAccountParams,
 ) -> Result<(), String> {
@@ -345,6 +350,11 @@ pub fn update_analytic_account(
 
     if account.organization_id != organization_id {
         return Err("Analytic account does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if account.company_id != company_id {
+        return Err("Analytic account does not belong to this company".to_string());
     }
 
     let old_values = serde_json::json!({
@@ -410,7 +420,7 @@ pub fn update_analytic_account(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(account.company_id),
             table_name: "account_analytic_account",
             record_id: account_id,
             action: "UPDATE",
@@ -429,7 +439,6 @@ pub fn update_analytic_account(
 pub fn create_analytic_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAnalyticLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_analytic_line", "create")?;
@@ -462,7 +471,7 @@ pub fn create_analytic_line(
         account_id: params.account_id,
         partner_id: params.partner_id,
         user_id: Some(ctx.sender()),
-        company_id,
+        company_id: account.company_id,
         currency_id: params.currency_id,
         general_account_id: params.general_account_id,
         move_id: params.move_id,
@@ -504,7 +513,7 @@ pub fn create_analytic_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(line.company_id),
             table_name: "account_analytic_line",
             record_id: line.id,
             action: "CREATE",
@@ -534,7 +543,6 @@ pub fn create_analytic_line(
 pub fn update_analytic_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
     params: UpdateAnalyticLineParams,
 ) -> Result<(), String> {
@@ -642,7 +650,7 @@ pub fn update_analytic_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(line.company_id),
             table_name: "account_analytic_line",
             record_id: line_id,
             action: "UPDATE",
@@ -661,7 +669,6 @@ pub fn update_analytic_line(
 pub fn delete_analytic_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     line_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_analytic_line", "delete")?;
@@ -705,7 +712,7 @@ pub fn delete_analytic_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(line.company_id),
             table_name: "account_analytic_line",
             record_id: line_id,
             action: "DELETE",
@@ -724,7 +731,6 @@ pub fn delete_analytic_line(
 pub fn create_analytic_distribution_model(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateAnalyticDistributionModelParams,
 ) -> Result<(), String> {
     check_permission(
@@ -733,6 +739,8 @@ pub fn create_analytic_distribution_model(
         "account_analytic_distribution_model",
         "create",
     )?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     // Validate distribution JSON
     let parsed: Vec<serde_json::Value> = serde_json::from_str(&params.analytic_distribution)
@@ -808,7 +816,6 @@ pub fn create_analytic_distribution_model(
 pub fn update_analytic_distribution_model(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     model_id: u64,
     params: UpdateAnalyticDistributionModelParams,
 ) -> Result<(), String> {
@@ -828,6 +835,11 @@ pub fn update_analytic_distribution_model(
 
     if model.organization_id != organization_id {
         return Err("Distribution model does not belong to this organization".to_string());
+    }
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if model.company_id != company_id {
+        return Err("Distribution model does not belong to this company".to_string());
     }
 
     let mut changed_fields = Vec::new();
@@ -907,7 +919,7 @@ pub fn update_analytic_distribution_model(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(model.company_id),
             table_name: "account_analytic_distribution_model",
             record_id: model_id,
             action: "UPDATE",
@@ -926,7 +938,6 @@ pub fn update_analytic_distribution_model(
 pub fn set_analytic_account_active(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     account_id: u64,
     active: bool,
 ) -> Result<(), String> {
@@ -956,7 +967,7 @@ pub fn set_analytic_account_active(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(account.company_id),
             table_name: "account_analytic_account",
             record_id: account_id,
             action: "SET_ACTIVE",

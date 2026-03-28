@@ -7,6 +7,7 @@
 ///   - StockPicking
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{InvoiceStatus, LineInvoiceStatus, ProcureMethod};
@@ -315,6 +316,7 @@ pub struct StockPicking {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockQuantParams {
+    pub company_id: Option<u64>,
     pub product_id: u64,
     pub product_variant_id: Option<u64>,
     pub location_id: u64,
@@ -340,6 +342,7 @@ pub struct CreateStockQuantParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockMoveParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub product_id: u64,
     pub product_tmpl_id: u64,
@@ -395,6 +398,7 @@ pub struct CreateStockMoveParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateStockPickingParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub picking_type_id: u64,
     pub location_id: u64,
@@ -453,6 +457,36 @@ pub struct CreateStockPickingParams {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateStockQuantQuantityParams {
+    pub company_id: Option<u64>,
+    pub quantity: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct StockQuantReserveParams {
+    pub company_id: Option<u64>,
+    pub reserve_qty: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct StockQuantUnreserveParams {
+    pub company_id: Option<u64>,
+    pub unreserve_qty: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct DoneStockMoveParams {
+    pub company_id: Option<u64>,
+    pub quantity_done: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AssignUserToPickingParams {
+    pub company_id: Option<u64>,
+    pub user_id: Option<Identity>,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -463,10 +497,11 @@ pub struct CreateStockPickingParams {
 pub fn create_stock_quant(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockQuantParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_quant", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let available_quantity = params.quantity - params.reserved_quantity;
     let value = params.quantity * params.cost;
@@ -529,10 +564,11 @@ pub fn create_stock_quant(
 pub fn update_stock_quant_quantity(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     quant_id: u64,
-    quantity: f64,
+    params: UpdateStockQuantQuantityParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let quant = ctx
         .db
         .stock_quant()
@@ -546,6 +582,7 @@ pub fn update_stock_quant_quantity(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    let quantity = params.quantity;
     let available_quantity = quantity - quant.reserved_quantity;
     let value = quantity * quant.cost;
 
@@ -578,10 +615,11 @@ pub fn update_stock_quant_quantity(
 pub fn reserve_stock_quant(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     quant_id: u64,
-    reserve_qty: f64,
+    params: StockQuantReserveParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let quant = ctx
         .db
         .stock_quant()
@@ -595,6 +633,7 @@ pub fn reserve_stock_quant(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    let reserve_qty = params.reserve_qty;
     let new_reserved = quant.reserved_quantity + reserve_qty;
     if new_reserved > quant.quantity {
         return Err("Cannot reserve more than available quantity".to_string());
@@ -632,10 +671,11 @@ pub fn reserve_stock_quant(
 pub fn unreserve_stock_quant(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     quant_id: u64,
-    unreserve_qty: f64,
+    params: StockQuantUnreserveParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let quant = ctx
         .db
         .stock_quant()
@@ -649,6 +689,7 @@ pub fn unreserve_stock_quant(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    let unreserve_qty = params.unreserve_qty;
     let new_reserved = (quant.reserved_quantity - unreserve_qty).max(0.0);
     let available_quantity = quant.quantity - new_reserved;
 
@@ -686,10 +727,11 @@ pub fn unreserve_stock_quant(
 pub fn create_stock_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockMoveParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_move", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Move name cannot be empty".to_string());
@@ -816,9 +858,11 @@ pub fn create_stock_move(
 pub fn confirm_stock_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     move_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let move_record = ctx
         .db
         .stock_move()
@@ -866,9 +910,11 @@ pub fn confirm_stock_move(
 pub fn assign_stock_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     move_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let move_record = ctx
         .db
         .stock_move()
@@ -916,10 +962,11 @@ pub fn assign_stock_move(
 pub fn done_stock_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     move_id: u64,
-    quantity_done: f64,
+    params: DoneStockMoveParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let move_record = ctx
         .db
         .stock_move()
@@ -936,6 +983,8 @@ pub fn done_stock_move(
     if move_record.state != "assigned" {
         return Err("Move must be assigned before marking as done".to_string());
     }
+
+    let quantity_done = params.quantity_done;
 
     ctx.db.stock_move().id().update(StockMove {
         state: "done".to_string(),
@@ -972,9 +1021,11 @@ pub fn done_stock_move(
 pub fn cancel_stock_move(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     move_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let move_record = ctx
         .db
         .stock_move()
@@ -1026,10 +1077,11 @@ pub fn cancel_stock_move(
 pub fn create_stock_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateStockPickingParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_picking", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     if params.name.is_empty() {
         return Err("Picking name cannot be empty".to_string());
@@ -1122,9 +1174,11 @@ pub fn create_stock_picking(
 pub fn confirm_stock_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     picking_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let picking = ctx
         .db
         .stock_picking()
@@ -1188,9 +1242,11 @@ pub fn confirm_stock_picking(
 pub fn assign_stock_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     picking_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let picking = ctx
         .db
         .stock_picking()
@@ -1255,9 +1311,11 @@ pub fn assign_stock_picking(
 pub fn validate_stock_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     picking_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let picking = ctx
         .db
         .stock_picking()
@@ -1394,9 +1452,11 @@ pub fn validate_stock_picking(
 pub fn cancel_stock_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     picking_id: u64,
+    params: CompanyScopeParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let picking = ctx
         .db
         .stock_picking()
@@ -1457,10 +1517,11 @@ pub fn cancel_stock_picking(
 pub fn assign_user_to_picking(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     picking_id: u64,
-    user_id: Option<Identity>,
+    params: AssignUserToPickingParams,
 ) -> Result<(), String> {
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let picking = ctx
         .db
         .stock_picking()
@@ -1473,6 +1534,8 @@ pub fn assign_user_to_picking(
     if picking.company_id != company_id {
         return Err("Picking does not belong to this company".to_string());
     }
+
+    let user_id = params.user_id;
 
     ctx.db.stock_picking().id().update(StockPicking {
         user_id,

@@ -6,7 +6,7 @@
  * Authentication: Cookie (web) or Bearer token (Expo/mobile)
  *
  * Notes:
- * - serverQueryAccountAccounts resolves company_id internally via companyWhere()
+ * - GET uses `organization_id` SQL scope; POST calls `create_account_account` with optional `company_id` in body (default resolved in reducer).
  * - `code` filter: prefix match on the account code (e.g. "1000")
  * - `search` filter: substring match on name or code
  */
@@ -16,7 +16,6 @@ import { resolveApiSession, type ApiSession } from '@/lib/api-session'
 import { callReducer } from '@/lib/stdb-reducer'
 import {
   serverQueryAccountAccounts,
-  resolveCompanyIds,
   type AccountAccount,
   type CreateAccountAccountParams,
 } from '@lumiere/stdb/server'
@@ -119,10 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const [companyId] = await resolveCompanyIds(session.organizationId, session.opts)
-    if (!companyId) return errorResponse('No company found for organization', 422)
-
-    await callReducer('create_account_account', [session.organizationId, companyId, body], session.opts)
+    await callReducer('create_account_account', [session.organizationId, body], session.opts)
     return NextResponse.json({ data: { message: 'Account created successfully' } }, { status: 201 })
   } catch (error) {
     console.error('Failed to create account:', error)

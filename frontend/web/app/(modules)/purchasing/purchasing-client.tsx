@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newPurchaseOrderForm, newPurchaseRequisitionForm } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newPurchaseOrderForm,
+  newPurchaseRequisitionForm,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+} from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
@@ -14,32 +21,53 @@ import {
   useCreatePurchaseRequisition,
   useContacts,
 } from "@/hooks/purchasing"
+import { usePricelists } from "@/hooks/sales"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  contactRowsToVendorSelectOptions,
+  pricelistRowsToSelectOptions,
+} from "@/lib/form-lookup"
 
 interface PurchasingClientProps {
   initialOrders?: Record<string, unknown>[]
   initialLines?: Record<string, unknown>[]
   initialRequisitions?: Record<string, unknown>[]
+  initialContacts?: Record<string, unknown>[]
+  initialPricelists?: Record<string, unknown>[]
   organizationId?: number
 }
 
-export function PurchasingClient({
+type PurchasingClientLoadedProps = Omit<PurchasingClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function PurchasingClient(props: PurchasingClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <PurchasingClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function PurchasingClientLoaded({
   initialOrders,
   initialLines,
   initialRequisitions,
+  initialContacts,
+  initialPricelists,
   organizationId,
-}: PurchasingClientProps) {
+}: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
-  const orgId = BigInt(organizationId ?? 1)
-  const companyId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: orders = [] } = usePurchaseOrders(companyId, initialOrders)
   const { data: lines = [] } = usePurchaseOrderLines(companyId, initialLines)
   const { data: requisitions = [] } = usePurchaseRequisitions(companyId, initialRequisitions)
-  const { data: allContacts = [] } = useContacts(companyId)
+  const { data: allContacts = [] } = useContacts(companyId, initialContacts)
+  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
 
   const vendors = useMemo(
-    () => allContacts.filter((c) => c.isVendor || c.supplierRank != null && Number(c.supplierRank) > 0),
+    () => allContacts.filter((c) => c.isVendor || (c.supplierRank != null && Number(c.supplierRank) > 0)),
     [allContacts],
   )
 
@@ -47,6 +75,35 @@ export function PurchasingClient({
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, companyId)
 
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
+
+  const vendorFieldOptions = useMemo(() => {
+    const fromApi = contactRowsToVendorSelectOptions(allContacts)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noVendors"), disabled: true }]
+  }, [allContacts, t])
+
+  const pricelistFieldOptions = useMemo(() => {
+    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+  }, [pricelists, t])
+
+  const purchaseOrderFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPurchaseOrderForm(t), {
+        partnerId: vendorFieldOptions,
+        pricelistId: pricelistFieldOptions,
+      }),
+    [t, vendorFieldOptions, pricelistFieldOptions],
+  )
+
+  const purchaseRequisitionFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPurchaseRequisitionForm(t), {
+        vendorId: vendorFieldOptions,
+      }),
+    [t, vendorFieldOptions],
+  )
 
   const liveSections = useMemo(() => {
     const openOrders = orders.filter(
@@ -79,8 +136,10 @@ export function PurchasingClient({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            create_purchase_order: () => setQuickActionForm({ form: newPurchaseOrderForm(t), action: "createPurchaseOrder" }),
-            create_requisition: () => setQuickActionForm({ form: newPurchaseRequisitionForm(t), action: "createPurchaseRequisition" }),
+            create_purchase_order: () =>
+              setQuickActionForm({ form: purchaseOrderFormConfig, action: "createPurchaseOrder" }),
+            create_requisition: () =>
+              setQuickActionForm({ form: purchaseRequisitionFormConfig, action: "createPurchaseRequisition" }),
           }
           return {
             ...w,
@@ -125,16 +184,26 @@ export function PurchasingClient({
         return w
       }),
     }))
-  }, [orders, moduleConfig, t])
+  }, [orders, moduleConfig, t, purchaseOrderFormConfig, purchaseRequisitionFormConfig])
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab
-      ),
-    }) as ModuleConfig,
-    [moduleConfig, liveSections]
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: moduleConfig.tabs.map((tab) => {
+          if (tab.id === "dashboard") {
+            return { ...tab, sections: liveSections }
+          }
+          if (tab.id === "orders" && tab.type === "entity") {
+            return { ...tab, createForm: purchaseOrderFormConfig }
+          }
+          if (tab.id === "requisitions" && tab.type === "entity") {
+            return { ...tab, createForm: purchaseRequisitionFormConfig }
+          }
+          return tab
+        }),
+      }) as ModuleConfig,
+    [moduleConfig, liveSections, purchaseOrderFormConfig, purchaseRequisitionFormConfig],
   )
 
   const data = useMemo(
@@ -144,7 +213,7 @@ export function PurchasingClient({
       requisitions: requisitions as unknown as Record<string, unknown>[],
       vendors: vendors as unknown as Record<string, unknown>[],
     }),
-    [orders, lines, requisitions, vendors]
+    [orders, lines, requisitions, vendors],
   )
 
   const handleFormSubmit = (
@@ -152,8 +221,67 @@ export function PurchasingClient({
     action: string,
     formData: Record<string, unknown>
   ) => {
-    if (action === "createPurchaseOrder") createPurchaseOrder.mutate(formData as never)
-    else if (action === "createPurchaseRequisition") createPurchaseRequisition.mutate(formData as never)
+    if (action === "createPurchaseOrder") {
+      const partnerRaw = formData.partnerId
+      const pricelistRaw = formData.pricelistId
+      if (partnerRaw === "" || partnerRaw == null) return
+      if (pricelistRaw === "" || pricelistRaw == null) return
+      const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
+      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
+      const currencyId = Number(pl.currencyId)
+
+      createPurchaseOrder.mutate({
+        partnerId: Number(partnerRaw),
+        currencyId,
+        origin: formData.origin ? String(formData.origin) : undefined,
+        partnerRef: formData.partnerRef ? String(formData.partnerRef) : undefined,
+        notes: formData.notes ? String(formData.notes) : undefined,
+        datePlanned: formData.datePlanned ? new Date(String(formData.datePlanned)) : undefined,
+        paymentTermId:
+          formData.paymentTermId != null && formData.paymentTermId !== ""
+            ? Number(formData.paymentTermId)
+            : undefined,
+        fiscalPositionId: undefined,
+        incotermId: undefined,
+        incotermLocation: undefined,
+        userId: undefined,
+        invoiceIds: [],
+        pickingIds: [],
+        messageFollowerIds: [],
+        messageIds: [],
+        activityIds: [],
+        isQuantityCopy: undefined,
+        metadata: undefined,
+      } as never)
+    } else if (action === "createPurchaseRequisition") {
+      const vendorRaw = formData.vendorId
+      createPurchaseRequisition.mutate({
+        description: formData.description ? String(formData.description) : undefined,
+        orderingDate: formData.orderingDate
+          ? new Date(String(formData.orderingDate))
+          : undefined,
+        dateEnd: formData.dateEnd ? new Date(String(formData.dateEnd)) : undefined,
+        scheduleDate: formData.scheduleDate
+          ? new Date(String(formData.scheduleDate))
+          : undefined,
+        departmentId:
+          formData.departmentId != null && formData.departmentId !== ""
+            ? Number(formData.departmentId)
+            : undefined,
+        exclusive: undefined,
+        multipleProduct: false,
+        lineIds: [],
+        purchaseIds: [],
+        vendorId:
+          vendorRaw !== "" && vendorRaw != null ? Number(vendorRaw) : undefined,
+        activityIds: [],
+        messageFollowerIds: [],
+        messageIds: [],
+        metadata: formData.origin
+          ? JSON.stringify({ origin: String(formData.origin) })
+          : undefined,
+      } as never)
+    }
   }
 
   return (
@@ -166,7 +294,7 @@ export function PurchasingClient({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newPurchaseOrderForm(t)}
+        config={quickActionForm?.form ?? purchaseOrderFormConfig}
         onSubmit={(formData) => {
           if (quickActionForm) {
             handleFormSubmit("dashboard", quickActionForm.action, formData)

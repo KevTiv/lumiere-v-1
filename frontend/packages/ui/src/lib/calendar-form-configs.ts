@@ -12,6 +12,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "name",
+          name: "name",
           type: "text",
           label: t("calendar.forms.newEvent.fields.name"),
           placeholder: t("calendar.forms.newEvent.fields.namePlaceholder"),
@@ -20,6 +21,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "start",
+          name: "start",
           type: "date",
           label: t("calendar.forms.newEvent.fields.start"),
           required: true,
@@ -27,6 +29,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "stop",
+          name: "stop",
           type: "date",
           label: t("calendar.forms.newEvent.fields.stop"),
           required: true,
@@ -34,6 +37,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "location",
+          name: "location",
           type: "text",
           label: t("calendar.forms.newEvent.fields.location"),
           placeholder: t("calendar.forms.newEvent.fields.locationPlaceholder"),
@@ -41,12 +45,14 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "allday",
+          name: "allday",
           type: "checkbox",
           label: t("calendar.forms.newEvent.fields.allday"),
           width: "1/2",
         },
         {
           id: "privacy",
+          name: "privacy",
           type: "select",
           label: t("calendar.forms.newEvent.fields.privacy"),
           width: "1/2",
@@ -58,6 +64,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("calendar.forms.newEvent.fields.description"),
           placeholder: t("calendar.forms.newEvent.fields.descriptionPlaceholder"),

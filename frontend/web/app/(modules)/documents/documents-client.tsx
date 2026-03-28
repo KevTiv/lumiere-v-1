@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newDocumentForm, newKnowledgeArticleForm } from "@lumiere/ui"
+import { ModuleView, FormModal, newDocumentForm, newKnowledgeArticleForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocuments, useKnowledgeArticles, useCreateDocument, useCreateKnowledgeArticle } from "@/hooks/documents"
 import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@/hooks/documents"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface DocumentsClientProps {
   initialDocuments?: Record<string, unknown>[]
@@ -14,16 +15,27 @@ interface DocumentsClientProps {
   organizationId?: number
 }
 
-export function DocumentsClient({ initialDocuments, initialArticles, organizationId }: DocumentsClientProps) {
+type DocumentsClientLoadedProps = Omit<DocumentsClientProps, "organizationId"> & {
+  organizationId: number
+}
+
+export function DocumentsClient(props: DocumentsClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />
+  }
+  return <DocumentsClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+function DocumentsClientLoaded({ initialDocuments, initialArticles, organizationId }: DocumentsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => documentsModuleConfig(t), [t])
-  const orgId = BigInt(organizationId ?? 1)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
   const createDocument = useCreateDocument(orgId)
-  const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, orgId)
+  const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, companyId)
 
   const liveSections = useMemo(() => {
     const shared = documents.filter((d) => d.isShared).length
@@ -51,7 +63,7 @@ export function DocumentsClient({ initialDocuments, initialArticles, organizatio
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            upload_document: () => setQuickActionForm({ form: newDocumentForm(t), action: "createDocument" }),
+            upload_document: () => setQuickActionForm({ form: newDocumentForm(t), action: "uploadDocument" }),
             new_article: () => setQuickActionForm({ form: newKnowledgeArticleForm(t), action: "createArticle" }),
           }
           return {
@@ -90,7 +102,7 @@ export function DocumentsClient({ initialDocuments, initialArticles, organizatio
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (action === "createDocument") {
+    if (action === "createDocument" || action === "uploadDocument") {
       createDocument.mutate({
         name: formData.name as string,
         fileName: formData.fileName as string,

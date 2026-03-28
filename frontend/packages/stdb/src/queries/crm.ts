@@ -20,7 +20,7 @@ export function crmSubscriptions(organizationId: bigint): string[] {
     `SELECT * FROM contact WHERE organization_id = ${id}`,
     `SELECT * FROM contact_tag WHERE organization_id = ${id}`,
     `SELECT * FROM lead_source WHERE organization_id = ${id}`,
-    `SELECT * FROM opportunity_stage WHERE organization_id = ${id}`,
+    `SELECT * FROM opp_stage WHERE organization_id = ${id}`,
     `SELECT * FROM activity WHERE organization_id = ${id}`,
     `SELECT * FROM activity_type WHERE organization_id = ${id}`,
   ];

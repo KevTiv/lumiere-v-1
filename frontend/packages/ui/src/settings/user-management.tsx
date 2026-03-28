@@ -43,12 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { User, Role } from "@/lib/rbac-types"
 import { useTranslation } from "@lumiere/i18n"
-
-const statusColors: Record<string, string> = {
-  active: "bg-green-500/10 text-green-500 border-green-500/20",
-  inactive: "bg-red-500/10 text-red-500 border-red-500/20",
-  pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-}
+import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
 
 export function UserManagement() {
   const { t } = useTranslation()
@@ -128,15 +123,7 @@ export function UserManagement() {
 
   const getRoleColor = (roleId: string): string => {
     const role = roles.find(r => r.id === roleId)
-    const colors: Record<string, string> = {
-      red: "bg-red-500/10 text-red-400 border-red-500/20",
-      purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-      blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      orange: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-      teal: "bg-teal-500/10 text-teal-400 border-teal-500/20",
-      green: "bg-green-500/10 text-green-400 border-green-500/20",
-    }
-    return colors[role?.color || "blue"] || colors.blue
+    return rolePillClassForColor(role?.color)
   }
 
   return (
@@ -177,7 +164,7 @@ export function UserManagement() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{user.name}</span>
-                      <Badge variant="outline" className={statusColors[user.status]}>
+                      <Badge variant="outline" className={userStatusPillClass[user.status]}>
                         {user.status}
                       </Badge>
                     </div>

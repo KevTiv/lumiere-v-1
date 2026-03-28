@@ -10,7 +10,9 @@ export function useCreatePurchaseOrder(organizationId: bigint, companyId: bigint
     mutationFn: (params: CreatePurchaseOrderParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createPurchaseOrder({ organizationId, companyId, params });
+      const scoped: CreatePurchaseOrderParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createPurchaseOrder({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
@@ -52,7 +54,9 @@ export function useCreatePurchaseRequisition(organizationId: bigint, companyId: 
     mutationFn: (params: CreatePurchaseRequisitionParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createPurchaseRequisition({ organizationId, companyId, params });
+      const scoped: CreatePurchaseRequisitionParams =
+        params.companyId !== undefined ? params : { ...params, companyId };
+      return conn.reducers.createPurchaseRequisition({ organizationId, params: scoped });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });

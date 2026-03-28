@@ -309,7 +309,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                               <Badge variant="secondary" className="text-xs">{t("settings.formConfigSettings.system")}</Badge>
                             )}
                             {field.validation?.required && (
-                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">{t("settings.formConfigSettings.required")}</Badge>
+                              <Badge variant="outline" className="text-xs text-warning border-warning/35">{t("settings.formConfigSettings.required")}</Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -347,7 +347,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                             {!field.isSystem && (
                               <DropdownMenuItem
                                 onClick={() => handleDeleteField(field.id)}
-                                className="text-red-600"
+                                className="text-destructive"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 {t("settings.formConfigSettings.delete")}

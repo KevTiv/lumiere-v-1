@@ -5,10 +5,13 @@ import { useState, useMemo } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
+  ThemeProvider,
   type User,
   type Role,
 } from "@lumiere/ui"
+import { StdbConnectionProvider, FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb"
 import { useStdbQuery } from "@/hooks/stdb"
+import { saveStdbSession } from "@/app/actions/save-stdb-token"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 const getRBACRoles = (rolesData: Record<string, unknown>[]) => {
@@ -83,19 +86,38 @@ export function Providers({
   children,
   serverIdentity,
   serverRoleNames,
+  organizationId,
+  stdbModule,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
+  organizationId?: number
+  /** Must match server `STDB_MODULE` / upstream database name */
+  stdbModule?: string
 }) {
   const [queryClient] = useState(() => new QueryClient())
   return (
     <I18nProvider>
-      <QueryClientProvider client={queryClient}>
-        <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
-          {children}
-        </RBACBridge>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <StdbConnectionProvider
+            sameOriginStdbProxy
+            moduleName={stdbModule}
+            serverIdentity={serverIdentity}
+            serverRoleNames={serverRoleNames}
+            organizationId={organizationId}
+            subscriptionResources={FULL_CLIENT_SUBSCRIPTION_RESOURCES}
+            onTokenPersisted={(token, identityHex) => {
+              void saveStdbSession(token, identityHex)
+            }}
+          >
+            <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
+              {children}
+            </RBACBridge>
+          </StdbConnectionProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </I18nProvider>
   )
 }

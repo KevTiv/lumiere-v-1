@@ -16,7 +16,7 @@ export type HrPayslip = Infer<typeof HrPayslipRow>;
 export type HrJobPosition = Infer<typeof HrJobPositionRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
-export function hrSubscriptions(organizationId: bigint, companyId: bigint): string[] {
+export function hrSubscription(organizationId: bigint, companyId: bigint): string[] {
   const cId = String(companyId);
   return [
     `SELECT * FROM hr_employee WHERE company_id = ${cId}`,

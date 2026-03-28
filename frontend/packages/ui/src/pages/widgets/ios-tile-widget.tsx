@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { widgetAccentTileClass, type WidgetAccentKey } from "@/lib/theme-colors"
 
 export interface IosTileData {
   tiles: IosTile[]
@@ -12,49 +13,10 @@ export interface IosTile {
   value: string | number
   subtitle?: string
   icon?: React.ReactNode
-  color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
+  color?: WidgetAccentKey
   progress?: number // 0-100 for ring progress
   sparkline?: number[] // for mini trend line
   size?: "small" | "medium" | "large"
-}
-
-const colorMap = {
-  blue: {
-    bg: "bg-blue-500/10",
-    ring: "stroke-blue-500",
-    text: "text-blue-400",
-    glow: "shadow-blue-500/20",
-  },
-  green: {
-    bg: "bg-emerald-500/10",
-    ring: "stroke-emerald-500",
-    text: "text-emerald-400",
-    glow: "shadow-emerald-500/20",
-  },
-  orange: {
-    bg: "bg-orange-500/10",
-    ring: "stroke-orange-500",
-    text: "text-orange-400",
-    glow: "shadow-orange-500/20",
-  },
-  red: {
-    bg: "bg-red-500/10",
-    ring: "stroke-red-500",
-    text: "text-red-400",
-    glow: "shadow-red-500/20",
-  },
-  purple: {
-    bg: "bg-purple-500/10",
-    ring: "stroke-purple-500",
-    text: "text-purple-400",
-    glow: "shadow-purple-500/20",
-  },
-  teal: {
-    bg: "bg-teal-500/10",
-    ring: "stroke-teal-500",
-    text: "text-teal-400",
-    glow: "shadow-teal-500/20",
-  },
 }
 
 function RingProgress({
@@ -126,7 +88,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 function SingleTile({ tile }: { tile: IosTile }) {
-  const colors = colorMap[tile.color || "blue"]
+  const colors = widgetAccentTileClass[tile.color || "blue"]
   const isLarge = tile.size === "large"
   const isMedium = tile.size === "medium"
 
@@ -136,16 +98,16 @@ function SingleTile({ tile }: { tile: IosTile }) {
         "group relative flex flex-col justify-between rounded-2xl p-4 transition-all duration-300",
         "bg-secondary/50 backdrop-blur-sm border border-border/30",
         "hover:border-border/60 hover:shadow-lg",
-        colors.glow,
+        colors.shadowGlow,
         isLarge ? "col-span-2 row-span-2 p-5" : "",
         isMedium ? "col-span-2" : ""
       )}
     >
       {/* Header with icon */}
       <div className="flex items-start justify-between">
-        <div className={cn("p-2 rounded-xl", colors.bg)}>
+        <div className={cn("p-2 rounded-xl", colors.bgSoft)}>
           {tile.icon || (
-            <div className={cn("w-5 h-5 rounded-full", colors.bg, colors.text)} />
+            <div className={cn("w-5 h-5 rounded-full", colors.bgSoft, colors.ringText)} />
           )}
         </div>
 
@@ -154,19 +116,19 @@ function SingleTile({ tile }: { tile: IosTile }) {
           <div className="relative flex items-center justify-center">
             <RingProgress
               progress={tile.progress}
-              color={colors.ring}
+              color={colors.stroke}
               size={isLarge ? 56 : 44}
             />
             <span className={cn(
               "absolute text-xs font-medium",
-              colors.text
+              colors.ringText
             )}>
               {tile.progress}%
             </span>
           </div>
         )}
         {tile.sparkline && !tile.progress && (
-          <MiniSparkline data={tile.sparkline} color={colors.ring} />
+          <MiniSparkline data={tile.sparkline} color={colors.stroke} />
         )}
       </div>
 
@@ -180,7 +142,7 @@ function SingleTile({ tile }: { tile: IosTile }) {
         </p>
         <p className="text-sm text-muted-foreground mt-0.5">{tile.label}</p>
         {tile.subtitle && (
-          <p className={cn("text-xs mt-1", colors.text)}>{tile.subtitle}</p>
+          <p className={cn("text-xs mt-1", colors.ringText)}>{tile.subtitle}</p>
         )}
       </div>
 

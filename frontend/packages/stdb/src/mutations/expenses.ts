@@ -4,13 +4,16 @@ import { getStdbConnection } from "../connection";
 
 export type { CreateExpenseParams, CreateExpenseSheetParams };
 
-export function useCreateExpense(organizationId: bigint, companyId: bigint) {
+export function useCreateExpense(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateExpenseParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createExpense({ organizationId, companyId, params });
+      return conn.reducers.createExpense({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -18,13 +21,16 @@ export function useCreateExpense(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useCreateExpenseSheet(organizationId: bigint, companyId: bigint) {
+export function useCreateExpenseSheet(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateExpenseSheetParams) => {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
-      return conn.reducers.createExpenseSheet({ organizationId, companyId, params });
+      return conn.reducers.createExpenseSheet({
+        organizationId,
+        params: { ...params, companyId: params.companyId ?? companyId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenseSheets"] });

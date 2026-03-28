@@ -35,15 +35,17 @@ import {
   X
 } from "lucide-react"
 import type { Role, PolicyRule, Resource, Action } from "@/lib/rbac-types"
+import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
 
 const roleColors = [
-  { value: "blue", label: "Blue", class: "bg-blue-500" },
-  { value: "green", label: "Green", class: "bg-green-500" },
-  { value: "orange", label: "Orange", class: "bg-orange-500" },
-  { value: "red", label: "Red", class: "bg-red-500" },
-  { value: "purple", label: "Purple", class: "bg-purple-500" },
-  { value: "teal", label: "Teal", class: "bg-teal-500" },
+  { value: "blue", label: "Blue", class: roleSwatchClass.blue },
+  { value: "green", label: "Green", class: roleSwatchClass.green },
+  { value: "orange", label: "Orange", class: roleSwatchClass.orange },
+  { value: "red", label: "Red", class: roleSwatchClass.red },
+  { value: "purple", label: "Purple", class: roleSwatchClass.purple },
+  { value: "teal", label: "Teal", class: roleSwatchClass.teal },
 ] as const
 
 export function RoleManagement() {
@@ -202,18 +204,6 @@ export function RoleManagement() {
     }
   }
 
-  const getRoleColorClass = (color: Role["color"]) => {
-    const colorMap: Record<string, string> = {
-      red: "bg-red-500/10 text-red-400 border-red-500/20",
-      purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-      blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      orange: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-      teal: "bg-teal-500/10 text-teal-400 border-teal-500/20",
-      green: "bg-green-500/10 text-green-400 border-green-500/20",
-    }
-    return colorMap[color] || colorMap.blue
-  }
-
   const countPermissions = (role: Role): number => {
     if (role.permissions.some(p => p.resource === "*" && p.action === "*")) {
       return resourceGroups.reduce((acc, group) => 
@@ -254,7 +244,7 @@ export function RoleManagement() {
             )}
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${getRoleColorClass(role.color)}`}>
+                <div className={cn("p-2 rounded-lg border", rolePillClassForColor(role.color))}>
                   <Shield className="h-5 w-5" />
                 </div>
                 <div>

@@ -2,6 +2,7 @@ export * from './generated';
 export * from './connection';
 export * from './context';
 export * from './queries/auth';
+export * from './queries/erp-subscriptions';
 export * from './hooks/useStdbAuth';
 export * from './queries/accounting';
 export * from './hooks/useIotHubs';
@@ -109,3 +110,12 @@ export * from './queries/fleet';
 export * from './hooks/useFleetVehicles';
 export * from './hooks/usePosTerminals';
 export * from './hooks/useWarehouseGeo';
+
+export type {
+  CreateActivityParams,
+  CreateJobPositionParams,
+  CreateReportTemplateParams,
+  CreateScheduledReportParams,
+  CreateSubscriptionFromSaleOrderParams,
+  CreateSubscriptionPlanParams,
+} from './generated/types';

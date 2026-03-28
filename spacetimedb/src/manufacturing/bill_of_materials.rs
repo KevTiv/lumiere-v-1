@@ -8,6 +8,7 @@
 /// | **MrpRoutingWorkcenter** | Routing workcenter operations |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::BomType;
@@ -188,6 +189,7 @@ pub struct BomLineInput {
 
 #[derive(SpacetimeType, Debug, Clone)]
 pub struct CreateBomParams {
+    pub company_id: Option<u64>,
     pub type_: BomType,
     pub product_id: u64,
     pub product_tmpl_id: u64,
@@ -344,10 +346,11 @@ fn explode_bom_recursive(
 pub fn create_bom(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateBomParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_bom", "create")?;
+
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     // Create BOM header
     let bom = ctx.db.mrp_bom().insert(MrpBom {

@@ -5,17 +5,11 @@ import { useTranslation } from "@lumiere/i18n"
 import { Trash2, GripVertical } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { productKindBadgeClass } from "@/lib/theme-colors"
 import type { ProposalLineItem } from "@lumiere/stdb"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Product = Record<string, any>
-
-const TYPE_BADGE: Record<string, string> = {
-  Service: "bg-blue-100 text-blue-700",
-  Product: "bg-green-100 text-green-700",
-  Storable: "bg-amber-100 text-amber-700",
-  Consumable: "bg-purple-100 text-purple-700",
-}
 
 function formatCurrency(val: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val)
@@ -45,7 +39,8 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
 
   const subtotal = qty * price * (1 - discount / 100)
   const productType = product?.type_ ?? product?.type ?? ""
-  const typeBadgeClass = TYPE_BADGE[productType] ?? "bg-muted text-muted-foreground"
+  const typeBadgeClass =
+    productKindBadgeClass[productType] ?? "bg-muted text-muted-foreground"
 
   const handleSave = () => {
     onUpdate(item.id, qty, price, discount, notes || undefined)

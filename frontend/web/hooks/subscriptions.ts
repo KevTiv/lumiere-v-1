@@ -7,20 +7,18 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+import { withCompanyScope } from '@/lib/org-scoped'
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useSubscriptions(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['subscriptions', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/subscriptions')
-      if (!r.ok) throw new Error('Failed to fetch subscriptions')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/subscriptions', 'Failed to fetch subscriptions'),
     staleTime: 30_000,
     initialData,
   })
@@ -28,16 +26,11 @@ export function useSubscriptions(
 
 export function useSubscriptionPlans(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['subscription-plans', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/subscription-plans')
-      if (!r.ok) throw new Error('Failed to fetch subscription plans')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/subscription-plans', 'Failed to fetch subscription plans'),
     staleTime: 30_000,
     initialData,
   })
@@ -45,18 +38,48 @@ export function useSubscriptionPlans(
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateSubscription(organizationId: bigint) {
+export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const r = await fetch('/api/call/create_subscription', {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_subscription_plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
       })
-      if (!r.ok) throw new Error('Failed to create subscription')
+      if (!r.ok) throw new Error('Failed to create subscription plan')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId.toString()] }),
   })
 }
+
+export function useCreateSubscriptionFromSaleOrder(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_subscription_from_sale_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+      })
+      if (!r.ok) throw new Error('Failed to create subscription from sale order')
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId.toString()] }),
+      ])
+    },
+  })
+}
+
+export function useCreateSubscription(organizationId: bigint, companyId?: bigint) {
+  return useCreateSubscriptionFromSaleOrder(organizationId, companyId)
+}
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type {
+  CreateSubscriptionFromSaleOrderParams,
+  CreateSubscriptionPlanParams,
+} from '@lumiere/stdb'

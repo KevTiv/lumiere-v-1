@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import {
   Table,
@@ -49,18 +56,31 @@ interface CreateInvoiceModalProps {
   open: boolean
   onClose: () => void
   onSave?: (params: Partial<CreateAccountMoveParams>) => void
+  /** Live journals from `/api/query/account-journals`; when non-empty, user must pick one. */
+  journalOptions?: Array<{ value: string; label: string }>
 }
 
-export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModalProps) {
+export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: CreateInvoiceModalProps) {
   const { t } = useTranslation()
   const today = new Date().toISOString().split("T")[0]
   const [partnerName, setPartnerName] = useState("")
   const [invoiceDate, setInvoiceDate] = useState(today)
   const [dueDate, setDueDate] = useState("")
   const [notes, setNotes] = useState("")
+  const [journalId, setJournalId] = useState("")
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", quantity: 1, unitPrice: 0, taxRate: 8, discount: 0 },
   ])
+
+  useEffect(() => {
+    if (!open) return
+    const opts = journalOptions ?? []
+    if (opts.length > 0) {
+      setJournalId(opts[0].value)
+    } else {
+      setJournalId("")
+    }
+  }, [open, journalOptions])
 
   const addLine = () =>
     setLineItems((prev) => [...prev, { id: String(Date.now()), description: "", quantity: 1, unitPrice: 0, taxRate: 8, discount: 0 }])
@@ -81,7 +101,11 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
   }, 0)
   const total = subtotal - totalDisc + totalTax
 
-  const canSave = partnerName.trim() !== "" && lineItems.some((l) => l.description.trim() !== "")
+  const needsJournal = (journalOptions?.length ?? 0) > 0
+  const canSave =
+    partnerName.trim() !== "" &&
+    lineItems.some((l) => l.description.trim() !== "") &&
+    (!needsJournal || journalId !== "")
 
   const handleSave = (asDraft: boolean) => {
     onSave?.({
@@ -92,6 +116,7 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
       amountTax: totalTax,
       amountTotal: total,
       amountResidual: total,
+      journalId: needsJournal && journalId ? BigInt(journalId) : undefined,
       metadata: JSON.stringify({ notes, lineItems, invoiceDate, dueDate }),
     } as unknown as Partial<CreateAccountMoveParams>)
     handleReset()
@@ -125,6 +150,23 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
               />
             </div>
             <div className="space-y-4">
+              {journalOptions && journalOptions.length > 0 && (
+                <div className="space-y-2">
+                  <Label>{t("accounting.forms.newInvoice.fields.journal")}</Label>
+                  <Select value={journalId} onValueChange={setJournalId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t("accounting.forms.newInvoice.fields.journalPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {journalOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t("accounting.forms.newInvoice.fields.invoiceDate")}</Label>
@@ -195,7 +237,7 @@ export function CreateInvoiceModal({ open, onClose, onSave }: CreateInvoiceModal
                   {totalDisc > 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-right">{t("accounting.forms.newInvoice.summary.discount")}</TableCell>
-                      <TableCell className="text-right text-red-600">-{formatCurrency(totalDisc)}</TableCell>
+                      <TableCell className="text-right text-destructive">-{formatCurrency(totalDisc)}</TableCell>
                       <TableCell />
                     </TableRow>
                   )}

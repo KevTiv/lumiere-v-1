@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newExpenseForm = (t: TFunction): FormConfig => ({
   id: "new-expense",
   title: t("expenses.forms.newExpense.title"),
@@ -11,7 +13,18 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
       title: t("expenses.forms.newExpense.sections.expenseDetails"),
       fields: [
         {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("expenses.forms.newExpense.fields.pricelistId"),
+          placeholder: t("expenses.forms.newExpense.fields.pricelistPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
           id: "name",
+          name: "name",
           type: "text",
           label: t("expenses.forms.newExpense.fields.name"),
           placeholder: t("expenses.forms.newExpense.fields.namePlaceholder"),
@@ -20,6 +33,7 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "totalAmount",
+          name: "totalAmount",
           type: "number",
           label: t("expenses.forms.newExpense.fields.totalAmount"),
           placeholder: "0.00",
@@ -28,6 +42,7 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "date",
+          name: "date",
           type: "date",
           label: t("expenses.forms.newExpense.fields.date"),
           required: true,
@@ -35,14 +50,17 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "employeeId",
-          type: "number",
+          name: "employeeId",
+          type: "select",
           label: t("expenses.forms.newExpense.fields.employeeId"),
-          placeholder: "1",
+          placeholder: t("expenses.forms.newExpense.fields.employeePlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "quantity",
+          name: "quantity",
           type: "number",
           label: t("expenses.forms.newExpense.fields.quantity"),
           placeholder: "1",
@@ -50,6 +68,7 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("expenses.forms.newExpense.fields.description"),
           placeholder: t("expenses.forms.newExpense.fields.descriptionPlaceholder"),
@@ -71,7 +90,18 @@ export const newExpenseSheetForm = (t: TFunction): FormConfig => ({
       title: t("expenses.forms.newExpenseReport.sections.reportDetails"),
       fields: [
         {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("expenses.forms.newExpenseReport.fields.pricelistId"),
+          placeholder: t("expenses.forms.newExpenseReport.fields.pricelistPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
           id: "name",
+          name: "name",
           type: "text",
           label: t("expenses.forms.newExpenseReport.fields.name"),
           placeholder: t("expenses.forms.newExpenseReport.fields.namePlaceholder"),
@@ -80,20 +110,24 @@ export const newExpenseSheetForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "employeeId",
-          type: "number",
+          name: "employeeId",
+          type: "select",
           label: t("expenses.forms.newExpenseReport.fields.employeeId"),
-          placeholder: "1",
+          placeholder: t("expenses.forms.newExpenseReport.fields.employeePlaceholder"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "accountingDate",
+          name: "accountingDate",
           type: "date",
           label: t("expenses.forms.newExpenseReport.fields.accountingDate"),
           width: "1/2",
         },
         {
           id: "notes",
+          name: "notes",
           type: "textarea",
           label: t("expenses.forms.newExpenseReport.fields.notes"),
           placeholder: t("expenses.forms.newExpenseReport.fields.notesPlaceholder"),

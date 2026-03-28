@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newSubscriptionForm = (t: TFunction): FormConfig => ({
   id: "new-subscription",
   title: t("subscriptions.forms.newSubscription.title"),
@@ -11,30 +13,36 @@ export const newSubscriptionForm = (t: TFunction): FormConfig => ({
       title: t("subscriptions.forms.newSubscription.sections.subscriptionDetails"),
       fields: [
         {
+          id: "saleOrderId",
+          name: "saleOrderId",
+          type: "select",
+          label: t("subscriptions.forms.newSubscription.fields.saleOrderId"),
+          placeholder: t("subscriptions.forms.newSubscription.fields.saleOrderPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "planId",
+          name: "planId",
+          type: "select",
+          label: t("subscriptions.forms.newSubscription.fields.planId"),
+          placeholder: t("subscriptions.forms.newSubscription.fields.planPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
           id: "code",
+          name: "code",
           type: "text",
           label: t("subscriptions.forms.newSubscription.fields.code"),
           placeholder: t("subscriptions.forms.newSubscription.fields.codePlaceholder"),
           width: "1/2",
         },
         {
-          id: "planId",
-          type: "number",
-          label: t("subscriptions.forms.newSubscription.fields.planId"),
-          placeholder: "1",
-          required: true,
-          width: "1/2",
-        },
-        {
-          id: "partnerId",
-          type: "number",
-          label: t("subscriptions.forms.newSubscription.fields.partnerId"),
-          placeholder: "1",
-          required: true,
-          width: "1/2",
-        },
-        {
           id: "dateStart",
+          name: "dateStart",
           type: "date",
           label: t("subscriptions.forms.newSubscription.fields.dateStart"),
           required: true,
@@ -42,6 +50,7 @@ export const newSubscriptionForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "paymentMode",
+          name: "paymentMode",
           type: "select",
           label: t("subscriptions.forms.newSubscription.fields.paymentMode"),
           width: "1/2",
@@ -52,11 +61,78 @@ export const newSubscriptionForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("subscriptions.forms.newSubscription.fields.description"),
           placeholder: t("subscriptions.forms.newSubscription.fields.descriptionPlaceholder"),
           width: "full",
           rows: 2,
+        },
+      ],
+    },
+    {
+      id: "sub-billing",
+      title: t("subscriptions.forms.newSubscription.sections.billing"),
+      fields: [
+        {
+          id: "recurringInvoiceDay",
+          name: "recurringInvoiceDay",
+          type: "number",
+          label: t("subscriptions.forms.newSubscription.fields.recurringInvoiceDay"),
+          placeholder: "1",
+          width: "1/2",
+        },
+        {
+          id: "isTrial",
+          name: "isTrial",
+          type: "checkbox",
+          label: t("subscriptions.forms.newSubscription.fields.isTrial"),
+          width: "1/2",
+        },
+        {
+          id: "recurringRuleType",
+          name: "recurringRuleType",
+          type: "select",
+          label: t("subscriptions.forms.newSubscription.fields.recurringRuleType"),
+          width: "1/2",
+          options: [
+            { value: "daily", label: t("subscriptions.forms.newSubscription.fields.options.recurring.daily") },
+            { value: "weekly", label: t("subscriptions.forms.newSubscription.fields.options.recurring.weekly") },
+            { value: "monthly", label: t("subscriptions.forms.newSubscription.fields.options.recurring.monthly") },
+            { value: "yearly", label: t("subscriptions.forms.newSubscription.fields.options.recurring.yearly") },
+          ],
+        },
+        {
+          id: "recurringInterval",
+          name: "recurringInterval",
+          type: "number",
+          label: t("subscriptions.forms.newSubscription.fields.recurringInterval"),
+          placeholder: "1",
+          width: "1/2",
+        },
+        {
+          id: "state",
+          name: "state",
+          type: "select",
+          label: t("subscriptions.forms.newSubscription.fields.state"),
+          width: "1/2",
+          options: [
+            { value: "draft", label: t("subscriptions.forms.newSubscription.fields.options.state.draft") },
+            { value: "open", label: t("subscriptions.forms.newSubscription.fields.options.state.open") },
+            { value: "pending", label: t("subscriptions.forms.newSubscription.fields.options.state.pending") },
+          ],
+        },
+        {
+          id: "health",
+          name: "health",
+          type: "select",
+          label: t("subscriptions.forms.newSubscription.fields.health"),
+          width: "1/2",
+          options: [
+            { value: "normal", label: t("subscriptions.forms.newSubscription.fields.options.health.normal") },
+            { value: "good", label: t("subscriptions.forms.newSubscription.fields.options.health.good") },
+            { value: "bad", label: t("subscriptions.forms.newSubscription.fields.options.health.bad") },
+          ],
         },
       ],
     },
@@ -73,7 +149,38 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
       title: t("subscriptions.forms.newPlan.sections.planDetails"),
       fields: [
         {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("subscriptions.forms.newPlan.fields.pricelistId"),
+          placeholder: t("subscriptions.forms.newPlan.fields.pricelistPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("subscriptions.forms.newPlan.fields.journalId"),
+          placeholder: t("subscriptions.forms.newPlan.fields.journalPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("subscriptions.forms.newPlan.fields.productId"),
+          placeholder: t("subscriptions.forms.newPlan.fields.productPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
           id: "name",
+          name: "name",
           type: "text",
           label: t("subscriptions.forms.newPlan.fields.name"),
           placeholder: t("subscriptions.forms.newPlan.fields.namePlaceholder"),
@@ -82,6 +189,7 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "code",
+          name: "code",
           type: "text",
           label: t("subscriptions.forms.newPlan.fields.code"),
           placeholder: t("subscriptions.forms.newPlan.fields.codePlaceholder"),
@@ -89,6 +197,7 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "billingPeriod",
+          name: "billingPeriod",
           type: "select",
           label: t("subscriptions.forms.newPlan.fields.billingPeriod"),
           width: "1/2",
@@ -100,6 +209,7 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "billingPeriodUnit",
+          name: "billingPeriodUnit",
           type: "number",
           label: t("subscriptions.forms.newPlan.fields.billingPeriodUnit"),
           placeholder: "1",
@@ -107,12 +217,14 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "trialPeriod",
+          name: "trialPeriod",
           type: "checkbox",
           label: t("subscriptions.forms.newPlan.fields.trialPeriod"),
           width: "1/2",
         },
         {
           id: "trialDuration",
+          name: "trialDuration",
           type: "number",
           label: t("subscriptions.forms.newPlan.fields.trialDuration"),
           placeholder: t("subscriptions.forms.newPlan.fields.trialDurationPlaceholder"),
@@ -120,12 +232,14 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "isDefault",
+          name: "isDefault",
           type: "checkbox",
           label: t("subscriptions.forms.newPlan.fields.isDefault"),
           width: "1/2",
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("subscriptions.forms.newPlan.fields.description"),
           placeholder: t("subscriptions.forms.newPlan.fields.descriptionPlaceholder"),

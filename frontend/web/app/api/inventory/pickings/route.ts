@@ -7,7 +7,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { resolveApiSession, type ApiSession } from '@/lib/api-session'
 import { callReducer } from '@/lib/stdb-reducer'
-import { serverQueryStockPickings, resolveCompanyIds } from '@lumiere/stdb/server'
+import { serverQueryStockPickings } from '@lumiere/stdb/server'
 
 interface ApiResponse<T> {
   data?: T
@@ -49,10 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const [companyId] = await resolveCompanyIds(session.organizationId, session.opts)
-    if (!companyId) return errorResponse('No company found for organization', 422)
-
-    await callReducer('create_stock_picking', [session.organizationId, companyId, body], session.opts)
+    await callReducer('create_stock_picking', [session.organizationId, body], session.opts)
     return NextResponse.json({ data: { message: 'Stock picking created successfully' } }, { status: 201 })
   } catch (error) {
     console.error('Failed to create stock picking:', error)

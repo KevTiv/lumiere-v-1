@@ -12,6 +12,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "title",
+          name: "title",
           type: "text",
           label: t("proposals.forms.newProposal.fields.title"),
           placeholder: t("proposals.forms.newProposal.fields.titlePlaceholder"),
@@ -20,6 +21,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "clientName",
+          name: "clientName",
           type: "text",
           label: t("proposals.forms.newProposal.fields.clientName"),
           placeholder: t("proposals.forms.newProposal.fields.clientNamePlaceholder"),
@@ -28,6 +30,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "type",
+          name: "type",
           type: "select",
           label: t("proposals.forms.newProposal.fields.type"),
           required: true,
@@ -43,6 +46,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "value",
+          name: "value",
           type: "number",
           label: t("proposals.forms.newProposal.fields.value"),
           placeholder: "0.00",
@@ -50,12 +54,14 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "deadline",
+          name: "deadline",
           type: "date",
           label: t("proposals.forms.newProposal.fields.deadline"),
           width: "1/2",
         },
         {
           id: "description",
+          name: "description",
           type: "textarea",
           label: t("proposals.forms.newProposal.fields.description"),
           placeholder: t("proposals.forms.newProposal.fields.descriptionPlaceholder"),

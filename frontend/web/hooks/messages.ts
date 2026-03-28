@@ -6,20 +6,17 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function useMailMessages(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRows,
 ) {
-  return useQuery({
+  return useQuery<QueryRows>({
     queryKey: ['mail-messages', organizationId.toString()],
-    queryFn: async () => {
-      const r = await fetch('/api/query/mail-messages')
-      if (!r.ok) throw new Error('Failed to fetch messages')
-      const json = await r.json()
-      return (json.data ?? []) as Record<string, unknown>[]
-    },
+    queryFn: () => fetchQueryList('/api/query/mail-messages', 'Failed to fetch messages'),
     staleTime: 30_000,
     initialData,
   })
@@ -29,8 +26,8 @@ export function useMailMessages(
 
 export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
       const r = await fetch('/api/call/post_message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

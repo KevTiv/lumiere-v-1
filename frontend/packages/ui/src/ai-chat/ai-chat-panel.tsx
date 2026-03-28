@@ -40,6 +40,7 @@ import {
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
+import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
 
 interface Position {
@@ -80,12 +81,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "book-open": <BookOpen className="h-4 w-4" />,
 }
 
-const categoryColors: Record<string, string> = {
-  data: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  action: "bg-green-500/20 text-green-400 border-green-500/30",
-  context: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  help: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-}
+const categoryColors: Record<string, string> = aiChatCategoryPillClass
 
 const MIN_WIDTH = 320
 const MIN_HEIGHT = 300
@@ -523,7 +519,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                             className="text-muted-foreground hover:text-foreground transition-colors"
                           >
                             {copiedId === message.id ? (
-                              <Check className="h-2.5 w-2.5 text-green-500" />
+                              <Check className="h-2.5 w-2.5 text-success" />
                             ) : (
                               <Copy className="h-2.5 w-2.5" />
                             )}

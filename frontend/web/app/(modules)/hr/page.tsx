@@ -5,6 +5,7 @@ import {
   serverQueryLeaveRequests,
   serverQueryContracts,
   serverQueryPayslips,
+  serverQueryPricelists,
 } from "@lumiere/stdb/server"
 import { HrClient } from "./hr-client"
 
@@ -15,13 +16,14 @@ export default async function HrPage() {
     return <HrClient />
   }
 
-  const [employees, departments, leaves, contracts, payslips] = await Promise.all([
+  const [employees, departments, leaves, contracts, payslips, pricelists] = await Promise.all([
     serverQueryEmployees(organizationId, opts),
     serverQueryDepartments(organizationId, opts),
     serverQueryLeaveRequests(organizationId, opts),
     serverQueryContracts(organizationId, opts),
     serverQueryPayslips(organizationId, opts),
-  ]).catch(() => [[], [], [], [], []])
+    serverQueryPricelists(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], []])
 
   return (
     <HrClient
@@ -30,6 +32,7 @@ export default async function HrPage() {
       initialLeaves={leaves as Record<string, unknown>[]}
       initialContracts={contracts as Record<string, unknown>[]}
       initialPayslips={payslips as Record<string, unknown>[]}
+      initialPricelists={pricelists as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

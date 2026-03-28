@@ -3,6 +3,7 @@
 /// Core HR entity tables. Based on the Supabase/Odoo HR schema.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::EmploymentType;
 
@@ -123,6 +124,7 @@ pub struct HrEmployee {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDepartmentParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub parent_id: Option<u64>,
     pub complete_name: Option<String>,
@@ -134,6 +136,7 @@ pub struct CreateDepartmentParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateDepartmentParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub parent_id: Option<u64>,
     pub manager_id: Option<u64>,
@@ -143,6 +146,7 @@ pub struct UpdateDepartmentParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateJobPositionParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub department_id: Option<u64>,
     pub expected_employees: u32,
@@ -154,6 +158,7 @@ pub struct CreateJobPositionParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateJobPositionParams {
+    pub company_id: Option<u64>,
     pub name: Option<String>,
     pub department_id: Option<u64>,
     pub description: Option<String>,
@@ -165,6 +170,7 @@ pub struct UpdateJobPositionParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateEmployeeParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub job_id: Option<u64>,
     pub department_id: Option<u64>,
@@ -212,10 +218,10 @@ pub struct UpdateEmployeeParams {
 pub fn create_department(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateDepartmentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_department", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if params.name.is_empty() {
         return Err("Department name cannot be empty".to_string());
     }
@@ -253,7 +259,6 @@ pub fn create_department(
 pub fn update_department(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     department_id: u64,
     params: UpdateDepartmentParams,
 ) -> Result<(), String> {
@@ -267,6 +272,7 @@ pub fn update_department(
     if dept.organization_id != organization_id {
         return Err("Department belongs to a different organization".to_string());
     }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if dept.company_id != company_id {
         return Err("Department does not belong to this company".to_string());
     }
@@ -301,10 +307,10 @@ pub fn update_department(
 pub fn create_job_position(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateJobPositionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_job_position", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if params.name.is_empty() {
         return Err("Job position name cannot be empty".to_string());
     }
@@ -343,7 +349,6 @@ pub fn create_job_position(
 pub fn update_job_position(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     job_id: u64,
     params: UpdateJobPositionParams,
 ) -> Result<(), String> {
@@ -357,6 +362,7 @@ pub fn update_job_position(
     if job.organization_id != organization_id {
         return Err("Job position belongs to a different organization".to_string());
     }
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if job.company_id != company_id {
         return Err("Job position does not belong to this company".to_string());
     }
@@ -393,10 +399,10 @@ pub fn update_job_position(
 pub fn create_employee(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     params: CreateEmployeeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if params.name.is_empty() {
         return Err("Employee name cannot be empty".to_string());
     }

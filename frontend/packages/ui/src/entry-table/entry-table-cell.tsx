@@ -1,6 +1,12 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import {
+  entryTableBadgeVariantClass,
+  entryTableProgressBarClass,
+  entryTableStatusDotClass,
+  entryTableStatusTextClass,
+} from "@/lib/theme-colors"
 import type { TableColumn, EntryData } from "@/lib/entry-table-types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -148,22 +154,14 @@ export function EntryTableCell({
       const strVal = String(value || "")
       const variant = badgeCol.variants?.[strVal]
       
-      const colorClasses = {
-        default: "bg-secondary text-secondary-foreground",
-        primary: "bg-primary/20 text-primary border-primary/30",
-        secondary: "bg-secondary text-secondary-foreground",
-        success: "bg-green-500/20 text-green-400 border-green-500/30",
-        warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-        danger: "bg-red-500/20 text-red-400 border-red-500/30",
-        info: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-      }
-
       return (
         <Badge
           variant="outline"
           className={cn(
             "font-medium",
-            variant ? colorClasses[variant.color] : colorClasses.default
+            variant
+              ? entryTableBadgeVariantClass[variant.color] ?? entryTableBadgeVariantClass.default
+              : entryTableBadgeVariantClass.default,
           )}
         >
           {variant?.label || strVal}
@@ -180,26 +178,6 @@ export function EntryTableCell({
         return <span className="text-muted-foreground">{strVal || "-"}</span>
       }
 
-      const colorClasses = {
-        green: "text-green-400",
-        yellow: "text-yellow-400",
-        red: "text-red-400",
-        blue: "text-blue-400",
-        gray: "text-gray-400",
-        purple: "text-purple-400",
-        orange: "text-orange-400",
-      }
-
-      const dotColors = {
-        green: "bg-green-400",
-        yellow: "bg-yellow-400",
-        red: "bg-red-400",
-        blue: "bg-blue-400",
-        gray: "bg-gray-400",
-        purple: "bg-purple-400",
-        orange: "bg-orange-400",
-      }
-
       const icons = {
         check: CheckCircle2,
         x: XCircle,
@@ -211,11 +189,21 @@ export function EntryTableCell({
       const IconComponent = status.icon ? icons[status.icon as keyof typeof icons] : null
 
       return (
-        <div className={cn("flex items-center gap-2", colorClasses[status.color])}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            entryTableStatusTextClass[status.color] ?? "text-muted-foreground",
+          )}
+        >
           {IconComponent ? (
             <IconComponent className="h-4 w-4" />
           ) : (
-            <span className={cn("h-2 w-2 rounded-full", dotColors[status.color])} />
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                entryTableStatusDotClass[status.color] ?? "bg-muted-foreground",
+              )}
+            />
           )}
           <span className="text-sm font-medium">{status.label}</span>
         </div>
@@ -228,18 +216,15 @@ export function EntryTableCell({
       const max = progCol.maxKey ? Number(row[progCol.maxKey] || 100) : 100
       const percent = Math.round((current / max) * 100)
 
-      const colorClasses = {
-        primary: "[&>div]:bg-primary",
-        success: "[&>div]:bg-green-500",
-        warning: "[&>div]:bg-yellow-500",
-        danger: "[&>div]:bg-red-500",
-      }
-
       return (
         <div className="flex items-center gap-3 min-w-24">
           <Progress
             value={percent}
-            className={cn("h-2 flex-1", colorClasses[progCol.color || "primary"])}
+            className={cn(
+              "h-2 flex-1",
+              entryTableProgressBarClass[progCol.color || "primary"] ??
+                entryTableProgressBarClass.primary,
+            )}
           />
           {progCol.showLabel && (
             <span className="text-xs text-muted-foreground font-mono w-10">
