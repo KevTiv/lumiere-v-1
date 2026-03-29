@@ -13,6 +13,9 @@ import {
   Upload,
   RefreshCw,
   Bell,
+  Calendar,
+  LayoutTemplate,
+  Activity,
   type LucideIcon
 } from "lucide-react"
 
@@ -40,6 +43,9 @@ const iconMap: Record<string, LucideIcon> = {
   upload: Upload,
   refresh: RefreshCw,
   bell: Bell,
+  calendar: Calendar,
+  template: LayoutTemplate,
+  gauge: Activity,
 }
 
 export function QuickActionsWidget({ data }: { data: QuickActionsData }) {
@@ -54,7 +60,9 @@ export function QuickActionsWidget({ data }: { data: QuickActionsData }) {
     )}>
       {data.actions.map((action) => {
         const IconComponent = iconMap[action.icon] || Plus
-        const colors = widgetAccentTileClass[action.color || "blue"]
+        const accentKey: WidgetAccentKey =
+          action.color && action.color in widgetAccentTileClass ? action.color : "blue"
+        const colors = widgetAccentTileClass[accentKey]
 
         return (
           <button

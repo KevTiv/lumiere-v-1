@@ -2,34 +2,74 @@
  * Workflows hooks — Phase 4 of API Gateway Refactor
  *
  * Wraps REST API calls with React Query for the Workflows module.
- * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+import type {
+  AddWorkflowActivityParams,
+  AddWorkflowTransitionParams,
+  CreateWorkflowParams,
+} from '@lumiere/stdb/generated/types'
+
+const wfKeys = (organizationId: bigint) => organizationId.toString()
+
+function invalidateAllWorkflowQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
+  const o = wfKeys(organizationId)
+  void qc.invalidateQueries({ queryKey: ['workflows', o] })
+  void qc.invalidateQueries({ queryKey: ['workflow-activities', o] })
+  void qc.invalidateQueries({ queryKey: ['workflow-instances', o] })
+  void qc.invalidateQueries({ queryKey: ['workflow-transitions', o] })
+  void qc.invalidateQueries({ queryKey: ['workflow-workitems', o] })
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useWorkflows(
-  organizationId: bigint,
-  initialData?: QueryRows,
-) {
+export function useWorkflows(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['workflows', organizationId.toString()],
+    queryKey: ['workflows', wfKeys(organizationId)],
     queryFn: () => fetchQueryList('/api/query/workflows', 'Failed to fetch workflows'),
     staleTime: 30_000,
     initialData,
   })
 }
 
-export function useWorkflowInstances(
-  organizationId: bigint,
-  initialData?: QueryRows,
-) {
+export function useWorkflowActivities(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['workflow-instances', organizationId.toString()],
-    queryFn: () => fetchQueryList('/api/query/workflow-instances', 'Failed to fetch workflow instances'),
+    queryKey: ['workflow-activities', wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/workflow-activities', 'Failed to fetch workflow activities'),
+    staleTime: 30_000,
+    initialData: initialData ?? [],
+  })
+}
+
+export function useWorkflowInstances(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['workflow-instances', wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/workflow-instances', 'Failed to fetch workflow instances'),
+    staleTime: 30_000,
+    initialData: initialData ?? [],
+  })
+}
+
+export function useWorkflowTransitions(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['workflow-transitions', wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/workflow-transitions', 'Failed to fetch workflow transitions'),
+    staleTime: 30_000,
+    initialData: initialData ?? [],
+  })
+}
+
+export function useWorkflowWorkitems(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['workflow-workitems', wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/workflow-workitems', 'Failed to fetch workflow work items'),
     staleTime: 30_000,
     initialData: initialData ?? [],
   })
@@ -39,16 +79,79 @@ export function useWorkflowInstances(
 
 export function useCreateWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateWorkflowParams>({
     mutationFn: async (params) => {
       const r = await fetch('/api/call/create_workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: JSON.stringify([organizationId.toString(), null, params]),
       })
       if (!r.ok) throw new Error('Failed to create workflow')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows', organizationId.toString()] }),
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useAddWorkflowActivity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      workflowId: bigint | number | string
+      params: AddWorkflowActivityParams
+    }) => {
+      const r = await fetch('/api/call/add_workflow_activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          params.workflowId.toString(),
+          params.params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to add workflow activity')
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useAddWorkflowTransition(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      workflowId: bigint | number | string
+      activityFrom: bigint | number | string
+      activityTo: bigint | number | string
+      params: AddWorkflowTransitionParams
+    }) => {
+      const r = await fetch('/api/call/add_workflow_transition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          params.workflowId.toString(),
+          params.activityFrom.toString(),
+          params.activityTo.toString(),
+          params.params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to add workflow transition')
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useImportWorkflowCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const r = await fetch('/api/call/import_workflow_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!r.ok) throw new Error('Failed to import workflows')
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })
 }
 
@@ -68,8 +171,7 @@ export function useSetWorkflowActive(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to update workflow active state')
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['workflows', organizationId.toString()] })
-      await qc.invalidateQueries({ queryKey: ['workflow-instances', organizationId.toString()] })
+      invalidateAllWorkflowQueries(qc, organizationId)
     },
   })
 }
@@ -95,7 +197,7 @@ export function useStartWorkflow(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to start workflow')
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['workflow-instances', organizationId.toString()] })
+      invalidateAllWorkflowQueries(qc, organizationId)
     },
   })
 }
@@ -119,7 +221,7 @@ export function useSignalWorkflow(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to signal workflow')
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['workflow-instances', organizationId.toString()] })
+      invalidateAllWorkflowQueries(qc, organizationId)
     },
   })
 }
@@ -136,7 +238,7 @@ export function useCancelWorkflowInstance(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to cancel workflow instance')
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['workflow-instances', organizationId.toString()] })
+      invalidateAllWorkflowQueries(qc, organizationId)
     },
   })
 }
@@ -153,10 +255,9 @@ export function useSetWorkitemException(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to set workitem exception')
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['workflow-instances', organizationId.toString()] })
+      invalidateAllWorkflowQueries(qc, organizationId)
     },
   })
 }
 
-// ── Types (re-exported so client components import from one place) ────────────
-export type { CreateWorkflowParams } from '@lumiere/stdb'
+export type { CreateWorkflowParams } from '@lumiere/stdb/generated/types'

@@ -141,7 +141,41 @@ export const newPricelistForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newPickingBatchForm = (t: TFunction): FormConfig => ({
+  id: "new-picking-batch",
+  title: t("sales.forms.newPickingBatch.title"),
+  description: t("sales.forms.newPickingBatch.description"),
+  sections: [
+    {
+      id: "batch-details",
+      title: t("sales.forms.newPickingBatch.sections.details"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("sales.forms.newPickingBatch.fields.name"),
+          placeholder: t("sales.forms.newPickingBatch.fields.namePlaceholder"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "pickingIds",
+          name: "pickingIds",
+          type: "textarea",
+          label: t("sales.forms.newPickingBatch.fields.pickingIds"),
+          placeholder: t("sales.forms.newPickingBatch.fields.pickingIdsPlaceholder"),
+          description: t("sales.forms.newPickingBatch.fields.pickingIdsHint"),
+          width: "full",
+          rows: 3,
+        },
+      ],
+    },
+  ],
+})
+
 export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-sale-order": newSaleOrderForm(t),
   "new-pricelist": newPricelistForm(t),
+  "new-picking-batch": newPickingBatchForm(t),
 })

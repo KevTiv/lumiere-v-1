@@ -45,18 +45,37 @@ function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = fa
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount)
 
+function moveStateStr(state: unknown): string {
+  if (state != null && typeof state === "object" && "tag" in state) {
+    return String((state as { tag: string }).tag)
+  }
+  return String(state ?? "")
+}
+
 interface InvoiceDetailModalProps {
   invoice: AccountMove | null
   open: boolean
   onClose: () => void
+  onPostDraft?: () => void
+  onRecordPayment?: () => void
+  postDraftPending?: boolean
+  recordPaymentPending?: boolean
 }
 
-export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModalProps) {
+export function InvoiceDetailModal({
+  invoice,
+  open,
+  onClose,
+  onPostDraft,
+  onRecordPayment,
+  postDraftPending,
+  recordPaymentPending,
+}: InvoiceDetailModalProps) {
   const { t } = useTranslation()
 
   const getStatusBadge = (move: AccountMove) => {
-    const state = String(move.state)
-    const paymentState = String(move.paymentState)
+    const state = moveStateStr(move.state)
+    const paymentState = moveStateStr(move.paymentState)
     if (state === "Cancelled") {
       return { label: t("accounting.states.cancelled"), cls: invoiceStatusBadgeClass.cancelled }
     }
@@ -81,6 +100,11 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
   if (!invoice) return null
 
   const { label, cls } = getStatusBadge(invoice)
+  const stateStr = moveStateStr(invoice.state)
+  const isDraft = stateStr === "Draft"
+  const isPosted = stateStr === "Posted"
+  const canRecordPayment =
+    Boolean(onRecordPayment) && isPosted && invoice.amountResidual > 0
 
   const getDaysUntilDue = () => {
     if (!invoice.invoiceDateDue) return null
@@ -103,12 +127,39 @@ export function InvoiceDetailModal({ invoice, open, onClose }: InvoiceDetailModa
         </DialogHeader>
 
         {/* Quick Actions */}
-        <div className="flex items-center gap-2 pb-4">
-          <Button variant="outline" size="sm" className="gap-2"><Send className="h-4 w-4" />{t("accounting.invoices.invoiceActions.send")}</Button>
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}</Button>
-          <Button variant="outline" size="sm" className="gap-2"><Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}</Button>
-          {invoice.amountResidual > 0 && (
-            <Button size="sm" className="gap-2 ml-auto"><DollarSign className="h-4 w-4" />{t("accounting.invoices.invoiceActions.recordPayment")}</Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+              <Send className="h-4 w-4" />{t("accounting.invoices.invoiceActions.send")}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+              <Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+              <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
+            </Button>
+            {isDraft && onPostDraft && (
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2"
+                disabled={postDraftPending}
+                onClick={() => onPostDraft()}
+              >
+                {t("accounting.invoices.invoiceActions.postDraft")}
+              </Button>
+            )}
+          </div>
+          {canRecordPayment && (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2"
+              disabled={recordPaymentPending}
+              onClick={() => onRecordPayment?.()}
+            >
+              <DollarSign className="h-4 w-4" />{t("accounting.invoices.invoiceActions.recordPayment")}
+            </Button>
           )}
         </div>
 

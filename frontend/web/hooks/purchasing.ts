@@ -297,5 +297,45 @@ export function useCancelPurchaseRequisition(organizationId: bigint) {
   })
 }
 
+export function useComputePurchaseOrderTotals(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const r = await fetch('/api/call/compute_purchase_order_totals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error('Failed to compute purchase order totals')
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId.toString()] }),
+      ])
+    },
+  })
+}
+
+export function useComputePurchaseOrderLineTotals(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const r = await fetch('/api/call/compute_purchase_order_line_totals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error('Failed to compute purchase order line totals')
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId.toString()] }),
+      ])
+    },
+  })
+}
+
 // Re-export cross-domain dependency so callers import from one place
 export { useContacts } from "@/hooks/crm"

@@ -126,6 +126,32 @@ export const pricelistsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Pricelist items (pricing rules) ───────────────────────────────────────────
+export const pricelistItemsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pricelist-items-table",
+  title: t("sales.pricelistItems.title"),
+  description: t("sales.pricelistItems.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.pricelistItems.searchPlaceholder"),
+    searchKeys: ["pricelistId", "productId"],
+    columns: [
+      { key: "id", label: t("sales.pricelistItems.columns.id"), width: "min-w-16" },
+      { key: "pricelistId", label: t("sales.pricelistItems.columns.pricelistId"), width: "min-w-20" },
+      { key: "sequence", label: t("sales.pricelistItems.columns.sequence"), type: "number", align: "right" },
+      { key: "appliedOn", label: t("sales.pricelistItems.columns.appliedOn"), type: "text" },
+      { key: "computePrice", label: t("sales.pricelistItems.columns.computePrice"), type: "text" },
+      { key: "productId", label: t("sales.pricelistItems.columns.productId"), width: "min-w-20" },
+      { key: "minQuantity", label: t("sales.pricelistItems.columns.minQuantity"), type: "number", align: "right" },
+      { key: "fixedPrice", label: t("sales.pricelistItems.columns.fixedPrice"), type: "currency", align: "right" },
+      { key: "percentPrice", label: t("sales.pricelistItems.columns.percentPrice"), type: "percent", align: "right" },
+    ],
+    emptyMessage: t("sales.pricelistItems.emptyMessage"),
+  },
+})
+
 // ── Deliveries (picking batches) ──────────────────────────────────────────────
 export const deliveriesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "deliveries-table",
@@ -165,5 +191,6 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
   "sale-orders-table": saleOrdersTableConfig(t),
   "sale-order-lines-table": saleOrderLinesTableConfig(t),
   "pricelists-table": pricelistsTableConfig(t),
+  "pricelist-items-table": pricelistItemsTableConfig(t),
   "deliveries-table": deliveriesTableConfig(t),
 })

@@ -1,11 +1,21 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { toast } from "sonner"
+import {
+  useStdbConnection,
+  seedOrganizationFormConfigs,
+  addFormField,
+  setFormRoleConfig,
+  type CreateFormFieldParams as StdbCreateFormFieldParams,
+} from "@lumiere/stdb"
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
 import { formRegistry } from "../forms/config/registry"
-import type { FormRegistryEntry, FormModuleMetadata } from "../forms/config/types"
+import type { FormRegistryEntry, FormModuleMetadata, FieldType, ParsedFormField } from "../forms/config/types"
+import { generateCustomFieldId, parseRoleConfig } from "../forms/config/types"
+import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -110,14 +120,10 @@ type ViewMode = "grid" | "list"
 
 export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettingsProps) {
   const { t } = useTranslation()
-  const { isAdmin } = useRBAC()
   const [isViewingSettings, setIsViewingSettings] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedModule, setSelectedModule] = useState<string | null>(null)
   const [selectedForm, setSelectedForm] = useState<FormRegistryEntry | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>("grid")
-  const [isFieldDialogOpen, setIsFieldDialogOpen] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
 
   const modules = useMemo(() => formRegistry.getModules(), [])
 
@@ -134,32 +140,23 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
     )
   }, [modules, searchQuery])
 
-  const formConfig = useMemo(() => {
-    if (!selectedForm) return null
-    return selectedForm.defaultConfig()
-  }, [selectedForm])
-
   const handleModuleSelect = (moduleId: string) => {
     setSelectedModule(moduleId)
     setSelectedForm(null)
-    setHasChanges(false)
   }
 
   const handleFormSelect = (form: FormRegistryEntry) => {
     setSelectedForm(form)
-    setHasChanges(false)
   }
 
   const handleBackToModules = () => {
     setSelectedModule(null)
     setSelectedForm(null)
     setIsViewingSettings(false)
-    setHasChanges(false)
   }
 
   const handleBackToForms = () => {
     setSelectedForm(null)
-    setHasChanges(false)
   }
 
   // ── Module Selection View ───────────────────────────────────────────────────
@@ -271,34 +268,229 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
 
   // ── Form Configuration View ─────────────────────────────────────────────────
   return (
+    <FormConfigurationDetail
+      className={className}
+      formEntry={selectedForm}
+      onBack={handleBackToForms}
+    />
+  )
+}
+
+interface FormConfigurationDetailProps {
+  className?: string
+  formEntry: FormRegistryEntry
+  onBack: () => void
+}
+
+const FIELD_TYPES_FOR_CUSTOM: FieldType[] = [
+  "Text",
+  "Textarea",
+  "Number",
+  "Select",
+  "MultiSelect",
+  "Date",
+  "DateTime",
+  "Checkbox",
+  "Switch",
+  "Radio",
+  "Rating",
+  "Tags",
+]
+
+function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigurationDetailProps) {
+  const { t } = useTranslation()
+  const { checkPermission } = useRBAC()
+  const { organizationId, connected } = useStdbConnection()
+  const canEditForms = checkPermission("admin:roles", "update").allowed
+
+  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [isFieldDialogOpen, setIsFieldDialogOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [fieldKey, setFieldKey] = useState("")
+  const [fieldLabel, setFieldLabel] = useState("")
+  const [fieldType, setFieldType] = useState<FieldType>("Text")
+  const [fieldRequired, setFieldRequired] = useState(false)
+
+  const {
+    config: mergedConfig,
+    isLoading,
+    error,
+    refetch,
+    sourceRoleConfigs,
+    dbConfigurationId,
+  } = useFormConfiguration({
+    moduleId: formEntry.moduleId,
+    formId: formEntry.formId,
+    organizationId: organizationId ?? 0,
+    forAdminSettings: true,
+  })
+
+  const roleConfigsForTabs = useMemo(() => {
+    const fromDb: Record<string, ReturnType<typeof parseRoleConfig>> = {}
+    for (const rc of sourceRoleConfigs) {
+      fromDb[rc.roleId] = parseRoleConfig(rc)
+    }
+    if (Object.keys(fromDb).length > 0) return fromDb
+    const def = formEntry.defaultConfig().roleConfigs
+    if (!def) return {}
+    const out: Record<string, ReturnType<typeof parseRoleConfig>> = {}
+    for (const [k, v] of Object.entries(def)) {
+      out[k] = {
+        enabledFields: [...v.enabledFields],
+        requiredFields: [...v.requiredFields],
+        defaultPrompts: [...(v.defaultPrompts ?? [])],
+      }
+    }
+    return out
+  }, [sourceRoleConfigs, formEntry])
+
+  const handleSeed = useCallback(async () => {
+    if (!organizationId) {
+      toast.error(t("settings.formConfig.noOrganization"))
+      return
+    }
+    try {
+      setIsSaving(true)
+      await seedOrganizationFormConfigs(BigInt(organizationId))
+      toast.success(t("settings.formConfig.seedSuccess"))
+      refetch()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("settings.formConfig.seedError"))
+    } finally {
+      setIsSaving(false)
+    }
+  }, [organizationId, refetch, t])
+
+  const handleAddCustomField = useCallback(async () => {
+    if (!organizationId || !dbConfigurationId) {
+      toast.error(t("settings.formConfig.needDbConfig"))
+      return
+    }
+    if (!canEditForms) {
+      toast.error(t("settings.formConfig.noPermission"))
+      return
+    }
+    const slug = fieldKey.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_")
+    if (!slug) {
+      toast.error(t("settings.formConfig.fieldKeyRequired"))
+      return
+    }
+    const fieldId = generateCustomFieldId(slug)
+    const maxOrder = Math.max(0, ...(mergedConfig?.fields.map(f => f.order) ?? [0]))
+    const params = {
+      fieldId,
+      name: slug,
+      label: fieldLabel.trim() || slug,
+      fieldType: { tag: fieldType },
+      description: undefined,
+      placeholder: undefined,
+      defaultValue: undefined,
+      options: [],
+      validation: { required: fieldRequired },
+      aiSuggestions: [],
+      order: maxOrder + 1,
+      isSystem: false,
+      isEnabled: true,
+      category: undefined,
+      showInList: false,
+      width: { tag: "Full" as const },
+      sectionId: undefined,
+    } as StdbCreateFormFieldParams
+
+    try {
+      setIsSaving(true)
+      await addFormField(BigInt(organizationId), BigInt(dbConfigurationId), params)
+
+      for (const rc of sourceRoleConfigs) {
+        const parsed = parseRoleConfig(rc)
+        const enabled = parsed.enabledFields.includes(fieldId)
+          ? parsed.enabledFields
+          : [...parsed.enabledFields, fieldId]
+        const required =
+          fieldRequired && !parsed.requiredFields.includes(fieldId)
+            ? [...parsed.requiredFields, fieldId]
+            : parsed.requiredFields
+        await setFormRoleConfig(BigInt(organizationId), BigInt(dbConfigurationId), {
+          roleId: rc.roleId,
+          enabledFields: enabled,
+          requiredFields: required,
+          defaultPrompts: parsed.defaultPrompts,
+        })
+      }
+
+      toast.success(t("settings.formConfig.customFieldAdded"))
+      setIsFieldDialogOpen(false)
+      setFieldKey("")
+      setFieldLabel("")
+      setFieldType("Text")
+      setFieldRequired(false)
+      refetch()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("settings.formConfig.addFieldError"))
+    } finally {
+      setIsSaving(false)
+    }
+  }, [
+    organizationId,
+    dbConfigurationId,
+    canEditForms,
+    fieldKey,
+    fieldLabel,
+    fieldType,
+    fieldRequired,
+    mergedConfig?.fields,
+    sourceRoleConfigs,
+    refetch,
+    t,
+  ])
+
+  const fields = mergedConfig?.fields ?? []
+
+  return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={handleBackToForms} className="gap-2">
+        <Button variant="ghost" onClick={onBack} className="gap-2">
           <ChevronRight className="h-4 w-4 rotate-180" />
           {t("settings.formConfig.backToForms")}
         </Button>
         <div className="flex-1">
-          <h3 className="text-lg font-semibold">{selectedForm.name}</h3>
-          <p className="text-sm text-muted-foreground">{selectedForm.description}</p>
+          <h3 className="text-lg font-semibold">{formEntry.name}</h3>
+          <p className="text-sm text-muted-foreground">{formEntry.description}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setHasChanges(false)}>
+          {organizationId && dbConfigurationId === 0 && (
+            <Button variant="outline" size="sm" className="gap-2" disabled={isSaving || !connected} onClick={() => void handleSeed()}>
+              <RefreshCw className={cn("h-4 w-4", isSaving && "animate-spin")} />
+              {t("settings.formConfig.seedDatabase")}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
             <RotateCcw className="h-4 w-4" />
-            {t("settings.formConfig.reset")}
-          </Button>
-          <Button size="sm" className="gap-2" disabled={!hasChanges}>
-            <Save className="h-4 w-4" />
-            {t("settings.formConfig.saveChanges")}
+            {t("settings.formConfig.refresh")}
           </Button>
         </div>
       </div>
 
-      {hasChanges && (
-        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/25 rounded-md">
-          <AlertCircle className="h-4 w-4 text-warning" />
-          <span className="text-sm text-warning">{t("settings.formConfig.unsavedChanges")}</span>
+      {!organizationId && (
+        <div className="flex items-center gap-2 p-3 bg-muted/50 border rounded-md text-sm">
+          <AlertCircle className="h-4 w-4" />
+          {t("settings.formConfig.noOrganization")}
         </div>
       )}
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/25 rounded-md text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {dbConfigurationId === 0 && organizationId ? (
+        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/25 rounded-md text-sm">
+          <AlertCircle className="h-4 w-4 text-warning shrink-0" />
+          {t("settings.formConfig.registryOnlyHint")}
+        </div>
+      ) : null}
 
       <Tabs defaultValue="fields" className="w-full flex flex-col">
         <TabsList className="grid w-full grid-cols-3 lg:w-100">
@@ -325,22 +517,30 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
                 <List className="h-4 w-4" />
               </Button>
             </div>
-            <Button onClick={() => setIsFieldDialogOpen(true)} className="gap-2">
+            <Button
+              onClick={() => setIsFieldDialogOpen(true)}
+              className="gap-2"
+              disabled={!canEditForms || !dbConfigurationId || isLoading}
+            >
               <Plus className="h-4 w-4" />
               {t("settings.formConfig.addField")}
             </Button>
           </div>
 
-          {formConfig && (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40 border rounded-lg text-muted-foreground text-sm">
+              {t("common.loading")}
+            </div>
+          ) : (
             <ScrollArea className="h-125 border rounded-lg p-4">
               <div className={viewMode === "grid" ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
-                {formConfig.fields.map((field: any, index: number) => (
+                {fields.map((field: ParsedFormField, index: number) => (
                   <FieldConfigCard
                     key={field.fieldId}
                     field={field}
                     index={index}
                     onEdit={() => setIsFieldDialogOpen(true)}
-                    onToggleEnabled={() => setHasChanges(true)}
+                    onToggleEnabled={() => {}}
                   />
                 ))}
               </div>
@@ -349,9 +549,9 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          {formConfig?.roleConfigs && (
+          {Object.keys(roleConfigsForTabs).length > 0 && (
             <div className="space-y-4">
-              {Object.entries(formConfig.roleConfigs).map(([roleId, config]: [string, any]) => (
+              {Object.entries(roleConfigsForTabs).map(([roleId, config]) => (
                 <Card key={roleId}>
                   <CardHeader>
                     <CardTitle className="text-base capitalize">
@@ -397,7 +597,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
                 <CardDescription>{t("settings.formConfig.export.description")}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button className="w-full gap-2">
+                <Button className="w-full gap-2" type="button" disabled>
                   <Download className="h-4 w-4" />
                   {t("settings.formConfig.export.button")}
                 </Button>
@@ -409,7 +609,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
                 <CardDescription>{t("settings.formConfig.import.description")}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full gap-2">
+                <Button variant="outline" className="w-full gap-2" type="button" disabled>
                   <Upload className="h-4 w-4" />
                   {t("settings.formConfig.import.button")}
                 </Button>
@@ -422,7 +622,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
               <CardDescription>{t("settings.formConfig.resetDefaults.description")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="destructive" className="gap-2">
+              <Button variant="destructive" className="gap-2" type="button" disabled>
                 <RotateCcw className="h-4 w-4" />
                 {t("settings.formConfig.resetDefaults.button")}
               </Button>
@@ -431,38 +631,41 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
         </TabsContent>
       </Tabs>
 
-      {/* Field Dialog */}
       <Dialog open={isFieldDialogOpen} onOpenChange={setIsFieldDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("settings.formConfig.fieldDialog.title")}</DialogTitle>
-            <DialogDescription>{t("settings.formConfig.fieldDialog.description")}</DialogDescription>
+            <DialogDescription>{t("settings.formConfig.fieldDialog.descriptionCustom")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("settings.formConfig.fieldDialog.fieldId")}</Label>
-                <Input placeholder={t("settings.formConfig.fieldDialog.fieldIdPlaceholder")} />
+                <Label>{t("settings.formConfig.fieldDialog.fieldKey")}</Label>
+                <Input
+                  placeholder={t("settings.formConfig.fieldDialog.fieldKeyPlaceholder")}
+                  value={fieldKey}
+                  onChange={e => setFieldKey(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
-                <Label>{t("settings.formConfig.fieldDialog.fieldName")}</Label>
-                <Input placeholder={t("settings.formConfig.fieldDialog.fieldNamePlaceholder")} />
+                <Label>{t("settings.formConfig.fieldDialog.label")}</Label>
+                <Input
+                  placeholder={t("settings.formConfig.fieldDialog.labelPlaceholder")}
+                  value={fieldLabel}
+                  onChange={e => setFieldLabel(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("settings.formConfig.fieldDialog.label")}</Label>
-              <Input placeholder={t("settings.formConfig.fieldDialog.labelPlaceholder")} />
             </div>
             <div className="space-y-2">
               <Label>{t("settings.formConfig.fieldDialog.type")}</Label>
-              <Select>
+              <Select value={fieldType} onValueChange={v => setFieldType(v as FieldType)}>
                 <SelectTrigger>
                   <SelectValue placeholder={t("settings.formConfig.fieldDialog.typePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["Text", "Textarea", "Number", "Select", "Date", "Checkbox", "Radio", "Rating", "Tags"] as const).map((type) => (
+                  {FIELD_TYPES_FOR_CUSTOM.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {t(`settings.formConfig.fieldDialog.fieldTypes.${type}`)}
+                      {t(`settings.formConfig.fieldDialog.fieldTypes.${type}`, { defaultValue: type })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -470,24 +673,16 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center space-x-2">
-                <Switch id="required" />
+                <Switch id="required" checked={fieldRequired} onCheckedChange={setFieldRequired} />
                 <Label htmlFor="required">{t("settings.formConfig.fieldDialog.required")}</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="enabled" defaultChecked />
-                <Label htmlFor="enabled">{t("settings.formConfig.fieldDialog.enabled")}</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="system" />
-                <Label htmlFor="system">{t("settings.formConfig.fieldDialog.systemField")}</Label>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)} type="button">
               {t("common.cancel")}
             </Button>
-            <Button onClick={() => { setIsFieldDialogOpen(false); setHasChanges(true) }}>
+            <Button onClick={() => void handleAddCustomField()} disabled={isSaving} type="button">
               {t("settings.formConfig.fieldDialog.saveField")}
             </Button>
           </DialogFooter>
@@ -500,7 +695,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
 // ── Field Config Card ───────────────────────────────────────────────────────
 // Defined outside UnifiedFormConfigSettings to avoid re-creating on each render
 interface FieldConfigCardProps {
-  field: any
+  field: ParsedFormField
   index: number
   onEdit: () => void
   onToggleEnabled: () => void
@@ -537,7 +732,7 @@ function FieldConfigCard({ field, index, onEdit, onToggleEnabled }: FieldConfigC
               )}
             </div>
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-              <span className="capitalize">{field.fieldType}</span>
+              <span className="capitalize">{field.type}</span>
               <span>·</span>
               <span className="capitalize">{field.width}</span>
             </div>

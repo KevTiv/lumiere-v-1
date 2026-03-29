@@ -78,7 +78,7 @@ function HrClientLoaded({
   const { data: contracts = [] } = useContracts(companyId, initialContracts)
   const { data: payslips = [] } = usePayslips(companyId, initialPayslips)
   const { data: jobPositions = [] } = useJobPositions(companyId)
-  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
   const createEmployee = useCreateEmployee(orgId, companyId)
   const createLeaveRequest = useCreateLeaveRequest(orgId, companyId)

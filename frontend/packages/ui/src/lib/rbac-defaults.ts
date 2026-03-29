@@ -292,13 +292,13 @@ export const settingsSections: SettingsSection[] = [
     requiredPermission: "admin:roles",
     requiredAction: "read"
   },
-  {
+    {
     id: "form-config",
     title: "Form Configuration",
     description: "Configure Journal and Forensic Report fields",
     icon: "settings2",
     requiredPermission: "admin:roles",
-    requiredAction: "manage"
+    requiredAction: "update"
   },
   {
     id: "audit",

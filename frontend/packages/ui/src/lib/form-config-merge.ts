@@ -35,3 +35,28 @@ export function mergeSelectOptionsForFields(
     config,
   )
 }
+
+/**
+ * Set `defaultValue` on fields by `name` (e.g. invoice residual for record payment).
+ * Use with a remounted `FormModal`/`ModularForm` (`key` tied to entity) so initial state refreshes.
+ */
+export function mergeFieldDefaultValues(
+  config: FormConfig,
+  defaults: Record<string, unknown>,
+): FormConfig {
+  return {
+    ...config,
+    sections: config.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        if (Object.prototype.hasOwnProperty.call(defaults, field.name)) {
+          const v = defaults[field.name]
+          if (v !== undefined) {
+            return { ...field, defaultValue: v } as typeof field
+          }
+        }
+        return field
+      }),
+    })),
+  }
+}

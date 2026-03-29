@@ -3,15 +3,12 @@
  *
  * Wraps REST API calls with React Query for the Inventory module.
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
- *
- * Notes:
- * - useStockLocations, useProductionLots, useQualityChecks return empty arrays (no route yet)
- * - useWarehouse3D returns empty zones/slots/items (no 3D route yet)
- * - useMoveStockItem3D posts to /api/call/create_inventory_adjustment as a proxy
  */
 
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { emptyQueryRows, fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+import { buildWarehouse3DView } from '@/lib/warehouse-3d-from-api'
 
 type ScalarId = bigint | number | string
 
@@ -21,8 +18,14 @@ function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organ
   void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-pickings', orgKey] })
   void qc.invalidateQueries({ queryKey: ['inventory-adjustments', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['production-lots', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-production-lots', orgKey] })
   void qc.invalidateQueries({ queryKey: ['warehouses', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['quality-checks', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['warehouse-3d', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-inventories', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-moves', orgKey] })
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -113,49 +116,187 @@ export function useInventoryAdjustments(
   })
 }
 
-// TODO: No route yet — returns empty array until stock_location table/route is added
 export function useStockLocations(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
     queryKey: ['stock-locations', organizationId.toString()],
-    queryFn: emptyQueryRows,
+    queryFn: () => fetchQueryList('/api/query/stock-locations', 'Failed to fetch stock locations'),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    initialData,
   })
 }
 
-// TODO: No route yet — returns empty array until production_lot table/route is added
 export function useProductionLots(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['production-lots', organizationId.toString()],
-    queryFn: emptyQueryRows,
+    queryKey: ['stock-production-lots', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-production-lots', 'Failed to fetch production lots'),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    initialData,
   })
 }
 
-// TODO: No route yet — returns empty array until quality_check table/route is added
 export function useQualityChecks(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
     queryKey: ['quality-checks', organizationId.toString()],
-    queryFn: emptyQueryRows,
+    queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    initialData,
   })
 }
 
-// TODO: No 3D warehouse route yet — returns empty zones/slots/items
-export function useWarehouse3D(..._args: [bigint, bigint, bigint]) {
-  void _args
-  return { zones: [], slots: [], items: [] }
+export function useWarehouse3D(organizationId: bigint, _companyId: bigint, warehouseId: bigint) {
+  const orgKey = organizationId.toString()
+  const { data: zones3D = [] } = useQuery<QueryRows>({
+    queryKey: ['warehouse-3d-zones', orgKey],
+    queryFn: () =>
+      fetchQueryList('/api/query/warehouse-3d-zones', 'Failed to fetch warehouse 3D zones'),
+    staleTime: 30_000,
+  })
+  const { data: allLocations = [] } = useQuery<QueryRows>({
+    queryKey: ['stock-locations', orgKey],
+    queryFn: () => fetchQueryList('/api/query/stock-locations', 'Failed to fetch stock locations'),
+    staleTime: 30_000,
+  })
+  const { data: allQuants = [] } = useQuery<QueryRows>({
+    queryKey: ['stock-quants', orgKey],
+    queryFn: () => fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
+    staleTime: 30_000,
+  })
+  const { data: products = [] } = useQuery<QueryRows>({
+    queryKey: ['products', orgKey],
+    queryFn: () => fetchQueryList('/api/query/products', 'Failed to fetch products'),
+    staleTime: 30_000,
+  })
+
+  return useMemo(() => {
+    if (warehouseId === 0n) {
+      return { zones: [], slots: [], items: [] }
+    }
+    const productById = new Map<string, { name: string; sku: string }>()
+    for (const p of products) {
+      const id = String(p.id ?? '')
+      productById.set(id, {
+        name: String(p.name ?? ''),
+        sku: String(p.defaultCode ?? ''),
+      })
+    }
+    return buildWarehouse3DView(warehouseId, zones3D, allLocations, allQuants, productById)
+  }, [warehouseId, zones3D, allLocations, allQuants, products])
+}
+
+// ── Reads: advanced inventory (query API + hooks; use in future tabs or dashboards) ──
+
+export function useStockCycleCounts(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-cycle-counts', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-cycle-counts', 'Failed to fetch cycle counts'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockInventories(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-inventories', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-inventories', 'Failed to fetch stock inventories'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-moves', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockRoutes(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-routes', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/stock-routes', 'Failed to fetch stock routes'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-rules', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/stock-rules', 'Failed to fetch stock rules'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePickingWaves(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['picking-waves', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/picking-waves', 'Failed to fetch picking waves'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useWarehouseTasks(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['warehouse-tasks', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/warehouse-tasks', 'Failed to fetch warehouse tasks'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useReplenishmentRules(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['replenishment-rules', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/replenishment-rules', 'Failed to fetch replenishment rules'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useBarcodeRules(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['barcode-rules', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/barcode-rules', 'Failed to fetch barcode rules'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useInventoryValuations(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['inventory-valuations', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/inventory-valuations', 'Failed to fetch inventory valuations'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockProductionSerials(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-production-serials', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-production-serials', 'Failed to fetch serial numbers'),
+    staleTime: 30_000,
+    initialData,
+  })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -172,6 +313,143 @@ export function useCreateProduct(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create product')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId.toString()] }),
+  })
+}
+
+export function useUpdateProduct(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
+    mutationFn: async ({ productId, params }) => {
+      const r = await fetch('/api/call/update_product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(productId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update product')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useDeleteProduct(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (productId) => {
+      const r = await fetch('/api/call/delete_product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(productId)]),
+      })
+      if (!r.ok) throw new Error('Failed to delete product')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useCreateProductVariant(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { productTmplId: ScalarId; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ productTmplId, params }) => {
+      const r = await fetch('/api/call/create_product_variant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(productTmplId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create product variant')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useCreateWarehouse(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_warehouse?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([params]),
+      })
+      if (!r.ok) throw new Error('Failed to create warehouse')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useUpdateWarehouse(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { warehouseId: ScalarId; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ warehouseId, params }) => {
+      const r = await fetch('/api/call/update_warehouse?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(warehouseId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update warehouse')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useDeleteWarehouse(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (warehouseId) => {
+      const r = await fetch('/api/call/delete_warehouse?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(warehouseId)]),
+      })
+      if (!r.ok) throw new Error('Failed to delete warehouse')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useOrgUsers() {
+  return useQuery({
+    queryKey: ['org-users'],
+    queryFn: async () => {
+      const r = await fetch('/api/settings/users?limit=100')
+      if (!r.ok) throw new Error('Failed to load users')
+      const json = (await r.json()) as { data?: Record<string, unknown>[] }
+      return json.data ?? []
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useAssignUserToPicking(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { pickingId: ScalarId; userIdentityHex: string | null }
+  >({
+    mutationFn: async ({ pickingId, userIdentityHex }) => {
+      const r = await fetch('/api/call/assign_user_to_picking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          Number(pickingId),
+          {
+            company_id: null,
+            user_id: userIdentityHex && userIdentityHex.length > 0 ? userIdentityHex : null,
+          },
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to assign user to picking')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })
 }
 
@@ -215,22 +493,186 @@ export function useMoveStockItem3D(organizationId: bigint) {
     { quantId: bigint; targetLocationId: bigint; quantity: number }
   >({
     mutationFn: async (params) => {
-      const r = await fetch('/api/call/create_inventory_adjustment', {
+      const r = await fetch('/api/call/move_stock_quant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([
           organizationId.toString(),
+          Number(params.quantId),
           {
-            quantId: params.quantId.toString(),
-            targetLocationId: params.targetLocationId.toString(),
+            company_id: null,
+            dest_location_id: Number(params.targetLocationId),
             quantity: params.quantity,
           },
         ]),
       })
       if (!r.ok) throw new Error('Failed to move stock item')
     },
+    onSuccess: () => {
+      const orgKey = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
+      void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
+    },
+  })
+}
+
+export function useProcessInventoryAdjustment(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (adjustmentId) => {
+      const r = await fetch('/api/call/process_inventory_adjustment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(adjustmentId)]),
+      })
+      if (!r.ok) throw new Error('Failed to process inventory adjustment')
+    },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['inventory-adjustments', organizationId.toString()] }),
+  })
+}
+
+export function useValidateStockPicking(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (pickingId) => {
+      const r = await fetch('/api/call/validate_stock_picking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(pickingId), { company_id: null }]),
+      })
+      if (!r.ok) throw new Error('Failed to validate stock picking')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useReserveStockQuant(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { quantId: ScalarId; reserveQty: number }>({
+    mutationFn: async ({ quantId, reserveQty }) => {
+      const r = await fetch('/api/call/reserve_stock_quant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          Number(quantId),
+          { company_id: null, reserve_qty: reserveQty },
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to reserve stock')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useUnreserveStockQuant(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { quantId: ScalarId; unreserveQty: number }>({
+    mutationFn: async ({ quantId, unreserveQty }) => {
+      const r = await fetch('/api/call/unreserve_stock_quant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          Number(quantId),
+          { company_id: null, unreserve_qty: unreserveQty },
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to unreserve stock')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useCreateCycleCountPlan(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { locationId: number; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ locationId, params }) => {
+      const r = await fetch('/api/call/create_cycle_count_plan?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(locationId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create cycle count plan')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId.toString()] }),
+  })
+}
+
+export function useStartCycleCountSession(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (cycleCountId) => {
+      const r = await fetch('/api/call/start_cycle_count_session?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(cycleCountId)]),
+      })
+      if (!r.ok) throw new Error('Failed to start cycle count session')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId.toString()] }),
+  })
+}
+
+export function useRecordCycleCountLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { cycleCountId: ScalarId; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ cycleCountId, params }) => {
+      const r = await fetch('/api/call/record_cycle_count_line?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(cycleCountId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to record cycle count line')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId.toString()] }),
+  })
+}
+
+export function useValidateCycleCount(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (cycleCountId) => {
+      const r = await fetch('/api/call/validate_cycle_count?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(cycleCountId)]),
+      })
+      if (!r.ok) throw new Error('Failed to validate cycle count')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId.toString()] }),
+  })
+}
+
+export function usePostCycleCountAdjustments(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (cycleCountId) => {
+      const r = await fetch('/api/call/post_cycle_count_adjustments?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(cycleCountId)]),
+      })
+      if (!r.ok) throw new Error('Failed to post cycle count adjustments')
+    },
+    onSuccess: () => {
+      const orgKey = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] })
+      void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
+    },
   })
 }
 

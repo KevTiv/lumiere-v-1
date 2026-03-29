@@ -9,11 +9,14 @@ import { createClientSubscriptions } from "./queries/erp-subscriptions";
 interface StdbConnectionState {
   identity: string | null;
   connected: boolean;
+  /** Active organization from server session (passed to {@link StdbConnectionProvider}). */
+  organizationId?: number;
 }
 
 const StdbConnectionContext = createContext<StdbConnectionState>({
   identity: null,
   connected: false,
+  organizationId: undefined,
 });
 
 export function useStdbConnection(): StdbConnectionState {
@@ -70,7 +73,7 @@ export function StdbConnectionProvider({
   subscriptionResources,
   sameOriginStdbProxy,
 }: StdbConnectionProviderProps) {
-  const [state, setState] = useState<StdbConnectionState>({
+  const [state, setState] = useState<Omit<StdbConnectionState, "organizationId">>({
     identity: null,
     connected: false,
   });
@@ -78,7 +81,8 @@ export function StdbConnectionProvider({
   useEffect(() => {
     let uri = host;
     if (sameOriginStdbProxy && typeof window !== "undefined") {
-      uri = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/stdb`;
+      // Trailing slash so SDK resolves `v1/...` under `/api/stdb/` (not under `/api/`).
+      uri = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/stdb/`;
     }
     if (!uri) {
       uri =
@@ -117,10 +121,13 @@ export function StdbConnectionProvider({
           setStdbConnection(c);
           setState({ identity: identityHex, connected: false });
 
-          // Dev mode: automatically provision this identity as org admin
-          if (process.env.NEXT_PUBLIC_DEV_ADMIN === "true") {
+          // Dev: auto-provision org admin only when explicitly enabled (avoid blocking first-tenant onboarding).
+          if (
+            process.env.NEXT_PUBLIC_DEV_ADMIN === "true" &&
+            process.env.NEXT_PUBLIC_DEV_ADMIN_AUTO_ORG === "true"
+          ) {
             try {
-              c.reducers.ensureDevAdmin();
+              c.reducers.ensureDevAdmin({});
             } catch (e) {
               console.warn("[stdb] ensure_dev_admin failed", e);
             }
@@ -174,7 +181,9 @@ export function StdbConnectionProvider({
   ]);
 
   return (
-    <StdbConnectionContext.Provider value={state}>
+    <StdbConnectionContext.Provider
+      value={{ ...state, organizationId }}
+    >
       {children}
     </StdbConnectionContext.Provider>
   );

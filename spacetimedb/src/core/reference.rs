@@ -417,3 +417,38 @@ pub fn create_uom_conversion(
 
     Ok(())
 }
+
+// ── Currency helpers (legacy `u64` id vs string PK on `currency`) ───────────────
+
+/// Maps ISO 4217 codes to the legacy numeric `currency_id` used on `Company` and related tables.
+pub(crate) fn legacy_currency_id_for_code(code: &str) -> u64 {
+    match code.trim().to_uppercase().as_str() {
+        "USD" => 1,
+        "EUR" => 2,
+        "GBP" => 3,
+        "CAD" => 4,
+        "AUD" => 5,
+        "JPY" => 6,
+        "CHF" => 7,
+        "CNY" => 8,
+        "INR" => 9,
+        _ => 1,
+    }
+}
+
+/// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).
+pub(crate) fn require_currency_row(
+    ctx: &ReducerContext,
+    code: &str,
+) -> Result<Currency, String> {
+    let normalized = code.trim().to_uppercase();
+    if normalized.is_empty() {
+        return Err("Currency code cannot be empty".to_string());
+    }
+    ctx.db.currency().code().find(&normalized).ok_or_else(|| {
+        format!(
+            "Currency '{}' is not in the global currency table. Seed currencies before tenant bootstrap.",
+            normalized
+        )
+    })
+}

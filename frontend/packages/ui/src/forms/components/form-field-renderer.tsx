@@ -35,6 +35,11 @@ import { CalendarIcon, FileIcon, X, Sparkles } from "lucide-react"
 import { format } from "date-fns"
 import type { ParsedFormField, FieldType, FieldOption, FieldValidation } from "../config/types"
 import { isCustomField } from "../config/types"
+import {
+  radixSelectControlledValue,
+  radixSelectItemValue,
+  storedValueFromRadixSelect,
+} from "../utils/radix-select-empty-value"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // FIELD RENDERER COMPONENT
@@ -104,16 +109,20 @@ export function FormFieldRenderer({
       case "Select":
         return (
           <Select
-            value={(value as string) || ""}
-            onValueChange={onChange}
+            value={radixSelectControlledValue(value as string | undefined, field.options)}
+            onValueChange={(v) => onChange(storedValueFromRadixSelect(v))}
             disabled={disabled}
           >
             <SelectTrigger className={cn(error && "border-destructive")}>
               <SelectValue placeholder={field.placeholder || "Select..."} />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+              {field.options?.map((option, idx) => (
+                <SelectItem
+                  key={`${radixSelectItemValue(option, idx)}-${idx}`}
+                  value={radixSelectItemValue(option, idx)}
+                  disabled={option.disabled}
+                >
                   <div className="flex items-center gap-2">
                     {option.color && (
                       <div

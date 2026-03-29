@@ -14,8 +14,44 @@
  */
 
 import { stdbSql, type StdbHttpOptions } from './http'
+import {
+  type FieldAccessContext,
+  resolveReadColumns,
+  selectOrgScopedSql,
+  selectRolesActiveSql,
+  selectUserProfileByIdentitySql,
+  selectUserRoleAssignmentsForIdentitySql,
+  selectUserOrganizationForIdentitySql,
+  selectCasbinRulesInSubjectsSql,
+} from './field-policy'
+
 export type { StdbHttpOptions }
 export { stdbSql }
+export type { FieldAccessContext, QueryResourceKey } from './field-policy'
+export { loadFieldAccessContext } from './server-field-access'
+
+/** HTTP options plus optional field-level RBAC context (used by `/api/query`). */
+export type StdbServerQueryOptions = StdbHttpOptions & {
+  fieldAccess?: FieldAccessContext
+}
+
+function fq(opts?: StdbServerQueryOptions): FieldAccessContext | undefined {
+  return opts?.fieldAccess
+}
+
+/** SpacetimeDB HTTP SQL rejects some `ORDER BY` shapes; sort client-side after fetch. */
+function sortSqlRows<T extends Record<string, unknown>>(
+  rows: T[],
+  compare: (a: T, b: T) => number,
+): T[] {
+  return [...rows].sort(compare)
+}
+
+function httpOpts(opts?: StdbServerQueryOptions): StdbHttpOptions | undefined {
+  if (!opts) return undefined
+  const { fieldAccess: _fa, ...rest } = opts
+  return rest as StdbHttpOptions
+}
 
 // ── Entity type re-exports for API route handlers ────────────────────────────
 // Import from "@lumiere/stdb/server" in route handlers — avoids pulling in
@@ -25,8 +61,9 @@ export type {
   Lead, Contact, Opportunity, Activity,
   CreateLeadParams, CreateContactParams, CreateOpportunityParams,
   // Sales
-  SaleOrder, SaleOrderLine, ProductPricelist,
+  SaleOrder, SaleOrderLine, ProductPricelist, ProductPricelistItem,
   CreateSaleOrderParams, CreateSaleOrderLineParams, CreatePricelistParams,
+  UpdateSaleOrderParams,
   // Accounting
   AccountAccount, AccountJournal, AccountMove, AccountTax,
   AccountAnalyticAccount,
@@ -36,6 +73,9 @@ export type {
   MoveType,
   // Inventory
   Product, StockQuant, StockPicking, Warehouse, InventoryAdjustment,
+  StockLocation, StockProductionLot, QualityCheck, Warehouse3DZone, StockCycleCount,
+  PickingWave, WarehouseTask, StockRoute, StockRule, ReplenishmentRule, BarcodeRule,
+  StockMove, StockInventory, InventoryValuation,
   // Purchasing
   PurchaseOrder, PurchaseOrderLine, PurchaseRequisition,
   CreatePurchaseOrderParams, CreatePurchaseRequisitionParams,
@@ -94,6 +134,9 @@ export const saleOrderLinesKey = (organizationId: bigint | number) =>
 export const pricelistsKey = (organizationId: bigint | number) =>
   ['pricelists', String(organizationId)] as const
 
+export const pricelistItemsKey = (organizationId: bigint | number) =>
+  ['pricelist-items', String(organizationId)] as const
+
 export const pickingBatchesKey = (organizationId: bigint | number) =>
   ['picking-batches', String(organizationId)] as const
 
@@ -132,6 +175,27 @@ export const warehousesKey = (organizationId: bigint | number) =>
 
 export const inventoryAdjustmentsKey = (organizationId: bigint | number) =>
   ['inventory-adjustments', String(organizationId)] as const
+
+export const stockLocationsKey = (organizationId: bigint | number) =>
+  ['stock-locations', String(organizationId)] as const
+
+export const stockProductionLotsKey = (organizationId: bigint | number) =>
+  ['stock-production-lots', String(organizationId)] as const
+
+export const qualityChecksKey = (organizationId: bigint | number) =>
+  ['quality-checks', String(organizationId)] as const
+
+export const warehouse3dZonesKey = (organizationId: bigint | number) =>
+  ['warehouse-3d-zones', String(organizationId)] as const
+
+export const stockCycleCountsKey = (organizationId: bigint | number) =>
+  ['stock-cycle-counts', String(organizationId)] as const
+
+export const pickingWavesKey = (organizationId: bigint | number) =>
+  ['picking-waves', String(organizationId)] as const
+
+export const warehouseTasksKey = (organizationId: bigint | number) =>
+  ['warehouse-tasks', String(organizationId)] as const
 
 // PURCHASING
 export const purchaseOrdersKey = (organizationId: bigint | number) =>
@@ -190,208 +254,540 @@ export const userOrganizationKey = (identityHex: string) =>
 
 // ── Server query functions ───────────────────────────────────────────────────
 // All public functions accept organizationId as the tenant scoping value.
+// Pass `fieldAccess` via `StdbServerQueryOptions` from `/api/query` to apply column-level RBAC.
 
 // ACCOUNTING
 
 export function serverQueryAccountAccounts(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM account_account WHERE organization_id = ${organizationId} ORDER BY code`, opts)
+  return stdbSql(
+    selectOrgScopedSql(
+      'account-accounts',
+      'account_account',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY code',
+    ),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryAccountJournals(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM account_journal WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('account-journals', 'account_journal', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryAccountMoves(
   organizationId: bigint | number,
   moveType?: string,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   const filter = moveType ? ` AND move_type = '${moveType}'` : ''
-  return stdbSql(`SELECT * FROM account_move WHERE organization_id = ${organizationId}${filter}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('account-moves', 'account_move', organizationId, fq(opts), filter),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryAccountTaxes(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM account_tax WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('account-taxes', 'account_tax', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryAccountPayments(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'account-payments',
+      'account_payment',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryBudgets(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM crossovered_budget WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('budgets', 'crossovered_budget', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryAnalyticAccounts(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM account_analytic_account WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql(
+      'analytic-accounts',
+      'account_analytic_account',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
 }
 
 // SALES
 
 export function serverQuerySaleOrders(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM sale_order WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('sale-orders', 'sale_order', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQuerySaleOrderLines(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM sale_order_line WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('sale-order-lines', 'sale_order_line', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryPricelists(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM product_pricelist WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('pricelists', 'product_pricelist', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPricelistItems(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'pricelist-items',
+      'product_pricelist_item',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY pricelist_id ASC, sequence ASC',
+    ),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryPickingBatches(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM stock_picking_batch WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('picking-batches', 'stock_picking_batch', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 // CRM — tables have organization_id directly, no company lookup needed
 
 export function serverQueryLeads(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM lead WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('leads', 'lead', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export async function serverQueryLeadById(
   id: number,
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
+  const cols = resolveReadColumns('leads', fq(opts))
+  const colPart = cols === null ? '*' : cols.join(', ')
   const rows = await stdbSql<{ id: number }>(
-    `SELECT * FROM lead WHERE id = ${id} AND organization_id = ${organizationId} LIMIT 1`,
-    opts,
+    `SELECT ${colPart} FROM lead WHERE id = ${id} AND organization_id = ${organizationId} LIMIT 1`,
+    httpOpts(opts),
   )
   return rows[0] ?? null
 }
 
 export function serverQueryOpportunities(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM opportunity WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('opportunities', 'opportunity', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryOpportunityStages(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM opp_stage WHERE organization_id = ${organizationId} ORDER BY sequence ASC`,
-    opts,
+    selectOrgScopedSql(
+      'opportunity-stages',
+      'opp_stage',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY sequence ASC',
+    ),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryContacts(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM contact WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('contacts', 'contact', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryActivities(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'activities',
+      'activity',
+      organizationId,
+      fq(opts),
+      ' AND deleted_at IS NULL',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
 }
 
 // PROJECTS
 
 export function serverQueryProjects(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM project_project WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('projects', 'project_project', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryTasks(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM project_task WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('tasks', 'project_task', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryTimesheets(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM project_timesheet WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('timesheets', 'project_timesheet', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 // INVENTORY — products/adjustments have organization_id directly; others via company
 
 export function serverQueryProducts(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM product WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('products', 'product', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryProductCategories(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM product_category WHERE organization_id = ${organizationId} AND deleted_at IS NULL`,
-    opts,
+    selectOrgScopedSql(
+      'product-categories',
+      'product_category',
+      organizationId,
+      fq(opts),
+      ' AND deleted_at IS NULL',
+    ),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryUoms(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM uom WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('uoms', 'uom', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryStockQuants(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM stock_quant WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('stock-quants', 'stock_quant', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryStockPickings(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM stock_picking WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('stock-pickings', 'stock_picking', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryWarehouses(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM warehouse WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('warehouses', 'warehouse', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryInventoryAdjustments(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM inventory_adjustment WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql(
+      'inventory-adjustments',
+      'inventory_adjustment',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockLocations(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('stock-locations', 'stock_location', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockProductionLots(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'stock-production-lots',
+      'stock_production_lot',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockProductionSerials(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'stock-production-serials',
+      'stock_production_serial',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryQualityChecks(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('quality-checks', 'quality_check', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryWarehouse3dZones(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'warehouse-3d-zones',
+      'warehouse_3d_zone',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockCycleCounts(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'stock-cycle-counts',
+      'stock_cycle_count',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockInventories(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('stock-inventories', 'stock_inventory', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockMoves(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('stock-moves', 'stock_move', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockRoutes(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('stock-routes', 'stock_route', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('stock-rules', 'stock_rule', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPickingWaves(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('picking-waves', 'picking_wave', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryWarehouseTasks(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('warehouse-tasks', 'warehouse_task', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryReplenishmentRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'replenishment-rules',
+      'replenishment_rule',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryBarcodeRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('barcode-rules', 'barcode_rule', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryInventoryValuations(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'inventory-valuations',
+      'inventory_valuation',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
   )
 }
 
@@ -399,101 +795,173 @@ export function serverQueryInventoryAdjustments(
 
 export function serverQueryPurchaseOrders(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM purchase_order WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('purchase-orders', 'purchase_order', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryPurchaseOrderLines(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM purchase_order_line WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql(
+      'purchase-order-lines',
+      'purchase_order_line',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryPurchaseRequisitions(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM purchase_requisition WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql(
+      'purchase-requisitions',
+      'purchase_requisition',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
 }
 
 // MANUFACTURING
 
 export function serverQueryMrpProductions(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM mrp_production WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('mrp-productions', 'mrp_production', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryMrpBoms(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM mrp_bom WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('mrp-boms', 'mrp_bom', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryMrpBomLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'mrp-bom-lines',
+      'mrp_bom_line',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY bom_id ASC, sequence ASC',
+    ),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryMrpWorkorders(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM mrp_workorder WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('mrp-workorders', 'mrp_workorder', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryMrpWorkcenters(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM mrp_workcenter WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('mrp-workcenters', 'mrp_workcenter', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 // HR
 
 export function serverQueryEmployees(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM hr_employee WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('employees', 'hr_employee', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryDepartments(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM hr_department WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('departments', 'hr_department', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryLeaveRequests(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM hr_leave WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('leave-requests', 'hr_leave', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryContracts(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM hr_contract WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('contracts', 'hr_contract', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryPayslips(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM hr_payslip WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('payslips', 'hr_payslip', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
 }
 
 // CALENDAR — organization_id scoped
 
 export function serverQueryCalendarEvents(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM calendar_event WHERE organization_id = ${organizationId} ORDER BY start ASC`,
-    opts,
+    selectOrgScopedSql(
+      'calendar-events',
+      'calendar_event',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY start ASC',
+    ),
+    httpOpts(opts),
   )
 }
 
@@ -501,21 +969,27 @@ export function serverQueryCalendarEvents(
 
 export function serverQueryDocuments(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM document WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('documents', 'document', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryKnowledgeArticles(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM knowledge_article WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql(
+      'knowledge-articles',
+      'knowledge_article',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
   )
 }
 
@@ -523,21 +997,21 @@ export function serverQueryKnowledgeArticles(
 
 export function serverQueryExpenses(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM hr_expense WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('expenses', 'hr_expense', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryExpenseSheets(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM expense_sheet WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('expense-sheets', 'expense_sheet', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
@@ -545,31 +1019,41 @@ export function serverQueryExpenseSheets(
 
 export function serverQueryHelpdeskTickets(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM helpdesk_ticket WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('helpdesk-tickets', 'helpdesk_ticket', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryHelpdeskTeams(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM helpdesk_team WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('helpdesk-teams', 'helpdesk_team', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryHelpdeskStages(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM helpdesk_stage WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('helpdesk-stages', 'helpdesk_stage', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryHelpdeskSlas(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('helpdesk-slas', 'helpdesk_sla', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
@@ -577,49 +1061,158 @@ export function serverQueryHelpdeskStages(
 
 export function serverQueryMailMessages(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM mail_message WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('mail-messages', 'mail_message', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
-// REPORTS — company_id scoped
+// REPORTS — organization_id scoped (company_id on row = ERP entity)
 
 export function serverQueryFinancialReports(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM financial_report WHERE organization_id = ${organizationId}`, opts)
+  return stdbSql(
+    selectOrgScopedSql('financial-reports', 'financial_report', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
 }
 
 export function serverQueryTrialBalances(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(`SELECT * FROM trial_balance WHERE organization_id = ${organizationId} ORDER BY account_code ASC`, opts)
+  return stdbSql(
+    selectOrgScopedSql('trial-balances', 'trial_balance', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      String(a.accountCode ?? '').localeCompare(String(b.accountCode ?? '')),
+    ),
+  )
+}
+
+export function serverQueryReportTemplates(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('report-templates', 'report_template', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
+}
+
+export function serverQueryScheduledReports(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('scheduled-reports', 'scheduled_report', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => {
+      const ta = Number(a.nextRun ?? 0)
+      const tb = Number(b.nextRun ?? 0)
+      return ta - tb
+    }),
+  )
+}
+
+export function serverQueryAnalyticsMetrics(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('analytics-metrics', 'analytics_metric', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
 }
 
 // SUBSCRIPTIONS — organization_id scoped
 
 export function serverQuerySubscriptions(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM subscription WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('subscriptions', 'subscription', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQuerySubscriptionPlans(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM subscription_plan WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql(
+      'subscription-plans',
+      'subscription_plan',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDeferredRevenueSchedules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'deferred-revenue-schedules',
+      'deferred_revenue_schedule',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDeferredRevenueLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'deferred-revenue-lines',
+      'deferred_revenue_line',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY schedule_id ASC, sequence ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryRevenueRecognitionRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'revenue-recognition-rules',
+      'revenue_recognition_rule',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY priority DESC, id DESC',
+    ),
+    httpOpts(opts),
   )
 }
 
@@ -627,21 +1220,78 @@ export function serverQuerySubscriptionPlans(
 
 export function serverQueryWorkflows(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM workflow WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('workflows', 'workflow', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryWorkflowInstances(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM workflow_instance WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql(
+      'workflow-instances',
+      'workflow_instance',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryWorkflowActivities(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'workflow-activities',
+      'workflow_activity',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY workflow_id ASC, sequence ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryWorkflowTransitions(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'workflow-transitions',
+      'workflow_transition',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryWorkflowWorkitems(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'workflow-workitems',
+      'workflow_workitem',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY instance_id ASC, id ASC',
+    ),
+    httpOpts(opts),
   )
 }
 
@@ -649,11 +1299,11 @@ export function serverQueryWorkflowInstances(
 
 export function serverQueryProposals(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM proposal WHERE organization_id = ${organizationId}`,
-    opts,
+    selectOrgScopedSql('proposals', 'proposal', organizationId, fq(opts), ''),
+    httpOpts(opts),
   )
 }
 
@@ -661,55 +1311,48 @@ export function serverQueryProposals(
 
 export function serverQueryUserProfile(
   identityHex: string,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM user_profile WHERE identity = '${identityHex}' LIMIT 1`,
-    opts,
+    selectUserProfileByIdentitySql(identityHex, fq(opts)),
+    httpOpts(opts),
   )
 }
 
 export function serverQueryUserRoleAssignments(
   identityHex: string,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM user_role_assignment WHERE user_identity = '${identityHex}' AND is_active = true`,
-    opts,
+    selectUserRoleAssignmentsForIdentitySql(identityHex, fq(opts)),
+    httpOpts(opts),
   )
 }
 
-export function serverQueryRoles(opts?: StdbHttpOptions) {
-  return stdbSql(`SELECT * FROM role WHERE is_active = true`, opts)
+export function serverQueryRoles(opts?: StdbServerQueryOptions) {
+  return stdbSql(selectRolesActiveSql(fq(opts)), httpOpts(opts))
 }
 
 /**
- * Fetches casbin_rule rows scoped to the given identity and their role names.
- * Only returns rules where v0 (subject) matches the identity hex directly,
- * or one of the user's assigned role names.
- *
- * This is the server-side enforcement point for "need to know" data access.
- * Future: add Casbin policy evaluation here before fetching business data.
+ * Fetches casbin_rule rows where v0 matches the identity hex, role id, or role names.
  */
 export function serverQueryCasbinRulesForUser(
   identityHex: string,
-  roleNames: string[],
-  opts?: StdbHttpOptions,
+  roleSubjects: string[],
+  opts?: StdbServerQueryOptions,
 ) {
-  const subjects = [identityHex, ...roleNames].map((s) => `'${s}'`).join(', ')
-  return stdbSql(
-    `SELECT * FROM casbin_rule WHERE v0 IN (${subjects})`,
-    opts,
-  )
+  const esc = (s: string) => s.replace(/'/g, "''")
+  const subjects = [identityHex, ...roleSubjects].map((s) => `'${esc(s)}'`).join(', ')
+  return stdbSql(selectCasbinRulesInSubjectsSql(subjects, fq(opts)), httpOpts(opts))
 }
 
 export function serverQueryUserOrganization(
   identityHex: string,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    `SELECT * FROM user_organization WHERE user_identity = '${identityHex}' AND is_active = true`,
-    opts,
+    selectUserOrganizationForIdentitySql(identityHex, fq(opts)),
+    httpOpts(opts),
   )
 }
 
@@ -719,16 +1362,64 @@ export function serverQueryUserOrganization(
  */
 export async function serverQueryOrgUsers(
   organizationId: bigint | number,
-  opts?: StdbHttpOptions,
+  opts?: StdbServerQueryOptions,
 ) {
+  const colsUo = resolveReadColumns('user-organization', fq(opts))
+  const colUo = colsUo === null ? '*' : colsUo.join(', ')
   const memberships = await stdbSql<{ userIdentity: string }>(
-    `SELECT * FROM user_organization WHERE organization_id = ${organizationId} AND is_active = true`,
-    opts,
+    `SELECT ${colUo} FROM user_organization WHERE organization_id = ${organizationId} AND is_active = true`,
+    httpOpts(opts),
   )
   if (memberships.length === 0) return []
-  const identities = memberships.map((m) => `'${m.userIdentity}'`).join(', ')
-  return stdbSql(
-    `SELECT * FROM user_profile WHERE identity IN (${identities})`,
-    opts,
-  )
+  // SpacetimeDB HTTP SQL rejects `identity IN (...)` for Identity columns; use `=` + OR (see selectUserProfileByIdentitySql).
+  const rawIds = memberships.map((m) => String(m.userIdentity))
+  const uniqueIds = [...new Set(rawIds)]
+  const esc = (s: string) => s.replace(/'/g, "''")
+  const colsP = resolveReadColumns('user-profile', fq(opts))
+  const colP = colsP === null ? '*' : colsP.join(', ')
+  const whereIdentity =
+    uniqueIds.length === 1
+      ? `identity = '${esc(uniqueIds[0])}'`
+      : `(${uniqueIds.map((id) => `identity = '${esc(id)}'`).join(' OR ')})`
+  const sqlProfile = `SELECT ${colP} FROM user_profile WHERE ${whereIdentity}`
+  // #region agent log
+  fetch('http://127.0.0.1:7671/ingest/07aebab7-6f69-4cbc-af66-6d5a65969c9c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f240c9' },
+    body: JSON.stringify({
+      sessionId: 'f240c9',
+      location: 'server.ts:serverQueryOrgUsers',
+      message: 'org users: profile query built',
+      data: {
+        organizationId: String(organizationId),
+        membershipCount: memberships.length,
+        uniqueIdentityCount: uniqueIds.length,
+        identityPredicate: uniqueIds.length === 1 ? 'EQ' : 'OR_EQ',
+        colPWildcard: colP === '*',
+        sqlPreviewLen: sqlProfile.length,
+        sqlHead: sqlProfile.slice(0, 140),
+      },
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'A',
+    }),
+  }).catch(() => {})
+  // #endregion
+  const rows = await stdbSql(sqlProfile, httpOpts(opts))
+  // #region agent log
+  fetch('http://127.0.0.1:7671/ingest/07aebab7-6f69-4cbc-af66-6d5a65969c9c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f240c9' },
+    body: JSON.stringify({
+      sessionId: 'f240c9',
+      location: 'server.ts:serverQueryOrgUsers',
+      message: 'org users: profile query ok',
+      data: { rowCount: rows.length },
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'A',
+    }),
+  }).catch(() => {})
+  // #endregion
+  return rows
 }

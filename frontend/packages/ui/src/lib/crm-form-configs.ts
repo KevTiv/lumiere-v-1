@@ -232,6 +232,139 @@ export const newContactForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+/** Convert a qualified lead to contact / opportunity (form builder). */
+export const convertLeadForm = (
+  t: TFunction,
+  stageOptions: OpportunityStageOption[] = [],
+): FormConfig => {
+  const stageField: FormField =
+    stageOptions.length > 0
+      ? {
+          id: "opportunityStageId",
+          name: "opportunityStageId",
+          type: "select",
+          label: t("crm.forms.convertLead.fields.opportunityStage"),
+          width: "full",
+          options: stageOptions,
+        }
+      : {
+          id: "opportunityStageId",
+          name: "opportunityStageId",
+          type: "number",
+          label: t("crm.forms.convertLead.fields.opportunityStageId"),
+          placeholder: t("crm.forms.convertLead.fields.opportunityStageIdPlaceholder"),
+          width: "full",
+        }
+
+  return {
+    id: "convert-lead",
+    title: t("crm.forms.convertLead.title"),
+    description: t("crm.forms.convertLead.description"),
+    sections: [
+      {
+        id: "convert-options",
+        title: t("crm.forms.convertLead.sections.options"),
+        fields: [
+          {
+            id: "createContact",
+            name: "createContact",
+            type: "checkbox",
+            label: t("crm.forms.convertLead.fields.createContact"),
+            width: "full",
+          },
+          {
+            id: "createOpportunity",
+            name: "createOpportunity",
+            type: "checkbox",
+            label: t("crm.forms.convertLead.fields.createOpportunity"),
+            width: "full",
+          },
+          stageField,
+        ],
+      },
+    ],
+  }
+}
+
+/** Convert opportunity → sale order (requires pricelist + warehouse). */
+export const convertOpportunityToOrderForm = (t: TFunction): FormConfig => ({
+  id: "convert-opportunity-order",
+  title: t("crm.forms.convertToSaleOrder.title"),
+  description: t("crm.forms.convertToSaleOrder.description"),
+  sections: [
+    {
+      id: "fulfillment",
+      title: t("crm.forms.convertToSaleOrder.sections.fulfillment"),
+      fields: [
+        {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("crm.forms.convertToSaleOrder.fields.pricelist"),
+          required: true,
+          width: "full",
+          options: [],
+        },
+        {
+          id: "warehouseId",
+          name: "warehouseId",
+          type: "select",
+          label: t("crm.forms.convertToSaleOrder.fields.warehouse"),
+          required: true,
+          width: "full",
+          options: [],
+        },
+      ],
+    },
+  ],
+})
+
+export const assignTagToContactForm = (t: TFunction): FormConfig => ({
+  id: "assign-tag-contact",
+  title: t("crm.forms.assignTag.title"),
+  description: t("crm.forms.assignTag.description"),
+  sections: [
+    {
+      id: "tag",
+      title: t("crm.forms.assignTag.sections.tag"),
+      fields: [
+        {
+          id: "tagId",
+          name: "tagId",
+          type: "number",
+          label: t("crm.forms.assignTag.fields.tagId"),
+          placeholder: t("crm.forms.assignTag.fields.tagIdPlaceholder"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const addContactToSegmentForm = (t: TFunction): FormConfig => ({
+  id: "add-contact-segment",
+  title: t("crm.forms.addToSegment.title"),
+  description: t("crm.forms.addToSegment.description"),
+  sections: [
+    {
+      id: "segment",
+      title: t("crm.forms.addToSegment.sections.segment"),
+      fields: [
+        {
+          id: "segmentId",
+          name: "segmentId",
+          type: "number",
+          label: t("crm.forms.addToSegment.fields.segmentId"),
+          placeholder: t("crm.forms.addToSegment.fields.segmentIdPlaceholder"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const newActivityForm = (t: TFunction): FormConfig => ({
   id: "new-activity",
   title: t("crm.forms.newActivity.title"),
@@ -294,4 +427,8 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-opportunity": newOpportunityForm(t),
   "new-contact": newContactForm(t),
   "new-activity": newActivityForm(t),
+  "convert-lead": convertLeadForm(t),
+  "convert-opportunity-order": convertOpportunityToOrderForm(t),
+  "assign-tag-contact": assignTagToContactForm(t),
+  "add-contact-segment": addContactToSegmentForm(t),
 })

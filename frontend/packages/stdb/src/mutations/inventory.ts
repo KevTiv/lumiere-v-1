@@ -4,6 +4,10 @@ import type {
   CreateStockPickingParams,
   CreateWarehouseParams,
   CreateInventoryAdjustmentParams,
+  UpdateProductParams,
+  CreateProductVariantParams,
+  UpdateWarehouseParams,
+  AssignUserToPickingParams,
 } from "../generated/types";
 import { getStdbConnection } from "../connection";
 
@@ -12,6 +16,10 @@ export type {
   CreateStockPickingParams,
   CreateWarehouseParams,
   CreateInventoryAdjustmentParams,
+  UpdateProductParams,
+  CreateProductVariantParams,
+  UpdateWarehouseParams,
+  AssignUserToPickingParams,
 };
 
 export function useCreateProduct(organizationId: bigint) {
@@ -69,6 +77,79 @@ export function useCreateInventoryAdjustment(organizationId: bigint) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-adjustments"] });
+    },
+  });
+}
+
+export function useUpdateProduct(organizationId: bigint) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { productId: bigint; params: UpdateProductParams }) => {
+      const conn = getStdbConnection();
+      if (!conn) throw new Error("Not connected");
+      return conn.reducers.updateProduct({
+        organizationId,
+        productId: args.productId,
+        params: args.params,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
+export function useCreateProductVariant(organizationId: bigint) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { productTmplId: bigint; params: CreateProductVariantParams }) => {
+      const conn = getStdbConnection();
+      if (!conn) throw new Error("Not connected");
+      return conn.reducers.createProductVariant({
+        organizationId,
+        productTmplId: args.productTmplId,
+        params: args.params,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
+export function useUpdateWarehouse(organizationId: bigint, companyId: bigint) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { warehouseId: bigint; params: UpdateWarehouseParams }) => {
+      const conn = getStdbConnection();
+      if (!conn) throw new Error("Not connected");
+      return conn.reducers.updateWarehouse({
+        organizationId,
+        companyId,
+        warehouseId: args.warehouseId,
+        params: args.params,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+    },
+  });
+}
+
+export function useAssignUserToPicking(organizationId: bigint) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { pickingId: bigint; params: AssignUserToPickingParams }) => {
+      const conn = getStdbConnection();
+      if (!conn) throw new Error("Not connected");
+      return conn.reducers.assignUserToPicking({
+        organizationId,
+        pickingId: args.pickingId,
+        params: args.params,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-pickings"] });
     },
   });
 }

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CreateSaleOrderParams, CreatePricelistParams } from "../generated/types";
+import type { CreateSaleOrderParams, CreatePricelistParams, UpdateSaleOrderParams } from "../generated/types";
 import { getStdbConnection } from "../connection";
 
-export type { CreateSaleOrderParams, CreatePricelistParams };
+export type { CreateSaleOrderParams, CreatePricelistParams, UpdateSaleOrderParams };
 
 export function useCreateSaleOrder(organizationId: bigint, companyId: bigint) {
   const queryClient = useQueryClient();

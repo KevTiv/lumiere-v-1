@@ -79,6 +79,7 @@ import AssignUserToPickingReducer from "./assign_user_to_picking_reducer";
 import BillTimesheetsReducer from "./bill_timesheets_reducer";
 import BlockSerialReducer from "./block_serial_reducer";
 import BlockWorkcenterReducer from "./block_workcenter_reducer";
+import BootstrapNewTenantReducer from "./bootstrap_new_tenant_reducer";
 import CancelAccountMoveReducer from "./cancel_account_move_reducer";
 import CancelBudgetReducer from "./cancel_budget_reducer";
 import CancelConsolidationReducer from "./cancel_consolidation_reducer";
@@ -340,6 +341,7 @@ import DeleteWarehouseReducer from "./delete_warehouse_reducer";
 import DeleteWarehouse3DZoneReducer from "./delete_warehouse_3_d_zone_reducer";
 import DeleteWhatsappBusinessAccountReducer from "./delete_whatsapp_business_account_reducer";
 import DeprecateAccountAccountReducer from "./deprecate_account_account_reducer";
+import DevPromoteCallerSuperuserReducer from "./dev_promote_caller_superuser_reducer";
 import DismissInsightReducer from "./dismiss_insight_reducer";
 import DisposeAccountAssetReducer from "./dispose_account_asset_reducer";
 import DoneBudgetReducer from "./done_budget_reducer";
@@ -428,6 +430,7 @@ import LinkDeviceToLocationReducer from "./link_device_to_location_reducer";
 import LinkDeviceToPosReducer from "./link_device_to_pos_reducer";
 import LinkDeviceToQualityCheckReducer from "./link_device_to_quality_check_reducer";
 import LinkDeviceToWorkcenterReducer from "./link_device_to_workcenter_reducer";
+import LinkWorkosUserReducer from "./link_workos_user_reducer";
 import LockDocumentReducer from "./lock_document_reducer";
 import LockKnowledgeArticleReducer from "./lock_knowledge_article_reducer";
 import LogAuditEventReducer from "./log_audit_event_reducer";
@@ -440,6 +443,7 @@ import MarkResetTokenUsedReducer from "./mark_reset_token_used_reducer";
 import MatchBankLineReducer from "./match_bank_line_reducer";
 import MatchEliminationEntriesReducer from "./match_elimination_entries_reducer";
 import MigrateAllOrganizationsReducer from "./migrate_all_organizations_reducer";
+import MoveStockQuantReducer from "./move_stock_quant_reducer";
 import OpenAccountPeriodReducer from "./open_account_period_reducer";
 import OpenContractReducer from "./open_contract_reducer";
 import OpenFiscalYearReducer from "./open_fiscal_year_reducer";
@@ -534,6 +538,7 @@ import StartTimesheetTimerReducer from "./start_timesheet_timer_reducer";
 import StartWorkflowReducer from "./start_workflow_reducer";
 import StartWorkorderReducer from "./start_workorder_reducer";
 import StopTimesheetTimerReducer from "./stop_timesheet_timer_reducer";
+import StoreSsoUserCredentialReducer from "./store_sso_user_credential_reducer";
 import StoreUserCredentialReducer from "./store_user_credential_reducer";
 import SubmitExpenseReducer from "./submit_expense_reducer";
 import SubmitExpenseSheetReducer from "./submit_expense_sheet_reducer";
@@ -633,6 +638,7 @@ import UpdateQualityPointReducer from "./update_quality_point_reducer";
 import UpdateQualityTeamReducer from "./update_quality_team_reducer";
 import UpdateReportTemplateReducer from "./update_report_template_reducer";
 import UpdateRoleReducer from "./update_role_reducer";
+import UpdateSaleOrderReducer from "./update_sale_order_reducer";
 import UpdateStockInventoryStateReducer from "./update_stock_inventory_state_reducer";
 import UpdateStockLocationReducer from "./update_stock_location_reducer";
 import UpdateStockProductionLotReducer from "./update_stock_production_lot_reducer";
@@ -1581,6 +1587,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'balance_sheet_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'balance_sheet_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -1750,6 +1759,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'cash_flow_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'cash_flow_by_parent', algorithm: 'btree', columns: [
         'parentId',
@@ -2250,6 +2262,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'financial_report_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'financial_report_by_type', algorithm: 'btree', columns: [
         'reportType',
@@ -3467,6 +3482,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'pricelist_item_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'pricelist_item_by_pricelist', algorithm: 'btree', columns: [
         'pricelistId',
       ] },
@@ -3520,6 +3538,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'profit_loss_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'profit_loss_by_parent', algorithm: 'btree', columns: [
         'parentId',
@@ -4626,6 +4647,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'trial_balance_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'trial_balance_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -5031,6 +5055,7 @@ const reducersSchema = __reducers(
   __reducerSchema("bill_timesheets", BillTimesheetsReducer),
   __reducerSchema("block_serial", BlockSerialReducer),
   __reducerSchema("block_workcenter", BlockWorkcenterReducer),
+  __reducerSchema("bootstrap_new_tenant", BootstrapNewTenantReducer),
   __reducerSchema("cancel_account_move", CancelAccountMoveReducer),
   __reducerSchema("cancel_budget", CancelBudgetReducer),
   __reducerSchema("cancel_consolidation", CancelConsolidationReducer),
@@ -5292,6 +5317,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_warehouse_3_d_zone", DeleteWarehouse3DZoneReducer),
   __reducerSchema("delete_whatsapp_business_account", DeleteWhatsappBusinessAccountReducer),
   __reducerSchema("deprecate_account_account", DeprecateAccountAccountReducer),
+  __reducerSchema("dev_promote_caller_superuser", DevPromoteCallerSuperuserReducer),
   __reducerSchema("dismiss_insight", DismissInsightReducer),
   __reducerSchema("dispose_account_asset", DisposeAccountAssetReducer),
   __reducerSchema("done_budget", DoneBudgetReducer),
@@ -5380,6 +5406,7 @@ const reducersSchema = __reducers(
   __reducerSchema("link_device_to_pos", LinkDeviceToPosReducer),
   __reducerSchema("link_device_to_quality_check", LinkDeviceToQualityCheckReducer),
   __reducerSchema("link_device_to_workcenter", LinkDeviceToWorkcenterReducer),
+  __reducerSchema("link_workos_user", LinkWorkosUserReducer),
   __reducerSchema("lock_document", LockDocumentReducer),
   __reducerSchema("lock_knowledge_article", LockKnowledgeArticleReducer),
   __reducerSchema("log_audit_event", LogAuditEventReducer),
@@ -5392,6 +5419,7 @@ const reducersSchema = __reducers(
   __reducerSchema("match_bank_line", MatchBankLineReducer),
   __reducerSchema("match_elimination_entries", MatchEliminationEntriesReducer),
   __reducerSchema("migrate_all_organizations", MigrateAllOrganizationsReducer),
+  __reducerSchema("move_stock_quant", MoveStockQuantReducer),
   __reducerSchema("open_account_period", OpenAccountPeriodReducer),
   __reducerSchema("open_contract", OpenContractReducer),
   __reducerSchema("open_fiscal_year", OpenFiscalYearReducer),
@@ -5486,6 +5514,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_workflow", StartWorkflowReducer),
   __reducerSchema("start_workorder", StartWorkorderReducer),
   __reducerSchema("stop_timesheet_timer", StopTimesheetTimerReducer),
+  __reducerSchema("store_sso_user_credential", StoreSsoUserCredentialReducer),
   __reducerSchema("store_user_credential", StoreUserCredentialReducer),
   __reducerSchema("submit_expense", SubmitExpenseReducer),
   __reducerSchema("submit_expense_sheet", SubmitExpenseSheetReducer),
@@ -5585,6 +5614,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_quality_team", UpdateQualityTeamReducer),
   __reducerSchema("update_report_template", UpdateReportTemplateReducer),
   __reducerSchema("update_role", UpdateRoleReducer),
+  __reducerSchema("update_sale_order", UpdateSaleOrderReducer),
   __reducerSchema("update_stock_inventory_state", UpdateStockInventoryStateReducer),
   __reducerSchema("update_stock_location", UpdateStockLocationReducer),
   __reducerSchema("update_stock_production_lot", UpdateStockProductionLotReducer),

@@ -3,6 +3,7 @@ import {
   serverQuerySaleOrders,
   serverQuerySaleOrderLines,
   serverQueryPricelists,
+  serverQueryPricelistItems,
   serverQueryPickingBatches,
   serverQueryContacts,
   serverQueryWarehouses,
@@ -16,20 +17,23 @@ export default async function SalesPage() {
     return <SalesClient />
   }
 
-  const [orders, orderLines, pricelists, deliveries, contacts, warehouses] = await Promise.all([
-    serverQuerySaleOrders(organizationId, opts),
-    serverQuerySaleOrderLines(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryPickingBatches(organizationId, opts),
-    serverQueryContacts(organizationId, opts),
-    serverQueryWarehouses(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], []])
+  const [orders, orderLines, pricelists, pricelistItems, deliveries, contacts, warehouses] =
+    await Promise.all([
+      serverQuerySaleOrders(organizationId, opts),
+      serverQuerySaleOrderLines(organizationId, opts),
+      serverQueryPricelists(organizationId, opts),
+      serverQueryPricelistItems(organizationId, opts),
+      serverQueryPickingBatches(organizationId, opts),
+      serverQueryContacts(organizationId, opts),
+      serverQueryWarehouses(organizationId, opts),
+    ]).catch(() => [[], [], [], [], [], [], []])
 
   return (
     <SalesClient
       initialOrders={orders as Record<string, unknown>[]}
       initialOrderLines={orderLines as Record<string, unknown>[]}
       initialPricelists={pricelists as Record<string, unknown>[]}
+      initialPricelistItems={pricelistItems as Record<string, unknown>[]}
       initialDeliveries={deliveries as Record<string, unknown>[]}
       initialContacts={contacts as Record<string, unknown>[]}
       initialWarehouses={warehouses as Record<string, unknown>[]}

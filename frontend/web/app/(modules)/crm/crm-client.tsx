@@ -3,6 +3,8 @@
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   crmParamsToJson,
+  toConvertLeadParams,
+  toConvertOpportunityParams,
   toCreateActivityParams,
   toCreateContactParams,
   toCreateLeadParams,
@@ -12,18 +14,44 @@ import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useActivities,
+  useAddContactToSegment,
+  useAssignTagToContact,
+  useCompleteActivity,
   useContacts,
+  useConvertLeadToCustomer,
+  useConvertOpportunityToSaleOrder,
   useCreateActivity,
   useCreateContact,
   useCreateLead,
   useCreateOpportunity,
+  useDeleteContact,
   useLeads,
   useOpportunities,
   useOpportunityStages,
 } from "@/hooks/crm"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
-import { FormModal, ModuleView, newActivityForm, newContactForm, newLeadForm, newOpportunityForm, MissingOrganization } from "@lumiere/ui"
-import { useMemo, useState } from "react"
+import { usePricelists } from "@/hooks/sales"
+import { useWarehouses } from "@/hooks/inventory"
+import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import {
+  FormModal,
+  ModuleView,
+  MissingOrganization,
+  activitiesTableConfig,
+  addContactToSegmentForm,
+  assignTagToContactForm,
+  convertLeadForm,
+  convertOpportunityToOrderForm,
+  mergeFieldDefaultValues,
+  mergeSelectOptionsForFields,
+  newActivityForm,
+  newContactForm,
+  newLeadForm,
+  newOpportunityForm,
+  contactsTableConfig,
+  leadsTableConfig,
+  opportunitiesTableConfig,
+} from "@lumiere/ui"
+import { useCallback, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface CrmClientProps {
@@ -35,6 +63,27 @@ interface CrmClientProps {
 
 type CrmClientLoadedProps = Omit<CrmClientProps, "organizationId"> & {
   organizationId: number
+}
+
+type WorkflowModal =
+  | { kind: "convertLead"; form: FormConfig; leadId: bigint }
+  | { kind: "convertOpp"; form: FormConfig; opportunityId: bigint }
+  | { kind: "assignTag"; form: FormConfig; contactId: bigint }
+  | { kind: "addSegment"; form: FormConfig; contactId: bigint }
+  | null
+
+function rowIdBigInt(row: Record<string, unknown>): bigint {
+  const r = row.id
+  if (typeof r === "bigint") return r
+  return BigInt(String(r ?? 0))
+}
+
+function leadStateRaw(row: Record<string, unknown>): string {
+  return String(row.state ?? row.State ?? "").toLowerCase()
+}
+
+function partnerId(row: Record<string, unknown>): unknown {
+  return row.partnerId ?? row.partner_id
 }
 
 export function CrmClient(props: CrmClientProps) {
@@ -53,12 +102,15 @@ function CrmClientLoaded({
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
 
   const { data: leads = [] } = useLeads(orgId, initialLeads)
   const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: activities = [] } = useActivities(orgId)
   const { data: opportunityStages = [] } = useOpportunityStages(orgId)
+  const { data: pricelists = [] } = usePricelists(orgId)
+  const { data: warehouses = [] } = useWarehouses(orgId)
 
   const opportunityStageOptions = useMemo(
     () =>
@@ -78,21 +130,231 @@ function CrmClientLoaded({
     [opportunityStages],
   )
 
+  const pricelistSelectOptions = useMemo(
+    () =>
+      pricelists.map((p) => {
+        const row = p as Record<string, unknown>
+        return {
+          value: String(row.id ?? ""),
+          label: String(row.name ?? row.id ?? ""),
+        }
+      }),
+    [pricelists],
+  )
+
+  const warehouseSelectOptions = useMemo(
+    () =>
+      warehouses.map((w) => {
+        const row = w as Record<string, unknown>
+        return {
+          value: String(row.id ?? ""),
+          label: String(row.name ?? row.id ?? ""),
+        }
+      }),
+    [warehouses],
+  )
+
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId)
   const createContact = useCreateContact(orgId)
   const createActivity = useCreateActivity(orgId)
+  const convertLead = useConvertLeadToCustomer(orgId)
+  const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)
+  const deleteContact = useDeleteContact(orgId)
+  const assignTag = useAssignTagToContact(orgId)
+  const addToSegment = useAddContactToSegment(orgId)
+  const completeActivity = useCompleteActivity(orgId)
 
-  const moduleConfig = useMemo(() => crmModuleConfig(t), [t])
+  const openConvertLeadModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      if (leadStateRaw(row) !== "qualified") {
+        window.alert(t("crm.actions.convertLeadQualifiedOnly"))
+        return
+      }
+      const leadId = rowIdBigInt(row)
+      const base = convertLeadForm(t, opportunityStageOptions)
+      const form = mergeFieldDefaultValues(base, {
+        createContact: true,
+        createOpportunity: true,
+      })
+      setWorkflowModal({ kind: "convertLead", leadId, form })
+    },
+    [t, opportunityStageOptions],
+  )
+
+  const openConvertOppModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const pid = partnerId(row)
+      if (pid == null || pid === "") {
+        window.alert(t("crm.actions.convertOppNeedsPartner"))
+        return
+      }
+      const opportunityId = rowIdBigInt(row)
+      let base = convertOpportunityToOrderForm(t)
+      base = mergeSelectOptionsForFields(base, {
+        pricelistId: pricelistSelectOptions,
+        warehouseId: warehouseSelectOptions,
+      })
+      const defaults: Record<string, unknown> = {}
+      if (pricelistSelectOptions[0]) defaults.pricelistId = pricelistSelectOptions[0].value
+      if (warehouseSelectOptions[0]) defaults.warehouseId = warehouseSelectOptions[0].value
+      const form = mergeFieldDefaultValues(base, defaults)
+      setWorkflowModal({ kind: "convertOpp", opportunityId, form })
+    },
+    [t, pricelistSelectOptions, warehouseSelectOptions],
+  )
+
+  const openAssignTagModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      setWorkflowModal({
+        kind: "assignTag",
+        contactId: rowIdBigInt(row),
+        form: assignTagToContactForm(t),
+      })
+    },
+    [t],
+  )
+
+  const openAddSegmentModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      setWorkflowModal({
+        kind: "addSegment",
+        contactId: rowIdBigInt(row),
+        form: addContactToSegmentForm(t),
+      })
+    },
+    [t],
+  )
+
+  const moduleConfig = useMemo((): ModuleConfig => {
+    const base = crmModuleConfig(t)
+
+    const leadsCfg = leadsTableConfig(t)
+    const oppCfg = opportunitiesTableConfig(t)
+    const contactCfg = contactsTableConfig(t)
+    const actCfg = activitiesTableConfig(t)
+
+    const leadsEntity: EntityViewConfig = {
+      ...leadsCfg,
+      view: {
+        ...(leadsCfg.view as EntityTableConfig),
+        actions: [
+          {
+            id: "convert-lead",
+            label: t("crm.actions.convertToCustomer"),
+            requiresSelection: true,
+            onClick: openConvertLeadModal,
+          },
+        ],
+      },
+    }
+
+    const oppEntity: EntityViewConfig = {
+      ...oppCfg,
+      view: {
+        ...(oppCfg.view as EntityTableConfig),
+        actions: [
+          {
+            id: "convert-opp-order",
+            label: t("crm.actions.convertToSaleOrder"),
+            requiresSelection: true,
+            onClick: openConvertOppModal,
+          },
+        ],
+      },
+    }
+
+    const contactEntity: EntityViewConfig = {
+      ...contactCfg,
+      view: {
+        ...(contactCfg.view as EntityTableConfig),
+        actions: [
+          {
+            id: "assign-tag",
+            label: t("crm.actions.assignTag"),
+            requiresSelection: true,
+            onClick: openAssignTagModal,
+          },
+          {
+            id: "add-segment",
+            label: t("crm.actions.addToSegment"),
+            requiresSelection: true,
+            onClick: openAddSegmentModal,
+          },
+          {
+            id: "delete-contact",
+            label: t("crm.actions.deleteContact"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              const row = rows[0]
+              if (!row) return
+              if (!window.confirm(t("crm.actions.deleteContactConfirm"))) return
+              deleteContact.mutate(rowIdBigInt(row))
+            },
+          },
+        ],
+      },
+    }
+
+    const activitiesEntity: EntityViewConfig = {
+      ...actCfg,
+      view: {
+        ...(actCfg.view as EntityTableConfig),
+        actions: [
+          {
+            id: "complete-activity",
+            label: t("crm.actions.markComplete"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              const row = rows[0]
+              if (!row) return
+              if (row.isDone === true || String(row.state ?? "").toLowerCase() === "done") {
+                window.alert(t("crm.actions.alreadyComplete"))
+                return
+              }
+              completeActivity.mutate(rowIdBigInt(row))
+            },
+          },
+        ],
+      },
+    }
+
+    return {
+      ...base,
+      tabs: base.tabs.map((tab) => {
+        if (tab.id === "leads") return { ...tab, entityConfig: leadsEntity }
+        if (tab.id === "opportunities") return { ...tab, entityConfig: oppEntity }
+        if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
+        if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
+        return tab
+      }),
+    }
+  }, [
+    t,
+    openConvertLeadModal,
+    openConvertOppModal,
+    openAssignTagModal,
+    openAddSegmentModal,
+    deleteContact,
+    completeActivity,
+  ])
 
   // Live KPI overrides
   const liveSections = useMemo(() => {
-    const activeLeads = leads.filter((l) => String(l.state) !== "Lost" && String(l.state) !== "Won").length
+    const activeLeads = leads.filter((l) => {
+      const s = leadStateRaw(l as Record<string, unknown>)
+      return s !== "lost" && s !== "won" && s !== "converted"
+    }).length
     const pipelineValue = opportunities.reduce((s, o) => s + Number(o.expectedRevenue ?? 0), 0)
-    const wonOpps = opportunities.filter((o) => Number(o.probability) === 100)
-    const totalOpps = opportunities.length
-    const winRate = totalOpps > 0 ? Math.round((wonOpps.length / totalOpps) * 100) : 0
-
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
 
@@ -132,14 +394,14 @@ function CrmClientLoaded({
           }
         }
         if (w.id === "crm-by-stage") {
-          const stageGroups = groupBy(leads, (l) => String(l.state ?? "Unknown"))
+          const stageGroups = groupBy(leads, (l) => String((l as Record<string, unknown>).state ?? "Unknown"))
           const stageValues = Object.entries(stageGroups)
             .map(([stage, items]) => ({ stage, Count: items.length }))
             .sort((a, b) => b.Count - a.Count)
           return { ...w, data: { ...(w.data as Record<string, unknown>), values: stageValues } }
         }
         if (w.id === "crm-pipeline-health") {
-          const stageGroups = groupBy(opportunities, (o) => String(o.stageId ?? "0"))
+          const stageGroups = groupBy(opportunities, (o) => String((o as Record<string, unknown>).stageId ?? "0"))
           const stages = Object.entries(stageGroups)
             .map(([stage, items]) => ({ label: `Stage ${stage.slice(-4)}`, count: items.length }))
             .sort((a, b) => b.count - a.count)
@@ -170,12 +432,13 @@ function CrmClientLoaded({
   }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, t])
 
   const config = useMemo(
-    () => ({
-      ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
-      ),
-    }) as ModuleConfig,
+    () =>
+      ({
+        ...moduleConfig,
+        tabs: moduleConfig.tabs.map((tab) =>
+          tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
+        ),
+      }) as ModuleConfig,
     [moduleConfig, liveSections],
   )
 
@@ -209,6 +472,57 @@ function CrmClientLoaded({
     }
   }
 
+  const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
+    if (!workflowModal) return
+    try {
+      if (workflowModal.kind === "convertLead") {
+        const p = toConvertLeadParams(formData)
+        if (!p) throw new Error(t("crm.forms.convertLead.validation.stageRequired"))
+        await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: crmParamsToJson(p) })
+      } else if (workflowModal.kind === "convertOpp") {
+        const p = toConvertOpportunityParams(formData)
+        if (!p) throw new Error(t("crm.forms.convertToSaleOrder.validation.pricelistWarehouse"))
+        await convertOppToOrder.mutateAsync({
+          opportunityId: workflowModal.opportunityId,
+          params: crmParamsToJson(p),
+        })
+      } else if (workflowModal.kind === "assignTag") {
+        const tagId = formData.tagId
+        if (tagId == null || String(tagId).trim() === "") {
+          throw new Error(t("crm.forms.assignTag.validation.tagId"))
+        }
+        await assignTag.mutateAsync({
+          contactId: workflowModal.contactId,
+          tagId: String(tagId),
+        })
+      } else if (workflowModal.kind === "addSegment") {
+        const segmentId = formData.segmentId
+        if (segmentId == null || String(segmentId).trim() === "") {
+          throw new Error(t("crm.forms.addToSegment.validation.segmentId"))
+        }
+        await addToSegment.mutateAsync({
+          segmentId: String(segmentId),
+          contactId: workflowModal.contactId,
+        })
+      }
+      setWorkflowModal(null)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Action failed")
+      throw e
+    }
+  }
+
+  const workflowModalKey =
+    workflowModal == null
+      ? "closed"
+      : workflowModal.kind === "convertLead"
+        ? `cl-${workflowModal.leadId.toString()}`
+        : workflowModal.kind === "convertOpp"
+          ? `co-${workflowModal.opportunityId.toString()}`
+          : workflowModal.kind === "assignTag"
+            ? `at-${workflowModal.contactId.toString()}`
+            : `as-${workflowModal.contactId.toString()}`
+
   return (
     <>
       <ModuleView
@@ -225,6 +539,15 @@ function CrmClientLoaded({
             handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
+        }}
+      />
+      <FormModal
+        key={workflowModalKey}
+        open={workflowModal !== null}
+        onOpenChange={(open) => !open && setWorkflowModal(null)}
+        config={workflowModal?.form ?? newLeadForm(t)}
+        onSubmit={(formData) => {
+          handleWorkflowSubmit(formData)
         }}
       />
     </>

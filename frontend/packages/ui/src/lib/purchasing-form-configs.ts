@@ -154,7 +154,143 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+/** Add a product line to a draft purchase order (calls `add_purchase_order_line`). */
+export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "add-purchase-order-line",
+  title: t("purchasing.forms.addPurchaseOrderLine.title"),
+  description: t("purchasing.forms.addPurchaseOrderLine.description"),
+  sections: [
+    {
+      id: "pol-order",
+      title: t("purchasing.forms.addPurchaseOrderLine.sections.order"),
+      fields: [
+        {
+          id: "orderId",
+          name: "orderId",
+          type: "select",
+          label: t("purchasing.forms.addPurchaseOrderLine.fields.orderId"),
+          placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.orderPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "pol-product",
+      title: t("purchasing.forms.addPurchaseOrderLine.sections.product"),
+      fields: [
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("purchasing.forms.addPurchaseOrderLine.fields.productId"),
+          placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.productPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("purchasing.forms.addPurchaseOrderLine.fields.uomId"),
+          placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.uomPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "number",
+          label: t("purchasing.forms.addPurchaseOrderLine.fields.quantity"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("purchasing.forms.addPurchaseOrderLine.fields.priceUnit"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+/** Record received quantity on a PO line (`receive_po_line`). */
+export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "receive-purchase-order-line",
+  title: t("purchasing.forms.receivePurchaseOrderLine.title"),
+  description: t("purchasing.forms.receivePurchaseOrderLine.description"),
+  sections: [
+    {
+      id: "recv-line",
+      title: t("purchasing.forms.receivePurchaseOrderLine.sections.line"),
+      fields: [
+        {
+          id: "lineId",
+          name: "lineId",
+          type: "select",
+          label: t("purchasing.forms.receivePurchaseOrderLine.fields.lineId"),
+          placeholder: t("purchasing.forms.receivePurchaseOrderLine.fields.linePlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "qty",
+          name: "qty",
+          type: "number",
+          label: t("purchasing.forms.receivePurchaseOrderLine.fields.qty"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+/** Record invoiced quantity on a PO line (`invoice_po_line`). */
+export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "invoice-purchase-order-line",
+  title: t("purchasing.forms.invoicePurchaseOrderLine.title"),
+  description: t("purchasing.forms.invoicePurchaseOrderLine.description"),
+  sections: [
+    {
+      id: "inv-line",
+      title: t("purchasing.forms.invoicePurchaseOrderLine.sections.line"),
+      fields: [
+        {
+          id: "lineId",
+          name: "lineId",
+          type: "select",
+          label: t("purchasing.forms.invoicePurchaseOrderLine.fields.lineId"),
+          placeholder: t("purchasing.forms.invoicePurchaseOrderLine.fields.linePlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "qty",
+          name: "qty",
+          type: "number",
+          label: t("purchasing.forms.invoicePurchaseOrderLine.fields.qty"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
+  "add-purchase-order-line": addPurchaseOrderLineForm(t),
+  "receive-purchase-order-line": receivePurchaseOrderLineForm(t),
+  "invoice-purchase-order-line": invoicePurchaseOrderLineForm(t),
 })

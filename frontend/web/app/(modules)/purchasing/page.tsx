@@ -5,6 +5,8 @@ import {
   serverQueryPurchaseRequisitions,
   serverQueryContacts,
   serverQueryPricelists,
+  serverQueryProducts,
+  serverQueryUoms,
 } from "@lumiere/stdb/server"
 import { PurchasingClient } from "./purchasing-client"
 
@@ -15,13 +17,15 @@ export default async function PurchasingPage() {
     return <PurchasingClient />
   }
 
-  const [orders, lines, requisitions, contacts, pricelists] = await Promise.all([
+  const [orders, lines, requisitions, contacts, pricelists, products, uoms] = await Promise.all([
     serverQueryPurchaseOrders(organizationId, opts),
     serverQueryPurchaseOrderLines(organizationId, opts),
     serverQueryPurchaseRequisitions(organizationId, opts),
     serverQueryContacts(organizationId, opts),
     serverQueryPricelists(organizationId, opts),
-  ]).catch(() => [[], [], [], [], []])
+    serverQueryProducts(organizationId, opts),
+    serverQueryUoms(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], [], []])
 
   return (
     <PurchasingClient
@@ -30,6 +34,8 @@ export default async function PurchasingPage() {
       initialRequisitions={requisitions as Record<string, unknown>[]}
       initialContacts={contacts as Record<string, unknown>[]}
       initialPricelists={pricelists as Record<string, unknown>[]}
+      initialProducts={products as Record<string, unknown>[]}
+      initialUoms={uoms as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

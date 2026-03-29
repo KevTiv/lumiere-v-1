@@ -67,6 +67,12 @@ export interface EntityTableConfig {
   searchKeys?: string[]
   filters?: EntityFilter[]
   actions?: EntityAction[]
+  /**
+   * When true, clicking a row toggles selection (for bulk actions).
+   * Defaults to true only if an action has `requiresSelection: true`.
+   * Set false when toolbar actions (e.g. import) should not hijack row clicks.
+   */
+  rowSelectionToggleOnClick?: boolean
   emptyMessage?: string
 }
 

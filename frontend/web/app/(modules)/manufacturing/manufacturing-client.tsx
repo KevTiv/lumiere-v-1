@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -10,19 +10,21 @@ import {
   newWorkcenterForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  manufacturingCsvImportForm,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { ManufacturingCsvImportKind } from "@lumiere/ui"
+import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useMrpProductions,
   useMrpBoms,
+  useMrpBomLines,
   useMrpWorkorders,
   useMrpWorkcenters,
   useQualityChecks,
-  useCreateManufacturingOrder,
-  useCreateBom,
-  useCreateWorkcenter,
+  useManufacturingMutations,
 } from "@/hooks/manufacturing"
+import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   useProducts,
@@ -41,6 +43,7 @@ import {
 interface ManufacturingClientProps {
   initialProductions?: Record<string, unknown>[]
   initialBoms?: Record<string, unknown>[]
+  initialBomLines?: Record<string, unknown>[]
   initialWorkorders?: Record<string, unknown>[]
   initialWorkcenters?: Record<string, unknown>[]
   initialProducts?: Record<string, unknown>[]
@@ -64,6 +67,7 @@ export function ManufacturingClient(props: ManufacturingClientProps) {
 function ManufacturingClientLoaded({
   initialProductions,
   initialBoms,
+  initialBomLines,
   initialWorkorders,
   initialWorkcenters,
   initialProducts,
@@ -75,9 +79,14 @@ function ManufacturingClientLoaded({
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
+  const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined)
 
   const { data: productions = [] } = useMrpProductions(companyId, initialProductions)
   const { data: boms = [] } = useMrpBoms(companyId, initialBoms)
+  const { data: bomLines = [] } = useMrpBomLines(companyId, initialBomLines)
   const { data: workorders = [] } = useMrpWorkorders(companyId, initialWorkorders)
   const { data: workcenters = [] } = useMrpWorkcenters(companyId, initialWorkcenters)
   const { data: qualityChecks = [] } = useQualityChecks(companyId)
@@ -86,11 +95,33 @@ function ManufacturingClientLoaded({
   const { data: transfers = [] } = useStockPickings(companyId, initialStockPickings)
   const { data: stockQuants = [] } = useStockQuants(companyId, initialStockQuants)
 
-  const createManufacturingOrder = useCreateManufacturingOrder(orgId, companyId)
-  const createBom = useCreateBom(orgId, companyId)
-  const createWorkcenter = useCreateWorkcenter(orgId, companyId)
+  const m = useManufacturingMutations(orgId, companyId)
 
   const moduleConfig = useMemo(() => manufacturingModuleConfig(t), [t])
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    return manufacturingCsvImportForm(t, csvKind)
+  }, [csvKind, t])
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const addCsvToolbar = (
+    ec: EntityViewConfig,
+    actions: Array<{ id: string; label: string; onClick: () => void }>,
+  ): EntityViewConfig => {
+    if (ec.view.mode !== "table") return ec
+    return {
+      ...ec,
+      view: {
+        ...ec.view,
+        rowSelectionToggleOnClick: false,
+        actions,
+      },
+    }
+  }
 
   const productFieldOptions = useMemo(() => {
     const fromApi = productRowsToSelectOptions(products)
@@ -187,6 +218,7 @@ function ManufacturingClientLoaded({
                 create_mo: () => setQuickActionForm({ form: moFormConfig, action: "createManufacturingOrder" }),
                 create_bom: () => setQuickActionForm({ form: bomFormConfig, action: "createBom" }),
                 create_workcenter: () => setQuickActionForm({ form: workcenterFormConfig, action: "createWorkcenter" }),
+                schedule_production: () => setActiveTab("orders"),
               }
               return {
                 ...w,
@@ -240,7 +272,16 @@ function ManufacturingClientLoaded({
       moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
       []
     )
-  }, [productions, workorders, workcenters, t, moduleConfig, moFormConfig, bomFormConfig, workcenterFormConfig])
+  }, [
+    productions,
+    workorders,
+    workcenters,
+    t,
+    moduleConfig,
+    moFormConfig,
+    bomFormConfig,
+    workcenterFormConfig,
+  ])
 
   const config = useMemo(
     () =>
@@ -248,24 +289,66 @@ function ManufacturingClientLoaded({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "orders") return { ...tab, createForm: moFormConfig }
-          if (tab.id === "boms") return { ...tab, createForm: bomFormConfig }
-          if (tab.id === "workcenters") return { ...tab, createForm: workcenterFormConfig }
+          if (tab.id === "orders" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: moFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-mo",
+                  label: t("manufacturing.toolbar.importMoCsv"),
+                  onClick: () => setCsvKind("mo"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "boms" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: bomFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-bom",
+                  label: t("manufacturing.toolbar.importBomCsv"),
+                  onClick: () => setCsvKind("bom"),
+                },
+                {
+                  id: "csv-bom-line",
+                  label: t("manufacturing.toolbar.importBomLineCsv"),
+                  onClick: () => setCsvKind("bom_line"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "workcenters" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: workcenterFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-wc",
+                  label: t("manufacturing.toolbar.importWorkcenterCsv"),
+                  onClick: () => setCsvKind("workcenter"),
+                },
+              ]),
+            }
+          }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig]
+    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig, t],
   )
 
   const data = useMemo(
     () => ({
       orders: productions as unknown as Record<string, unknown>[],
       boms: boms as unknown as Record<string, unknown>[],
+      "bom-lines": bomLines as unknown as Record<string, unknown>[],
       workorders: workorders as unknown as Record<string, unknown>[],
       workcenters: workcenters as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
     }),
-    [productions, boms, workorders, workcenters, qualityChecks]
+    [productions, boms, bomLines, workorders, workcenters, qualityChecks]
   )
 
   const handleFormSubmit = (
@@ -301,7 +384,7 @@ function ManufacturingClientLoaded({
             ? Number(productRow.uomPoId)
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      createManufacturingOrder.mutate({
+      m.createManufacturingOrder.mutate({
         productId: Number(prodRaw),
         productQty: Number(formData.productQty ?? 1),
         productUomId: uomFromProduct,
@@ -353,7 +436,7 @@ function ManufacturingClientLoaded({
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
       const pid = Number(tmplRaw)
-      createBom.mutate({
+      m.createBom.mutate({
         type: String(formData.type ?? "Normal"),
         productId: pid,
         productTmplId: pid,
@@ -376,7 +459,7 @@ function ManufacturingClientLoaded({
       const timeEfficiency = Number(formData.timeEfficiency ?? 100)
       const capacity = Number(formData.capacity ?? 1)
 
-      createWorkcenter.mutate({
+      m.createWorkcenter.mutate({
         name: String(formData.name ?? ""),
         active: formData.active == null ? true : Boolean(formData.active),
         code: formData.code ? String(formData.code) : undefined,
@@ -415,7 +498,54 @@ function ManufacturingClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        onRowClick={(tabId, row) => {
+          if (["orders", "boms", "workorders", "workcenters"].includes(tabId)) {
+            setRowPick({ tabId, row })
+          }
+        }}
       />
+      <ManufacturingRowDialog
+        open={rowPick !== null}
+        onOpenChange={(o) => {
+          if (!o) setRowPick(null)
+        }}
+        tabId={rowPick?.tabId ?? null}
+        row={rowPick?.row ?? null}
+        workcenters={workcenters}
+        mutations={m}
+        t={t}
+      />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "mo") await m.importMoCsv.mutateAsync(text)
+              else if (csvKind === "bom") await m.importBomCsv.mutateAsync(text)
+              else if (csvKind === "bom_line") await m.importBomLineCsv.mutateAsync(text)
+              else await m.importWorkcenterCsv.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

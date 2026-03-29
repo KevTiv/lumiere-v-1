@@ -72,8 +72,9 @@ pub fn check_permission(
         return Ok(());
     }
 
-    // Fine-grained Casbin override check
+    // Fine-grained Casbin override check (v0 = role id or role name, matches seed policies)
     let role_str = role.id.to_string();
+    let role_name = role.name.as_str();
     let org_str = organization_id.to_string();
     let has_casbin = ctx
         .db
@@ -81,7 +82,9 @@ pub fn check_permission(
         .casbin_by_ptype()
         .filter(&"p".to_string())
         .any(|r| {
-            r.v0.as_deref() == Some(&role_str)
+            let subject_ok = r.v0.as_deref() == Some(role_str.as_str())
+                || r.v0.as_deref() == Some(role_name);
+            subject_ok
                 && r.v1.as_deref() == Some(&org_str)
                 && r.v2.as_deref() == Some(resource)
                 && (r.v3.as_deref() == Some(action) || r.v3.as_deref() == Some("*"))

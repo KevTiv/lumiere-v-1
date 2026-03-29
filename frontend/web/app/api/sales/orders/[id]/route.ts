@@ -10,6 +10,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { resolveApiSession, type ApiSession } from '@/lib/api-session'
+import { fetchDefaultCompanyId } from '@/lib/default-company-id'
 import { callReducer } from '@/lib/stdb-reducer'
 import {
   serverQuerySaleOrders,
@@ -79,19 +80,56 @@ export async function GET(
 
 /**
  * PUT /api/sales/orders/[id]
- * Update a sale order.
+ * Update a sale order header (draft/sent only) via `update_sale_order`.
  *
- * TODO: No update_sale_order reducer exists in the generated bindings.
- * Implement this endpoint once the backend reducer is added.
+ * Body: JSON object matching `UpdateSaleOrderParams` (camelCase). Omitted keys are left unchanged;
+ * pass `null` is not used — only include fields to update.
  */
 export async function PUT(
-  _request: NextRequest,
-  _context: RouteContext,
+  request: NextRequest,
+  context: RouteContext,
 ): Promise<NextResponse> {
-  return NextResponse.json(
-    { error: 'update_sale_order reducer not yet implemented on the backend' } as ApiResponse<unknown>,
-    { status: 501 },
-  )
+  const session = await requireSession(request)
+  if (!session) {
+    return errorResponse('Unauthorized', 401)
+  }
+
+  if (!session.organizationId) {
+    return errorResponse('No organization assigned', 403)
+  }
+
+  const { id } = await context.params
+  const orderId = parseInt(id, 10)
+  if (Number.isNaN(orderId)) {
+    return errorResponse('Invalid order ID', 400)
+  }
+
+  const companyId = await fetchDefaultCompanyId(session.organizationId, session.opts)
+  if (companyId == null) {
+    return errorResponse('No company found for organization', 422)
+  }
+
+  let params: Record<string, unknown>
+  try {
+    params = (await request.json()) as Record<string, unknown>
+  } catch {
+    return errorResponse('Invalid JSON body', 400)
+  }
+
+  try {
+    await callReducer(
+      'update_sale_order',
+      [session.organizationId, companyId, orderId, params],
+      session.opts,
+    )
+    const orders = await serverQuerySaleOrders(session.organizationId, session.opts)
+    const updated = (orders as SaleOrder[]).find(o => BigInt(o.id) === BigInt(orderId)) ?? null
+    return NextResponse.json({ data: updated } as ApiResponse<SaleOrder | null>)
+  } catch (error) {
+    console.error('Failed to update sale order:', error)
+    const message = error instanceof Error ? error.message : 'Failed to update sale order'
+    return errorResponse(message, 500)
+  }
 }
 
 /**

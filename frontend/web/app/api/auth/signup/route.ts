@@ -9,6 +9,7 @@ import {
 } from '@/lib/stdb-auth-server'
 import { saveStdbSession } from '@/app/actions/save-stdb-token'
 import { sendWelcomeEmail } from '@/lib/email'
+import { postAuthDestinationAfterSession } from '@/lib/post-auth-destination'
 
 const schema = z.object({
   email: z.string().email(),
@@ -17,6 +18,16 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.WORKOS_CLIENT_ID) {
+      return NextResponse.json(
+        {
+          error:
+            'Password sign-up is disabled. Use the WorkOS sign-up page (Continue with WorkOS).',
+        },
+        { status: 410 },
+      )
+    }
+
     const body = await req.json()
     const { email, password } = schema.parse(body)
 
@@ -49,7 +60,7 @@ export async function POST(req: NextRequest) {
     // Send welcome email (best-effort)
     sendWelcomeEmail(email).catch((e) => console.warn('[signup] welcome email failed', e))
 
-    return NextResponse.json({ redirectTo: '/onboarding' })
+    return NextResponse.json({ redirectTo: postAuthDestinationAfterSession({ hasOrganization: false }) })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors[0]?.message ?? 'Invalid input' }, { status: 400 })

@@ -475,6 +475,14 @@ pub struct StockQuantUnreserveParams {
     pub unreserve_qty: f64,
 }
 
+/// Move available quantity from one stock location to another (internal transfer at quant level).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct MoveStockQuantParams {
+    pub company_id: Option<u64>,
+    pub dest_location_id: u64,
+    pub quantity: f64,
+}
+
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct DoneStockMoveParams {
     pub company_id: Option<u64>,
@@ -712,6 +720,184 @@ pub fn unreserve_stock_quant(
             ),
             new_values: Some(serde_json::json!({ "reserved_quantity": new_reserved }).to_string()),
             changed_fields: vec!["reserved_quantity".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn move_stock_quant(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    quant_id: u64,
+    params: MoveStockQuantParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_quant", "write")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    if params.quantity <= 0.0 {
+        return Err("Quantity must be positive".to_string());
+    }
+
+    let src = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant_id)
+        .ok_or("Quant not found")?;
+
+    if src.organization_id != organization_id {
+        return Err("Quant does not belong to this organization".to_string());
+    }
+    if src.company_id != company_id {
+        return Err("Quant does not belong to this company".to_string());
+    }
+
+    if params.dest_location_id == src.location_id {
+        return Ok(());
+    }
+
+    if params.quantity > src.available_quantity {
+        return Err("Cannot move more than available quantity (unreserve first)".to_string());
+    }
+
+    let qty = params.quantity;
+    let eps = 1e-9_f64;
+
+    // Find an existing quant at destination with the same product / variant / lot / package / owner.
+    let mut dest_id: Option<u64> = None;
+    for q in ctx.db.stock_quant().quant_by_product().filter(&src.product_id) {
+        if q.organization_id != organization_id || q.company_id != company_id {
+            continue;
+        }
+        if q.location_id != params.dest_location_id {
+            continue;
+        }
+        if q.product_variant_id != src.product_variant_id {
+            continue;
+        }
+        if q.lot_id != src.lot_id {
+            continue;
+        }
+        if q.package_id != src.package_id {
+            continue;
+        }
+        if q.owner_id != src.owner_id {
+            continue;
+        }
+        dest_id = Some(q.id);
+        break;
+    }
+
+    let is_emptying_src = (src.quantity - qty).abs() <= eps;
+
+    match dest_id {
+        Some(did) => {
+            let dest = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&did)
+                .ok_or("Destination quant disappeared")?;
+            let new_dest_qty = dest.quantity + qty;
+            let new_dest_reserved = dest.reserved_quantity;
+            let new_dest_available = new_dest_qty - new_dest_reserved;
+            let new_dest_value = new_dest_qty * dest.cost;
+
+            ctx.db.stock_quant().id().update(StockQuant {
+                quantity: new_dest_qty,
+                available_quantity: new_dest_available,
+                value: new_dest_value,
+                ..dest.clone()
+            });
+
+            if is_emptying_src {
+                ctx.db.stock_quant().id().delete(&quant_id);
+            } else {
+                let new_src_qty = src.quantity - qty;
+                let new_src_available = new_src_qty - src.reserved_quantity;
+                let new_src_value = new_src_qty * src.cost;
+                ctx.db.stock_quant().id().update(StockQuant {
+                    quantity: new_src_qty,
+                    available_quantity: new_src_available,
+                    value: new_src_value,
+                    ..src.clone()
+                });
+            }
+        }
+        None if is_emptying_src => {
+            ctx.db.stock_quant().id().update(StockQuant {
+                location_id: params.dest_location_id,
+                ..src.clone()
+            });
+        }
+        None => {
+            let new_src_qty = src.quantity - qty;
+            let new_src_available = new_src_qty - src.reserved_quantity;
+            let new_src_value = new_src_qty * src.cost;
+            ctx.db.stock_quant().id().update(StockQuant {
+                quantity: new_src_qty,
+                available_quantity: new_src_available,
+                value: new_src_value,
+                ..src.clone()
+            });
+
+            ctx.db.stock_quant().insert(StockQuant {
+                id: 0,
+                organization_id: src.organization_id,
+                product_id: src.product_id,
+                product_variant_id: src.product_variant_id,
+                location_id: params.dest_location_id,
+                lot_id: src.lot_id,
+                package_id: src.package_id,
+                owner_id: src.owner_id,
+                company_id: src.company_id,
+                quantity: qty,
+                reserved_quantity: 0.0,
+                available_quantity: qty,
+                in_date: src.in_date,
+                inventory_quantity: src.inventory_quantity,
+                inventory_diff_quantity: src.inventory_diff_quantity,
+                inventory_quantity_set: src.inventory_quantity_set,
+                is_outdated: src.is_outdated,
+                user_id: src.user_id,
+                inventory_date: src.inventory_date,
+                cost: src.cost,
+                value: qty * src.cost,
+                cost_method: src.cost_method.clone(),
+                accounting_date: src.accounting_date,
+                currency_id: src.currency_id,
+                accounting_entry_ids: src.accounting_entry_ids.clone(),
+                metadata: src.metadata.clone(),
+            });
+        }
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_quant",
+            record_id: quant_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "location_id": src.location_id,
+                    "quantity": src.quantity,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "dest_location_id": params.dest_location_id,
+                    "moved_quantity": qty,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["location_id".to_string(), "quantity".to_string()],
             metadata: None,
         },
     );

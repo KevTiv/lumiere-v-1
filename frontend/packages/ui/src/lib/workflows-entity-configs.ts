@@ -2,11 +2,15 @@ import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
 const instanceStateBadges = (t: TFunction) => ({
-  badgeVariants: { running: "default", done: "outline", cancelled: "destructive" },
+  badgeVariants: {
+    Active: "default",
+    Complete: "secondary",
+    Exception: "destructive",
+  },
   badgeLabels: {
-    running: t("workflows.instances.states.running"),
-    done: t("workflows.instances.states.done"),
-    cancelled: t("workflows.instances.states.cancelled"),
+    Active: t("workflows.instances.states.Active"),
+    Complete: t("workflows.instances.states.Complete"),
+    Exception: t("workflows.instances.states.Exception"),
   },
 }) as const
 
@@ -24,7 +28,7 @@ export const workflowsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "isActive",
-        label: t("workflows.workflows.filters.isActive"),
+        label: t("workflows.workflows.filters.isActiveLabel"),
         type: "select",
         options: [
           { value: "true", label: t("workflows.workflows.filters.isActive.options.true") },
@@ -56,16 +60,16 @@ export const workflowInstancesTableConfig = (t: TFunction): EntityViewConfig => 
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("workflows.instances.searchPlaceholder"),
-    searchKeys: ["resType"],
+    searchKeys: ["resType", "stateTag"],
     filters: [
       {
-        key: "state",
-        label: t("workflows.instances.filters.state"),
+        key: "stateTag",
+        label: t("workflows.instances.filters.stateLabel"),
         type: "select",
         options: [
-          { value: "running", label: t("workflows.instances.filters.state.options.running") },
-          { value: "done", label: t("workflows.instances.filters.state.options.done") },
-          { value: "cancelled", label: t("workflows.instances.filters.state.options.cancelled") },
+          { value: "Active", label: t("workflows.instances.filters.state.options.Active") },
+          { value: "Complete", label: t("workflows.instances.filters.state.options.Complete") },
+          { value: "Exception", label: t("workflows.instances.filters.state.options.Exception") },
         ],
       },
     ],
@@ -73,7 +77,7 @@ export const workflowInstancesTableConfig = (t: TFunction): EntityViewConfig => 
       { key: "workflowId", label: t("workflows.instances.columns.workflowId"), width: "min-w-28" },
       { key: "resType", label: t("workflows.instances.columns.resType"), width: "min-w-32" },
       { key: "resId", label: t("workflows.instances.columns.resId"), type: "number", align: "right" },
-      { key: "state", label: t("workflows.instances.columns.state"), type: "badge", ...instanceStateBadges(t) },
+      { key: "stateTag", label: t("workflows.instances.columns.state"), type: "badge", ...instanceStateBadges(t) },
       { key: "createDate", label: t("workflows.instances.columns.createDate"), type: "date" },
       { key: "writeDate", label: t("workflows.instances.columns.writeDate"), type: "date" },
     ],

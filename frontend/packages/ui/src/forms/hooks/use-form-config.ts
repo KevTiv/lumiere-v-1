@@ -1,9 +1,9 @@
 //! Form Configuration Hooks
 //!
 //! React hooks for accessing and managing form configurations from SpacetimeDB.
-//! These hooks work with the unified form configuration system.
 
 import { useEffect, useMemo, useReducer, useState } from "react"
+import { getStdbConnection, useStdbConnection } from "@lumiere/stdb"
 import type {
   FormConfig,
   FormConfigField,
@@ -13,7 +13,8 @@ import type {
   ParsedRoleConfig,
   MergedFormConfiguration,
   CreateFormFieldParams,
-  CreateRoleConfigParams,
+  FieldType,
+  FieldWidth,
 } from "../config/types"
 import {
   parseFormField,
@@ -22,7 +23,7 @@ import {
   mergeWithCustomFields,
   isCustomField,
 } from "../config/types"
-import { formRegistry, getDefaultFormConfig } from "../config/registry"
+import { getDefaultFormConfig } from "../config/registry"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // STATE REDUCERS
@@ -69,9 +70,7 @@ function formConfigReducer(state: FormConfigState, action: FormConfigAction): Fo
     case "UPDATE_FIELD":
       return {
         ...state,
-        fields: state.fields.map(f =>
-          f.id === action.payload.id ? action.payload : f
-        ),
+        fields: state.fields.map(f => (f.id === action.payload.id ? action.payload : f)),
       }
     case "ADD_CUSTOM_FIELD":
       return {
@@ -89,6 +88,149 @@ function formConfigReducer(state: FormConfigState, action: FormConfigAction): Fo
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// STDB ↔ UI MAPPING
+// ═════════════════════════════════════════════════════════════════════════════
+
+function enumTag(v: unknown): string {
+  if (v !== null && typeof v === "object" && "tag" in v) {
+    return String((v as { tag: string }).tag)
+  }
+  return String(v)
+}
+
+function ts(t: { toDate?: () => Date } | undefined): string {
+  try {
+    return t?.toDate?.()?.toISOString() ?? ""
+  } catch {
+    return ""
+  }
+}
+
+function mapStdbFormConfigRow(row: {
+  id: bigint
+  organizationId: bigint
+  moduleId: string
+  formId: string
+  name: string
+  description: string
+  isActive: boolean
+  isSystemDefault: boolean
+  createdAt: { toDate?: () => Date }
+  updatedAt: { toDate?: () => Date }
+  createdBy: { toHexString?: () => string }
+  updatedBy: { toHexString?: () => string }
+}): FormConfig {
+  return {
+    id: Number(row.id),
+    organizationId: Number(row.organizationId),
+    moduleId: row.moduleId,
+    formId: row.formId,
+    name: row.name,
+    description: row.description,
+    isActive: row.isActive,
+    isSystemDefault: row.isSystemDefault,
+    createdAt: ts(row.createdAt),
+    updatedAt: ts(row.updatedAt),
+    createdBy: row.createdBy?.toHexString?.() ?? "",
+    updatedBy: row.updatedBy?.toHexString?.() ?? "",
+  }
+}
+
+function mapStdbFormConfigFieldRow(row: {
+  id: bigint
+  configurationId: bigint
+  fieldId: string
+  name: string
+  label: string
+  fieldType: unknown
+  description: string
+  placeholder: string
+  defaultValue: string
+  optionsJson: string
+  validationJson: string
+  aiSuggestionsJson: string
+  order: number
+  isSystem: boolean
+  isEnabled: boolean
+  category: string
+  showInList: boolean
+  width: unknown
+  sectionId: string
+  createdAt: { toDate?: () => Date }
+  updatedAt: { toDate?: () => Date }
+}): FormConfigField {
+  return {
+    id: Number(row.id),
+    configurationId: Number(row.configurationId),
+    fieldId: row.fieldId,
+    name: row.name,
+    label: row.label,
+    fieldType: enumTag(row.fieldType) as FieldType,
+    description: row.description,
+    placeholder: row.placeholder,
+    defaultValue: row.defaultValue,
+    optionsJson: row.optionsJson,
+    validationJson: row.validationJson,
+    aiSuggestionsJson: row.aiSuggestionsJson,
+    order: row.order,
+    isSystem: row.isSystem,
+    isEnabled: row.isEnabled,
+    category: row.category,
+    showInList: row.showInList,
+    width: enumTag(row.width) as FieldWidth,
+    sectionId: row.sectionId,
+    createdAt: ts(row.createdAt),
+    updatedAt: ts(row.updatedAt),
+  }
+}
+
+function mapStdbFormRoleConfigRow(row: {
+  id: bigint
+  configurationId: bigint
+  roleId: string
+  enabledFieldsJson: string
+  requiredFieldsJson: string
+  defaultPromptsJson: string
+  isActive: boolean
+  createdAt: { toDate?: () => Date }
+  updatedAt: { toDate?: () => Date }
+}): FormRoleConfig {
+  return {
+    id: Number(row.id),
+    configurationId: Number(row.configurationId),
+    roleId: row.roleId,
+    enabledFieldsJson: row.enabledFieldsJson,
+    requiredFieldsJson: row.requiredFieldsJson,
+    defaultPromptsJson: row.defaultPromptsJson,
+    isActive: row.isActive,
+    createdAt: ts(row.createdAt),
+    updatedAt: ts(row.updatedAt),
+  }
+}
+
+function mapStdbUserCustomFieldRow(row: {
+  id: bigint
+  organizationId: bigint
+  userId: { toHexString?: () => string }
+  configurationId: bigint
+  fieldId: string
+  fieldDataJson: string
+  createdAt: { toDate?: () => Date }
+  updatedAt: { toDate?: () => Date }
+}): UserCustomField {
+  return {
+    id: Number(row.id),
+    organizationId: Number(row.organizationId),
+    userId: row.userId?.toHexString?.() ?? "",
+    configurationId: Number(row.configurationId),
+    fieldId: row.fieldId,
+    fieldDataJson: row.fieldDataJson,
+    createdAt: ts(row.createdAt),
+    updatedAt: ts(row.updatedAt),
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // HOOKS
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -99,51 +241,42 @@ interface UseFormConfigurationOptions {
   roleId?: string
   userId?: string
   useDefaultIfMissing?: boolean
+  /** Skip role filtering; include all enabled fields (for org admin form settings). */
+  forAdminSettings?: boolean
 }
 
 /**
  * Hook to access a form configuration with all its fields, role configs, and custom fields.
- * This is the main hook for consuming form configurations.
  */
 export function useFormConfiguration(options: UseFormConfigurationOptions): {
   config: MergedFormConfiguration | null
   isLoading: boolean
   error: string | null
   refetch: () => void
+  /** Raw DB role rows for admin tools (e.g. append fields to enabled lists). */
+  sourceRoleConfigs: FormRoleConfig[]
+  /** 0 when using registry fallback only (no SpacetimeDB row yet). */
+  dbConfigurationId: number
 } {
-  const { moduleId, formId, organizationId, roleId, useDefaultIfMissing = true } = options
+  const {
+    moduleId,
+    formId,
+    organizationId,
+    roleId,
+    userId,
+    useDefaultIfMissing = true,
+    forAdminSettings = false,
+  } = options
+  const { identity } = useStdbConnection()
   const [state, dispatch] = useReducer(formConfigReducer, initialState)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     dispatch({ type: "SET_LOADING", payload: true })
 
-    // TODO: Replace with generated bindings once forms module is published
-    // import { FormConfig, FormConfigField, FormRoleConfig, UserCustomField } from "@/stdb/generated";
-    //
-    // // Subscribe to form config
-    // const config = FormConfig.filter({ organizationId, moduleId, formId }).find(c => c.isActive);
-    // if (config) {
-    //   const fields = FormConfigField.filterByConfigurationId(config.id);
-    //   const roleConfigs = FormRoleConfig.filterByConfigurationId(config.id);
-    //   const customFields = UserCustomField.filter({ configurationId: config.id });
-    //   dispatch({ type: "SET_DATA", payload: { config, fields, roleConfigs, customFields } });
-    // } else if (useDefaultIfMissing) {
-    //   // Use default config from registry
-    //   loadDefaultConfig();
-    // }
-
-    // For now, use default config
-    if (useDefaultIfMissing) {
-      loadDefaultConfig()
-    } else {
-      dispatch({ type: "SET_ERROR", payload: "Form configuration not found" })
-    }
-
     function loadDefaultConfig() {
       const defaultConfig = getDefaultFormConfig(moduleId, formId)
       if (defaultConfig) {
-        // Convert default config to mock FormConfig structure
         const mockConfig: FormConfig = {
           id: 0,
           organizationId,
@@ -159,7 +292,6 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           updatedBy: "",
         }
 
-        // Convert default fields to mock FormConfigField structure
         const mockFields: FormConfigField[] = defaultConfig.fields.map((field, index) => ({
           id: index + 1,
           configurationId: 0,
@@ -169,7 +301,12 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           fieldType: field.fieldType,
           description: field.description || "",
           placeholder: field.placeholder || "",
-          defaultValue: field.defaultValue || "",
+          defaultValue:
+            field.defaultValue !== undefined && field.defaultValue !== null
+              ? typeof field.defaultValue === "string"
+                ? field.defaultValue
+                : JSON.stringify(field.defaultValue)
+              : "",
           optionsJson: JSON.stringify(field.options || []),
           validationJson: JSON.stringify(field.validation || { required: false }),
           aiSuggestionsJson: JSON.stringify(field.aiSuggestions || []),
@@ -184,7 +321,6 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           updatedAt: new Date().toISOString(),
         }))
 
-        // Convert role configs
         const mockRoleConfigs: FormRoleConfig[] = defaultConfig.roleConfigs
           ? Object.values(defaultConfig.roleConfigs).map((rc, index) => ({
               id: index + 1,
@@ -212,59 +348,143 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
       }
     }
-  }, [moduleId, formId, organizationId, useDefaultIfMissing, refreshKey])
 
-  // Memoize the merged configuration
+    if (!organizationId) {
+      if (useDefaultIfMissing) loadDefaultConfig()
+      else dispatch({ type: "SET_ERROR", payload: "Missing organization" })
+      return
+    }
+
+    const conn = getStdbConnection()
+    if (!conn) {
+      if (useDefaultIfMissing) loadDefaultConfig()
+      else dispatch({ type: "SET_ERROR", payload: "Not connected to SpacetimeDB" })
+      return
+    }
+
+    const db = conn
+
+    function syncFromDb() {
+      const configs = [...db.db.form_config.iter()].filter(
+        c =>
+          Number(c.organizationId) === organizationId &&
+          c.moduleId === moduleId &&
+          c.formId === formId &&
+          c.isActive,
+      )
+
+      if (configs.length === 0) {
+        if (useDefaultIfMissing) loadDefaultConfig()
+        else dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
+        return
+      }
+
+      const cfg = configs[0]
+      const configurationId = Number(cfg.id)
+
+      const fields = [...db.db.form_config_field.iter()]
+        .filter(f => Number(f.configurationId) === configurationId)
+        .map(mapStdbFormConfigFieldRow)
+
+      const roleConfigs = [...db.db.form_role_config.iter()]
+        .filter(r => Number(r.configurationId) === configurationId)
+        .map(mapStdbFormRoleConfigRow)
+
+      const effectiveUser = userId ?? identity ?? ""
+      const customRows = [...db.db.user_custom_field.iter()].filter(
+        cf =>
+          Number(cf.organizationId) === organizationId &&
+          Number(cf.configurationId) === configurationId &&
+          (!effectiveUser || cf.userId?.toHexString?.() === effectiveUser),
+      )
+      const customFields = customRows.map(mapStdbUserCustomFieldRow)
+
+      dispatch({
+        type: "SET_DATA",
+        payload: {
+          config: mapStdbFormConfigRow(cfg),
+          fields,
+          roleConfigs,
+          customFields,
+        },
+      })
+    }
+
+    syncFromDb()
+
+    const tables = [
+      db.db.form_config,
+      db.db.form_config_field,
+      db.db.form_role_config,
+      db.db.user_custom_field,
+    ] as const
+    for (const t of tables) {
+      t.onInsert(() => syncFromDb())
+      t.onUpdate(() => syncFromDb())
+      t.onDelete(() => syncFromDb())
+    }
+  }, [
+    moduleId,
+    formId,
+    organizationId,
+    useDefaultIfMissing,
+    refreshKey,
+    userId,
+    identity,
+  ])
+
   const mergedConfig = useMemo<MergedFormConfiguration | null>(() => {
     if (!state.config) return null
 
     const parsedFields = state.fields.map(parseFormField)
-    const parsedRoleConfig = roleId
-      ? state.roleConfigs.find(rc => rc.roleId === roleId)
-      : undefined
+    const parsedRoleConfig = roleId ? state.roleConfigs.find(rc => rc.roleId === roleId) : undefined
+
     const parsedCustomFields = state.customFields.map(cf => {
-      const data = JSON.parse(cf.fieldDataJson)
+      const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
       return parseFormField({
         id: cf.id,
         configurationId: cf.configurationId,
-        fieldId: data.fieldId,
-        name: data.name,
-        label: data.label,
-        fieldType: data.type,
-        description: data.description || "",
-        placeholder: data.placeholder || "",
-        defaultValue: data.defaultValue || "",
+        fieldId: String(data.fieldId ?? ""),
+        name: String(data.name ?? ""),
+        label: String(data.label ?? ""),
+        fieldType: (data.type as FieldType) ?? "Text",
+        description: String(data.description ?? ""),
+        placeholder: String(data.placeholder ?? ""),
+        defaultValue: typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
         optionsJson: JSON.stringify(data.options || []),
         validationJson: JSON.stringify(data.validation || { required: false }),
         aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
-        order: data.order,
+        order: Number(data.order ?? 0),
         isSystem: false,
         isEnabled: true,
         category: "",
         showInList: false,
-        width: data.width || "Full",
-        sectionId: data.sectionId || "",
+        width: (data.width as FieldWidth) || "Full",
+        sectionId: String(data.sectionId ?? ""),
         createdAt: cf.createdAt,
         updatedAt: cf.updatedAt,
       } as FormConfigField)
     })
 
-    // Get fields filtered by role
-    const roleFields = getFieldsForRole(
-      parsedFields,
-      parsedRoleConfig ? parseRoleConfig(parsedRoleConfig) : undefined
-    )
+    let roleFields: ParsedFormField[]
+    if (forAdminSettings) {
+      roleFields = parsedFields.filter(f => f.isEnabled).sort((a, b) => a.order - b.order)
+    } else {
+      roleFields = getFieldsForRole(
+        parsedFields,
+        parsedRoleConfig ? parseRoleConfig(parsedRoleConfig) : undefined,
+      )
+    }
 
-    // Merge with custom fields
-    const allFields = mergeWithCustomFields(roleFields, parsedCustomFields)
+    const allFields = mergeWithCustomFields(roleFields, parsedCustomFields).sort((a, b) => a.order - b.order)
 
     return {
       config: state.config,
-      fields: parsedFields,
+      fields: allFields,
       roleConfig: parsedRoleConfig ? parseRoleConfig(parsedRoleConfig) : undefined,
       customFields: parsedCustomFields,
     }
-  }, [state.config, state.fields, state.roleConfigs, state.customFields, roleId])
+  }, [state.config, state.fields, state.roleConfigs, state.customFields, roleId, forAdminSettings])
 
   const refetch = () => setRefreshKey(k => k + 1)
 
@@ -273,12 +493,13 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     isLoading: state.isLoading,
     error: state.error,
     refetch,
+    sourceRoleConfigs: state.roleConfigs,
+    dbConfigurationId: state.config?.id ?? 0,
   }
 }
 
 /**
  * Hook to get all form configurations for an organization.
- * Useful for the settings page.
  */
 export function useOrganizationFormConfigs(organizationId: number): {
   configs: FormConfig[]
@@ -286,22 +507,35 @@ export function useOrganizationFormConfigs(organizationId: number): {
 } {
   const [configs, setConfigs] = useReducer(listReducer<FormConfig>, [])
   const [isLoading, setIsLoading] = useState(true)
+  const { connected } = useStdbConnection()
 
   useEffect(() => {
-    setIsLoading(true)
+    if (!organizationId) {
+      setConfigs([])
+      setIsLoading(false)
+      return
+    }
 
-    // TODO: Replace with generated bindings
-    // import { FormConfig } from "@/stdb/generated";
-    // setConfigs(FormConfig.filter({ organizationId }));
-    // const unsub = FormConfig.onUpdate(() => {
-    //   setConfigs(FormConfig.filter({ organizationId }));
-    // });
-    // return unsub;
+    const conn = getStdbConnection()
+    if (!conn) {
+      setConfigs([])
+      setIsLoading(false)
+      return
+    }
 
-    // For now, return empty
-    setConfigs([])
-    setIsLoading(false)
-  }, [organizationId])
+    const db = conn
+
+    function load() {
+      const rows = [...db.db.form_config.iter()].filter(c => Number(c.organizationId) === organizationId)
+      setConfigs(rows.map(mapStdbFormConfigRow))
+      setIsLoading(false)
+    }
+
+    load()
+    db.db.form_config.onInsert(() => load())
+    db.db.form_config.onUpdate(() => load())
+    db.db.form_config.onDelete(() => load())
+  }, [organizationId, connected])
 
   return { configs, isLoading }
 }
@@ -311,7 +545,7 @@ export function useOrganizationFormConfigs(organizationId: number): {
  */
 export function useRoleFormFields(
   configurationId: number,
-  roleId: string
+  roleId: string,
 ): {
   fields: ParsedFormField[]
   isLoading: boolean
@@ -321,12 +555,6 @@ export function useRoleFormFields(
 
   useEffect(() => {
     setIsLoading(true)
-
-    // TODO: Replace with generated bindings
-    // Load fields and role config
-    // Filter by enabled fields for role
-    // Apply required field overrides
-
     setFields([])
     setIsLoading(false)
   }, [configurationId, roleId])
@@ -339,7 +567,7 @@ export function useRoleFormFields(
  */
 export function useUserCustomFields(
   configurationId: number,
-  userId?: string
+  userId?: string,
 ): {
   customFields: ParsedFormField[]
   addCustomField: (field: CreateFormFieldParams) => Promise<void>
@@ -351,10 +579,6 @@ export function useUserCustomFields(
 
   useEffect(() => {
     setIsLoading(true)
-
-    // TODO: Replace with generated bindings
-    // Subscribe to UserCustomField table
-
     setCustomFields([])
     setIsLoading(false)
   }, [configurationId, userId])
@@ -363,14 +587,11 @@ export function useUserCustomFields(
     if (!isCustomField(field.fieldId)) {
       throw new Error("Custom field IDs must start with 'custom:'")
     }
-
-    // TODO: Call reducer to add custom field
-    console.log("Adding custom field:", field)
+    console.warn("addCustomField: wire add_user_custom_field reducer when needed", field)
   }
 
   const removeCustomField = async (fieldId: string) => {
-    // TODO: Call reducer to remove custom field
-    console.log("Removing custom field:", fieldId)
+    console.warn("removeCustomField: wire delete_user_custom_field reducer when needed", fieldId)
   }
 
   return {
@@ -381,17 +602,10 @@ export function useUserCustomFields(
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// UTILITY HOOKS
-// ═════════════════════════════════════════════════════════════════════════════
-
 /**
  * Hook to check if a form field is visible for the current role.
  */
-export function useFieldVisibility(
-  fieldId: string,
-  roleConfig?: ParsedRoleConfig
-): boolean {
+export function useFieldVisibility(fieldId: string, roleConfig?: ParsedRoleConfig): boolean {
   return useMemo(() => {
     if (!roleConfig) return true
     return roleConfig.enabledFields.includes(fieldId)
@@ -404,7 +618,7 @@ export function useFieldVisibility(
 export function useFieldRequired(
   fieldId: string,
   fieldValidation?: { required?: boolean },
-  roleConfig?: ParsedRoleConfig
+  roleConfig?: ParsedRoleConfig,
 ): boolean {
   return useMemo(() => {
     const baseRequired = fieldValidation?.required ?? false

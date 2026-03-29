@@ -71,7 +71,7 @@ function ProjectsClientLoaded({
   const { data: tasks = [] } = useTasks(companyId, initialTasks)
   const { data: timesheets = [] } = useTimesheets(companyId, initialTimesheets)
   const { data: employees = [] } = useEmployees(companyId)
-  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: contacts = [] } = useContacts(companyId, initialContacts)
 
   const createProject = useCreateProject(orgId, companyId)

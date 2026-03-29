@@ -8,13 +8,11 @@ export type FinancialReport = Infer<typeof FinancialReportRow>;
 export type TrialBalance = Infer<typeof TrialBalanceRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
-// Note: financial_report and trial_balance are scoped by company_id
-export function reportsSubscriptions(companyIds: bigint[]): string[] {
-  if (!companyIds.length) return [];
-  const ids = companyIds.map(String).join(", ");
+export function reportsSubscriptions(organizationId: bigint): string[] {
+  const id = String(organizationId);
   return [
-    `SELECT * FROM financial_report WHERE company_id IN (${ids})`,
-    `SELECT * FROM trial_balance WHERE company_id IN (${ids})`,
+    `SELECT * FROM financial_report WHERE organization_id = ${id}`,
+    `SELECT * FROM trial_balance WHERE organization_id = ${id}`,
   ];
 }
 

@@ -7,6 +7,9 @@ import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
+import { redirectToWorkOsSignInForPasswordReset } from "@/app/actions/workos-auth"
+
+const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
@@ -23,11 +26,36 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       })
-      // Always show success to prevent email enumeration
       setSubmitted(true)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (useWorkOsAuth) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("auth.forgotPassword.title")}</CardTitle>
+          <CardDescription>{t("auth.forgotPassword.descriptionWorkOs")}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <form action={redirectToWorkOsSignInForPasswordReset} className="space-y-2">
+            <input type="hidden" name="returnTo" value="/sign-in" />
+            <Button type="submit" size="lg" className="w-full">
+              {t("auth.forgotPassword.openWorkOsReset")}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground text-center">
+            {t("auth.forgotPassword.workOsResetHint")}
+          </p>
+          <Link href="/sign-in" className="block text-center text-sm font-medium hover:underline">
+            {t("auth.forgotPassword.backToSignIn")}
+          </Link>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (submitted) {

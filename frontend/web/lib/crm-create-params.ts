@@ -3,58 +3,67 @@
  */
 
 import type {
+  ConvertLeadParams,
+  ConvertOpportunityParams,
   CreateActivityParams,
   CreateContactParams,
   CreateLeadParams,
   CreateOpportunityParams,
-} from '@lumiere/stdb'
-import { Timestamp } from 'spacetimedb'
+} from '@lumiere/stdb/generated/types';
+import { Timestamp } from 'spacetimedb';
 
-import { stdbParamsToJson } from '@/lib/stdb-params-json'
+import { stdbParamsToJson } from '@/lib/stdb-params-json';
 
 function optionalString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === '' ? undefined : s
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  return s === '' ? undefined : s;
 }
 
 function optionalTrimmedString(v: unknown): string | undefined {
-  return optionalString(v)
+  return optionalString(v);
 }
 
 function parseF64(v: unknown, fallback = 0): number {
-  if (v == null || v === '') return fallback
-  const n = Number(v)
-  return Number.isFinite(n) ? n : fallback
+  if (v == null || v === '') return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 /** Parses a non-negative stage / id for reducers (form values are often strings). */
 function parseU64Field(v: unknown): bigint | null {
-  if (typeof v === 'bigint') return v >= 0n ? v : null
-  if (typeof v === 'number' && Number.isFinite(v) && v >= 0 && Number.isInteger(v)) {
-    return BigInt(v)
+  if (typeof v === 'bigint') return v >= 0n ? v : null;
+  if (
+    typeof v === 'number' &&
+    Number.isFinite(v) &&
+    v >= 0 &&
+    Number.isInteger(v)
+  ) {
+    return BigInt(v);
   }
   if (typeof v === 'string') {
-    const t = v.trim()
-    if (t === '') return null
+    const t = v.trim();
+    if (t === '') return null;
     try {
-      const b = BigInt(t)
-      return b >= 0n ? b : null
+      const b = BigInt(t);
+      return b >= 0n ? b : null;
     } catch {
-      return null
+      return null;
     }
   }
-  return null
+  return null;
 }
 
 /**
  * Lead form uses contact-centric field names; `name` is the lead title required by `create_lead`.
  */
-export function toCreateLeadParams(formData: Record<string, unknown>): CreateLeadParams | null {
-  const contactName = optionalTrimmedString(formData.contactName)
-  if (!contactName) return null
+export function toCreateLeadParams(
+  formData: Record<string, unknown>,
+): CreateLeadParams | null {
+  const contactName = optionalTrimmedString(formData.contactName);
+  if (!contactName) return null;
 
-  const partnerName = optionalTrimmedString(formData.partnerName)
+  const partnerName = optionalTrimmedString(formData.partnerName);
 
   return {
     name: contactName,
@@ -85,26 +94,26 @@ export function toCreateLeadParams(formData: Record<string, unknown>): CreateLea
     partnerId: undefined,
     dateDeadline: undefined,
     metadata: undefined,
-  }
+  };
 }
 
 export function toCreateOpportunityParams(
   formData: Record<string, unknown>,
 ): CreateOpportunityParams | null {
-  const name = optionalTrimmedString(formData.name)
-  if (!name) return null
+  const name = optionalTrimmedString(formData.name);
+  if (!name) return null;
 
-  const stageId = parseU64Field(formData.stageId)
-  if (stageId === null) return null
+  const stageId = parseU64Field(formData.stageId);
+  if (stageId === null) return null;
 
-  const priority = optionalTrimmedString(formData.priority) ?? 'Medium'
+  const priority = optionalTrimmedString(formData.priority) ?? 'Medium';
 
-  let dateDeadline: CreateOpportunityParams['dateDeadline']
-  const rawDeadline = formData.dateDeadline
+  let dateDeadline: CreateOpportunityParams['dateDeadline'];
+  const rawDeadline = formData.dateDeadline;
   if (rawDeadline != null && String(rawDeadline).trim() !== '') {
-    const d = new Date(String(rawDeadline))
+    const d = new Date(String(rawDeadline));
     if (!Number.isNaN(d.getTime())) {
-      dateDeadline = Timestamp.fromDate(d)
+      dateDeadline = Timestamp.fromDate(d);
     }
   }
 
@@ -137,14 +146,16 @@ export function toCreateOpportunityParams(
     color: undefined,
     description: undefined,
     metadata: undefined,
-  }
+  };
 }
 
-export function toCreateContactParams(formData: Record<string, unknown>): CreateContactParams | null {
-  const name = optionalTrimmedString(formData.name)
-  if (!name) return null
+export function toCreateContactParams(
+  formData: Record<string, unknown>,
+): CreateContactParams | null {
+  const name = optionalTrimmedString(formData.name);
+  if (!name) return null;
 
-  const isCompany = Boolean(formData.isCompany)
+  const isCompany = Boolean(formData.isCompany);
 
   return {
     name,
@@ -185,27 +196,29 @@ export function toCreateContactParams(formData: Record<string, unknown>): Create
     userId: undefined,
     color: undefined,
     metadata: undefined,
-  }
+  };
 }
 
-export function toCreateActivityParams(formData: Record<string, unknown>): CreateActivityParams | null {
-  const summary = optionalTrimmedString(formData.summary)
-  if (!summary) return null
+export function toCreateActivityParams(
+  formData: Record<string, unknown>,
+): CreateActivityParams | null {
+  const summary = optionalTrimmedString(formData.summary);
+  if (!summary) return null;
 
-  const typeRaw = formData.activityTypeId
-  const activityTypeNum = Number(typeRaw)
-  if (!Number.isFinite(activityTypeNum) || activityTypeNum <= 0) return null
+  const typeRaw = formData.activityTypeId;
+  const activityTypeNum = Number(typeRaw);
+  if (!Number.isFinite(activityTypeNum) || activityTypeNum <= 0) return null;
 
-  const rawDeadline = formData.dateDeadline
-  if (rawDeadline == null || String(rawDeadline).trim() === '') return null
-  const d = new Date(String(rawDeadline))
-  if (Number.isNaN(d.getTime())) return null
+  const rawDeadline = formData.dateDeadline;
+  if (rawDeadline == null || String(rawDeadline).trim() === '') return null;
+  const d = new Date(String(rawDeadline));
+  if (Number.isNaN(d.getTime())) return null;
 
-  const userRaw = formData.userId
-  let userIdNum: number | null = null
+  const userRaw = formData.userId;
+  let userIdNum: number | null = null;
   if (userRaw != null && String(userRaw).trim() !== '') {
-    const n = Number(userRaw)
-    if (Number.isFinite(n) && n > 0) userIdNum = n
+    const n = Number(userRaw);
+    if (Number.isFinite(n) && n > 0) userIdNum = n;
   }
 
   return {
@@ -229,7 +242,7 @@ export function toCreateActivityParams(formData: Record<string, unknown>): Creat
       activityTypeId: activityTypeNum,
       userId: userIdNum,
     }),
-  }
+  };
 }
 
 /**
@@ -240,7 +253,47 @@ export function crmParamsToJson(
     | CreateLeadParams
     | CreateOpportunityParams
     | CreateContactParams
-    | CreateActivityParams,
+    | CreateActivityParams
+    | ConvertLeadParams
+    | ConvertOpportunityParams,
 ): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params);
+}
+
+export function toConvertLeadParams(
+  formData: Record<string, unknown>,
+): ConvertLeadParams | null {
+  const createContact = Boolean(formData.createContact);
+  const createOpportunity = Boolean(formData.createOpportunity);
+  let opportunityStageId: ConvertLeadParams['opportunityStageId'];
+  if (createOpportunity) {
+    const sid = parseU64Field(formData.opportunityStageId);
+    if (sid === null) return null;
+    opportunityStageId = sid;
+  } else {
+    opportunityStageId = undefined;
+  }
+
+  return {
+    createContact,
+    createOpportunity,
+    contactType: undefined,
+    isVendor: undefined,
+    isEmployee: undefined,
+    isProspect: undefined,
+    isPartner: undefined,
+    customerRank: undefined,
+    supplierRank: undefined,
+    opportunityStageId,
+    metadata: undefined,
+  };
+}
+
+export function toConvertOpportunityParams(
+  formData: Record<string, unknown>,
+): ConvertOpportunityParams | null {
+  const pricelistId = parseU64Field(formData.pricelistId);
+  const warehouseId = parseU64Field(formData.warehouseId);
+  if (pricelistId === null || warehouseId === null) return null;
+  return { pricelistId, warehouseId };
 }

@@ -25,6 +25,9 @@ export * from "./config/registry"
 // Hooks exports
 export * from "./hooks/use-form-config"
 
+// Metadata helpers (custom:* fields ↔ JSON metadata column)
+export * from "./utils/metadata-defaults"
+
 // Component exports
 export * from "./components/configurable-form"
 export * from "./components/form-field-renderer"

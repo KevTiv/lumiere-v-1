@@ -137,8 +137,12 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to submit expense sheet')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+      ])
+    },
   })
 }
 
@@ -153,8 +157,12 @@ export function useApproveExpenseSheet(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to approve expense sheet')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+      ])
+    },
   })
 }
 
@@ -169,8 +177,12 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to refuse expense sheet')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+      ])
+    },
   })
 }
 

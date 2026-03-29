@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -28,6 +29,7 @@ export async function saveStdbSession(
   const store = await cookies()
   store.set('stdb_token', token, COOKIE_OPTS)
   store.set('stdb_identity', identityHex, COOKIE_OPTS)
+  revalidatePath('/', 'layout')
 }
 
 export async function clearStdbSession(): Promise<void> {

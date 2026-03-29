@@ -1123,6 +1123,7 @@ export type AuditRule = __Infer<typeof AuditRule>;
 
 export const BalanceSheetLine = __t.object("BalanceSheetLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   reportId: __t.u64(),
   sequence: __t.u32(),
   name: __t.string(),
@@ -1283,6 +1284,22 @@ export const BomType = __t.enum("BomType", {
 });
 export type BomType = __Infer<typeof BomType>;
 
+export const BootstrapNewTenantParams = __t.object("BootstrapNewTenantParams", {
+  get organization() {
+    return CreateOrganizationParams;
+  },
+  defaultCompanyName: __t.string(),
+  defaultCompanyCode: __t.string(),
+  defaultCompanyCurrencyCode: __t.string(),
+  fiscalYearEndMonth: __t.u8(),
+  fiscalYearEndDay: __t.u8(),
+  seedFormConfigs: __t.bool(),
+  get settings() {
+    return UpsertOrganizationSettingsParams;
+  },
+});
+export type BootstrapNewTenantParams = __Infer<typeof BootstrapNewTenantParams>;
+
 export const BudgetPost = __t.object("BudgetPost", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1386,6 +1403,7 @@ export type CasbinRule = __Infer<typeof CasbinRule>;
 
 export const CashFlowLine = __t.object("CashFlowLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   reportId: __t.u64(),
   sequence: __t.u32(),
   name: __t.string(),
@@ -5144,6 +5162,7 @@ export type FieldWidth = __Infer<typeof FieldWidth>;
 
 export const FinancialReport = __t.object("FinancialReport", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   get reportType() {
     return ReportType;
@@ -6252,6 +6271,13 @@ export const ModuleConfigInput = __t.object("ModuleConfigInput", {
 });
 export type ModuleConfigInput = __Infer<typeof ModuleConfigInput>;
 
+export const MoveStockQuantParams = __t.object("MoveStockQuantParams", {
+  companyId: __t.option(__t.u64()),
+  destLocationId: __t.u64(),
+  quantity: __t.f64(),
+});
+export type MoveStockQuantParams = __Infer<typeof MoveStockQuantParams>;
+
 // The tagged union or sum type for the algebraic type `MoveType`.
 export const MoveType = __t.enum("MoveType", {
   Entry: __t.unit(),
@@ -7315,6 +7341,7 @@ export type ProductPricelist = __Infer<typeof ProductPricelist>;
 
 export const ProductPricelistItem = __t.object("ProductPricelistItem", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   pricelistId: __t.u64(),
   get appliedOn() {
     return PricelistAppliedOn;
@@ -7393,6 +7420,7 @@ export type ProductVariant = __Infer<typeof ProductVariant>;
 
 export const ProfitLossLine = __t.object("ProfitLossLine", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   reportId: __t.u64(),
   sequence: __t.u32(),
   name: __t.string(),
@@ -9635,6 +9663,7 @@ export type TicketPriority = __Infer<typeof TicketPriority>;
 
 export const TrialBalance = __t.object("TrialBalance", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   reportId: __t.u64(),
   accountId: __t.u64(),
   accountCode: __t.string(),
@@ -10522,6 +10551,29 @@ export const UpdateRoleParams = __t.object("UpdateRoleParams", {
 });
 export type UpdateRoleParams = __Infer<typeof UpdateRoleParams>;
 
+export const UpdateSaleOrderParams = __t.object("UpdateSaleOrderParams", {
+  clientOrderRef: __t.option(__t.string()),
+  note: __t.option(__t.string()),
+  termsAndConditions: __t.option(__t.string()),
+  partnerInvoiceId: __t.option(__t.u64()),
+  partnerShippingId: __t.option(__t.u64()),
+  pricelistId: __t.option(__t.u64()),
+  warehouseId: __t.option(__t.u64()),
+  commitmentDate: __t.option(__t.timestamp()),
+  expectedDate: __t.option(__t.timestamp()),
+  shippingPolicy: __t.option(__t.string()),
+  pickingPolicy: __t.option(__t.string()),
+  validityDate: __t.option(__t.timestamp()),
+  carrierId: __t.option(__t.u64()),
+  incoterm: __t.option(__t.string()),
+  incotermLocation: __t.option(__t.string()),
+  customerLead: __t.option(__t.f64()),
+  analyticAccountId: __t.option(__t.u64()),
+  userId: __t.option(__t.identity()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSaleOrderParams = __Infer<typeof UpdateSaleOrderParams>;
+
 export const UpdateStockLocationParams = __t.object("UpdateStockLocationParams", {
   name: __t.option(__t.string()),
   usage: __t.option(__t.string()),
@@ -10848,6 +10900,7 @@ export const UserCredential = __t.object("UserCredential", {
   email: __t.string(),
   identity: __t.identity(),
   passwordHash: __t.string(),
+  workosUserId: __t.option(__t.string()),
   stdbTokenEnc: __t.string(),
   emailVerified: __t.bool(),
   createdAt: __t.timestamp(),

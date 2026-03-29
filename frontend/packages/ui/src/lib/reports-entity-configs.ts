@@ -25,7 +25,7 @@ export const financialReportsTableConfig = (t: TFunction): EntityViewConfig => (
     filters: [
       {
         key: "state",
-        label: t("reports.financialReports.filters.state"),
+        label: t("reports.financialReports.filters.state.label"),
         type: "select",
         options: [
           { value: "draft", label: t("reports.financialReports.filters.state.options.draft") },
@@ -72,8 +72,80 @@ export const trialBalancesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Report templates ─────────────────────────────────────────────────────────────
+export const reportTemplatesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "report-templates-table",
+  title: t("reports.reportTemplates.title"),
+  description: t("reports.reportTemplates.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.reportTemplates.searchPlaceholder"),
+    searchKeys: ["name", "model"],
+    columns: [
+      { key: "name", label: t("reports.reportTemplates.columns.name"), width: "min-w-40" },
+      { key: "model", label: t("reports.reportTemplates.columns.model") },
+      { key: "reportType", label: t("reports.reportTemplates.columns.reportType") },
+      { key: "orientation", label: t("reports.reportTemplates.columns.orientation") },
+      { key: "isActive", label: t("reports.reportTemplates.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("reports.reportTemplates.emptyMessage"),
+  },
+})
+
+// ── Scheduled reports ───────────────────────────────────────────────────────────
+export const scheduledReportsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "scheduled-reports-table",
+  title: t("reports.scheduledReports.title"),
+  description: t("reports.scheduledReports.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.scheduledReports.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("reports.scheduledReports.columns.name"), width: "min-w-40" },
+      { key: "reportTemplateId", label: t("reports.scheduledReports.columns.templateId") },
+      { key: "frequency", label: t("reports.scheduledReports.columns.frequency") },
+      { key: "nextRun", label: t("reports.scheduledReports.columns.nextRun"), type: "datetime" },
+      { key: "runCount", label: t("reports.scheduledReports.columns.runCount"), type: "number" },
+      { key: "isActive", label: t("reports.scheduledReports.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("reports.scheduledReports.emptyMessage"),
+  },
+})
+
+// ── Analytics metrics ───────────────────────────────────────────────────────────
+export const analyticsMetricsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "analytics-metrics-table",
+  title: t("reports.analyticsMetrics.title"),
+  description: t("reports.analyticsMetrics.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.analyticsMetrics.searchPlaceholder"),
+    searchKeys: ["name", "category"],
+    columns: [
+      { key: "name", label: t("reports.analyticsMetrics.columns.name"), width: "min-w-40" },
+      { key: "category", label: t("reports.analyticsMetrics.columns.category") },
+      { key: "metricType", label: t("reports.analyticsMetrics.columns.metricType") },
+      { key: "model", label: t("reports.analyticsMetrics.columns.model") },
+      { key: "aggregation", label: t("reports.analyticsMetrics.columns.aggregation") },
+      { key: "currentValue", label: t("reports.analyticsMetrics.columns.currentValue"), type: "number" },
+      { key: "isActive", label: t("reports.analyticsMetrics.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("reports.analyticsMetrics.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const reportsEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "financial-reports-table": financialReportsTableConfig(t),
   "trial-balances-table": trialBalancesTableConfig(t),
+  "report-templates-table": reportTemplatesTableConfig(t),
+  "scheduled-reports-table": scheduledReportsTableConfig(t),
+  "analytics-metrics-table": analyticsMetricsTableConfig(t),
 })

@@ -42,6 +42,7 @@ export interface FieldOption {
   label: string
   color?: string
   icon?: string
+  disabled?: boolean
 }
 
 export interface FieldValidation {

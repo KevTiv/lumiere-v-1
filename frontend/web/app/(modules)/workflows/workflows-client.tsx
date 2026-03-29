@@ -5,13 +5,31 @@ import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newWorkflowForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { workflowsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useWorkflows, useWorkflowInstances, useCreateWorkflow } from "@/hooks/workflows"
+import {
+  useWorkflows,
+  useWorkflowInstances,
+  useWorkflowActivities,
+  useWorkflowWorkitems,
+  useCreateWorkflow,
+  useSetWorkflowActive,
+  useAddWorkflowActivity,
+  useAddWorkflowTransition,
+  useImportWorkflowCsv,
+  useStartWorkflow,
+  useSignalWorkflow,
+  useCancelWorkflowInstance,
+  useSetWorkitemException,
+} from "@/hooks/workflows"
 import type { CreateWorkflowParams } from "@/hooks/workflows"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { instanceStateTag } from "@/lib/workflow-enum"
+import { WorkflowsRowDialog } from "./workflows-row-dialog"
 
 interface WorkflowsClientProps {
   initialWorkflows?: Record<string, unknown>[]
   initialInstances?: Record<string, unknown>[]
+  initialActivities?: Record<string, unknown>[]
+  initialWorkitems?: Record<string, unknown>[]
   organizationId?: number
 }
 
@@ -26,20 +44,52 @@ export function WorkflowsClient(props: WorkflowsClientProps) {
   return <WorkflowsClientLoaded {...props} organizationId={props.organizationId} />
 }
 
-function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizationId }: WorkflowsClientLoadedProps) {
+function WorkflowsClientLoaded({
+  initialWorkflows,
+  initialInstances,
+  initialActivities,
+  initialWorkitems,
+  organizationId,
+}: WorkflowsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => workflowsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
+    null,
+  )
+  const [rowDialog, setRowDialog] = useState<{
+    tabId: "workflows" | "instances"
+    row: Record<string, unknown>
+  } | null>(null)
 
   const { data: workflows = [] } = useWorkflows(orgId, initialWorkflows)
-  const { data: instances = [] } = useWorkflowInstances(orgId, initialInstances)
+  const { data: instancesRaw = [] } = useWorkflowInstances(orgId, initialInstances)
+  const { data: activities = [] } = useWorkflowActivities(orgId, initialActivities)
+  const { data: workitems = [] } = useWorkflowWorkitems(orgId, initialWorkitems)
+
+  const instances = useMemo(
+    () =>
+      instancesRaw.map((row) => ({
+        ...row,
+        stateTag: instanceStateTag(row.state),
+      })),
+    [instancesRaw],
+  )
+
   const createWorkflow = useCreateWorkflow(orgId)
+  const setWorkflowActive = useSetWorkflowActive(orgId)
+  const addWorkflowActivity = useAddWorkflowActivity(orgId)
+  const addWorkflowTransition = useAddWorkflowTransition(orgId)
+  const importWorkflowCsv = useImportWorkflowCsv(orgId)
+  const startWorkflow = useStartWorkflow(orgId)
+  const signalWorkflow = useSignalWorkflow(orgId)
+  const cancelWorkflowInstance = useCancelWorkflowInstance(orgId)
+  const setWorkitemException = useSetWorkitemException(orgId)
 
   const liveSections = useMemo(() => {
-    const active = workflows.filter((w) => w.isActive).length
-    const running = instances.filter((i) => String(i.state) === "running").length
-    const done = instances.filter((i) => String(i.state) === "done").length
+    const activeDefs = workflows.filter((w) => w.isActive).length
+    const activeInst = instances.filter((i) => i.stateTag === "Active").length
+    const completeInst = instances.filter((i) => i.stateTag === "Complete").length
 
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
@@ -52,10 +102,26 @@ function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizatio
             ...w,
             data: {
               stats: [
-                { label: t("workflows.dashboard.totalWorkflows"), value: String(workflows.length), icon: "GitBranch" },
-                { label: t("workflows.dashboard.active"), value: String(active), icon: "CheckCircle" },
-                { label: t("workflows.dashboard.runningInstances"), value: String(running), icon: "Play" },
-                { label: t("workflows.dashboard.completed"), value: String(done), icon: "Flag" },
+                {
+                  label: t("workflows.dashboard.totalWorkflows"),
+                  value: String(workflows.length),
+                  icon: "GitBranch",
+                },
+                {
+                  label: t("workflows.dashboard.active"),
+                  value: String(activeDefs),
+                  icon: "CheckCircle",
+                },
+                {
+                  label: t("workflows.dashboard.activeInstances"),
+                  value: String(activeInst),
+                  icon: "Play",
+                },
+                {
+                  label: t("workflows.dashboard.completed"),
+                  value: String(completeInst),
+                  icon: "Flag",
+                },
               ],
             },
           }
@@ -63,12 +129,41 @@ function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizatio
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             new_workflow: () => setQuickActionForm({ form: newWorkflowForm(t), action: "createWorkflow" }),
+            import_workflow_csv: () =>
+              setQuickActionForm({
+                form: {
+                  id: "import-csv-quick",
+                  title: t("workflows.forms.importCsv.title"),
+                  description: t("workflows.forms.importCsv.description"),
+                  sections: [
+                    {
+                      id: "csv",
+                      title: t("workflows.forms.importCsv.sections.data"),
+                      fields: [
+                        {
+                          id: "csvData",
+                          name: "csvData",
+                          type: "textarea",
+                          label: t("workflows.forms.importCsv.fields.csvData"),
+                          required: true,
+                          rows: 10,
+                          width: "full",
+                        },
+                      ],
+                    },
+                  ],
+                },
+                action: "importWorkflowCsv",
+              }),
           }
           return {
             ...w,
             data: {
               ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
+              actions: w.data.actions.map((a) => ({
+                ...a,
+                onClick: handlers[a.id],
+              })),
             },
           }
         }
@@ -95,23 +190,28 @@ function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizatio
     [workflows, instances],
   )
 
-  const handleFormSubmit = (
-    _tabId: string,
-    action: string,
-    formData: Record<string, unknown>,
-  ) => {
+  const handleFormSubmit = (_tabId: string, action: string, formData: Record<string, unknown>) => {
     if (action === "createWorkflow") {
       const name = String(formData.name ?? "").trim()
       const model = String(formData.model ?? "").trim()
       const stateField = String(formData.stateField ?? "").trim()
       if (!name || !model || !stateField) return
-      createWorkflow.mutate({
+      const payload: CreateWorkflowParams = {
         name,
         model,
         stateField,
-        description: formData.description as string | undefined,
+        onCreate: Boolean(formData.onCreate),
+        isActive: formData.isActive !== false,
+        description: formData.description ? String(formData.description) : undefined,
         metadata: undefined,
-      } as unknown as CreateWorkflowParams)
+      }
+      createWorkflow.mutate(payload)
+      return
+    }
+    if (action === "importWorkflowCsv") {
+      const csv = String(formData.csvData ?? "")
+      if (!csv.trim()) return
+      importWorkflowCsv.mutate(csv)
     }
   }
 
@@ -121,6 +221,11 @@ function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizatio
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        onRowClick={(tabId, row) => {
+          if (tabId === "workflows" || tabId === "instances") {
+            setRowDialog({ tabId, row })
+          }
+        }}
       />
       <FormModal
         open={quickActionForm !== null}
@@ -131,6 +236,25 @@ function WorkflowsClientLoaded({ initialWorkflows, initialInstances, organizatio
             handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
+        }}
+      />
+      <WorkflowsRowDialog
+        open={rowDialog !== null}
+        onOpenChange={(open) => !open && setRowDialog(null)}
+        tabId={rowDialog?.tabId ?? null}
+        row={rowDialog?.row ?? null}
+        activities={activities}
+        workitems={workitems}
+        t={t}
+        mutations={{
+          setWorkflowActive,
+          addWorkflowActivity,
+          addWorkflowTransition,
+          importWorkflowCsv,
+          startWorkflow,
+          signalWorkflow,
+          cancelWorkflowInstance,
+          setWorkitemException,
         }}
       />
     </>

@@ -43,6 +43,9 @@ export function ModularForm({
             case "number":
               values[field.name] = ""
               break
+            case "file":
+              values[field.name] = undefined
+              break
             default:
               values[field.name] = ""
           }
@@ -69,8 +72,13 @@ export function ModularForm({
   }
 
   const validateField = (field: FormField, value: unknown): string | null => {
-    if (field.required && (value === "" || value === null || value === undefined)) {
-      return t("common.validation.required")
+    if (field.required) {
+      if (field.type === "file") {
+        const fl = value as FileList | null | undefined
+        if (!fl || fl.length === 0) return t("common.validation.required")
+      } else if (value === "" || value === null || value === undefined) {
+        return t("common.validation.required")
+      }
     }
 
     if (field.validation) {

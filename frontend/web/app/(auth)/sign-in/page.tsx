@@ -8,6 +8,11 @@ import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
+import {
+  redirectToWorkOsSignIn,
+} from "@/app/actions/workos-auth"
+
+const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
 export default function SignInPage() {
   const { t } = useTranslation()
@@ -41,6 +46,41 @@ export default function SignInPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (useWorkOsAuth) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("auth.signIn.title")}</CardTitle>
+          <CardDescription>{t("auth.signIn.descriptionWorkOs")}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <form action={redirectToWorkOsSignIn} className="space-y-2">
+            <input type="hidden" name="returnTo" value={callbackUrl} />
+            <Button type="submit" size="lg" className="w-full">
+              {t("auth.signIn.continueWithWorkOs")}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground text-center">
+            {t("auth.signIn.workOsProvidersHint")}
+          </p>
+        </CardContent>
+
+        <CardFooter className="justify-center flex-col gap-2">
+          <p className="text-sm text-muted-foreground">
+            {t("auth.signIn.noAccount")}{" "}
+            <Link href="/sign-up" className="font-medium text-foreground hover:underline">
+              {t("auth.signIn.createOne")}
+            </Link>
+          </p>
+          <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+            {t("auth.signIn.forgotPassword")}
+          </Link>
+        </CardFooter>
+      </Card>
+    )
   }
 
   return (

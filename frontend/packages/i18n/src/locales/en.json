@@ -38,6 +38,7 @@
       "noUoms": "No units of measure — configure UOMs for your organization first.",
       "noSaleOrders": "No sale orders — create a confirmed sale order first.",
       "noSubscriptionPlans": "No subscription plans — create a plan first.",
+      "noAccounts": "No GL accounts — set up chart of accounts first.",
       "noEmployees": "No employees — add employees in HR first.",
       "noTeams": "No helpdesk teams — configure teams first.",
       "noStages": "No pipeline stages — configure helpdesk stages first.",
@@ -581,7 +582,9 @@
       "partner": "Partner",
       "untaxed": "Untaxed",
       "residual": "Residual",
-      "payment": "Payment"
+      "payment": "Payment",
+      "postEntry": "Post",
+      "cancelEntry": "Cancel"
     },
     "invoices": {
       "title": "Invoices",
@@ -620,7 +623,8 @@
         "send": "Send",
         "download": "Download",
         "print": "Print",
-        "recordPayment": "Record Payment"
+        "recordPayment": "Record Payment",
+        "postDraft": "Post"
       }
     },
     "bills": {
@@ -648,7 +652,9 @@
       "title": "Budgets",
       "planned": "Planned",
       "practical": "Actual",
-      "variance": "Variance %"
+      "variance": "Variance %",
+      "confirmSelected": "Confirm selected",
+      "cancelSelected": "Cancel selected"
     },
     "states": {
       "draft": "Draft",
@@ -942,6 +948,19 @@
         "fields": {
           "confirmed": "I confirm this entry is correct and ready to be posted"
         }
+      },
+      "recordPayment": {
+        "title": "Record payment",
+        "description": "Apply a payment against this invoice's outstanding balance.",
+        "submitLabel": "Register payment",
+        "sections": {
+          "payment": "Payment"
+        },
+        "fields": {
+          "amount": "Amount",
+          "memo": "Memo",
+          "memoPlaceholder": "Optional note"
+        }
       }
     }
   },
@@ -972,14 +991,16 @@
           "New": "New",
           "Qualified": "Qualified",
           "Won": "Won",
-          "Lost": "Lost"
+          "Lost": "Lost",
+          "Converted": "Converted"
         }
       },
       "states": {
         "New": "New",
         "Qualified": "Qualified",
         "Won": "Won",
-        "Lost": "Lost"
+        "Lost": "Lost",
+        "Converted": "Converted"
       }
     },
     "opportunities": {
@@ -1023,18 +1044,37 @@
       "emptyMessage": "No activities found.",
       "columns": {
         "summary": "Summary",
+        "activityType": "Type",
         "activityTypeId": "Type",
+        "state": "Status",
         "dateDeadline": "Due Date",
         "userId": "Assigned To",
-        "resName": "Related To"
+        "resName": "Related To",
+        "isDone": "Done"
+      },
+      "states": {
+        "planned": "Planned",
+        "done": "Done"
       },
       "filters": {
-        "activityCategory": "Type",
-        "activityCategory.options": {
-          "default": "General",
-          "upload_file": "File Upload"
+        "state": "Status",
+        "state.options": {
+          "planned": "Planned",
+          "done": "Done"
         }
       }
+    },
+    "actions": {
+      "convertToCustomer": "Convert to customer",
+      "convertToSaleOrder": "Convert to sale order",
+      "convertLeadQualifiedOnly": "Only leads in Qualified status can be converted.",
+      "convertOppNeedsPartner": "Set a customer (partner) on the opportunity before converting to a sale order.",
+      "deleteContact": "Archive contact",
+      "deleteContactConfirm": "Archive this contact? It will be hidden from default lists.",
+      "assignTag": "Assign tag",
+      "addToSegment": "Add to segment",
+      "markComplete": "Mark complete",
+      "alreadyComplete": "This activity is already complete."
     },
     "forms": {
       "newLead": {
@@ -1119,6 +1159,65 @@
           "userIdPlaceholder": "User ID",
           "note": "Notes",
           "notePlaceholder": "Additional details…"
+        }
+      },
+      "convertLead": {
+        "title": "Convert lead",
+        "description": "Create a contact and/or pipeline opportunity from this qualified lead.",
+        "sections": {
+          "options": "Conversion"
+        },
+        "fields": {
+          "createContact": "Create contact",
+          "createOpportunity": "Create opportunity",
+          "opportunityStage": "Opportunity stage",
+          "opportunityStageId": "Opportunity stage ID",
+          "opportunityStageIdPlaceholder": "Stage row id from pipeline"
+        },
+        "validation": {
+          "stageRequired": "When creating an opportunity, choose a pipeline stage (or enter a valid stage ID)."
+        }
+      },
+      "convertToSaleOrder": {
+        "title": "Convert to sale order",
+        "description": "Choose pricelist and warehouse for the new order.",
+        "sections": {
+          "fulfillment": "Pricing & warehouse"
+        },
+        "fields": {
+          "pricelist": "Pricelist",
+          "warehouse": "Warehouse"
+        },
+        "validation": {
+          "pricelistWarehouse": "Select both a pricelist and a warehouse."
+        }
+      },
+      "assignTag": {
+        "title": "Assign tag",
+        "description": "Link an existing tag to the selected contact.",
+        "sections": {
+          "tag": "Tag"
+        },
+        "fields": {
+          "tagId": "Tag ID",
+          "tagIdPlaceholder": "Contact tag row id"
+        },
+        "validation": {
+          "tagId": "Enter a valid tag ID."
+        }
+      },
+      "addToSegment": {
+        "title": "Add to segment",
+        "description": "Add this contact to a static segment.",
+        "sections": {
+          "segment": "Segment"
+        },
+        "fields": {
+          "segmentId": "Segment ID",
+          "segmentIdPlaceholder": "Contact segment row id"
+        },
+        "validation": {
+          "segmentId": "Enter a valid segment ID."
         }
       }
     }
@@ -1586,6 +1685,159 @@
         "fail": "Fail"
       }
     },
+    "cycleCounts": {
+      "title": "Cycle counts",
+      "description": "Planned and in-progress cycle count programs",
+      "emptyMessage": "No cycle counts found.",
+      "columns": {
+        "name": "Name",
+        "state": "Status",
+        "locationId": "Location",
+        "frequency": "Frequency",
+        "nextCountDate": "Next count"
+      }
+    },
+    "pickingWaves": {
+      "title": "Picking waves",
+      "description": "Batch picking waves",
+      "emptyMessage": "No picking waves found.",
+      "columns": {
+        "name": "Name",
+        "state": "Status",
+        "pickingTypeId": "Operation type",
+        "dateStart": "Started"
+      }
+    },
+    "warehouseTasks": {
+      "title": "Warehouse tasks",
+      "description": "Floor picking and putaway tasks",
+      "emptyMessage": "No warehouse tasks found.",
+      "columns": {
+        "name": "Task",
+        "taskType": "Type",
+        "state": "Status",
+        "priority": "Priority",
+        "quantity": "Qty"
+      }
+    },
+    "stockRoutes": {
+      "title": "Routes",
+      "description": "Stock routes and pull rules overview",
+      "emptyMessage": "No routes found.",
+      "columns": {
+        "name": "Name",
+        "sequence": "Seq",
+        "active": "Active"
+      }
+    },
+    "stockRules": {
+      "title": "Rules",
+      "description": "Individual stock rules linked to routes",
+      "emptyMessage": "No stock rules found.",
+      "columns": {
+        "name": "Name",
+        "action": "Action",
+        "sequence": "Seq",
+        "active": "Active"
+      }
+    },
+    "stockMoves": {
+      "title": "Stock moves",
+      "description": "Individual stock operations and internal transfers",
+      "searchPlaceholder": "Search by name, reference, origin…",
+      "emptyMessage": "No stock moves found.",
+      "columns": {
+        "name": "Name",
+        "state": "Status",
+        "productId": "Product",
+        "locationId": "From",
+        "locationDestId": "To",
+        "productUomQty": "Demand qty"
+      },
+      "filters": {
+        "state": "Status",
+        "state.options": {
+          "draft": "Draft",
+          "confirmed": "Confirmed",
+          "assigned": "Assigned",
+          "done": "Done",
+          "cancel": "Cancelled"
+        }
+      }
+    },
+    "inventoryValuations": {
+      "title": "Valuations",
+      "description": "Inventory valuation layers (read-only list)",
+      "emptyMessage": "No valuation lines found.",
+      "columns": {
+        "name": "Description",
+        "state": "Status",
+        "productId": "Product",
+        "value": "Value"
+      }
+    },
+    "replenishmentRules": {
+      "title": "Replenishment",
+      "description": "Reorder rules and min/max triggers (read-only)",
+      "emptyMessage": "No replenishment rules found.",
+      "columns": {
+        "name": "Name",
+        "active": "Active",
+        "sequence": "Seq"
+      }
+    },
+    "cycleCountWizard": {
+      "tabLabel": "Count wizard",
+      "title": "Cycle count",
+      "stepPlan": "1. Plan",
+      "stepStart": "2. Start",
+      "stepRecord": "3. Record line",
+      "stepValidate": "4. Validate",
+      "stepPost": "5. Post",
+      "openWizard": "Open wizard",
+      "locationId": "Location",
+      "planName": "Plan name",
+      "countBy": "Count by",
+      "frequency": "Frequency",
+      "tolerancePct": "Tolerance %",
+      "toleranceVal": "Tolerance qty",
+      "createPlan": "Create plan",
+      "startSession": "Start session",
+      "cycleCountId": "Cycle count ID",
+      "productId": "Product",
+      "recordLocationId": "Line location",
+      "qtyCounted": "Counted qty",
+      "uomId": "UOM",
+      "recordLine": "Record line",
+      "validate": "Validate",
+      "post": "Post adjustments"
+    },
+    "productActions": {
+      "confirmDelete": "Delete this product? This cannot be undone.",
+      "addVariant": "Add variant"
+    },
+    "warehouseActions": {
+      "confirmDelete": "Delete this warehouse?"
+    },
+    "stockMoveActions": {
+      "done": "Mark done",
+      "cancel": "Cancel move",
+      "quantityDonePrompt": "Quantity done"
+    },
+    "transferActions": {
+      "confirm": "Confirm",
+      "assign": "Assign",
+      "assignUser": "Assign user",
+      "validate": "Validate (done)",
+      "cancel": "Cancel"
+    },
+    "stockActions": {
+      "reserve": "Reserve 1",
+      "unreserve": "Unreserve 1"
+    },
+    "adjustmentActions": {
+      "process": "Post adjustment"
+    },
     "forms": {
       "newProduct": {
         "title": "New Product",
@@ -1651,6 +1903,97 @@
           "locationId": "Location",
           "locationPlaceholder": "Select location…",
           "inventoryQuantity": "Counted quantity"
+        }
+      },
+      "newStockLocation": {
+        "title": "New location",
+        "description": "Create a stock location under an optional parent",
+        "sections": {
+          "main": "Location"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "Shelf A-1",
+          "usage": "Usage",
+          "parentLocationId": "Parent location",
+          "parentNone": "Root (no parent)",
+          "barcode": "Barcode"
+        }
+      },
+      "newWarehouse": {
+        "title": "New warehouse",
+        "description": "Copy operational settings from an existing warehouse, then set a unique name and code",
+        "sections": {
+          "identity": "Warehouse"
+        },
+        "fields": {
+          "templateWarehouseId": "Copy settings from",
+          "name": "Name",
+          "code": "Code",
+          "sequence": "Sequence",
+          "active": "Active"
+        }
+      },
+      "editWarehouse": {
+        "title": "Edit warehouse",
+        "description": "Update warehouse details",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "name": "Name",
+          "code": "Code",
+          "active": "Active",
+          "sequence": "Sequence",
+          "receptionSteps": "Reception steps",
+          "deliverySteps": "Delivery steps",
+          "manufactureSteps": "Manufacturing steps",
+          "crossdock": "Cross-dock",
+          "buyToResupply": "Buy to resupply",
+          "manufactureToResupply": "Manufacture to resupply",
+          "metadata": "Metadata (JSON)"
+        }
+      },
+      "editProduct": {
+        "title": "Edit product",
+        "description": "Update catalog fields",
+        "sections": {
+          "main": "Product"
+        },
+        "fields": {
+          "name": "Name",
+          "defaultCode": "Internal reference",
+          "standardPrice": "Cost",
+          "listPrice": "Sales price",
+          "description": "Description",
+          "saleOk": "Can be sold",
+          "purchaseOk": "Can be purchased",
+          "active": "Active",
+          "isPublished": "Published"
+        }
+      },
+      "newProductVariant": {
+        "title": "New variant",
+        "description": "Add a variant under this product template",
+        "sections": {
+          "main": "Variant"
+        },
+        "fields": {
+          "name": "Variant name",
+          "standardPrice": "Cost",
+          "lstPrice": "List price",
+          "defaultCode": "SKU",
+          "barcode": "Barcode"
+        }
+      },
+      "assignUserToPicking": {
+        "title": "Assign to user",
+        "description": "Set the responsible user for this transfer",
+        "sections": {
+          "main": "User"
+        },
+        "fields": {
+          "userIdentity": "User"
         }
       }
     }
@@ -1766,6 +2109,21 @@
         "taxId": "Tax ID"
       }
     },
+    "actions": {
+      "sendSelected": "Send",
+      "confirmSelected": "Confirm",
+      "cancelSelected": "Cancel",
+      "recalculateTotals": "Recalculate totals",
+      "recalculateLineTotals": "Recalculate line totals",
+      "submitSelected": "Submit",
+      "approveSelected": "Approve",
+      "closeSelected": "Close",
+      "cancelRequisitions": "Cancel",
+      "receiveGoodsForm": "Receive goods…",
+      "addLineForm": "Add line…",
+      "invoiceQtyForm": "Invoice qty…",
+      "receiveFullOpenQty": "Receive all open qty"
+    },
     "forms": {
       "newPurchaseOrder": {
         "title": "New Purchase Order",
@@ -1808,6 +2166,48 @@
           "orderingDate": "Ordering Date",
           "dateEnd": "Expiry Date",
           "scheduleDate": "Scheduled Date"
+        }
+      },
+      "addPurchaseOrderLine": {
+        "title": "Add purchase order line",
+        "description": "Add a product line to a draft purchase order.",
+        "sections": {
+          "order": "Purchase order",
+          "product": "Product & pricing"
+        },
+        "fields": {
+          "orderId": "Draft purchase order",
+          "orderPlaceholder": "Select a draft PO…",
+          "productId": "Product",
+          "productPlaceholder": "Select product…",
+          "uomId": "Unit of measure",
+          "uomPlaceholder": "Select UoM…",
+          "quantity": "Quantity",
+          "priceUnit": "Unit price"
+        }
+      },
+      "receivePurchaseOrderLine": {
+        "title": "Receive goods",
+        "description": "Record received quantity against a purchase order line.",
+        "sections": {
+          "line": "Line & quantity"
+        },
+        "fields": {
+          "lineId": "Order line",
+          "linePlaceholder": "Select a line with open receipt…",
+          "qty": "Quantity to receive"
+        }
+      },
+      "invoicePurchaseOrderLine": {
+        "title": "Invoice purchase quantity",
+        "description": "Record invoiced quantity for vendor billing (accrual on the PO line).",
+        "sections": {
+          "line": "Line & quantity"
+        },
+        "fields": {
+          "lineId": "Order line",
+          "linePlaceholder": "Select a line with quantity to bill…",
+          "qty": "Quantity to invoice"
         }
       }
     }
@@ -1866,6 +2266,24 @@
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
         "discount": "Disc %"
+      }
+    },
+    "pricelistItems": {
+      "title": "Pricelist rules",
+      "tabLabel": "Pricelist rules",
+      "description": "Per-pricelist pricing rules (product, category, or global)",
+      "searchPlaceholder": "Search by pricelist or product ID…",
+      "emptyMessage": "No pricelist rules found.",
+      "columns": {
+        "id": "Rule #",
+        "pricelistId": "Pricelist",
+        "sequence": "Seq",
+        "appliedOn": "Applies to",
+        "computePrice": "Price type",
+        "productId": "Product",
+        "minQuantity": "Min qty",
+        "fixedPrice": "Fixed price",
+        "percentPrice": "Percent"
       }
     },
     "pricelists": {
@@ -1954,7 +2372,35 @@
             "WithDiscount": "Include Discount"
           }
         }
+      },
+      "newPickingBatch": {
+        "title": "New delivery batch",
+        "createButton": "New batch",
+        "description": "Group stock pickings into a batch (optional pickings — you can add more later in Inventory).",
+        "sections": {
+          "details": "Batch"
+        },
+        "fields": {
+          "name": "Batch name",
+          "namePlaceholder": "e.g. Morning picks",
+          "pickingIds": "Stock picking IDs",
+          "pickingIdsPlaceholder": "101, 102, 103",
+          "pickingIdsHint": "Comma-separated IDs from Inventory → deliveries / pickings. Leave empty to create an empty batch."
+        }
       }
+    },
+    "actions": {
+      "confirmSelected": "Confirm",
+      "cancelOrders": "Cancel orders",
+      "recalculateTotals": "Recalculate totals",
+      "togglePricelistActive": "Toggle active",
+      "deletePricelists": "Delete",
+      "deletePricelistsConfirm": "Delete {{count}} pricelist(s)? This cannot be undone.",
+      "startBatches": "Start",
+      "completeBatches": "Complete",
+      "cancelBatches": "Cancel batch",
+      "deletePricelistRules": "Delete rules",
+      "deletePricelistRulesConfirm": "Delete {{count}} pricing rule(s)?"
     }
   },
   "manufacturing": {
@@ -2030,6 +2476,23 @@
         "Subcontracting": "Subcontracting"
       }
     },
+    "bomLines": {
+      "tabLabel": "BOM Lines",
+      "title": "BOM Lines",
+      "description": "Component lines for each bill of materials",
+      "searchPlaceholder": "Search BOM lines…",
+      "emptyMessage": "No BOM lines found.",
+      "columns": {
+        "bomId": "BOM",
+        "sequence": "Seq.",
+        "productId": "Component",
+        "productTmplId": "Template",
+        "productQty": "Quantity",
+        "productUomId": "UoM",
+        "manualConsumption": "Manual consumption",
+        "childBomId": "Child BOM"
+      }
+    },
     "workOrders": {
       "title": "Work Orders",
       "description": "Operations scheduled at work centers",
@@ -2077,6 +2540,71 @@
         "capacity": "Capacity",
         "workorderCount": "WO Count"
       }
+    },
+    "rowActions": {
+      "description": "Run workflow actions for the selected record.",
+      "runAction": "Run action",
+      "importSubmit": "Import",
+      "form": {
+        "chooseAction": "Choose action",
+        "action": "Action",
+        "parameters": "Parameters",
+        "moDescription": "Order #{{id}} — status: {{state}}",
+        "moParamsHint": "Production quantity applies to “Record output”. Work center fields apply to “Create work order”.",
+        "produceQty": "Quantity (record output)",
+        "bomDescription": "BOM #{{id}}",
+        "bomParamsHint": "Quantity applies to “Update quantity”. Check the box before deleting a BOM.",
+        "confirmDeleteBom": "I understand this BOM and its lines will be deleted",
+        "woDescription": "Work order #{{id}} — status: {{state}}",
+        "noActionsAvailable": "No actions available for this status",
+        "wcDescription": "Work center #{{id}}",
+        "wcParamsHint": "Name applies to “Save name”. Reason applies to “Block”. IDs apply to “Log productivity”.",
+        "workorderId": "Work order ID",
+        "csvFile": "CSV file"
+      },
+      "titleOrder": "Manufacturing order",
+      "titleBom": "Bill of materials",
+      "titleWo": "Work order",
+      "titleWc": "Work center",
+      "idLabel": "ID",
+      "checkAvailability": "Check availability",
+      "confirm": "Confirm",
+      "start": "Start",
+      "finish": "Finish",
+      "cancel": "Cancel",
+      "recordOutput": "Record output",
+      "consumeMaterials": "Consume materials",
+      "createWorkorderSection": "Add work order",
+      "selectWorkcenter": "Work center",
+      "durationExpected": "Expected duration (min)",
+      "sequence": "Sequence",
+      "addWorkorder": "Create work order",
+      "saveBomQty": "Update quantity",
+      "computeCost": "Compute cost",
+      "explodeBom": "Explode BOM",
+      "deleteBom": "Delete BOM",
+      "deleteBomConfirm": "Delete this BOM and its lines? This cannot be undone.",
+      "saveName": "Save name",
+      "blockReasonPlaceholder": "Reason (block)",
+      "block": "Block",
+      "unblock": "Unblock",
+      "logProductivity": "Log productivity",
+      "duration": "Duration",
+      "lossId": "Loss ID",
+      "logTime": "Log time"
+    },
+    "csvImport": {
+      "description": "Choose a UTF-8 CSV file. Headers must match the import template expected by SpacetimeDB.",
+      "importMoCsvTitle": "Import manufacturing orders (CSV)",
+      "importBomCsvTitle": "Import BOMs (CSV)",
+      "importBomLineCsvTitle": "Import BOM lines (CSV)",
+      "importWorkcenterCsvTitle": "Import work centers (CSV)"
+    },
+    "toolbar": {
+      "importMoCsv": "Import MOs (CSV)",
+      "importBomCsv": "Import BOMs (CSV)",
+      "importBomLineCsv": "Import BOM lines (CSV)",
+      "importWorkcenterCsv": "Import work centers (CSV)"
     },
     "forms": {
       "newManufacturingOrder": {
@@ -2455,54 +2983,108 @@
     }
   },
   "helpdesk": {
+    "actions": {
+      "importTicketsCsv": "Import tickets (CSV)"
+    },
+    "tabs": {
+      "teams": "Teams",
+      "stages": "Stages",
+      "slas": "SLAs",
+      "newTeam": "New Team",
+      "newStage": "New Stage",
+      "newSla": "New SLA"
+    },
     "dashboard": {
       "totalTickets": "Total Tickets",
-      "open": "Open",
-      "solved": "Solved",
-      "urgent": "Urgent"
+      "open": "Active",
+      "solved": "Closed",
+      "urgent": "Urgent",
+      "slaBreached": "SLA breached"
+    },
+    "teams": {
+      "title": "Support teams",
+      "description": "Groups that own tickets and SLAs",
+      "searchPlaceholder": "Search teams…",
+      "emptyMessage": "No teams yet — create one to get started.",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "isActive": "Active",
+        "createdAt": "Created"
+      }
+    },
+    "stages": {
+      "title": "Pipeline stages",
+      "description": "Ticket workflow stages (per team or shared)",
+      "searchPlaceholder": "Search stages…",
+      "emptyMessage": "No stages yet.",
+      "columns": {
+        "name": "Name",
+        "teamId": "Team",
+        "sequence": "Order",
+        "isClosed": "Closing stage",
+        "createdAt": "Created"
+      }
+    },
+    "slas": {
+      "title": "SLA policies",
+      "description": "Targets by team, stage, and priority",
+      "searchPlaceholder": "Search SLAs…",
+      "emptyMessage": "No SLAs defined.",
+      "columns": {
+        "name": "Name",
+        "teamId": "Team",
+        "stageId": "Stage",
+        "priority": "Priority",
+        "timeDays": "Days",
+        "timeHours": "Hours",
+        "isActive": "Active"
+      }
     },
     "tickets": {
       "title": "Helpdesk Tickets",
       "description": "Customer support and internal IT tickets",
-      "searchPlaceholder": "Search by subject or ticket number…",
+      "searchPlaceholder": "Search by subject or customer…",
       "emptyMessage": "No tickets found.",
       "columns": {
         "name": "Subject",
-        "ticketNumber": "Ticket #",
-        "partnerId": "Customer",
-        "userId": "Assigned To",
-        "priority": "Priority",
+        "partnerName": "Customer",
+        "partnerEmail": "Email",
         "state": "Status",
-        "createDate": "Created",
-        " slaDeadline": "SLA Deadline"
+        "priority": "Priority",
+        "slaReached": "SLA met",
+        "slaDeadline": "SLA deadline",
+        "createdAt": "Created"
       },
       "filters": {
-        "priority": "Priority",
-        "priority.options": {
-          "0": "Low",
-          "1": "Medium",
-          "2": "High",
-          "3": "Urgent"
-        },
         "state": "Status",
+        "priority": "Priority",
         "state.options": {
           "New": "New",
-          "InProgress": "In Progress",
-          "Solved": "Solved",
+          "InProgress": "In progress",
+          "OnHold": "On hold",
+          "Closed": "Closed",
           "Cancelled": "Cancelled"
+        },
+        "priority.options": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "urgent": "Urgent"
         }
       },
       "states": {
         "New": "New",
-        "InProgress": "In Progress",
-        "Solved": "Solved",
+        "InProgress": "In progress",
+        "OnHold": "On hold",
+        "Closed": "Closed",
         "Cancelled": "Cancelled"
       },
       "priority": {
-        "0": "Low",
-        "1": "Medium",
-        "2": "High",
-        "3": "Urgent"
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "urgent": "Urgent"
       }
     },
     "forms": {
@@ -2525,6 +3107,8 @@
           "teamPlaceholder": "Select a team",
           "stageId": "Stage",
           "stagePlaceholder": "Select a stage",
+          "slaId": "SLA (optional)",
+          "slaPlaceholder": "None",
           "priority": "Priority",
           "description": "Description",
           "descriptionPlaceholder": "Detailed description of the issue…",
@@ -2534,6 +3118,84 @@
             "high": "High",
             "urgent": "Urgent"
           }
+        }
+      },
+      "newTeam": {
+        "title": "New team",
+        "description": "Create a support team",
+        "sections": {
+          "details": "Team"
+        },
+        "fields": {
+          "name": "Name",
+          "description": "Description",
+          "isActive": "Active"
+        }
+      },
+      "newStage": {
+        "title": "New stage",
+        "description": "Add a pipeline stage (optionally scoped to one team)",
+        "sections": {
+          "details": "Stage"
+        },
+        "fields": {
+          "name": "Name",
+          "teamId": "Team (optional)",
+          "teamPlaceholder": "Shared — all teams",
+          "sequence": "Sequence",
+          "isClosed": "Closing stage",
+          "description": "Description",
+          "template": "Email template name"
+        }
+      },
+      "newSla": {
+        "title": "New SLA",
+        "description": "Define a resolution target for a team and stage",
+        "sections": {
+          "details": "SLA"
+        },
+        "fields": {
+          "name": "Name",
+          "teamId": "Team",
+          "stageId": "Target stage",
+          "priority": "Priority",
+          "timeDays": "Days",
+          "timeHours": "Hours",
+          "isActive": "Active"
+        }
+      },
+      "ticketDetail": {
+        "title": "Ticket",
+        "description": "Ticket #{{id}}",
+        "save": "Save changes",
+        "sections": {
+          "fields": "Details"
+        },
+        "assignTo": "Assign to",
+        "agentUnassigned": "Unassigned",
+        "noAgents": "No users loaded",
+        "assignDisabledClosed": "Reopen the ticket to change assignment.",
+        "closeTicket": "Close ticket",
+        "reopenTicket": "Reopen ticket"
+      },
+      "csvImport": {
+        "pasteLabel": "CSV contents",
+        "pastePlaceholder": "Paste CSV including header row…",
+        "ticket": {
+          "title": "Import tickets (CSV)",
+          "description": "Headers must match the server import template for tickets."
+        },
+        "team": {
+          "title": "Import teams (CSV)",
+          "description": "Headers must match the server import template for teams."
+        },
+        "stage": {
+          "title": "Import stages (CSV)",
+          "description": "Headers must match the server import template for stages."
+        },
+        "sla": {
+          "title": "Import SLAs (CSV)",
+          "description": "Headers must match the server import template for SLAs."
         }
       }
     }
@@ -2582,6 +3244,57 @@
         "recurrenceId": "Billing Cycle",
         "active": "Active"
       }
+    },
+    "deferredSchedules": {
+      "title": "Deferred revenue schedules",
+      "description": "Revenue allocated over time (ASC 606 / IFRS 15 style schedules)",
+      "searchPlaceholder": "Search schedules…",
+      "emptyMessage": "No deferred revenue schedules yet.",
+      "columns": {
+        "id": "ID",
+        "description": "Description",
+        "state": "State",
+        "totalAmount": "Total",
+        "deferredAmount": "Deferred",
+        "startDate": "Start",
+        "endDate": "End"
+      }
+    },
+    "deferredLines": {
+      "title": "Deferred revenue lines",
+      "description": "Recognition periods generated for each schedule",
+      "searchPlaceholder": "Search lines…",
+      "emptyMessage": "No deferred revenue lines.",
+      "columns": {
+        "id": "ID",
+        "scheduleId": "Schedule",
+        "sequence": "Seq",
+        "recognitionDate": "Recognition date",
+        "amount": "Amount",
+        "recognized": "Posted"
+      }
+    },
+    "recognitionRules": {
+      "title": "Revenue recognition rules",
+      "description": "Match products or categories to recognition treatment",
+      "searchPlaceholder": "Search rules…",
+      "emptyMessage": "No recognition rules.",
+      "columns": {
+        "id": "ID",
+        "description": "Description",
+        "priority": "Priority",
+        "isActive": "Active",
+        "recognitionMethod": "Method",
+        "recognitionPeriod": "Period"
+      }
+    },
+    "actions": {
+      "activate": "Activate",
+      "close": "Close",
+      "generateInvoice": "Generate invoice",
+      "recognizeLine": "Post recognition",
+      "activateRule": "Activate rule",
+      "deactivateRule": "Deactivate rule"
     },
     "forms": {
       "newSubscription": {
@@ -2668,7 +3381,120 @@
             "yearly": "Yearly"
           }
         }
+      },
+      "deferredSchedule": {
+        "title": "New deferred revenue schedule",
+        "description": "Create a schedule and generate recognition lines",
+        "sections": {
+          "main": "Schedule"
+        },
+        "fields": {
+          "description": "Description",
+          "journalId": "Journal",
+          "revenueAccountId": "Revenue account",
+          "deferredAccountId": "Deferred revenue (liability) account",
+          "currencyId": "Currency ID",
+          "totalAmount": "Total contract value",
+          "recognizedAmount": "Already recognized",
+          "startDate": "Start date",
+          "endDate": "End date",
+          "recognitionMethod": "Recognition method",
+          "recognitionPeriod": "Recognition period",
+          "state": "State",
+          "notes": "Notes"
+        },
+        "options": {
+          "straightLine": "Straight-line",
+          "oneTime": "One-time",
+          "monthly": "Monthly",
+          "month": "Monthly periods",
+          "quarter": "Quarterly periods",
+          "year": "Annual periods",
+          "stateDraft": "Draft",
+          "stateRunning": "Running"
+        }
+      },
+      "recognitionRule": {
+        "title": "New revenue recognition rule",
+        "description": "Define how revenue is recognized for matching products",
+        "sections": {
+          "main": "Rule"
+        },
+        "fields": {
+          "description": "Description",
+          "recognitionAccountId": "Revenue account",
+          "deferredAccountId": "Deferred account",
+          "expenseAccountId": "COGS / expense account (optional)",
+          "expenseAccountIdPlaceholder": "Leave empty if not used",
+          "productCategoryIds": "Product category IDs",
+          "productIds": "Product IDs",
+          "idListPlaceholder": "Comma-separated numeric IDs, e.g. 1, 2, 3",
+          "recognitionMethod": "Method",
+          "recognitionPeriod": "Period",
+          "priority": "Priority (higher runs first)",
+          "isActive": "Active",
+          "notes": "Notes"
+        }
+      },
+      "closeSubscription": {
+        "title": "Close subscription",
+        "description": "Mark this subscription as closed",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "closeReasonId": "Close reason ID",
+          "closeReasonIdPlaceholder": "Optional reason record ID",
+          "notes": "Notes"
+        }
+      },
+      "generateInvoice": {
+        "title": "Generate invoice",
+        "description": "Run billing for the next cycle (active subscriptions only)",
+        "sections": {
+          "main": "Invoice"
+        },
+        "fields": {
+          "invoiceDate": "Invoice date"
+        }
+      },
+      "recognizeLine": {
+        "title": "Post recognition",
+        "description": "Link this line to the posted journal entry that recognizes revenue",
+        "sections": {
+          "main": "Journal entry"
+        },
+        "fields": {
+          "moveId": "Journal entry (move) ID",
+          "moveLineId": "Journal item line ID"
+        }
+      },
+      "importPlanCsv": {
+        "title": "Import subscription plans (CSV)",
+        "description": "Paste CSV with headers matching the server import (e.g. name, currency_id, journal_id, product_id).",
+        "sections": {
+          "main": "CSV data"
+        },
+        "fields": {
+          "csvData": "CSV content",
+          "csvPlaceholder": "name,code,currency_id,journal_id,product_id,..."
+        }
+      },
+      "importSubscriptionCsv": {
+        "title": "Import subscriptions (CSV)",
+        "description": "Paste CSV with headers matching the server import. Rows create subscription records for this company.",
+        "sections": {
+          "main": "CSV data"
+        },
+        "fields": {
+          "csvData": "CSV content",
+          "csvPlaceholder": "code,plan_id,partner_id,..."
+        }
       }
+    },
+    "dashboard": {
+      "importPlanCsv": "Import plans (CSV)",
+      "importSubscriptionCsv": "Import subscriptions (CSV)"
     }
   },
   "expenses": {
@@ -2695,21 +3521,23 @@
         "state": "Status",
         "state.options": {
           "Draft": "Draft",
-          "Reported": "Reported",
+          "Submitted": "Submitted",
           "Approved": "Approved",
-          "Done": "Reimbursed",
+          "Posted": "Posted",
+          "Done": "Done",
           "Refused": "Refused"
         }
       },
       "states": {
         "Draft": "Draft",
-        "Reported": "Reported",
+        "Submitted": "Submitted",
         "Approved": "Approved",
-        "Done": "Reimbursed",
+        "Posted": "Posted",
+        "Done": "Done",
         "Refused": "Refused"
       }
     },
-    "sheets": {
+    "expenseReports": {
       "title": "Expense Reports",
       "description": "Expense report summaries for approval",
       "searchPlaceholder": "Search expense reports…",
@@ -2719,27 +3547,43 @@
         "employeeId": "Employee",
         "state": "Status",
         "createDate": "Submitted",
-        "totalAmount": "Total Amount"
+        "totalAmount": "Total Amount",
+        "accountingDate": "Accounting date",
+        "createdAt": "Created"
       },
       "filters": {
         "state": "Status",
         "state.options": {
           "Draft": "Draft",
-          "Submit": "Submitted",
-          "Approve": "Approved",
-          "Post": "Posted",
-          "Done": "Reimbursed",
-          "Cancel": "Cancelled"
+          "Submitted": "Submitted",
+          "Approved": "Approved",
+          "Posted": "Posted",
+          "Done": "Done",
+          "Refused": "Refused"
         }
       },
       "states": {
         "Draft": "Draft",
-        "Submit": "Submitted",
-        "Approve": "Approved",
-        "Post": "Posted",
-        "Done": "Reimbursed",
-        "Cancel": "Cancelled"
+        "Submitted": "Submitted",
+        "Approved": "Approved",
+        "Posted": "Posted",
+        "Done": "Done",
+        "Refused": "Refused"
       }
+    },
+    "workflow": {
+      "expenseTitle": "Expense",
+      "reportTitle": "Expense report",
+      "actionsTitle": "Actions",
+      "editExpense": "Edit draft",
+      "addToReport": "Add to report",
+      "submitReport": "Submit for approval",
+      "approveReport": "Approve",
+      "refuseReport": "Refuse",
+      "postReport": "Post",
+      "confirmApprove": "Approve this expense report?",
+      "confirmRefuse": "Refuse this expense report? The report stays in the system but will not be reimbursed.",
+      "noActions": "No actions available for this status."
     },
     "forms": {
       "newExpense": {
@@ -2795,6 +3639,51 @@
           "notes": "Notes",
           "notesPlaceholder": "Additional notes…"
         }
+      },
+      "editExpense": {
+        "title": "Edit expense",
+        "description": "Update this draft expense line.",
+        "sections": {
+          "details": "Details"
+        },
+        "fields": {
+          "name": "Description",
+          "unitAmount": "Unit amount",
+          "quantity": "Quantity",
+          "description": "Notes"
+        }
+      },
+      "addToReport": {
+        "title": "Add to expense report",
+        "description": "Attach this draft line to a draft report for the same organization.",
+        "sections": {
+          "sheet": "Report"
+        },
+        "fields": {
+          "sheetId": "Expense report",
+          "sheetPlaceholder": "Select a draft report"
+        },
+        "emptySheets": "No draft reports for this employee — create a report first."
+      },
+      "submitReport": {
+        "title": "Submit expense report",
+        "description": "Send this report for approval. Enter the total to match your attached lines.",
+        "sections": {
+          "totals": "Totals"
+        },
+        "fields": {
+          "totalAmount": "Total amount"
+        }
+      },
+      "postReport": {
+        "title": "Post expense report",
+        "description": "Set the accounting date when posting this approved report.",
+        "sections": {
+          "date": "Accounting"
+        },
+        "fields": {
+          "accountingDate": "Accounting date"
+        }
       }
     }
   },
@@ -2806,12 +3695,26 @@
       "emptyMessage": "No workflows found.",
       "columns": {
         "name": "Name",
+        "description": "Description",
+        "model": "Model",
         "modelId": "Model",
+        "stateField": "State field",
+        "transitionCount": "Transitions",
+        "isActive": "Active",
+        "onCreate": "On create",
+        "createDate": "Created",
         "state": "Status",
         "active": "Active"
       },
       "filters": {
         "state": "Status",
+        "isActiveLabel": "Active",
+        "isActive": {
+          "options": {
+            "true": "Yes",
+            "false": "No"
+          }
+        },
         "state.options": {
           "Draft": "Draft",
           "Active": "Active",
@@ -2839,7 +3742,11 @@
       },
       "filters": {
         "state": "Status",
+        "stateLabel": "Status",
         "state.options": {
+          "Active": "Active",
+          "Complete": "Complete",
+          "Exception": "Exception",
           "Running": "Running",
           "Completed": "Completed",
           "Cancelled": "Cancelled",
@@ -2847,6 +3754,9 @@
         }
       },
       "states": {
+        "Active": "Active",
+        "Complete": "Complete",
+        "Exception": "Exception",
         "Running": "Running",
         "Completed": "Completed",
         "Cancelled": "Cancelled",
@@ -2854,6 +3764,45 @@
       }
     },
     "forms": {
+      "addActivity": {
+        "title": "Add workflow activity",
+        "description": "Define a step (node) in this workflow. Mark one activity as the entry point (flow start).",
+        "sections": {
+          "details": "Activity"
+        },
+        "fields": {
+          "name": "Name",
+          "kind": "Kind",
+          "sequence": "Sequence",
+          "splitMode": "Split mode",
+          "joinMode": "Join mode",
+          "flowStart": "Entry point (flow start)",
+          "flowStop": "Terminal (flow stop)"
+        }
+      },
+      "addTransition": {
+        "title": "Add transition",
+        "description": "Connect two activities. Optional signal name must match when calling signal on an instance.",
+        "sections": {
+          "edge": "Edge"
+        },
+        "fields": {
+          "from": "From activity",
+          "to": "To activity",
+          "sequence": "Sequence",
+          "signal": "Signal name"
+        }
+      },
+      "importCsv": {
+        "title": "Import workflows (CSV)",
+        "description": "Paste CSV with headers including name, model, and optionally state_field, description, on_create, company_id, metadata.",
+        "sections": {
+          "data": "CSV data"
+        },
+        "fields": {
+          "csvData": "CSV content"
+        }
+      },
       "newWorkflow": {
         "title": "New Workflow",
         "description": "Create a business process workflow",
@@ -2878,9 +3827,31 @@
     },
     "dashboard": {
       "totalWorkflows": "Total Workflows",
-      "active": "Active",
-      "runningInstances": "Running Instances",
-      "completed": "Completed"
+      "active": "Active definitions",
+      "activeInstances": "Active instances",
+      "runningInstances": "Active instances",
+      "completed": "Completed",
+      "exceptions": "Exceptions"
+    },
+    "rowDialog": {
+      "workflowTitle": "Workflow",
+      "instanceTitle": "Instance",
+      "toggleActivate": "Activate",
+      "toggleDeactivate": "Deactivate",
+      "addActivity": "Add activity",
+      "addTransition": "Add transition",
+      "importCsv": "Import CSV",
+      "back": "Back",
+      "signalLabel": "Signal name",
+      "signalPlaceholder": "e.g. approve",
+      "sendSignal": "Send signal",
+      "cancelInstance": "Stop instance",
+      "workitems": "Work items",
+      "markException": "Mark exception",
+      "startInstance": "Start on record",
+      "resType": "Resource type",
+      "resId": "Resource id",
+      "start": "Start workflow"
     }
   },
   "proposals": {
@@ -3117,6 +4088,17 @@
         "importExport": "Import/Export"
       },
       "addField": "Add Field",
+      "noOrganization": "No active organization in session. Sign in again or select an organization.",
+      "seedDatabase": "Seed form configs",
+      "seedSuccess": "Default form configurations were created for your organization.",
+      "seedError": "Could not seed form configurations.",
+      "refresh": "Refresh",
+      "registryOnlyHint": "Showing built-in defaults only. Seed form configurations in the database to add custom fields.",
+      "needDbConfig": "Seed form configurations first (button above), then add custom fields.",
+      "noPermission": "You do not have permission to change form configuration.",
+      "fieldKeyRequired": "Enter a field key (letters, numbers, underscores).",
+      "customFieldAdded": "Custom field added.",
+      "addFieldError": "Could not add field.",
       "roleConfig": {
         "description": "Configure field visibility and requirements",
         "enabledFields": "Enabled Fields",
@@ -3138,10 +4120,13 @@
         "button": "Reset to Defaults"
       },
       "fieldDialog": {
-        "title": "Configure Field",
+        "title": "Add custom field",
         "description": "Add or edit a form field",
+        "descriptionCustom": "Custom fields use IDs like custom:your_key and are stored in entity metadata JSON.",
         "fieldId": "Field ID",
         "fieldIdPlaceholder": "e.g., first_name",
+        "fieldKey": "Field key",
+        "fieldKeyPlaceholder": "e.g., partner_notes",
         "fieldName": "Field Name",
         "fieldNamePlaceholder": "e.g., First Name",
         "label": "Label",
@@ -3157,8 +4142,11 @@
           "Textarea": "Text Area",
           "Number": "Number",
           "Select": "Select",
+          "MultiSelect": "Multi select",
           "Date": "Date",
+          "DateTime": "Date & time",
           "Checkbox": "Checkbox",
+          "Switch": "Switch",
           "Radio": "Radio",
           "Rating": "Rating",
           "Tags": "Tags"
@@ -3232,7 +4220,8 @@
       "permissions": "Permissions",
       "saveChanges": "Save Changes",
       "systemCannotDelete": "System roles cannot be deleted",
-      "deleteConfirm": "Are you sure you want to delete this role?"
+      "deleteConfirm": "Are you sure you want to delete this role?",
+      "fieldPolicyHint": "API row field access: store a Casbin policy (ptype p) with v0 = role id or identity hex, v1 = organization id, v2 = resource key (e.g. products) or table name (product), v3 = read, and metadata JSON {\"fields\":[\"id\",\"name\",\"list_price\"]}. Superusers and roles with permission *:* receive full columns. Use add_casbin_rule from SpacetimeDB to persist policies."
     },
     "profile": {
       "personalInfo": "Personal Information",
@@ -3378,6 +4367,143 @@
     }
   },
   "reports": {
+    "moduleTitle": "Reports",
+    "moduleDescription": "Financial reports, templates, schedules, and metrics",
+    "dashboard": {
+      "quickActionsTitle": "Quick actions",
+      "kpiTitle": "Key metrics",
+      "quickActions": {
+        "generate": "Generate report",
+        "newTemplate": "New template",
+        "scheduleReport": "Schedule report",
+        "newMetric": "New metric"
+      },
+      "kpis": {
+        "totalReports": "Total reports",
+        "generated": "Generated",
+        "exported": "Exported",
+        "trialLines": "TB lines",
+        "templates": "Templates",
+        "scheduled": "Scheduled",
+        "metrics": "Metrics"
+      }
+    },
+    "tabs": {
+      "dashboard": "Dashboard",
+      "financialReports": "Financial reports",
+      "trialBalance": "Trial balance",
+      "reportTemplates": "Report templates",
+      "scheduledReports": "Scheduled",
+      "analyticsMetrics": "Metrics"
+    },
+    "createButton": {
+      "generateReport": "Generate report",
+      "newTemplate": "New template",
+      "scheduleReport": "Schedule report",
+      "newMetric": "New metric"
+    },
+    "financialReports": {
+      "title": "Financial reports",
+      "description": "Generated and exported financial statements",
+      "searchPlaceholder": "Search by name…",
+      "emptyMessage": "No financial reports yet.",
+      "columns": {
+        "name": "Name",
+        "dateFrom": "From",
+        "dateTo": "To",
+        "state": "State",
+        "showZeroLines": "Zero lines",
+        "generatedAt": "Generated"
+      },
+      "filters": {
+        "state": {
+          "label": "State",
+          "options": {
+            "draft": "Draft",
+            "generated": "Generated",
+            "exported": "Exported",
+            "archived": "Archived"
+          }
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "generated": "Generated",
+        "exported": "Exported",
+        "archived": "Archived"
+      }
+    },
+    "trialBalance": {
+      "title": "Trial balance",
+      "description": "Account balances for the selected report",
+      "selectReportHint": "Go to Financial Reports and click a row to show only that report’s trial balance lines.",
+      "filteredHint": "Filtered to report #{{id}}.",
+      "searchPlaceholder": "Search accounts…",
+      "emptyMessage": "No trial balance lines.",
+      "columns": {
+        "accountCode": "Code",
+        "accountName": "Account",
+        "openingDebit": "Opening Dr",
+        "openingCredit": "Opening Cr",
+        "periodDebit": "Period Dr",
+        "periodCredit": "Period Cr",
+        "closingDebit": "Closing Dr",
+        "closingCredit": "Closing Cr"
+      }
+    },
+    "reportTemplates": {
+      "title": "Report templates",
+      "description": "Reusable layout definitions for exports and scheduling",
+      "searchPlaceholder": "Search templates…",
+      "emptyMessage": "No report templates yet.",
+      "columns": {
+        "name": "Name",
+        "model": "Model",
+        "reportType": "Format",
+        "orientation": "Orientation",
+        "isActive": "Active"
+      }
+    },
+    "scheduledReports": {
+      "title": "Scheduled reports",
+      "description": "Automated delivery of reports",
+      "searchPlaceholder": "Search schedules…",
+      "emptyMessage": "No scheduled reports.",
+      "columns": {
+        "name": "Name",
+        "templateId": "Template ID",
+        "frequency": "Frequency",
+        "nextRun": "Next run",
+        "runCount": "Runs",
+        "isActive": "Active"
+      }
+    },
+    "analyticsMetrics": {
+      "title": "Analytics metrics",
+      "description": "KPIs and cached values",
+      "searchPlaceholder": "Search metrics…",
+      "emptyMessage": "No metrics yet.",
+      "columns": {
+        "name": "Name",
+        "category": "Category",
+        "metricType": "Type",
+        "model": "Model",
+        "aggregation": "Aggregation",
+        "currentValue": "Current",
+        "isActive": "Active"
+      }
+    },
+    "actions": {
+      "exportPdf": "Export PDF",
+      "exportXlsx": "Export Excel",
+      "exportCsv": "Export CSV",
+      "archive": "Archive",
+      "delete": "Delete",
+      "regenerate": "Regenerate",
+      "editTemplate": "Edit template layout",
+      "refreshMetric": "Update metric values",
+      "recordRun": "Record run"
+    },
     "forms": {
       "generateReport": {
         "title": "Generate Report",
@@ -3388,9 +4514,28 @@
         "fields": {
           "name": "Report Name",
           "namePlaceholder": "e.g. Q1 Profit & Loss",
+          "reportType": "Report type",
+          "reportTypes": {
+            "trialBalance": "Trial balance",
+            "balanceSheet": "Balance sheet",
+            "profitAndLoss": "Profit & loss",
+            "cashFlow": "Cash flow",
+            "generalLedger": "General ledger"
+          },
+          "comparisonMode": "Comparison",
+          "comparisonOptions": {
+            "none": "None",
+            "previousPeriod": "Previous period",
+            "previousYear": "Previous year"
+          },
+          "currencyId": "Currency ID",
+          "currencyIdPlaceholder": "Company currency (default 1)",
+          "hierarchyLevel": "Hierarchy depth",
+          "hierarchyLevelPlaceholder": "0–9",
           "dateFrom": "From Date",
           "dateTo": "To Date",
           "targetMove": "Target Entries",
+          "showDebitCredit": "Show debit & credit columns",
           "showHierarchy": "Show Hierarchy",
           "showPercentage": "Show Percentage",
           "showZeroLines": "Show Zero Lines",
@@ -3398,6 +4543,107 @@
             "all": "All Entries",
             "posted": "Posted Only"
           }
+        }
+      },
+      "reportTemplate": {
+        "title": "New report template",
+        "description": "Define a reusable layout for scheduled or generated reports",
+        "sections": {
+          "main": "Template"
+        },
+        "fields": {
+          "name": "Name",
+          "model": "Model",
+          "reportType": "Output format",
+          "orientation": "Orientation",
+          "orientations": {
+            "portrait": "Portrait",
+            "landscape": "Landscape"
+          },
+          "marginTop": "Margin top",
+          "marginBottom": "Margin bottom",
+          "marginLeft": "Margin left",
+          "marginRight": "Margin right",
+          "headerLine": "Header line",
+          "footerLine": "Footer line",
+          "attachmentUse": "Attach to records",
+          "multiCompany": "Multi-company",
+          "isActive": "Active"
+        }
+      },
+      "scheduledReport": {
+        "title": "Schedule report",
+        "description": "Deliver a template on a recurring schedule",
+        "sections": {
+          "main": "Schedule"
+        },
+        "fields": {
+          "name": "Schedule name",
+          "reportTemplateId": "Report template",
+          "model": "Model",
+          "frequency": "Frequency",
+          "nextRun": "First run",
+          "attachmentFormat": "Attachment format",
+          "recipients": "Recipients",
+          "recipientsPlaceholder": "Comma-separated email addresses",
+          "isActive": "Active"
+        },
+        "frequencies": {
+          "daily": "Daily",
+          "weekly": "Weekly",
+          "monthly": "Monthly",
+          "quarterly": "Quarterly"
+        }
+      },
+      "analyticsMetric": {
+        "title": "New metric",
+        "description": "Define a KPI to track",
+        "sections": {
+          "main": "Metric"
+        },
+        "fields": {
+          "name": "Name",
+          "category": "Category",
+          "metricType": "Metric type",
+          "model": "Model",
+          "field": "Field",
+          "aggregation": "Aggregation",
+          "timePeriod": "Time period",
+          "refreshFrequencyMinutes": "Refresh (minutes)",
+          "targetValue": "Target (optional)",
+          "isActive": "Active"
+        }
+      },
+      "updateReportTemplate": {
+        "title": "Edit template layout",
+        "description": "Update orientation, paper, and template markup",
+        "sections": {
+          "layout": "Layout"
+        },
+        "fields": {
+          "paperFormat": "Paper format",
+          "templateContent": "Template content"
+        }
+      },
+      "updateMetricValues": {
+        "title": "Update metric values",
+        "description": "Set cached current and previous values",
+        "sections": {
+          "values": "Values"
+        },
+        "fields": {
+          "currentValue": "Current value",
+          "previousValue": "Previous value (optional)"
+        }
+      },
+      "recordScheduledRun": {
+        "title": "Record scheduled run",
+        "description": "Mark a run as completed and set the next scheduled time.",
+        "sections": {
+          "next": "Next run"
+        },
+        "fields": {
+          "nextRun": "Next run at"
         }
       }
     }
@@ -3706,14 +4952,22 @@
       "signUpFailed": "Sign up failed",
       "resetFailed": "Reset failed",
       "inviteFailed": "Failed to accept invitation",
+      "inviteInvalid": "This invitation link is invalid or expired.",
+      "inviteUsed": "This invitation has already been used.",
+      "inviteExpired": "This invitation has expired.",
       "generic": "Something went wrong. Please try again.",
       "passwordMismatch": "Passwords do not match"
     },
     "signIn": {
       "title": "Sign in",
       "description": "Enter your email and password",
+      "descriptionWorkOs": "Sign in with WorkOS to use email, password, Google, Microsoft, Apple, or your enterprise SSO.",
       "submit": "Sign in",
       "submitting": "Signing in\u2026",
+      "continueWithSso": "Continue with SSO",
+      "continueWithWorkOs": "Continue with WorkOS",
+      "workOsProvidersHint": "Google, Microsoft, Apple, and enterprise SSO are configured in your WorkOS dashboard.",
+      "orContinueWith": "Or continue with",
       "forgotPassword": "Forgot password?",
       "noAccount": "Don't have an account?",
       "createOne": "Create one"
@@ -3721,14 +4975,19 @@
     "signUp": {
       "title": "Create an account",
       "description": "Set up your Lumiere ERP account",
+      "descriptionWorkOs": "Create your account with WorkOS — email and password or social sign-in.",
       "submit": "Create account",
       "submitting": "Creating account\u2026",
+      "continueWithWorkOs": "Continue with WorkOS",
       "hasAccount": "Already have an account?",
       "signIn": "Sign in"
     },
     "forgotPassword": {
       "title": "Forgot your password?",
       "description": "Enter your email and we'll send you a reset link.",
+      "descriptionWorkOs": "Password resets are handled by WorkOS. Open the sign-in screen and use the forgot-password link there.",
+      "openWorkOsReset": "Open WorkOS sign-in",
+      "workOsResetHint": "On the next screen, use WorkOS\u2019s forgot-password flow for email accounts or sign in with Google, Microsoft, or Apple.",
       "submit": "Send reset link",
       "submitting": "Sending\u2026",
       "backToSignIn": "Back to sign in",
@@ -3738,6 +4997,7 @@
     "resetPassword": {
       "title": "Reset your password",
       "description": "Enter your new password below.",
+      "descriptionWorkOs": "Password reset links from the old app no longer apply. Use WorkOS to reset your password or sign in with a social provider.",
       "submit": "Reset password",
       "submitting": "Resetting\u2026",
       "invalidTitle": "Invalid reset link",
@@ -3749,6 +5009,9 @@
     "acceptInvite": {
       "title": "Accept your invitation",
       "description": "Create a password to complete your account setup.",
+      "descriptionWorkOs": "Sign in with WorkOS using the email this invitation was sent to. You can create an account or sign in with Google, Microsoft, or Apple if enabled.",
+      "continueWithWorkOs": "Continue with WorkOS",
+      "workOsInviteHint": "You must use the same email address the invitation was sent to.",
       "emailPlaceholder": "The email your invite was sent to",
       "submit": "Join organization",
       "submitting": "Joining\u2026",

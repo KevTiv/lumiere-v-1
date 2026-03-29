@@ -135,3 +135,25 @@ export function salesParamsToJson(
 ): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
+
+/** Comma- or whitespace-separated stock picking IDs → create_picking_batch params JSON. */
+export function toCreatePickingBatchParamsJson(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+  const raw = formData.pickingIds
+  const parts =
+    raw == null || String(raw).trim() === ''
+      ? []
+      : String(raw)
+          .split(/[,\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+  const pickingIds = parts.map((p) => BigInt(p))
+  return stdbParamsToJson({
+    name,
+    pickingIds,
+    isWave: false,
+  })
+}

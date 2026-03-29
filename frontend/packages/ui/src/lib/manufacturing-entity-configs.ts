@@ -129,6 +129,31 @@ export const bomsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── BOM Lines ─────────────────────────────────────────────────────────────────
+export const bomLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "bom-lines-table",
+  title: t("manufacturing.bomLines.title"),
+  description: t("manufacturing.bomLines.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("manufacturing.bomLines.searchPlaceholder"),
+    searchKeys: ["bomId", "productId"],
+    columns: [
+      { key: "bomId", label: t("manufacturing.bomLines.columns.bomId"), width: "min-w-24" },
+      { key: "sequence", label: t("manufacturing.bomLines.columns.sequence"), type: "number", align: "right" },
+      { key: "productId", label: t("manufacturing.bomLines.columns.productId"), width: "min-w-36" },
+      { key: "productTmplId", label: t("manufacturing.bomLines.columns.productTmplId"), width: "min-w-28" },
+      { key: "productQty", label: t("manufacturing.bomLines.columns.productQty"), type: "number", align: "right" },
+      { key: "productUomId", label: t("manufacturing.bomLines.columns.productUomId"), width: "min-w-20" },
+      { key: "manualConsumption", label: t("manufacturing.bomLines.columns.manualConsumption"), type: "boolean" },
+      { key: "childBomId", label: t("manufacturing.bomLines.columns.childBomId"), width: "min-w-24" },
+    ],
+    emptyMessage: t("manufacturing.bomLines.emptyMessage"),
+  },
+})
+
 // ── Work Orders ───────────────────────────────────────────────────────────────
 export const workordersTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "workorders-table",
@@ -196,6 +221,7 @@ export const workcentersTableConfig = (t: TFunction): EntityViewConfig => ({
 export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "manufacturing-orders-table": manufacturingOrdersTableConfig(t),
   "boms-table": bomsTableConfig(t),
+  "bom-lines-table": bomLinesTableConfig(t),
   "workorders-table": workordersTableConfig(t),
   "workcenters-table": workcentersTableConfig(t),
 })

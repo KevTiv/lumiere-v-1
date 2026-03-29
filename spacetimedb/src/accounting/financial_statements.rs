@@ -21,6 +21,7 @@ use crate::types::{AccountMoveState, ReportState, ReportType};
 #[spacetimedb::table(
     accessor = financial_report,
     public,
+    index(accessor = financial_report_by_org, btree(columns = [organization_id])),
     index(accessor = financial_report_by_type, btree(columns = [report_type])),
     index(accessor = financial_report_by_company, btree(columns = [company_id])),
     index(accessor = financial_report_by_state, btree(columns = [state])),
@@ -31,6 +32,8 @@ pub struct FinancialReport {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation
+    pub organization_id: u64,
     pub name: String,
     pub report_type: ReportType,
     pub date_from: Timestamp,
@@ -65,6 +68,7 @@ pub struct FinancialReport {
 #[spacetimedb::table(
     accessor = trial_balance,
     public,
+    index(accessor = trial_balance_by_org, btree(columns = [organization_id])),
     index(accessor = trial_balance_by_account, btree(columns = [account_id])),
     index(accessor = trial_balance_by_company, btree(columns = [company_id])),
     index(accessor = trial_balance_by_report, btree(columns = [report_id])),
@@ -74,6 +78,8 @@ pub struct TrialBalance {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation
+    pub organization_id: u64,
     pub report_id: u64,
     pub account_id: u64,
     pub account_code: String,
@@ -99,6 +105,7 @@ pub struct TrialBalance {
 #[spacetimedb::table(
     accessor = balance_sheet_line,
     public,
+    index(accessor = balance_sheet_line_by_org, btree(columns = [organization_id])),
     index(accessor = balance_sheet_by_report, btree(columns = [report_id])),
     index(accessor = balance_sheet_by_account, btree(columns = [account_id])),
     index(accessor = balance_sheet_by_parent, btree(columns = [parent_id]))
@@ -107,6 +114,8 @@ pub struct BalanceSheetLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation
+    pub organization_id: u64,
     pub report_id: u64,
     pub sequence: u32,
     pub name: String,
@@ -132,6 +141,7 @@ pub struct BalanceSheetLine {
 #[spacetimedb::table(
     accessor = profit_loss_line,
     public,
+    index(accessor = profit_loss_line_by_org, btree(columns = [organization_id])),
     index(accessor = profit_loss_by_report, btree(columns = [report_id])),
     index(accessor = profit_loss_by_account, btree(columns = [account_id])),
     index(accessor = profit_loss_by_parent, btree(columns = [parent_id]))
@@ -140,6 +150,8 @@ pub struct ProfitLossLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation
+    pub organization_id: u64,
     pub report_id: u64,
     pub sequence: u32,
     pub name: String,
@@ -165,6 +177,7 @@ pub struct ProfitLossLine {
 #[spacetimedb::table(
     accessor = cash_flow_line,
     public,
+    index(accessor = cash_flow_line_by_org, btree(columns = [organization_id])),
     index(accessor = cash_flow_by_report, btree(columns = [report_id])),
     index(accessor = cash_flow_by_parent, btree(columns = [parent_id]))
 )]
@@ -172,6 +185,8 @@ pub struct CashFlowLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Tenant isolation
+    pub organization_id: u64,
     pub report_id: u64,
     pub sequence: u32,
     pub name: String,
@@ -299,6 +314,7 @@ pub fn create_financial_report(
 
     let report = ctx.db.financial_report().insert(FinancialReport {
         id: 0,
+        organization_id,
         name: params.name.clone(),
         report_type: params.report_type.clone(),
         date_from: params.date_from,
@@ -378,6 +394,10 @@ pub fn update_financial_report(
         .id()
         .find(&report_id)
         .ok_or("Financial report not found")?;
+
+    if report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
 
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());
@@ -527,6 +547,10 @@ pub fn generate_financial_report(
         .find(&report_id)
         .ok_or("Financial report not found")?;
 
+    if report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
+
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());
     }
@@ -662,6 +686,7 @@ pub fn generate_financial_report(
 
         ctx.db.trial_balance().insert(TrialBalance {
             id: 0,
+            organization_id,
             report_id,
             account_id: bucket.account_id,
             account_code: bucket.account_code.clone(),
@@ -764,6 +789,10 @@ pub fn export_financial_report(
         .find(&report_id)
         .ok_or("Financial report not found")?;
 
+    if report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
+
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());
     }
@@ -819,6 +848,10 @@ pub fn archive_financial_report(
         .find(&report_id)
         .ok_or("Financial report not found")?;
 
+    if report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
+
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());
     }
@@ -873,6 +906,21 @@ pub fn create_trial_balance_entry(
         return Err("Level must be between 0 and 9".to_string());
     }
 
+    let parent_report = ctx
+        .db
+        .financial_report()
+        .id()
+        .find(&params.report_id)
+        .ok_or("Financial report not found")?;
+
+    if parent_report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
+
+    if parent_report.company_id != company_id {
+        return Err("Report does not belong to this company".to_string());
+    }
+
     let closing_debit = if params.opening_debit + params.period_debit
         > params.opening_credit + params.period_credit
     {
@@ -891,6 +939,7 @@ pub fn create_trial_balance_entry(
 
     let entry = ctx.db.trial_balance().insert(TrialBalance {
         id: 0,
+        organization_id,
         report_id: params.report_id,
         account_id: params.account_id,
         account_code: params.account_code.clone(),
@@ -960,6 +1009,10 @@ pub fn delete_financial_report(
         .id()
         .find(&report_id)
         .ok_or("Financial report not found")?;
+
+    if report.organization_id != organization_id {
+        return Err("Report does not belong to this organization".to_string());
+    }
 
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());

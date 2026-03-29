@@ -91,7 +91,8 @@ export function useCreateBom(organizationId: bigint, companyId: bigint) {
       return conn.reducers.createBom({ organizationId, params: scoped });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mrp-boms"] });
+      void queryClient.invalidateQueries({ queryKey: ["mrp-boms"] });
+      void queryClient.invalidateQueries({ queryKey: ["mrp-bom-lines"] });
     },
   });
 }

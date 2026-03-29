@@ -22,6 +22,11 @@ import {
   SelectValue,
 } from "../components/select"
 import { Search } from "lucide-react"
+import {
+  radixSelectControlledValue,
+  radixSelectItemValue,
+  storedValueFromRadixSelect,
+} from "../forms/utils/radix-select-empty-value"
 
 interface EntityTableProps {
   config: EntityTableConfig
@@ -124,6 +129,9 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
   }
 
   const hasActions = (config.actions?.length ?? 0) > 0
+  const selectionToggleOnRowClick =
+    config.rowSelectionToggleOnClick ??
+    (hasActions && (config.actions?.some((a) => a.requiresSelection === true) ?? false))
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -141,23 +149,37 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
               />
             </div>
           )}
-          {config.filters?.map((f) => (
+          {config.filters?.map((f) => {
+            const raw = filters[f.key] ?? "__all__"
+            const selectValue =
+              raw === "__all__"
+                ? "__all__"
+                : radixSelectControlledValue(raw, f.options)
+            return (
             <Select
               key={f.key}
-              value={filters[f.key] ?? "__all__"}
-              onValueChange={(val) => setFilters((prev) => ({ ...prev, [f.key]: val }))}
+              value={selectValue}
+              onValueChange={(val) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  [f.key]: val === "__all__" ? "__all__" : storedValueFromRadixSelect(val),
+                }))
+              }
             >
               <SelectTrigger className="w-40">
                 <SelectValue placeholder={f.placeholder ?? f.label} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All {f.label}s</SelectItem>
-                {f.options?.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                {f.options?.map((o, idx) => (
+                  <SelectItem key={`${radixSelectItemValue(o, idx)}-${idx}`} value={radixSelectItemValue(o, idx)}>
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          ))}
+            )
+          })}
           <div className="ml-auto flex items-center gap-2">
             {config.actions?.map((action) => {
               const Icon = action.icon
@@ -215,11 +237,11 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                   <TableRow
                     key={key}
                     onClick={() => {
-                      if (hasActions) toggleRow(key)
+                      if (selectionToggleOnRowClick) toggleRow(key)
                       onRowClick?.(row)
                     }}
                     className={cn(
-                      onRowClick || hasActions ? "cursor-pointer" : "",
+                      onRowClick || selectionToggleOnRowClick ? "cursor-pointer" : "",
                       isSelected && "bg-primary/5",
                     )}
                   >

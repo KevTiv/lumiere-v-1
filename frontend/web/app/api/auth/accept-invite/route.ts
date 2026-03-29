@@ -9,6 +9,7 @@ import {
   callStdbReducer,
   findCredentialByEmail,
   microsToDate,
+  getRoleNameInOrganization,
 } from '@/lib/stdb-auth-server'
 import { saveStdbSession } from '@/app/actions/save-stdb-token'
 
@@ -20,6 +21,16 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.WORKOS_CLIENT_ID) {
+      return NextResponse.json(
+        {
+          error:
+            'Invitation acceptance uses WorkOS. Open the invitation link and use Continue with WorkOS.',
+        },
+        { status: 410 },
+      )
+    }
+
     const body = await req.json()
     const { token, email, password } = schema.parse(body)
 
@@ -72,12 +83,17 @@ export async function POST(req: NextRequest) {
       ])
     }
 
+    const roleName = await getRoleNameInOrganization(invite.role_id, invite.organization_id)
+    if (!roleName) {
+      return NextResponse.json({ error: 'Invite role not found' }, { status: 400 })
+    }
+
     // Add user to org with the invited role
     await callStdbReducer('add_org_member', [
       stdbIdentity,
       invite.organization_id,
       {
-        role_name: String(invite.role_id), // role_id stored in invite; reducer resolves by name
+        role_name: roleName,
         company_id: null,
         job_title: null,
         department_id: null,

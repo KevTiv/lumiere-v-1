@@ -1,6 +1,7 @@
 import type SaleOrderRow from "../generated/sale_order_table";
 import type SaleOrderLineRow from "../generated/sale_order_line_table";
 import type ProductPricelistRow from "../generated/product_pricelist_table";
+import type ProductPricelistItemRow from "../generated/product_pricelist_item_table";
 import type StockPickingBatchRow from "../generated/stock_picking_batch_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
@@ -9,16 +10,18 @@ import { getStdbConnection } from "../connection";
 export type SaleOrder = Infer<typeof SaleOrderRow>;
 export type SaleOrderLine = Infer<typeof SaleOrderLineRow>;
 export type ProductPricelist = Infer<typeof ProductPricelistRow>;
+export type ProductPricelistItem = Infer<typeof ProductPricelistItemRow>;
 export type StockPickingBatch = Infer<typeof StockPickingBatchRow>;
 
 // ── Subscription SQL ──────────────────────────────────────────────────────────
-export function salesSubscriptions(companyId: bigint): string[] {
-  const id = String(companyId);
+/** @param scopeId Tenant scope: same numeric id used for `company_id` on sale tables and `organization_id` on org-scoped tables (e.g. pricelist). */
+export function salesSubscriptions(scopeId: bigint): string[] {
+  const id = String(scopeId);
   return [
     `SELECT * FROM sale_order WHERE company_id = ${id}`,
     `SELECT * FROM sale_order_line WHERE company_id = ${id}`,
-    `SELECT * FROM product_pricelist WHERE company_id = ${id}`,
-    `SELECT * FROM product_pricelist_item WHERE company_id = ${id}`,
+    `SELECT * FROM product_pricelist WHERE organization_id = ${id}`,
+    `SELECT * FROM product_pricelist_item WHERE organization_id = ${id}`,
     `SELECT * FROM stock_picking_batch WHERE company_id = ${id}`,
   ];
 }

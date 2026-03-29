@@ -11,6 +11,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { fetchQueryList, emptyQueryRows, type QueryRows } from '@/lib/query-fetch'
+import {
+  paymentParamsToJson,
+  toCreatePaymentParamsFromInvoice,
+  type PaymentResolutionContext,
+} from '@/lib/accounting-create-params'
 
 function invalidateAccountingQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
   const org = organizationId.toString()
@@ -21,6 +26,7 @@ function invalidateAccountingQueries(qc: ReturnType<typeof useQueryClient>, orga
     qc.invalidateQueries({ queryKey: ['budgets', org] }),
     qc.invalidateQueries({ queryKey: ['analytic-accounts', org] }),
     qc.invalidateQueries({ queryKey: ['bank-statements', org] }),
+    qc.invalidateQueries({ queryKey: ['account-payments', org] }),
   ])
 }
 
@@ -99,6 +105,18 @@ export function useAnalyticAccounts(
   })
 }
 
+export function useAccountPayments(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['account-payments', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/account-payments', 'Failed to fetch account payments'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 // TODO: No route yet — returns empty array until bank_statement table/route is added
 export function useBankStatements(
   organizationId: bigint,
@@ -159,6 +177,97 @@ export function useCreateMove(organizationId: bigint, _companyId?: bigint) {
   })
 }
 
+async function readApiError(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    if (typeof j?.error === 'string' && j.error.length > 0) return j.error
+  } catch {
+    /* ignore */
+  }
+  return `HTTP ${r.status}`
+}
+
+/** Journal entries → `post_account_move`; customer/vendor invoices & refunds → `post_invoice` (with COGS/inventory GL). */
+export function useSmartPostDraft(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      moveId: number
+      move: Record<string, unknown>
+      cogsAccountId: number
+      inventoryAccountId: number
+    }) => {
+      const mtRaw = args.move.moveType
+      const mt =
+        mtRaw != null && typeof mtRaw === 'object' && 'tag' in mtRaw
+          ? String((mtRaw as { tag: string }).tag)
+          : String(mtRaw ?? '')
+      const oid = Number(organizationId)
+      const invoiceLike =
+        mt === 'OutInvoice' ||
+        mt === 'InInvoice' ||
+        mt === 'OutRefund' ||
+        mt === 'InRefund'
+
+      if (invoiceLike) {
+        const r = await fetch('/api/call/post_invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([
+            oid,
+            args.moveId,
+            args.cogsAccountId,
+            args.inventoryAccountId,
+          ]),
+        })
+        if (!r.ok) throw new Error(await readApiError(r))
+        return
+      }
+
+      const r = await fetch('/api/call/post_account_move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([oid, args.moveId]),
+      })
+      if (!r.ok) throw new Error(await readApiError(r))
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['account-moves', organizationId.toString()] }),
+  })
+}
+
+export function usePostMove(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (moveId: string | number | bigint) => {
+      const r = await fetch('/api/call/post_account_move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(organizationId), Number(moveId)]),
+      })
+      if (!r.ok) throw new Error(await readApiError(r))
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['account-moves', organizationId.toString()] }),
+  })
+}
+
+export function useCancelMove(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (moveId: string | number | bigint) => {
+      const r = await fetch('/api/call/cancel_account_move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([Number(organizationId), Number(moveId)]),
+      })
+      if (!r.ok) throw new Error(await readApiError(r))
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['account-moves', organizationId.toString()] }),
+  })
+}
+
 export function useCreateTax(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
@@ -213,7 +322,7 @@ export function useConfirmBudget(organizationId: bigint, _companyId?: bigint) {
       const r = await fetch('/api/call/confirm_budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), budgetId.toString()]),
+        body: JSON.stringify([Number(organizationId), Number(budgetId)]),
       })
       if (!r.ok) throw new Error('Failed to confirm budget')
     },
@@ -228,11 +337,76 @@ export function useCancelBudget(organizationId: bigint, _companyId?: bigint) {
       const r = await fetch('/api/call/cancel_budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), budgetId.toString()]),
+        body: JSON.stringify([Number(organizationId), Number(budgetId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel budget')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets', organizationId.toString()] }),
+  })
+}
+
+/** Create payment, post it, reconcile to invoice/bill — full AR/AP settlement flow. */
+export function useRecordPaymentForInvoice(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      invoiceRow: Record<string, unknown>
+      amount: number
+      memo?: string
+      paymentContext?: PaymentResolutionContext
+    }) => {
+      const oid = Number(organizationId)
+      const invoiceId = Number(args.invoiceRow.id)
+      const paymentRef = `pay-${invoiceId}-${Date.now()}`
+      const params = toCreatePaymentParamsFromInvoice(
+        args.invoiceRow,
+        companyId,
+        args.amount,
+        paymentRef,
+        args.memo,
+        args.paymentContext,
+      )
+      if (!params) {
+        throw new Error(
+          'Cannot build payment: need partner, journal, and currency on the invoice (or a default journal in context).',
+        )
+      }
+
+      const r1 = await fetch('/api/call/create_payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([oid, paymentParamsToJson(params)]),
+      })
+      if (!r1.ok) throw new Error(await readApiError(r1))
+
+      await qc.invalidateQueries({ queryKey: ['account-payments', organizationId.toString()] })
+      const rows = await fetchQueryList('/api/query/account-payments', 'Failed to refresh payments')
+      const pay = rows.find((p) => String(p.ref ?? '') === paymentRef)
+      if (!pay?.id) throw new Error('Could not find payment after create')
+      const paymentId = Number(pay.id)
+
+      const r2 = await fetch('/api/call/post_payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([oid, paymentId]),
+      })
+      if (!r2.ok) throw new Error(await readApiError(r2))
+
+      const mtRaw = args.invoiceRow.moveType
+      const mt =
+        mtRaw != null && typeof mtRaw === 'object' && 'tag' in mtRaw
+          ? String((mtRaw as { tag: string }).tag)
+          : String(mtRaw ?? '')
+      const isBill = mt === 'InInvoice' || mt === 'InRefund'
+
+      const r3 = await fetch('/api/call/register_payment_on_invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([oid, paymentId, [invoiceId], isBill]),
+      })
+      if (!r3.ok) throw new Error(await readApiError(r3))
+    },
+    onSuccess: () => invalidateAccountingQueries(qc, organizationId),
   })
 }
 

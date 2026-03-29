@@ -1,4 +1,10 @@
 import { authSubscriptions } from "./auth";
+import {
+  type FieldAccessContext,
+  selectOrgScopedSql,
+  selectRolesActiveSql,
+  selectUserRoleAssignmentsForIdentitySql,
+} from "../field-policy";
 
 /** Context for building subscription SQL (org + identity where needed). */
 export interface SubscriptionQueryContext {
@@ -7,6 +13,8 @@ export interface SubscriptionQueryContext {
   identityHex?: string;
   /** Passed to {@link authSubscriptions} when resource is `auth`. */
   roleNames?: string[];
+  /** When set (e.g. from the same sources as `/api/query`), subscription SQL matches API column projection. */
+  fieldAccess?: FieldAccessContext;
 }
 
 /**
@@ -58,15 +66,25 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "payslips",
   "financial-reports",
   "trial-balances",
+  "report-templates",
+  "scheduled-reports",
+  "analytics-metrics",
   "documents",
   "knowledge-articles",
   "helpdesk-tickets",
   "helpdesk-teams",
   "helpdesk-stages",
+  "helpdesk-slas",
   "subscriptions",
   "subscription-plans",
+  "deferred-revenue-schedules",
+  "deferred-revenue-lines",
+  "revenue-recognition-rules",
   "workflows",
+  "workflow-activities",
   "workflow-instances",
+  "workflow-transitions",
+  "workflow-workitems",
   "proposals",
   "calendar-events",
   "mail-messages",
@@ -88,104 +106,229 @@ const AUTH_SINGLE: Record<string, string> = {
 };
 
 /** Org-scoped ERP resources (matches `/api/query/[resource]` for data tables). */
-const ERP_ORG_SQL: Record<string, (organizationId: number) => string> = {
-  "account-accounts": (id) =>
-    `SELECT * FROM account_account WHERE organization_id = ${id}`,
-  "account-journals": (id) =>
-    `SELECT * FROM account_journal WHERE organization_id = ${id}`,
-  "account-moves": (id) =>
-    `SELECT * FROM account_move WHERE organization_id = ${id}`,
-  "account-taxes": (id) =>
-    `SELECT * FROM account_tax WHERE organization_id = ${id}`,
-  budgets: (id) =>
-    `SELECT * FROM crossovered_budget WHERE organization_id = ${id}`,
-  "analytic-accounts": (id) =>
-    `SELECT * FROM account_analytic_account WHERE organization_id = ${id}`,
-  "sale-orders": (id) =>
-    `SELECT * FROM sale_order WHERE organization_id = ${id}`,
-  "sale-order-lines": (id) =>
-    `SELECT * FROM sale_order_line WHERE organization_id = ${id}`,
-  pricelists: (id) =>
-    `SELECT * FROM product_pricelist WHERE organization_id = ${id}`,
-  "picking-batches": (id) =>
-    `SELECT * FROM stock_picking_batch WHERE organization_id = ${id}`,
-  leads: (id) => `SELECT * FROM lead WHERE organization_id = ${id}`,
-  opportunities: (id) =>
-    `SELECT * FROM opportunity WHERE organization_id = ${id}`,
-  "opportunity-stages": (id) =>
-    `SELECT * FROM opp_stage WHERE organization_id = ${id}`,
-  contacts: (id) => `SELECT * FROM contact WHERE organization_id = ${id}`,
-  projects: (id) =>
-    `SELECT * FROM project_project WHERE organization_id = ${id}`,
-  tasks: (id) => `SELECT * FROM project_task WHERE organization_id = ${id}`,
-  timesheets: (id) =>
-    `SELECT * FROM project_timesheet WHERE organization_id = ${id}`,
-  products: (id) => `SELECT * FROM product WHERE organization_id = ${id}`,
-  "product-categories": (id) =>
-    `SELECT * FROM product_category WHERE organization_id = ${id} AND deleted_at IS NULL`,
-  uoms: (id) => `SELECT * FROM uom WHERE organization_id = ${id}`,
-  "stock-quants": (id) =>
-    `SELECT * FROM stock_quant WHERE organization_id = ${id}`,
-  "stock-pickings": (id) =>
-    `SELECT * FROM stock_picking WHERE organization_id = ${id}`,
-  warehouses: (id) =>
-    `SELECT * FROM warehouse WHERE organization_id = ${id}`,
-  "inventory-adjustments": (id) =>
-    `SELECT * FROM inventory_adjustment WHERE organization_id = ${id}`,
-  "purchase-orders": (id) =>
-    `SELECT * FROM purchase_order WHERE organization_id = ${id}`,
-  "purchase-order-lines": (id) =>
-    `SELECT * FROM purchase_order_line WHERE organization_id = ${id}`,
-  "purchase-requisitions": (id) =>
-    `SELECT * FROM purchase_requisition WHERE organization_id = ${id}`,
-  "mrp-productions": (id) =>
-    `SELECT * FROM mrp_production WHERE organization_id = ${id}`,
-  "mrp-boms": (id) => `SELECT * FROM mrp_bom WHERE organization_id = ${id}`,
-  "mrp-workorders": (id) =>
-    `SELECT * FROM mrp_workorder WHERE organization_id = ${id}`,
-  "mrp-workcenters": (id) =>
-    `SELECT * FROM mrp_workcenter WHERE organization_id = ${id}`,
-  employees: (id) =>
-    `SELECT * FROM hr_employee WHERE organization_id = ${id}`,
-  departments: (id) =>
-    `SELECT * FROM hr_department WHERE organization_id = ${id}`,
-  "leave-requests": (id) =>
-    `SELECT * FROM hr_leave WHERE organization_id = ${id}`,
-  contracts: (id) =>
-    `SELECT * FROM hr_contract WHERE organization_id = ${id}`,
-  payslips: (id) => `SELECT * FROM hr_payslip WHERE organization_id = ${id}`,
-  "financial-reports": (id) =>
-    `SELECT * FROM financial_report WHERE organization_id = ${id}`,
-  "trial-balances": (id) =>
-    `SELECT * FROM trial_balance WHERE organization_id = ${id}`,
-  documents: (id) =>
-    `SELECT * FROM document WHERE organization_id = ${id}`,
-  "knowledge-articles": (id) =>
-    `SELECT * FROM knowledge_article WHERE organization_id = ${id}`,
-  "helpdesk-tickets": (id) =>
-    `SELECT * FROM helpdesk_ticket WHERE organization_id = ${id}`,
-  "helpdesk-teams": (id) =>
-    `SELECT * FROM helpdesk_team WHERE organization_id = ${id}`,
-  "helpdesk-stages": (id) =>
-    `SELECT * FROM helpdesk_stage WHERE organization_id = ${id}`,
-  subscriptions: (id) =>
-    `SELECT * FROM subscription WHERE organization_id = ${id}`,
-  "subscription-plans": (id) =>
-    `SELECT * FROM subscription_plan WHERE organization_id = ${id}`,
-  workflows: (id) => `SELECT * FROM workflow WHERE organization_id = ${id}`,
-  "workflow-instances": (id) =>
-    `SELECT * FROM workflow_instance WHERE organization_id = ${id}`,
-  proposals: (id) => `SELECT * FROM proposal WHERE organization_id = ${id}`,
-  "calendar-events": (id) =>
-    `SELECT * FROM calendar_event WHERE organization_id = ${id}`,
-  "mail-messages": (id) =>
-    `SELECT * FROM mail_message WHERE organization_id = ${id}`,
-  expenses: (id) => `SELECT * FROM hr_expense WHERE organization_id = ${id}`,
-  "expense-sheets": (id) =>
-    `SELECT * FROM expense_sheet WHERE organization_id = ${id}`,
+const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessContext) => string> = {
+  "account-accounts": (id, fa) =>
+    selectOrgScopedSql("account-accounts", "account_account", id, fa, "", " ORDER BY code"),
+  "account-journals": (id, fa) =>
+    selectOrgScopedSql("account-journals", "account_journal", id, fa, ""),
+  "account-moves": (id, fa) =>
+    selectOrgScopedSql("account-moves", "account_move", id, fa, ""),
+  "account-taxes": (id, fa) =>
+    selectOrgScopedSql("account-taxes", "account_tax", id, fa, ""),
+  budgets: (id, fa) =>
+    selectOrgScopedSql("budgets", "crossovered_budget", id, fa, ""),
+  "analytic-accounts": (id, fa) =>
+    selectOrgScopedSql("analytic-accounts", "account_analytic_account", id, fa, ""),
+  "sale-orders": (id, fa) =>
+    selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
+  "sale-order-lines": (id, fa) =>
+    selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
+  pricelists: (id, fa) =>
+    selectOrgScopedSql("pricelists", "product_pricelist", id, fa, ""),
+  "pricelist-items": (id, fa) =>
+    selectOrgScopedSql(
+      "pricelist-items",
+      "product_pricelist_item",
+      id,
+      fa,
+      "",
+      " ORDER BY pricelist_id ASC, sequence ASC",
+    ),
+  "picking-batches": (id, fa) =>
+    selectOrgScopedSql("picking-batches", "stock_picking_batch", id, fa, ""),
+  leads: (id, fa) => selectOrgScopedSql("leads", "lead", id, fa, ""),
+  opportunities: (id, fa) =>
+    selectOrgScopedSql("opportunities", "opportunity", id, fa, ""),
+  "opportunity-stages": (id, fa) =>
+    selectOrgScopedSql(
+      "opportunity-stages",
+      "opp_stage",
+      id,
+      fa,
+      "",
+      " ORDER BY sequence ASC",
+    ),
+  contacts: (id, fa) => selectOrgScopedSql("contacts", "contact", id, fa, ""),
+  projects: (id, fa) =>
+    selectOrgScopedSql("projects", "project_project", id, fa, ""),
+  tasks: (id, fa) => selectOrgScopedSql("tasks", "project_task", id, fa, ""),
+  timesheets: (id, fa) =>
+    selectOrgScopedSql("timesheets", "project_timesheet", id, fa, ""),
+  products: (id, fa) => selectOrgScopedSql("products", "product", id, fa, ""),
+  "product-categories": (id, fa) =>
+    selectOrgScopedSql(
+      "product-categories",
+      "product_category",
+      id,
+      fa,
+      " AND deleted_at IS NULL",
+    ),
+  uoms: (id, fa) => selectOrgScopedSql("uoms", "uom", id, fa, ""),
+  "stock-quants": (id, fa) =>
+    selectOrgScopedSql("stock-quants", "stock_quant", id, fa, ""),
+  "stock-pickings": (id, fa) =>
+    selectOrgScopedSql("stock-pickings", "stock_picking", id, fa, ""),
+  warehouses: (id, fa) =>
+    selectOrgScopedSql("warehouses", "warehouse", id, fa, ""),
+  "inventory-adjustments": (id, fa) =>
+    selectOrgScopedSql(
+      "inventory-adjustments",
+      "inventory_adjustment",
+      id,
+      fa,
+      "",
+    ),
+  "purchase-orders": (id, fa) =>
+    selectOrgScopedSql("purchase-orders", "purchase_order", id, fa, ""),
+  "purchase-order-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-order-lines",
+      "purchase_order_line",
+      id,
+      fa,
+      "",
+    ),
+  "purchase-requisitions": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-requisitions",
+      "purchase_requisition",
+      id,
+      fa,
+      "",
+    ),
+  "mrp-productions": (id, fa) =>
+    selectOrgScopedSql("mrp-productions", "mrp_production", id, fa, ""),
+  "mrp-boms": (id, fa) => selectOrgScopedSql("mrp-boms", "mrp_bom", id, fa, ""),
+  "mrp-workorders": (id, fa) =>
+    selectOrgScopedSql("mrp-workorders", "mrp_workorder", id, fa, ""),
+  "mrp-workcenters": (id, fa) =>
+    selectOrgScopedSql("mrp-workcenters", "mrp_workcenter", id, fa, ""),
+  employees: (id, fa) =>
+    selectOrgScopedSql("employees", "hr_employee", id, fa, ""),
+  departments: (id, fa) =>
+    selectOrgScopedSql("departments", "hr_department", id, fa, ""),
+  "leave-requests": (id, fa) =>
+    selectOrgScopedSql("leave-requests", "hr_leave", id, fa, ""),
+  contracts: (id, fa) =>
+    selectOrgScopedSql("contracts", "hr_contract", id, fa, ""),
+  payslips: (id, fa) => selectOrgScopedSql("payslips", "hr_payslip", id, fa, ""),
+  "financial-reports": (id, fa) =>
+    selectOrgScopedSql("financial-reports", "financial_report", id, fa, ""),
+  "trial-balances": (id, fa) =>
+    selectOrgScopedSql("trial-balances", "trial_balance", id, fa, ""),
+  "report-templates": (id, fa) =>
+    selectOrgScopedSql("report-templates", "report_template", id, fa, ""),
+  "scheduled-reports": (id, fa) =>
+    selectOrgScopedSql("scheduled-reports", "scheduled_report", id, fa, ""),
+  "analytics-metrics": (id, fa) =>
+    selectOrgScopedSql("analytics-metrics", "analytics_metric", id, fa, ""),
+  documents: (id, fa) =>
+    selectOrgScopedSql("documents", "document", id, fa, ""),
+  "knowledge-articles": (id, fa) =>
+    selectOrgScopedSql(
+      "knowledge-articles",
+      "knowledge_article",
+      id,
+      fa,
+      "",
+    ),
+  "helpdesk-tickets": (id, fa) =>
+    selectOrgScopedSql("helpdesk-tickets", "helpdesk_ticket", id, fa, ""),
+  "helpdesk-teams": (id, fa) =>
+    selectOrgScopedSql("helpdesk-teams", "helpdesk_team", id, fa, ""),
+  "helpdesk-stages": (id, fa) =>
+    selectOrgScopedSql("helpdesk-stages", "helpdesk_stage", id, fa, ""),
+  "helpdesk-slas": (id, fa) =>
+    selectOrgScopedSql("helpdesk-slas", "helpdesk_sla", id, fa, ""),
+  subscriptions: (id, fa) =>
+    selectOrgScopedSql("subscriptions", "subscription", id, fa, ""),
+  "subscription-plans": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-plans",
+      "subscription_plan",
+      id,
+      fa,
+      "",
+    ),
+  "deferred-revenue-schedules": (id, fa) =>
+    selectOrgScopedSql(
+      "deferred-revenue-schedules",
+      "deferred_revenue_schedule",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "deferred-revenue-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "deferred-revenue-lines",
+      "deferred_revenue_line",
+      id,
+      fa,
+      "",
+      " ORDER BY schedule_id ASC, sequence ASC",
+    ),
+  "revenue-recognition-rules": (id, fa) =>
+    selectOrgScopedSql(
+      "revenue-recognition-rules",
+      "revenue_recognition_rule",
+      id,
+      fa,
+      "",
+      " ORDER BY priority DESC, id DESC",
+    ),
+  workflows: (id, fa) => selectOrgScopedSql("workflows", "workflow", id, fa, ""),
+  "workflow-activities": (id, fa) =>
+    selectOrgScopedSql(
+      "workflow-activities",
+      "workflow_activity",
+      id,
+      fa,
+      "",
+      " ORDER BY workflow_id ASC, sequence ASC",
+    ),
+  "workflow-instances": (id, fa) =>
+    selectOrgScopedSql(
+      "workflow-instances",
+      "workflow_instance",
+      id,
+      fa,
+      "",
+    ),
+  "workflow-transitions": (id, fa) =>
+    selectOrgScopedSql(
+      "workflow-transitions",
+      "workflow_transition",
+      id,
+      fa,
+      "",
+      " ORDER BY id ASC",
+    ),
+  "workflow-workitems": (id, fa) =>
+    selectOrgScopedSql(
+      "workflow-workitems",
+      "workflow_workitem",
+      id,
+      fa,
+      "",
+      " ORDER BY instance_id ASC, id ASC",
+    ),
+  proposals: (id, fa) => selectOrgScopedSql("proposals", "proposal", id, fa, ""),
+  "calendar-events": (id, fa) =>
+    selectOrgScopedSql(
+      "calendar-events",
+      "calendar_event",
+      id,
+      fa,
+      "",
+      " ORDER BY start ASC",
+    ),
+  "mail-messages": (id, fa) =>
+    selectOrgScopedSql("mail-messages", "mail_message", id, fa, ""),
+  expenses: (id, fa) => selectOrgScopedSql("expenses", "hr_expense", id, fa, ""),
+  "expense-sheets": (id, fa) =>
+    selectOrgScopedSql("expense-sheets", "expense_sheet", id, fa, ""),
 };
-
-const ROLES_SQL = "SELECT * FROM role WHERE is_active = true";
 
 /**
  * Returns subscription SQL for a single resource key.
@@ -210,15 +353,27 @@ export function subscriptionQueriesForResource(
   }
 
   if (r === "roles") {
-    return [ROLES_SQL];
+    return [selectRolesActiveSql(ctx.fieldAccess)];
+  }
+
+  /** Form configuration tables: org-scoped via form_config + subqueries for child tables. */
+  if (r === "form-configuration") {
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) {
+      return null;
+    }
+    const id = String(org);
+    return [
+      `SELECT * FROM form_config WHERE organization_id = ${id}`,
+      `SELECT * FROM form_config_field WHERE configuration_id IN (SELECT id FROM form_config WHERE organization_id = ${id})`,
+      `SELECT * FROM form_role_config WHERE configuration_id IN (SELECT id FROM form_config WHERE organization_id = ${id})`,
+      `SELECT * FROM user_custom_field WHERE organization_id = ${id}`,
+    ];
   }
 
   if (r === "user-roles") {
     if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    const hex = ctx.identityHex.replace(/'/g, "''");
-    return [
-      `SELECT * FROM user_role_assignment WHERE user_identity = '${hex}' AND is_active = true`,
-    ];
+    return [selectUserRoleAssignmentsForIdentitySql(ctx.identityHex, ctx.fieldAccess)];
   }
 
   const org = ctx.organizationId;
@@ -229,7 +384,7 @@ export function subscriptionQueriesForResource(
   const builder = ERP_ORG_SQL[r];
   if (!builder) return null;
 
-  return [builder(Number(org))];
+  return [builder(Number(org), ctx.fieldAccess)];
 }
 
 /** Keys for org-scoped ERP tables (same as {@link ERP_ORG_SQL}). */
@@ -241,6 +396,7 @@ export const ALL_ERP_RESOURCE_KEYS: string[] = Object.keys(ERP_ORG_SQL);
  */
 export const FULL_CLIENT_SUBSCRIPTION_RESOURCES: string[] = [
   "auth",
+  "form-configuration",
   ...ALL_ERP_RESOURCE_KEYS,
 ];
 

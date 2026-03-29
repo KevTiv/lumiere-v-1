@@ -1,6 +1,22 @@
 /**
  * Build `<select>` options from `/api/query` rows for modular forms.
  */
+
+import { expenseVariantTag } from './expense-state'
+/** Chart of accounts — code + name for GL pickers. */
+export function accountAccountRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const id = row.id
+    const code = String(row.code ?? "")
+    const name = String(row.name ?? "")
+    const label =
+      code && name ? `${code} — ${name}` : name || code || (id != null ? String(id) : "?")
+    return { value: String(id), label }
+  })
+}
+
 export function accountJournalRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
@@ -98,6 +114,67 @@ export function uomRowsToSelectOptions(
       const sym = row.symbol != null ? String(row.symbol) : ""
       const label = sym ? `${name} (${sym})` : name
       return { value: String(row.id), label }
+    })
+}
+
+/** Purchase orders — optional filter to draft-only (for adding lines). */
+export function purchaseOrderRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+  opts?: { draftOnly?: boolean },
+): Array<{ value: string; label: string }> {
+  const list =
+    opts?.draftOnly === true
+      ? rows.filter((r) => String(r.state ?? "") === "Draft")
+      : rows
+  return list.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? `PO ${row.id}`),
+  }))
+}
+
+/** PO lines with remaining qty to receive (goods receipt). */
+export function purchaseOrderLineRowsToReceiveOptions(
+  lines: Record<string, unknown>[],
+  productLabel?: (productId: string) => string,
+): Array<{ value: string; label: string }> {
+  return lines
+    .filter((l) => {
+      const pq = Number(l.productQty ?? 0)
+      const qr = Number(l.qtyReceived ?? 0)
+      return pq > qr
+    })
+    .map((l) => {
+      const id = String(l.id)
+      const pid = String(l.productId ?? "")
+      const pname = productLabel?.(pid) ?? `Product ${pid}`
+      const left = Math.max(0, Number(l.productQty ?? 0) - Number(l.qtyReceived ?? 0))
+      return {
+        value: id,
+        label: `PO ${l.orderId} — ${pname} (${left} left)`,
+      }
+    })
+}
+
+/** PO lines with qty left to invoice (vendor bill / accrual). */
+export function purchaseOrderLineRowsToInvoiceOptions(
+  lines: Record<string, unknown>[],
+  productLabel?: (productId: string) => string,
+): Array<{ value: string; label: string }> {
+  return lines
+    .filter((l) => {
+      const qr = Number(l.qtyReceived ?? 0)
+      const qi = Number(l.qtyInvoiced ?? 0)
+      return qr > qi
+    })
+    .map((l) => {
+      const id = String(l.id)
+      const pid = String(l.productId ?? "")
+      const pname = productLabel?.(pid) ?? `Product ${pid}`
+      const left = Math.max(0, Number(l.qtyReceived ?? 0) - Number(l.qtyInvoiced ?? 0))
+      return {
+        value: id,
+        label: `PO ${l.orderId} — ${pname} (${left} to bill)`,
+      }
     })
 }
 
@@ -221,6 +298,35 @@ export function helpdeskStageRowsToSelectOptions(
   }))
 }
 
+/** Stage options with team name prefix when `teams` is provided. */
+export function helpdeskStageRowsToSelectOptionsWithTeams(
+  stages: Record<string, unknown>[],
+  teams: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  const teamName = (teamId: unknown): string => {
+    if (teamId == null || teamId === "") return "—"
+    const t = teams.find((x) => String(x.id) === String(teamId))
+    return t != null ? String(t.name ?? teamId) : String(teamId)
+  }
+  return stages.map((row) => {
+    const tid = row.teamId
+    const prefix = tid != null && tid !== "" ? `${teamName(tid)} · ` : ""
+    return {
+      value: String(row.id),
+      label: `${prefix}${String(row.name ?? row.sequence ?? row.id)}`,
+    }
+  })
+}
+
+export function helpdeskSlaRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.id),
+  }))
+}
+
 export function mrpBomRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
@@ -248,4 +354,21 @@ export function locationOptionsFromQuantsAndTransfers(
     if (b != null && !map.has(String(b))) map.set(String(b), `Loc ${String(b).slice(-8)} (dest)`)
   }
   return [...map.entries()].map(([value, label]) => ({ value, label }))
+}
+
+/** Draft expense reports only; optionally filter to the same employee as the expense line. */
+export function expenseSheetRowsToDraftSelectOptions(
+  rows: Record<string, unknown>[],
+  employeeId?: string,
+): Array<{ value: string; label: string }> {
+  let list = rows.filter((r) => expenseVariantTag(r.state) === 'Draft')
+  if (employeeId != null && employeeId !== '') {
+    list = list.filter(
+      (r) => String(r.employeeId ?? (r as { employee_id?: unknown }).employee_id) === employeeId,
+    )
+  }
+  return list.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.id),
+  }))
 }

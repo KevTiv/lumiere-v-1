@@ -7,16 +7,40 @@ import {
   FormModal,
   newSubscriptionForm,
   newSubscriptionPlanForm,
+  newDeferredRevenueScheduleForm,
+  newRevenueRecognitionRuleForm,
+  closeSubscriptionForm,
+  generateSubscriptionInvoiceForm,
+  recognizeDeferredRevenueLineForm,
+  importSubscriptionPlanCsvForm,
+  importSubscriptionCsvForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  subscriptionsTableConfig,
+  deferredRevenueLinesTableConfig,
+  revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
+import { PlayCircle, XCircle, FileText, ClipboardCheck, CheckCircle2, CircleSlash } from "lucide-react"
 import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useSubscriptions,
   useSubscriptionPlans,
   useCreateSubscription,
   useCreateSubscriptionPlan,
+  useDeferredRevenueSchedules,
+  useDeferredRevenueLines,
+  useRevenueRecognitionRules,
+  useActivateSubscription,
+  useCloseSubscription,
+  useGenerateSubscriptionInvoice,
+  useCreateDeferredRevenueSchedule,
+  useRecognizeDeferredRevenue,
+  useCreateRevenueRecognitionRule,
+  useActivateRevenueRecognitionRule,
+  useDeactivateRevenueRecognitionRule,
+  useImportSubscriptionPlanCsv,
+  useImportSubscriptionCsv,
 } from "@/hooks/subscriptions"
 import type {
   CreateSubscriptionFromSaleOrderParams,
@@ -25,22 +49,44 @@ import type {
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders, usePricelists } from "@/hooks/sales"
 import { useProducts } from "@/hooks/inventory"
-import { useAccountJournals } from "@/hooks/accounting"
+import { useAccountJournals, useAccountAccounts } from "@/hooks/accounting"
 import {
   saleOrderRowsToSelectOptions,
   subscriptionPlanRowsToSelectOptions,
   pricelistRowsToSelectOptions,
   productRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
+import {
+  buildCloseSubscriptionParams,
+  buildCreateDeferredRevenueScheduleParams,
+  buildCreateRevenueRecognitionRuleParams,
+  buildGenerateSubscriptionInvoiceParams,
+  buildRecognizeDeferredRevenueParams,
+} from "@/lib/subscriptions-revenue-params"
+
+function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
+  const state = String(row.state ?? "")
+  if (state === "closed") return false
+  return state === "active" || state === "open"
+}
+
+function isTrialSubscriptionRow(row: Record<string, unknown>): boolean {
+  return row.isTrial === true || row.isTrial === 1 || row.is_trial === true || row.is_trial === 1
+}
 
 interface SubscriptionsClientProps {
   initialSubscriptions?: Record<string, unknown>[]
   initialPlans?: Record<string, unknown>[]
+  initialDeferredSchedules?: Record<string, unknown>[]
+  initialDeferredLines?: Record<string, unknown>[]
+  initialRecognitionRules?: Record<string, unknown>[]
   initialSaleOrders?: Record<string, unknown>[]
   initialPricelists?: Record<string, unknown>[]
   initialProducts?: Record<string, unknown>[]
   initialJournals?: Record<string, unknown>[]
+  initialAccounts?: Record<string, unknown>[]
   organizationId?: number
 }
 
@@ -58,26 +104,49 @@ export function SubscriptionsClient(props: SubscriptionsClientProps) {
 function SubscriptionsClientLoaded({
   initialSubscriptions,
   initialPlans,
+  initialDeferredSchedules,
+  initialDeferredLines,
+  initialRecognitionRules,
   initialSaleOrders,
   initialPricelists,
   initialProducts,
   initialJournals,
+  initialAccounts,
   organizationId,
 }: SubscriptionsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { orgId, companyId } = orgBigInts(organizationId)
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
+    null,
+  )
+  const [closeTargetId, setCloseTargetId] = useState<number | null>(null)
+  const [generateTargetId, setGenerateTargetId] = useState<number | null>(null)
+  const [recognizeLineId, setRecognizeLineId] = useState<number | null>(null)
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
+  const { data: deferredSchedules = [] } = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
+  const { data: deferredLines = [] } = useDeferredRevenueLines(orgId, initialDeferredLines)
+  const { data: recognitionRules = [] } = useRevenueRecognitionRules(orgId, initialRecognitionRules)
   const { data: saleOrders = [] } = useSaleOrders(companyId, initialSaleOrders)
-  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: journals = [] } = useAccountJournals(orgId, initialJournals)
+  const { data: accounts = [] } = useAccountAccounts(orgId, initialAccounts)
 
   const createSubscription = useCreateSubscription(orgId, orgId)
   const createPlan = useCreateSubscriptionPlan(orgId, orgId)
+  const activateSubscription = useActivateSubscription(orgId, orgId)
+  const closeSubscription = useCloseSubscription(orgId, orgId)
+  const generateInvoice = useGenerateSubscriptionInvoice(orgId, orgId)
+  const createDeferredSchedule = useCreateDeferredRevenueSchedule(orgId, orgId)
+  const recognizeDeferred = useRecognizeDeferredRevenue(orgId, orgId)
+  const createRecognitionRule = useCreateRevenueRecognitionRule(orgId, orgId)
+  const activateRule = useActivateRevenueRecognitionRule(orgId, orgId)
+  const deactivateRule = useDeactivateRevenueRecognitionRule(orgId, orgId)
+  const importPlanCsv = useImportSubscriptionPlanCsv(orgId, orgId)
+  const importSubscriptionCsv = useImportSubscriptionCsv(orgId, orgId)
 
   const saleOrderOptions = useMemo(() => {
     const fromApi = saleOrderRowsToSelectOptions(saleOrders)
@@ -109,6 +178,12 @@ function SubscriptionsClientLoaded({
     return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
   }, [products, t])
 
+  const accountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(accounts)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
+  }, [accounts, t])
+
   const subscriptionFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newSubscriptionForm(t), {
@@ -128,10 +203,124 @@ function SubscriptionsClientLoaded({
     [t, pricelistFieldOptions, journalFieldOptions, productFieldOptions],
   )
 
+  const deferredScheduleFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newDeferredRevenueScheduleForm(t), {
+        journalId: journalFieldOptions,
+        accountId: accountFieldOptions,
+        deferredAccountId: accountFieldOptions,
+      }),
+    [t, journalFieldOptions, accountFieldOptions],
+  )
+
+  const recognitionRuleFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newRevenueRecognitionRuleForm(t), {
+        recognitionAccountId: accountFieldOptions,
+        deferredAccountId: accountFieldOptions,
+      }),
+    [t, accountFieldOptions],
+  )
+
+  const importPlanCsvFormConfig = useMemo(() => importSubscriptionPlanCsvForm(t), [t])
+  const importSubscriptionCsvFormConfig = useMemo(() => importSubscriptionCsvForm(t), [t])
+
+  const subscriptionRowActions = useMemo((): EntityAction[] => {
+    return [
+      {
+        id: "activate-sub",
+        label: t("subscriptions.actions.activate"),
+        icon: PlayCircle,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r || String(r.state) !== "draft") return
+          void activateSubscription.mutate({ subscriptionId: BigInt(String(r.id)) })
+        },
+      },
+      {
+        id: "close-sub",
+        label: t("subscriptions.actions.close"),
+        icon: XCircle,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          if (String(r.state) === "closed") return
+          setCloseTargetId(Number(r.id))
+        },
+      },
+      {
+        id: "gen-inv",
+        label: t("subscriptions.actions.generateInvoice"),
+        icon: FileText,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          if (String(r.state) !== "active") return
+          setGenerateTargetId(Number(r.id))
+        },
+      },
+    ]
+  }, [t, activateSubscription])
+
+  const deferredLineActions = useMemo((): EntityAction[] => {
+    return [
+      {
+        id: "recognize-line",
+        label: t("subscriptions.actions.recognizeLine"),
+        icon: ClipboardCheck,
+        variant: "default",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          if (r.recognized === true || r.recognized === 1) return
+          setRecognizeLineId(Number(r.id))
+        },
+      },
+    ]
+  }, [t])
+
+  const recognitionRuleActions = useMemo((): EntityAction[] => {
+    return [
+      {
+        id: "activate-rule",
+        label: t("subscriptions.actions.activateRule"),
+        icon: CheckCircle2,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          void activateRule.mutate({ ruleId: BigInt(String(r.id)) })
+        },
+      },
+      {
+        id: "deactivate-rule",
+        label: t("subscriptions.actions.deactivateRule"),
+        icon: CircleSlash,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          void deactivateRule.mutate({ ruleId: BigInt(String(r.id)) })
+        },
+      },
+    ]
+  }, [t, activateRule, deactivateRule])
+
   const liveSections = useMemo(() => {
-    const active = subscriptions.filter((s) => String(s.state) === "open").length
-    const mrr = subscriptions
-      .filter((s) => String(s.state) === "open")
+    const rows = subscriptions as Record<string, unknown>[]
+    const active = rows.filter(isSubscriptionActiveForMetrics).length
+    const trials = rows.filter(isTrialSubscriptionRow).length
+    const mrr = rows
+      .filter(isSubscriptionActiveForMetrics)
       .reduce((sum, s) => sum + Number(s.recurringMonthly ?? 0), 0)
 
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
@@ -148,15 +337,20 @@ function SubscriptionsClientLoaded({
                 { label: "Total Subscriptions", value: String(subscriptions.length), icon: "RefreshCw" },
                 { label: "Active", value: String(active), icon: "CheckCircle" },
                 { label: "MRR", value: `$${mrr.toLocaleString()}`, icon: "TrendingUp" },
-                { label: "Plans", value: String(plans.length), icon: "List" },
+                { label: "Trials", value: String(trials), icon: "Clock" },
               ],
             },
           }
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_subscription: () => setQuickActionForm({ form: subscriptionFormConfig, action: "createSubscription" }),
+            new_subscription: () =>
+              setQuickActionForm({ form: subscriptionFormConfig, action: "createSubscription" }),
             new_plan: () => setQuickActionForm({ form: planFormConfig, action: "createPlan" }),
+            import_plan_csv: () =>
+              setQuickActionForm({ form: importPlanCsvFormConfig, action: "importPlanCsv" }),
+            import_subscription_csv: () =>
+              setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" }),
           }
           return {
             ...w,
@@ -169,7 +363,15 @@ function SubscriptionsClientLoaded({
         return w
       }),
     }))
-  }, [subscriptions, plans, moduleConfig, t, subscriptionFormConfig, planFormConfig])
+  }, [
+    subscriptions,
+    plans,
+    moduleConfig,
+    subscriptionFormConfig,
+    planFormConfig,
+    importPlanCsvFormConfig,
+    importSubscriptionCsvFormConfig,
+  ])
 
   const config = useMemo(
     () =>
@@ -177,20 +379,51 @@ function SubscriptionsClientLoaded({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "subscriptions") return { ...tab, createForm: subscriptionFormConfig }
+          if (tab.id === "subscriptions")
+            return {
+              ...tab,
+              createForm: subscriptionFormConfig,
+              entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
+            }
           if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
+          if (tab.id === "deferred-schedules") return { ...tab, createForm: deferredScheduleFormConfig }
+          if (tab.id === "deferred-lines")
+            return {
+              ...tab,
+              entityConfig: deferredRevenueLinesTableConfig(t, deferredLineActions),
+            }
+          if (tab.id === "recognition-rules")
+            return {
+              ...tab,
+              createForm: recognitionRuleFormConfig,
+              entityConfig: revenueRecognitionRulesTableConfig(t, recognitionRuleActions),
+            }
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, subscriptionFormConfig, planFormConfig],
+    [
+      liveSections,
+      moduleConfig,
+      subscriptionFormConfig,
+      planFormConfig,
+      deferredScheduleFormConfig,
+      recognitionRuleFormConfig,
+      t,
+      subscriptionRowActions,
+      deferredLineActions,
+      recognitionRuleActions,
+    ],
   )
 
   const data = useMemo(
     () => ({
       subscriptions: subscriptions as unknown as Record<string, unknown>[],
       plans: plans as unknown as Record<string, unknown>[],
+      "deferred-schedules": deferredSchedules as unknown as Record<string, unknown>[],
+      "deferred-lines": deferredLines as unknown as Record<string, unknown>[],
+      "recognition-rules": recognitionRules as unknown as Record<string, unknown>[],
     }),
-    [subscriptions, plans],
+    [subscriptions, plans, deferredSchedules, deferredLines, recognitionRules],
   )
 
   const handleFormSubmit = (
@@ -251,7 +484,8 @@ function SubscriptionsClientLoaded({
       const plRaw = formData.pricelistId
       const jRaw = formData.journalId
       const prodRaw = formData.productId
-      if (plRaw === "" || plRaw == null || jRaw === "" || jRaw == null || prodRaw === "" || prodRaw == null) return
+      if (plRaw === "" || plRaw == null || jRaw === "" || jRaw == null || prodRaw === "" || prodRaw == null)
+        return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const currencyId = Number(pl.currencyId)
@@ -285,16 +519,36 @@ function SubscriptionsClientLoaded({
         recurringRuleMaxCount: Number(formData.billingPeriodUnit ?? 1),
         metadata: undefined,
       } as unknown as CreateSubscriptionPlanParams)
+    } else if (action === "createDeferredSchedule") {
+      const params = buildCreateDeferredRevenueScheduleParams(formData)
+      void createDeferredSchedule.mutate(params)
+    } else if (action === "createRecognitionRule") {
+      const raw = { ...formData }
+      if (raw.expenseAccountId != null && String(raw.expenseAccountId).trim() !== "") {
+        raw.expenseAccountId = raw.expenseAccountId
+      } else {
+        delete raw.expenseAccountId
+      }
+      const params = buildCreateRevenueRecognitionRuleParams(raw)
+      void createRecognitionRule.mutate(params)
+    } else if (action === "importPlanCsv") {
+      const raw = formData.csvData
+      if (raw == null || String(raw).trim() === "") return
+      void importPlanCsv.mutate({ csvData: String(raw) })
+    } else if (action === "importSubscriptionCsv") {
+      const raw = formData.csvData
+      if (raw == null || String(raw).trim() === "") return
+      void importSubscriptionCsv.mutate({ csvData: String(raw) })
     }
   }
 
+  const closeForm = useMemo(() => closeSubscriptionForm(t), [t])
+  const generateForm = useMemo(() => generateSubscriptionInvoiceForm(t), [t])
+  const recognizeForm = useMemo(() => recognizeDeferredRevenueLineForm(t), [t])
+
   return (
     <>
-      <ModuleView
-        config={config}
-        data={data}
-        onFormSubmit={handleFormSubmit}
-      />
+      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -304,6 +558,48 @@ function SubscriptionsClientLoaded({
             handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
+        }}
+      />
+      <FormModal
+        open={closeTargetId !== null}
+        onOpenChange={(open) => !open && setCloseTargetId(null)}
+        config={closeForm}
+        onSubmit={(formData) => {
+          if (closeTargetId == null) return
+          const params = buildCloseSubscriptionParams(formData)
+          void closeSubscription.mutate({
+            subscriptionId: BigInt(closeTargetId),
+            params: params as unknown as Record<string, unknown>,
+          })
+          setCloseTargetId(null)
+        }}
+      />
+      <FormModal
+        open={generateTargetId !== null}
+        onOpenChange={(open) => !open && setGenerateTargetId(null)}
+        config={generateForm}
+        onSubmit={(formData) => {
+          if (generateTargetId == null) return
+          const params = buildGenerateSubscriptionInvoiceParams(formData)
+          void generateInvoice.mutate({
+            subscriptionId: BigInt(generateTargetId),
+            params: params as unknown as Record<string, unknown>,
+          })
+          setGenerateTargetId(null)
+        }}
+      />
+      <FormModal
+        open={recognizeLineId !== null}
+        onOpenChange={(open) => !open && setRecognizeLineId(null)}
+        config={recognizeForm}
+        onSubmit={(formData) => {
+          if (recognizeLineId == null) return
+          const params = buildRecognizeDeferredRevenueParams(formData)
+          void recognizeDeferred.mutate({
+            lineId: BigInt(recognizeLineId),
+            params: params as unknown as Record<string, unknown>,
+          })
+          setRecognizeLineId(null)
         }}
       />
     </>

@@ -14,9 +14,16 @@ interface ModuleViewProps {
   /** Live data keyed by tab id — entity tabs receive data[tab.id] */
   data?: Record<string, Record<string, unknown>[]>
   /** Called when a create form is submitted: tabId, createAction, form values */
-  onFormSubmit?: (tabId: string, action: string, data: Record<string, unknown>) => void
+  onFormSubmit?: (
+    tabId: string,
+    action: string,
+    data: Record<string, unknown>,
+  ) => void | Promise<void>
   /** Called when a table row is clicked: tabId, row record */
   onRowClick?: (tabId: string, row: Record<string, unknown>) => void
+  /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
+  activeTab?: string
+  onActiveTabChange?: (tab: string) => void
 }
 
 export function ModuleView({
@@ -24,9 +31,16 @@ export function ModuleView({
   data = {},
   onFormSubmit,
   onRowClick,
+  activeTab: activeTabProp,
+  onActiveTabChange,
 }: ModuleViewProps) {
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  const [internalTab, setInternalTab] = useState(defaultTab)
+  const activeTab = activeTabProp ?? internalTab
+  const setActiveTab = (v: string) => {
+    onActiveTabChange?.(v)
+    if (activeTabProp === undefined) setInternalTab(v)
+  }
   const [openForm, setOpenForm] = useState<string | null>(null)
 
   return (
@@ -73,8 +87,8 @@ export function ModuleView({
                     open={openForm === tab.id}
                     onOpenChange={(open) => !open && setOpenForm(null)}
                     config={tab.createForm}
-                    onSubmit={(formData) => {
-                      onFormSubmit?.(
+                    onSubmit={async (formData) => {
+                      await onFormSubmit?.(
                         tab.id,
                         tab.createAction ?? tab.id,
                         formData,

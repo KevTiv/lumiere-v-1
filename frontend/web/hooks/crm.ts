@@ -70,7 +70,7 @@ export function useActivities(
 ) {
   return useQuery<QueryRows>({
     queryKey: ['activities', organizationId.toString()],
-    queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch activities'),
+    queryFn: () => fetchQueryList('/api/query/activities', 'Failed to fetch activities'),
     staleTime: 30_000,
     initialData,
   })
@@ -274,10 +274,109 @@ export function useCreateContactSegment(organizationId: bigint) {
   })
 }
 
+export function useConvertLeadToCustomer(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { leadId: ScalarId; params: Record<string, unknown> }>({
+    mutationFn: async ({ leadId, params }) => {
+      const r = await fetch('/api/call/convert_lead_to_customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), leadId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to convert lead')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] })
+    },
+  })
+}
+
+export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { opportunityId: ScalarId; params: Record<string, unknown> }>({
+    mutationFn: async ({ opportunityId, params }) => {
+      const r = await fetch('/api/call/convert_opportunity_to_sale_order?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([opportunityId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to convert opportunity to sale order')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+    },
+  })
+}
+
+export function useDeleteContact(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (contactId) => {
+      const r = await fetch('/api/call/delete_contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), contactId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to delete contact')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+  })
+}
+
+export function useAssignTagToContact(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { contactId: ScalarId; tagId: ScalarId; metadata?: string | null }>({
+    mutationFn: async ({ contactId, tagId, metadata }) => {
+      const r = await fetch('/api/call/assign_tag_to_contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), contactId.toString(), tagId.toString(), metadata ?? null]),
+      })
+      if (!r.ok) throw new Error('Failed to assign tag')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+  })
+}
+
+export function useAddContactToSegment(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { segmentId: ScalarId; contactId: ScalarId }>({
+    mutationFn: async ({ segmentId, contactId }) => {
+      const r = await fetch('/api/call/add_contact_to_segment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), segmentId.toString(), contactId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to add contact to segment')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+  })
+}
+
+export function useCompleteActivity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (activityId) => {
+      const r = await fetch('/api/call/complete_activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), activityId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to complete activity')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', organizationId.toString()] }),
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   CreateLeadParams,
   CreateOpportunityParams,
   CreateContactParams,
   CreateActivityParams,
+  ConvertLeadParams,
+  ConvertOpportunityParams,
 } from '@lumiere/stdb'

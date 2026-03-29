@@ -32,12 +32,15 @@ pub struct ProductPricelist {
 #[spacetimedb::table(
     accessor = product_pricelist_item,
     public,
+    index(accessor = pricelist_item_by_org, btree(columns = [organization_id])),
     index(accessor = pricelist_item_by_pricelist, btree(columns = [pricelist_id]))
 )]
 pub struct ProductPricelistItem {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Denormalized from parent pricelist for org-scoped queries and subscriptions.
+    pub organization_id: u64,
     pub pricelist_id: u64,
     pub applied_on: PricelistAppliedOn, // AllProducts | Category | Product
     pub compute_price: ComputePrice,    // Fixed | Percentage | Formula
@@ -206,6 +209,7 @@ pub fn create_pricelist_item(
         .product_pricelist_item()
         .insert(ProductPricelistItem {
             id: 0,
+            organization_id: pl.organization_id,
             pricelist_id: params.pricelist_id,
             applied_on: params.applied_on,
             compute_price: params.compute_price,

@@ -8,6 +8,7 @@ import type {
   CreateAccountTaxParams,
   CreateCrossoveredBudgetParams,
 } from '@lumiere/stdb'
+import type { CreatePaymentParams } from '@lumiere/stdb/generated/types'
 import { Timestamp } from 'spacetimedb'
 
 import { userTypeIdFromInternalGroup } from '@/lib/accounting-defaults'
@@ -284,5 +285,61 @@ export function accountingParamsToJson(
     | CreateAccountTaxParams
     | CreateCrossoveredBudgetParams,
 ): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export type PaymentResolutionContext = {
+  /** When move row has no journal (edge case), use first available sales/purchase journal. */
+  defaultJournalId?: bigint
+  /** When currency is missing on the move, use journal or company currency. */
+  fallbackCurrencyId?: bigint
+}
+
+/** Build payment draft for AR/AP from an invoice/bill move row. */
+export function toCreatePaymentParamsFromInvoice(
+  invoice: Record<string, unknown>,
+  companyId: bigint,
+  amount: number,
+  paymentRef: string,
+  memo: string | undefined,
+  context?: PaymentResolutionContext,
+): CreatePaymentParams | null {
+  const journalId =
+    optionalBigIntU64(invoice.journalId) ?? context?.defaultJournalId
+  const currencyId =
+    optionalBigIntU64(invoice.currencyId) ??
+    optionalBigIntU64((invoice as { companyCurrencyId?: unknown }).companyCurrencyId) ??
+    context?.fallbackCurrencyId
+  const partnerId =
+    optionalBigIntU64(invoice.partnerId) ??
+    optionalBigIntU64((invoice as { commercialPartnerId?: unknown }).commercialPartnerId)
+  const cid = optionalBigIntU64(invoice.companyId) ?? companyId
+  const mtRaw = invoice.moveType
+  const mt =
+    mtRaw != null && typeof mtRaw === 'object' && 'tag' in mtRaw
+      ? String((mtRaw as { tag: string }).tag)
+      : String(mtRaw ?? '')
+  if (!journalId || !currencyId || !partnerId) return null
+  if (amount <= 0) return null
+
+  const isCustomerInvoice = mt === 'OutInvoice' || mt === 'OutRefund'
+  const isVendorBill = mt === 'InInvoice' || mt === 'InRefund'
+  if (!isCustomerInvoice && !isVendorBill) return null
+
+  return {
+    companyId: cid,
+    paymentType: isCustomerInvoice ? { tag: 'InBound' as const } : { tag: 'OutBound' as const },
+    partnerType: isCustomerInvoice ? { tag: 'Customer' as const } : { tag: 'Supplier' as const },
+    partnerId,
+    amount,
+    currencyId,
+    date: undefined,
+    journalId,
+    ref: paymentRef,
+    memo: memo?.trim() ? memo.trim() : undefined,
+  }
+}
+
+export function paymentParamsToJson(params: CreatePaymentParams): Record<string, unknown> {
   return stdbParamsToJson(params)
 }

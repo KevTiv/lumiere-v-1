@@ -26,6 +26,13 @@ interface FormModalProps {
   config: FormConfig
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   className?: string
+  /**
+   * When false, the modal does not close after submit; call `onOpenChange(false)` from `onSubmit` on success.
+   * Use when you handle errors inside `onSubmit` and need to keep the dialog open.
+   */
+  closeOnSubmit?: boolean
+  /** Shown above the form body (e.g. API / validation errors while the dialog stays open). */
+  submitError?: string | null
 }
 
 export function FormModal({
@@ -34,12 +41,16 @@ export function FormModal({
   config,
   onSubmit,
   className,
+  closeOnSubmit = true,
+  submitError,
 }: FormModalProps) {
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (onSubmit) {
       await onSubmit(data)
     }
-    onOpenChange(false)
+    if (closeOnSubmit) {
+      onOpenChange(false)
+    }
   }
 
   const handleCancel = () => {
@@ -89,6 +100,11 @@ export function FormModal({
 
         {/* Scrollable form body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {submitError ? (
+            <p className="text-sm text-destructive mb-4" role="alert">
+              {submitError}
+            </p>
+          ) : null}
           <ModularForm
             config={{ ...config, title: "", description: "" }}
             onSubmit={handleSubmit}

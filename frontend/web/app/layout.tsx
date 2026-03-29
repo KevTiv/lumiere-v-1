@@ -46,7 +46,7 @@ export default async function RootLayout({
   const identityHex = session?.identityHex
   const organizationId = session?.organizationId
   const opts = session?.opts ?? {}
-  const stdbModule = process.env.STDB_MODULE ?? process.env.NEXT_PUBLIC_STDB_MODULE ?? 'lumiere-v1'
+  const stdbModule = process.env.STDB_MODULE ?? process.env.NEXT_PUBLIC_STDB_MODULE ?? 'lumiere-v1-j1uo0'
 
   let serverRoleNames: string[] = []
   if (identityHex) {
@@ -69,7 +69,11 @@ export default async function RootLayout({
   }
 
   const store = await cookies()
-  if (!Boolean(store.get("stdb_token")?.value)) redirect("/sign-in")
+  const hasStdbCookie = Boolean(store.get("stdb_token")?.value)
+  const devAdmin = process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
+  // Dev admin: allow first paint without cookies so the client can connect from localStorage
+  // and bridge the token via saveStdbSession (WebSocket + /api/query then succeed).
+  if (!hasStdbCookie && !devAdmin) redirect("/sign-in")
 
   return (
     <html lang="en" suppressHydrationWarning>

@@ -11,6 +11,7 @@
     "add:native": "pnpm dlx @react-native-reusables/cli@latest add"
   },
   "dependencies": {
+    "@lumiere/stdb": "workspace:*",
     "@base-ui/react": "^1.2.0",
     "@codemirror/commands": "^6.0.0",
     "@codemirror/lang-python": "^6.0.0",

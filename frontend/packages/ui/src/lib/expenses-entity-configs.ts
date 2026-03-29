@@ -2,24 +2,40 @@ import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
 const expenseStateBadges = (t: TFunction) => ({
-  badgeVariants: { draft: "secondary", reported: "outline", approved: "default", done: "default", refused: "destructive" },
+  badgeVariants: {
+    Draft: "secondary",
+    Submitted: "outline",
+    Approved: "default",
+    Posted: "default",
+    Done: "default",
+    Refused: "destructive",
+  },
   badgeLabels: {
-    draft: t("expenses.expenses.states.draft"),
-    reported: t("expenses.expenses.states.reported"),
-    approved: t("expenses.expenses.states.approved"),
-    done: t("expenses.expenses.states.done"),
-    refused: t("expenses.expenses.states.refused"),
+    Draft: t("expenses.expenses.states.Draft"),
+    Submitted: t("expenses.expenses.states.Submitted"),
+    Approved: t("expenses.expenses.states.Approved"),
+    Posted: t("expenses.expenses.states.Posted"),
+    Done: t("expenses.expenses.states.Done"),
+    Refused: t("expenses.expenses.states.Refused"),
   },
 }) as const
 
 const sheetStateBadges = (t: TFunction) => ({
-  badgeVariants: { draft: "secondary", submit: "outline", approve: "default", post: "default", done: "default" },
+  badgeVariants: {
+    Draft: "secondary",
+    Submitted: "outline",
+    Approved: "default",
+    Posted: "default",
+    Done: "default",
+    Refused: "destructive",
+  },
   badgeLabels: {
-    draft: t("expenses.expenseReports.states.draft"),
-    submit: t("expenses.expenseReports.states.submit"),
-    approve: t("expenses.expenseReports.states.approve"),
-    post: t("expenses.expenseReports.states.post"),
-    done: t("expenses.expenseReports.states.done"),
+    Draft: t("expenses.expenseReports.states.Draft"),
+    Submitted: t("expenses.expenseReports.states.Submitted"),
+    Approved: t("expenses.expenseReports.states.Approved"),
+    Posted: t("expenses.expenseReports.states.Posted"),
+    Done: t("expenses.expenseReports.states.Done"),
+    Refused: t("expenses.expenseReports.states.Refused"),
   },
 }) as const
 
@@ -40,11 +56,12 @@ export const expensesTableConfig = (t: TFunction): EntityViewConfig => ({
         label: t("expenses.expenses.filters.state"),
         type: "select",
         options: [
-          { value: "draft", label: t("expenses.expenses.filters.state.options.draft") },
-          { value: "reported", label: t("expenses.expenses.filters.state.options.reported") },
-          { value: "approved", label: t("expenses.expenses.filters.state.options.approved") },
-          { value: "done", label: t("expenses.expenses.filters.state.options.done") },
-          { value: "refused", label: t("expenses.expenses.filters.state.options.refused") },
+          { value: "Draft", label: t("expenses.expenses.filters.state.options.Draft") },
+          { value: "Submitted", label: t("expenses.expenses.filters.state.options.Submitted") },
+          { value: "Approved", label: t("expenses.expenses.filters.state.options.Approved") },
+          { value: "Posted", label: t("expenses.expenses.filters.state.options.Posted") },
+          { value: "Done", label: t("expenses.expenses.filters.state.options.Done") },
+          { value: "Refused", label: t("expenses.expenses.filters.state.options.Refused") },
         ],
       },
     ],
@@ -77,11 +94,12 @@ export const expenseSheetsTableConfig = (t: TFunction): EntityViewConfig => ({
         label: t("expenses.expenseReports.filters.state"),
         type: "select",
         options: [
-          { value: "draft", label: t("expenses.expenseReports.filters.state.options.draft") },
-          { value: "submit", label: t("expenses.expenseReports.filters.state.options.submit") },
-          { value: "approve", label: t("expenses.expenseReports.filters.state.options.approve") },
-          { value: "post", label: t("expenses.expenseReports.filters.state.options.post") },
-          { value: "done", label: t("expenses.expenseReports.filters.state.options.done") },
+          { value: "Draft", label: t("expenses.expenseReports.filters.state.options.Draft") },
+          { value: "Submitted", label: t("expenses.expenseReports.filters.state.options.Submitted") },
+          { value: "Approved", label: t("expenses.expenseReports.filters.state.options.Approved") },
+          { value: "Posted", label: t("expenses.expenseReports.filters.state.options.Posted") },
+          { value: "Done", label: t("expenses.expenseReports.filters.state.options.Done") },
+          { value: "Refused", label: t("expenses.expenseReports.filters.state.options.Refused") },
         ],
       },
     ],

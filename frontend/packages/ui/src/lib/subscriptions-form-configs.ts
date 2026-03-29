@@ -251,7 +251,386 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
+  id: "new-deferred-revenue-schedule",
+  title: t("subscriptions.forms.deferredSchedule.title"),
+  description: t("subscriptions.forms.deferredSchedule.description"),
+  sections: [
+    {
+      id: "drs-main",
+      title: t("subscriptions.forms.deferredSchedule.sections.main"),
+      fields: [
+        {
+          id: "description",
+          name: "description",
+          type: "text",
+          label: t("subscriptions.forms.deferredSchedule.fields.description"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.journalId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "accountId",
+          name: "accountId",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.revenueAccountId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "deferredAccountId",
+          name: "deferredAccountId",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.deferredAccountId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "number",
+          label: t("subscriptions.forms.deferredSchedule.fields.currencyId"),
+          placeholder: "1",
+          width: "1/2",
+        },
+        {
+          id: "totalAmount",
+          name: "totalAmount",
+          type: "number",
+          label: t("subscriptions.forms.deferredSchedule.fields.totalAmount"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "recognizedAmount",
+          name: "recognizedAmount",
+          type: "number",
+          label: t("subscriptions.forms.deferredSchedule.fields.recognizedAmount"),
+          placeholder: "0",
+          width: "1/2",
+        },
+        {
+          id: "startDate",
+          name: "startDate",
+          type: "date",
+          label: t("subscriptions.forms.deferredSchedule.fields.startDate"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "endDate",
+          name: "endDate",
+          type: "date",
+          label: t("subscriptions.forms.deferredSchedule.fields.endDate"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "recognitionMethod",
+          name: "recognitionMethod",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.recognitionMethod"),
+          width: "1/2",
+          options: [
+            { value: "straight_line", label: t("subscriptions.forms.deferredSchedule.options.straightLine") },
+            { value: "one_time", label: t("subscriptions.forms.deferredSchedule.options.oneTime") },
+            { value: "monthly", label: t("subscriptions.forms.deferredSchedule.options.monthly") },
+          ],
+        },
+        {
+          id: "recognitionPeriod",
+          name: "recognitionPeriod",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.recognitionPeriod"),
+          width: "1/2",
+          options: [
+            { value: "month", label: t("subscriptions.forms.deferredSchedule.options.month") },
+            { value: "quarter", label: t("subscriptions.forms.deferredSchedule.options.quarter") },
+            { value: "year", label: t("subscriptions.forms.deferredSchedule.options.year") },
+          ],
+        },
+        {
+          id: "state",
+          name: "state",
+          type: "select",
+          label: t("subscriptions.forms.deferredSchedule.fields.state"),
+          width: "1/2",
+          options: [
+            { value: "draft", label: t("subscriptions.forms.deferredSchedule.options.stateDraft") },
+            { value: "running", label: t("subscriptions.forms.deferredSchedule.options.stateRunning") },
+          ],
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("subscriptions.forms.deferredSchedule.fields.notes"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const newRevenueRecognitionRuleForm = (t: TFunction): FormConfig => ({
+  id: "new-revenue-recognition-rule",
+  title: t("subscriptions.forms.recognitionRule.title"),
+  description: t("subscriptions.forms.recognitionRule.description"),
+  sections: [
+    {
+      id: "rr-main",
+      title: t("subscriptions.forms.recognitionRule.sections.main"),
+      fields: [
+        {
+          id: "description",
+          name: "description",
+          type: "text",
+          label: t("subscriptions.forms.recognitionRule.fields.description"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "recognitionAccountId",
+          name: "recognitionAccountId",
+          type: "select",
+          label: t("subscriptions.forms.recognitionRule.fields.recognitionAccountId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "deferredAccountId",
+          name: "deferredAccountId",
+          type: "select",
+          label: t("subscriptions.forms.recognitionRule.fields.deferredAccountId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "expenseAccountId",
+          name: "expenseAccountId",
+          type: "number",
+          label: t("subscriptions.forms.recognitionRule.fields.expenseAccountId"),
+          placeholder: t("subscriptions.forms.recognitionRule.fields.expenseAccountIdPlaceholder"),
+          width: "1/2",
+        },
+        {
+          id: "productCategoryIds",
+          name: "productCategoryIds",
+          type: "text",
+          label: t("subscriptions.forms.recognitionRule.fields.productCategoryIds"),
+          placeholder: t("subscriptions.forms.recognitionRule.fields.idListPlaceholder"),
+          width: "full",
+        },
+        {
+          id: "productIds",
+          name: "productIds",
+          type: "text",
+          label: t("subscriptions.forms.recognitionRule.fields.productIds"),
+          placeholder: t("subscriptions.forms.recognitionRule.fields.idListPlaceholder"),
+          width: "full",
+        },
+        {
+          id: "recognitionMethod",
+          name: "recognitionMethod",
+          type: "select",
+          label: t("subscriptions.forms.recognitionRule.fields.recognitionMethod"),
+          width: "1/2",
+          options: [
+            { value: "straight_line", label: t("subscriptions.forms.deferredSchedule.options.straightLine") },
+            { value: "one_time", label: t("subscriptions.forms.deferredSchedule.options.oneTime") },
+          ],
+        },
+        {
+          id: "recognitionPeriod",
+          name: "recognitionPeriod",
+          type: "select",
+          label: t("subscriptions.forms.recognitionRule.fields.recognitionPeriod"),
+          width: "1/2",
+          options: [
+            { value: "month", label: t("subscriptions.forms.deferredSchedule.options.month") },
+            { value: "quarter", label: t("subscriptions.forms.deferredSchedule.options.quarter") },
+            { value: "year", label: t("subscriptions.forms.deferredSchedule.options.year") },
+          ],
+        },
+        {
+          id: "priority",
+          name: "priority",
+          type: "number",
+          label: t("subscriptions.forms.recognitionRule.fields.priority"),
+          placeholder: "10",
+          width: "1/2",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("subscriptions.forms.recognitionRule.fields.isActive"),
+          width: "1/2",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("subscriptions.forms.recognitionRule.fields.notes"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const closeSubscriptionForm = (t: TFunction): FormConfig => ({
+  id: "close-subscription",
+  title: t("subscriptions.forms.closeSubscription.title"),
+  description: t("subscriptions.forms.closeSubscription.description"),
+  sections: [
+    {
+      id: "cs-main",
+      title: t("subscriptions.forms.closeSubscription.sections.main"),
+      fields: [
+        {
+          id: "closeReasonId",
+          name: "closeReasonId",
+          type: "text",
+          label: t("subscriptions.forms.closeSubscription.fields.closeReasonId"),
+          placeholder: t("subscriptions.forms.closeSubscription.fields.closeReasonIdPlaceholder"),
+          width: "full",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("subscriptions.forms.closeSubscription.fields.notes"),
+          width: "full",
+          rows: 3,
+        },
+      ],
+    },
+  ],
+})
+
+export const generateSubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
+  id: "generate-subscription-invoice",
+  title: t("subscriptions.forms.generateInvoice.title"),
+  description: t("subscriptions.forms.generateInvoice.description"),
+  sections: [
+    {
+      id: "gi-main",
+      title: t("subscriptions.forms.generateInvoice.sections.main"),
+      fields: [
+        {
+          id: "invoiceDate",
+          name: "invoiceDate",
+          type: "date",
+          label: t("subscriptions.forms.generateInvoice.fields.invoiceDate"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const recognizeDeferredRevenueLineForm = (t: TFunction): FormConfig => ({
+  id: "recognize-deferred-revenue-line",
+  title: t("subscriptions.forms.recognizeLine.title"),
+  description: t("subscriptions.forms.recognizeLine.description"),
+  sections: [
+    {
+      id: "rl-main",
+      title: t("subscriptions.forms.recognizeLine.sections.main"),
+      fields: [
+        {
+          id: "moveId",
+          name: "moveId",
+          type: "number",
+          label: t("subscriptions.forms.recognizeLine.fields.moveId"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "moveLineId",
+          name: "moveLineId",
+          type: "number",
+          label: t("subscriptions.forms.recognizeLine.fields.moveLineId"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const importSubscriptionPlanCsvForm = (t: TFunction): FormConfig => ({
+  id: "import-subscription-plan-csv",
+  title: t("subscriptions.forms.importPlanCsv.title"),
+  description: t("subscriptions.forms.importPlanCsv.description"),
+  sections: [
+    {
+      id: "ipc-main",
+      title: t("subscriptions.forms.importPlanCsv.sections.main"),
+      fields: [
+        {
+          id: "csvData",
+          name: "csvData",
+          type: "textarea",
+          label: t("subscriptions.forms.importPlanCsv.fields.csvData"),
+          placeholder: t("subscriptions.forms.importPlanCsv.fields.csvPlaceholder"),
+          required: true,
+          width: "full",
+          rows: 12,
+        },
+      ],
+    },
+  ],
+})
+
+export const importSubscriptionCsvForm = (t: TFunction): FormConfig => ({
+  id: "import-subscription-csv",
+  title: t("subscriptions.forms.importSubscriptionCsv.title"),
+  description: t("subscriptions.forms.importSubscriptionCsv.description"),
+  sections: [
+    {
+      id: "isc-main",
+      title: t("subscriptions.forms.importSubscriptionCsv.sections.main"),
+      fields: [
+        {
+          id: "csvData",
+          name: "csvData",
+          type: "textarea",
+          label: t("subscriptions.forms.importSubscriptionCsv.fields.csvData"),
+          placeholder: t("subscriptions.forms.importSubscriptionCsv.fields.csvPlaceholder"),
+          required: true,
+          width: "full",
+          rows: 12,
+        },
+      ],
+    },
+  ],
+})
+
 export const subscriptionsFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-subscription": newSubscriptionForm(t),
   "new-subscription-plan": newSubscriptionPlanForm(t),
+  "new-deferred-revenue-schedule": newDeferredRevenueScheduleForm(t),
+  "new-revenue-recognition-rule": newRevenueRecognitionRuleForm(t),
+  "close-subscription": closeSubscriptionForm(t),
+  "generate-subscription-invoice": generateSubscriptionInvoiceForm(t),
+  "recognize-deferred-revenue-line": recognizeDeferredRevenueLineForm(t),
+  "import-subscription-plan-csv": importSubscriptionPlanCsvForm(t),
+  "import-subscription-csv": importSubscriptionCsvForm(t),
 })

@@ -1,8 +1,7 @@
+@import '@lumiere/ui/app-theme.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
 @source "../../packages/ui/src";
 
 @custom-variant dark (&:is(.dark *));
-
-@import '../../packages/ui/src/styles/app-theme.css';

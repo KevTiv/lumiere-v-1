@@ -9,10 +9,26 @@
  */
 
 import { cookies } from 'next/headers'
+import type { FieldAccessContext } from '@lumiere/stdb/server'
 import {
-  serverQueryUserOrganization,
+  loadFieldAccessContext,
   type StdbHttpOptions,
 } from '@lumiere/stdb/server'
+import { serverQueryUserOrganizationWithFallback } from '@/lib/stdb-org-resolve'
+import { callReducer } from '@/lib/stdb-reducer'
+import { decodeIdentityHexFromStdbToken } from '@/lib/stdb-token-identity'
+
+/** When true with `NEXT_PUBLIC_DEV_ADMIN`, auto-call `ensure_dev_admin` and dev seed org fallbacks. */
+const DEV_ADMIN_AUTO_ORG = process.env.NEXT_PUBLIC_DEV_ADMIN_AUTO_ORG === 'true'
+
+const DEV_ADMIN_ENABLED = process.env.NEXT_PUBLIC_DEV_ADMIN === 'true'
+
+function devSeedOrgId(): number | undefined {
+  const raw = process.env['NEXT_PUBLIC_DEV_SEED_ORG_ID'] ?? process.env['DEV_SEED_ORG_ID']
+  if (!raw) return undefined
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
 
 export interface ApiSession {
   /** SpacetimeDB auth token */
@@ -26,6 +42,8 @@ export interface ApiSession {
   organizationId: number | undefined
   /** Pre-built StdbHttpOptions ready to pass to server query functions */
   opts: StdbHttpOptions
+  /** Casbin + role context for field-level SQL projection on `/api/query` */
+  fieldAccess?: FieldAccessContext
 }
 
 /**
@@ -45,11 +63,21 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
   const mockOrgId = process.env['DEV_MOCK_ORG_ID']
   const mockToken = process.env['STDB_SERVER_TOKEN']
   if (mockOrgId && mockToken) {
+    const opts: StdbHttpOptions = { token: mockToken }
+    const organizationId = Number(mockOrgId)
+    const identityHex = 'dev-mock-identity'
+    let fieldAccess: FieldAccessContext | undefined
+    try {
+      fieldAccess = await loadFieldAccessContext(identityHex, organizationId, opts)
+    } catch {
+      fieldAccess = undefined
+    }
     return {
       stdbToken: mockToken,
-      identityHex: 'dev-mock-identity',
-      organizationId: Number(mockOrgId),
-      opts: { token: mockToken },
+      identityHex,
+      organizationId,
+      opts,
+      fieldAccess,
     }
   }
 
@@ -79,13 +107,19 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
     }
   }
 
-  // If still no token, try server token as fallback
+  // If still no token, try server token as fallback (admin / server-side SQL)
   if (!token) {
     token = process.env['STDB_SERVER_TOKEN']
   }
 
   if (!token) {
     return null
+  }
+
+  // Recover identity from JWT when the cookie is missing (common before first saveStdbSession).
+  if (!identityHex) {
+    const fromJwt = decodeIdentityHexFromStdbToken(token)
+    if (fromJwt) identityHex = fromJwt
   }
 
   const opts: StdbHttpOptions = { token }
@@ -95,7 +129,7 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
   // Only try to resolve organization if we have an identity
   if (identityHex) {
     try {
-      const orgs = await serverQueryUserOrganization(identityHex, opts)
+      const orgs = await serverQueryUserOrganizationWithFallback(identityHex, opts)
       const org = (orgs as Array<Record<string, unknown>>).find(
         (o) => o['isDefault'],
       ) ?? orgs[0]
@@ -107,10 +141,51 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
     }
   }
 
+  // Dev: provision caller into the seeded / first org before RSC runs, so layout and
+  // /api/query see organizationId (client WS also calls ensureDevAdmin — idempotent).
+  if (
+    DEV_ADMIN_ENABLED &&
+    DEV_ADMIN_AUTO_ORG &&
+    organizationId === undefined &&
+    identityHex &&
+    identityHex !== 'unknown'
+  ) {
+    try {
+      await callReducer('ensure_dev_admin', [], opts)
+      const orgs = await serverQueryUserOrganizationWithFallback(identityHex, opts)
+      const org = (orgs as Array<Record<string, unknown>>).find(
+        (o) => o['isDefault'],
+      ) ?? orgs[0]
+      if (org) {
+        organizationId = Number((org as Record<string, unknown>)['organizationId'])
+      }
+    } catch {
+      const fallbackId = devSeedOrgId()
+      if (fallbackId !== undefined) organizationId = fallbackId
+    }
+  }
+
+  // Dev admin: org id from env so /api/query and RSC role hydration work before membership sync.
+  if (DEV_ADMIN_ENABLED && DEV_ADMIN_AUTO_ORG && organizationId === undefined) {
+    const fallbackId = devSeedOrgId()
+    if (fallbackId !== undefined) organizationId = fallbackId
+  }
+
+  const resolvedIdentity = identityHex || 'unknown'
+  let fieldAccess: FieldAccessContext | undefined
+  if (organizationId !== undefined && resolvedIdentity !== 'unknown') {
+    try {
+      fieldAccess = await loadFieldAccessContext(resolvedIdentity, organizationId, opts)
+    } catch {
+      fieldAccess = undefined
+    }
+  }
+
   return {
     stdbToken: token,
-    identityHex: identityHex || 'unknown',
+    identityHex: resolvedIdentity,
     organizationId,
     opts,
+    fieldAccess,
   }
 }

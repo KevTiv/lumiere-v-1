@@ -1,7 +1,7 @@
 /// Auth — Credential Management & Invite/Reset Tokens
 ///
 /// Tables (all PRIVATE — no `public` flag, not subscribable by WebSocket clients):
-///   UserCredential     — email + bcrypt hash + encrypted STDB token, keyed by email
+///   UserCredential     — email + bcrypt hash + encrypted STDB token + optional WorkOS id
 ///   UserInvite         — org-scoped invite tokens sent by admins
 ///   PasswordResetToken — short-lived tokens for the forgot-password flow
 ///
@@ -27,8 +27,10 @@ pub struct UserCredential {
     /// SpacetimeDB identity that owns this credential.
     #[unique]
     pub identity: Identity,
-    /// bcrypt hash of the user's password (hashed server-side in Node.js).
+    /// bcrypt hash of the user's password (hashed server-side in Node.js). Empty for SSO-only.
     pub password_hash: String,
+    /// WorkOS User Management id when the account uses SSO; None for password-only.
+    pub workos_user_id: Option<String>,
     /// SpacetimeDB token encrypted with AES-GCM using STDB_CREDENTIAL_ENCRYPTION_KEY.
     /// Stored encrypted so that even if the SpacetimeDB HTTP SQL API is queried,
     /// the raw token is not exposed.
@@ -84,6 +86,50 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+/// **Trusted local / dev nodes only.** Promotes `ctx.sender()` to `is_superuser` so HTTP calls
+/// using `STDB_SERVER_TOKEN` can invoke `store_user_credential` and other admin reducers.
+/// The JWT identity usually has no profile or `is_superuser: false` until this runs or `ensure_dev_admin`.
+/// Do **not** rely on this for production security — anyone who can invoke reducers as this identity
+/// can escalate; use only with local `spacetime` or controlled deployments.
+#[spacetimedb::reducer]
+pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> {
+    let sender = ctx.sender();
+    if let Some(profile) = ctx.db.user_profile().identity().find(sender) {
+        if profile.is_superuser {
+            return Ok(());
+        }
+        ctx.db.user_profile().identity().update(UserProfile {
+            is_superuser: true,
+            updated_at: ctx.timestamp,
+            ..profile
+        });
+    } else {
+        ctx.db.user_profile().insert(UserProfile {
+            identity: sender,
+            email: String::new(),
+            email_verified: false,
+            name: String::new(),
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: "UTC".to_string(),
+            language: "en".to_string(),
+            signature: None,
+            notification_preferences: None,
+            ui_preferences: None,
+            is_active: true,
+            is_superuser: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            last_login: Some(ctx.timestamp),
+            metadata: Some("{\"dev_promote_caller_superuser\":true}".to_string()),
+        });
+    }
+    Ok(())
+}
+
 // ============================================================================
 // REDUCERS — admin-called (from Next.js server via HTTP admin API)
 // ============================================================================
@@ -118,10 +164,100 @@ pub fn store_user_credential(
         email,
         identity: new_identity,
         password_hash,
+        workos_user_id: None,
         stdb_token_enc,
         email_verified: false,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+    });
+
+    Ok(())
+}
+
+/// Store credentials for a new user provisioned via WorkOS SSO (no password).
+#[spacetimedb::reducer]
+pub fn store_sso_user_credential(
+    ctx: &ReducerContext,
+    new_identity: Identity,
+    email: String,
+    stdb_token_enc: String,
+    workos_user_id: String,
+    email_verified: bool,
+) -> Result<(), String> {
+    require_superuser(ctx)?;
+
+    if email.is_empty() || workos_user_id.is_empty() {
+        return Err("Email and WorkOS user id are required".to_string());
+    }
+
+    if ctx.db.user_credential().email().find(&email).is_some() {
+        return Err("Email already registered".to_string());
+    }
+    if ctx.db.user_credential().identity().find(&new_identity).is_some() {
+        return Err("Identity already has credentials".to_string());
+    }
+
+    let dup_workos = ctx.db.user_credential().iter().any(|c| {
+        c.workos_user_id
+            .as_ref()
+            .is_some_and(|w| w == &workos_user_id)
+    });
+    if dup_workos {
+        return Err("WorkOS user already linked".to_string());
+    }
+
+    ctx.db.user_credential().insert(UserCredential {
+        id: 0,
+        email,
+        identity: new_identity,
+        password_hash: String::new(),
+        workos_user_id: Some(workos_user_id),
+        stdb_token_enc,
+        email_verified,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+    });
+
+    Ok(())
+}
+
+/// Link a WorkOS user id to an existing password account (same email).
+#[spacetimedb::reducer]
+pub fn link_workos_user(
+    ctx: &ReducerContext,
+    target_identity: Identity,
+    workos_user_id: String,
+) -> Result<(), String> {
+    require_superuser(ctx)?;
+
+    if workos_user_id.is_empty() {
+        return Err("WorkOS user id is required".to_string());
+    }
+
+    let dup_workos = ctx.db.user_credential().iter().any(|c| {
+        c.workos_user_id
+            .as_ref()
+            .is_some_and(|w| w == &workos_user_id)
+    });
+    if dup_workos {
+        return Err("WorkOS user already linked to another account".to_string());
+    }
+
+    let cred = ctx
+        .db
+        .user_credential()
+        .identity()
+        .find(&target_identity)
+        .ok_or("Credential not found for identity")?;
+
+    if cred.workos_user_id.is_some() {
+        return Err("Account already has a WorkOS link".to_string());
+    }
+
+    ctx.db.user_credential().id().update(UserCredential {
+        workos_user_id: Some(workos_user_id),
+        updated_at: ctx.timestamp,
+        ..cred
     });
 
     Ok(())

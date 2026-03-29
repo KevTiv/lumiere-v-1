@@ -2,6 +2,7 @@ import { getStdbSession } from "@/lib/api-session"
 import {
   serverQueryMrpProductions,
   serverQueryMrpBoms,
+  serverQueryMrpBomLines,
   serverQueryMrpWorkorders,
   serverQueryMrpWorkcenters,
   serverQueryProducts,
@@ -21,6 +22,7 @@ export default async function ManufacturingPage() {
   const [
     productions,
     boms,
+    bomLines,
     workorders,
     workcenters,
     products,
@@ -30,18 +32,20 @@ export default async function ManufacturingPage() {
   ] = await Promise.all([
     serverQueryMrpProductions(organizationId, opts),
     serverQueryMrpBoms(organizationId, opts),
+    serverQueryMrpBomLines(organizationId, opts),
     serverQueryMrpWorkorders(organizationId, opts),
     serverQueryMrpWorkcenters(organizationId, opts),
     serverQueryProducts(organizationId, opts),
     serverQueryWarehouses(organizationId, opts),
     serverQueryStockPickings(organizationId, opts),
     serverQueryStockQuants(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], []])
+  ]).catch(() => [[], [], [], [], [], [], [], [], []])
 
   return (
     <ManufacturingClient
       initialProductions={productions as Record<string, unknown>[]}
       initialBoms={boms as Record<string, unknown>[]}
+      initialBomLines={bomLines as Record<string, unknown>[]}
       initialWorkorders={workorders as Record<string, unknown>[]}
       initialWorkcenters={workcenters as Record<string, unknown>[]}
       initialProducts={products as Record<string, unknown>[]}

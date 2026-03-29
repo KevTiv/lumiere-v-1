@@ -3,8 +3,23 @@ import type { EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const leadStateBadges = (t: TFunction) => ({
-  badgeVariants: { New: "secondary", Qualified: "outline", Won: "default", Lost: "destructive" },
+  badgeVariants: {
+    new: "secondary",
+    qualified: "outline",
+    won: "default",
+    lost: "destructive",
+    converted: "default",
+    New: "secondary",
+    Qualified: "outline",
+    Won: "default",
+    Lost: "destructive",
+  },
   badgeLabels: {
+    new: t("crm.leads.states.New"),
+    qualified: t("crm.leads.states.Qualified"),
+    won: t("crm.leads.states.Won"),
+    lost: t("crm.leads.states.Lost"),
+    converted: t("crm.leads.states.Converted"),
     New: t("crm.leads.states.New"),
     Qualified: t("crm.leads.states.Qualified"),
     Won: t("crm.leads.states.Won"),
@@ -21,15 +36,6 @@ const opportunityPriorityBadges = (t: TFunction) => ({
   },
 }) as const
 
-const activityStateBadges = (t: TFunction) => ({
-  badgeVariants: { false: "outline", today: "default", overdue: "destructive" },
-  badgeLabels: {
-    false: t("crm.activities.filters.activityCategory.options.default"),
-    today: t("crm.activities.columns.dateDeadline"),
-    overdue: t("crm.activities.columns.dateDeadline"),
-  },
-}) as const
-
 // ── Leads ─────────────────────────────────────────────────────────────────────
 export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "leads-table",
@@ -40,17 +46,18 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("crm.leads.searchPlaceholder"),
-    searchKeys: ["contactName", "emailFrom", "partnerName"],
+    searchKeys: ["contactName", "contact_name", "emailFrom", "email_from", "email", "partnerName", "partner_name", "name"],
     filters: [
       {
         key: "state",
         label: t("crm.leads.filters.state"),
         type: "select",
         options: [
-          { value: "New", label: t("crm.leads.filters.state.options.New") },
-          { value: "Qualified", label: t("crm.leads.filters.state.options.Qualified") },
-          { value: "Won", label: t("crm.leads.filters.state.options.Won") },
-          { value: "Lost", label: t("crm.leads.filters.state.options.Lost") },
+          { value: "new", label: t("crm.leads.filters.state.options.New") },
+          { value: "qualified", label: t("crm.leads.filters.state.options.Qualified") },
+          { value: "won", label: t("crm.leads.filters.state.options.Won") },
+          { value: "lost", label: t("crm.leads.filters.state.options.Lost") },
+          { value: "converted", label: t("crm.leads.filters.state.options.Converted") },
         ],
       },
     ],
@@ -127,21 +134,21 @@ export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["summary", "note"],
     filters: [
       {
-        key: "activityCategory",
-        label: t("crm.activities.filters.activityCategory"),
+        key: "state",
+        label: t("crm.activities.filters.state"),
         type: "select",
         options: [
-          { value: "default", label: t("crm.activities.filters.activityCategory.options.default") },
-          { value: "upload_file", label: t("crm.activities.filters.activityCategory.options.upload_file") },
+          { value: "planned", label: t("crm.activities.filters.state.options.planned") },
+          { value: "done", label: t("crm.activities.filters.state.options.done") },
         ],
       },
     ],
     columns: [
       { key: "summary", label: t("crm.activities.columns.summary"), width: "min-w-48" },
-      { key: "activityTypeId", label: t("crm.activities.columns.activityTypeId"), width: "min-w-28" },
+      { key: "activityType", label: t("crm.activities.columns.activityType"), width: "min-w-28" },
+      { key: "state", label: t("crm.activities.columns.state"), type: "badge", badgeVariants: { planned: "outline", done: "default" }, badgeLabels: { planned: t("crm.activities.states.planned"), done: t("crm.activities.states.done") } },
       { key: "dateDeadline", label: t("crm.activities.columns.dateDeadline"), type: "date" },
-      { key: "userId", label: t("crm.activities.columns.userId"), width: "min-w-36" },
-      { key: "resName", label: t("crm.activities.columns.resName"), width: "min-w-36" },
+      { key: "isDone", label: t("crm.activities.columns.isDone"), type: "boolean" },
     ],
     emptyMessage: t("crm.activities.emptyMessage"),
   },

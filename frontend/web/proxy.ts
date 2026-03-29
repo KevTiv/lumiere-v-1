@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // Auth pages that don't require a session
-const AUTH_PATHS = ['/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/accept-invite']
+const AUTH_PATHS = [
+  '/sign-in',
+  '/sign-up',
+  '/forgot-password',
+  '/reset-password',
+  '/accept-invite',
+  '/auth/callback',
+]
 
 /**
  * Extracts Bearer token from Authorization header.
@@ -32,7 +39,7 @@ function isAuthenticated(request: NextRequest): boolean {
   return false
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow all API routes - authentication is handled in route handlers

@@ -37,7 +37,7 @@ function resolveModule(override?: string): string {
     cachedModule =
       process.env['STDB_MODULE'] ??
       process.env['NEXT_PUBLIC_STDB_MODULE'] ??
-      'lumiere-v1'
+      'lumiere-v1-j1uo0'
   }
   return cachedModule
 }
@@ -89,12 +89,17 @@ export async function callReducer(
   if (!res.ok) {
     let errorBody: string
     try {
-      // Try to parse as JSON for structured error
       const json = await res.json()
       errorBody = JSON.stringify(json)
     } catch {
-      // Fall back to text
-      errorBody = await res.text().catch(() => 'Unknown error')
+      errorBody = (await res.text().catch(() => '')) || 'Unknown error'
+    }
+    if (res.status === 404) {
+      throw new Error(
+        `SpacetimeDB reducer call failed (404) at /v1/database/${module}/call/${reducerName}. ` +
+          `Usually the published database name does not match env: set NEXT_PUBLIC_STDB_MODULE and STDB_MODULE ` +
+          `to the same value you passed to spacetime publish (e.g. maincloud dashboard). Body: ${errorBody}`,
+      )
     }
     throw new Error(`SpacetimeDB reducer call failed (${res.status}): ${errorBody}`)
   }

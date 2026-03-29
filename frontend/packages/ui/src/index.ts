@@ -1,6 +1,9 @@
 // Web components (shadcn/ui based)
 export * from "./components/missing-organization";
 export * from "./components/button";
+export * from "./components/dialog";
+export * from "./components/input";
+export * from "./components/label";
 export * from "./components/theme-provider";
 // form.tsx: exclude FormField (conflicts with lib/form-types FormField type)
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/form";
@@ -56,6 +59,7 @@ export * from "./lib/purchasing-entity-configs";
 export * from "./lib/purchasing-form-configs";
 export * from "./lib/manufacturing-entity-configs";
 export * from "./lib/manufacturing-form-configs";
+export * from "./lib/manufacturing-row-action-forms";
 export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
@@ -71,6 +75,7 @@ export * from "./lib/expenses-entity-configs";
 export * from "./lib/expenses-form-configs";
 export * from "./lib/helpdesk-entity-configs";
 export * from "./lib/helpdesk-form-configs";
+export * from "./lib/helpdesk-row-forms";
 export * from "./lib/workflows-entity-configs";
 export * from "./lib/workflows-form-configs";
 export * from "./lib/messages-entity-configs";

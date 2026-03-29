@@ -5,9 +5,10 @@ import { getStdbConnection } from "../connection";
 
 export type { ProductPricelist };
 
-export function usePricelists(companyId: bigint, initialData?: Record<string, unknown>[]) {
+/** Pricelists are scoped by `organization_id` (see serverQueryPricelists / product_pricelist). */
+export function usePricelists(organizationId: bigint, initialData?: Record<string, unknown>[]) {
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ["pricelists", companyId.toString()], [companyId]);
+  const queryKey = useMemo(() => ["pricelists", organizationId.toString()], [organizationId]);
 
   useEffect(() => {
     const conn = getStdbConnection();

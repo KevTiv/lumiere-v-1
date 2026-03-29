@@ -1,14 +1,21 @@
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
+/** Matches SpacetimeDB `HelpdeskTicketState` variant names. */
 const ticketStateBadges = (t: TFunction) => ({
-  badgeVariants: { new: "secondary", open: "default", pending: "outline", solved: "default", cancelled: "destructive" },
+  badgeVariants: {
+    New: "secondary",
+    InProgress: "default",
+    OnHold: "outline",
+    Closed: "default",
+    Cancelled: "destructive",
+  },
   badgeLabels: {
-    new: t("helpdesk.tickets.states.new"),
-    open: t("helpdesk.tickets.states.open"),
-    pending: t("helpdesk.tickets.states.pending"),
-    solved: t("helpdesk.tickets.states.solved"),
-    cancelled: t("helpdesk.tickets.states.cancelled"),
+    New: t("helpdesk.tickets.states.New"),
+    InProgress: t("helpdesk.tickets.states.InProgress"),
+    OnHold: t("helpdesk.tickets.states.OnHold"),
+    Closed: t("helpdesk.tickets.states.Closed"),
+    Cancelled: t("helpdesk.tickets.states.Cancelled"),
   },
 }) as const
 
@@ -39,11 +46,11 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
         label: t("helpdesk.tickets.filters.state"),
         type: "select",
         options: [
-          { value: "new", label: t("helpdesk.tickets.filters.state.options.new") },
-          { value: "open", label: t("helpdesk.tickets.filters.state.options.open") },
-          { value: "pending", label: t("helpdesk.tickets.filters.state.options.pending") },
-          { value: "solved", label: t("helpdesk.tickets.filters.state.options.solved") },
-          { value: "cancelled", label: t("helpdesk.tickets.filters.state.options.cancelled") },
+          { value: "New", label: t("helpdesk.tickets.filters.state.options.New") },
+          { value: "InProgress", label: t("helpdesk.tickets.filters.state.options.InProgress") },
+          { value: "OnHold", label: t("helpdesk.tickets.filters.state.options.OnHold") },
+          { value: "Closed", label: t("helpdesk.tickets.filters.state.options.Closed") },
+          { value: "Cancelled", label: t("helpdesk.tickets.filters.state.options.Cancelled") },
         ],
       },
       {
@@ -72,7 +79,74 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const helpdeskTeamsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "helpdesk-teams-table",
+  title: t("helpdesk.teams.title"),
+  description: t("helpdesk.teams.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("helpdesk.teams.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("helpdesk.teams.columns.name"), width: "min-w-40" },
+      { key: "description", label: t("helpdesk.teams.columns.description"), width: "min-w-48" },
+      { key: "isActive", label: t("helpdesk.teams.columns.isActive"), type: "boolean" },
+      { key: "createdAt", label: t("helpdesk.teams.columns.createdAt"), type: "date" },
+    ],
+    emptyMessage: t("helpdesk.teams.emptyMessage"),
+  },
+})
+
+export const helpdeskStagesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "helpdesk-stages-table",
+  title: t("helpdesk.stages.title"),
+  description: t("helpdesk.stages.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("helpdesk.stages.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("helpdesk.stages.columns.name"), width: "min-w-36" },
+      { key: "teamId", label: t("helpdesk.stages.columns.teamId"), width: "min-w-24" },
+      { key: "sequence", label: t("helpdesk.stages.columns.sequence"), type: "number" },
+      { key: "isClosed", label: t("helpdesk.stages.columns.isClosed"), type: "boolean" },
+      { key: "createdAt", label: t("helpdesk.stages.columns.createdAt"), type: "date" },
+    ],
+    emptyMessage: t("helpdesk.stages.emptyMessage"),
+  },
+})
+
+export const helpdeskSlasTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "helpdesk-slas-table",
+  title: t("helpdesk.slas.title"),
+  description: t("helpdesk.slas.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("helpdesk.slas.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("helpdesk.slas.columns.name"), width: "min-w-40" },
+      { key: "teamId", label: t("helpdesk.slas.columns.teamId"), width: "min-w-24" },
+      { key: "stageId", label: t("helpdesk.slas.columns.stageId"), width: "min-w-24" },
+      { key: "priority", label: t("helpdesk.slas.columns.priority"), width: "min-w-24" },
+      { key: "timeDays", label: t("helpdesk.slas.columns.timeDays"), type: "number" },
+      { key: "timeHours", label: t("helpdesk.slas.columns.timeHours"), type: "number" },
+      { key: "isActive", label: t("helpdesk.slas.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("helpdesk.slas.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const helpdeskEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "helpdesk-tickets-table": helpdeskTicketsTableConfig(t),
+  "helpdesk-teams-table": helpdeskTeamsTableConfig(t),
+  "helpdesk-stages-table": helpdeskStagesTableConfig(t),
+  "helpdesk-slas-table": helpdeskSlasTableConfig(t),
 })

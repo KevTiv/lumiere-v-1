@@ -17,6 +17,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   pricelistId: __t.u64().name("pricelist_id"),
   get appliedOn() {
     return PricelistAppliedOn.name("applied_on");

@@ -18,6 +18,8 @@ use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
 use crate::inventory::product::product;
+use crate::inventory::warehouse::warehouse;
+use crate::sales::pricelists::product_pricelist;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
 };
@@ -83,6 +85,29 @@ pub struct CreateSaleOrderParams {
     pub message_partner_ids: Option<Vec<u64>>,
     pub message_channel_ids: Option<Vec<u64>>,
     pub activity_ids: Option<Vec<u64>>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateSaleOrderParams {
+    pub client_order_ref: Option<String>,
+    pub note: Option<String>,
+    pub terms_and_conditions: Option<String>,
+    pub partner_invoice_id: Option<u64>,
+    pub partner_shipping_id: Option<u64>,
+    pub pricelist_id: Option<u64>,
+    pub warehouse_id: Option<u64>,
+    pub commitment_date: Option<Timestamp>,
+    pub expected_date: Option<Timestamp>,
+    pub shipping_policy: Option<String>,
+    pub picking_policy: Option<String>,
+    pub validity_date: Option<Timestamp>,
+    pub carrier_id: Option<u64>,
+    pub incoterm: Option<String>,
+    pub incoterm_location: Option<String>,
+    pub customer_lead: Option<f64>,
+    pub analytic_account_id: Option<u64>,
+    pub user_id: Option<Identity>,
     pub metadata: Option<String>,
 }
 
@@ -769,6 +794,271 @@ pub fn compute_so_totals(
         write_date: ctx.timestamp,
         ..order
     });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn update_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    order_id: u64,
+    params: UpdateSaleOrderParams,
+) -> Result<(), String> {
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    if order.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    match order.state {
+        SaleState::Draft | SaleState::Sent => {}
+        _ => return Err("Only draft or sent orders can be updated".to_string()),
+    }
+
+    if params.shipping_policy.is_some() {
+        if let Some(ref sp) = params.shipping_policy {
+            ShippingPolicy::from_str(sp)?;
+        }
+    }
+    if params.picking_policy.is_some() {
+        if let Some(ref pp) = params.picking_policy {
+            PickingPolicy::from_str(pp)?;
+        }
+    }
+
+    let mut client_order_ref = order.client_order_ref.clone();
+    let mut note = order.note.clone();
+    let mut terms_and_conditions = order.terms_and_conditions.clone();
+    let mut partner_invoice_id = order.partner_invoice_id;
+    let mut partner_shipping_id = order.partner_shipping_id;
+    let mut pricelist_id = order.pricelist_id;
+    let mut currency_id = order.currency_id;
+    let mut warehouse_id = order.warehouse_id;
+    let mut commitment_date = order.commitment_date;
+    let mut expected_date = order.expected_date;
+    let mut shipping_policy = order.shipping_policy.clone();
+    let mut picking_policy = order.picking_policy.clone();
+    let mut validity_date = order.validity_date;
+    let mut carrier_id = order.carrier_id;
+    let mut incoterm = order.incoterm.clone();
+    let mut incoterm_location = order.incoterm_location.clone();
+    let mut customer_lead = order.customer_lead;
+    let mut analytic_account_id = order.analytic_account_id;
+    let mut user_id = order.user_id;
+    let mut metadata = order.metadata.clone();
+
+    if let Some(v) = &params.client_order_ref {
+        client_order_ref = Some(v.clone());
+    }
+    if let Some(v) = &params.note {
+        note = Some(v.clone());
+    }
+    if let Some(v) = &params.terms_and_conditions {
+        terms_and_conditions = Some(v.clone());
+    }
+    if let Some(v) = params.partner_invoice_id {
+        partner_invoice_id = v;
+    }
+    if let Some(v) = params.partner_shipping_id {
+        partner_shipping_id = v;
+    }
+    if let Some(pid) = params.pricelist_id {
+        let pl = ctx
+            .db
+            .product_pricelist()
+            .id()
+            .find(&pid)
+            .ok_or("Pricelist not found")?;
+        if pl.organization_id != organization_id {
+            return Err("Pricelist belongs to a different organization".to_string());
+        }
+        pricelist_id = pid;
+        currency_id = pl.currency_id;
+    }
+    if let Some(wid) = params.warehouse_id {
+        let wh = ctx
+            .db
+            .warehouse()
+            .id()
+            .find(&wid)
+            .ok_or("Warehouse not found")?;
+        if wh.company_id != company_id {
+            return Err("Warehouse does not belong to this company".to_string());
+        }
+        warehouse_id = wid;
+    }
+    if let Some(v) = params.commitment_date {
+        commitment_date = Some(v);
+    }
+    if let Some(v) = params.expected_date {
+        expected_date = Some(v);
+    }
+    if let Some(ref v) = params.shipping_policy {
+        shipping_policy = v.clone();
+    }
+    if let Some(ref v) = params.picking_policy {
+        picking_policy = v.clone();
+    }
+    if let Some(v) = params.validity_date {
+        validity_date = Some(v);
+    }
+    if let Some(v) = params.carrier_id {
+        carrier_id = Some(v);
+    }
+    if let Some(ref v) = params.incoterm {
+        incoterm = Some(v.clone());
+    }
+    if let Some(ref v) = params.incoterm_location {
+        incoterm_location = Some(v.clone());
+    }
+    if let Some(v) = params.customer_lead {
+        customer_lead = v;
+    }
+    if let Some(v) = params.analytic_account_id {
+        analytic_account_id = Some(v);
+    }
+    if let Some(v) = params.user_id {
+        user_id = v;
+    }
+    if let Some(ref v) = params.metadata {
+        metadata = Some(v.clone());
+    }
+
+    let mut changed_fields: Vec<String> = Vec::new();
+    if params.client_order_ref.is_some() {
+        changed_fields.push("client_order_ref".into());
+    }
+    if params.note.is_some() {
+        changed_fields.push("note".into());
+    }
+    if params.terms_and_conditions.is_some() {
+        changed_fields.push("terms_and_conditions".into());
+    }
+    if params.partner_invoice_id.is_some() {
+        changed_fields.push("partner_invoice_id".into());
+    }
+    if params.partner_shipping_id.is_some() {
+        changed_fields.push("partner_shipping_id".into());
+    }
+    if params.pricelist_id.is_some() {
+        changed_fields.push("pricelist_id".into());
+        changed_fields.push("currency_id".into());
+    }
+    if params.warehouse_id.is_some() {
+        changed_fields.push("warehouse_id".into());
+    }
+    if params.commitment_date.is_some() {
+        changed_fields.push("commitment_date".into());
+    }
+    if params.expected_date.is_some() {
+        changed_fields.push("expected_date".into());
+    }
+    if params.shipping_policy.is_some() {
+        changed_fields.push("shipping_policy".into());
+    }
+    if params.picking_policy.is_some() {
+        changed_fields.push("picking_policy".into());
+    }
+    if params.validity_date.is_some() {
+        changed_fields.push("validity_date".into());
+    }
+    if params.carrier_id.is_some() {
+        changed_fields.push("carrier_id".into());
+    }
+    if params.incoterm.is_some() {
+        changed_fields.push("incoterm".into());
+    }
+    if params.incoterm_location.is_some() {
+        changed_fields.push("incoterm_location".into());
+    }
+    if params.customer_lead.is_some() {
+        changed_fields.push("customer_lead".into());
+    }
+    if params.analytic_account_id.is_some() {
+        changed_fields.push("analytic_account_id".into());
+    }
+    if params.user_id.is_some() {
+        changed_fields.push("user_id".into());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".into());
+    }
+
+    if changed_fields.is_empty() {
+        return Err("No fields to update".to_string());
+    }
+
+    let old_snapshot = serde_json::json!({
+        "client_order_ref": order.client_order_ref,
+        "pricelist_id": order.pricelist_id,
+        "warehouse_id": order.warehouse_id,
+    })
+    .to_string();
+
+    ctx.db.sale_order().id().update(SaleOrder {
+        client_order_ref,
+        note,
+        terms_and_conditions,
+        partner_invoice_id,
+        partner_shipping_id,
+        pricelist_id,
+        currency_id,
+        warehouse_id,
+        commitment_date,
+        expected_date,
+        shipping_policy,
+        picking_policy,
+        validity_date,
+        carrier_id,
+        incoterm,
+        incoterm_location,
+        customer_lead,
+        analytic_account_id,
+        user_id,
+        metadata,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    let updated = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .expect("just updated");
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(old_snapshot),
+            new_values: Some(
+                serde_json::json!({
+                    "client_order_ref": updated.client_order_ref,
+                    "pricelist_id": updated.pricelist_id,
+                    "warehouse_id": updated.warehouse_id,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

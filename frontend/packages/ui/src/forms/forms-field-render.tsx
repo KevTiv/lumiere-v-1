@@ -16,6 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/select"
+import {
+  radixSelectControlledValue,
+  radixSelectItemValue,
+  storedValueFromRadixSelect,
+} from "./utils/radix-select-empty-value"
 
 const inputBase =
   "bg-background border-input focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-colors duration-150"
@@ -96,8 +101,8 @@ export function FormFieldRenderer({
       case "select":
         return (
           <Select
-            value={(value as string) || ""}
-            onValueChange={onChange}
+            value={radixSelectControlledValue(value as string | undefined, field.options)}
+            onValueChange={(v) => onChange(storedValueFromRadixSelect(v))}
             disabled={field.disabled}
           >
             <SelectTrigger
@@ -110,10 +115,10 @@ export function FormFieldRenderer({
               <SelectValue placeholder={field.placeholder || "Select..."} />
             </SelectTrigger>
             <SelectContent>
-              {field.options.map((option) => (
+              {field.options.map((option, idx) => (
                 <SelectItem
-                  key={option.value}
-                  value={option.value}
+                  key={`${radixSelectItemValue(option, idx)}-${idx}`}
+                  value={radixSelectItemValue(option, idx)}
                   disabled={option.disabled}
                 >
                   {option.label}

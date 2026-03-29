@@ -221,6 +221,9 @@ export function RoleManagement() {
           <p className="text-sm text-muted-foreground">
             {t("settings.roles.description")}
           </p>
+          <p className="text-xs text-muted-foreground mt-2 max-w-3xl leading-relaxed">
+            {t("settings.roles.fieldPolicyHint")}
+          </p>
         </div>
         {canCreate && (
           <Button onClick={handleCreateRole} className="gap-2">

@@ -64,7 +64,7 @@ export const productsTableConfig = (t: TFunction): EntityViewConfig => ({
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("inventory.products.searchPlaceholder"),
-    searchKeys: ["name", "defaultCode"],
+    searchKeys: ["name", "defaultCode", "barcode"],
     filters: [
       {
         key: "type",
@@ -291,6 +291,195 @@ export const qualityChecksTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Cycle counts ─────────────────────────────────────────────────────────────
+export const cycleCountsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "cycle-counts-table",
+  title: t("inventory.cycleCounts.title"),
+  description: t("inventory.cycleCounts.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.cycleCounts.title"),
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: t("inventory.cycleCounts.columns.name"), width: "min-w-40" },
+      { key: "state", label: t("inventory.cycleCounts.columns.state"), type: "badge" },
+      { key: "locationId", label: t("inventory.cycleCounts.columns.locationId"), width: "min-w-24" },
+      { key: "frequency", label: t("inventory.cycleCounts.columns.frequency"), width: "min-w-24" },
+      { key: "nextCountDate", label: t("inventory.cycleCounts.columns.nextCountDate"), type: "date" },
+    ],
+    emptyMessage: t("inventory.cycleCounts.emptyMessage"),
+  },
+})
+
+// ── Picking waves ────────────────────────────────────────────────────────────
+export const pickingWavesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "picking-waves-table",
+  title: t("inventory.pickingWaves.title"),
+  description: t("inventory.pickingWaves.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: t("inventory.pickingWaves.columns.name"), width: "min-w-40" },
+      { key: "state", label: t("inventory.pickingWaves.columns.state"), type: "badge" },
+      { key: "pickingTypeId", label: t("inventory.pickingWaves.columns.pickingTypeId"), width: "min-w-24" },
+      { key: "dateStart", label: t("inventory.pickingWaves.columns.dateStart"), type: "datetime" },
+    ],
+    emptyMessage: t("inventory.pickingWaves.emptyMessage"),
+  },
+})
+
+// ── Warehouse tasks ───────────────────────────────────────────────────────────
+export const warehouseTasksTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "warehouse-tasks-table",
+  title: t("inventory.warehouseTasks.title"),
+  description: t("inventory.warehouseTasks.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: t("inventory.warehouseTasks.columns.name"), width: "min-w-40" },
+      { key: "taskType", label: t("inventory.warehouseTasks.columns.taskType"), width: "min-w-24" },
+      { key: "state", label: t("inventory.warehouseTasks.columns.state"), type: "badge" },
+      { key: "priority", label: t("inventory.warehouseTasks.columns.priority"), width: "min-w-20" },
+      { key: "quantity", label: t("inventory.warehouseTasks.columns.quantity"), type: "number", align: "right" },
+    ],
+    emptyMessage: t("inventory.warehouseTasks.emptyMessage"),
+  },
+})
+
+// ── Stock routes / rules (read-only lists) ───────────────────────────────────
+export const stockRoutesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-routes-table",
+  title: t("inventory.stockRoutes.title"),
+  description: t("inventory.stockRoutes.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("inventory.stockRoutes.columns.name"), width: "min-w-48" },
+      { key: "sequence", label: t("inventory.stockRoutes.columns.sequence"), type: "number", align: "right" },
+      { key: "active", label: t("inventory.stockRoutes.columns.active"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.stockRoutes.emptyMessage"),
+  },
+})
+
+export const stockRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-rules-table",
+  title: t("inventory.stockRules.title"),
+  description: t("inventory.stockRules.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "action"],
+    columns: [
+      { key: "name", label: t("inventory.stockRules.columns.name"), width: "min-w-40" },
+      { key: "action", label: t("inventory.stockRules.columns.action"), width: "min-w-24" },
+      { key: "sequence", label: t("inventory.stockRules.columns.sequence"), type: "number", align: "right" },
+      { key: "active", label: t("inventory.stockRules.columns.active"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.stockRules.emptyMessage"),
+  },
+})
+
+export const stockMovesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-moves-table",
+  title: t("inventory.stockMoves.title"),
+  description: t("inventory.stockMoves.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.stockMoves.searchPlaceholder"),
+    searchKeys: ["name", "reference", "origin"],
+    filters: [
+      {
+        key: "state",
+        label: t("inventory.stockMoves.filters.state"),
+        type: "select",
+        options: [
+          { value: "draft", label: t("inventory.stockMoves.filters.state.options.draft") },
+          { value: "confirmed", label: t("inventory.stockMoves.filters.state.options.confirmed") },
+          { value: "assigned", label: t("inventory.stockMoves.filters.state.options.assigned") },
+          { value: "done", label: t("inventory.stockMoves.filters.state.options.done") },
+          { value: "cancel", label: t("inventory.stockMoves.filters.state.options.cancel") },
+        ],
+      },
+    ],
+    columns: [
+      { key: "name", label: t("inventory.stockMoves.columns.name"), width: "min-w-32" },
+      { key: "state", label: t("inventory.stockMoves.columns.state"), type: "badge" },
+      { key: "productId", label: t("inventory.stockMoves.columns.productId"), width: "min-w-20" },
+      { key: "locationId", label: t("inventory.stockMoves.columns.locationId"), width: "min-w-20" },
+      { key: "locationDestId", label: t("inventory.stockMoves.columns.locationDestId"), width: "min-w-20" },
+      {
+        key: "productUomQty",
+        label: t("inventory.stockMoves.columns.productUomQty"),
+        type: "number",
+        align: "right",
+      },
+    ],
+    emptyMessage: t("inventory.stockMoves.emptyMessage"),
+  },
+})
+
+export const inventoryValuationsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "inventory-valuations-table",
+  title: t("inventory.inventoryValuations.title"),
+  description: t("inventory.inventoryValuations.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "reference"],
+    columns: [
+      { key: "name", label: t("inventory.inventoryValuations.columns.name"), width: "min-w-40" },
+      { key: "state", label: t("inventory.inventoryValuations.columns.state"), type: "badge" },
+      { key: "productId", label: t("inventory.inventoryValuations.columns.productId"), width: "min-w-24" },
+      {
+        key: "value",
+        label: t("inventory.inventoryValuations.columns.value"),
+        type: "currency",
+        align: "right",
+      },
+    ],
+    emptyMessage: t("inventory.inventoryValuations.emptyMessage"),
+  },
+})
+
+export const replenishmentRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "replenishment-rules-table",
+  title: t("inventory.replenishmentRules.title"),
+  description: t("inventory.replenishmentRules.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("inventory.replenishmentRules.columns.name"), width: "min-w-40" },
+      { key: "active", label: t("inventory.replenishmentRules.columns.active"), type: "boolean" },
+      {
+        key: "sequence",
+        label: t("inventory.replenishmentRules.columns.sequence"),
+        type: "number",
+        align: "right",
+      },
+    ],
+    emptyMessage: t("inventory.replenishmentRules.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "products-table": productsTableConfig(t),
@@ -301,4 +490,12 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "stock-locations-table": stockLocationsTableConfig(t),
   "production-lots-table": productionLotsTableConfig(t),
   "quality-checks-table": qualityChecksTableConfig(t),
+  "cycle-counts-table": cycleCountsTableConfig(t),
+  "picking-waves-table": pickingWavesTableConfig(t),
+  "warehouse-tasks-table": warehouseTasksTableConfig(t),
+  "stock-routes-table": stockRoutesTableConfig(t),
+  "stock-rules-table": stockRulesTableConfig(t),
+  "stock-moves-table": stockMovesTableConfig(t),
+  "inventory-valuations-table": inventoryValuationsTableConfig(t),
+  "replenishment-rules-table": replenishmentRulesTableConfig(t),
 })

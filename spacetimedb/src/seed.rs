@@ -247,6 +247,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
+    // ── 1.4b Role (admin) — same scope as owner; used by dev test-user script ──
+    ctx.db.role().insert(Role {
+        id: 0,
+        organization_id: org_id,
+        name: "admin".to_string(),
+        description: Some("Organization administrator with full permissions".to_string()),
+        parent_id: None,
+        permissions: vec!["*:*".to_string()],
+        is_system: true,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
     // ── 1.5 UserOrganization ──────────────────────────────────────────────────
     ctx.db.user_organization().insert(UserOrganization {
         id: 0,
@@ -4542,7 +4557,111 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
 // ── Dev admin provisioning ────────────────────────────────────────────────────
 
-/// Idempotent: grants the caller full admin access to the first seeded org.
+/// When the database has no organizations, inserts USD (if missing), a **Lumiere Dev Org**,
+/// default company, and `owner` role so [`ensure_dev_admin`] works without `seed_dev_data`.
+fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
+    if ctx.db.organization().iter().next().is_some() {
+        return Ok(());
+    }
+    log::info!("[ensure_minimal_dev_org] Seeding Lumiere Dev Org (minimal)…");
+
+    if ctx.db.currency().code().find(&"USD".to_string()).is_none() {
+        ctx.db.currency().insert(Currency {
+            code: "USD".to_string(),
+            name: "US Dollar".to_string(),
+            symbol: "$".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "before".to_string(),
+            created_at: ctx.timestamp,
+            metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+        });
+    }
+
+    let org = ctx.db.organization().insert(Organization {
+        id: 0,
+        name: "Lumiere Dev Org".to_string(),
+        code: "DEV".to_string(),
+        description: Some("Minimal local dev org (auto-seeded for alpha)".to_string()),
+        logo_url: None,
+        website: None,
+        email: None,
+        phone: None,
+        currency_id: None,
+        timezone: "America/New_York".to_string(),
+        date_format: "%Y-%m-%d".to_string(),
+        language: "en".to_string(),
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+    });
+    let org_id = org.id;
+
+    let company = ctx.db.company().insert(Company {
+        id: 0,
+        organization_id: org_id,
+        name: "Dev Company".to_string(),
+        code: "DEVCO".to_string(),
+        is_parent: true,
+        parent_id: None,
+        currency_id: 1,
+        fiscal_year_end_month: 12,
+        fiscal_year_end_day: 31,
+        tax_id: None,
+        company_registry: None,
+        address_street: None,
+        address_city: None,
+        address_zip: None,
+        address_country_code: None,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        deleted_at: None,
+        metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+    });
+
+    ctx.db.role().insert(Role {
+        id: 0,
+        organization_id: org_id,
+        name: "owner".to_string(),
+        description: Some("Organization owner with full permissions".to_string()),
+        parent_id: None,
+        permissions: vec!["*:*".to_string()],
+        is_system: true,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+    });
+
+    ctx.db.role().insert(Role {
+        id: 0,
+        organization_id: org_id,
+        name: "admin".to_string(),
+        description: Some("Organization administrator with full permissions".to_string()),
+        parent_id: None,
+        permissions: vec!["*:*".to_string()],
+        is_system: true,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+    });
+
+    log::info!(
+        "[ensure_minimal_dev_org] org_id={} company_id={}",
+        org_id,
+        company.id
+    );
+
+    Ok(())
+}
+
+/// Idempotent: grants the caller full admin access to the first org.
+///
+/// If no organization exists yet, creates a minimal **Lumiere Dev Org** (company + owner role)
+/// so you do not need to run `seed_dev_data` first during alpha.
 ///
 /// Call once after connecting, or set NEXT_PUBLIC_DEV_ADMIN=true in the
 /// frontend .env.local to have the client call it automatically on connect.
@@ -4552,13 +4671,15 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
     let caller = ctx.sender();
 
-    // Find the first org (seeded by seed_dev_data)
+    ensure_minimal_dev_org(ctx)?;
+
+    // First org: either from seed_dev_data / ensure_minimal_dev_org, or any existing tenant
     let org = ctx
         .db
         .organization()
         .iter()
         .next()
-        .ok_or("No org found — run seed_dev_data first")?;
+        .ok_or("No organization row after ensure_minimal_dev_org")?;
     let org_id = org.id;
 
     let company = ctx
@@ -4566,7 +4687,7 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         .company()
         .iter()
         .find(|c| c.organization_id == org_id)
-        .ok_or("No company found — run seed_dev_data first")?;
+        .ok_or("No company for organization — run seed_dev_data or clear DB and retry")?;
     let company_id = company.id;
 
     // Find or create owner role for this org
@@ -4686,6 +4807,17 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         "[ensure_dev_admin] Caller provisioned as owner of org {}",
         org_id
     );
+
+    // Mark profile as superuser (parity with seed_dev_data admin)
+    if let Some(profile) = ctx.db.user_profile().identity().find(caller) {
+        if !profile.is_superuser {
+            ctx.db.user_profile().identity().update(UserProfile {
+                is_superuser: true,
+                updated_at: ctx.timestamp,
+                ..profile
+            });
+        }
+    }
 
     Ok(())
 }

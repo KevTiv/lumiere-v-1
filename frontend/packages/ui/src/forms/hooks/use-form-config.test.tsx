@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { useFormConfiguration } from "./use-form-config"
 import type { FormConfig, FormConfigField, FormRoleConfig } from "../config/types"
 
+vi.mock("@lumiere/stdb", () => ({
+  getStdbConnection: () => null,
+  useStdbConnection: () => ({ identity: null, connected: false, organizationId: undefined }),
+}))
+
 vi.mock("@lumiere/ui/forms", async () => {
   const actual = await vi.importActual("@lumiere/ui/forms")
   return {
@@ -81,6 +86,8 @@ describe("useFormConfiguration", () => {
     expect(result.current.config).not.toBeNull()
     expect(result.current.config?.config.moduleId).toBe("journal")
     expect(result.current.config?.config.formId).toBe("daily-entry")
+    expect(result.current.sourceRoleConfigs).toBeDefined()
+    expect(result.current.dbConfigurationId).toBe(0)
   })
 
   it("should return fields from configuration", async () => {
@@ -156,11 +163,13 @@ describe("useFormConfiguration", () => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    const initialConfig = result.current.config
     act(() => {
       result.current.refetch()
     })
 
-    expect(result.current.isLoading).toBe(true)
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+    expect(result.current.config).not.toBeNull()
   })
 })

@@ -48,6 +48,18 @@ export function usePricelists(
   })
 }
 
+export function usePricelistItems(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['pricelist-items', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/pricelist-items', 'Failed to fetch pricelist items'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function usePickingBatches(
   organizationId: bigint,
   initialData?: QueryRows,
@@ -90,6 +102,7 @@ export function useConfirmSaleOrder(organizationId: bigint) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
       qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] })
     },
   })
@@ -110,7 +123,28 @@ export function useCancelSaleOrder(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to cancel sale order')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
+    },
+  })
+}
+
+export function useComputeSoTotals(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const r = await fetch('/api/call/compute_so_totals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), orderId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to recalculate order totals')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
+    },
   })
 }
 
@@ -168,7 +202,64 @@ export function useCreatePricelistItem(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to create pricelist item')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+    },
+  })
+}
+
+export function useDeletePricelist(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (pricelistId: bigint | number | string) => {
+      const r = await fetch('/api/call/delete_pricelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), pricelistId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to delete pricelist')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+    },
+  })
+}
+
+export function useDeletePricelistItem(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (itemId: bigint | number | string) => {
+      const r = await fetch('/api/call/delete_pricelist_item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), itemId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to delete pricelist item')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+    },
+  })
+}
+
+export function useUpdateSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { orderId: bigint | number | string; params: Record<string, unknown> }) => {
+      const r = await fetch(`/api/sales/orders/${args.orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args.params),
+      })
+      if (!r.ok) throw new Error('Failed to update sale order')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
+    },
   })
 }
 
@@ -236,4 +327,5 @@ export function useCancelPickingBatch(organizationId: bigint) {
 export type {
   CreateSaleOrderParams,
   CreatePricelistParams,
+  UpdateSaleOrderParams,
 } from '@lumiere/stdb'

@@ -1,7 +1,22 @@
 "use client"
 
 import type { ComponentType } from "react"
-import { TrendingUp, TrendingDown, DollarSign, Users, ShoppingCart, Package } from "lucide-react"
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  ShoppingCart,
+  Package,
+  BarChart2,
+  CheckCircle,
+  Download,
+  Scale,
+  FileText,
+  Calendar,
+  LayoutTemplate,
+  Activity,
+} from "lucide-react"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
@@ -9,6 +24,14 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   users: Users,
   cart: ShoppingCart,
   package: Package,
+  BarChart2,
+  CheckCircle,
+  Download,
+  Scale,
+  FileText,
+  Calendar,
+  template: LayoutTemplate,
+  gauge: Activity,
 }
 
 export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] }) {

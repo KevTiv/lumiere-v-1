@@ -14,6 +14,16 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.WORKOS_CLIENT_ID) {
+      return NextResponse.json(
+        {
+          message:
+            'Password reset is handled by WorkOS. Use the WorkOS sign-in screen.',
+        },
+        { status: 410 },
+      )
+    }
+
     const body = await req.json()
     const { email } = schema.parse(body)
 

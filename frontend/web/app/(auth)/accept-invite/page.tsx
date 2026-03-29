@@ -8,12 +8,16 @@ import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
+import { redirectToWorkOsForInvite } from "@/app/actions/workos-auth"
+
+const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
 export default function AcceptInvitePage() {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
+  const inviteErr = searchParams.get("inviteErr")
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -60,6 +64,50 @@ export default function AcceptInvitePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (useWorkOsAuth) {
+    const inviteErrKey =
+      inviteErr === "invalid" || inviteErr === "missing"
+        ? "auth.errors.inviteInvalid"
+        : inviteErr === "used"
+          ? "auth.errors.inviteUsed"
+          : inviteErr === "expired"
+            ? "auth.errors.inviteExpired"
+            : null
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("auth.acceptInvite.title")}</CardTitle>
+          <CardDescription>{t("auth.acceptInvite.descriptionWorkOs")}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {inviteErrKey ? (
+            <p className="text-sm text-destructive text-center">{t(inviteErrKey)}</p>
+          ) : null}
+          <form action={redirectToWorkOsForInvite} className="space-y-2">
+            <input type="hidden" name="token" value={token ?? ""} />
+            <Button type="submit" size="lg" className="w-full">
+              {t("auth.acceptInvite.continueWithWorkOs")}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground text-center">
+            {t("auth.acceptInvite.workOsInviteHint")}
+          </p>
+        </CardContent>
+
+        <CardFooter className="justify-center">
+          <p className="text-sm text-muted-foreground">
+            {t("auth.acceptInvite.hasAccount")}{" "}
+            <Link href="/sign-in" className="font-medium text-foreground hover:underline">
+              {t("auth.acceptInvite.signIn")}
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
+    )
   }
 
   return (

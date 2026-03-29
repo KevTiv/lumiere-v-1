@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -9,8 +9,11 @@ import {
   newTaxForm,
   MissingOrganization,
   mergeSelectOptionsByFieldName,
+  mergeFieldDefaultValues,
+  recordPaymentForm,
+  budgetsTableConfig,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   toCreateAccountAccountParams,
@@ -33,6 +36,11 @@ import {
   useCreateTax,
   useCreateBudget,
   useAccountJournals,
+  useSmartPostDraft,
+  useCancelMove,
+  useConfirmBudget,
+  useCancelBudget,
+  useRecordPaymentForInvoice,
 } from "@/hooks/accounting"
 import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
 import type { AccountMove } from "@/hooks/accounting"
@@ -45,6 +53,26 @@ import {
   GeneralLedgerView,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { resolveDefaultCogsInventoryAccountIds } from "@/lib/accounting-post-draft"
+import type { PaymentResolutionContext } from "@/lib/accounting-create-params"
+
+function moveTypeTag(row: Record<string, unknown>): string {
+  const v = row.moveType
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function moveStateStr(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function budgetStateStr(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
 
 interface AccountingClientProps {
   initialAccounts?: Record<string, unknown>[]
@@ -87,6 +115,7 @@ function AccountingClientLoaded({
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(companyId, initialAccounts)
@@ -119,14 +148,95 @@ function AccountingClientLoaded({
   const createMove = useCreateMove(orgId, companyId)
   const createTax = useCreateTax(orgId, companyId)
   const createBudget = useCreateBudget(orgId, companyId)
+  const smartPostDraft = useSmartPostDraft(orgId)
+  const cancelMove = useCancelMove(orgId)
+  const confirmBudget = useConfirmBudget(orgId, companyId)
+  const cancelBudget = useCancelBudget(orgId, companyId)
+  const recordPaymentForInvoice = useRecordPaymentForInvoice(orgId, companyId)
+
+  const budgetsEntityConfig = useMemo((): EntityViewConfig => {
+    const view = budgetsTableConfig.view as EntityTableConfig
+    return {
+      ...budgetsTableConfig,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "confirm-budget",
+            label: t("accounting.budgets.confirmSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (budgetStateStr(r) === "Draft") confirmBudget.mutate(r.id as string | number | bigint)
+              }
+            },
+          },
+          {
+            id: "cancel-budget",
+            label: t("accounting.budgets.cancelSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              for (const r of rows) {
+                const st = budgetStateStr(r)
+                if (st !== "Done" && st !== "Cancel") cancelBudget.mutate(r.id as string | number | bigint)
+              }
+            },
+          },
+        ],
+      },
+    }
+  }, [t, confirmBudget, cancelBudget])
+
+  const defaultCogsInventoryIds = useMemo(
+    () => resolveDefaultCogsInventoryAccountIds(accounts as Record<string, unknown>[]),
+    [accounts],
+  )
+
+  const paymentResolutionContext = useMemo((): PaymentResolutionContext => {
+    const j0 = journals[0] as Record<string, unknown> | undefined
+    if (!j0?.id) return {}
+    const jid = j0.id
+    const defaultJournalId = typeof jid === "bigint" ? jid : BigInt(String(jid))
+    const cur = j0.currencyId
+    let fallbackCurrencyId: bigint | undefined
+    if (cur != null && cur !== "") {
+      fallbackCurrencyId = typeof cur === "bigint" ? cur : BigInt(String(cur))
+    }
+    return { defaultJournalId, fallbackCurrencyId }
+  }, [journals])
+
+  const recordPaymentFormConfig = useMemo(() => {
+    const base = recordPaymentForm(t)
+    if (!selectedInvoice) return base
+    const residual = Number(selectedInvoice.amountResidual)
+    return mergeFieldDefaultValues(base, {
+      amount: Number.isFinite(residual) ? residual : 0,
+      memo: "",
+    })
+  }, [t, selectedInvoice])
+
+  const postDraft = useCallback(
+    (move: unknown) => {
+      const row = move as Record<string, unknown>
+      const ids = defaultCogsInventoryIds ?? { cogsAccountId: 0, inventoryAccountId: 0 }
+      smartPostDraft.mutate({
+        moveId: Number(row.id),
+        move: row,
+        cogsAccountId: ids.cogsAccountId,
+        inventoryAccountId: ids.inventoryAccountId,
+      })
+    },
+    [smartPostDraft, defaultCogsInventoryIds],
+  )
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const invoices = useMemo(
-    () => allMoves.filter((m) => String(m.moveType) === "OutInvoice"),
+    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
     [allMoves],
   )
   const bills = useMemo(
-    () => allMoves.filter((m) => String(m.moveType) === "InInvoice"),
+    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
     [allMoves],
   )
 
@@ -138,7 +248,7 @@ function AccountingClientLoaded({
       .filter((a) => a.isBankAccount)
       .reduce((s, a) => s + Number(a.openingBalance ?? 0), 0)
     const revenue = invoices
-      .filter((m) => String(m.state) === "Posted")
+      .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
       .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
 
     const dashboardTab = moduleConfig.tabs.find((t) => t.id === "dashboard")
@@ -289,14 +399,35 @@ function AccountingClientLoaded({
               <GeneralLedgerView
                 moves={allMoves as unknown as AccountMove[]}
                 onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
+                onPostMove={(move) => postDraft(move)}
+                onCancelMove={(move) => cancelMove.mutate(move.id)}
+                postMovePending={smartPostDraft.isPending}
+                cancelMovePending={cancelMove.isPending}
               />
             ),
           }
         }
+        if (tab.id === "budgets") {
+          return { ...tab, entityConfig: budgetsEntityConfig }
+        }
         return tab
       }),
     }) as ModuleConfig,
-    [liveSections, invoices, bills, accounts, allMoves, createAccount.mutate, t, moduleConfig, journalEntryFormConfig],
+    [
+      liveSections,
+      invoices,
+      bills,
+      accounts,
+      allMoves,
+      createAccount.mutate,
+      t,
+      moduleConfig,
+      journalEntryFormConfig,
+      budgetsEntityConfig,
+      smartPostDraft,
+      cancelMove,
+      postDraft,
+    ],
   )
 
   // Entity tab data (taxes, budgets, analytic, etc. — non-rich tabs)
@@ -324,6 +455,38 @@ function AccountingClientLoaded({
         invoice={selectedInvoice}
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
+        onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onRecordPayment={
+          selectedInvoice ? () => setRecordPaymentOpen(true) : undefined
+        }
+        postDraftPending={smartPostDraft.isPending}
+        recordPaymentPending={recordPaymentForInvoice.isPending}
+      />
+
+      <FormModal
+        key={
+          selectedInvoice && recordPaymentOpen
+            ? `rp-${selectedInvoice.id}-${Number(selectedInvoice.amountResidual)}`
+            : "rp-closed"
+        }
+        open={recordPaymentOpen && !!selectedInvoice}
+        onOpenChange={setRecordPaymentOpen}
+        config={recordPaymentFormConfig}
+        onSubmit={async (data) => {
+          if (!selectedInvoice) return
+          const raw = data.amount
+          const amount =
+            typeof raw === "number" ? raw : Number.parseFloat(String(raw ?? ""))
+          if (!Number.isFinite(amount) || amount <= 0) return
+          const memo = String(data.memo ?? "").trim()
+          await recordPaymentForInvoice.mutateAsync({
+            invoiceRow: selectedInvoice as unknown as Record<string, unknown>,
+            amount,
+            memo,
+            paymentContext: paymentResolutionContext,
+          })
+          setSelectedInvoice(null)
+        }}
       />
 
       {/* Create invoice */}

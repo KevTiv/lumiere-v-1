@@ -5,9 +5,11 @@
 ///          Companies are sub-units within an Organization.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::{role, Role};
+use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::users::{user_organization, UserOrganization};
-use crate::helpers::check_permission;
+use crate::forms::migrations::run_seed_organization_form_configs;
+use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -125,6 +127,19 @@ pub struct UpdateCompanyHierarchyParams {
     pub parent_id: Option<u64>,
 }
 
+/// Full tenant bootstrap for first admin: organization, default company, settings, optional form-config seed.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BootstrapNewTenantParams {
+    pub organization: CreateOrganizationParams,
+    pub default_company_name: String,
+    pub default_company_code: String,
+    pub default_company_currency_code: String,
+    pub fiscal_year_end_month: u8,
+    pub fiscal_year_end_day: u8,
+    pub seed_form_configs: bool,
+    pub settings: UpsertOrganizationSettingsParams,
+}
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(accessor = organization, public)]
@@ -194,14 +209,11 @@ pub struct Company {
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
-
-/// Create a new top-level Organization. No permission check — any authenticated
-/// user can create an org (they become its first admin via the bootstrap below).
-#[spacetimedb::reducer]
-pub fn create_organization(
+/// Shared insert path for `create_organization` and `bootstrap_new_tenant`.
+fn insert_organization_with_owner(
     ctx: &ReducerContext,
     params: CreateOrganizationParams,
-) -> Result<(), String> {
+) -> Result<(Organization, Role), String> {
     if params.name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
     }
@@ -209,7 +221,6 @@ pub fn create_organization(
         return Err("Organization code cannot be empty".to_string());
     }
 
-    // Capture code before moving into params
     let code = params.code.clone();
 
     let org = ctx.db.organization().insert(Organization {
@@ -231,7 +242,6 @@ pub fn create_organization(
         metadata: params.metadata,
     });
 
-    // System-managed: bootstrap default owner role for this organization
     let owner_role = ctx.db.role().insert(Role {
         id: 0,
         organization_id: org.id,
@@ -246,7 +256,6 @@ pub fn create_organization(
         metadata: Some(format!("{{\"bootstrap\":true,\"org_code\":\"{}\"}}", code)),
     });
 
-    // System-managed: bootstrap creator membership as owner
     ctx.db.user_organization().insert(UserOrganization {
         id: 0,
         user_identity: ctx.sender(),
@@ -262,8 +271,151 @@ pub fn create_organization(
         metadata: Some("{\"bootstrap\":true}".to_string()),
     });
 
+    Ok((org, owner_role))
+}
+
+/// Create a new top-level Organization. No permission check — any authenticated
+/// user can create an org (they become its first admin via the bootstrap below).
+#[spacetimedb::reducer]
+pub fn create_organization(
+    ctx: &ReducerContext,
+    params: CreateOrganizationParams,
+) -> Result<(), String> {
+    let (org, _) = insert_organization_with_owner(ctx, params)?;
+    write_audit_log_v2(
+        ctx,
+        org.id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "organization",
+            record_id: org.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(r#"{"source":"create_organization"}"#.to_string()),
+            changed_fields: vec!["name".to_string(), "code".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
+
+/// Production tenant bootstrap: organization, default company, settings, optional form configs, role assignment.
+#[spacetimedb::reducer]
+pub fn bootstrap_new_tenant(
+    ctx: &ReducerContext,
+    params: BootstrapNewTenantParams,
+) -> Result<(), String> {
+    let already_member = ctx.db.user_organization().iter().any(|uo| {
+        uo.user_identity == ctx.sender() && uo.is_active
+    });
+    if already_member {
+        return Err("Already a member of an organization".to_string());
+    }
+
+    let default_name = params.default_company_name.trim();
+    let default_code = params.default_company_code.trim();
+    if default_name.is_empty() {
+        return Err("Default company name cannot be empty".to_string());
+    }
+    if default_code.is_empty() {
+        return Err("Default company code cannot be empty".to_string());
+    }
+
+    let (org, owner_role) = insert_organization_with_owner(ctx, params.organization)?;
+
+    let currency_code = params.default_company_currency_code.trim().to_uppercase();
+    if currency_code.is_empty() {
+        return Err("Default company currency code cannot be empty".to_string());
+    }
+    let currency_row = require_currency_row(ctx, &currency_code)?;
+    let legacy_company_currency_id = legacy_currency_id_for_code(&currency_row.code);
+
+    ctx.db.organization().id().update(Organization {
+        currency_id: Some(legacy_company_currency_id),
+        updated_at: ctx.timestamp,
+        ..org
+    });
+
+    ctx.db.organization_settings().insert(OrganizationSettings {
+        organization_id: org.id,
+        module_config: params.settings.module_config,
+        feature_flags: params.settings.feature_flags,
+        integration_keys: params.settings.integration_keys,
+        updated_at: ctx.timestamp,
+        metadata: params.settings.metadata,
+    });
+
+    let company = ctx.db.company().insert(Company {
+        id: 0,
+        organization_id: org.id,
+        name: default_name.to_string(),
+        code: default_code.to_string(),
+        is_parent: true,
+        parent_id: None,
+        currency_id: legacy_company_currency_id,
+        fiscal_year_end_month: params.fiscal_year_end_month,
+        fiscal_year_end_day: params.fiscal_year_end_day,
+        tax_id: None,
+        company_registry: None,
+        address_street: None,
+        address_city: None,
+        address_zip: None,
+        address_country_code: None,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        deleted_at: None,
+        metadata: None,
+    });
+
+    let uo = ctx
+        .db
+        .user_organization()
+        .iter()
+        .find(|uo| uo.user_identity == ctx.sender() && uo.organization_id == org.id)
+        .ok_or("Membership row missing after bootstrap")?;
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: Some(company.id),
+        ..uo
+    });
+
+    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: ctx.sender(),
+        role_id: owner_role.id,
+        organization_id: org.id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: None,
+        is_active: true,
+        metadata: None,
+    });
+
+    if params.seed_form_configs {
+        run_seed_organization_form_configs(ctx, org.id)?;
+    }
+
+    write_audit_log_v2(
+        ctx,
+        org.id,
+        AuditLogParams {
+            company_id: Some(company.id),
+            table_name: "organization",
+            record_id: org.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(r#"{"bootstrap":"tenant_v1"}"#.to_string()),
+            changed_fields: vec![
+                "organization".to_string(),
+                "company".to_string(),
+                "organization_settings".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 
 #[spacetimedb::reducer]
 pub fn update_organization(

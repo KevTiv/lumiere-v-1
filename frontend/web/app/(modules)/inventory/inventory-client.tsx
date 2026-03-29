@@ -9,10 +9,16 @@ import {
   newProductForm,
   newTransferForm,
   newInventoryAdjustmentForm,
+  newStockLocationForm,
+  newWarehouseForm,
+  editWarehouseForm,
+  editProductForm,
+  newProductVariantForm,
+  assignUserToPickingForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
 import {
@@ -26,14 +32,43 @@ import {
   useStockLocations,
   useProductionLots,
   useQualityChecks,
+  useStockCycleCounts,
+  usePickingWaves,
+  useWarehouseTasks,
+  useStockRoutes,
+  useStockRules,
+  useStockMoves,
+  useInventoryValuations,
+  useReplenishmentRules,
   useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
+  useCreateProductVariant,
   useCreateStockPicking,
   useCreateInventoryAdjustment,
+  useCreateStockLocation,
+  useCreateWarehouse,
+  useUpdateWarehouse,
+  useDeleteWarehouse,
+  useDeleteStockLocation,
+  useConfirmStockPicking,
+  useAssignStockPicking,
+  useAssignUserToPicking,
+  useValidateStockPicking,
+  useCancelStockPicking,
+  useProcessInventoryAdjustment,
+  useReserveStockQuant,
+  useUnreserveStockQuant,
   useWarehouse3D,
   useMoveStockItem3D,
+  useDoneStockMove,
+  useCancelStockMove,
+  useOrgUsers,
 } from "@/hooks/inventory"
 import { usePricelists } from "@/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+
+type ScalarId = bigint | number | string
 import {
   pricelistRowsToSelectOptions,
   pickingTypeOptionsFromTransfers,
@@ -42,6 +77,10 @@ import {
   productCategoryRowsToSelectOptions,
   uomRowsToSelectOptions,
 } from "@/lib/form-lookup"
+import { CheckCircle, ListChecks, Pencil, Plus, Trash2, UserCircle2, UserPlus, XCircle } from "lucide-react"
+import { buildCreateWarehouseParamsFromTemplate } from "@/lib/warehouse-create-params"
+import { withDefaultsFromRow } from "@/lib/prefill-form-config"
+import { CycleCountWizard } from "./cycle-count-wizard"
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -58,6 +97,12 @@ interface InventoryClientProps {
   initialPricelists?: Record<string, unknown>[]
   initialProductCategories?: Record<string, unknown>[]
   initialUoms?: Record<string, unknown>[]
+  initialStockLocations?: Record<string, unknown>[]
+  initialStockCycleCounts?: Record<string, unknown>[]
+  initialStockMoves?: Record<string, unknown>[]
+  initialWarehouse3dZones?: Record<string, unknown>[]
+  initialInventoryValuations?: Record<string, unknown>[]
+  initialReplenishmentRules?: Record<string, unknown>[]
   organizationId?: number
 }
 
@@ -81,23 +126,42 @@ function InventoryClientLoaded({
   initialPricelists,
   initialProductCategories,
   initialUoms,
+  initialStockLocations,
+  initialStockCycleCounts,
+  initialStockMoves,
+  initialWarehouse3dZones: _initialWarehouse3dZones,
+  initialInventoryValuations,
+  initialReplenishmentRules,
   organizationId,
 }: InventoryClientLoadedProps) {
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [editProductRow, setEditProductRow] = useState<Record<string, unknown> | null>(null)
+  const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)
+  const [editWarehouseRow, setEditWarehouseRow] = useState<Record<string, unknown> | null>(null)
+  const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null)
 
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
-  const { data: stockQuants = [] } = useStockQuants(companyId, initialStockQuants)
-  const { data: transfers = [] } = useStockPickings(companyId, initialTransfers)
-  const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses)
+  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
+  const { data: transfers = [] } = useStockPickings(orgId, initialTransfers)
+  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses)
   const { data: adjustments = [] } = useInventoryAdjustments(orgId, initialAdjustments)
-  const { data: locations = [] } = useStockLocations(companyId)
-  const { data: lots = [] } = useProductionLots(companyId)
-  const { data: qualityChecks = [] } = useQualityChecks(companyId)
-  const { data: pricelists = [] } = usePricelists(companyId, initialPricelists)
+  const { data: locations = [] } = useStockLocations(orgId, initialStockLocations)
+  const { data: lots = [] } = useProductionLots(orgId)
+  const { data: qualityChecks = [] } = useQualityChecks(orgId)
+  const { data: cycleCounts = [] } = useStockCycleCounts(orgId, initialStockCycleCounts)
+  const { data: pickingWaves = [] } = usePickingWaves(orgId)
+  const { data: warehouseTasks = [] } = useWarehouseTasks(orgId)
+  const { data: stockRoutes = [] } = useStockRoutes(orgId)
+  const { data: stockRules = [] } = useStockRules(orgId)
+  const { data: stockMoves = [] } = useStockMoves(orgId, initialStockMoves)
+  const { data: inventoryValuations = [] } = useInventoryValuations(orgId, initialInventoryValuations)
+  const { data: replenishmentRulesList = [] } = useReplenishmentRules(orgId, initialReplenishmentRules)
+  const { data: orgUsers = [] } = useOrgUsers()
+  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -181,6 +245,93 @@ function InventoryClientLoaded({
   const createProduct = useCreateProduct(orgId)
   const createStockPicking = useCreateStockPicking(orgId, companyId)
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId)
+  const createStockLocation = useCreateStockLocation(orgId)
+  const createWarehouse = useCreateWarehouse(orgId)
+  const updateWarehouse = useUpdateWarehouse(orgId)
+  const deleteWarehouse = useDeleteWarehouse(orgId)
+  const updateProduct = useUpdateProduct(orgId)
+  const deleteProduct = useDeleteProduct(orgId)
+  const createProductVariant = useCreateProductVariant(orgId)
+  const deleteStockLocation = useDeleteStockLocation(orgId)
+  const doneStockMove = useDoneStockMove(orgId)
+  const cancelStockMove = useCancelStockMove(orgId)
+  const assignUserToPicking = useAssignUserToPicking(orgId)
+  const confirmPicking = useConfirmStockPicking(orgId)
+  const assignPicking = useAssignStockPicking(orgId)
+  const validatePicking = useValidateStockPicking(orgId)
+  const cancelPicking = useCancelStockPicking(orgId)
+  const processAdjustment = useProcessInventoryAdjustment(orgId)
+  const reserveQuant = useReserveStockQuant(orgId)
+  const unreserveQuant = useUnreserveStockQuant(orgId)
+
+  const locationParentOptions = useMemo(() => {
+    const opts = locations.map((loc) => ({
+      value: String(loc.id),
+      label: String(loc.completeName ?? loc.name ?? loc.id),
+    }))
+    return [
+      { value: "", label: t("inventory.forms.newStockLocation.fields.parentNone") },
+      ...opts,
+    ]
+  }, [locations, t])
+
+  const stockLocationFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newStockLocationForm(t), {
+        parentLocationId: locationParentOptions,
+      }),
+    [t, locationParentOptions],
+  )
+
+  const warehouseTemplateOptions = useMemo(() => {
+    if (warehouses.length === 0)
+      return [{ value: "", label: t("common.lookup.noWarehouses"), disabled: true }]
+    return warehouses.map((w) => ({
+      value: String(w.id),
+      label: `${String(w.name ?? "")} (${String(w.code ?? w.id)})`,
+    }))
+  }, [warehouses, t])
+
+  const warehouseFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newWarehouseForm(t), {
+        templateWarehouseId: warehouseTemplateOptions,
+      }),
+    [t, warehouseTemplateOptions],
+  )
+
+  const assignUserFieldOptions = useMemo(() => {
+    const rows = orgUsers as Record<string, unknown>[]
+    const opts = rows
+      .map((u) => {
+        const id = String(u.identity ?? u.userIdentity ?? "")
+        if (!id) return null
+        return {
+          value: id,
+          label: String(u.name ?? u.email ?? u.username ?? id).slice(0, 80),
+        }
+      })
+      .filter((x): x is { value: string; label: string } => x != null)
+    return [{ value: "", label: "—" }, ...opts]
+  }, [orgUsers])
+
+  const assignUserFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(assignUserToPickingForm(t), {
+        userIdentity: assignUserFieldOptions,
+      }),
+    [t, assignUserFieldOptions],
+  )
+
+  const editProductModalConfig = useMemo(() => {
+    if (!editProductRow) return editProductForm(t)
+    return withDefaultsFromRow(editProductForm(t), editProductRow)
+  }, [t, editProductRow])
+
+  const editWarehouseModalConfig = useMemo(() => {
+    if (!editWarehouseRow) return editWarehouseForm(t)
+    return withDefaultsFromRow(editWarehouseForm(t), editWarehouseRow)
+  }, [t, editWarehouseRow])
 
   // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
   const firstWarehouseId = warehouses[0]?.id ? BigInt(String(warehouses[0].id)) : 0n
@@ -338,30 +489,343 @@ function InventoryClientLoaded({
     [zones, slots, warehouseItems, warehouses, moveStockItem, t, isMounted]
   )
 
-  const config = useMemo(
-    () =>
-      ({
-        ...moduleConfig,
-        tabs: [
-          ...moduleConfig.tabs.map((tab) => {
-            if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-            if (tab.id === "products") return { ...tab, createForm: productFormConfig }
-            if (tab.id === "transfers") return { ...tab, createForm: transferFormConfig }
-            if (tab.id === "adjustments") return { ...tab, createForm: adjustmentFormConfig }
-            return tab
-          }),
-          warehouse3DTab,
-        ],
-      }) as ModuleConfig,
-    [
-      moduleConfig,
-      liveSections,
-      warehouse3DTab,
-      productFormConfig,
-      transferFormConfig,
-      adjustmentFormConfig,
-    ]
+  const cycleCountWizardTab = useMemo(
+    () => ({
+      id: "cycle-wizard",
+      label: t("inventory.cycleCountWizard.tabLabel"),
+      type: "custom" as const,
+      customContent: <CycleCountWizard organizationId={organizationId} locations={locations} />,
+    }),
+    [t, organizationId, locations],
   )
+
+  const config = useMemo(() => {
+    const withTransferActions = (
+      tab: (typeof moduleConfig.tabs)[number],
+    ): (typeof moduleConfig.tabs)[number] => {
+      if (tab.type !== "entity" || !tab.entityConfig || tab.entityConfig.view.mode !== "table") {
+        return tab
+      }
+      const v = tab.entityConfig.view as EntityTableConfig
+      if (tab.id === "transfers") {
+        return {
+          ...tab,
+          createForm: transferFormConfig,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "confirm-picking",
+                  label: t("inventory.transferActions.confirm"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void confirmPicking.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "assign-picking",
+                  label: t("inventory.transferActions.assign"),
+                  icon: UserCircle2,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void assignPicking.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "assign-user-picking",
+                  label: t("inventory.transferActions.assignUser"),
+                  icon: UserPlus,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) setAssignPickingId(id)
+                  },
+                },
+                {
+                  id: "validate-picking",
+                  label: t("inventory.transferActions.validate"),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void validatePicking.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "cancel-picking",
+                  label: t("inventory.transferActions.cancel"),
+                  icon: XCircle,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void cancelPicking.mutateAsync(id)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "products") {
+        return {
+          ...tab,
+          createForm: productFormConfig,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "edit-product",
+                  label: t("common.edit"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    if (row) setEditProductRow(row)
+                  },
+                },
+                {
+                  id: "delete-product",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null) return
+                    if (typeof window !== "undefined" && window.confirm(t("inventory.productActions.confirmDelete"))) {
+                      void deleteProduct.mutateAsync(id)
+                    }
+                  },
+                },
+                {
+                  id: "add-variant",
+                  label: t("inventory.productActions.addVariant"),
+                  icon: Plus,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) setVariantProductId(id)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "warehouses") {
+        return {
+          ...tab,
+          createForm: warehouseFormConfig,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "edit-warehouse",
+                  label: t("common.edit"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    if (row) setEditWarehouseRow(row)
+                  },
+                },
+                {
+                  id: "delete-warehouse",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null) return
+                    if (typeof window !== "undefined" && window.confirm(t("inventory.warehouseActions.confirmDelete"))) {
+                      void deleteWarehouse.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "stock-moves") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "done-move",
+                  label: t("inventory.stockMoveActions.done"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    const id = row?.id as ScalarId | undefined
+                    if (id == null) return
+                    const def = Number(row?.productUomQty ?? row?.product_uom_qty ?? 1)
+                    const q =
+                      typeof window !== "undefined"
+                        ? window.prompt(t("inventory.stockMoveActions.quantityDonePrompt"), String(def))
+                        : null
+                    const qty = q != null && q !== "" ? Number(q) : def
+                    if (!Number.isFinite(qty)) return
+                    void doneStockMove.mutateAsync({ moveId: id, quantityDone: qty })
+                  },
+                },
+                {
+                  id: "cancel-move",
+                  label: t("inventory.stockMoveActions.cancel"),
+                  icon: XCircle,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void cancelStockMove.mutateAsync(id)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "stock") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "reserve-qty",
+                  label: t("inventory.stockActions.reserve"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void reserveQuant.mutateAsync({ quantId: id, reserveQty: 1 })
+                  },
+                },
+                {
+                  id: "unreserve-qty",
+                  label: t("inventory.stockActions.unreserve"),
+                  icon: XCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void unreserveQuant.mutateAsync({ quantId: id, unreserveQty: 1 })
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "adjustments") {
+        return {
+          ...tab,
+          createForm: adjustmentFormConfig,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "process-adjustment",
+                  label: t("inventory.adjustmentActions.process"),
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void processAdjustment.mutateAsync(id)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "locations") {
+        return {
+          ...tab,
+          createForm: stockLocationFormConfig,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "delete-location",
+                  label: t("common.delete"),
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void deleteStockLocation.mutateAsync(id)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      return tab
+    }
+
+    return {
+      ...moduleConfig,
+      tabs: [
+        ...moduleConfig.tabs.map((tab) => {
+          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "products") return withTransferActions(tab)
+          if (tab.id === "transfers") return withTransferActions(tab)
+          if (tab.id === "warehouses") return withTransferActions(tab)
+          if (tab.id === "stock-moves") return withTransferActions(tab)
+          if (tab.id === "stock") return withTransferActions(tab)
+          if (tab.id === "adjustments") return withTransferActions(tab)
+          if (tab.id === "locations") return withTransferActions(tab)
+          return tab
+        }),
+        cycleCountWizardTab,
+        warehouse3DTab,
+      ],
+    } as ModuleConfig
+  }, [
+    moduleConfig,
+    liveSections,
+    cycleCountWizardTab,
+    warehouse3DTab,
+    productFormConfig,
+    warehouseFormConfig,
+    transferFormConfig,
+    adjustmentFormConfig,
+    stockLocationFormConfig,
+    t,
+    confirmPicking,
+    assignPicking,
+    validatePicking,
+    cancelPicking,
+    processAdjustment,
+    reserveQuant,
+    unreserveQuant,
+    deleteStockLocation,
+    deleteProduct,
+    deleteWarehouse,
+    doneStockMove,
+    cancelStockMove,
+  ])
 
   const data = useMemo(
     () => ({
@@ -373,8 +837,33 @@ function InventoryClientLoaded({
       locations: locations as unknown as Record<string, unknown>[],
       lots: lots as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
+      "cycle-counts": cycleCounts as unknown as Record<string, unknown>[],
+      "picking-waves": pickingWaves as unknown as Record<string, unknown>[],
+      "warehouse-tasks": warehouseTasks as unknown as Record<string, unknown>[],
+      routes: stockRoutes as unknown as Record<string, unknown>[],
+      rules: stockRules as unknown as Record<string, unknown>[],
+      "stock-moves": stockMoves as unknown as Record<string, unknown>[],
+      valuations: inventoryValuations as unknown as Record<string, unknown>[],
+      replenishment: replenishmentRulesList as unknown as Record<string, unknown>[],
     }),
-    [products, stockQuants, transfers, warehouses, adjustments, locations, lots, qualityChecks]
+    [
+      products,
+      stockQuants,
+      transfers,
+      warehouses,
+      adjustments,
+      locations,
+      lots,
+      qualityChecks,
+      cycleCounts,
+      pickingWaves,
+      warehouseTasks,
+      stockRoutes,
+      stockRules,
+      stockMoves,
+      inventoryValuations,
+      replenishmentRulesList,
+    ]
   )
 
   const handleFormSubmit = (
@@ -551,6 +1040,57 @@ function InventoryClientLoaded({
           originalForm: formData,
         }),
       } as never)
+    } else if (action === "createStockLocation") {
+      const name = String(formData.name ?? "").trim()
+      if (!name) return
+      const usage = String(formData.usage ?? "internal")
+      const parentRaw = formData.parentLocationId
+      const parentId =
+        parentRaw !== "" && parentRaw != null && String(parentRaw).trim() !== ""
+          ? Number(parentRaw)
+          : undefined
+      createStockLocation.mutate({
+        name,
+        usage,
+        locationCategory: usage,
+        parentPath: parentId ? "" : "/",
+        childLeft: 0,
+        childRight: 1,
+        scrapLocation: false,
+        returnLocation: false,
+        active: true,
+        posx: 0,
+        posy: 0,
+        posz: 0,
+        cyclicInventoryFrequency: 0,
+        locationId: parentId,
+        completeName: undefined,
+        valuationInAccountId: undefined,
+        valuationOutAccountId: undefined,
+        comment: undefined,
+        barcode: formData.barcode ? String(formData.barcode) : undefined,
+        lastInventoryDate: undefined,
+        nextInventoryDate: undefined,
+        metadata: undefined,
+      } as never)
+    } else if (action === "createWarehouse") {
+      const tid = formData.templateWarehouseId
+      if (tid === "" || tid == null) return
+      const template = warehouses.find((w) => String(w.id) === String(tid)) as
+        | Record<string, unknown>
+        | undefined
+      if (!template) return
+      const name = String(formData.name ?? "").trim()
+      const code = String(formData.code ?? "").trim()
+      const active = formData.active == null ? true : Boolean(formData.active)
+      const sequence = Number(formData.sequence ?? 0)
+      let params: Record<string, unknown>
+      try {
+        params = buildCreateWarehouseParamsFromTemplate(template, { name, code, active, sequence })
+      } catch {
+        return
+      }
+      createWarehouse.mutate(params)
     }
   }
 
@@ -570,6 +1110,109 @@ function InventoryClientLoaded({
             handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
+        }}
+      />
+      <FormModal
+        key={editProductRow ? `edit-product-${String(editProductRow.id)}` : "edit-product-closed"}
+        open={editProductRow !== null}
+        onOpenChange={(open) => !open && setEditProductRow(null)}
+        config={editProductModalConfig}
+        onSubmit={async (fd) => {
+          if (!editProductRow) return
+          const id = editProductRow.id as ScalarId
+          await updateProduct.mutateAsync({
+            productId: id,
+            params: {
+              name: fd.name != null && String(fd.name).trim() !== "" ? String(fd.name) : undefined,
+              standardPrice:
+                fd.standardPrice != null && fd.standardPrice !== ""
+                  ? Number(fd.standardPrice)
+                  : undefined,
+              listPrice:
+                fd.listPrice != null && fd.listPrice !== "" ? Number(fd.listPrice) : undefined,
+              description:
+                fd.description != null && String(fd.description).trim() !== ""
+                  ? String(fd.description)
+                  : undefined,
+              saleOk: fd.saleOk != null ? Boolean(fd.saleOk) : undefined,
+              purchaseOk: fd.purchaseOk != null ? Boolean(fd.purchaseOk) : undefined,
+              active: fd.active != null ? Boolean(fd.active) : undefined,
+              isPublished: fd.isPublished != null ? Boolean(fd.isPublished) : undefined,
+            },
+          })
+        }}
+      />
+      <FormModal
+        key={variantProductId != null ? `variant-${String(variantProductId)}` : "variant-closed"}
+        open={variantProductId !== null}
+        onOpenChange={(open) => !open && setVariantProductId(null)}
+        config={newProductVariantForm(t)}
+        onSubmit={async (fd) => {
+          if (variantProductId == null) return
+          await createProductVariant.mutateAsync({
+            productTmplId: variantProductId,
+            params: {
+              name: String(fd.name ?? "").trim(),
+              attributeValueIds: [],
+              standardPrice: Number(fd.standardPrice ?? 0),
+              lstPrice: Number(fd.lstPrice ?? fd.standardPrice ?? 0),
+              defaultCode: fd.defaultCode ? String(fd.defaultCode) : undefined,
+              barcode: fd.barcode ? String(fd.barcode) : undefined,
+            },
+          })
+        }}
+      />
+      <FormModal
+        key={editWarehouseRow ? `edit-wh-${String(editWarehouseRow.id)}` : "edit-wh-closed"}
+        open={editWarehouseRow !== null}
+        onOpenChange={(open) => !open && setEditWarehouseRow(null)}
+        config={editWarehouseModalConfig}
+        onSubmit={async (fd) => {
+          if (!editWarehouseRow) return
+          const id = editWarehouseRow.id as ScalarId
+          await updateWarehouse.mutateAsync({
+            warehouseId: id,
+            params: {
+              name: fd.name != null && String(fd.name).trim() !== "" ? String(fd.name) : undefined,
+              code: fd.code != null && String(fd.code).trim() !== "" ? String(fd.code) : undefined,
+              active: fd.active != null ? Boolean(fd.active) : undefined,
+              receptionSteps:
+                fd.receptionSteps != null && String(fd.receptionSteps).trim() !== ""
+                  ? String(fd.receptionSteps)
+                  : undefined,
+              deliverySteps:
+                fd.deliverySteps != null && String(fd.deliverySteps).trim() !== ""
+                  ? String(fd.deliverySteps)
+                  : undefined,
+              manufactureSteps:
+                fd.manufactureSteps != null && String(fd.manufactureSteps).trim() !== ""
+                  ? String(fd.manufactureSteps)
+                  : undefined,
+              buyToResupply: fd.buyToResupply != null ? Boolean(fd.buyToResupply) : undefined,
+              manufactureToResupply:
+                fd.manufactureToResupply != null ? Boolean(fd.manufactureToResupply) : undefined,
+              crossdock: fd.crossdock != null ? Boolean(fd.crossdock) : undefined,
+              sequence:
+                fd.sequence != null && fd.sequence !== "" ? Number(fd.sequence) : undefined,
+              metadata:
+                fd.metadata != null && String(fd.metadata).trim() !== ""
+                  ? String(fd.metadata)
+                  : undefined,
+            },
+          })
+        }}
+      />
+      <FormModal
+        key={assignPickingId != null ? `assign-${String(assignPickingId)}` : "assign-closed"}
+        open={assignPickingId !== null}
+        onOpenChange={(open) => !open && setAssignPickingId(null)}
+        config={assignUserFormConfig}
+        onSubmit={async (fd) => {
+          if (assignPickingId == null) return
+          const raw = fd.userIdentity
+          const hex =
+            raw != null && String(raw).trim() !== "" ? String(raw).trim() : null
+          await assignUserToPicking.mutateAsync({ pickingId: assignPickingId, userIdentityHex: hex })
         }}
       />
     </>

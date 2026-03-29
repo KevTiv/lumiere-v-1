@@ -12,6 +12,10 @@ import type {
 } from "./rbac-types"
 import { defaultRoles, defaultUsers, defaultPolicies } from "./rbac-defaults"
 
+/** When true, UI RBAC checks always pass (pair with server `ensureDevAdmin` in alpha). */
+const DEV_ADMIN_RBAC_BYPASS =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
+
 const RBACContext = createContext<RBACContextType | null>(null)
 
 interface RBACProviderProps {
@@ -46,6 +50,10 @@ export function RBACProvider({ children, initialUser, initialRoles, initialPolic
     resource: Resource, 
     action: Action
   ): PermissionCheckResult => {
+    if (DEV_ADMIN_RBAC_BYPASS) {
+      return { allowed: true, reason: "NEXT_PUBLIC_DEV_ADMIN" }
+    }
+
     if (!currentUser) {
       return { allowed: false, reason: "No user logged in" }
     }
@@ -90,8 +98,8 @@ export function RBACProvider({ children, initialUser, initialRoles, initialPolic
     return currentUser.roles.includes(roleId)
   }, [currentUser])
 
-  // Check if user is an admin
   const isAdmin = useCallback((): boolean => {
+    if (DEV_ADMIN_RBAC_BYPASS) return true
     return hasRole("role-admin")
   }, [hasRole])
 

@@ -11,10 +11,8 @@ use crate::forms::{
     FieldValidation, FieldWidth,
 };
 
-/// Seed default form configurations for an organization
-/// This should be called during migration or when a new organization is created
-#[spacetimedb::reducer]
-pub fn seed_organization_form_configs(
+/// Shared implementation for `seed_organization_form_configs` and tenant bootstrap.
+pub(crate) fn run_seed_organization_form_configs(
     ctx: &ReducerContext,
     organization_id: u64,
 ) -> Result<(), String> {
@@ -74,6 +72,16 @@ pub fn seed_organization_form_configs(
         organization_id
     );
     Ok(())
+}
+
+/// Seed default form configurations for an organization
+/// This should be called during migration or when a new organization is created
+#[spacetimedb::reducer]
+pub fn seed_organization_form_configs(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    run_seed_organization_form_configs(ctx, organization_id)
 }
 
 /// Seed Journal form configuration

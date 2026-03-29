@@ -414,6 +414,41 @@ export const postMoveForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const recordPaymentForm = (t: TFunction): FormConfig => ({
+  id: "record-payment",
+  title: t("accounting.forms.recordPayment.title"),
+  description: t("accounting.forms.recordPayment.description"),
+  submitLabel: t("accounting.forms.recordPayment.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  size: "md",
+  sections: [
+    {
+      id: "payment",
+      title: t("accounting.forms.recordPayment.sections.payment"),
+      fields: [
+        {
+          id: "amount",
+          name: "amount",
+          type: "number",
+          label: t("accounting.forms.recordPayment.fields.amount"),
+          required: true,
+          width: "full",
+          step: 0.01,
+          validation: { min: 0.01 },
+        },
+        {
+          id: "memo",
+          name: "memo",
+          type: "text",
+          label: t("accounting.forms.recordPayment.fields.memo"),
+          placeholder: t("accounting.forms.recordPayment.fields.memoPlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-invoice": newInvoiceForm(t),
   "new-bill": newBillForm(t),
@@ -422,4 +457,5 @@ export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "new-tax": newTaxForm(t),
   "new-budget": newBudgetForm(t),
   "post-move": postMoveForm(t),
+  "record-payment": recordPaymentForm(t),
 })

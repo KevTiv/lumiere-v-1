@@ -51,12 +51,30 @@ interface EntryLine {
   credit: number
 }
 
+function moveStateStr(state: unknown): string {
+  if (state != null && typeof state === 'object' && 'tag' in state) {
+    return String((state as { tag: string }).tag)
+  }
+  return String(state ?? '')
+}
+
 interface GeneralLedgerViewProps {
   moves: AccountMove[]
   onCreate?: (data: Record<string, unknown>) => void
+  onPostMove?: (move: AccountMove) => void
+  onCancelMove?: (move: AccountMove) => void
+  postMovePending?: boolean
+  cancelMovePending?: boolean
 }
 
-export function GeneralLedgerView({ moves, onCreate }: GeneralLedgerViewProps) {
+export function GeneralLedgerView({
+  moves,
+  onCreate,
+  onPostMove,
+  onCancelMove,
+  postMovePending,
+  cancelMovePending,
+}: GeneralLedgerViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMove, setSelectedMove] = useState<AccountMove | null>(null)
@@ -232,6 +250,31 @@ export function GeneralLedgerView({ moves, onCreate }: GeneralLedgerViewProps) {
                   </div>
                 </div>
               </div>
+              {selectedMove && (onPostMove || onCancelMove) && (
+                <DialogFooter className="gap-2 sm:gap-2">
+                  {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
+                    <Button
+                      type="button"
+                      disabled={postMovePending}
+                      onClick={() => onPostMove(selectedMove)}
+                    >
+                      {t("accounting.journalEntries.postEntry")}
+                    </Button>
+                  )}
+                  {(moveStateStr(selectedMove.state) === 'Draft' ||
+                    moveStateStr(selectedMove.state) === 'Posted') &&
+                    onCancelMove && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={cancelMovePending}
+                        onClick={() => onCancelMove(selectedMove)}
+                      >
+                        {t("accounting.journalEntries.cancelEntry")}
+                      </Button>
+                    )}
+                </DialogFooter>
+              )}
             </>
           )}
         </DialogContent>

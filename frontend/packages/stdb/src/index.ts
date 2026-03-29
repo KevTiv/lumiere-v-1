@@ -110,12 +110,18 @@ export * from './queries/fleet';
 export * from './hooks/useFleetVehicles';
 export * from './hooks/usePosTerminals';
 export * from './hooks/useWarehouseGeo';
+export * from './mutations/form-config';
 
 export type {
   CreateActivityParams,
   CreateJobPositionParams,
   CreateReportTemplateParams,
   CreateScheduledReportParams,
+  CloseSubscriptionParams,
+  CreateDeferredRevenueScheduleParams,
+  CreateRevenueRecognitionRuleParams,
   CreateSubscriptionFromSaleOrderParams,
   CreateSubscriptionPlanParams,
+  GenerateSubscriptionInvoiceParams,
+  RecognizeDeferredRevenueParams,
 } from './generated/types';
