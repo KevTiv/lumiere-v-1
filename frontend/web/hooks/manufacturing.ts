@@ -565,6 +565,34 @@ export function useImportManufacturingOrderCsv(organizationId: bigint, companyId
   })
 }
 
+/** Links an IoT device to an MRP work center. Reducer is scoped by `organization_id` only (no company arg). */
+export function useLinkDeviceToWorkcenter(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      deviceId,
+      workcenterId,
+    }: {
+      deviceId: string | number | bigint
+      workcenterId: string | number | bigint
+    }) => {
+      const r = await fetch('/api/call/link_device_to_workcenter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          deviceId.toString(),
+          workcenterId.toString(),
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['iot-devices', organizationId.toString()] })
+    },
+  })
+}
+
 /** All manufacturing `/api/call` mutations for module UI (row actions, CSV). */
 export function useManufacturingMutations(organizationId: bigint, companyId: bigint) {
   return {
@@ -593,6 +621,7 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     importBomCsv: useImportBomCsv(organizationId, companyId),
     importBomLineCsv: useImportBomLineCsv(organizationId, companyId),
     importMoCsv: useImportManufacturingOrderCsv(organizationId, companyId),
+    linkDeviceToWorkcenter: useLinkDeviceToWorkcenter(organizationId),
   }
 }
 

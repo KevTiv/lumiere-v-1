@@ -18,7 +18,9 @@ import {
   ChevronRight,
   Settings2,
   BookMarked,
-  Lock
+  Lock,
+  Building,
+  Sparkles,
 } from "lucide-react"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
@@ -26,6 +28,8 @@ import { AuditLog } from "./audit-log"
 import { ProfileSettings } from "./profile-settings"
 import { UnifiedFormConfigSettings } from "./unified-form-config-settings"
 import { UserCustomFields } from "./user-custom-fields"
+import { OrganizationSettings } from "./organization-settings"
+import { AiSettings } from "./ai-settings"
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   user: User,
@@ -36,6 +40,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   scroll: ScrollText,
   settings2: Settings2,
   bookmarked: BookMarked,
+  building: Building,
+  sparkles: Sparkles,
 }
 
 interface SettingsModuleProps {
@@ -63,6 +69,10 @@ export function SettingsModule({ className }: SettingsModuleProps) {
         return <UnifiedFormConfigSettings />
       case "custom-fields":
         return <UserCustomFields />
+      case "organization":
+        return <OrganizationSettings />
+      case "ai":
+        return <AiSettings />
       default:
         return null
     }

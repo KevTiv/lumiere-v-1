@@ -46,6 +46,7 @@
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
     "@tanstack/react-query": "latest",
+    "@tanstack/react-router": "^1.168.10",
     "@vercel/analytics": "1.6.1",
     "@workos-inc/authkit-nextjs": "^3.0.0",
     "autoprefixer": "^10.4.20",
@@ -81,6 +82,7 @@
   "devDependencies": {
     "@lumiere/stdb": "workspace:*",
     "@tailwindcss/postcss": "^4.2.0",
+    "@tanstack/router-devtools": "^1.166.11",
     "@types/bcryptjs": "^3.0.0",
     "@types/leaflet": "^1.9.14",
     "@types/node": "^22",

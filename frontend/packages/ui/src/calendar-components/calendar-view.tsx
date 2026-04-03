@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,8 @@ import type { CalendarEvent, ViewMode } from "../lib/calendar-types"
 import { eventTypeConfig } from "../lib/calendar-types"
 import { EventDetailPanel } from "./event-detail-panel"
 
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
+
 interface CalendarViewProps {
   events: CalendarEvent[]
   viewMode: ViewMode
@@ -37,6 +40,8 @@ interface CalendarViewProps {
   onSearchChange: (term: string) => void
   onSelectEvent: (id: string | null) => void
   onCreateEvent?: () => void
+  onEditEvent?: (eventId: string) => void
+  onDeleteEvent?: (eventId: string) => void
 }
 
 export function CalendarView({
@@ -55,7 +60,10 @@ export function CalendarView({
   onSearchChange,
   onSelectEvent,
   onCreateEvent,
+  onEditEvent,
+  onDeleteEvent,
 }: CalendarViewProps) {
+  const { t, i18n } = useTranslation()
   const filteredEvents = useMemo(
     () =>
       events?.filter(
@@ -126,7 +134,7 @@ export function CalendarView({
             })}
             {dayEvents.length > 2 && (
               <div className="text-xs text-muted-foreground px-1">
-                +{dayEvents.length - 2} more
+                {t("calendar.view.moreEvents", { count: dayEvents.length - 2 })}
               </div>
             )}
           </div>
@@ -136,9 +144,9 @@ export function CalendarView({
 
     return (
       <div className="grid grid-cols-7 gap-2 mb-6">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day} className="text-center font-semibold text-sm py-2">
-            {day}
+        {WEEKDAY_KEYS.map((key) => (
+          <div key={key} className="text-center font-semibold text-sm py-2">
+            {t(`calendar.view.weekdaysShort.${key}`)}
           </div>
         ))}
         {days}
@@ -152,7 +160,7 @@ export function CalendarView({
     return (
       <div className="space-y-3">
         <div className="text-sm font-semibold text-muted-foreground">
-          {selectedDate?.toLocaleDateString("en-US", {
+          {selectedDate?.toLocaleDateString(i18n.language, {
             weekday: "long",
             month: "long",
             day: "numeric",
@@ -174,7 +182,7 @@ export function CalendarView({
                     <h4 className="font-medium text-sm">{event.title}</h4>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                       <Clock className="w-3 h-3" />
-                      {event.startTime.toLocaleTimeString("en-US", {
+                      {event.startTime.toLocaleTimeString(i18n.language, {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -188,7 +196,7 @@ export function CalendarView({
                     {event.attendees.length > 0 && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                         <Users className="w-3 h-3" />
-                        {event.attendees.length} attendees
+                        {t("calendar.view.attendeesCount", { count: event.attendees.length })}
                       </div>
                     )}
                   </div>
@@ -202,14 +210,14 @@ export function CalendarView({
         ) : (
           <div className="text-center py-6 text-muted-foreground">
             <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No events scheduled</p>
+            <p className="text-sm">{t("calendar.view.noEventsScheduled")}</p>
           </div>
         )}
       </div>
     )
   }
 
-  const monthYear = currentDate?.toLocaleDateString("en-US", {
+  const monthYear = currentDate?.toLocaleDateString(i18n.language, {
     month: "long",
     year: "numeric",
   })
@@ -221,7 +229,7 @@ export function CalendarView({
         <h2 className="text-2xl font-bold">{monthYear}</h2>
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Search events..."
+            placeholder={t("calendar.events.searchPlaceholder")}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-48"
@@ -237,10 +245,10 @@ export function CalendarView({
               <List className="w-4 h-4" />
             </Button>
           </div>
-          <Button size="sm" variant="outline" onClick={onToday}>Today</Button>
+          <Button size="sm" variant="outline" onClick={onToday}>{t("calendar.view.today")}</Button>
           <Button size="sm" className="gap-2" onClick={onCreateEvent}>
             <Plus className="w-4 h-4" />
-            New Event
+            {t("calendar.view.newEvent")}
           </Button>
         </div>
       </div>
@@ -272,8 +280,10 @@ export function CalendarView({
 
       {selectedEventId && (
         <EventDetailPanel
-          event={events.find((e) => e.id === selectedEventId)}
+          event={events.find((e) => e.id === selectedEventId)!}
           onClose={() => onSelectEvent(null)}
+          onEdit={onEditEvent ? () => onEditEvent(selectedEventId) : undefined}
+          onDelete={onDeleteEvent ? () => onDeleteEvent(selectedEventId) : undefined}
         />
       )}
     </div>

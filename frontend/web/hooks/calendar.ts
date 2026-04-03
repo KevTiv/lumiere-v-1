@@ -40,5 +40,65 @@ export function useCreateCalendarEvent(organizationId: bigint) {
   })
 }
 
+export function useUpdateCalendarEvent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { eventId: string | number | bigint; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ eventId, params }) => {
+      const r = await fetch('/api/call/update_calendar_event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), eventId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update calendar event')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId.toString()] }),
+  })
+}
+
+export function useDeleteCalendarEvent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string | number | bigint>({
+    mutationFn: async (eventId) => {
+      const r = await fetch('/api/call/delete_calendar_event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), eventId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to delete calendar event')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId.toString()] }),
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type { CreateCalendarEventParams } from '@lumiere/stdb'
+
+// Local type until SpacetimeDB bindings are regenerated
+export interface UpdateCalendarEventParams {
+  name?: string
+  start?: number | bigint
+  stop?: number | bigint
+  allday?: boolean
+  privacy?: string
+  show_as?: string
+  state?: string
+  recurrency?: boolean
+  partner_ids?: (number | bigint)[]
+  alarm_ids?: (number | bigint)[]
+  user_id?: string
+  description?: string | null
+  location?: string | null
+  videocall_location?: string | null
+  color?: string | null
+  recurrence_id?: number | bigint | null
+  rrule?: string | null
+  rrule_type?: string | null
+  final_date?: number | bigint | null
+  metadata?: string | null
+}

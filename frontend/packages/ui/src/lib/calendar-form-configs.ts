@@ -1,10 +1,20 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
-export const newCalendarEventForm = (t: TFunction): FormConfig => ({
-  id: "new-calendar-event",
-  title: t("calendar.forms.newEvent.title"),
-  description: t("calendar.forms.newEvent.description"),
+interface CalendarEventDefaults {
+  name?: string
+  start?: string
+  stop?: string
+  allday?: boolean
+  privacy?: string
+  location?: string
+  description?: string
+}
+
+export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefaults): FormConfig => ({
+  id: defaults ? "edit-calendar-event" : "new-calendar-event",
+  title: defaults ? t("calendar.forms.editEvent.title") : t("calendar.forms.newEvent.title"),
+  description: defaults ? t("calendar.forms.editEvent.description") : t("calendar.forms.newEvent.description"),
   sections: [
     {
       id: "event-details",
@@ -18,22 +28,25 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
           placeholder: t("calendar.forms.newEvent.fields.namePlaceholder"),
           required: true,
           width: "full",
+          defaultValue: defaults?.name,
         },
         {
           id: "start",
           name: "start",
-          type: "date",
+          type: "datetime",
           label: t("calendar.forms.newEvent.fields.start"),
           required: true,
           width: "1/2",
+          defaultValue: defaults?.start,
         },
         {
           id: "stop",
           name: "stop",
-          type: "date",
+          type: "datetime",
           label: t("calendar.forms.newEvent.fields.stop"),
           required: true,
           width: "1/2",
+          defaultValue: defaults?.stop,
         },
         {
           id: "location",
@@ -42,6 +55,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
           label: t("calendar.forms.newEvent.fields.location"),
           placeholder: t("calendar.forms.newEvent.fields.locationPlaceholder"),
           width: "full",
+          defaultValue: defaults?.location,
         },
         {
           id: "allday",
@@ -49,6 +63,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
           type: "checkbox",
           label: t("calendar.forms.newEvent.fields.allday"),
           width: "1/2",
+          defaultValue: defaults?.allday,
         },
         {
           id: "privacy",
@@ -61,6 +76,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
             { value: "private", label: t("calendar.forms.newEvent.fields.options.private") },
             { value: "confidential", label: t("calendar.forms.newEvent.fields.options.confidential") },
           ],
+          defaultValue: defaults?.privacy ?? "public",
         },
         {
           id: "description",
@@ -70,6 +86,7 @@ export const newCalendarEventForm = (t: TFunction): FormConfig => ({
           placeholder: t("calendar.forms.newEvent.fields.descriptionPlaceholder"),
           width: "full",
           rows: 3,
+          defaultValue: defaults?.description,
         },
       ],
     },

@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -8,6 +9,7 @@ import {
   newPurchaseOrderForm,
   newPurchaseRequisitionForm,
   addPurchaseOrderLineForm,
+  editPurchaseOrderLineForm,
   receivePurchaseOrderLineForm,
   invoicePurchaseOrderLineForm,
   MissingOrganization,
@@ -39,6 +41,24 @@ import {
   useComputePurchaseOrderTotals,
   useComputePurchaseOrderLineTotals,
   useContacts,
+  // Landed costs
+  useLandedCosts,
+  useDeleteLandedCost,
+  useComputeLandedCosts,
+  usePostLandedCosts,
+  useApplyLandedCosts,
+  useCancelLandedCost,
+  // Supplier intake
+  useSupplierIntakes,
+  useDeleteSupplierIntake,
+  useApproveSupplierIntake,
+  useRejectSupplierIntake,
+  useHoldSupplierIntake,
+  // Bill creation
+  useCreateBillFromPurchaseOrder,
+  useLockPurchaseOrder,
+  useUnlockPurchaseOrder,
+  useUpdatePurchaseOrderLine,
 } from "@/hooks/purchasing"
 import { usePricelists } from "@/hooks/sales"
 import { useProducts, useUoms } from "@/hooks/inventory"
@@ -49,6 +69,7 @@ import {
   productRowsToSelectOptions,
   uomRowsToSelectOptions,
   purchaseOrderRowsToSelectOptions,
+  purchaseOrderLineRowsToEditOptions,
   purchaseOrderLineRowsToReceiveOptions,
   purchaseOrderLineRowsToInvoiceOptions,
 } from "@/lib/form-lookup"
@@ -56,6 +77,7 @@ import {
   toAddPurchaseOrderLineParams,
   toInvoicePoLineArgs,
   toReceivePoLineArgs,
+  toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
 
 function poState(row: Record<string, unknown>): string {
@@ -65,6 +87,18 @@ function poState(row: Record<string, unknown>): string {
 }
 
 function requisitionState(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function landedCostState(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function supplierIntakeState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
@@ -105,10 +139,20 @@ function PurchasingClientLoaded({
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
-  const [activeTab, setActiveTab] = useState(moduleConfig.defaultTab ?? "dashboard")
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    moduleConfig.tabs.map((t) => t.id),
+  )
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,
   )
+  const [formModalKey, setFormModalKey] = useState(0)
+
+  useEffect(() => {
+    if (quickActionForm != null) {
+      setFormModalKey((k) => k + 1)
+    }
+  }, [quickActionForm])
 
   const { data: orders = [] } = usePurchaseOrders(companyId, initialOrders)
   const { data: lines = [] } = usePurchaseOrderLines(companyId, initialLines)
@@ -117,6 +161,8 @@ function PurchasingClientLoaded({
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(companyId, initialProducts)
   const { data: uoms = [] } = useUoms(companyId, initialUoms)
+  const { data: landedCosts = [] } = useLandedCosts(orgId)
+  const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, companyId)
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, companyId)
@@ -133,6 +179,25 @@ function PurchasingClientLoaded({
   const cancelPurchaseRequisition = useCancelPurchaseRequisition(orgId)
   const computePoTotals = useComputePurchaseOrderTotals(orgId)
   const computePoLineTotals = useComputePurchaseOrderLineTotals(orgId)
+
+  // Landed costs mutations
+  const deleteLandedCost = useDeleteLandedCost(orgId)
+  const computeLandedCosts = useComputeLandedCosts(orgId)
+  const postLandedCosts = usePostLandedCosts(orgId)
+  const applyLandedCosts = useApplyLandedCosts(orgId, companyId)
+  const cancelLandedCost = useCancelLandedCost(orgId)
+
+  // Supplier intake mutations
+  const deleteSupplierIntake = useDeleteSupplierIntake(orgId)
+  const approveSupplierIntake = useApproveSupplierIntake(orgId)
+  const rejectSupplierIntake = useRejectSupplierIntake(orgId)
+  const holdSupplierIntake = useHoldSupplierIntake(orgId)
+
+  // Additional PO operations
+  const lockPurchaseOrder = useLockPurchaseOrder(orgId)
+  const unlockPurchaseOrder = useUnlockPurchaseOrder(orgId)
+  const createBillFromPurchaseOrder = useCreateBillFromPurchaseOrder(orgId)
+  const updatePurchaseOrderLine = useUpdatePurchaseOrderLine(orgId)
 
   const vendors = useMemo(
     () => allContacts.filter((c) => c.isVendor || (c.supplierRank != null && Number(c.supplierRank) > 0)),
@@ -232,6 +297,21 @@ function PurchasingClientLoaded({
     [t, invoiceLineOptions],
   )
 
+  const editLineOptions = useMemo(
+    () => purchaseOrderLineRowsToEditOptions(lines as Record<string, unknown>[], productLabel),
+    [lines, productLabel],
+  )
+
+  const editLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(editPurchaseOrderLineForm(t), {
+        lineId: editLineOptions,
+        productId: productFieldOptions,
+        uomId: uomFieldOptions,
+      }),
+    [t, editLineOptions, productFieldOptions, uomFieldOptions],
+  )
+
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseOrdersTableConfig(t)
     const view = base.view as EntityTableConfig
@@ -299,6 +379,41 @@ function PurchasingClientLoaded({
               }
             },
           },
+          {
+            id: "po-lock",
+            label: t("purchasing.actions.lockSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+              }
+            },
+          },
+          {
+            id: "po-unlock",
+            label: t("purchasing.actions.unlockSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+              }
+            },
+          },
+          {
+            id: "po-create-bill",
+            label: t("purchasing.actions.createBillsFromSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                const st = poState(r)
+                if (st === "Approved" || st === "Done") {
+                  void createBillFromPurchaseOrder.mutateAsync({
+                    orderId: r.id as string | number | bigint,
+                  })
+                }
+              }
+            },
+          },
         ],
       },
     }
@@ -309,6 +424,9 @@ function PurchasingClientLoaded({
     cancelPurchaseOrder,
     computePoTotals,
     computePoLineTotals,
+    lockPurchaseOrder,
+    unlockPurchaseOrder,
+    createBillFromPurchaseOrder,
   ])
 
   const linesEntityConfig = useMemo((): EntityViewConfig => {
@@ -324,6 +442,12 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.addLineForm"),
             onClick: () =>
               setQuickActionForm({ form: addLineFormConfig, action: "addPurchaseOrderLine" }),
+          },
+          {
+            id: "pol-edit-form",
+            label: t("purchasing.actions.editLineForm"),
+            onClick: () =>
+              setQuickActionForm({ form: editLineFormConfig, action: "updatePurchaseOrderLine" }),
           },
           {
             id: "pol-receive-form",
@@ -371,6 +495,7 @@ function PurchasingClientLoaded({
   }, [
     t,
     addLineFormConfig,
+    editLineFormConfig,
     receiveLineFormConfig,
     invoiceLineFormConfig,
     removePurchaseOrderLine,
@@ -437,6 +562,166 @@ function PurchasingClientLoaded({
       },
     }
   }, [t, submitPurchaseRequisition, approvePurchaseRequisition, closePurchaseRequisition, cancelPurchaseRequisition])
+
+  const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
+    const view: EntityTableConfig = {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("purchasing.landedCosts.searchPlaceholder"),
+      searchKeys: ["name", "description"],
+      columns: [
+        { key: "name", label: t("purchasing.landedCosts.columns.name"), width: "min-w-40" },
+        { key: "state", label: t("purchasing.landedCosts.columns.state"), width: "min-w-24" },
+        { key: "amountTotal", label: t("purchasing.landedCosts.columns.amountTotal"), type: "currency", align: "right" },
+        { key: "vendorBillId", label: t("purchasing.landedCosts.columns.vendorBillId"), width: "min-w-24" },
+      ],
+      emptyMessage: t("purchasing.landedCosts.emptyMessage"),
+      actions: [
+        {
+          id: "lc-compute",
+          label: t("purchasing.actions.recalculateTotals"),
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              void computeLandedCosts.mutateAsync(r.id as string | number | bigint)
+            }
+          },
+        },
+        {
+          id: "lc-post",
+          label: t("purchasing.actions.postSelected"),
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              if (landedCostState(r) !== "Cancelled") {
+                void postLandedCosts.mutateAsync(r.id as string | number | bigint)
+              }
+            }
+          },
+        },
+        {
+          id: "lc-apply",
+          label: t("purchasing.actions.applySelected"),
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              void applyLandedCosts.mutateAsync({
+                landedCostId: r.id as string | number | bigint,
+              })
+            }
+          },
+        },
+        {
+          id: "lc-cancel",
+          label: t("purchasing.actions.cancelSelected"),
+          requiresSelection: true,
+          variant: "destructive",
+          onClick: (rows) => {
+            for (const r of rows) {
+              if (landedCostState(r) !== "Cancelled") {
+                void cancelLandedCost.mutateAsync(r.id as string | number | bigint)
+              }
+            }
+          },
+        },
+        {
+          id: "lc-delete",
+          label: t("common.delete"),
+          requiresSelection: true,
+          variant: "destructive",
+          onClick: (rows) => {
+            for (const r of rows) {
+              if (landedCostState(r) === "Draft") {
+                void deleteLandedCost.mutateAsync(r.id as string | number | bigint)
+              }
+            }
+          },
+        },
+      ],
+    }
+    return {
+      id: "landed-costs-table",
+      title: t("purchasing.landedCosts.title"),
+      description: t("purchasing.landedCosts.description"),
+      view,
+    }
+  }, [t, computeLandedCosts, postLandedCosts, applyLandedCosts, cancelLandedCost, deleteLandedCost])
+
+  const supplierIntakesEntityConfig = useMemo((): EntityViewConfig => {
+    const view: EntityTableConfig = {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("purchasing.supplierIntakes.searchPlaceholder"),
+      searchKeys: ["reference", "notes"],
+      columns: [
+        { key: "reference", label: t("purchasing.supplierIntakes.columns.reference"), width: "min-w-36" },
+        { key: "state", label: t("purchasing.supplierIntakes.columns.state"), width: "min-w-24" },
+        { key: "requestedAt", label: t("purchasing.supplierIntakes.columns.requestedAt"), type: "date" },
+        { key: "requestedBy", label: t("purchasing.supplierIntakes.columns.requestedBy"), width: "min-w-24" },
+      ],
+      emptyMessage: t("purchasing.supplierIntakes.emptyMessage"),
+      actions: [
+        {
+          id: "si-approve",
+          label: t("purchasing.actions.approveSelected"),
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              if (supplierIntakeState(r) !== "Approved") {
+                void approveSupplierIntake.mutateAsync(r.id as string | number | bigint)
+              }
+            }
+          },
+        },
+        {
+          id: "si-reject",
+          label: t("purchasing.actions.rejectSelected"),
+          requiresSelection: true,
+          variant: "destructive",
+          onClick: (rows) => {
+            for (const r of rows) {
+              void rejectSupplierIntake.mutateAsync({
+                intakeId: r.id as string | number | bigint,
+                reason: "Rejected from purchasing UI",
+              })
+            }
+          },
+        },
+        {
+          id: "si-hold",
+          label: t("purchasing.actions.holdSelected"),
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              void holdSupplierIntake.mutateAsync({
+                intakeId: r.id as string | number | bigint,
+                reason: "Held from purchasing UI",
+              })
+            }
+          },
+        },
+        {
+          id: "si-delete",
+          label: t("common.delete"),
+          requiresSelection: true,
+          variant: "destructive",
+          onClick: (rows) => {
+            for (const r of rows) {
+              void deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
+            }
+          },
+        },
+      ],
+    }
+    return {
+      id: "supplier-intakes-table",
+      title: t("purchasing.supplierIntakes.title"),
+      description: t("purchasing.supplierIntakes.description"),
+      view,
+    }
+  }, [t, approveSupplierIntake, rejectSupplierIntake, holdSupplierIntake, deleteSupplierIntake])
 
   const liveSections = useMemo(() => {
     const openOrders = orders.filter(
@@ -526,7 +811,8 @@ function PurchasingClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
+        tabs: [
+          ...moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") {
             return { ...tab, sections: liveSections }
           }
@@ -540,7 +826,20 @@ function PurchasingClientLoaded({
             return { ...tab, entityConfig: requisitionsEntityConfig, createForm: purchaseRequisitionFormConfig }
           }
           return tab
-        }),
+          }),
+          {
+            id: "landed-costs",
+            label: t("purchasing.landedCosts.title"),
+            type: "entity",
+            entityConfig: landedCostsEntityConfig,
+          },
+          {
+            id: "supplier-intakes",
+            label: t("purchasing.supplierIntakes.title"),
+            type: "entity",
+            entityConfig: supplierIntakesEntityConfig,
+          },
+        ],
       }) as ModuleConfig,
     [
       moduleConfig,
@@ -550,6 +849,9 @@ function PurchasingClientLoaded({
       ordersEntityConfig,
       linesEntityConfig,
       requisitionsEntityConfig,
+      landedCostsEntityConfig,
+      supplierIntakesEntityConfig,
+      t,
     ],
   )
 
@@ -559,8 +861,10 @@ function PurchasingClientLoaded({
       lines: lines as unknown as Record<string, unknown>[],
       requisitions: requisitions as unknown as Record<string, unknown>[],
       vendors: vendors as unknown as Record<string, unknown>[],
+      "landed-costs": landedCosts as unknown as Record<string, unknown>[],
+      "supplier-intakes": supplierIntakes as unknown as Record<string, unknown>[],
     }),
-    [orders, lines, requisitions, vendors],
+    [orders, lines, requisitions, vendors, landedCosts, supplierIntakes],
   )
 
   const handleFormSubmit = (
@@ -636,6 +940,14 @@ function PurchasingClientLoaded({
         orderId: orderId as string | number | bigint,
         params,
       })
+    } else if (action === "updatePurchaseOrderLine") {
+      const lineId = formData.lineId
+      const params = toUpdatePurchaseOrderLineParams(formData)
+      if (params == null || lineId === "" || lineId == null) return
+      void updatePurchaseOrderLine.mutateAsync({
+        lineId: lineId as string | number | bigint,
+        params,
+      })
     } else if (action === "receivePurchaseOrderLine") {
       const args = toReceivePoLineArgs(formData)
       if (args == null) return
@@ -659,6 +971,7 @@ function PurchasingClientLoaded({
         onActiveTabChange={setActiveTab}
       />
       <FormModal
+        key={formModalKey}
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? defaultQuickForm}

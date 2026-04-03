@@ -1,0 +1,62 @@
+/**
+ * Settings hooks — Organization and system configuration
+ *
+ * Wraps REST API calls with React Query for the Settings module.
+ * All hooks accept organizationId: bigint matching the stdb hooks interface.
+ */
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+// ── Organization Mutations ─────────────────────────────────────────────────
+
+export function useUpsertOrganizationSettings(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (settings) => {
+      const r = await fetch('/api/call/upsert_organization_settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), settings]),
+      })
+      if (!r.ok) throw new Error('Failed to save organization settings')
+    },
+    onSuccess: () => {
+      // Invalidate any queries that might depend on organization settings
+      qc.invalidateQueries({ queryKey: ['organization-settings', organizationId.toString()] })
+    },
+  })
+}
+
+export function useUpdateOrganization(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/update_organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update organization')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['organization', organizationId.toString()] })
+    },
+  })
+}
+
+export function useCreateOrganization() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([params]),
+      })
+      if (!r.ok) throw new Error('Failed to create organization')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['organizations'] })
+    },
+  })
+}

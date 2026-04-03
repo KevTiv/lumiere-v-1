@@ -211,7 +211,84 @@ export function toCreateTaskParams(
 }
 
 export function projectsParamsToJson(
-  params: CreateProjectParams | CreateTaskParams,
+  params: CreateProjectParams | CreateTaskParams | Record<string, unknown>,
 ): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params as Record<string, unknown>)
+}
+
+// ── Update params helpers ────────────────────────────────────────────────────
+
+export function toUpdateProjectParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+
+  const dateStart = optionalTimestampFromFormDate(formData.dateStart)
+  const dateEnd = optionalTimestampFromFormDate(formData.dateEnd)
+
+  return {
+    name,
+    description: optionalTrimmedString(formData.description),
+    dateStart,
+    dateEnd,
+    partnerId: optionalPartnerId(formData.partnerId) ?? null,
+    active: Boolean(formData.active),
+    metadata: JSON.stringify({
+      allocatedHours: formData.allocatedHours ?? null,
+      pricelistId: formData.pricelistId ?? null,
+    }),
+  }
+}
+
+export function toUpdateTaskParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+
+  const stageId = parseTaskStageId(formData.projectId, formData.stageId)
+  const dateDeadline = optionalTimestampFromFormDate(formData.dateDeadline)
+
+  return {
+    name,
+    description: optionalTrimmedString(formData.description),
+    projectId: parseU64FromForm(formData.projectId) ?? undefined,
+    stageId,
+    priority: String(formData.priority ?? '0'),
+    plannedHours: parseF64(formData.plannedHours, 0),
+    dateDeadline,
+    kanbanState: String(formData.kanbanState ?? 'normal'),
+  }
+}
+
+// ── Timesheet params helpers ─────────────────────────────────────────────────
+
+export function toLogTimesheetParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): Record<string, unknown> | null {
+  const projectId = parseU64FromForm(formData.projectId)
+  if (projectId === null) return null
+
+  const taskId = parseU64FromForm(formData.taskId)
+  const date = optionalTimestampFromFormDate(formData.date)
+  if (!date) return null
+
+  const hours = parseF64(formData.unitAmount, 0)
+  if (hours <= 0) return null
+
+  return {
+    companyId: companyId !== undefined ? companyId : undefined,
+    projectId,
+    taskId: taskId ?? undefined,
+    date,
+    name: optionalTrimmedString(formData.name) ?? '',
+    unitAmount: hours,
+    billable: Boolean(formData.billable ?? true),
+    validated: false,
+    billed: false,
+    encoding: 'utf-8',
+    manuallyModified: true,
+  }
 }

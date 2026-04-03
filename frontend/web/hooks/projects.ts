@@ -196,6 +196,131 @@ export function useStopTimesheetTimer(organizationId: bigint) {
   })
 }
 
+// ── Additional Project Lifecycle Mutations ───────────────────────────────────
+
+export function useSetProjectActive(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      active,
+    }: {
+      projectId: string | number | bigint
+      active: boolean
+    }) => {
+      const r = await fetch('/api/call/set_project_active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), projectId.toString(), active]),
+      })
+      if (!r.ok) throw new Error('Failed to set project active state')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+  })
+}
+
+export function useToggleProjectFavorite(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (projectId: string | number | bigint) => {
+      const r = await fetch('/api/call/toggle_project_favorite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), projectId.toString()]),
+      })
+      if (!r.ok) throw new Error('Failed to toggle project favorite')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+  })
+}
+
+export function useSetTaskParent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      parentId,
+    }: {
+      taskId: string | number | bigint
+      parentId: string | number | bigint | null
+    }) => {
+      const r = await fetch('/api/call/set_task_parent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), taskId.toString(), parentId?.toString() ?? null]),
+      })
+      if (!r.ok) throw new Error('Failed to set task parent')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+  })
+}
+
+export function useAssignTaskUsers(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      userIds,
+    }: {
+      taskId: string | number | bigint
+      userIds: (string | number | bigint)[]
+    }) => {
+      const r = await fetch('/api/call/assign_task_users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), taskId.toString(), userIds.map((id) => id.toString())]),
+      })
+      if (!r.ok) throw new Error('Failed to assign task users')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+  })
+}
+
+export function useValidateTimesheets(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      timesheetIds,
+      validated,
+    }: {
+      timesheetIds: (string | number | bigint)[]
+      validated: boolean
+    }) => {
+      const r = await fetch('/api/call/validate_timesheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), timesheetIds.map((id) => id.toString()), validated]),
+      })
+      if (!r.ok) throw new Error('Failed to validate timesheets')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] }),
+  })
+}
+
+export function useBillTimesheets(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      timesheetIds,
+      partnerId,
+    }: {
+      timesheetIds: (string | number | bigint)[]
+      partnerId?: string | number | bigint | null
+    }) => {
+      const r = await fetch('/api/call/bill_timesheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), timesheetIds.map((id) => id.toString()), partnerId?.toString() ?? null]),
+      })
+      if (!r.ok) throw new Error('Failed to bill timesheets')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+    },
+  })
+}
+
 // Re-export cross-domain dependency so callers import from one place
 export { useEmployees } from "@/hooks/hr"
 

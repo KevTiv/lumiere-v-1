@@ -376,6 +376,41 @@ export function useRecordReportRun(organizationId: bigint) {
   })
 }
 
+export function useCreateTrialBalanceEntry(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        reportId: Number(formData.reportId),
+        accountId: Number(formData.accountId),
+        accountCode: String(formData.accountCode ?? ''),
+        accountName: String(formData.accountName ?? ''),
+        openingDebit: Number(formData.openingDebit ?? 0),
+        openingCredit: Number(formData.openingCredit ?? 0),
+        periodDebit: Number(formData.periodDebit ?? 0),
+        periodCredit: Number(formData.periodCredit ?? 0),
+        closingDebit: Number(formData.closingDebit ?? 0),
+        closingCredit: Number(formData.closingCredit ?? 0),
+        currencyId: Number(formData.currencyId ?? 1),
+        parentId: formData.parentId != null && String(formData.parentId).trim() !== ''
+          ? Number(formData.parentId)
+          : null,
+        level: Number(formData.level ?? 1),
+        isLeaf: Boolean(formData.isLeaf),
+      }
+      const r = await fetch('/api/call/create_trial_balance_entry?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([stdbParamsToJson(params)]),
+      })
+      if (!r.ok) throw new Error('Failed to create trial balance entry')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   CreateReportTemplateParams,

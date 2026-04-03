@@ -40,6 +40,7 @@ export type Resource =
   | "admin:roles"
   | "admin:permissions"
   | "admin:audit-log"
+  | "admin:organization"
 
 // Actions that can be performed
 export type Action = "read" | "create" | "update" | "delete" | "manage"

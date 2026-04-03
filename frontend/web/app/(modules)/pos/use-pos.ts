@@ -8,6 +8,8 @@ import {
   type POSOrder,
   type POSPaymentMethod,
 } from "@lumiere/ui/lib/finance-types"
+import { useProducts } from "@/hooks/inventory"
+import { useCreatePosOrder, usePosTerminals } from "@/hooks/pos"
 
 export const POS_CATEGORIES = ["All", ...Array.from(new Set(posProducts.map((p) => p.category)))]
 
@@ -40,7 +42,52 @@ export interface UsePOSReturn {
   handlePaymentComplete: (method: POSPaymentMethod, tendered: number) => void
 }
 
-export function usePOS(): UsePOSReturn {
+function toColor(seed: string): string {
+  const palette = [
+    "bg-info",
+    "bg-category-1",
+    "bg-category-3",
+    "bg-neutral-500",
+    "bg-warning",
+    "bg-success",
+    "bg-accent",
+    "bg-category-7",
+    "bg-destructive",
+    "bg-primary",
+    "bg-category-5",
+  ]
+  let acc = 0
+  for (let i = 0; i < seed.length; i += 1) {
+    acc = (acc + seed.charCodeAt(i)) % palette.length
+  }
+  return palette[acc]
+}
+
+function toPosProduct(row: Record<string, unknown>): POSProduct {
+  const id = String(row.id ?? row.productTmplId ?? "")
+  const name = String(row.name ?? "Product")
+  const sku = String(row.defaultCode ?? row.sku ?? `SKU-${id}`)
+  const listPrice = Number(row.listPrice ?? row.price ?? 0)
+  const taxRate = Number(row.taxRate ?? row.saleTaxRate ?? 0)
+  const category = String(row.categoryName ?? row.category ?? "General")
+  const stock = Number(row.qtyAvailable ?? row.virtualAvailable ?? row.stock ?? 0)
+  return {
+    id,
+    name,
+    sku,
+    price: Number.isFinite(listPrice) ? listPrice : 0,
+    taxRate: Number.isFinite(taxRate) ? taxRate : 0,
+    category,
+    stock: Number.isFinite(stock) ? Math.max(0, stock) : 0,
+    imageColor: toColor(id || name),
+  }
+}
+
+export function usePOS(
+  organizationId: bigint,
+  initialProducts?: Record<string, unknown>[],
+  initialTerminals?: Record<string, unknown>[]
+): UsePOSReturn {
   const [cart, setCart] = useState<POSCartItem[]>([])
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("All")
@@ -51,16 +98,30 @@ export function usePOS(): UsePOSReturn {
   const [discountCode, setDiscountCode] = useState("")
   const [orderDiscount, setOrderDiscount] = useState(0)
 
+  const { data: productRows = [] } = useProducts(organizationId, initialProducts)
+  const { data: terminals = [] } = usePosTerminals(organizationId, initialTerminals)
+  const createPosOrder = useCreatePosOrder(organizationId)
+
+  const liveProducts = useMemo(() => {
+    if (productRows.length === 0) return posProducts
+    return productRows.map((row) => toPosProduct(row as Record<string, unknown>))
+  }, [productRows])
+
   const filteredProducts = useMemo(
     () =>
-      posProducts.filter((p) => {
+      liveProducts.filter((p) => {
         const matchSearch =
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.sku.toLowerCase().includes(search.toLowerCase())
         const matchCat = category === "All" || p.category === category
         return matchSearch && matchCat
       }),
-    [search, category]
+    [liveProducts, search, category]
+  )
+
+  const categories = useMemo(
+    () => ["All", ...Array.from(new Set(liveProducts.map((p) => p.category)))],
+    [liveProducts]
   )
 
   const addToCart = useCallback((product: POSProduct) => {
@@ -140,6 +201,25 @@ export function usePOS(): UsePOSReturn {
 
   const handlePaymentComplete = useCallback(
     (method: POSPaymentMethod, tendered: number) => {
+      const primaryTerminalId =
+        terminals.length > 0 ? String((terminals[0] as Record<string, unknown>).id ?? "") : null
+
+      // Persist POS checkout through SpacetimeDB reducer coverage path.
+      createPosOrder.mutate({
+        company_id: null,
+        terminal_id: primaryTerminalId,
+        payment_method: method,
+        amount_tendered: tendered,
+        discount_pct: orderDiscount,
+        lines: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          tax_rate: item.product.taxRate,
+          discount_pct: item.discountPct,
+        })),
+      })
+
       const order: POSOrder = {
         id: `pos-order-${Date.now()}`,
         orderNumber: `POS-${String(orderCount).padStart(4, "0")}`,
@@ -160,7 +240,7 @@ export function usePOS(): UsePOSReturn {
       clearCart()
       setShowPayment(false)
     },
-    [cart, orderCount, subtotal, taxTotal, discountTotal, total, clearCart]
+    [cart, terminals, createPosOrder, orderDiscount, orderCount, subtotal, taxTotal, discountTotal, total, clearCart]
   )
 
   return {
@@ -177,7 +257,7 @@ export function usePOS(): UsePOSReturn {
     taxTotal,
     discountTotal,
     total,
-    categories: POS_CATEGORIES,
+    categories,
     setSearch,
     setCategory,
     setGridMode,

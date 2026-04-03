@@ -1,6 +1,6 @@
 "use client"
 
-import { ProposalWorkspace } from "@lumiere/ui"
+import { ProposalWorkspaceWrapper } from "./proposal-workspace-wrapper"
 import type { AIAnalysis } from "@lumiere/ui"
 
 interface WorkspaceClientProps {
@@ -28,7 +28,7 @@ export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: W
   }
 
   return (
-    <ProposalWorkspace
+    <ProposalWorkspaceWrapper
       proposalId={proposalId}
       proposalTitle={proposalTitle}
       organizationId={orgId}

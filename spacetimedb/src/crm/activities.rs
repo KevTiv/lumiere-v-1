@@ -63,6 +63,33 @@ pub struct CreateCalendarEventParams {
     pub metadata: Option<String>,
 }
 
+/// Params for updating a calendar event.
+/// All fields are optional; only provided values are updated.
+/// `duration` is recomputed from `start`/`stop`/`allday` when any of those change.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateCalendarEventParams {
+    pub name: Option<String>,
+    pub start: Option<Timestamp>,
+    pub stop: Option<Timestamp>,
+    pub allday: Option<bool>,
+    pub privacy: Option<String>,
+    pub show_as: Option<String>,
+    pub state: Option<String>,
+    pub recurrency: Option<bool>,
+    pub partner_ids: Option<Vec<u64>>,
+    pub alarm_ids: Option<Vec<u64>>,
+    pub user_id: Option<Identity>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub videocall_location: Option<String>,
+    pub color: Option<String>,
+    pub recurrence_id: Option<u64>,
+    pub rrule: Option<String>,
+    pub rrule_type: Option<String>,
+    pub final_date: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: ACTIVITIES
 // ══════════════════════════════════════════════════════════════════════════════
@@ -293,6 +320,107 @@ pub fn create_calendar_event(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_calendar_event(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    event_id: u64,
+    params: UpdateCalendarEventParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "calendar_event", "write")?;
+
+    let event = ctx
+        .db
+        .calendar_event()
+        .id()
+        .find(&event_id)
+        .ok_or("Calendar event not found")?;
+
+    if event.organization_id != organization_id {
+        return Err("Calendar event does not belong to this organization".to_string());
+    }
+
+    // Validate name if provided
+    if let Some(ref name) = params.name {
+        if name.is_empty() {
+            return Err("Event name cannot be empty".to_string());
+        }
+    }
+
+    // Determine new start/stop/allday values
+    let new_start = params.start.unwrap_or(event.start);
+    let new_stop = params.stop.unwrap_or(event.stop);
+    let new_allday = params.allday.unwrap_or(event.allday);
+
+    // Validate time range if either start or stop was provided
+    if params.start.is_some() || params.stop.is_some() {
+        if new_stop < new_start {
+            return Err("End time must be after start time".to_string());
+        }
+    }
+
+    // Recompute duration if start, stop, or allday changed
+    let new_duration = if new_allday {
+        None
+    } else {
+        Some(
+            new_stop.to_micros_since_unix_epoch() as f64 / 3_600_000_000.0
+                - new_start.to_micros_since_unix_epoch() as f64 / 3_600_000_000.0,
+        )
+    };
+
+    ctx.db.calendar_event().id().update(CalendarEvent {
+        name: params.name.unwrap_or(event.name),
+        description: params.description.or(event.description),
+        start: new_start,
+        stop: new_stop,
+        duration: new_duration,
+        allday: new_allday,
+        location: params.location.or(event.location),
+        videocall_location: params.videocall_location.or(event.videocall_location),
+        privacy: params.privacy.unwrap_or(event.privacy),
+        show_as: params.show_as.unwrap_or(event.show_as),
+        color: params.color.or(event.color),
+        user_id: params.user_id.or(event.user_id),
+        partner_ids: params.partner_ids.unwrap_or(event.partner_ids),
+        alarm_ids: params.alarm_ids.unwrap_or(event.alarm_ids),
+        recurrency: params.recurrency.unwrap_or(event.recurrency),
+        recurrence_id: params.recurrence_id.or(event.recurrence_id),
+        final_date: params.final_date.or(event.final_date),
+        rrule: params.rrule.or(event.rrule),
+        rrule_type: params.rrule_type.or(event.rrule_type),
+        state: params.state.unwrap_or(event.state),
+        metadata: params.metadata.or(event.metadata),
+        ..event
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn delete_calendar_event(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    event_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "calendar_event", "delete")?;
+
+    let event = ctx
+        .db
+        .calendar_event()
+        .id()
+        .find(&event_id)
+        .ok_or("Calendar event not found")?;
+
+    if event.organization_id != organization_id {
+        return Err("Calendar event does not belong to this organization".to_string());
+    }
+
+    ctx.db.calendar_event().id().delete(&event_id);
 
     Ok(())
 }

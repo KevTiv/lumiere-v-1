@@ -14,28 +14,6 @@ import type {
   ProposalStatus,
 } from "@/lib/proposal-workspace-types"
 import { SECTION_TEMPLATES } from "@/lib/proposal-workspace-types"
-import {
-  useProposalSections,
-  useProposalSourceDocs,
-  useProposalVersions,
-  useProposalLineItems,
-  useProposalPresence,
-  useProposalComments,
-  useProducts,
-  useUpsertProposalSection,
-  useDeleteProposalSection,
-  useAddProposalSourceDoc,
-  useDeleteProposalSourceDoc,
-  useSaveProposalVersion,
-  useUpdateProposalStatus,
-  useAddProposalLineItem,
-  useUpdateProposalLineItem,
-  useDeleteProposalLineItem,
-  useUpdateProposalPresence,
-  useClearProposalPresence,
-  useAddProposalComment,
-  useResolveProposalComment,
-} from "@lumiere/stdb"
 import { SectionSidebar } from "./section-sidebar"
 import { SectionEditor } from "./section-editor"
 import { AIPanel } from "./ai-panel"
@@ -59,7 +37,7 @@ function simpleLineDiff(
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
-      dp[i][j] = oldLines[i - 1] === newLines[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+      dp[i][j] = oldLines[i - 1] === newLines[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j])
   let i = m, j = n
   const ops: import("@/lib/proposal-workspace-types").VersionLine[] = []
   while (i > 0 || j > 0) {
@@ -94,6 +72,93 @@ const STATUS_VARIANT: Record<ProposalStatus, "secondary" | "outline" | "default"
   archived: "secondary",
 }
 
+// ─── Hook Types ───────────────────────────────────────────────────────────────
+
+export type QueryResult<T> = { data: T[] }
+export type UseQueryHook<T> = (organizationId: bigint, initialData?: Record<string, unknown>[]) => QueryResult<T>
+export type UseQueryHookWithId<T> = (
+  organizationId: bigint,
+  id?: bigint,
+  initialData?: Record<string, unknown>[]
+) => QueryResult<T>
+
+export type MutationResult<T> = {
+  mutate: (params: T, options?: { onSettled?: () => void }) => void
+  isPending?: boolean
+}
+
+export interface ProposalWorkspaceHooks {
+  // Query hooks
+  useProposalSections: UseQueryHook<unknown>
+  useProposalSourceDocs: UseQueryHook<unknown>
+  useProposalVersions: UseQueryHook<unknown>
+  useProposalLineItems: UseQueryHookWithId<unknown>
+  useProposalPresence: UseQueryHookWithId<unknown>
+  useProposalComments: UseQueryHookWithId<unknown>
+  useProducts: UseQueryHook<unknown>
+
+  // Mutation hooks
+  useUpsertProposalSection: () => MutationResult<{
+    proposalId: bigint | number | string
+    sectionId?: bigint | number | string | null
+    title: string
+    content: string
+    status: string
+    sequence?: number
+    aiSuggestion?: string | null
+  }>
+  useDeleteProposalSection: () => MutationResult<{ sectionId: bigint | number | string }>
+  useAddProposalSourceDoc: () => MutationResult<{
+    proposalId: bigint | number | string
+    name: string
+    content: string
+    docType: string
+    wordCount: number
+  }>
+  useDeleteProposalSourceDoc: () => MutationResult<{ docId: bigint | number | string }>
+  useSaveProposalVersion: () => MutationResult<{
+    proposalId: bigint | number | string
+    message: string
+    sectionsJson: string
+  }>
+  useUpdateProposalStatus: () => MutationResult<{
+    proposalId: bigint | number | string
+    status: string
+  }>
+  useAddProposalLineItem: () => MutationResult<{
+    proposalId: bigint | number | string
+    sectionId?: bigint | number | string | null
+    productId: bigint | number | string
+    productName: string
+    quantity: number
+    priceUnit: number
+    discount: number
+    notes?: string | null
+  }>
+  useUpdateProposalLineItem: () => MutationResult<{
+    lineItemId: bigint | number | string
+    quantity: number
+    priceUnit: number
+    discount: number
+    notes?: string | null
+  }>
+  useDeleteProposalLineItem: () => MutationResult<{ lineItemId: bigint | number | string }>
+  useUpdateProposalPresence: () => MutationResult<{
+    proposalId: bigint | number | string
+    sectionId?: bigint | number | string | null
+    userName: string
+  }>
+  useClearProposalPresence: () => MutationResult<bigint | number | string>
+  useAddProposalComment: () => MutationResult<{
+    proposalId: bigint | number | string
+    sectionId: bigint | number | string
+    content: string
+    parentId?: bigint | number | string | null
+    authorName: string
+  }>
+  useResolveProposalComment: () => MutationResult<bigint | number | string>
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ProposalWorkspaceProps {
@@ -104,6 +169,7 @@ interface ProposalWorkspaceProps {
   currentUserId?: string
   currentUserName?: string
   onAnalyze: (text: string) => Promise<AIAnalysis>
+  hooks: ProposalWorkspaceHooks
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -116,6 +182,7 @@ export function ProposalWorkspace({
   currentUserId,
   currentUserName,
   onAnalyze,
+  hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
   const effectiveUserName = currentUserName ?? t("proposalWorkspace.you")
@@ -132,7 +199,31 @@ export function ProposalWorkspace({
   const [isSaving, setIsSaving] = useState(false)
   const presenceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── STDB data ───────────────────────────────────────────────────────────────
+  // ── Injected hooks ────────────────────────────────────────────────────────────
+  const {
+    useProposalSections,
+    useProposalSourceDocs,
+    useProposalVersions,
+    useProposalLineItems,
+    useProposalPresence,
+    useProposalComments,
+    useProducts,
+    useUpsertProposalSection,
+    useDeleteProposalSection,
+    useAddProposalSourceDoc,
+    useDeleteProposalSourceDoc,
+    useSaveProposalVersion,
+    useUpdateProposalStatus,
+    useAddProposalLineItem,
+    useUpdateProposalLineItem,
+    useDeleteProposalLineItem,
+    useUpdateProposalPresence,
+    useClearProposalPresence,
+    useAddProposalComment,
+    useResolveProposalComment,
+  } = hooks
+
+  // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: sections = [] } = useProposalSections(organizationId)
   const { data: sourceDocs = [] } = useProposalSourceDocs(organizationId)
   const { data: versions = [] } = useProposalVersions(organizationId)
@@ -143,35 +234,36 @@ export function ProposalWorkspace({
 
   // Filter to this proposal
   const proposalSections = sections
-    .filter((s) => String(s.proposalId) === proposalId)
-    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+    .filter((s) => String((s as { proposalId?: unknown }).proposalId) === proposalId)
+    .sort((a, b) => ((a as { sequence?: number }).sequence ?? 0) - ((b as { sequence?: number }).sequence ?? 0))
 
-  const proposalSourceDocs = sourceDocs.filter((d) => String(d.proposalId) === proposalId)
-  const proposalVersions = versions.filter((v) => String(v.proposalId) === proposalId)
-  const proposalComments = comments.filter((c) => String(c.proposalId) === proposalId)
-  const proposalPresence = presenceRows.filter((p) => String(p.proposalId) === proposalId)
+  const proposalSourceDocs = sourceDocs.filter((d) => String((d as { proposalId?: unknown }).proposalId) === proposalId)
+  const proposalVersions = versions.filter((v) => String((v as { proposalId?: unknown }).proposalId) === proposalId)
+  const proposalComments = comments.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId)
+  const proposalPresence = presenceRows.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId)
 
   // Active section data
   const activeSection = activeSectionId
-    ? proposalSections.find((s) => s.id === activeSectionId) ?? null
+    ? proposalSections.find((s) => String((s as { id?: unknown }).id) === String(activeSectionId)) ?? null
     : proposalSections[0] ?? null
 
-  const effectiveActiveSectionId = activeSection?.id ?? null
+  const effectiveActiveSectionId = (activeSection as { id?: bigint } | null)?.id ?? null
 
   const activeSectionLineItems = lineItems.filter(
-    (item) => effectiveActiveSectionId && String(item.sectionId) === String(effectiveActiveSectionId)
+    (item) => effectiveActiveSectionId && String((item as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
   const activeSectionComments = proposalComments.filter(
-    (c) => effectiveActiveSectionId && String(c.sectionId) === String(effectiveActiveSectionId)
+    (c) => effectiveActiveSectionId && String((c as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
   // Presence by section (for sidebar)
   const presenceBySection = useMemo(() => {
     const map = new Map<string, typeof proposalPresence>()
     for (const p of proposalPresence) {
-      if (p.sectionId) {
-        const key = String(p.sectionId)
+      const sectionId = (p as { sectionId?: bigint | null }).sectionId
+      if (sectionId) {
+        const key = String(sectionId)
         const arr = map.get(key) ?? []
         arr.push(p)
         map.set(key, arr)
@@ -181,8 +273,11 @@ export function ProposalWorkspace({
   }, [proposalPresence])
 
   // Total proposal value from all line items
-  const totalValue = lineItems.reduce((sum, item) => {
-    return sum + (item.quantity ?? 1) * (item.priceUnit ?? 0) * (1 - (item.discount ?? 0) / 100)
+  const totalValue = lineItems.reduce((sum: number, item) => {
+    const quantity = (item as { quantity?: number }).quantity ?? 1
+    const priceUnit = (item as { priceUnit?: number }).priceUnit ?? 0
+    const discount = (item as { discount?: number }).discount ?? 0
+    return sum + quantity * priceUnit * (1 - discount / 100)
   }, 0)
 
   // ── Mutations ───────────────────────────────────────────────────────────────
@@ -226,7 +321,7 @@ export function ProposalWorkspace({
     presenceDebounceRef.current = setTimeout(() => {
       updatePresence.mutate({
         proposalId: proposalIdBig,
-        sectionId: BigInt(String(effectiveActiveSectionId)),
+        sectionId: effectiveActiveSectionId,
         userName: effectiveUserName,
       })
     }, 500)
@@ -234,11 +329,11 @@ export function ProposalWorkspace({
 
   const handleAddSection = useCallback((title: string) => {
     const sequence = proposalSections.length > 0
-      ? (proposalSections[proposalSections.length - 1].sequence ?? 0) + 10
+      ? ((proposalSections[proposalSections.length - 1] as { sequence?: number }).sequence ?? 0) + 10
       : 10
     upsertSection.mutate({
       proposalId: proposalIdBig,
-      sectionId: BigInt(0),
+      sectionId: null,
       title,
       content: "",
       status: "empty",
@@ -254,12 +349,12 @@ export function ProposalWorkspace({
     upsertSection.mutate(
       {
         proposalId: proposalIdBig,
-        sectionId: BigInt(String(effectiveActiveSectionId)),
-        title: activeSection?.title ?? "",
+        sectionId: effectiveActiveSectionId,
+        title: (activeSection as { title?: string })?.title ?? "",
         content,
         status: sectionStatus,
-        sequence: activeSection?.sequence ?? 0,
-        aiSuggestion: activeSection?.aiSuggestion ?? undefined,
+        sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
+        aiSuggestion: (activeSection as { aiSuggestion?: string })?.aiSuggestion ?? undefined,
       },
       { onSettled: () => setIsSaving(false) }
     )
@@ -270,11 +365,11 @@ export function ProposalWorkspace({
     if (!effectiveActiveSectionId) return
     upsertSection.mutate({
       proposalId: proposalIdBig,
-      sectionId: BigInt(String(effectiveActiveSectionId)),
+      sectionId: effectiveActiveSectionId,
       title,
-      content: activeSection?.content ?? "",
-      status: (activeSection?.status as string)?.toLowerCase() ?? "draft",
-      sequence: activeSection?.sequence ?? 0,
+      content: (activeSection as { content?: string })?.content ?? "",
+      status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
+      sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
     })
   }, [proposalIdBig, effectiveActiveSectionId, activeSection, upsertSection])
 
@@ -287,7 +382,7 @@ export function ProposalWorkspace({
     suggested.forEach((title, idx) => {
       upsertSection.mutate({
         proposalId: proposalIdBig,
-        sectionId: BigInt(0),
+        sectionId: null,
         title,
         content: "",
         status: "empty",
@@ -298,7 +393,7 @@ export function ProposalWorkspace({
   }, [analysis, proposalIdBig, upsertSection])
 
   const handleAnalyze = useCallback(async () => {
-    const combinedText = proposalSourceDocs.map((d) => d.content).join("\n\n---\n\n")
+    const combinedText = proposalSourceDocs.map((d) => String((d as { content?: string }).content ?? "")).join("\n\n---\n\n")
     if (!combinedText.trim()) return
     setIsAnalyzing(true)
     setAnalyzeError(null)
@@ -310,7 +405,7 @@ export function ProposalWorkspace({
     } finally {
       setIsAnalyzing(false)
     }
-  }, [proposalSourceDocs, onAnalyze])
+  }, [proposalSourceDocs, onAnalyze, t])
 
   const handleStatusChange = useCallback((newStatus: ProposalStatus) => {
     setStatus(newStatus)
@@ -320,19 +415,19 @@ export function ProposalWorkspace({
   const handleSaveVersion = useCallback((message: string) => {
     const sectionsJson = JSON.stringify(
       proposalSections.map((s) => ({
-        id: String(s.id),
-        title: s.title,
-        content: s.content,
-        status: s.status,
-        sequence: s.sequence,
-        wordCount: s.wordCount,
+        id: String((s as { id?: unknown }).id),
+        title: (s as { title?: string }).title,
+        content: (s as { content?: string }).content,
+        status: (s as { status?: string }).status,
+        sequence: (s as { sequence?: number }).sequence,
+        wordCount: (s as { wordCount?: number }).wordCount,
       }))
     )
     saveVersion.mutate({ proposalId: proposalIdBig, message, sectionsJson })
   }, [proposalIdBig, proposalSections, saveVersion])
 
   const handleExportMarkdown = () => {
-    const md = proposalSections.map((s) => `## ${s.title}\n\n${s.content}`).join("\n\n---\n\n")
+    const md = proposalSections.map((s) => `## ${(s as { title?: string }).title}\n\n${(s as { content?: string }).content}`).join("\n\n---\n\n")
     const blob = new Blob([`# ${proposalTitle}\n\n${md}`], { type: "text/markdown" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a"); a.href = url
@@ -342,7 +437,7 @@ export function ProposalWorkspace({
 
   const handleExportText = () => {
     const text = proposalSections
-      .map((s) => `${s.title.toUpperCase()}\n${"=".repeat(s.title.length)}\n\n${s.content}`)
+      .map((s) => `${(s as { title?: string }).title?.toUpperCase()}\n${"=".repeat((s as { title?: string }).title?.length ?? 0)}\n\n${(s as { content?: string }).content}`)
       .join("\n\n\n")
     const blob = new Blob([text], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
@@ -354,13 +449,13 @@ export function ProposalWorkspace({
   // Convert STDB versions to local version format for VersionHistoryBar
   const localVersions = proposalVersions.map((v) => {
     let parsedSections: TenderSection[] = []
-    try { parsedSections = JSON.parse(v.sectionsJson ?? "[]") } catch { /* ignore */ }
+    try { parsedSections = JSON.parse((v as { sectionsJson?: string }).sectionsJson ?? "[]") } catch { /* ignore */ }
     return {
-      id: String(v.id),
-      versionNumber: v.versionNumber ?? 0,
-      message: v.message ?? "",
-      author: String(v.authorId ?? ""),
-      createdAt: new Date(Number(v.createDate ?? 0) / 1000),
+      id: String((v as { id?: unknown }).id),
+      versionNumber: (v as { versionNumber?: number }).versionNumber ?? 0,
+      message: (v as { message?: string }).message ?? "",
+      author: String((v as { authorId?: unknown }).authorId ?? ""),
+      createdAt: new Date(Number((v as { createDate?: number }).createDate ?? 0) / 1000),
       sections: parsedSections,
       diff: null,
     }
@@ -384,9 +479,9 @@ export function ProposalWorkspace({
       <div id="proposal-print-root" className="hidden print:block">
         <h1>{proposalTitle}</h1>
         {proposalSections.map((s) => (
-          <div key={String(s.id)}>
-            <h2>{s.title}</h2>
-            {String(s.content ?? "").split("\n").map((line, i) => <p key={i}>{line}</p>)}
+          <div key={String((s as { id?: unknown }).id)}>
+            <h2>{(s as { title?: string }).title}</h2>
+            {String((s as { content?: string }).content ?? "").split("\n").map((line, i) => <p key={i}>{line}</p>)}
           </div>
         ))}
       </div>
@@ -398,212 +493,149 @@ export function ProposalWorkspace({
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-foreground truncate">{proposalTitle}</h1>
-          </div>
+          <h1 className="text-sm font-medium text-foreground truncate">{proposalTitle}</h1>
 
-          {/* Presence avatars */}
-          <PresenceBar
-            presenceRows={proposalPresence}
-            sections={proposalSections}
-            currentUserId={currentUserId}
-          />
+          <div className="ml-auto flex items-center gap-2">
+            <PresenceBar presence={proposalPresence.map((p) => ({ userId: String((p as { userId?: unknown }).userId), userName: String((p as { userName?: string }).userName ?? "") }))} currentUserId={currentUserId} />
 
-          {/* Status selector */}
-          <div className="relative group">
-            <button className="flex items-center gap-1.5">
-              <Badge variant={STATUS_VARIANT[status]} className="text-xs cursor-pointer">
-                {getStatusOptions(t).find((o) => o.value === status)?.label ?? status}
-              </Badge>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </button>
+            <Badge variant={STATUS_VARIANT[status]} className="capitalize text-xs">
+              {status}
+            </Badge>
 
-            <div className="absolute top-full right-0 mt-1 z-20 rounded-lg border border-border bg-popover shadow-lg hidden group-hover:block min-w-[130px]">
-              {getStatusOptions(t).map((opt) => (
-                <button
-                  type="button"
-                  key={opt.value}
-                  onClick={() => handleStatusChange(opt.value)}
-                  className={cn(
-                    "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors",
-                    status === opt.value && "font-semibold text-primary"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={handleExportMarkdown} title={t("proposalWorkspace.exportMarkdown")}>
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleExportText} title={t("proposalWorkspace.exportText")}>
+                <Download className="h-4 w-4" />
+              </Button>
+              <SaveVersionButton onSave={handleSaveVersion} />
             </div>
-          </div>
 
-          {/* Save version */}
-          <SaveVersionButton
-            onSave={handleSaveVersion}
-            isDirty={true}
-            versionCount={localVersions.length}
-          />
+            <div className="relative group">
+              <Button variant="outline" size="sm" className="gap-1">
+                {t("proposalWorkspace.status.label")}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+              <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                {getStatusOptions(t).map((opt) => (
+                  <button
+                    key={opt.value}
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground first:rounded-t last:rounded-b",
+                      status === opt.value && "bg-accent"
+                    )}
+                    onClick={() => handleStatusChange(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Export menu */}
-          <div className="relative group">
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs">
-              <Download className="h-3.5 w-3.5" />
-              {t("proposalWorkspace.export")}
-              <ChevronDown className="h-3 w-3" />
+            <Button variant="default" size="sm" onClick={() => setAiPanelCollapsed((v) => !v)}>
+              {aiPanelCollapsed ? t("proposalWorkspace.showAiPanel") : t("proposalWorkspace.hideAiPanel")}
             </Button>
-            <div className="absolute top-full right-0 mt-1 z-20 rounded-lg border border-border bg-popover shadow-lg hidden group-hover:block min-w-[160px]">
-              <button type="button" onClick={() => window.print()} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportPdf")}</button>
-              <button type="button" onClick={handleExportMarkdown} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportMarkdown")}</button>
-              <button type="button" onClick={handleExportText} className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors">{t("proposalWorkspace.exportText")}</button>
-            </div>
           </div>
         </header>
 
-        {/* ── Main workspace ──────────────────────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left: Section sidebar (w-56) */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col overflow-hidden">
-            <SectionSidebar
-              sections={proposalSections}
-              sourceDocs={proposalSourceDocs}
-              activeSectionId={effectiveActiveSectionId}
-              presenceBySection={presenceBySection}
-              totalValue={totalValue}
-              onSelectSection={handleSelectSection}
-              onAddSection={handleAddSection}
-              onDeleteSection={(id) => deleteSection.mutate(id)}
-              onAddSourceDoc={() => setShowDocInput(true)}
-              onDeleteSourceDoc={(id) => deleteSourceDoc.mutate(id)}
+        {/* ── Main workspace ─────────────────────────────────────────────────── */}
+        <div className="flex flex-1 overflow-hidden">
+          <SectionSidebar
+            sections={proposalSections as unknown as TenderSection[]}
+            activeSectionId={effectiveActiveSectionId}
+            onSelect={handleSelectSection}
+            onAdd={handleAddSection}
+            onDelete={(id) => deleteSection.mutate({ sectionId: id })}
+            presenceBySection={presenceBySection}
+          />
+
+          <div className="flex-1 flex overflow-hidden">
+            <SectionEditor
+              section={activeSection as unknown as TenderSection | null}
+              lineItems={activeSectionLineItems as unknown as { id: string; productName: string; quantity: number; priceUnit: number; discount: number; subtotal: number }[]}
+              comments={activeSectionComments as unknown as { id: string; authorName: string; content: string; isResolved: boolean; parentId: string | null }[]}
+              products={products as unknown as { id: string; name: string; listPrice: number }[]}
+              isSaving={isSaving}
+              onSaveContent={handleSaveContent}
+              onSaveTitle={handleSaveTitle}
+              onFocus={handleEditorFocus}
+              onAddLineItem={(params) => addLineItem.mutate({ proposalId: proposalIdBig, sectionId: effectiveActiveSectionId, ...params })}
+              onUpdateLineItem={(id, params) => updateLineItem.mutate({ lineItemId: id, ...params })}
+              onDeleteLineItem={(id) => deleteLineItem.mutate({ lineItemId: id })}
+              onAddComment={(content) => {
+                if (!effectiveActiveSectionId) return
+                addComment.mutate({
+                  proposalId: proposalIdBig,
+                  sectionId: effectiveActiveSectionId,
+                  content,
+                  authorName: effectiveUserName,
+                  parentId: null,
+                })
+              }}
+              onResolveComment={(id) => resolveComment.mutate(id)}
+            />
+
+            {aiPanelCollapsed ? null : (
+              <div className="w-80 border-l border-border bg-muted/20 flex flex-col">
+                <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                  <span className="text-sm font-medium">{t("proposalWorkspace.aiPanel")}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setAiPanelCollapsed(true)}>✕</Button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => setShowDocInput((v) => !v)}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {showDocInput ? t("proposalWorkspace.hideSourceDocs") : t("proposalWorkspace.sourceDocs")}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleAnalyze}
+                      disabled={isAnalyzing || proposalSourceDocs.length === 0}
+                    >
+                      {isAnalyzing ? t("proposalWorkspace.analyzing") : t("proposalWorkspace.analyze")}
+                    </Button>
+                  </div>
+
+                  {showDocInput && (
+                    <DocumentInputPanel
+                      docs={proposalSourceDocs as unknown as { id: string; name: string; content: string; docType: string; wordCount: number }[]}
+                      onAdd={(d) => addSourceDoc.mutate({ proposalId: proposalIdBig, ...d })}
+                      onDelete={(id) => deleteSourceDoc.mutate({ docId: id })}
+                    />
+                  )}
+
+                  {analyzeError && (
+                    <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                      {analyzeError}
+                    </div>
+                  )}
+
+                  <AIPanel
+                    analysis={analysis}
+                    isLoading={isAnalyzing}
+                    onApplyStructure={handleApplyStructure}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Version history (right sidebar) ───────────────────────────── */}
+          <div className="w-64 border-l border-border bg-muted/10 flex flex-col">
+            <VersionHistoryBar
+              versions={localVersions}
+              currentSectionId={effectiveActiveSectionId ? String(effectiveActiveSectionId) : undefined}
             />
           </div>
-
-          {/* Middle: Section editor (flex-1) */}
-          <SectionEditor
-            section={activeSection}
-            lineItems={activeSectionLineItems}
-            comments={activeSectionComments}
-            products={products}
-            currentUserId={currentUserId}
-            isSaving={isSaving}
-            onSaveContent={handleSaveContent}
-            onSaveTitle={handleSaveTitle}
-            onAddLineItem={(productId, productName, priceUnit) => {
-              addLineItem.mutate({
-                proposalId: proposalIdBig,
-                sectionId: effectiveActiveSectionId ? BigInt(String(effectiveActiveSectionId)) : undefined,
-                productId,
-                productName,
-                quantity: 1,
-                priceUnit,
-                discount: 0,
-              })
-            }}
-            onUpdateLineItem={(id, quantity, priceUnit, discount, notes) => {
-              updateLineItem.mutate({ lineItemId: id, quantity, priceUnit, discount, notes })
-            }}
-            onDeleteLineItem={(id) => deleteLineItem.mutate(id)}
-            onAddComment={(content, parentId) => {
-              if (!effectiveActiveSectionId) return
-              addComment.mutate({
-                proposalId: proposalIdBig,
-                sectionId: BigInt(String(effectiveActiveSectionId)),
-                content,
-                parentId,
-                authorName: effectiveUserName,
-              })
-            }}
-            onResolveComment={(id) => resolveComment.mutate(id)}
-            onFocus={handleEditorFocus}
-          />
-
-          {/* Right: AI panel (collapsible) */}
-          <AIPanel
-            analysis={analysis}
-            isAnalyzing={isAnalyzing}
-            analyzeError={analyzeError}
-            onApplyStructure={handleApplyStructure}
-            collapsed={aiPanelCollapsed}
-            onToggleCollapse={() => setAiPanelCollapsed((v) => !v)}
-          />
         </div>
-
-        {/* ── Document input modal (for source docs) ──────────────────────── */}
-        {showDocInput && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-            <div className="bg-background rounded-xl border border-border shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <div className="flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-semibold">{t("proposalWorkspace.addSourceDocument")}</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDocInput(false)}
-                  className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                >
-                  &times;
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <DocumentInputPanel
-                  sources={proposalSourceDocs.map((d) => ({
-                    id: String(d.id),
-                    name: String(d.name ?? ""),
-                    content: String(d.content ?? ""),
-                    type: (d.docType as "pasted" | "uploaded") ?? "pasted",
-                    wordCount: Number(d.wordCount ?? 0),
-                    addedAt: new Date(Number(d.addedAt ?? 0) / 1000),
-                  }))}
-                  dispatch={(action) => {
-                    if (action.type === "ADD_SOURCE") {
-                      addSourceDoc.mutate({
-                        proposalId: proposalIdBig,
-                        name: action.source.name,
-                        content: action.source.content,
-                        docType: action.source.type,
-                        wordCount: action.source.wordCount,
-                      })
-                      setShowDocInput(false)
-                    } else if (action.type === "REMOVE_SOURCE") {
-                      const doc = proposalSourceDocs.find((d) => String(d.id) === action.id)
-                      if (doc) deleteSourceDoc.mutate(doc.id)
-                    }
-                  }}
-                  onAnalyze={async () => { setShowDocInput(false); await handleAnalyze() }}
-                  isAnalyzing={isAnalyzing}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Version history footer ──────────────────────────────────────── */}
-        <VersionHistoryBar
-          versions={localVersions}
-          activeVersionId={null}
-          currentSections={proposalSections.map((s) => ({
-            id: String(s.id),
-            title: s.title ?? "",
-            content: s.content ?? "",
-            status: ((s.status as string)?.toLowerCase() as import("@/lib/proposal-workspace-types").SectionStatus) ?? "draft",
-            aiSuggestion: s.aiSuggestion ?? null,
-            order: s.sequence ?? 0,
-            wordCount: s.wordCount ?? 0,
-          }))}
-          onRestoreVersion={(versionId) => {
-            const version = localVersions.find((v) => v.id === versionId)
-            if (!version) return
-            // Restore: upsert all sections from snapshot
-            version.sections.forEach((sec, idx) => {
-              upsertSection.mutate({
-                proposalId: proposalIdBig,
-                sectionId: BigInt(0), // creates new (simplest restore approach)
-                title: sec.title,
-                content: sec.content,
-                status: sec.status,
-                sequence: (idx + 1) * 10,
-              })
-            })
-          }}
-        />
       </div>
     </>
   )

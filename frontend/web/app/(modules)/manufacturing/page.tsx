@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
 import {
   serverQueryMrpProductions,
@@ -5,6 +6,7 @@ import {
   serverQueryMrpBomLines,
   serverQueryMrpWorkorders,
   serverQueryMrpWorkcenters,
+  serverQueryIotDevices,
   serverQueryProducts,
   serverQueryWarehouses,
   serverQueryStockPickings,
@@ -16,7 +18,7 @@ export default async function ManufacturingPage() {
   const { organizationId, opts } = await getStdbSession()
 
   if (!organizationId) {
-    return <ManufacturingClient />
+    return <Suspense><ManufacturingClient /></Suspense>
   }
 
   const [
@@ -25,6 +27,7 @@ export default async function ManufacturingPage() {
     bomLines,
     workorders,
     workcenters,
+    iotDevices,
     products,
     warehouses,
     stockPickings,
@@ -35,24 +38,28 @@ export default async function ManufacturingPage() {
     serverQueryMrpBomLines(organizationId, opts),
     serverQueryMrpWorkorders(organizationId, opts),
     serverQueryMrpWorkcenters(organizationId, opts),
+    serverQueryIotDevices(organizationId, opts),
     serverQueryProducts(organizationId, opts),
     serverQueryWarehouses(organizationId, opts),
     serverQueryStockPickings(organizationId, opts),
     serverQueryStockQuants(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], []])
+  ]).catch(() => [[], [], [], [], [], [], [], [], [], []])
 
   return (
-    <ManufacturingClient
-      initialProductions={productions as Record<string, unknown>[]}
-      initialBoms={boms as Record<string, unknown>[]}
-      initialBomLines={bomLines as Record<string, unknown>[]}
-      initialWorkorders={workorders as Record<string, unknown>[]}
-      initialWorkcenters={workcenters as Record<string, unknown>[]}
-      initialProducts={products as Record<string, unknown>[]}
-      initialWarehouses={warehouses as Record<string, unknown>[]}
-      initialStockPickings={stockPickings as Record<string, unknown>[]}
-      initialStockQuants={stockQuants as Record<string, unknown>[]}
-      organizationId={organizationId}
-    />
+    <Suspense>
+      <ManufacturingClient
+        initialProductions={productions as Record<string, unknown>[]}
+        initialBoms={boms as Record<string, unknown>[]}
+        initialBomLines={bomLines as Record<string, unknown>[]}
+        initialWorkorders={workorders as Record<string, unknown>[]}
+        initialWorkcenters={workcenters as Record<string, unknown>[]}
+        initialIotDevices={iotDevices as Record<string, unknown>[]}
+        initialProducts={products as Record<string, unknown>[]}
+        initialWarehouses={warehouses as Record<string, unknown>[]}
+        initialStockPickings={stockPickings as Record<string, unknown>[]}
+        initialStockQuants={stockQuants as Record<string, unknown>[]}
+        organizationId={organizationId}
+      />
+    </Suspense>
   )
 }

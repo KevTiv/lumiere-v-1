@@ -283,6 +283,10 @@ export function manufacturingWorkorderRowActionForm(
 export interface ManufacturingWorkcenterRowFormParams {
   recordId: string
   defaultName: string
+  /** Options for “Link IoT device”; include a disabled empty row when there are no devices. */
+  iotDeviceOptions: Array<{ value: string; label: string; disabled?: boolean }>
+  /** Device currently linked to this work center (for default select value). */
+  linkedDeviceId?: string
 }
 
 export function manufacturingWorkcenterRowActionForm(
@@ -324,6 +328,10 @@ export function manufacturingWorkcenterRowActionForm(
                 value: "log_productivity",
                 label: t("manufacturing.rowActions.logProductivity"),
               },
+              {
+                value: "link_iot_device",
+                label: t("manufacturing.rowActions.linkIotDevice"),
+              },
             ],
             width: "full",
           },
@@ -335,6 +343,15 @@ export function manufacturingWorkcenterRowActionForm(
         description: t("manufacturing.rowActions.form.wcParamsHint"),
         columns: 2,
         fields: [
+          {
+            type: "select",
+            id: "linkDeviceId",
+            name: "linkDeviceId",
+            label: t("manufacturing.rowActions.linkIotDeviceSelect"),
+            options: p.iotDeviceOptions,
+            defaultValue: p.linkedDeviceId ?? "",
+            width: "full",
+          },
           {
             type: "text",
             id: "wcName",

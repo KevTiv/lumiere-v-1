@@ -10,6 +10,7 @@ import {
   newContractForm,
   newPayslipForm,
   newJobPositionForm,
+  newDepartmentForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
 } from "@lumiere/ui"
@@ -23,11 +24,14 @@ import {
   useContracts,
   usePayslips,
   useJobPositions,
+  useLeaveTypes,
+  usePayrollStructures,
   useCreateEmployee,
   useCreateLeaveRequest,
   useCreateContract,
   useCreatePayslip,
   useCreateJobPosition,
+  useCreateDepartment,
 } from "@/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@/hooks/sales"
@@ -35,7 +39,8 @@ import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
   departmentRowsToSelectOptions,
-  leaveTypeOptionsFromLeaveRequests,
+  leaveTypeRowsToSelectOptions,
+  payrollStructureRowsToSelectOptions,
 } from "@/lib/form-lookup"
 
 interface HrClientProps {
@@ -78,6 +83,8 @@ function HrClientLoaded({
   const { data: contracts = [] } = useContracts(companyId, initialContracts)
   const { data: payslips = [] } = usePayslips(companyId, initialPayslips)
   const { data: jobPositions = [] } = useJobPositions(companyId)
+  const { data: leaveTypes = [] } = useLeaveTypes(companyId)
+  const { data: payrollStructures = [] } = usePayrollStructures(companyId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
   const createEmployee = useCreateEmployee(orgId, companyId)
@@ -85,6 +92,7 @@ function HrClientLoaded({
   const createContract = useCreateContract(orgId, companyId)
   const createPayslip = useCreatePayslip(orgId, companyId)
   const createJobPosition = useCreateJobPosition(orgId, companyId)
+  const createDepartment = useCreateDepartment(orgId, companyId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])
 
@@ -107,10 +115,16 @@ function HrClientLoaded({
   }, [departments, t])
 
   const leaveTypeFieldOptions = useMemo(() => {
-    const fromApi = leaveTypeOptionsFromLeaveRequests(leaves as Record<string, unknown>[])
+    const fromApi = leaveTypeRowsToSelectOptions(leaveTypes as Record<string, unknown>[])
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noLeaveTypes"), disabled: true }]
-  }, [leaves, t])
+  }, [leaveTypes, t])
+
+  const payrollStructureFieldOptions = useMemo(() => {
+    const fromApi = payrollStructureRowsToSelectOptions(payrollStructures as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPayrollStructures"), disabled: true }]
+  }, [payrollStructures, t])
 
   const employeeFormConfig = useMemo(
     () =>
@@ -146,6 +160,14 @@ function HrClientLoaded({
     [t, departmentFieldOptions],
   )
 
+  const payslipFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPayslipForm(t), {
+        structId: payrollStructureFieldOptions,
+      }),
+    [t, payrollStructureFieldOptions],
+  )
+
   const liveSections = useMemo(() => {
     const activeEmployees = employees.filter((e) => e.isActive)
     const pendingLeaves = leaves.filter((l) => String(l.state) === "Confirm").length
@@ -176,7 +198,7 @@ function HrClientLoaded({
                 create_employee: () => setQuickActionForm({ form: employeeFormConfig, action: "createEmployee" }),
                 create_leave: () => setQuickActionForm({ form: leaveFormConfig, action: "createLeaveRequest" }),
                 create_contract: () => setQuickActionForm({ form: contractFormConfig, action: "createContract" }),
-                create_payslip: () => setQuickActionForm({ form: newPayslipForm(t), action: "createPayslip" }),
+                create_payslip: () => setQuickActionForm({ form: payslipFormConfig, action: "createPayslip" }),
                 create_job_position: () => setQuickActionForm({ form: jobFormConfig, action: "createJobPosition" }),
               }
               return {
@@ -261,13 +283,15 @@ function HrClientLoaded({
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
           if (tab.id === "employees") return { ...tab, createForm: employeeFormConfig }
+          if (tab.id === "departments") return { ...tab, createForm: newDepartmentForm(t), createLabel: "New Department", createAction: "createDepartment" }
           if (tab.id === "leaves") return { ...tab, createForm: leaveFormConfig }
           if (tab.id === "contracts") return { ...tab, createForm: contractFormConfig }
+          if (tab.id === "payslips") return { ...tab, createForm: payslipFormConfig }
           if (tab.id === "job-positions") return { ...tab, createForm: jobFormConfig }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, employeeFormConfig, leaveFormConfig, contractFormConfig, jobFormConfig],
+    [moduleConfig, liveSections, employeeFormConfig, leaveFormConfig, contractFormConfig, payslipFormConfig, jobFormConfig, t],
   )
 
   const data = useMemo(
@@ -368,6 +392,16 @@ function HrClientLoaded({
         requirements: formData.requirements as string | undefined,
         state: String(formData.state ?? "recruit"),
         isActive: formData.isActive == null ? true : Boolean(formData.isActive),
+      } as never)
+    } else if (action === "createDepartment") {
+      const parentRaw = formData.parentId
+      const managerRaw = formData.managerId
+      createDepartment.mutate({
+        name: String(formData.name ?? ""),
+        parentId: parentRaw !== "" && parentRaw != null ? Number(parentRaw) : undefined,
+        managerId: managerRaw !== "" && managerRaw != null ? Number(managerRaw) : undefined,
+        note: formData.note ? String(formData.note) : undefined,
+        isActive: true,
       } as never)
     }
   }

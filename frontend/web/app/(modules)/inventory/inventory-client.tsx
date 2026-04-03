@@ -15,6 +15,18 @@ import {
   editProductForm,
   newProductVariantForm,
   assignUserToPickingForm,
+  newQualityCheckForm,
+  newQualityAlertForm,
+  newQualityPointForm,
+  newQualityTeamForm,
+  newBarcodeRuleForm,
+  newReplenishmentRuleForm,
+  newPickingWaveForm,
+  newProductCategoryForm,
+  newStockQuantForm,
+  newWarehouse3dZoneForm,
+  newProductSupplierLineForm,
+  newProductPackagingForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
 } from "@lumiere/ui"
@@ -38,8 +50,12 @@ import {
   useStockRoutes,
   useStockRules,
   useStockMoves,
+  useStockProductionSerials,
+  useDoneStockMove,
+  useCancelStockMove,
   useInventoryValuations,
   useReplenishmentRules,
+  useBarcodeRules,
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
@@ -61,14 +77,95 @@ import {
   useUnreserveStockQuant,
   useWarehouse3D,
   useMoveStockItem3D,
-  useDoneStockMove,
-  useCancelStockMove,
   useOrgUsers,
+  // Quality management
+  useCreateQualityCheck,
+  usePassQualityCheck,
+  useFailQualityCheck,
+  useDeleteQualityCheck,
+  useCreateQualityAlert,
+  useAssignQualityAlert,
+  useCancelQualityAlert,
+  useDeleteQualityAlert,
+  useCreateQualityPoint,
+  useDeleteQualityPoint,
+  useCreateQualityTeam,
+  useDeleteQualityTeam,
+  // Barcode management
+  useCreateBarcodeRule,
+  useUpdateBarcodeRule,
+  useDeleteBarcodeRule,
+  useRecordBarcodeScan,
+  // Replenishment
+  useCreateReplenishmentRule,
+  useUpdateReplenishmentRule,
+  useDeleteReplenishmentRule,
+  useTriggerReplenishment,
+  // Picking waves
+  useCreatePickingWave,
+  useUpdatePickingWave,
+  useDeletePickingWave,
+  useConfirmPickingWave,
+  useProcessPickingWave,
+  useCompletePickingWave,
+  // Product category
+  useCreateProductCategory,
+  useUpdateProductCategory,
+  useDeleteProductCategory,
+  // Stock routes and rules
+  useCreateStockRoute,
+  useUpdateStockRoute,
+  useDeleteStockRoute,
+  useCreateStockRule,
+  useUpdateStockRule,
+  useDeleteStockRule,
+  // Warehouse tasks
+  useCreateWarehouseTask,
+  useUpdateWarehouseTask,
+  useDeleteWarehouseTask,
+  useStartWarehouseTask,
+  useCompleteWarehouseTask,
+  useCancelWarehouseTask,
+  useStartQualityCheck,
+  useOpenQualityAlert,
+  useSolveQualityAlert,
+  useCreateQualityAlertReason,
+  useUpdateQualityAlertReason,
+  useDeleteQualityAlertReason,
+  useAddMemberToQualityTeam,
+  useRemoveMemberFromQualityTeam,
+  useExecuteReplenishmentRule,
+  useCreateStockQuant,
+  useUpdateStockQuantQuantity,
+  useUpdateStockProductionLot,
+  useDeleteStockProductionLot,
+  useUpdateStockProductionSerial,
+  useDeleteStockProductionSerial,
+  useCreateWarehouse3dZone,
+  useUpdateWarehouse3dZone,
+  useDeleteWarehouse3dZone,
+  useUpdateWarehouseTaskStatus,
+  useLinkDeviceToQualityCheck,
+  useCreateProductSupplierInfo,
+  useUpdateProductSupplierInfo,
+  useCreateProductPackaging,
+  useUpdateProductPackaging,
+  useRestoreProductCategory,
+  useUpsertWarehouseGeo,
 } from "@/hooks/inventory"
 import { usePricelists } from "@/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 type ScalarId = bigint | number | string
+
+/** SpacetimeDB sum-type encoding for `ZoneDisplayType` (warehouse 3D zones). */
+function zoneDisplayTypeForReducer(tag: string): Record<string, unknown> {
+  const t = String(tag || "Rack")
+  if (t === "Floor") return { Floor: [] }
+  if (t === "Bin") return { Bin: [] }
+  return { Rack: [] }
+}
+
 import {
   pricelistRowsToSelectOptions,
   pickingTypeOptionsFromTransfers,
@@ -77,7 +174,10 @@ import {
   productCategoryRowsToSelectOptions,
   uomRowsToSelectOptions,
 } from "@/lib/form-lookup"
-import { CheckCircle, ListChecks, Pencil, Plus, Trash2, UserCircle2, UserPlus, XCircle } from "lucide-react"
+import {
+  CheckCircle, ListChecks, Pencil, Plus, Trash2, UserCircle2, UserPlus, XCircle,
+  ShieldCheck, AlertTriangle, ScanLine, RefreshCw, PackageOpen, FolderTree, Route, ClipboardList,
+} from "lucide-react"
 import { buildCreateWarehouseParamsFromTemplate } from "@/lib/warehouse-create-params"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { CycleCountWizard } from "./cycle-count-wizard"
@@ -103,6 +203,7 @@ interface InventoryClientProps {
   initialWarehouse3dZones?: Record<string, unknown>[]
   initialInventoryValuations?: Record<string, unknown>[]
   initialReplenishmentRules?: Record<string, unknown>[]
+  initialStockProductionSerials?: Record<string, unknown>[]
   organizationId?: number
 }
 
@@ -132,6 +233,7 @@ function InventoryClientLoaded({
   initialWarehouse3dZones: _initialWarehouse3dZones,
   initialInventoryValuations,
   initialReplenishmentRules,
+  initialStockProductionSerials,
   organizationId,
 }: InventoryClientLoadedProps) {
   const { t } = useTranslation()
@@ -141,6 +243,15 @@ function InventoryClientLoaded({
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)
   const [editWarehouseRow, setEditWarehouseRow] = useState<Record<string, unknown> | null>(null)
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null)
+  const [editQualityCheckId, setEditQualityCheckId] = useState<ScalarId | null>(null)
+  const [editQualityAlertId, setEditQualityAlertId] = useState<ScalarId | null>(null)
+  const [editReplenishmentRuleId, setEditReplenishmentRuleId] = useState<ScalarId | null>(null)
+  const [editPickingWaveId, setEditPickingWaveId] = useState<ScalarId | null>(null)
+  const [editProductCategoryId, setEditProductCategoryId] = useState<ScalarId | null>(null)
+  const [editStockRouteId, setEditStockRouteId] = useState<ScalarId | null>(null)
+  const [editStockRuleId, setEditStockRuleId] = useState<ScalarId | null>(null)
+  const [supplierLineProductId, setSupplierLineProductId] = useState<ScalarId | null>(null)
+  const [packagingProductId, setPackagingProductId] = useState<ScalarId | null>(null)
 
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
@@ -151,6 +262,7 @@ function InventoryClientLoaded({
   const { data: adjustments = [] } = useInventoryAdjustments(orgId, initialAdjustments)
   const { data: locations = [] } = useStockLocations(orgId, initialStockLocations)
   const { data: lots = [] } = useProductionLots(orgId)
+  const { data: serials = [] } = useStockProductionSerials(orgId, initialStockProductionSerials)
   const { data: qualityChecks = [] } = useQualityChecks(orgId)
   const { data: cycleCounts = [] } = useStockCycleCounts(orgId, initialStockCycleCounts)
   const { data: pickingWaves = [] } = usePickingWaves(orgId)
@@ -160,6 +272,7 @@ function InventoryClientLoaded({
   const { data: stockMoves = [] } = useStockMoves(orgId, initialStockMoves)
   const { data: inventoryValuations = [] } = useInventoryValuations(orgId, initialInventoryValuations)
   const { data: replenishmentRulesList = [] } = useReplenishmentRules(orgId, initialReplenishmentRules)
+  const { data: barcodeRules = [] } = useBarcodeRules(orgId)
   const { data: orgUsers = [] } = useOrgUsers()
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
@@ -338,6 +451,151 @@ function InventoryClientLoaded({
   const { zones, slots, items: warehouseItems } = useWarehouse3D(orgId, companyId, firstWarehouseId)
   const moveStockItem = useMoveStockItem3D(orgId)
 
+  // Quality management hooks
+  const createQualityCheck = useCreateQualityCheck(orgId, companyId)
+  const passQualityCheck = usePassQualityCheck(orgId, companyId)
+  const failQualityCheck = useFailQualityCheck(orgId, companyId)
+  const deleteQualityCheck = useDeleteQualityCheck(orgId, companyId)
+  const createQualityAlert = useCreateQualityAlert(orgId, companyId)
+  const assignQualityAlert = useAssignQualityAlert(orgId, companyId)
+  const cancelQualityAlert = useCancelQualityAlert(orgId, companyId)
+  const deleteQualityAlert = useDeleteQualityAlert(orgId, companyId)
+  const createQualityPoint = useCreateQualityPoint(orgId, companyId)
+  const deleteQualityPoint = useDeleteQualityPoint(orgId, companyId)
+  const createQualityTeam = useCreateQualityTeam(orgId, companyId)
+  const deleteQualityTeam = useDeleteQualityTeam(orgId, companyId)
+
+  // Barcode hooks
+  const createBarcodeRule = useCreateBarcodeRule(orgId, companyId)
+  const updateBarcodeRule = useUpdateBarcodeRule(orgId, companyId)
+  const deleteBarcodeRule = useDeleteBarcodeRule(orgId, companyId)
+  const recordBarcodeScan = useRecordBarcodeScan(orgId, companyId)
+
+  // Replenishment hooks
+  const createReplenishmentRule = useCreateReplenishmentRule(orgId, companyId)
+  const updateReplenishmentRule = useUpdateReplenishmentRule(orgId, companyId)
+  const deleteReplenishmentRule = useDeleteReplenishmentRule(orgId, companyId)
+  const triggerReplenishment = useTriggerReplenishment(orgId, companyId)
+
+  // Picking wave hooks
+  const createPickingWave = useCreatePickingWave(orgId, companyId)
+  const updatePickingWave = useUpdatePickingWave(orgId, companyId)
+  const deletePickingWave = useDeletePickingWave(orgId, companyId)
+  const confirmPickingWave = useConfirmPickingWave(orgId, companyId)
+  const processPickingWave = useProcessPickingWave(orgId, companyId)
+  const completePickingWave = useCompletePickingWave(orgId, companyId)
+
+  // Product category hooks
+  const createProductCategory = useCreateProductCategory(orgId, companyId)
+  const updateProductCategory = useUpdateProductCategory(orgId, companyId)
+  const deleteProductCategory = useDeleteProductCategory(orgId, companyId)
+
+  // Stock routes and rules hooks
+  const createStockRoute = useCreateStockRoute(orgId, companyId)
+  const updateStockRoute = useUpdateStockRoute(orgId, companyId)
+  const deleteStockRoute = useDeleteStockRoute(orgId, companyId)
+  const createStockRule = useCreateStockRule(orgId, companyId)
+  const updateStockRule = useUpdateStockRule(orgId, companyId)
+  const deleteStockRule = useDeleteStockRule(orgId, companyId)
+
+  // Warehouse task hooks
+  const createWarehouseTask = useCreateWarehouseTask(orgId, companyId)
+  const updateWarehouseTask = useUpdateWarehouseTask(orgId, companyId)
+  const deleteWarehouseTask = useDeleteWarehouseTask(orgId, companyId)
+  const startWarehouseTask = useStartWarehouseTask(orgId, companyId)
+  const completeWarehouseTask = useCompleteWarehouseTask(orgId, companyId)
+  const cancelWarehouseTask = useCancelWarehouseTask(orgId, companyId)
+
+  const startQualityCheck = useStartQualityCheck(orgId)
+  const openQualityAlert = useOpenQualityAlert(orgId)
+  const solveQualityAlert = useSolveQualityAlert(orgId)
+  const createQualityAlertReason = useCreateQualityAlertReason(orgId)
+  const updateQualityAlertReason = useUpdateQualityAlertReason(orgId)
+  const deleteQualityAlertReason = useDeleteQualityAlertReason(orgId)
+  const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId)
+  const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId)
+  const executeReplenishmentRule = useExecuteReplenishmentRule(orgId)
+  const createStockQuant = useCreateStockQuant(orgId)
+  const updateStockQuantQuantity = useUpdateStockQuantQuantity(orgId)
+  const updateStockProductionLot = useUpdateStockProductionLot(orgId)
+  const deleteStockProductionLot = useDeleteStockProductionLot(orgId)
+  const updateStockProductionSerial = useUpdateStockProductionSerial(orgId)
+  const deleteStockProductionSerial = useDeleteStockProductionSerial(orgId)
+  const createWarehouse3dZone = useCreateWarehouse3dZone(orgId)
+  const updateWarehouse3dZone = useUpdateWarehouse3dZone(orgId)
+  const deleteWarehouse3dZone = useDeleteWarehouse3dZone(orgId)
+  const updateWarehouseTaskStatus = useUpdateWarehouseTaskStatus(orgId)
+  const linkDeviceToQualityCheck = useLinkDeviceToQualityCheck(orgId)
+  const createProductSupplierInfo = useCreateProductSupplierInfo(orgId)
+  const updateProductSupplierInfo = useUpdateProductSupplierInfo(orgId)
+  const createProductPackaging = useCreateProductPackaging(orgId)
+  const updateProductPackaging = useUpdateProductPackaging(orgId)
+  const restoreProductCategory = useRestoreProductCategory(orgId)
+  const upsertWarehouseGeo = useUpsertWarehouseGeo(orgId)
+
+  const stockOnHandLocationOptions = useMemo(() => {
+    const opts = locations.map((loc) => ({
+      value: String(loc.id),
+      label: String(loc.completeName ?? loc.name ?? loc.id),
+    }))
+    return opts.length > 0
+      ? opts
+      : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
+  }, [locations, t])
+
+  const stockQuantFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newStockQuantForm(t), {
+        productId: productRowsToSelectOptions(products),
+        locationId: stockOnHandLocationOptions,
+      }),
+    [t, products, stockOnHandLocationOptions],
+  )
+
+  const warehouse3dZoneFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newWarehouse3dZoneForm(t), {
+        warehouseId: warehouses.map((w) => ({ value: String(w.id), label: String(w.name ?? w.id) })),
+        locationId: stockOnHandLocationOptions,
+      }),
+    [t, warehouses, stockOnHandLocationOptions],
+  )
+
+  const currencyIdFromPricelistsOptions = useMemo(() => {
+    const seen = new Set<number>()
+    const opts: { value: string; label: string }[] = []
+    for (const p of pricelists) {
+      const cid = p.currencyId
+      if (cid == null) continue
+      const n = Number(cid)
+      if (seen.has(n)) continue
+      seen.add(n)
+      opts.push({
+        value: String(n),
+        label: `${String(p.name ?? "Pricelist")} (${n})`,
+      })
+    }
+    return opts.length > 0
+      ? opts
+      : [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+  }, [pricelists, t])
+
+  const productSupplierLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProductSupplierLineForm(t), {
+        currencyId: currencyIdFromPricelistsOptions,
+      }),
+    [t, currencyIdFromPricelistsOptions],
+  )
+
+  const productPackagingFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProductPackagingForm(t), {
+        uomId: uomFieldOptions,
+      }),
+    [t, uomFieldOptions],
+  )
+
   const moduleConfig = useMemo(() => inventoryModuleConfig(t), [t])
 
   // Only render the 3D viewer on the client to avoid SSR/hydration tree mismatches
@@ -469,24 +727,88 @@ function InventoryClientLoaded({
       label: t("inventory.3dView"),
       type: "custom" as const,
       customContent: isMounted ? (
-        <div className="h-[calc(100vh-12rem)]">
-          <WarehouseViewer
-            zones={zones}
-            slots={slots}
-            items={warehouseItems}
-            warehouseName={warehouses[0]?.name ? String(warehouses[0].name) : undefined}
-            onMoveItem={(itemId, targetSlotId) => {
-              moveStockItem.mutate({
-                quantId: BigInt(itemId),
-                targetLocationId: BigInt(targetSlotId),
-                quantity: 1,
-              })
-            }}
-          />
+        <div className="flex flex-col gap-2 h-[calc(100vh-12rem)]">
+          <div className="flex flex-wrap gap-2 shrink-0 items-center">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                setQuickActionForm({ form: warehouse3dZoneFormConfig, action: "createWarehouse3dZone" })
+              }
+            >
+              {t("inventory.z3dActions.addZone")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (typeof window === "undefined") return
+                const zid = window.prompt(t("inventory.z3dActions.zoneIdPrompt"))
+                if (zid == null || zid.trim() === "") return
+                const zoneId = Number(zid)
+                if (!Number.isFinite(zoneId)) return
+                const color = window.prompt("Color hex (optional, leave empty to skip)")
+                void updateWarehouse3dZone.mutateAsync({
+                  zoneId,
+                  params:
+                    color != null && color.trim() !== ""
+                      ? { color: color.trim() }
+                      : {},
+                })
+              }}
+            >
+              {t("inventory.z3dActions.editZone")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (typeof window === "undefined") return
+                const zid = window.prompt(t("inventory.z3dActions.zoneIdPrompt"))
+                if (zid == null || zid.trim() === "") return
+                const zoneId = Number(zid)
+                if (!Number.isFinite(zoneId)) return
+                if (window.confirm(t("inventory.z3dActions.deleteZone") + "?")) {
+                  void deleteWarehouse3dZone.mutateAsync(zoneId)
+                }
+              }}
+            >
+              {t("inventory.z3dActions.deleteZone")}
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <WarehouseViewer
+              zones={zones}
+              slots={slots}
+              items={warehouseItems}
+              warehouseName={warehouses[0]?.name ? String(warehouses[0].name) : undefined}
+              onMoveItem={(itemId, targetSlotId) => {
+                moveStockItem.mutate({
+                  quantId: BigInt(itemId),
+                  targetLocationId: BigInt(targetSlotId),
+                  quantity: 1,
+                })
+              }}
+            />
+          </div>
         </div>
       ) : null,
     }),
-    [zones, slots, warehouseItems, warehouses, moveStockItem, t, isMounted]
+    [
+      zones,
+      slots,
+      warehouseItems,
+      warehouses,
+      moveStockItem,
+      t,
+      isMounted,
+      warehouse3dZoneFormConfig,
+      updateWarehouse3dZone,
+      deleteWarehouse3dZone,
+    ]
   )
 
   const cycleCountWizardTab = useMemo(
@@ -615,6 +937,68 @@ function InventoryClientLoaded({
                     if (id != null) setVariantProductId(id)
                   },
                 },
+                {
+                  id: "add-supplier-line",
+                  label: t("inventory.productActions.addSupplierLine"),
+                  icon: PackageOpen,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) setSupplierLineProductId(id)
+                  },
+                },
+                {
+                  id: "add-packaging",
+                  label: t("inventory.productActions.addPackaging"),
+                  icon: FolderTree,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) setPackagingProductId(id)
+                  },
+                },
+                {
+                  id: "update-supplier-line",
+                  label: t("inventory.productActions.updateSupplierLineById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.productActions.supplierLineIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const supplierInfoId = Number(raw)
+                    if (!Number.isFinite(supplierInfoId)) return
+                    const priceS = window.prompt("New price (empty to skip)")
+                    const minS = window.prompt("New min qty (empty to skip)")
+                    void updateProductSupplierInfo.mutateAsync({
+                      supplierInfoId,
+                      params: {
+                        price:
+                          priceS != null && priceS.trim() !== "" ? Number(priceS) : undefined,
+                        min_qty:
+                          minS != null && minS.trim() !== "" ? Number(minS) : undefined,
+                      },
+                    })
+                  },
+                },
+                {
+                  id: "update-packaging-row",
+                  label: t("inventory.productActions.updatePackagingById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.productActions.packagingIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const packagingId = Number(raw)
+                    if (!Number.isFinite(packagingId)) return
+                    const name = window.prompt("New name (empty to skip)")
+                    void updateProductPackaging.mutateAsync({
+                      packagingId,
+                      params: {
+                        name: name != null && name.trim() !== "" ? name.trim() : undefined,
+                      },
+                    })
+                  },
+                },
               ],
             },
           },
@@ -651,6 +1035,29 @@ function InventoryClientLoaded({
                     if (typeof window !== "undefined" && window.confirm(t("inventory.warehouseActions.confirmDelete"))) {
                       void deleteWarehouse.mutateAsync(id)
                     }
+                  },
+                },
+                {
+                  id: "warehouse-geo",
+                  label: t("inventory.warehouseActions.setGeo"),
+                  icon: Route,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    const latS = window.prompt(t("inventory.warehouseActions.geoLatPrompt"), "0")
+                    const lngS = window.prompt(t("inventory.warehouseActions.geoLngPrompt"), "0")
+                    if (latS == null || lngS == null) return
+                    const latitude = Number(latS)
+                    const longitude = Number(lngS)
+                    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
+                    const address = window.prompt(t("inventory.warehouseActions.geoAddressPrompt"))
+                    void upsertWarehouseGeo.mutateAsync({
+                      warehouseId: id,
+                      latitude,
+                      longitude,
+                      address: address && address.trim() !== "" ? address.trim() : null,
+                    })
                   },
                 },
               ],
@@ -704,6 +1111,7 @@ function InventoryClientLoaded({
       if (tab.id === "stock") {
         return {
           ...tab,
+          createForm: stockQuantFormConfig,
           entityConfig: {
             ...tab.entityConfig,
             view: {
@@ -727,6 +1135,21 @@ function InventoryClientLoaded({
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined
                     if (id != null) void unreserveQuant.mutateAsync({ quantId: id, unreserveQty: 1 })
+                  },
+                },
+                {
+                  id: "set-quant-qty",
+                  label: t("inventory.stockActions.setQuantity"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    const q = window.prompt(t("inventory.stockActions.quantityPrompt"), "0")
+                    if (q == null) return
+                    const qty = Number(q)
+                    if (!Number.isFinite(qty)) return
+                    void updateStockQuantQuantity.mutateAsync({ quantId: id, quantity: qty })
                   },
                 },
               ],
@@ -781,6 +1204,594 @@ function InventoryClientLoaded({
           },
         }
       }
+      if (tab.id === "lots") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "edit-lot-note",
+                  label: t("inventory.lotActions.editNote"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    const note = window.prompt(t("inventory.lotActions.notePrompt"))
+                    if (note == null) return
+                    void updateStockProductionLot.mutateAsync({
+                      lotId: id,
+                      params: { company_id: null, note: note.trim() !== "" ? note : null },
+                    })
+                  },
+                },
+                {
+                  id: "delete-lot",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    if (window.confirm(t("inventory.lotActions.confirmDelete"))) {
+                      void deleteStockProductionLot.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "serials") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "edit-serial-note",
+                  label: t("inventory.serialActions.editNote"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    const note = window.prompt(t("inventory.serialActions.notePrompt"))
+                    if (note == null) return
+                    void updateStockProductionSerial.mutateAsync({
+                      serialId: id,
+                      params: { company_id: null, note: note.trim() !== "" ? note : null },
+                    })
+                  },
+                },
+                {
+                  id: "delete-serial",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    if (window.confirm(t("inventory.serialActions.confirmDelete"))) {
+                      void deleteStockProductionSerial.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Quality checks actions
+      if (tab.id === "quality") {
+        return {
+          ...tab,
+          createForm: mergeSelectOptionsForFields(newQualityCheckForm(t), {
+            productId: productRowsToSelectOptions(products),
+            teamId: [] as { value: string; label: string }[],
+          }),
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "pass-check",
+                  label: t("inventory.qualityActions.pass"),
+                  icon: ShieldCheck,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void passQualityCheck.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "fail-check",
+                  label: t("inventory.qualityActions.fail"),
+                  icon: AlertTriangle,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    const reason = typeof window !== "undefined" ? window.prompt(t("inventory.qualityActions.failReason")) : null
+                    if (id != null) void failQualityCheck.mutateAsync({ checkId: id, reason: reason ?? undefined })
+                  },
+                },
+                {
+                  id: "start-check",
+                  label: t("inventory.qualityActions.startCheck"),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void startQualityCheck.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "link-device-check",
+                  label: t("inventory.qualityActions.linkDevice"),
+                  icon: ScanLine,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const checkId = rows[0]?.id as ScalarId | undefined
+                    if (checkId == null || typeof window === "undefined") return
+                    const dev = window.prompt(t("inventory.qualityActions.deviceIdPrompt"))
+                    if (dev == null || dev.trim() === "") return
+                    const deviceId = Number(dev)
+                    if (!Number.isFinite(deviceId)) return
+                    void linkDeviceToQualityCheck.mutateAsync({ deviceId, checkId })
+                  },
+                },
+                {
+                  id: "open-alert-prompt",
+                  label: t("inventory.qualityActions.openAlertById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.qualityActions.alertIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const alertId = Number(raw)
+                    if (!Number.isFinite(alertId)) return
+                    void openQualityAlert.mutateAsync(alertId)
+                  },
+                },
+                {
+                  id: "solve-alert-prompt",
+                  label: t("inventory.qualityActions.solveAlertById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.qualityActions.alertIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const alertId = Number(raw)
+                    if (!Number.isFinite(alertId)) return
+                    const desc = window.prompt(t("inventory.qualityActions.solveDescriptionPrompt"))
+                    void solveQualityAlert.mutateAsync({ alertId, description: desc ?? null })
+                  },
+                },
+                {
+                  id: "add-alert-reason",
+                  label: t("inventory.qualityActions.addAlertReason"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const name = window.prompt(t("inventory.qualityActions.alertReasonNamePrompt"))
+                    if (name == null || name.trim() === "") return
+                    const desc = window.prompt(t("inventory.qualityActions.alertReasonDescPrompt"))
+                    void createQualityAlertReason.mutateAsync({
+                      name: name.trim(),
+                      description: desc && desc.trim() !== "" ? desc.trim() : null,
+                    })
+                  },
+                },
+                {
+                  id: "update-alert-reason",
+                  label: t("inventory.qualityActions.updateAlertReason"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const rid = window.prompt(t("inventory.qualityActions.reasonIdPrompt"))
+                    if (rid == null || rid.trim() === "") return
+                    const reasonId = Number(rid)
+                    if (!Number.isFinite(reasonId)) return
+                    const name = window.prompt(t("inventory.qualityActions.newReasonNamePrompt"))
+                    void updateQualityAlertReason.mutateAsync({
+                      reasonId,
+                      params: {
+                        name: name != null && name.trim() !== "" ? name.trim() : null,
+                      },
+                    })
+                  },
+                },
+                {
+                  id: "delete-alert-reason",
+                  label: t("inventory.qualityActions.deleteAlertReason"),
+                  variant: "destructive",
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const rid = window.prompt(t("inventory.qualityActions.reasonIdPrompt"))
+                    if (rid == null || rid.trim() === "") return
+                    const reasonId = Number(rid)
+                    if (!Number.isFinite(reasonId)) return
+                    if (window.confirm(t("common.delete") + "?")) {
+                      void deleteQualityAlertReason.mutateAsync(reasonId)
+                    }
+                  },
+                },
+                {
+                  id: "add-team-member",
+                  label: t("inventory.qualityActions.addTeamMember"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const tid = window.prompt(t("inventory.qualityActions.teamIdPrompt"))
+                    if (tid == null || tid.trim() === "") return
+                    const teamId = Number(tid)
+                    if (!Number.isFinite(teamId)) return
+                    const hex = window.prompt(t("inventory.qualityActions.memberIdentityPrompt"))
+                    if (hex == null || hex.trim() === "") return
+                    void addMemberToQualityTeam.mutateAsync({ teamId, memberIdentityHex: hex.trim() })
+                  },
+                },
+                {
+                  id: "remove-team-member",
+                  label: t("inventory.qualityActions.removeTeamMember"),
+                  variant: "destructive",
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const tid = window.prompt(t("inventory.qualityActions.teamIdPrompt"))
+                    if (tid == null || tid.trim() === "") return
+                    const teamId = Number(tid)
+                    if (!Number.isFinite(teamId)) return
+                    const hex = window.prompt(t("inventory.qualityActions.memberIdentityPrompt"))
+                    if (hex == null || hex.trim() === "") return
+                    void removeMemberFromQualityTeam.mutateAsync({ teamId, memberIdentityHex: hex.trim() })
+                  },
+                },
+                {
+                  id: "delete-check",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.qualityActions.confirmDeleteCheck"))) {
+                      void deleteQualityCheck.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Replenishment rules actions
+      if (tab.id === "replenishment") {
+        return {
+          ...tab,
+          createForm: mergeSelectOptionsForFields(newReplenishmentRuleForm(t), {
+            productId: productRowsToSelectOptions(products),
+            locationId: locationParentOptions,
+          }),
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "trigger-replenishment",
+                  label: t("inventory.replenishmentActions.trigger"),
+                  icon: RefreshCw,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    const productId = row?.productId as ScalarId | undefined
+                    const locationId = row?.locationId as ScalarId | undefined
+                    void triggerReplenishment.mutateAsync({ productId, locationId })
+                  },
+                },
+                {
+                  id: "execute-replenishment-rule",
+                  label: t("inventory.replenishmentActions.executeRule"),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    if (
+                      window.confirm(
+                        `${t("inventory.replenishmentActions.executeRule")}\n${t("inventory.replenishmentActions.executeRuleHint")}`,
+                      )
+                    ) {
+                      void executeReplenishmentRule.mutateAsync(id)
+                    }
+                  },
+                },
+                {
+                  id: "delete-rule",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.replenishmentActions.confirmDelete"))) {
+                      void deleteReplenishmentRule.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Picking waves actions
+      if (tab.id === "picking-waves") {
+        return {
+          ...tab,
+          createForm: mergeSelectOptionsForFields(newPickingWaveForm(t), {
+            warehouseId: warehouses.map((w) => ({ value: String(w.id), label: String(w.name ?? w.id) })),
+          }),
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "confirm-wave",
+                  label: t("inventory.pickingWaveActions.confirm"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void confirmPickingWave.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "process-wave",
+                  label: t("inventory.pickingWaveActions.process"),
+                  icon: PackageOpen,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void processPickingWave.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "complete-wave",
+                  label: t("inventory.pickingWaveActions.complete"),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void completePickingWave.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "delete-wave",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.pickingWaveActions.confirmDelete"))) {
+                      void deletePickingWave.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Product categories actions
+      if (tab.id === "product-categories") {
+        return {
+          ...tab,
+          createForm: mergeSelectOptionsForFields(newProductCategoryForm(t), {
+            parentId: productCategoryRowsToSelectOptions(productCategories).map((o) => ({ ...o, value: String(o.value) })),
+          }),
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "delete-category",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.categoryActions.confirmDelete"))) {
+                      void deleteProductCategory.mutateAsync(id)
+                    }
+                  },
+                },
+                {
+                  id: "restore-category",
+                  label: t("inventory.categoryActions.restoreById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    if (typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.categoryActions.categoryIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const categoryId = Number(raw)
+                    if (!Number.isFinite(categoryId)) return
+                    void restoreProductCategory.mutateAsync(categoryId)
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Stock routes actions
+      if (tab.id === "routes") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "delete-route",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.routeActions.confirmDelete"))) {
+                      void deleteStockRoute.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Stock rules actions
+      if (tab.id === "rules") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "delete-rule",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.ruleActions.confirmDelete"))) {
+                      void deleteStockRule.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Barcode rules actions
+      if (tab.id === "barcode-rules") {
+        return {
+          ...tab,
+          createForm: newBarcodeRuleForm(t),
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "delete-barcode-rule",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.barcodeActions.confirmDelete"))) {
+                      void deleteBarcodeRule.mutateAsync(id)
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      // Warehouse tasks actions
+      if (tab.id === "warehouse-tasks") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "start-task",
+                  label: t("inventory.taskActions.start"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void startWarehouseTask.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "complete-task",
+                  label: t("inventory.taskActions.complete"),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void completeWarehouseTask.mutateAsync({ taskId: id, result: {} })
+                  },
+                },
+                {
+                  id: "cancel-task",
+                  label: t("inventory.taskActions.cancel"),
+                  icon: XCircle,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void cancelWarehouseTask.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "delete-task",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.taskActions.confirmDelete"))) {
+                      void deleteWarehouseTask.mutateAsync(id)
+                    }
+                  },
+                },
+                {
+                  id: "set-task-status",
+                  label: t("inventory.taskActions.setStatus"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id == null || typeof window === "undefined") return
+                    const st = window.prompt(t("inventory.taskActions.statusPrompt"))
+                    if (st == null || st.trim() === "") return
+                    void updateWarehouseTaskStatus.mutateAsync({ taskId: id, newStatus: st.trim() })
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
       return tab
     }
 
@@ -794,8 +1805,18 @@ function InventoryClientLoaded({
           if (tab.id === "warehouses") return withTransferActions(tab)
           if (tab.id === "stock-moves") return withTransferActions(tab)
           if (tab.id === "stock") return withTransferActions(tab)
+          if (tab.id === "lots") return withTransferActions(tab)
+          if (tab.id === "serials") return withTransferActions(tab)
           if (tab.id === "adjustments") return withTransferActions(tab)
           if (tab.id === "locations") return withTransferActions(tab)
+          if (tab.id === "quality") return withTransferActions(tab)
+          if (tab.id === "replenishment") return withTransferActions(tab)
+          if (tab.id === "picking-waves") return withTransferActions(tab)
+          if (tab.id === "product-categories") return withTransferActions(tab)
+          if (tab.id === "routes") return withTransferActions(tab)
+          if (tab.id === "rules") return withTransferActions(tab)
+          if (tab.id === "barcode-rules") return withTransferActions(tab)
+          if (tab.id === "warehouse-tasks") return withTransferActions(tab)
           return tab
         }),
         cycleCountWizardTab,
@@ -825,6 +1846,60 @@ function InventoryClientLoaded({
     deleteWarehouse,
     doneStockMove,
     cancelStockMove,
+    // Quality management
+    passQualityCheck,
+    failQualityCheck,
+    deleteQualityCheck,
+    deleteQualityAlert,
+    deleteQualityPoint,
+    deleteQualityTeam,
+    // Replenishment
+    triggerReplenishment,
+    deleteReplenishmentRule,
+    // Picking waves
+    confirmPickingWave,
+    processPickingWave,
+    completePickingWave,
+    deletePickingWave,
+    // Product categories
+    deleteProductCategory,
+    // Stock routes and rules
+    deleteStockRoute,
+    deleteStockRule,
+    // Barcode
+    deleteBarcodeRule,
+    // Warehouse tasks
+    startWarehouseTask,
+    completeWarehouseTask,
+    cancelWarehouseTask,
+    deleteWarehouseTask,
+    updateWarehouseTaskStatus,
+    executeReplenishmentRule,
+    startQualityCheck,
+    openQualityAlert,
+    solveQualityAlert,
+    createQualityAlertReason,
+    updateQualityAlertReason,
+    deleteQualityAlertReason,
+    addMemberToQualityTeam,
+    removeMemberFromQualityTeam,
+    updateStockQuantQuantity,
+    updateStockProductionLot,
+    deleteStockProductionLot,
+    updateStockProductionSerial,
+    deleteStockProductionSerial,
+    linkDeviceToQualityCheck,
+    upsertWarehouseGeo,
+    restoreProductCategory,
+    updateProductSupplierInfo,
+    updateProductPackaging,
+    stockQuantFormConfig,
+    // Data dependencies for form configs
+    products,
+    warehouses,
+    locations,
+    productCategories,
+    pricelists,
   ])
 
   const data = useMemo(
@@ -836,6 +1911,7 @@ function InventoryClientLoaded({
       adjustments: adjustments as unknown as Record<string, unknown>[],
       locations: locations as unknown as Record<string, unknown>[],
       lots: lots as unknown as Record<string, unknown>[],
+      serials: serials as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
       "cycle-counts": cycleCounts as unknown as Record<string, unknown>[],
       "picking-waves": pickingWaves as unknown as Record<string, unknown>[],
@@ -845,6 +1921,8 @@ function InventoryClientLoaded({
       "stock-moves": stockMoves as unknown as Record<string, unknown>[],
       valuations: inventoryValuations as unknown as Record<string, unknown>[],
       replenishment: replenishmentRulesList as unknown as Record<string, unknown>[],
+      "barcode-rules": barcodeRules as unknown as Record<string, unknown>[],
+      "product-categories": productCategories as unknown as Record<string, unknown>[],
     }),
     [
       products,
@@ -854,6 +1932,7 @@ function InventoryClientLoaded({
       adjustments,
       locations,
       lots,
+      serials,
       qualityChecks,
       cycleCounts,
       pickingWaves,
@@ -863,6 +1942,8 @@ function InventoryClientLoaded({
       stockMoves,
       inventoryValuations,
       replenishmentRulesList,
+      barcodeRules,
+      productCategories,
     ]
   )
 
@@ -1092,6 +2173,123 @@ function InventoryClientLoaded({
       }
       createWarehouse.mutate(params)
     }
+    else if (action === "createQualityCheck") {
+      const productRaw = formData.productId
+      if (productRaw === "" || productRaw == null) return
+      createQualityCheck.mutate({
+        name: String(formData.name ?? "Quality Check"),
+        productId: Number(productRaw),
+        pointId: formData.pointId ? Number(formData.pointId) : undefined,
+        lotId: formData.lotId ? Number(formData.lotId) : undefined,
+        teamId: formData.teamId ? Number(formData.teamId) : undefined,
+      } as never)
+    }
+    else if (action === "createQualityAlert") {
+      const name = String(formData.name ?? "").trim()
+      if (!name) return
+      createQualityAlert.mutate({
+        name,
+        productId: formData.productId ? Number(formData.productId) : undefined,
+        pickingId: formData.pickingId ? Number(formData.pickingId) : undefined,
+        description: formData.description ? String(formData.description) : undefined,
+        priority: formData.priority ? Number(formData.priority) : undefined,
+      } as never)
+    }
+    else if (action === "createReplenishmentRule") {
+      const productRaw = formData.productId
+      const locRaw = formData.locationId
+      if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return
+      createReplenishmentRule.mutate({
+        productId: Number(productRaw),
+        locationId: Number(locRaw),
+        minQty: Number(formData.minQty ?? 0),
+        maxQty: Number(formData.maxQty ?? 0),
+        qtyToOrder: formData.qtyToOrder ? Number(formData.qtyToOrder) : undefined,
+        routeId: formData.routeId ? Number(formData.routeId) : undefined,
+        trigger: String(formData.trigger ?? "auto"),
+      } as never)
+    }
+    else if (action === "createPickingWave") {
+      const name = String(formData.name ?? "").trim()
+      if (!name) return
+      createPickingWave.mutate({
+        name,
+        scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : new Date(),
+        warehouseId: formData.warehouseId ? Number(formData.warehouseId) : undefined,
+        userId: formData.userId ? Number(formData.userId) : undefined,
+        pickingTypeId: formData.pickingTypeId ? Number(formData.pickingTypeId) : undefined,
+      } as never)
+    }
+    else if (action === "createProductCategory") {
+      const name = String(formData.name ?? "").trim()
+      if (!name) return
+      createProductCategory.mutate({
+        name,
+        parentId: formData.parentId ? Number(formData.parentId) : undefined,
+        removalStrategyId: formData.removalStrategyId ? Number(formData.removalStrategyId) : undefined,
+        costingMethod: String(formData.costingMethod ?? "standard"),
+        propertyValuation: String(formData.propertyValuation ?? "manual_periodic"),
+      } as never)
+    }
+    else if (action === "createBarcodeRule") {
+      const name = String(formData.name ?? "").trim()
+      const pattern = String(formData.pattern ?? "").trim()
+      if (!name || !pattern) return
+      createBarcodeRule.mutate({
+        name,
+        pattern,
+        encoding: String(formData.encoding ?? "any"),
+        type: String(formData.type ?? "product"),
+        sequence: Number(formData.sequence ?? 100),
+      } as never)
+    } else if (action === "createStockQuant") {
+      const p = formData.productId
+      const l = formData.locationId
+      if (p === "" || p == null || l === "" || l == null) return
+      createStockQuant.mutate({
+        company_id: null,
+        product_id: Number(p),
+        product_variant_id: null,
+        location_id: Number(l),
+        lot_id: null,
+        package_id: null,
+        owner_id: null,
+        quantity: Number(formData.quantity ?? 0),
+        reserved_quantity: Number(formData.reservedQuantity ?? 0),
+        in_date: null,
+        inventory_quantity: 0,
+        inventory_diff_quantity: 0,
+        inventory_quantity_set: false,
+        is_outdated: false,
+        user_id: null,
+        inventory_date: null,
+        cost: Number(formData.cost ?? 0),
+        cost_method: null,
+        accounting_date: null,
+        currency_id: null,
+        accounting_entry_ids: [],
+        metadata: null,
+      } as never)
+    } else if (action === "createWarehouse3dZone") {
+      const wid = formData.warehouseId
+      const lid = formData.locationId
+      if (wid === "" || wid == null || lid === "" || lid == null) return
+      const dt = String(formData.displayType ?? "Rack")
+      createWarehouse3dZone.mutate({
+        warehouseId: wid,
+        locationId: lid,
+        params: {
+          display_type: zoneDisplayTypeForReducer(dt),
+          color: String(formData.color ?? "#0e7490"),
+          width: Number(formData.width ?? 10),
+          height: Number(formData.height ?? 3),
+          depth: Number(formData.depth ?? 8),
+          rows: Math.max(0, Math.floor(Number(formData.rows ?? 4))),
+          columns: Math.max(0, Math.floor(Number(formData.columns ?? 8))),
+          levels: Math.max(0, Math.floor(Number(formData.levels ?? 3))),
+        },
+      })
+    }
   }
 
   return (
@@ -1213,6 +2411,65 @@ function InventoryClientLoaded({
           const hex =
             raw != null && String(raw).trim() !== "" ? String(raw).trim() : null
           await assignUserToPicking.mutateAsync({ pickingId: assignPickingId, userIdentityHex: hex })
+        }}
+      />
+      <FormModal
+        key={supplierLineProductId != null ? `supplier-${String(supplierLineProductId)}` : "supplier-closed"}
+        open={supplierLineProductId !== null}
+        onOpenChange={(open) => !open && setSupplierLineProductId(null)}
+        config={productSupplierLineFormConfig}
+        onSubmit={async (fd) => {
+          if (supplierLineProductId == null) return
+          const partnerRaw = fd.partnerId
+          const curRaw = fd.currencyId
+          if (partnerRaw === "" || partnerRaw == null || curRaw === "" || curRaw == null) return
+          const tmplRaw = fd.productTmplId
+          const tmplOpt =
+            tmplRaw !== "" && tmplRaw != null && String(tmplRaw).trim() !== ""
+              ? Number(tmplRaw)
+              : Number(supplierLineProductId)
+          await createProductSupplierInfo.mutateAsync({
+            partner_id: Number(partnerRaw),
+            product_tmpl_id: tmplOpt,
+            product_id: null,
+            min_qty: Number(fd.minQty ?? 0),
+            price: Number(fd.price ?? 0),
+            currency_id: Number(curRaw),
+            delay: Math.floor(Number(fd.delay ?? 0)),
+            sequence: Math.floor(Number(fd.sequence ?? 10)),
+            product_name: null,
+            product_code: null,
+            date_start: null,
+            date_end: null,
+          } as never)
+          setSupplierLineProductId(null)
+        }}
+      />
+      <FormModal
+        key={packagingProductId != null ? `pkg-${String(packagingProductId)}` : "pkg-closed"}
+        open={packagingProductId !== null}
+        onOpenChange={(open) => !open && setPackagingProductId(null)}
+        config={productPackagingFormConfig}
+        onSubmit={async (fd) => {
+          if (packagingProductId == null) return
+          const uomRaw = fd.uomId
+          const name = String(fd.name ?? "").trim()
+          if (name === "" || uomRaw === "" || uomRaw == null) return
+          await createProductPackaging.mutateAsync({
+            productId: packagingProductId,
+            params: {
+              name,
+              qty: Number(fd.qty ?? 1),
+              uom_id: Number(uomRaw),
+              barcode: fd.barcode != null && String(fd.barcode).trim() !== "" ? String(fd.barcode) : null,
+              length: Number(fd.length ?? 0),
+              width: Number(fd.width ?? 0),
+              height: Number(fd.height ?? 0),
+              weight: Number(fd.weight ?? 0),
+              max_weight: Number(fd.maxWeight ?? 0),
+            },
+          })
+          setPackagingProductId(null)
         }}
       />
     </>

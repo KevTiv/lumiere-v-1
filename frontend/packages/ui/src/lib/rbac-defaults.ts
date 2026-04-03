@@ -308,6 +308,22 @@ export const settingsSections: SettingsSection[] = [
     requiredPermission: "admin:audit-log",
     requiredAction: "read"
   },
+  {
+    id: "organization",
+    title: "Organization",
+    description: "Manage organization settings and configuration",
+    icon: "building",
+    requiredPermission: "admin:organization",
+    requiredAction: "update"
+  },
+  {
+    id: "ai",
+    title: "AI",
+    description: "Agents, team personas, insights, and usage spend",
+    icon: "sparkles",
+    requiredPermission: "admin:organization",
+    requiredAction: "update"
+  },
 ]
 
 // Dashboard view to permission mapping

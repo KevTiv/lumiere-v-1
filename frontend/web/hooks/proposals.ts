@@ -22,17 +22,141 @@ export function useProposals(
   })
 }
 
+export function useProposalSections(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-sections', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-sections', 'Failed to fetch proposal sections'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalLineItems(
+  organizationId: bigint,
+  proposalId?: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-line-items', organizationId.toString(), proposalId?.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-line-items', 'Failed to fetch proposal line items'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalVersions(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-versions', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-versions', 'Failed to fetch proposal versions'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalSourceDocs(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-source-docs', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-source-docs', 'Failed to fetch proposal source docs'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalPresence(
+  organizationId: bigint,
+  proposalId?: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-presence', organizationId.toString(), proposalId?.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-presence', 'Failed to fetch proposal presence'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalComments(
+  organizationId: bigint,
+  proposalId?: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['proposal-comments', organizationId.toString(), proposalId?.toString()],
+    queryFn: () => fetchQueryList('/api/query/proposal-comments', 'Failed to fetch proposal comments'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
+
+export function useUpsertProposalSection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      sectionId?: bigint | number | string | null
+      title: string
+      content: string
+      status: string
+      sequence?: number
+      aiSuggestion?: string | null
+    }) => {
+      const r = await fetch('/api/call/upsert_proposal_section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          Number(params.proposalId),
+          params.sectionId != null ? Number(params.sectionId) : 0,
+          params.title,
+          params.content,
+          params.status,
+          params.sequence ?? 0,
+          params.aiSuggestion ?? null,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to upsert proposal section')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposal-sections'] }),
+  })
+}
 
 export function useCreateProposal() {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, {
+    organizationId: bigint | number | string
+    title: string
+    clientName: string
+    value: number
+    deadline?: Date | string | null
+    description?: string | null
+    documentFolderId?: bigint | number | string | null
+  }>({
     mutationFn: async (params) => {
-      const orgId = params.organizationId
+      const deadline = params.deadline instanceof Date
+        ? params.deadline.toISOString()
+        : params.deadline ?? null
       const r = await fetch('/api/call/create_proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([orgId?.toString(), params]),
+        body: JSON.stringify([
+          Number(params.organizationId),
+          params.title,
+          params.clientName,
+          params.value,
+          deadline,
+          params.description ?? null,
+          params.documentFolderId != null ? Number(params.documentFolderId) : null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create proposal')
     },

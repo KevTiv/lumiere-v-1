@@ -76,6 +76,18 @@ export function useActivities(
   })
 }
 
+export function useUsers(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['users', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/users', 'Failed to fetch users'),
+    staleTime: 60_000,
+    initialData,
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateLead(organizationId: bigint) {

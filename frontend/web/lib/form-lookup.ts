@@ -132,6 +132,29 @@ export function purchaseOrderRowsToSelectOptions(
   }))
 }
 
+/** Draft PO lines (for editing qty/price before confirmation). */
+export function purchaseOrderLineRowsToEditOptions(
+  lines: Record<string, unknown>[],
+  productLabel?: (productId: string) => string,
+): Array<{ value: string; label: string }> {
+  return lines
+    .filter((l) => {
+      const s = l.state
+      const st =
+        s != null && typeof s === "object" && "tag" in s ? String((s as { tag: string }).tag) : String(s ?? "")
+      return st === "Draft"
+    })
+    .map((l) => {
+      const id = String(l.id)
+      const pid = String(l.productId ?? "")
+      const pname = productLabel?.(pid) ?? `Product ${pid}`
+      return {
+        value: id,
+        label: `PO ${l.orderId} — ${pname}`,
+      }
+    })
+}
+
 /** PO lines with remaining qty to receive (goods receipt). */
 export function purchaseOrderLineRowsToReceiveOptions(
   lines: Record<string, unknown>[],
@@ -243,12 +266,59 @@ export function leaveTypeOptionsFromLeaveRequests(
   return [...seen.entries()].map(([value, label]) => ({ value, label }))
 }
 
+/** Leave types from hr_leave_type table (preferred over inferring from requests). */
+export function leaveTypeRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows
+    .filter((r) => r.active !== false && r.active !== 0)
+    .map((row) => ({
+      value: String(row.id),
+      label: String(row.name ?? row.displayName ?? row.code ?? row.id),
+    }))
+}
+
+/** Payroll structures for payslip structId picker. */
+export function payrollStructureRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows
+    .filter((r) => r.isActive !== false && r.isActive !== 0)
+    .map((row) => ({
+      value: String(row.id),
+      label: String(row.name ?? row.id),
+    }))
+}
+
 export function projectRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => ({
     value: String(row.id),
     label: String(row.name ?? row.id),
+  }))
+}
+
+export function taskRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+  projectId?: string | number,
+): Array<{ value: string; label: string }> {
+  let filtered = rows
+  if (projectId != null) {
+    filtered = rows.filter((r) => String(r.projectId) === String(projectId))
+  }
+  return filtered.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.id),
+  }))
+}
+
+export function userRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.email ?? row.id),
   }))
 }
 

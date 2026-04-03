@@ -287,10 +287,70 @@ export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+/** Update qty/price/product/UoM on a draft PO line (`update_purchase_order_line`). */
+export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "edit-purchase-order-line",
+  title: t("purchasing.forms.editPurchaseOrderLine.title"),
+  description: t("purchasing.forms.editPurchaseOrderLine.description"),
+  sections: [
+    {
+      id: "eol-line",
+      title: t("purchasing.forms.editPurchaseOrderLine.sections.line"),
+      fields: [
+        {
+          id: "lineId",
+          name: "lineId",
+          type: "select",
+          label: t("purchasing.forms.editPurchaseOrderLine.fields.lineId"),
+          placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.linePlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("purchasing.forms.editPurchaseOrderLine.fields.productId"),
+          placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.productPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("purchasing.forms.editPurchaseOrderLine.fields.uomId"),
+          placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.uomPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "number",
+          label: t("purchasing.forms.editPurchaseOrderLine.fields.quantity"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("purchasing.forms.editPurchaseOrderLine.fields.priceUnit"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
   "add-purchase-order-line": addPurchaseOrderLineForm(t),
   "receive-purchase-order-line": receivePurchaseOrderLineForm(t),
   "invoice-purchase-order-line": invoicePurchaseOrderLineForm(t),
+  "edit-purchase-order-line": editPurchaseOrderLineForm(t),
 })

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -32,6 +33,7 @@ import {
   useStockPickings,
   useWarehouses,
 } from "@/hooks/inventory"
+import { useIotDevices } from "@/hooks/iot"
 import {
   productRowsToSelectOptions,
   warehouseRowsToSelectOptions,
@@ -46,6 +48,7 @@ interface ManufacturingClientProps {
   initialBomLines?: Record<string, unknown>[]
   initialWorkorders?: Record<string, unknown>[]
   initialWorkcenters?: Record<string, unknown>[]
+  initialIotDevices?: Record<string, unknown>[]
   initialProducts?: Record<string, unknown>[]
   initialWarehouses?: Record<string, unknown>[]
   initialStockPickings?: Record<string, unknown>[]
@@ -70,6 +73,7 @@ function ManufacturingClientLoaded({
   initialBomLines,
   initialWorkorders,
   initialWorkcenters,
+  initialIotDevices,
   initialProducts,
   initialWarehouses,
   initialStockPickings,
@@ -82,13 +86,14 @@ function ManufacturingClientLoaded({
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<string | undefined>(undefined)
+  // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
   const { data: productions = [] } = useMrpProductions(companyId, initialProductions)
   const { data: boms = [] } = useMrpBoms(companyId, initialBoms)
   const { data: bomLines = [] } = useMrpBomLines(companyId, initialBomLines)
   const { data: workorders = [] } = useMrpWorkorders(companyId, initialWorkorders)
   const { data: workcenters = [] } = useMrpWorkcenters(companyId, initialWorkcenters)
+  const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices)
   const { data: qualityChecks = [] } = useQualityChecks(companyId)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses)
@@ -98,6 +103,10 @@ function ManufacturingClientLoaded({
   const m = useManufacturingMutations(orgId, companyId)
 
   const moduleConfig = useMemo(() => manufacturingModuleConfig(t), [t])
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    moduleConfig.tabs.map((tab) => tab.id),
+  )
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -514,6 +523,7 @@ function ManufacturingClientLoaded({
         tabId={rowPick?.tabId ?? null}
         row={rowPick?.row ?? null}
         workcenters={workcenters}
+        iotDevices={iotDevices}
         mutations={m}
         t={t}
       />

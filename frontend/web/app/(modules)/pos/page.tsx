@@ -1,9 +1,24 @@
-"use client"
+import { getStdbSession } from "@/lib/api-session"
+import { serverQueryProducts, serverQueryPosTerminals } from "@lumiere/stdb/server"
+import { PosClient } from "./pos-client"
 
-import { POSPage } from '@lumiere/ui/pos/pos-page'
-import { usePOS } from './use-pos'
+export default async function PosPage() {
+  const { organizationId, opts } = await getStdbSession()
 
-export default function POSPageWrapper() {
-  const pos = usePOS()
-  return <POSPage {...pos} />
+  if (!organizationId) {
+    return <PosClient />
+  }
+
+  const [products, terminals] = await Promise.all([
+    serverQueryProducts(organizationId, opts),
+    serverQueryPosTerminals(organizationId, opts),
+  ]).catch(() => [[], []])
+
+  return (
+    <PosClient
+      initialProducts={products as Record<string, unknown>[]}
+      initialTerminals={terminals as Record<string, unknown>[]}
+      organizationId={organizationId}
+    />
+  )
 }

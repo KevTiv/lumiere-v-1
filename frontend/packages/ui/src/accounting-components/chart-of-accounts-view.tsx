@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -171,9 +171,11 @@ function AccountsTable({ accounts, t }: AccountsTableProps) {
 interface ChartOfAccountsViewProps {
   accounts: AccountAccount[]
   onCreate?: (data: Record<string, unknown>) => void
+  /** When set, shows a second top-level tab (e.g. account types & groups). */
+  chartStructureContent?: ReactNode
 }
 
-export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewProps) {
+export function ChartOfAccountsView({ accounts, onCreate, chartStructureContent }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -207,7 +209,7 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
     { value: "expense", label: t("accounting.forms.newAccount.fields.options.expense"), accounts: byGroup("expense") },
   ]
 
-  return (
+  const main = (
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -331,4 +333,23 @@ export function ChartOfAccountsView({ accounts, onCreate }: ChartOfAccountsViewP
       </Dialog>
     </div>
   )
+
+  if (chartStructureContent) {
+    return (
+      <Tabs defaultValue="accounts" className="flex flex-col gap-6">
+        <TabsList>
+          <TabsTrigger value="accounts">{t("accounting.accounts.coasTab")}</TabsTrigger>
+          <TabsTrigger value="structure">{t("accounting.chartStructure.tabLabel")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="accounts" className="mt-0">
+          {main}
+        </TabsContent>
+        <TabsContent value="structure" className="mt-0">
+          {chartStructureContent}
+        </TabsContent>
+      </Tabs>
+    )
+  }
+
+  return main
 }

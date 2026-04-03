@@ -21,6 +21,7 @@ export interface ManufacturingRowDialogProps {
   tabId: string | null
   row: Record<string, unknown> | null
   workcenters: QueryRows
+  iotDevices: QueryRows
   mutations: ManufacturingMutations
   t: TFunction
 }
@@ -39,12 +40,18 @@ function stateStr(v: unknown): string {
   return String(v)
 }
 
+function workcenterIdOnDevice(d: Record<string, unknown>): string {
+  const w = d.workcenterId ?? d.workcenter_id
+  return w != null && String(w) !== "" ? String(w) : ""
+}
+
 export function ManufacturingRowDialog({
   open,
   onOpenChange,
   tabId,
   row,
   workcenters,
+  iotDevices,
   mutations,
   t,
 }: ManufacturingRowDialogProps) {
@@ -67,6 +74,30 @@ export function ManufacturingRowDialog({
         .filter((o) => o.value !== ""),
     [workcenters],
   )
+
+  const iotDeviceOptions = useMemo(() => {
+    const sorted = [...iotDevices].sort((a, b) =>
+      String(a.name ?? "").localeCompare(String(b.name ?? "")),
+    )
+    const opts = sorted
+      .map((d) => {
+        const id = d.id != null ? String(d.id) : ""
+        const ident = String(d.identifier ?? id)
+        const name = String(d.name ?? t("manufacturing.rowActions.iotDeviceUntitled"))
+        return { value: id, label: ident ? `${name} (${ident})` : name }
+      })
+      .filter((o) => o.value !== "")
+    if (opts.length > 0) return opts
+    return [{ value: "", label: t("manufacturing.rowActions.noIotDevices"), disabled: true as const }]
+  }, [iotDevices, t])
+
+  const linkedDeviceIdForWc = useMemo(() => {
+    if (!row || entity !== "workcenters") return ""
+    const wid = rowId(row)
+    const linked = iotDevices.find((d) => workcenterIdOnDevice(d as Record<string, unknown>) === wid)
+    const lid = linked?.id
+    return lid != null ? String(lid) : ""
+  }, [row, entity, iotDevices])
 
   const formConfig = useMemo(() => {
     if (!row || !entity) return null
@@ -97,10 +128,12 @@ export function ManufacturingRowDialog({
       return manufacturingWorkcenterRowActionForm(t, {
         recordId: id,
         defaultName: String(row.name ?? ""),
+        iotDeviceOptions,
+        linkedDeviceId: linkedDeviceIdForWc || undefined,
       })
     }
     return null
-  }, [row, entity, id, state, t, workcenterOptions])
+  }, [row, entity, id, state, t, workcenterOptions, iotDeviceOptions, linkedDeviceIdForWc])
 
   if (!formConfig || !tabId) return null
 

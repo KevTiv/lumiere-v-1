@@ -23,8 +23,8 @@ pub mod segments;
 
 // Re-export key types for convenience
 pub use activities::{
-    complete_activity, create_activity, create_calendar_event, Activity, ActivityType,
-    CalendarEvent,
+    complete_activity, create_activity, create_calendar_event, delete_calendar_event,
+    update_calendar_event, Activity, ActivityType, CalendarEvent, UpdateCalendarEventParams,
 };
 pub use contacts::{
     assign_tag_to_contact, create_contact, create_contact_tag, delete_contact, update_contact,

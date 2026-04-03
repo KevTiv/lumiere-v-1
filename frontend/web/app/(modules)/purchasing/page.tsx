@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
 import {
   serverQueryPurchaseOrders,
@@ -14,7 +15,7 @@ export default async function PurchasingPage() {
   const { organizationId, opts } = await getStdbSession()
 
   if (!organizationId) {
-    return <PurchasingClient />
+    return <Suspense><PurchasingClient /></Suspense>
   }
 
   const [orders, lines, requisitions, contacts, pricelists, products, uoms] = await Promise.all([
@@ -28,15 +29,17 @@ export default async function PurchasingPage() {
   ]).catch(() => [[], [], [], [], [], [], []])
 
   return (
-    <PurchasingClient
-      initialOrders={orders as Record<string, unknown>[]}
-      initialLines={lines as Record<string, unknown>[]}
-      initialRequisitions={requisitions as Record<string, unknown>[]}
-      initialContacts={contacts as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      initialProducts={products as Record<string, unknown>[]}
-      initialUoms={uoms as Record<string, unknown>[]}
-      organizationId={organizationId}
-    />
+    <Suspense>
+      <PurchasingClient
+        initialOrders={orders as Record<string, unknown>[]}
+        initialLines={lines as Record<string, unknown>[]}
+        initialRequisitions={requisitions as Record<string, unknown>[]}
+        initialContacts={contacts as Record<string, unknown>[]}
+        initialPricelists={pricelists as Record<string, unknown>[]}
+        initialProducts={products as Record<string, unknown>[]}
+        initialUoms={uoms as Record<string, unknown>[]}
+        organizationId={organizationId}
+      />
+    </Suspense>
   )
 }

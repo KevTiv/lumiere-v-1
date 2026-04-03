@@ -107,6 +107,17 @@ pub struct AddLandedCostLineParams {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLandedCostParams {
+    pub date: Option<Timestamp>,
+    pub target_move: Option<String>,
+    pub currency_id: Option<u64>,
+    pub amount_total: Option<f64>,
+    pub picking_ids: Option<Vec<u64>>,
+    pub description: Option<String>,
+    pub metadata: Option<String>,
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 /// Create a new landed cost record
@@ -392,6 +403,106 @@ pub fn cancel_landed_cost(
             metadata: None,
         },
     );
+
+    Ok(())
+}
+
+/// Update a draft landed cost header fields.
+#[reducer]
+pub fn update_landed_cost(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    landed_cost_id: u64,
+    params: UpdateLandedCostParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_landed_cost", "write")?;
+
+    let landed_cost = ctx
+        .db
+        .stock_landed_cost()
+        .id()
+        .find(&landed_cost_id)
+        .ok_or("Landed cost not found")?;
+
+    if landed_cost.organization_id != organization_id {
+        return Err("Landed cost does not belong to this organization".to_string());
+    }
+
+    if !matches!(landed_cost.state, LandedCostState::Draft) {
+        return Err("Can only update draft landed costs".to_string());
+    }
+
+    let mut updated = landed_cost;
+
+    if let Some(d) = params.date {
+        updated.date = d;
+    }
+    if let Some(ref tm) = params.target_move {
+        updated.target_move = tm.clone();
+    }
+    if let Some(cid) = params.currency_id {
+        updated.currency_id = cid;
+    }
+    if let Some(amt) = params.amount_total {
+        updated.amount_total = amt;
+    }
+    if let Some(ref pids) = params.picking_ids {
+        if pids.is_empty() {
+            return Err("At least one picking must be selected".to_string());
+        }
+        updated.picking_ids = pids.clone();
+    }
+    if let Some(ref desc) = params.description {
+        updated.description = Some(desc.clone());
+    }
+    if let Some(ref m) = params.metadata {
+        updated.metadata = Some(m.clone());
+    }
+
+    updated.write_uid = ctx.sender();
+    updated.write_date = ctx.timestamp;
+
+    ctx.db.stock_landed_cost().id().update(updated);
+
+    Ok(())
+}
+
+/// Permanently delete a draft landed cost and its lines.
+#[reducer]
+pub fn delete_landed_cost(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    landed_cost_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_landed_cost", "delete")?;
+
+    let landed_cost = ctx
+        .db
+        .stock_landed_cost()
+        .id()
+        .find(&landed_cost_id)
+        .ok_or("Landed cost not found")?;
+
+    if landed_cost.organization_id != organization_id {
+        return Err("Landed cost does not belong to this organization".to_string());
+    }
+
+    if !matches!(landed_cost.state, LandedCostState::Draft) {
+        return Err("Can only delete draft landed costs".to_string());
+    }
+
+    let lines: Vec<_> = ctx
+        .db
+        .stock_landed_cost_lines()
+        .stock_landed_cost_lines_by_landed_cost()
+        .filter(&landed_cost_id)
+        .collect();
+
+    for line in lines {
+        ctx.db.stock_landed_cost_lines().id().delete(&line.id);
+    }
+
+    ctx.db.stock_landed_cost().id().delete(&landed_cost_id);
 
     Ok(())
 }

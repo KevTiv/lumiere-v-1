@@ -2,11 +2,11 @@
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
 import { useTranslation } from "@lumiere/i18n"
-import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/calendar"
-import type { CreateCalendarEventParams } from "@/hooks/calendar"
+import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@/hooks/calendar"
+import type { CreateCalendarEventParams, UpdateCalendarEventParams } from "@/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, MissingOrganization } from "@lumiere/ui"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
@@ -30,7 +30,14 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => calendarModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; eventId?: string } | null>(null)
+  const [formModalKey, setFormModalKey] = useState(0)
+
+  useEffect(() => {
+    if (quickActionForm != null) {
+      setFormModalKey((k) => k + 1)
+    }
+  }, [quickActionForm])
   const [viewMode, setViewMode] = useState<ViewMode>("month")
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -38,6 +45,8 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const { data: events = [] } = useCalendarEvents(orgId, initialEvents)
   const createCalendarEvent = useCreateCalendarEvent(orgId)
+  const updateCalendarEvent = useUpdateCalendarEvent(orgId)
+  const deleteCalendarEvent = useDeleteCalendarEvent(orgId)
 
   const liveSections = useMemo(() => {
     const confirmed = events?.filter((e) => String(e.state) === "confirmed").length
@@ -118,6 +127,31 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                 onSearchChange={setSearchTerm}
                 onSelectEvent={setSelectedEventId}
                 onCreateEvent={() => setQuickActionForm({ form: newCalendarEventForm(t), action: "createEvent" })}
+                onEditEvent={(eventId) => {
+                  const event = events.find((e) => String(e.id) === eventId)
+                  if (event) {
+                    setQuickActionForm({
+                      form: newCalendarEventForm(t, {
+                        name: String(event.name ?? ""),
+                        start: new Date(Number(event.start ?? 0) / 1000).toISOString().slice(0, 16),
+                        stop: new Date(Number(event.stop ?? 0) / 1000).toISOString().slice(0, 16),
+                        allday: Boolean(event.allday),
+                        privacy: String(event.privacy ?? "public"),
+                        location: event.location ? String(event.location) : "",
+                        description: event.description ? String(event.description) : "",
+                      }),
+                      action: "editEvent",
+                      eventId,
+                    })
+                  }
+                }}
+                onDeleteEvent={(eventId) => {
+                  if (confirm(t("calendar.confirmDelete"))) {
+                    deleteCalendarEvent.mutate(eventId, {
+                      onSuccess: () => setSelectedEventId(null),
+                    })
+                  }
+                }}
               />
             ),
           }
@@ -125,7 +159,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events.map, currentDate, liveSections, moduleConfig, t],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t],
   )
 
   const data = useMemo(
@@ -160,6 +194,27 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         location: formData.location as string | undefined,
         description: formData.description as string | undefined,
       } as unknown as CreateCalendarEventParams)
+    } else if (action === "editEvent" && quickActionForm?.eventId) {
+      const title = String(formData.name ?? "").trim()
+      if (!title) return
+      const start = new Date(String(formData.start ?? ""))
+      const stop = new Date(String(formData.stop ?? ""))
+      if (Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return
+      const updateParams: UpdateCalendarEventParams = {}
+      // Only include changed fields
+      if (title) updateParams.name = title
+      updateParams.start = BigInt(start.getTime() * 1000)
+      updateParams.stop = BigInt(stop.getTime() * 1000)
+      updateParams.allday = Boolean(formData.allday)
+      updateParams.privacy = (formData.privacy as string) ?? "public"
+      updateParams.show_as = "busy"
+      updateParams.state = "confirmed"
+      if (formData.location) updateParams.location = String(formData.location)
+      if (formData.description) updateParams.description = String(formData.description)
+      updateCalendarEvent.mutate({
+        eventId: quickActionForm.eventId,
+        params: updateParams as Record<string, unknown>,
+      })
     }
   }
 
@@ -172,6 +227,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       />
 
       <FormModal
+        key={formModalKey}
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newCalendarEventForm(t)}

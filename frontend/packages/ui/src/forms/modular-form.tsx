@@ -17,6 +17,8 @@ interface ModularFormProps {
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   onCancel?: () => void
   className?: string
+  /** Renders at the start of the footer row (e.g. destructive actions beside Cancel / Submit). */
+  leadingActions?: React.ReactNode
 }
 
 export function ModularForm({
@@ -24,6 +26,7 @@ export function ModularForm({
   onSubmit,
   onCancel,
   className,
+  leadingActions,
 }: ModularFormProps) {
   const { t } = useTranslation()
   // Initialize form state with default values
@@ -207,36 +210,44 @@ export function ModularForm({
         )
       })}
 
-      <div className="flex items-center justify-end gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50">
-        {config.showReset && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleReset}
-            disabled={isSubmitting}
-          >
-            {t("common.reset")}
-          </Button>
+      <div
+        className={cn(
+          "flex items-center gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50",
+          leadingActions ? "justify-between" : "justify-end",
         )}
-        {(onCancel || config.onCancel) && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-          >
-            {config.cancelLabel || t("common.cancel")}
+      >
+        {leadingActions ? <div className="flex items-center gap-2">{leadingActions}</div> : null}
+        <div className="flex items-center gap-3">
+          {config.showReset && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              disabled={isSubmitting}
+            >
+              {t("common.reset")}
+            </Button>
+          )}
+          {(onCancel || config.onCancel) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+            >
+              {config.cancelLabel || t("common.cancel")}
+            </Button>
+          )}
+          <Button type="submit" size="sm" disabled={isSubmitting}>
+            {isSubmitting
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <Check className="mr-2 h-4 w-4" />
+            }
+            {config.submitLabel || t("common.submit")}
           </Button>
-        )}
-        <Button type="submit" size="sm" disabled={isSubmitting}>
-          {isSubmitting
-            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            : <Check className="mr-2 h-4 w-4" />
-          }
-          {config.submitLabel || t("common.submit")}
-        </Button>
+        </div>
       </div>
     </form>
   )

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRBAC } from "@/lib/rbac-context"
@@ -63,6 +63,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
   const [collapsed, setCollapsed] = useState(false)
   const { checkPermission, currentUser, roles } = useRBAC()
   const pathname = usePathname()
+  const router = useRouter()
   const { t } = useTranslation()
   const isCollapsed = forceCollapsed || collapsed
 
@@ -177,6 +178,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
                       key={item.href}
                       href={item.href}
                       title={isCollapsed ? item.label : undefined}
+                      onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                         active

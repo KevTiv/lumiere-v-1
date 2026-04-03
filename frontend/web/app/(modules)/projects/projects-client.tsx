@@ -1,12 +1,15 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
   newProjectForm,
   newTaskForm,
+  editProjectForm,
+  editTaskForm,
+  logTimesheetForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
 } from "@lumiere/ui"
@@ -15,6 +18,9 @@ import {
   projectsParamsToJson,
   toCreateProjectParams,
   toCreateTaskParams,
+  toUpdateProjectParams,
+  toUpdateTaskParams,
+  toLogTimesheetParams,
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
 import {
@@ -23,16 +29,30 @@ import {
   useTimesheets,
   useCreateProject,
   useCreateTask,
+  useCreateTimesheet,
+  useUpdateProject,
+  useUpdateTask,
+  useUpdateTaskState,
+  useStartTimesheetTimer,
+  useStopTimesheetTimer,
+  useSetProjectActive,
+  useToggleProjectFavorite,
+  useSetTaskParent,
+  useAssignTaskUsers,
+  useValidateTimesheets,
+  useBillTimesheets,
   useEmployees,
 } from "@/hooks/projects"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@/hooks/sales"
-import { useContacts } from "@/hooks/crm"
+import { useContacts, useUsers } from "@/hooks/crm"
 import {
   pricelistRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
   projectRowsToSelectOptions,
+  taskRowsToSelectOptions,
   taskStagePairOptionsFromTasks,
+  employeeRowsToSelectOptions,
 } from "@/lib/form-lookup"
 
 interface ProjectsClientProps {
@@ -47,6 +67,12 @@ interface ProjectsClientProps {
 type ProjectsClientLoadedProps = Omit<ProjectsClientProps, "organizationId"> & {
   organizationId: number
 }
+
+type ModalState =
+  | { type: null }
+  | { type: 'create'; form: FormConfig; action: string }
+  | { type: 'edit'; form: FormConfig; action: string; entityId: string | number }
+  | { type: 'timesheet'; form: FormConfig; action: string }
 
 export function ProjectsClient(props: ProjectsClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -65,7 +91,7 @@ function ProjectsClientLoaded({
 }: ProjectsClientLoadedProps) {
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [modal, setModal] = useState<ModalState>({ type: null })
 
   const { data: projects = [] } = useProjects(companyId, initialProjects)
   const { data: tasks = [] } = useTasks(companyId, initialTasks)
@@ -73,9 +99,22 @@ function ProjectsClientLoaded({
   const { data: employees = [] } = useEmployees(companyId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: contacts = [] } = useContacts(companyId, initialContacts)
+  const { data: users = [] } = useUsers(companyId)
 
   const createProject = useCreateProject(orgId, companyId)
   const createTask = useCreateTask(orgId, companyId)
+  const updateProject = useUpdateProject(orgId, companyId)
+  const updateTask = useUpdateTask(orgId, companyId)
+  const updateTaskState = useUpdateTaskState(orgId)
+  const createTimesheet = useCreateTimesheet(orgId, companyId)
+  const startTimer = useStartTimesheetTimer(orgId, companyId)
+  const stopTimer = useStopTimesheetTimer(orgId)
+  const setProjectActive = useSetProjectActive(orgId)
+  const toggleFavorite = useToggleProjectFavorite(orgId)
+  const setTaskParent = useSetTaskParent(orgId)
+  const assignTaskUsers = useAssignTaskUsers(orgId)
+  const validateTimesheets = useValidateTimesheets(orgId)
+  const billTimesheets = useBillTimesheets(orgId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
 
@@ -97,6 +136,19 @@ function ProjectsClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noProjects"), disabled: true }]
   }, [projects, t])
+
+  const taskFieldOptions = useMemo(() => {
+    const fromApi = taskRowsToSelectOptions(tasks)
+    const optional = { value: "", label: "—" }
+    if (fromApi.length > 0) return [optional, ...fromApi]
+    return [{ value: "", label: t("common.lookup.noTasks"), disabled: true }]
+  }, [tasks, t])
+
+  const employeeFieldOptions = useMemo(() => {
+    const fromApi = employeeRowsToSelectOptions(employees)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
+  }, [employees, t])
 
   const taskStageFieldOptions = useMemo(() => {
     const optional = { value: "", label: "—" }
@@ -125,6 +177,69 @@ function ProjectsClientLoaded({
       }),
     [t, projectFieldOptions, taskStageFieldOptions],
   )
+
+  const timesheetFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(logTimesheetForm(t), {
+        projectId: projectFieldOptions,
+        taskId: taskFieldOptions,
+      }),
+    [t, projectFieldOptions, taskFieldOptions],
+  )
+
+  // Helper to build edit form with initial values
+  const buildEditProjectForm = useCallback((project: Record<string, unknown>): FormConfig => {
+    const base = mergeSelectOptionsForFields(editProjectForm(t), {
+      pricelistId: pricelistFieldOptions,
+      partnerId: partnerFieldOptions,
+    })
+    return {
+      ...base,
+      sections: base.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const updatedField = { ...field, defaultValue: getProjectFieldValue(project, field.name) }
+          return updatedField as typeof field
+        }),
+      })) as typeof base.sections,
+    }
+  }, [t, pricelistFieldOptions, partnerFieldOptions])
+
+  const buildEditTaskForm = useCallback((task: Record<string, unknown>): FormConfig => {
+    const base = mergeSelectOptionsForFields(editTaskForm(t), {
+      projectId: projectFieldOptions,
+      stageId: taskStageFieldOptions,
+    })
+    return {
+      ...base,
+      sections: base.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const updatedField = { ...field, defaultValue: getTaskFieldValue(task, field.name) }
+          return updatedField as typeof field
+        }),
+      })) as typeof base.sections,
+    }
+  }, [t, projectFieldOptions, taskStageFieldOptions])
+
+  // Handle row click for edit
+  const handleRowClick = useCallback((tabId: string, row: Record<string, unknown>) => {
+    if (tabId === 'projects') {
+      setModal({
+        type: 'edit',
+        form: buildEditProjectForm(row),
+        action: "updateProject",
+        entityId: row.id as string | number,
+      })
+    } else if (tabId === 'tasks') {
+      setModal({
+        type: 'edit',
+        form: buildEditTaskForm(row),
+        action: "updateTask",
+        entityId: row.id as string | number,
+      })
+    }
+  }, [buildEditProjectForm, buildEditTaskForm])
 
   // Live KPI overrides
   const liveSections = useMemo(() => {
@@ -164,8 +279,10 @@ function ProjectsClientLoaded({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            create_project: () => setQuickActionForm({ form: projectFormConfig, action: "createProject" }),
-            create_task: () => setQuickActionForm({ form: taskFormConfig, action: "createTask" }),
+            create_project: () => setModal({ type: 'create', form: projectFormConfig, action: "createProject" }),
+            create_task: () => setModal({ type: 'create', form: taskFormConfig, action: "createTask" }),
+            log_timesheet: () => setModal({ type: 'timesheet', form: timesheetFormConfig, action: "logTimesheet" }),
+            start_timer: () => setModal({ type: 'timesheet', form: timesheetFormConfig, action: "startTimer" }),
           }
           return {
             ...w,
@@ -218,7 +335,7 @@ function ProjectsClientLoaded({
         return w
       }),
     }))
-  }, [projects, tasks, timesheets, t, moduleConfig, projectFormConfig, taskFormConfig])
+  }, [projects, tasks, timesheets, t, moduleConfig, projectFormConfig, taskFormConfig, timesheetFormConfig])
 
   const config = useMemo(
     () =>
@@ -228,10 +345,11 @@ function ProjectsClientLoaded({
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
           if (tab.id === "projects") return { ...tab, createForm: projectFormConfig }
           if (tab.id === "tasks") return { ...tab, createForm: taskFormConfig }
+          if (tab.id === "timesheets") return { ...tab, createForm: timesheetFormConfig }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, projectFormConfig, taskFormConfig],
+    [moduleConfig, liveSections, projectFormConfig, taskFormConfig, timesheetFormConfig],
   )
 
   const data = useMemo(
@@ -255,7 +373,27 @@ function ProjectsClientLoaded({
     } else if (action === "createTask") {
       const p = toCreateTaskParams(formData, companyId)
       if (p) createTask.mutate(projectsParamsToJson(p))
+    } else if (action === "updateProject" && modal.type === 'edit') {
+      const p = toUpdateProjectParams(formData)
+      if (p) updateProject.mutate({ projectId: modal.entityId, params: projectsParamsToJson(p) })
+    } else if (action === "updateTask" && modal.type === 'edit') {
+      const p = toUpdateTaskParams(formData)
+      if (p) updateTask.mutate({ taskId: modal.entityId, params: projectsParamsToJson(p) })
+    } else if (action === "logTimesheet") {
+      const p = toLogTimesheetParams(formData, companyId)
+      if (p) createTimesheet.mutate(projectsParamsToJson(p))
+    } else if (action === "startTimer") {
+      const p = toLogTimesheetParams(formData, companyId)
+      if (p) startTimer.mutate(projectsParamsToJson(p))
     }
+  }
+
+  const handleModalSubmit = (formData: Record<string, unknown>) => {
+    if (!modal.type || modal.type === null) return
+
+    const tabId = modal.type === 'create' ? 'dashboard' : modal.type === 'edit' ? (modal.action === 'updateProject' ? 'projects' : 'tasks') : 'timesheets'
+    handleFormSubmit(tabId, modal.action, formData)
+    setModal({ type: null })
   }
 
   return (
@@ -264,18 +402,61 @@ function ProjectsClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        onRowClick={handleRowClick}
       />
       <FormModal
-        open={quickActionForm !== null}
-        onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? projectFormConfig}
-        onSubmit={(formData) => {
-          if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
-            setQuickActionForm(null)
-          }
-        }}
+        open={modal.type !== null}
+        onOpenChange={(open) => !open && setModal({ type: null })}
+        config={modal.type ? modal.form : projectFormConfig}
+        onSubmit={handleModalSubmit}
       />
     </>
   )
+}
+
+// Helper functions to extract field values from entities
+function getProjectFieldValue(project: Record<string, unknown>, fieldName: string): unknown {
+  switch (fieldName) {
+    case 'name':
+      return project.name ?? ''
+    case 'pricelistId':
+      return String(project.pricelistId ?? '')
+    case 'partnerId':
+      return String(project.partnerId ?? '')
+    case 'allocatedHours':
+      return project.allocatedHours ?? ''
+    case 'dateStart':
+      return project.dateStart ? new Date(Number(project.dateStart) / 1000).toISOString().split('T')[0] : ''
+    case 'dateEnd':
+      return project.dateEnd ? new Date(Number(project.dateEnd) / 1000).toISOString().split('T')[0] : ''
+    case 'description':
+      return project.description ?? ''
+    case 'active':
+      return project.active ?? true
+    default:
+      return ''
+  }
+}
+
+function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): unknown {
+  switch (fieldName) {
+    case 'name':
+      return task.name ?? ''
+    case 'projectId':
+      return String(task.projectId ?? '')
+    case 'stageId':
+      return task.stageId ? `${task.projectId}:${task.stageId}` : ''
+    case 'priority':
+      return String(task.priority ?? '0')
+    case 'plannedHours':
+      return task.plannedHours ?? ''
+    case 'dateDeadline':
+      return task.dateDeadline ? new Date(Number(task.dateDeadline) / 1000).toISOString().split('T')[0] : ''
+    case 'description':
+      return task.description ?? ''
+    case 'kanbanState':
+      return task.kanbanState ?? 'normal'
+    default:
+      return ''
+  }
 }

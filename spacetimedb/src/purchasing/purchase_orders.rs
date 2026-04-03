@@ -226,6 +226,36 @@ pub struct AddPurchaseOrderLineParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdatePurchaseOrderParams {
+    pub origin: Option<String>,
+    pub partner_ref: Option<String>,
+    pub notes: Option<String>,
+    pub date_planned: Option<Timestamp>,
+    pub payment_term_id: Option<u64>,
+    pub fiscal_position_id: Option<u64>,
+    pub incoterm_id: Option<u64>,
+    pub incoterm_location: Option<String>,
+    pub partner_id: Option<u64>,
+    pub currency_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdatePurchaseOrderLineParams {
+    pub product_id: Option<u64>,
+    pub quantity: Option<f64>,
+    pub uom_id: Option<u64>,
+    pub price_unit: Option<f64>,
+    pub tax_ids: Option<Vec<u64>>,
+    pub date_planned: Option<Timestamp>,
+    pub product_variant_id: Option<u64>,
+    pub account_analytic_id: Option<u64>,
+    pub display_type: Option<String>,
+    pub propagate_cancel: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePurchaseRequisitionParams {
     pub company_id: Option<u64>,
     pub description: Option<String>,
@@ -513,6 +543,143 @@ pub fn cancel_purchase_order(
     Ok(())
 }
 
+/// Update header fields on a draft purchase order (company-scoped).
+#[reducer]
+pub fn update_purchase_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    order_id: u64,
+    params: UpdatePurchaseOrderParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    if order.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    if order.is_locked {
+        return Err("Purchase order is locked".to_string());
+    }
+
+    if order.state != PoState::Draft {
+        return Err("Only draft purchase orders can be updated".to_string());
+    }
+
+    let mut updated = order;
+
+    if let Some(ref o) = params.origin {
+        updated.origin = Some(o.clone());
+    }
+    if let Some(ref pr) = params.partner_ref {
+        updated.partner_ref = Some(pr.clone());
+    }
+    if let Some(ref n) = params.notes {
+        updated.notes = Some(n.clone());
+    }
+    if let Some(d) = params.date_planned {
+        updated.date_planned = Some(d);
+    }
+    if let Some(pt) = params.payment_term_id {
+        updated.payment_term_id = Some(pt);
+    }
+    if let Some(fp) = params.fiscal_position_id {
+        updated.fiscal_position_id = Some(fp);
+    }
+    if let Some(i) = params.incoterm_id {
+        updated.incoterm_id = Some(i);
+    }
+    if let Some(ref il) = params.incoterm_location {
+        updated.incoterm_location = Some(il.clone());
+    }
+    if let Some(pid) = params.partner_id {
+        let vendor = ctx
+            .db
+            .contact()
+            .id()
+            .find(&pid)
+            .ok_or("Vendor contact not found")?;
+        if !vendor.is_vendor {
+            return Err("Partner is not a vendor".to_string());
+        }
+        updated.partner_id = pid;
+    }
+    if let Some(cid) = params.currency_id {
+        updated.currency_id = cid;
+    }
+    if let Some(ref m) = params.metadata {
+        updated.metadata = Some(m.clone());
+    }
+
+    updated.write_uid = ctx.sender();
+    updated.write_date = ctx.timestamp;
+
+    ctx.db.purchase_order().id().update(updated);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "id": order_id }).to_string()),
+            new_values: Some("updated".to_string()),
+            changed_fields: vec!["write_date".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn lock_purchase_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    if matches!(order.state, PoState::Done | PoState::Cancelled) {
+        return Err("Cannot lock a completed or cancelled purchase order".to_string());
+    }
+
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        is_locked: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn unlock_purchase_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        is_locked: false,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
 /// Add a line to a purchase order
 #[reducer]
 pub fn add_purchase_order_line(
@@ -640,6 +807,88 @@ pub fn remove_purchase_order_line(
     );
 
     log::info!("Line {} removed from purchase order {}", line_id, order.id);
+    Ok(())
+}
+
+/// Update an existing draft purchase order line (quantity, price, product, UoM, etc.).
+#[reducer]
+pub fn update_purchase_order_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+    params: UpdatePurchaseOrderLineParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+
+    let line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Purchase order line not found")?;
+
+    if line.organization_id != organization_id {
+        return Err("Line does not belong to this organization".to_string());
+    }
+
+    let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+
+    if order.is_locked {
+        return Err("Purchase order is locked".to_string());
+    }
+
+    if order.state != PoState::Draft {
+        return Err("Can only update lines on draft purchase orders".to_string());
+    }
+
+    let product_id = params.product_id.unwrap_or(line.product_id);
+    let quantity = params.quantity.unwrap_or(line.product_qty);
+    let uom_id = params.uom_id.unwrap_or(line.product_uom);
+    let price_unit = params.price_unit.unwrap_or(line.price_unit);
+    let tax_ids = params.tax_ids.unwrap_or_default();
+
+    if quantity <= 0.0 {
+        return Err("Quantity must be greater than zero".to_string());
+    }
+
+    let subtotal = quantity * price_unit;
+    let tax = calculate_tax(ctx, &tax_ids, subtotal);
+
+    let date_planned = params.date_planned.or(line.date_planned);
+    let product_variant_id = params.product_variant_id.or(line.product_variant_id);
+    let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
+    let display_type = params.display_type.or(line.display_type.clone());
+    let propagate_cancel = params.propagate_cancel.unwrap_or(line.propagate_cancel);
+    let metadata = params.metadata.or(line.metadata.clone());
+    let order_id = line.order_id;
+
+    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        product_id,
+        product_qty: quantity,
+        product_uom_qty: quantity,
+        product_uom: uom_id,
+        price_unit,
+        price_subtotal: subtotal,
+        price_tax: tax,
+        price_total: subtotal + tax,
+        date_planned,
+        product_variant_id,
+        account_analytic_id,
+        display_type,
+        propagate_cancel,
+        metadata,
+        qty_to_invoice: (quantity - line.qty_invoiced).max(0.0),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..line
+    });
+
+    compute_purchase_order_line_totals(ctx, organization_id, order_id)?;
+    compute_purchase_order_totals(ctx, organization_id, order_id)?;
+    update_po_receipt_status(ctx, organization_id, order_id)?;
+    update_po_invoice_status(ctx, organization_id, order_id)?;
+
+    log::info!("Purchase order line {} updated", line_id);
     Ok(())
 }
 

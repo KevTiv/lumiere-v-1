@@ -8,7 +8,8 @@ LOCAL      := http://127.0.0.1:3000
         publish publish-clear test \
         publish-cloud publish-cloud-clear \
         call-tests logs \
-        call-tests-cloud logs-cloud
+        call-tests-cloud logs-cloud \
+        seed-test-user
 
 help:
 	@echo "Usage: make <target>"
@@ -18,13 +19,14 @@ help:
 	@echo "  build                Compile to WASM (release)"
 	@echo ""
 	@echo "  --- Local (default) ---"
-	@echo "  start                Start local SpacetimeDB server"
+	@echo "  start                Start local SpacetimeDB (default :3000 — stop Next.js first or use PORT=3001 for web)"
 	@echo "  stop                 Stop local SpacetimeDB server"
 	@echo "  publish              Publish to local server"
 	@echo "  publish-clear        Clear local DB and republish"
 	@echo "  test                 Clear DB, republish, and run all tests (clean slate)"
 	@echo "  call-tests           Call run_all_core_tests on local"
 	@echo "  logs                 Tail logs from local"
+	@echo "  seed-test-user       Provision test@email.com + admin org (make publish first; uses frontend/web/.env.local)"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -54,7 +56,7 @@ publish:
 	spacetime publish $(DB) --module-path $(MODULE) --server local -y
 
 db-client:
-	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path ../spacetimedb
+	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
 
 publish-clear:
 	spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
@@ -66,6 +68,9 @@ call-tests:
 
 logs:
 	spacetime logs $(DB) --server local
+
+seed-test-user:
+	cd frontend/web && pnpm run seed-test-user
 
 # ── Cloud ─────────────────────────────────────────────────────────────────────
 

@@ -144,6 +144,15 @@ export async function submitManufacturingRowAction(
         })
         return
       }
+      case "link_iot_device": {
+        const devId = String(values.linkDeviceId ?? "")
+        if (!devId) throw new Error("Select an IoT device")
+        await m.linkDeviceToWorkcenter.mutateAsync({
+          deviceId: devId,
+          workcenterId: wcId,
+        })
+        return
+      }
       default:
         throw new Error("Unknown action")
     }

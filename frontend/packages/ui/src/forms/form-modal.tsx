@@ -33,6 +33,8 @@ interface FormModalProps {
   closeOnSubmit?: boolean
   /** Shown above the form body (e.g. API / validation errors while the dialog stays open). */
   submitError?: string | null
+  /** Passed to {@link ModularForm} — e.g. a destructive action beside Cancel / Submit. */
+  formLeadingActions?: React.ReactNode
 }
 
 export function FormModal({
@@ -43,6 +45,7 @@ export function FormModal({
   className,
   closeOnSubmit = true,
   submitError,
+  formLeadingActions,
 }: FormModalProps) {
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (onSubmit) {
@@ -109,6 +112,7 @@ export function FormModal({
             config={{ ...config, title: "", description: "" }}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
+            leadingActions={formLeadingActions}
           />
         </div>
       </DialogContent>

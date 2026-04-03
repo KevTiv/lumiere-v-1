@@ -589,3 +589,169 @@ pub fn hold_supplier_intake(
     log::info!("Supplier intake {} put on hold", intake_id);
     Ok(())
 }
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateSupplierIntakeParams {
+    pub company_name: Option<String>,
+    pub contact_name: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub website: Option<String>,
+    pub industry: Option<String>,
+    pub product_categories: Option<Vec<String>>,
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+    pub street: Option<String>,
+    pub city: Option<String>,
+    pub zip: Option<String>,
+    pub country_code: Option<String>,
+    pub bank_account_number: Option<String>,
+    pub bank_name: Option<String>,
+    pub payment_terms_id: Option<u64>,
+    pub currency_id: Option<u64>,
+    pub min_order_value: Option<f64>,
+    pub lead_time_days: Option<u32>,
+    pub quality_certificates: Option<Vec<String>>,
+    pub documents: Option<Vec<String>>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+/// Update a supplier intake request before it is approved or onboarded.
+#[reducer]
+pub fn update_supplier_intake(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intake_id: u64,
+    params: UpdateSupplierIntakeParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "supplier_intake_request", "write")?;
+
+    let intake = ctx
+        .db
+        .supplier_intake_request()
+        .id()
+        .find(&intake_id)
+        .ok_or("Supplier intake request not found")?;
+
+    if intake.organization_id != organization_id {
+        return Err("Supplier intake does not belong to this organization".to_string());
+    }
+
+    if matches!(
+        intake.state,
+        IntakeState::Approved | IntakeState::Rejected | IntakeState::Onboarded
+    ) {
+        return Err("Cannot update a finalized supplier intake".to_string());
+    }
+
+    let mut updated = intake;
+
+    if let Some(v) = params.company_name {
+        updated.company_name = v;
+    }
+    if let Some(v) = params.contact_name {
+        updated.contact_name = v;
+    }
+    if let Some(v) = params.email {
+        updated.email = v;
+    }
+    if let Some(v) = params.phone {
+        updated.phone = Some(v);
+    }
+    if let Some(v) = params.website {
+        updated.website = Some(v);
+    }
+    if let Some(v) = params.industry {
+        updated.industry = Some(v);
+    }
+    if let Some(v) = params.product_categories {
+        updated.product_categories = v;
+    }
+    if let Some(v) = params.tax_id {
+        updated.tax_id = Some(v);
+    }
+    if let Some(v) = params.company_registry {
+        updated.company_registry = Some(v);
+    }
+    if let Some(v) = params.street {
+        updated.street = Some(v);
+    }
+    if let Some(v) = params.city {
+        updated.city = Some(v);
+    }
+    if let Some(v) = params.zip {
+        updated.zip = Some(v);
+    }
+    if let Some(v) = params.country_code {
+        updated.country_code = Some(v);
+    }
+    if let Some(v) = params.bank_account_number {
+        updated.bank_account_number = Some(v);
+    }
+    if let Some(v) = params.bank_name {
+        updated.bank_name = Some(v);
+    }
+    if let Some(v) = params.payment_terms_id {
+        updated.payment_terms_id = Some(v);
+    }
+    if let Some(v) = params.currency_id {
+        updated.currency_id = Some(v);
+    }
+    if let Some(v) = params.min_order_value {
+        updated.min_order_value = Some(v);
+    }
+    if let Some(v) = params.lead_time_days {
+        updated.lead_time_days = Some(v);
+    }
+    if let Some(v) = params.quality_certificates {
+        updated.quality_certificates = v;
+    }
+    if let Some(v) = params.documents {
+        updated.documents = v;
+    }
+    if let Some(v) = params.notes {
+        updated.notes = Some(v);
+    }
+    if let Some(v) = params.metadata {
+        updated.metadata = Some(v);
+    }
+
+    updated.updated_at = ctx.timestamp;
+
+    ctx.db.supplier_intake_request().id().update(updated);
+
+    Ok(())
+}
+
+/// Delete a supplier intake request that is not yet approved or onboarded.
+#[reducer]
+pub fn delete_supplier_intake(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intake_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "supplier_intake_request", "delete")?;
+
+    let intake = ctx
+        .db
+        .supplier_intake_request()
+        .id()
+        .find(&intake_id)
+        .ok_or("Supplier intake request not found")?;
+
+    if intake.organization_id != organization_id {
+        return Err("Supplier intake does not belong to this organization".to_string());
+    }
+
+    if matches!(
+        intake.state,
+        IntakeState::Approved | IntakeState::Rejected | IntakeState::Onboarded
+    ) {
+        return Err("Cannot delete a finalized supplier intake".to_string());
+    }
+
+    ctx.db.supplier_intake_request().id().delete(&intake_id);
+
+    Ok(())
+}

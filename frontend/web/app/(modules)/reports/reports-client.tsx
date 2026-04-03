@@ -9,6 +9,7 @@ import {
   newReportTemplateForm,
   newScheduledReportForm,
   newAnalyticsMetricForm,
+  newTrialBalanceEntryForm,
   updateReportTemplateForm,
   updateMetricValuesForm,
   recordScheduledRunForm,
@@ -39,6 +40,7 @@ import {
   useUpdateReportTemplate,
   useUpdateMetricValues,
   useRecordReportRun,
+  useCreateTrialBalanceEntry,
 } from "@/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -109,6 +111,7 @@ function ReportsClientLoaded({
     [reportsRaw],
   )
 
+  const createTrialBalanceEntry = useCreateTrialBalanceEntry(companyId)
   const createFinancialReportFlow = useCreateFinancialReportFlow(companyId)
   const generateFinancialReport = useGenerateFinancialReport(companyId)
   const exportFinancialReport = useExportFinancialReport(companyId)
@@ -331,6 +334,8 @@ function ReportsClientLoaded({
     }
   }, [moduleConfig.tabs, t])
 
+  const trialBalanceEntryFormConfig = useMemo(() => newTrialBalanceEntryForm(t), [t])
+
   const trialBalanceEntityConfig = useMemo((): EntityViewConfig => {
     const base = trialBalancesTableConfig(t)
     return {
@@ -437,7 +442,7 @@ function ReportsClientLoaded({
       tabs: moduleConfig.tabs.map((tab) => {
         if (tab.id === "dashboard") return { ...tab, sections: liveSections }
         if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
-        if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig }
+        if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig }
         if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig }
         if (tab.id === "scheduled-reports") {
@@ -455,6 +460,7 @@ function ReportsClientLoaded({
       moduleConfig,
       financialReportsEntityConfig,
       trialBalanceEntityConfig,
+      trialBalanceEntryFormConfig,
       reportTemplatesEntityConfig,
       analyticsMetricsEntityConfig,
       scheduledReportsEntityConfig,
@@ -486,6 +492,8 @@ function ReportsClientLoaded({
       await createScheduledReport.mutateAsync(formData)
     } else if (action === "createAnalyticsMetric") {
       await createAnalyticsMetric.mutateAsync(formData)
+    } else if (action === "createTrialBalanceEntry") {
+      await createTrialBalanceEntry.mutateAsync(formData)
     }
   }
 

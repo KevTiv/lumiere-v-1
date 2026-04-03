@@ -257,6 +257,26 @@ export const productionLotsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const stockProductionSerialsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-production-serials-table",
+  title: t("inventory.productionSerials.title"),
+  description: t("inventory.productionSerials.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.productionSerials.searchPlaceholder"),
+    searchKeys: ["name", "ref"],
+    columns: [
+      { key: "name", label: t("inventory.productionSerials.columns.name"), width: "min-w-36" },
+      { key: "productId", label: t("inventory.productionSerials.columns.productId"), width: "min-w-32" },
+      { key: "state", label: t("inventory.productionSerials.columns.state"), width: "min-w-24" },
+      { key: "createDate", label: t("inventory.productionSerials.columns.createDate"), type: "date" },
+    ],
+    emptyMessage: t("inventory.productionSerials.emptyMessage"),
+  },
+})
+
 // ── Quality Checks ────────────────────────────────────────────────────────────
 export const qualityChecksTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "quality-checks-table",
@@ -489,6 +509,7 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "inventory-adjustments-table": inventoryAdjustmentsTableConfig(t),
   "stock-locations-table": stockLocationsTableConfig(t),
   "production-lots-table": productionLotsTableConfig(t),
+  "stock-production-serials-table": stockProductionSerialsTableConfig(t),
   "quality-checks-table": qualityChecksTableConfig(t),
   "cycle-counts-table": cycleCountsTableConfig(t),
   "picking-waves-table": pickingWavesTableConfig(t),

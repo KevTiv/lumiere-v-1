@@ -48,7 +48,12 @@ export function useStdbReducer(reducerName: string) {
 export function useStdbQuery(
   resource: string,
   organizationId: bigint | number,
-  options?: { staleTime?: number; enabled?: boolean },
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+    /** SSR / hydration seed until the first fetch completes */
+    initialData?: Record<string, unknown>[]
+  },
 ) {
   return useQuery({
     queryKey: ['stdb', resource, organizationId.toString()],
@@ -63,6 +68,7 @@ export function useStdbQuery(
     },
     staleTime: options?.staleTime ?? 30_000,
     enabled: options?.enabled,
+    initialData: options?.initialData,
   })
 }
 

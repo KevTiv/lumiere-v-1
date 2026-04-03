@@ -14,6 +14,7 @@ import {
   serverQueryWarehouse3dZones,
   serverQueryInventoryValuations,
   serverQueryReplenishmentRules,
+  serverQueryStockProductionSerials,
 } from "@lumiere/stdb/server"
 import { InventoryClient } from "./inventory-client"
 
@@ -39,6 +40,7 @@ export default async function InventoryPage() {
     warehouse3dZones,
     inventoryValuations,
     replenishmentRules,
+    stockProductionSerials,
   ] = await Promise.all([
     serverQueryProducts(organizationId, opts),
     serverQueryStockQuants(organizationId, opts),
@@ -54,7 +56,8 @@ export default async function InventoryPage() {
     serverQueryWarehouse3dZones(organizationId, opts),
     serverQueryInventoryValuations(organizationId, opts),
     serverQueryReplenishmentRules(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], []])
+    serverQueryStockProductionSerials(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], [], []])
 
   return (
     <InventoryClient
@@ -72,6 +75,7 @@ export default async function InventoryPage() {
       initialWarehouse3dZones={warehouse3dZones as Record<string, unknown>[]}
       initialInventoryValuations={inventoryValuations as Record<string, unknown>[]}
       initialReplenishmentRules={replenishmentRules as Record<string, unknown>[]}
+      initialStockProductionSerials={stockProductionSerials as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

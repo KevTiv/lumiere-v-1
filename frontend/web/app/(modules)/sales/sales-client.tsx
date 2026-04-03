@@ -48,6 +48,14 @@ import {
   useCompletePickingBatch,
   useCancelPickingBatch,
   usePricelistItems,
+  // Additional sale order operations
+  useUpdateSaleOrder,
+  useLockSaleOrder,
+  useUnlockSaleOrder,
+  useCreateSaleOrderLine,
+  useUpdateSaleOrderLine,
+  useDeleteSaleOrderLine,
+  useCreateInvoiceFromSaleOrder,
 } from '@/hooks/sales';
 import { useContacts } from '@/hooks/crm';
 import { useWarehouses } from '@/hooks/inventory';
@@ -141,6 +149,15 @@ function SalesClientLoaded({
   const startPickingBatch = useStartPickingBatch(orgId);
   const completePickingBatch = useCompletePickingBatch(orgId);
   const cancelPickingBatch = useCancelPickingBatch(orgId);
+
+  // Additional sale order operations
+  const updateSaleOrder = useUpdateSaleOrder(orgId);
+  const lockSaleOrder = useLockSaleOrder(orgId);
+  const unlockSaleOrder = useUnlockSaleOrder(orgId);
+  const createSaleOrderLine = useCreateSaleOrderLine(orgId);
+  const updateSaleOrderLine = useUpdateSaleOrderLine(orgId);
+  const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
+  const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
 
   const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
 
@@ -565,6 +582,11 @@ function SalesClientLoaded({
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
       deliveriesEntityConfig,
+      // New mutations
+      updateSaleOrder,
+      lockSaleOrder,
+      unlockSaleOrder,
+      createInvoiceFromSaleOrder,
     ],
   );
 

@@ -344,10 +344,60 @@ export const newJobPositionForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newDepartmentForm = (t: TFunction): FormConfig => ({
+  id: "new-department",
+  title: t("hr.forms.newDepartment.title"),
+  description: t("hr.forms.newDepartment.description"),
+  sections: [
+    {
+      id: "dept-details",
+      title: t("hr.forms.newDepartment.sections.departmentDetails"),
+      fields: [
+        {
+          id: "dept-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newDepartment.fields.name"),
+          placeholder: t("hr.forms.newDepartment.fields.namePlaceholder"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "dept-parent",
+          type: "select",
+          name: "parentId",
+          label: t("hr.forms.newDepartment.fields.parentId"),
+          placeholder: t("hr.forms.newDepartment.fields.parentPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "dept-manager",
+          type: "select",
+          name: "managerId",
+          label: t("hr.forms.newDepartment.fields.managerId"),
+          placeholder: t("hr.forms.newDepartment.fields.managerPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "dept-note",
+          type: "textarea",
+          name: "note",
+          label: t("hr.forms.newDepartment.fields.note"),
+          placeholder: t("hr.forms.newDepartment.fields.notePlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const hrFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-employee": newEmployeeForm(t),
   "new-leave-request": newLeaveRequestForm(t),
   "new-contract": newContractForm(t),
   "new-payslip": newPayslipForm(t),
   "new-job-position": newJobPositionForm(t),
+  "new-department": newDepartmentForm(t),
 })

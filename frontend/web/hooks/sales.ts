@@ -245,24 +245,6 @@ export function useDeletePricelistItem(organizationId: bigint) {
   })
 }
 
-export function useUpdateSaleOrder(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: { orderId: bigint | number | string; params: Record<string, unknown> }) => {
-      const r = await fetch(`/api/sales/orders/${args.orderId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args.params),
-      })
-      if (!r.ok) throw new Error('Failed to update sale order')
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
-    },
-  })
-}
-
 export function useCreatePickingBatch(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
@@ -320,6 +302,127 @@ export function useCancelPickingBatch(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to cancel picking batch')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] }),
+  })
+}
+
+// ── Sale Order Updates ───────────────────────────────────────────────────────
+
+export function useUpdateSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { orderId: bigint | number | string; params: Record<string, unknown> }>({
+    mutationFn: async ({ orderId, params }) => {
+      const r = await fetch('/api/call/update_sale_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update sale order')
+    },
+    onSuccess: async () => {
+      const orgKey = organizationId.toString()
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] }),
+        qc.invalidateQueries({ queryKey: ['sale-order-lines', orgKey] }),
+      ])
+    },
+  })
+}
+
+export function useLockSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint | number | string>({
+    mutationFn: async (orderId) => {
+      const r = await fetch('/api/call/lock_sale_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error('Failed to lock sale order')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+  })
+}
+
+export function useUnlockSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint | number | string>({
+    mutationFn: async (orderId) => {
+      const r = await fetch('/api/call/unlock_sale_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error('Failed to unlock sale order')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+  })
+}
+
+// ── Sale Order Line Management ──────────────────────────────────────────────
+
+export function useCreateSaleOrderLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { orderId: bigint | number | string; params: Record<string, unknown> }>({
+    mutationFn: async ({ orderId, params }) => {
+      const r = await fetch('/api/call/create_sale_order_line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create sale order line')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+  })
+}
+
+export function useUpdateSaleOrderLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { lineId: bigint | number | string; params: Record<string, unknown> }>({
+    mutationFn: async ({ lineId, params }) => {
+      const r = await fetch('/api/call/update_sale_order_line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(lineId), params]),
+      })
+      if (!r.ok) throw new Error('Failed to update sale order line')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+  })
+}
+
+export function useDeleteSaleOrderLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint | number | string>({
+    mutationFn: async (lineId) => {
+      const r = await fetch('/api/call/delete_sale_order_line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(lineId)]),
+      })
+      if (!r.ok) throw new Error('Failed to delete sale order line')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+  })
+}
+
+// ── Invoice Creation ──────────────────────────────────────────────────────────
+
+export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { orderId: bigint | number | string; invoiceDate?: string; journalId?: bigint | number | string }>({
+    mutationFn: async ({ orderId, invoiceDate, journalId }) => {
+      const r = await fetch('/api/call/create_invoice_from_sale_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId), invoiceDate ?? null, journalId ? Number(journalId) : null]),
+      })
+      if (!r.ok) throw new Error('Failed to create invoice from sale order')
+    },
+    onSuccess: () => {
+      const orgKey = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] })
+      void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
+    },
   })
 }
 

@@ -10,8 +10,10 @@
  *   - organizationId: Override org ID (falls back to session org)
  *
  * Available resources:
- *   Accounting: account-accounts, account-journals, account-moves, account-taxes,
- *               account-payments, budgets, analytic-accounts
+ *   Accounting: account-accounts, account-account-types, account-groups, account-journals, account-moves, account-taxes,
+ *               account-payments, budgets, budget-lines, budget-posts, analytic-accounts, analytic-lines,
+ *               analytic-distribution-models, bank-statements, bank-statement-lines,
+ *               bank-match-candidates, account-reconciliation-widgets, account-assets, fiscal-years, account-periods
  *   Sales:      sale-orders, sale-order-lines, pricelists, pricelist-items, picking-batches
  *   CRM:        leads, opportunities, opportunity-stages, contacts, activities
  *   Projects:   projects, tasks, timesheets
@@ -19,10 +21,12 @@
  *               stock-locations, stock-production-lots, stock-production-serials, quality-checks, warehouse-3d-zones,
  *               stock-cycle-counts, stock-inventories, stock-moves, stock-routes, stock-rules, picking-waves,
  *               warehouse-tasks, replenishment-rules, barcode-rules, inventory-valuations
- *   Purchasing: purchase-orders, purchase-order-lines, purchase-requisitions
+ *   Purchasing: purchase-orders, purchase-order-lines, purchase-requisitions, landed-costs, supplier-intakes
  *   Manufacturing: mrp-productions, mrp-boms, mrp-bom-lines, mrp-workorders, mrp-workcenters
  *   HR:         employees, departments, leave-requests, contracts, payslips
  *   Reports:    financial-reports, trial-balances
+ *   IoT:        iot-devices, iot-hubs, iot-alerts, iot-actions, iot-telemetry, iot-thresholds
+ *   AI:         ai-agents, ai-team-members, ai-insights
  *   Other:      documents, knowledge-articles, helpdesk-tickets, helpdesk-teams,
  *               helpdesk-stages, helpdesk-slas, subscriptions,
  *               subscription-plans, deferred-revenue-schedules, deferred-revenue-lines,
@@ -36,12 +40,18 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { resolveApiSession } from '@/lib/api-session'
 import {
   serverQueryAccountAccounts,
+  serverQueryAccountAccountTypes,
+  serverQueryAccountGroups,
   serverQueryAccountJournals,
   serverQueryAccountMoves,
   serverQueryAccountTaxes,
   serverQueryAccountPayments,
   serverQueryBudgets,
+  serverQueryBudgetLines,
+  serverQueryBudgetPosts,
   serverQueryAnalyticAccounts,
+  serverQueryAnalyticLines,
+  serverQueryAnalyticDistributionModels,
   serverQuerySaleOrders,
   serverQuerySaleOrderLines,
   serverQueryPricelists,
@@ -80,6 +90,8 @@ import {
   serverQueryPurchaseOrders,
   serverQueryPurchaseOrderLines,
   serverQueryPurchaseRequisitions,
+  serverQueryLandedCosts,
+  serverQuerySupplierIntakes,
   serverQueryMrpProductions,
   serverQueryMrpBoms,
   serverQueryMrpBomLines,
@@ -87,9 +99,14 @@ import {
   serverQueryMrpWorkcenters,
   serverQueryEmployees,
   serverQueryDepartments,
+  serverQueryJobPositions,
   serverQueryLeaveRequests,
   serverQueryContracts,
   serverQueryPayslips,
+  serverQueryLeaveTypes,
+  serverQueryPayrollStructures,
+  serverQuerySalaryRules,
+  serverQueryHrResources,
   serverQueryCalendarEvents,
   serverQueryDocuments,
   serverQueryKnowledgeArticles,
@@ -116,8 +133,35 @@ import {
   serverQueryWorkflowTransitions,
   serverQueryWorkflowWorkitems,
   serverQueryProposals,
+  serverQueryProposalSections,
+  serverQueryProposalLineItems,
+  serverQueryProposalVersions,
+  serverQueryProposalSourceDocs,
+  serverQueryProposalPresence,
+  serverQueryProposalComments,
+  serverQueryFleetVehicles,
+  serverQueryPosTerminals,
   serverQueryRoles,
   serverQueryUserRoleAssignments,
+  serverQueryIotDevices,
+  serverQueryIotHubs,
+  serverQueryIotAlerts,
+  serverQueryIotActions,
+  serverQueryIotTelemetry,
+  serverQueryIotThresholds,
+  serverQueryAiAgents,
+  serverQueryAiTeamMembers,
+  serverQueryAiInsights,
+  serverQueryBankStatements,
+  serverQueryBankStatementLines,
+  serverQueryBankMatchCandidates,
+  serverQueryAccountReconciliationWidgets,
+  serverQueryAccountAssets,
+  serverQueryFiscalYears,
+  serverQueryAccountPeriods,
+  serverQueryConsolidationAccounts,
+  serverQueryConsolidationJournals,
+  serverQueryConsolidationEliminationEntries,
   type StdbServerQueryOptions,
 } from '@lumiere/stdb/server'
 
@@ -130,12 +174,31 @@ type QueryFn = (
 const QUERY_MAP: Record<string, QueryFn> = {
   // Accounting
   'account-accounts': (orgId, opts) => serverQueryAccountAccounts(orgId, opts),
+  'account-account-types': (orgId, opts) => serverQueryAccountAccountTypes(orgId, opts),
+  'account-groups': (orgId, opts) => serverQueryAccountGroups(orgId, opts),
   'account-journals': (orgId, opts) => serverQueryAccountJournals(orgId, opts),
   'account-moves': (orgId, opts) => serverQueryAccountMoves(orgId, String(opts)),
   'account-taxes': (orgId, opts) => serverQueryAccountTaxes(orgId, opts),
   'account-payments': (orgId, opts) => serverQueryAccountPayments(orgId, opts),
   'budgets': (orgId, opts) => serverQueryBudgets(orgId, opts),
+  'budget-lines': (orgId, opts) => serverQueryBudgetLines(orgId, opts),
+  'budget-posts': (orgId, opts) => serverQueryBudgetPosts(orgId, opts),
   'analytic-accounts': (orgId, opts) => serverQueryAnalyticAccounts(orgId, opts),
+  'analytic-lines': (orgId, opts) => serverQueryAnalyticLines(orgId, opts),
+  'analytic-distribution-models': (orgId, opts) =>
+    serverQueryAnalyticDistributionModels(orgId, opts),
+  'bank-statements': (orgId, opts) => serverQueryBankStatements(orgId, opts),
+  'bank-statement-lines': (orgId, opts) => serverQueryBankStatementLines(orgId, opts),
+  'bank-match-candidates': (orgId, opts) => serverQueryBankMatchCandidates(orgId, opts),
+  'account-reconciliation-widgets': (orgId, opts) =>
+    serverQueryAccountReconciliationWidgets(orgId, opts),
+  'account-assets': (orgId, opts) => serverQueryAccountAssets(orgId, opts),
+  'fiscal-years': (orgId, opts) => serverQueryFiscalYears(orgId, opts),
+  'account-periods': (orgId, opts) => serverQueryAccountPeriods(orgId, opts),
+  'consolidation-accounts': (orgId, opts) => serverQueryConsolidationAccounts(orgId, opts),
+  'consolidation-journals': (orgId, opts) => serverQueryConsolidationJournals(orgId, opts),
+  'consolidation-elimination-entries': (orgId, opts) =>
+    serverQueryConsolidationEliminationEntries(orgId, opts),
   // Sales
   'sale-orders': (orgId, opts) => serverQuerySaleOrders(orgId, opts),
   'sale-order-lines': (orgId, opts) => serverQuerySaleOrderLines(orgId, opts),
@@ -179,6 +242,8 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'purchase-orders': (orgId, opts) => serverQueryPurchaseOrders(orgId, opts),
   'purchase-order-lines': (orgId, opts) => serverQueryPurchaseOrderLines(orgId, opts),
   'purchase-requisitions': (orgId, opts) => serverQueryPurchaseRequisitions(orgId, opts),
+  'landed-costs': (orgId, opts) => serverQueryLandedCosts(orgId, opts),
+  'supplier-intakes': (orgId, opts) => serverQuerySupplierIntakes(orgId, opts),
   // Manufacturing
   'mrp-productions': (orgId, opts) => serverQueryMrpProductions(orgId, opts),
   'mrp-boms': (orgId, opts) => serverQueryMrpBoms(orgId, opts),
@@ -188,9 +253,14 @@ const QUERY_MAP: Record<string, QueryFn> = {
   // HR
   'employees': (orgId, opts) => serverQueryEmployees(orgId, opts),
   'departments': (orgId, opts) => serverQueryDepartments(orgId, opts),
+  'job-positions': (orgId, opts) => serverQueryJobPositions(orgId, opts),
   'leave-requests': (orgId, opts) => serverQueryLeaveRequests(orgId, opts),
   'contracts': (orgId, opts) => serverQueryContracts(orgId, opts),
   'payslips': (orgId, opts) => serverQueryPayslips(orgId, opts),
+  'leave-types': (orgId, opts) => serverQueryLeaveTypes(orgId, opts),
+  'payroll-structures': (orgId, opts) => serverQueryPayrollStructures(orgId, opts),
+  'salary-rules': (orgId, opts) => serverQuerySalaryRules(orgId, opts),
+  'hr-resources': (orgId, opts) => serverQueryHrResources(orgId, opts),
   // Reports
   'financial-reports': (orgId, opts) => serverQueryFinancialReports(orgId, opts),
   'trial-balances': (orgId, opts) => serverQueryTrialBalances(orgId, opts),
@@ -217,6 +287,24 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'workflow-transitions': (orgId, opts) => serverQueryWorkflowTransitions(orgId, opts),
   'workflow-workitems': (orgId, opts) => serverQueryWorkflowWorkitems(orgId, opts),
   'proposals': (orgId, opts) => serverQueryProposals(orgId, opts),
+  'proposal-sections': (orgId, opts) => serverQueryProposalSections(orgId, opts),
+  'proposal-line-items': (orgId, opts) => serverQueryProposalLineItems(orgId, opts),
+  'proposal-versions': (orgId, opts) => serverQueryProposalVersions(orgId, opts),
+  'proposal-source-docs': (orgId, opts) => serverQueryProposalSourceDocs(orgId, opts),
+  'proposal-presence': (orgId, opts) => serverQueryProposalPresence(orgId, opts),
+  'proposal-comments': (orgId, opts) => serverQueryProposalComments(orgId, opts),
+  'fleet-vehicles': (orgId, opts) => serverQueryFleetVehicles(orgId, opts),
+  'pos-terminals': (orgId, opts) => serverQueryPosTerminals(orgId, opts),
+  // IoT
+  'iot-devices': (orgId, opts) => serverQueryIotDevices(orgId, opts),
+  'iot-hubs': (orgId, opts) => serverQueryIotHubs(orgId, opts),
+  'iot-alerts': (orgId, opts) => serverQueryIotAlerts(orgId, opts),
+  'iot-actions': (orgId, opts) => serverQueryIotActions(orgId, opts),
+  'iot-telemetry': (orgId, opts) => serverQueryIotTelemetry(orgId, opts),
+  'iot-thresholds': (orgId, opts) => serverQueryIotThresholds(orgId, opts),
+  'ai-agents': (orgId, opts) => serverQueryAiAgents(orgId, opts),
+  'ai-team-members': (orgId, opts) => serverQueryAiTeamMembers(orgId, opts),
+  'ai-insights': (orgId, opts) => serverQueryAiInsights(orgId, opts),
   'calendar-events': (orgId, opts) => serverQueryCalendarEvents(orgId, opts),
   'mail-messages': (orgId, opts) => serverQueryMailMessages(orgId, opts),
   'expenses': (orgId, opts) => serverQueryExpenses(orgId, opts),

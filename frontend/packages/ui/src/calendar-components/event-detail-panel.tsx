@@ -6,13 +6,17 @@ import { Clock, MapPin, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CalendarEvent } from "@lumiere/ui"
 import { eventTypeConfig } from "@lumiere/ui"
+import { useTranslation } from "@lumiere/i18n"
 
 interface EventDetailPanelProps {
   event: CalendarEvent
   onClose: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
-export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
+export function EventDetailPanel({ event, onClose, onEdit, onDelete }: EventDetailPanelProps) {
+  const { t, i18n } = useTranslation()
   const config = eventTypeConfig[event.type]
 
   return (
@@ -24,7 +28,9 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
             <Badge variant="outline">{config.label}</Badge>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={t("calendar.eventDetail.closeAria")}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             ✕
@@ -40,7 +46,7 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span>
-              {event.startTime.toLocaleString()} - {event.endTime.toLocaleString()}
+              {event.startTime.toLocaleString(i18n.language)} — {event.endTime.toLocaleString(i18n.language)}
             </span>
           </div>
           {event.location && (
@@ -60,15 +66,19 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
         {event.relatedTo && (
           <div className="bg-muted/50 rounded p-3 mb-4 text-sm">
             <div className="font-semibold text-xs text-muted-foreground uppercase mb-1">
-              Related {event.relatedTo.type}
+              {t("calendar.eventDetail.relatedTo", { type: event.relatedTo.type })}
             </div>
             <div className="font-medium">{event.relatedTo.id}</div>
           </div>
         )}
 
         <div className="flex gap-2">
-          <Button size="sm" className="flex-1">Edit</Button>
-          <Button size="sm" variant="outline" className="flex-1">Delete</Button>
+          <Button size="sm" className="flex-1" onClick={onEdit} disabled={!onEdit}>
+            {t("calendar.eventDetail.edit")}
+          </Button>
+          <Button size="sm" variant="outline" className="flex-1" onClick={onDelete} disabled={!onDelete}>
+            {t("calendar.eventDetail.delete")}
+          </Button>
         </div>
       </div>
     </div>

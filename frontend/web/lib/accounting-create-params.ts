@@ -7,8 +7,26 @@ import type {
   CreateAccountMoveParams,
   CreateAccountTaxParams,
   CreateCrossoveredBudgetParams,
+  CreateAnalyticAccountParams,
+  CreateAnalyticLineParams,
+  CreateAnalyticDistributionModelParams,
+  UpdateAnalyticAccountParams,
+  UpdateAnalyticLineParams,
+  UpdateAnalyticDistributionModelParams,
 } from '@lumiere/stdb'
-import type { CreatePaymentParams } from '@lumiere/stdb/generated/types'
+import type {
+  CreateAccountAccountTypeParams,
+  CreateAccountBankStatementLineParams,
+  CreateAccountGroupParams,
+  CreateAccountReconciliationWidgetParams,
+  CreateBudgetPostParams,
+  CreateFiscalYearParams,
+  CreateAccountPeriodParams,
+  CreatePaymentParams,
+  UpdateAccountAccountTypeParams,
+  UpdateAccountGroupParams,
+  UpdateBudgetPostParams,
+} from '@lumiere/stdb/generated/types'
 import { Timestamp } from 'spacetimedb'
 
 import { userTypeIdFromInternalGroup } from '@/lib/accounting-defaults'
@@ -278,14 +296,415 @@ export function toCreateCrossoveredBudgetParams(
   }
 }
 
+function parseAccountIdList(raw: unknown): number[] {
+  const s = String(raw ?? '').trim()
+  if (!s) return []
+  return s
+    .split(/[\s,]+/)
+    .map((x) => Number(x.trim()))
+    .filter((n) => Number.isFinite(n) && n >= 0)
+}
+
+export function toCreateBudgetPostParams(formData: Record<string, unknown>): CreateBudgetPostParams {
+  return {
+    companyId: undefined,
+    name: String(formData.name ?? '').trim(),
+    code: optionalTrimmedString(formData.code),
+    description: optionalTrimmedString(formData.description),
+    accountIds: parseAccountIdList(formData.accountIds),
+    isActive: formData.isActive !== false,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateBudgetPostParams(formData: Record<string, unknown>): UpdateBudgetPostParams {
+  return {
+    companyId: undefined,
+    name: String(formData.name ?? '').trim(),
+    code: optionalTrimmedString(formData.code),
+    description: optionalTrimmedString(formData.description),
+    accountIds: parseAccountIdList(formData.accountIds),
+    isActive: Boolean(formData.isActive),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateAccountAccountTypeParams(
+  formData: Record<string, unknown>,
+): CreateAccountAccountTypeParams {
+  return {
+    name: String(formData.name ?? '').trim(),
+    type: String(formData.type ?? '').trim(),
+    internalGroup: toInternalGroup(formData.internalGroup) ?? { tag: 'Asset' },
+    includeInitialBalance: Boolean(formData.includeInitialBalance),
+    companyId: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAccountAccountTypeParams(
+  formData: Record<string, unknown>,
+): UpdateAccountAccountTypeParams {
+  return {
+    companyId: undefined,
+    name: optionalTrimmedString(formData.name),
+    type: optionalTrimmedString(formData.type),
+    internalGroup:
+      formData.internalGroup === '' || formData.internalGroup == null
+        ? undefined
+        : toInternalGroup(formData.internalGroup),
+    includeInitialBalance:
+      formData.includeInitialBalance === '' || formData.includeInitialBalance === undefined
+        ? undefined
+        : Boolean(formData.includeInitialBalance),
+    isDeprecated:
+      formData.isDeprecated === '' || formData.isDeprecated === undefined
+        ? undefined
+        : Boolean(formData.isDeprecated),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateAccountGroupParams(
+  formData: Record<string, unknown>,
+): CreateAccountGroupParams {
+  const levelRaw = Number(formData.level ?? 0)
+  return {
+    name: String(formData.name ?? '').trim(),
+    codePrefixStart: optionalTrimmedString(formData.codePrefixStart),
+    codePrefixEnd: optionalTrimmedString(formData.codePrefixEnd),
+    level: Number.isFinite(levelRaw) ? Math.max(0, Math.trunc(levelRaw)) : 0,
+    parentId: optionalBigIntU64(formData.parentId),
+    companyId: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+/** Parent hierarchy is only set on create; updates omit `parentId` so the server keeps the existing parent. */
+export function toUpdateAccountGroupParams(
+  formData: Record<string, unknown>,
+): UpdateAccountGroupParams {
+  return {
+    companyId: undefined,
+    name: optionalTrimmedString(formData.name),
+    codePrefixStart: optionalTrimmedString(formData.codePrefixStart),
+    codePrefixEnd: optionalTrimmedString(formData.codePrefixEnd),
+    level:
+      formData.level === '' || formData.level == null
+        ? undefined
+        : Math.max(0, Math.trunc(Number(formData.level))),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
 export function accountingParamsToJson(
   params:
     | CreateAccountAccountParams
     | CreateAccountMoveParams
     | CreateAccountTaxParams
-    | CreateCrossoveredBudgetParams,
+    | CreateCrossoveredBudgetParams
+    | CreateFiscalYearParams
+    | CreateAccountPeriodParams,
 ): Record<string, unknown> {
   return stdbParamsToJson(params)
+}
+
+export function analyticParamsToJson(params: object): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toCreateAnalyticAccountParams(
+  formData: Record<string, unknown>,
+  defaultCurrencyId: bigint,
+): CreateAnalyticAccountParams | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+  const currencyId = optionalBigIntU64(formData.currencyId) ?? defaultCurrencyId
+  return {
+    companyId: undefined,
+    name,
+    code: optionalTrimmedString(formData.code),
+    active: formData.active !== false,
+    currencyId,
+    partnerId: optionalBigIntU64(formData.partnerId),
+    planId: optionalBigIntU64(formData.planId),
+    rootId: optionalBigIntU64(formData.rootId),
+    groupId: optionalBigIntU64(formData.groupId),
+    parentId: optionalBigIntU64(formData.parentId),
+    color:
+      formData.color != null && String(formData.color).trim() !== ''
+        ? Number(formData.color)
+        : undefined,
+    isRequiredInMoveLines: Boolean(formData.isRequiredInMoveLines),
+    isRequiredInDistribution: Boolean(formData.isRequiredInDistribution),
+    isRootPlan: Boolean(formData.isRootPlan),
+    lineIds: [],
+    childIds: [],
+    messageFollowerIds: [],
+    activityIds: [],
+    messageIds: [],
+    balance: Number(formData.balance ?? 0),
+    debit: Number(formData.debit ?? 0),
+    credit: Number(formData.credit ?? 0),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateAnalyticLineParams(
+  formData: Record<string, unknown>,
+  defaultCurrencyId: bigint,
+): CreateAnalyticLineParams | null {
+  const name = String(formData.name ?? '').trim()
+  const accountId = optionalBigIntU64(formData.accountId)
+  if (!name || accountId === undefined) return null
+  return {
+    name,
+    description: optionalTrimmedString(formData.description),
+    accountId,
+    amount: Number(formData.amount ?? 0),
+    unitAmount: Number(formData.unitAmount ?? formData.amount ?? 0),
+    currencyId: optionalBigIntU64(formData.currencyId) ?? defaultCurrencyId,
+    date: timestampFromFormDate(formData.date ?? new Date().toISOString()),
+    partnerId: optionalBigIntU64(formData.partnerId),
+    productId: optionalBigIntU64(formData.productId),
+    productUomId: optionalBigIntU64(formData.productUomId),
+    generalAccountId: optionalBigIntU64(formData.generalAccountId),
+    moveId: optionalBigIntU64(formData.moveId),
+    moveLineId: optionalBigIntU64(formData.moveLineId),
+    paymentId: optionalBigIntU64(formData.paymentId),
+    projectId: optionalBigIntU64(formData.projectId),
+    taskId: optionalBigIntU64(formData.taskId),
+    employeeId: optionalBigIntU64(formData.employeeId),
+    timesheetInvoiceId: optionalBigIntU64(formData.timesheetInvoiceId),
+    timesheetInvoiceType: optionalTrimmedString(formData.timesheetInvoiceType),
+    sheetId: optionalBigIntU64(formData.sheetId),
+    isTimesheet: Boolean(formData.isTimesheet),
+    category: optionalTrimmedString(formData.category),
+    tagIds: [],
+    analyticRef: optionalTrimmedString(formData.analyticRef),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+/** Single analytic account @ 100% — matches server validation (total percentage = 100). */
+export function toCreateAnalyticDistributionModelParams(
+  formData: Record<string, unknown>,
+): CreateAnalyticDistributionModelParams | null {
+  const accountId = optionalBigIntU64(formData.analyticAccountId)
+  if (accountId === undefined) return null
+  const distribution = JSON.stringify([
+    { account_id: Number(accountId), percentage: 100 },
+  ])
+  const precRaw = Number(formData.analyticPrecision ?? 2)
+  const analyticPrecision = Number.isFinite(precRaw)
+    ? Math.min(255, Math.max(0, Math.trunc(precRaw)))
+    : 2
+  return {
+    companyId: undefined,
+    name: optionalTrimmedString(formData.name),
+    partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
+    productId: optionalBigIntU64(formData.productId),
+    productCategId: optionalBigIntU64(formData.productCategId),
+    analyticDistribution: distribution,
+    analyticPrecision,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAnalyticAccountParams(
+  formData: Record<string, unknown>,
+): UpdateAnalyticAccountParams {
+  return {
+    companyId: undefined,
+    name: optionalTrimmedString(formData.name),
+    code:
+      formData.code === '' || formData.code == null
+        ? undefined
+        : optionalTrimmedString(formData.code),
+    partnerId: optionalBigIntU64(formData.partnerId),
+    planId: optionalBigIntU64(formData.planId),
+    groupId: optionalBigIntU64(formData.groupId),
+    color:
+      formData.color != null && String(formData.color).trim() !== ''
+        ? Number(formData.color)
+        : undefined,
+    isRequiredInMoveLines:
+      formData.isRequiredInMoveLines === ''
+        ? undefined
+        : formData.isRequiredInMoveLines === undefined
+          ? undefined
+          : Boolean(formData.isRequiredInMoveLines),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAnalyticLineParams(
+  formData: Record<string, unknown>,
+): UpdateAnalyticLineParams {
+  return {
+    name: optionalTrimmedString(formData.name),
+    amount:
+      formData.amount === '' || formData.amount == null
+        ? undefined
+        : Number(formData.amount),
+    unitAmount:
+      formData.unitAmount === '' || formData.unitAmount == null
+        ? undefined
+        : Number(formData.unitAmount),
+    partnerId: optionalBigIntU64(formData.partnerId),
+    projectId: optionalBigIntU64(formData.projectId),
+    taskId: optionalBigIntU64(formData.taskId),
+    category: optionalTrimmedString(formData.category),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAnalyticDistributionModelParams(
+  formData: Record<string, unknown>,
+): UpdateAnalyticDistributionModelParams {
+  const dist = optionalTrimmedString(formData.analyticDistribution)
+  return {
+    companyId: undefined,
+    name: optionalTrimmedString(formData.name),
+    partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
+    productId: optionalBigIntU64(formData.productId),
+    productCategId: optionalBigIntU64(formData.productCategId),
+    analyticDistribution: dist,
+    analyticPrecision:
+      formData.analyticPrecision === '' || formData.analyticPrecision == null
+        ? undefined
+        : Number(formData.analyticPrecision),
+    isActive:
+      formData.isActive === '' ? undefined : formData.isActive === undefined
+        ? undefined
+        : Boolean(formData.isActive),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+/** Convert SpacetimeDB timestamp JSON (or number) to `YYYY-MM-DD` for date inputs. */
+export function bankStatementTimestampToDateInput(v: unknown): string {
+  if (v != null && typeof v === 'object' && 'microsSinceUnixEpoch' in v) {
+    const micros = BigInt(String((v as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch))
+    const ms = Number(micros / 1000n)
+    if (Number.isFinite(ms)) return new Date(ms).toISOString().slice(0, 10)
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    return new Date(v / 1000).toISOString().slice(0, 10)
+  }
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function toCreateAccountBankStatementLineParams(
+  formData: Record<string, unknown>,
+): CreateAccountBankStatementLineParams | null {
+  const amount = Number(formData.amount ?? 0)
+  if (!Number.isFinite(amount)) return null
+  const ac = formData.amountCurrency
+  const amountCurrency =
+    ac === '' || ac == null || (typeof ac === 'string' && ac.trim() === '')
+      ? amount
+      : Number(ac)
+  if (!Number.isFinite(amountCurrency)) return null
+
+  return {
+    date: timestampFromFormDate(formData.date ?? new Date()),
+    amount,
+    amountCurrency,
+    currencyId: optionalBigIntU64(formData.currencyId),
+    foreignCurrencyId: undefined,
+    partnerId: optionalBigIntU64(formData.partnerId),
+    bankAccountId: undefined,
+    accountNumber: optionalTrimmedString(formData.accountNumber),
+    moveId: undefined,
+    isReconciled: formData.isReconciled === true,
+    transactionType: optionalTrimmedString(formData.transactionType),
+    moveIds: [],
+    paymentIds: [],
+    amountResidual: (() => {
+      if (formData.amountResidual === '' || formData.amountResidual == null) return amount
+      const r = Number(formData.amountResidual)
+      return Number.isFinite(r) ? r : amount
+    })(),
+    autoReconcileIds: [],
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAccountBankStatementLineParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> {
+  const amount = Number(formData.amount ?? 0)
+  const ac = formData.amountCurrency
+  const amountCurrency =
+    ac === '' || ac == null || (typeof ac === 'string' && ac.trim() === '')
+      ? amount
+      : Number(ac)
+  const raw: Record<string, unknown> = {
+    date: timestampFromFormDate(formData.date ?? new Date()),
+    amount: Number.isFinite(amount) ? amount : 0,
+    amountCurrency: Number.isFinite(amountCurrency) ? amountCurrency : amount,
+  }
+  const acct = optionalTrimmedString(formData.accountNumber)
+  if (acct !== undefined) raw.accountNumber = acct
+  const tt = optionalTrimmedString(formData.transactionType)
+  if (tt !== undefined) raw.transactionType = tt
+  return stdbParamsToJson(raw)
+}
+
+export function bankStatementLineParamsToJson(params: object): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+function parseBigIntU64Csv(v: unknown): bigint[] {
+  const s = String(v ?? '').trim()
+  if (s === '') return []
+  return s
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((p) => BigInt(p.trim()))
+}
+
+export function toCreateAccountReconciliationWidgetParams(
+  formData: Record<string, unknown>,
+): CreateAccountReconciliationWidgetParams | null {
+  const accountId = requiredBigIntU64(formData.accountId)
+  if (accountId === null) return null
+  const moveLineIds = parseBigIntU64Csv(formData.moveLineIds)
+  if (moveLineIds.length === 0) return null
+  return {
+    partnerId: optionalBigIntU64(formData.partnerId),
+    accountId,
+    moveLineIds,
+    toCheck: formData.toCheck === true,
+    mode: String(formData.mode ?? 'bank').trim() || 'bank',
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAccountReconciliationWidgetParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const accountId = requiredBigIntU64(formData.accountId)
+  if (accountId === null) return null
+  const moveLineIds = parseBigIntU64Csv(formData.moveLineIds)
+  const raw: Record<string, unknown> = {
+    accountId,
+    moveLineIds,
+    toCheck: formData.toCheck === true,
+    mode: String(formData.mode ?? 'bank').trim() || 'bank',
+  }
+  const pid = optionalBigIntU64(formData.partnerId)
+  if (pid !== undefined) raw.partnerId = pid
+  return stdbParamsToJson(raw)
+}
+
+export function reconciliationWidgetParamsToJson(params: object): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function bankReconcileParamsToJson(moveIds: bigint[], amountResidual: number): Record<string, unknown> {
+  return stdbParamsToJson({ moveIds, amountResidual })
 }
 
 export type PaymentResolutionContext = {
@@ -341,5 +760,541 @@ export function toCreatePaymentParamsFromInvoice(
 }
 
 export function paymentParamsToJson(params: CreatePaymentParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// ── Fiscal years ─────────────────────────────────────────────────────────────
+
+function fiscalYearTypeFromSelect(raw: unknown): string {
+  const s = String(raw ?? 'standard').trim().toLowerCase()
+  if (s === 'standard' || s === 'adjustment' || s === 'opening' || s === 'closing') return s
+  return 'standard'
+}
+
+/** `datetime-local` value from a SpacetimeDB timestamp JSON field. */
+export function fiscalYearTimestampToDatetimeLocal(v: unknown): string {
+  if (v != null && typeof v === 'object' && 'microsSinceUnixEpoch' in v) {
+    const micros = BigInt(String((v as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch))
+    const ms = Number(micros / 1000n)
+    if (Number.isFinite(ms)) {
+      const d = new Date(ms)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+  }
+  return ''
+}
+
+export function fiscalYearStateTag(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === 'object' && 'tag' in v) return String((v as { tag: string }).tag)
+  return String(v ?? '')
+}
+
+export function fiscalYearRowToFormDefaults(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    fiscalYearId: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    dateFrom: fiscalYearTimestampToDatetimeLocal(row.dateFrom),
+    dateTo: fiscalYearTimestampToDatetimeLocal(row.dateTo),
+    fiscalYearType: String(row.type ?? 'standard'),
+    isAdjustment: Boolean(row.isAdjustment),
+    notes: row.notes != null ? String(row.notes) : '',
+  }
+}
+
+export function toCreateFiscalYearParams(formData: Record<string, unknown>): CreateFiscalYearParams | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+  const dateFrom = timestampFromFormDate(formData.dateFrom)
+  const dateTo = timestampFromFormDate(formData.dateTo)
+  if (dateTo.microsSinceUnixEpoch <= dateFrom.microsSinceUnixEpoch) return null
+  return {
+    name,
+    dateFrom,
+    dateTo,
+    type: fiscalYearTypeFromSelect(formData.fiscalYearType),
+    state: { tag: 'Draft' as const },
+    carryOverAccounts: [],
+    closingMoveId: undefined,
+    openingMoveId: undefined,
+    isAdjustment: Boolean(formData.isAdjustment),
+    notes: optionalTrimmedString(formData.notes),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateFiscalYearParams(formData: Record<string, unknown>): Record<string, unknown> {
+  const payload = {
+    name: String(formData.name ?? '').trim(),
+    dateFrom: timestampFromFormDate(formData.dateFrom),
+    dateTo: timestampFromFormDate(formData.dateTo),
+    type: fiscalYearTypeFromSelect(formData.fiscalYearType),
+    isAdjustment: Boolean(formData.isAdjustment),
+    notes: optionalTrimmedString(formData.notes),
+  }
+  return stdbParamsToJson(payload)
+}
+
+// ── Account periods (fiscal sub-periods) ────────────────────────────────────
+
+export function accountPeriodStateTag(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === 'object' && 'tag' in v) return String((v as { tag: string }).tag)
+  return String(v ?? '')
+}
+
+export function accountPeriodRowToFormDefaults(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    accountPeriodId: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    code: String(row.code ?? ''),
+    dateFrom: fiscalYearTimestampToDatetimeLocal(row.dateFrom),
+    dateTo: fiscalYearTimestampToDatetimeLocal(row.dateTo),
+    isAdjustment: Boolean(row.isAdjustment),
+    notes: row.notes != null ? String(row.notes) : '',
+  }
+}
+
+export function toCreateAccountPeriodParams(
+  formData: Record<string, unknown>,
+): CreateAccountPeriodParams | null {
+  const name = String(formData.name ?? '').trim()
+  const code = String(formData.code ?? '').trim()
+  const fiscalYearId = requiredBigIntU64(formData.fiscalYearId)
+  if (!name || !code || fiscalYearId === null) return null
+  const dateFrom = timestampFromFormDate(formData.dateFrom)
+  const dateTo = timestampFromFormDate(formData.dateTo)
+  if (dateTo.microsSinceUnixEpoch <= dateFrom.microsSinceUnixEpoch) return null
+  return {
+    name,
+    code,
+    dateFrom,
+    dateTo,
+    fiscalYearId,
+    state: { tag: 'Draft' as const },
+    isAdjustment: Boolean(formData.isAdjustment),
+    notes: optionalTrimmedString(formData.notes),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toUpdateAccountPeriodParams(formData: Record<string, unknown>): Record<string, unknown> {
+  const payload = {
+    name: String(formData.name ?? '').trim(),
+    code: String(formData.code ?? '').trim(),
+    dateFrom: timestampFromFormDate(formData.dateFrom),
+    dateTo: timestampFromFormDate(formData.dateTo),
+    isAdjustment: Boolean(formData.isAdjustment),
+    notes: optionalTrimmedString(formData.notes),
+  }
+  return stdbParamsToJson(payload)
+}
+
+// ── Depreciation lines ─────────────────────────────────────────────────────────
+
+import type { CreateDepreciationLineParams } from '@lumiere/stdb/generated/types'
+
+export function toCreateDepreciationLineParams(
+  formData: Record<string, unknown>,
+): CreateDepreciationLineParams | null {
+  const assetId = requiredBigIntU64(formData.assetId)
+  if (assetId === null) return null
+  const amount = Number(formData.amount ?? 0)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  return {
+    assetId,
+    amount,
+    depreciationDate: timestampFromFormDate(formData.depreciationDate ?? new Date()),
+    name: optionalTrimmedString(formData.name),
+    moveId: optionalBigIntU64(formData.moveId),
+    moveCheck: formData.moveCheck === true,
+    movePostedCheck: formData.movePostedCheck === true,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function depreciationLineParamsToJson(params: CreateDepreciationLineParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// ── Intercompany ──────────────────────────────────────────────────────────────
+
+import type {
+  CreateIntercompanyRuleParams,
+  CreateIntercompanyTransactionParams,
+  ProcessIntercompanyTransactionParams,
+} from '@lumiere/stdb/generated/types'
+
+function toRuleType(raw: unknown): { tag: 'Sale' | 'Purchase' | 'Transfer' | 'Service' } | undefined {
+  const s = String(raw ?? '').trim()
+  switch (s) {
+    case 'Sale':
+    case 'Purchase':
+    case 'Transfer':
+    case 'Service':
+      return { tag: s }
+    default:
+      return undefined
+  }
+}
+
+export function toCreateIntercompanyRuleParams(
+  formData: Record<string, unknown>,
+): CreateIntercompanyRuleParams | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+
+  const ruleType = toRuleType(formData.ruleType)
+  if (!ruleType) return null
+
+  return {
+    name,
+    ruleType,
+    autoValidation: formData.autoValidation === true,
+    autoGenerateInvoice: formData.autoGenerateInvoice === true,
+    autoGenerateBill: formData.autoGenerateBill === true,
+    isActive: formData.isActive !== false, // default true
+    journalId: optionalBigIntU64(formData.journalId),
+    accountId: optionalBigIntU64(formData.accountId),
+    pricelistId: optionalBigIntU64(formData.pricelistId),
+    sequence: Number(formData.sequence ?? 0),
+    notes: optionalTrimmedString(formData.notes),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function intercompanyRuleParamsToJson(params: CreateIntercompanyRuleParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toCreateIntercompanyTransactionParams(
+  formData: Record<string, unknown>,
+): CreateIntercompanyTransactionParams | null {
+  const originDocumentId = requiredBigIntU64(formData.originDocumentId)
+  if (originDocumentId === null) return null
+
+  const destinationCompanyId = requiredBigIntU64(formData.destinationCompanyId)
+  if (destinationCompanyId === null) return null
+
+  const amount = Number(formData.amount ?? 0)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  if (currencyId === null) return null
+
+  const transactionType = toRuleType(formData.transactionType)
+  if (!transactionType) return null
+
+  return {
+    originDocumentId,
+    originDocumentModel: String(formData.originDocumentModel ?? 'sale.order').trim(),
+    destinationCompanyId,
+    amount,
+    currencyId,
+    transactionType,
+    autoProcess: formData.autoProcess === true,
+    requiresApproval: formData.requiresApproval !== false, // default true
+    notes: optionalTrimmedString(formData.notes),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function intercompanyTransactionParamsToJson(params: CreateIntercompanyTransactionParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toProcessIntercompanyTransactionParams(
+  formData: Record<string, unknown>,
+): ProcessIntercompanyTransactionParams | null {
+  const destinationDocumentId = requiredBigIntU64(formData.destinationDocumentId)
+  if (destinationDocumentId === null) return null
+
+  return {
+    destinationDocumentId,
+    destinationDocumentModel: String(formData.destinationDocumentModel ?? 'sale.order').trim(),
+  }
+}
+
+export function processIntercompanyTransactionParamsToJson(
+  params: ProcessIntercompanyTransactionParams,
+): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// ── Moves / Payments ────────────────────────────────────────────────────────────
+
+import type { UpdateAccountMoveLineParams } from '@lumiere/stdb/generated/types'
+
+export function toUpdateAccountMoveLineParams(
+  formData: Record<string, unknown>,
+): UpdateAccountMoveLineParams {
+  return {
+    companyId: optionalBigIntU64(formData.companyId),
+    name: optionalTrimmedString(formData.name),
+    debit: formData.debit === '' || formData.debit == null ? undefined : Number(formData.debit),
+    credit: formData.credit === '' || formData.credit == null ? undefined : Number(formData.credit),
+    partnerId: formData.partnerId === '' || formData.partnerId == null
+      ? undefined
+      : optionalBigIntU64(formData.partnerId),
+    analyticAccountId: formData.analyticAccountId === '' || formData.analyticAccountId == null
+      ? undefined
+      : optionalBigIntU64(formData.analyticAccountId),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function updateAccountMoveLineParamsToJson(params: UpdateAccountMoveLineParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// ── Tax (Extended) ────────────────────────────────────────────────────────────
+
+import type {
+  CreateAccountTaxGroupParams,
+  CreateTaxJurisdictionParams,
+  CreateTaxScheduleParams,
+  CreateTaxDeadlineParams,
+  UpdateAccountTaxGroupParams,
+  UpdateTaxJurisdictionParams,
+  UpdateTaxScheduleParams,
+  UpdateTaxDeadlineParams,
+} from '@lumiere/stdb/generated/types'
+
+// Tax Groups
+export function toCreateAccountTaxGroupParams(
+  formData: Record<string, unknown>,
+): CreateAccountTaxGroupParams | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+
+  return {
+    name,
+    sequence: Number(formData.sequence ?? 0),
+    precedingSubtotal: optionalTrimmedString(formData.precedingSubtotal),
+    taxPayableAccountId: optionalBigIntU64(formData.taxPayableAccountId),
+    taxReceivableAccountId: optionalBigIntU64(formData.taxReceivableAccountId),
+    advanceTaxPaymentAccountId: optionalBigIntU64(formData.advanceTaxPaymentAccountId),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function createAccountTaxGroupParamsToJson(params: CreateAccountTaxGroupParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toUpdateAccountTaxGroupParams(
+  formData: Record<string, unknown>,
+): UpdateAccountTaxGroupParams {
+  return {
+    name: optionalTrimmedString(formData.name),
+    sequence: formData.sequence === '' || formData.sequence == null ? undefined : Number(formData.sequence),
+    precedingSubtotal: formData.precedingSubtotal === '' || formData.precedingSubtotal == null
+      ? undefined
+      : optionalTrimmedString(formData.precedingSubtotal),
+    taxPayableAccountId: formData.taxPayableAccountId === '' || formData.taxPayableAccountId == null
+      ? undefined
+      : optionalBigIntU64(formData.taxPayableAccountId),
+    taxReceivableAccountId: formData.taxReceivableAccountId === '' || formData.taxReceivableAccountId == null
+      ? undefined
+      : optionalBigIntU64(formData.taxReceivableAccountId),
+    advanceTaxPaymentAccountId: formData.advanceTaxPaymentAccountId === '' || formData.advanceTaxPaymentAccountId == null
+      ? undefined
+      : optionalBigIntU64(formData.advanceTaxPaymentAccountId),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function updateAccountTaxGroupParamsToJson(params: UpdateAccountTaxGroupParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// Tax Jurisdictions
+export function toCreateTaxJurisdictionParams(
+  formData: Record<string, unknown>,
+): CreateTaxJurisdictionParams | null {
+  const name = String(formData.name ?? '').trim()
+  const code = String(formData.code ?? '').trim()
+  const countryCode = String(formData.countryCode ?? '').trim()
+  if (!name || !code || !countryCode) return null
+
+  return {
+    name,
+    code,
+    countryCode,
+    stateCode: optionalTrimmedString(formData.stateCode),
+    countyCode: optionalTrimmedString(formData.countyCode),
+    city: optionalTrimmedString(formData.city),
+    zipFrom: optionalTrimmedString(formData.zipFrom),
+    zipTo: optionalTrimmedString(formData.zipTo),
+    isActive: formData.isActive !== false, // default true
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function createTaxJurisdictionParamsToJson(params: CreateTaxJurisdictionParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toUpdateTaxJurisdictionParams(
+  formData: Record<string, unknown>,
+): UpdateTaxJurisdictionParams {
+  return {
+    name: optionalTrimmedString(formData.name),
+    code: optionalTrimmedString(formData.code),
+    stateCode: formData.stateCode === '' || formData.stateCode == null
+      ? undefined
+      : optionalTrimmedString(formData.stateCode),
+    countyCode: formData.countyCode === '' || formData.countyCode == null
+      ? undefined
+      : optionalTrimmedString(formData.countyCode),
+    city: formData.city === '' || formData.city == null
+      ? undefined
+      : optionalTrimmedString(formData.city),
+    zipFrom: formData.zipFrom === '' || formData.zipFrom == null
+      ? undefined
+      : optionalTrimmedString(formData.zipFrom),
+    zipTo: formData.zipTo === '' || formData.zipTo == null
+      ? undefined
+      : optionalTrimmedString(formData.zipTo),
+    isActive: formData.isActive === '' || formData.isActive == null ? undefined : Boolean(formData.isActive),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function updateTaxJurisdictionParamsToJson(params: UpdateTaxJurisdictionParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// Tax Schedules
+export function toCreateTaxScheduleParams(
+  formData: Record<string, unknown>,
+): CreateTaxScheduleParams | null {
+  const name = String(formData.name ?? '').trim()
+  if (!name) return null
+
+  return {
+    name,
+    description: optionalTrimmedString(formData.description),
+    jurisdictionId: optionalBigIntU64(formData.jurisdictionId),
+    taxIds: Array.isArray(formData.taxIds)
+      ? formData.taxIds.map((id) => BigInt(String(id)))
+      : [],
+    isActive: formData.isActive !== false, // default true
+    effectiveFrom: optionalTimestampFromFormDate(formData.effectiveFrom),
+    effectiveTo: optionalTimestampFromFormDate(formData.effectiveTo),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function createTaxScheduleParamsToJson(params: CreateTaxScheduleParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toUpdateTaxScheduleParams(
+  formData: Record<string, unknown>,
+): UpdateTaxScheduleParams {
+  return {
+    name: optionalTrimmedString(formData.name),
+    description: formData.description === '' || formData.description == null
+      ? undefined
+      : optionalTrimmedString(formData.description),
+    jurisdictionId: formData.jurisdictionId === '' || formData.jurisdictionId == null
+      ? undefined
+      : optionalBigIntU64(formData.jurisdictionId),
+    taxIds: formData.taxIds === undefined
+      ? undefined
+      : Array.isArray(formData.taxIds)
+        ? formData.taxIds.map((id) => BigInt(String(id)))
+        : [],
+    isActive: formData.isActive === '' || formData.isActive == null ? undefined : Boolean(formData.isActive),
+    effectiveFrom: formData.effectiveFrom === undefined
+      ? undefined
+      : optionalTimestampFromFormDate(formData.effectiveFrom),
+    effectiveTo: formData.effectiveTo === undefined
+      ? undefined
+      : optionalTimestampFromFormDate(formData.effectiveTo),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function updateTaxScheduleParamsToJson(params: UpdateTaxScheduleParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+// Tax Deadlines
+function toTaxDeadlineType(raw: unknown): { tag: 'Filing' | 'Payment' | 'Registration' | 'Report' | 'Renewal' } | undefined {
+  const s = String(raw ?? '').trim()
+  switch (s) {
+    case 'Filing':
+    case 'Payment':
+    case 'Registration':
+    case 'Report':
+    case 'Renewal':
+      return { tag: s }
+    default:
+      return undefined
+  }
+}
+
+export function toCreateTaxDeadlineParams(
+  formData: Record<string, unknown>,
+): CreateTaxDeadlineParams | null {
+  const title = String(formData.title ?? '').trim()
+  if (!title) return null
+
+  const deadlineType = toTaxDeadlineType(formData.deadlineType)
+  if (!deadlineType) return undefined as unknown as null
+
+  const dueDate = formData.dueDate != null && String(formData.dueDate).trim() !== ''
+    ? timestampFromFormDate(formData.dueDate)
+    : undefined as unknown as null
+  if (!dueDate) return null
+
+  return {
+    companyId: optionalBigIntU64(formData.companyId),
+    taxObligationId: optionalBigIntU64(formData.taxObligationId),
+    deadlineType,
+    title,
+    description: optionalTrimmedString(formData.description),
+    dueDate,
+    fiscalPeriodStart: optionalTimestampFromFormDate(formData.fiscalPeriodStart),
+    fiscalPeriodEnd: optionalTimestampFromFormDate(formData.fiscalPeriodEnd),
+    reminderDaysBefore: Array.isArray(formData.reminderDaysBefore)
+      ? formData.reminderDaysBefore.map((d) => Number(d))
+      : [],
+    autoGenerated: formData.autoGenerated === true,
+  }
+}
+
+export function createTaxDeadlineParamsToJson(params: CreateTaxDeadlineParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
+export function toUpdateTaxDeadlineParams(
+  formData: Record<string, unknown>,
+): UpdateTaxDeadlineParams {
+  return {
+    title: optionalTrimmedString(formData.title),
+    description: optionalTrimmedString(formData.description),
+    dueDate: formData.dueDate === undefined
+      ? undefined
+      : optionalTimestampFromFormDate(formData.dueDate),
+    fiscalPeriodStart: formData.fiscalPeriodStart === undefined
+      ? undefined
+      : optionalTimestampFromFormDate(formData.fiscalPeriodStart),
+    fiscalPeriodEnd: formData.fiscalPeriodEnd === undefined
+      ? undefined
+      : optionalTimestampFromFormDate(formData.fiscalPeriodEnd),
+    reminderDaysBefore: formData.reminderDaysBefore === undefined
+      ? undefined
+      : Array.isArray(formData.reminderDaysBefore)
+        ? formData.reminderDaysBefore.map((d) => Number(d))
+        : [],
+  }
+}
+
+export function updateTaxDeadlineParamsToJson(params: UpdateTaxDeadlineParams): Record<string, unknown> {
   return stdbParamsToJson(params)
 }

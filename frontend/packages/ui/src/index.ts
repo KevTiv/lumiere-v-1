@@ -190,7 +190,10 @@ export * from "./accounting-components/invoice-detail-modal";
 export * from "./accounting-components/create-invoice-modal";
 export * from "./accounting-components/bills-list-view";
 export * from "./accounting-components/chart-of-accounts-view";
+export * from "./accounting-components/chart-structure-workspace";
 export * from "./accounting-components/general-ledger-view";
+export * from "./accounting-components/budgets-workspace";
+export * from "./accounting-components/consolidation-workspace";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";

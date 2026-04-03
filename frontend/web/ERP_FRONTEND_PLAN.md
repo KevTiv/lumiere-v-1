@@ -5,6 +5,21 @@
 
 ---
 
+## Remaining work — form builder (required)
+
+Any **new or unfinished UI** that collects structured user input (entity create/edit, multi-field dialogs) **must** use the shared form builder:
+
+| Piece | Where |
+|-------|--------|
+| **`FormConfig`** | `frontend/packages/ui/src/lib/*-form-configs.ts` and/or `frontend/packages/ui/src/forms/config/modules/*.config.ts` |
+| **Shell** | **`FormModal`** + **`ModularForm`** (`@lumiere/ui`) — avoid new ad-hoc `Dialog` + raw inputs for CRUD |
+| **Edit mode** | `mergeFieldDefaultValues` from `form-config-merge`; remount with a changing `key` when switching rows |
+| **Dynamic selects** | `mergeSelectOptionsByFieldName` for options backed by live queries |
+
+Treat this as **standard for all pending items that touch forms**, unless this document explicitly documents an exception.
+
+---
+
 ## Current State Summary
 
 ### Existing Module Pages (have `*-client.tsx` + dashboard configs)
