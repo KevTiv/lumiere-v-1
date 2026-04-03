@@ -12,6 +12,9 @@
     "settings": "Settings",
     "back": "Back",
     "next": "Next",
+    "active": "Active",
+    "inactive": "Inactive",
+    "none": "None",
     "close": "Close",
     "submit": "Submit",
     "reset": "Reset",
@@ -39,14 +42,16 @@
       "noSaleOrders": "No sale orders — create a confirmed sale order first.",
       "noSubscriptionPlans": "No subscription plans — create a plan first.",
       "noAccounts": "No GL accounts — set up chart of accounts first.",
+      "noAnalyticAccounts": "No analytic accounts — create an analytic account first.",
       "noEmployees": "No employees — add employees in HR first.",
       "noTeams": "No helpdesk teams — configure teams first.",
       "noStages": "No pipeline stages — configure helpdesk stages first.",
       "noProjects": "No projects — create a project first.",
       "noBoms": "No bills of materials — create a BOM first.",
       "noTaskStages": "No task stages yet — create a task with a stage first, or leave stage empty.",
-      "noLeaveTypes": "No leave types in history — configure leave types or submit a first request with a type id.",
-      "noDepartments": "No departments — create departments first."
+      "noLeaveTypes": "No leave types configured — create leave types first.",
+      "noDepartments": "No departments — create departments first.",
+      "noPayrollStructures": "No payroll structures — create a payroll structure first."
     },
     "validation": {
       "required": "This field is required",
@@ -564,7 +569,30 @@
         "unused": "Unused",
         "deprecated": "Deprecated",
         "active": "Active"
-      }
+      },
+      "coasTab": "Accounts"
+    },
+    "chartStructure": {
+      "tabLabel": "Chart structure",
+      "typesTitle": "Account types",
+      "typesDescription": "Classification types linked to the chart (opening balance rules, internal group).",
+      "groupsTitle": "Account groups",
+      "groupsDescription": "Hierarchical groups and optional code prefix ranges.",
+      "newType": "New account type",
+      "newGroup": "New account group",
+      "searchTypes": "Search types…",
+      "searchGroups": "Search groups…",
+      "colName": "Name",
+      "colTypeKey": "Type key",
+      "colGroup": "Internal group",
+      "colOpening": "Opening bal.",
+      "colDeprecated": "Deprecated",
+      "colLevel": "Level",
+      "colParent": "Parent",
+      "colPrefixStart": "Prefix from",
+      "colPrefixEnd": "Prefix to",
+      "emptyTypes": "No account types yet.",
+      "emptyGroups": "No account groups yet."
     },
     "journalEntries": {
       "title": "Journal Entries",
@@ -648,13 +676,267 @@
       "taxUse": "Type",
       "priceInclude": "Price Inc."
     },
+    "taxGroups": {
+      "title": "Tax Groups",
+      "description": "Group taxes by type for reporting and sequencing",
+      "searchPlaceholder": "Search tax groups…",
+      "emptyMessage": "No tax groups found.",
+      "columns": {
+        "name": "Name",
+        "sequence": "Sequence",
+        "precedingSubtotal": "Preceding Subtotal",
+        "taxPayableAccountId": "Payable Account",
+        "taxReceivableAccountId": "Receivable Account",
+        "advanceTaxPaymentAccountId": "Advance Payment Account"
+      },
+      "filters": {
+        "name": "Name"
+      },
+      "actions": {
+        "newTaxGroup": "New Tax Group",
+        "editTaxGroup": "Edit Tax Group"
+      }
+    },
+    "taxJurisdictions": {
+      "title": "Tax Jurisdictions",
+      "description": "Geographic areas for tax calculation (country, state, county, city, ZIP)",
+      "searchPlaceholder": "Search jurisdictions…",
+      "emptyMessage": "No tax jurisdictions found.",
+      "columns": {
+        "name": "Name",
+        "code": "Code",
+        "countryCode": "Country",
+        "stateCode": "State",
+        "countyCode": "County",
+        "city": "City",
+        "zipFrom": "ZIP From",
+        "zipTo": "ZIP To",
+        "isActive": "Active"
+      },
+      "filters": {
+        "countryCode": "Country",
+        "stateCode": "State",
+        "isActive": "Status"
+      },
+      "actions": {
+        "newJurisdiction": "New Jurisdiction",
+        "editJurisdiction": "Edit Jurisdiction"
+      }
+    },
+    "taxSchedules": {
+      "title": "Tax Schedules",
+      "description": "Date-based tax configurations with effective periods",
+      "searchPlaceholder": "Search schedules…",
+      "emptyMessage": "No tax schedules found.",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "jurisdictionId": "Jurisdiction",
+        "taxIds": "Taxes",
+        "isActive": "Active",
+        "effectiveFrom": "Effective From",
+        "effectiveTo": "Effective To"
+      },
+      "filters": {
+        "jurisdictionId": "Jurisdiction",
+        "isActive": "Status"
+      },
+      "actions": {
+        "newSchedule": "New Schedule",
+        "editSchedule": "Edit Schedule"
+      }
+    },
+    "taxDeadlines": {
+      "title": "Tax Deadlines",
+      "description": "Filing and payment due dates with reminders",
+      "searchPlaceholder": "Search deadlines…",
+      "emptyMessage": "No tax deadlines found.",
+      "columns": {
+        "title": "Title",
+        "deadlineType": "Type",
+        "dueDate": "Due Date",
+        "status": "Status",
+        "companyId": "Company",
+        "fiscalPeriodStart": "Period Start",
+        "fiscalPeriodEnd": "Period End",
+        "reminderDaysBefore": "Reminders",
+        "autoGenerated": "Auto-generated"
+      },
+      "filters": {
+        "deadlineType": "Type",
+        "status": "Status",
+        "companyId": "Company"
+      },
+      "deadlineTypes": {
+        "Filing": "Filing",
+        "Payment": "Payment",
+        "Registration": "Registration",
+        "Report": "Report",
+        "Renewal": "Renewal"
+      },
+      "statuses": {
+        "pending": "Pending",
+        "completed": "Completed",
+        "waived": "Waived",
+        "overdue": "Overdue"
+      },
+      "actions": {
+        "newDeadline": "New Deadline",
+        "editDeadline": "Edit Deadline",
+        "completeSelected": "Complete Selected",
+        "waiveSelected": "Waive Selected",
+        "deleteSelected": "Delete Selected",
+        "refreshStatuses": "Refresh Statuses",
+        "scheduleUpdates": "Schedule Updates"
+      }
+    },
     "budgets": {
       "title": "Budgets",
       "planned": "Planned",
       "practical": "Actual",
       "variance": "Variance %",
       "confirmSelected": "Confirm selected",
-      "cancelSelected": "Cancel selected"
+      "cancelSelected": "Cancel selected",
+      "workspace": {
+        "listTitle": "Budgets",
+        "listDescription": "Open a budget to run workflow actions and manage lines.",
+        "emptyBudgets": "No budgets found.",
+        "postsTitle": "Budget positions",
+        "postsDescription": "Categorize GL accounts for planning and reporting.",
+        "searchPosts": "Search budget positions…",
+        "emptyPosts": "No budget positions yet.",
+        "colName": "Name",
+        "newPost": "New position",
+        "editPost": "Edit budget position",
+        "detailHint": "Confirm, validate, or close the budget. Edit line actuals when the budget is confirmed or validated.",
+        "confirm": "Confirm",
+        "validate": "Validate",
+        "markDone": "Mark done",
+        "cancelBudget": "Cancel budget",
+        "linesTitle": "Budget lines",
+        "colAnalytic": "Analytic account",
+        "actions": "Actions",
+        "noLines": "No lines on this budget.",
+        "actuals": "Actuals",
+        "deleteLine": "Delete line",
+        "postCode": "Code",
+        "postDescription": "Description",
+        "accountIdsHint": "Account IDs (comma-separated)",
+        "active": "Active"
+      }
+    },
+    "consolidation": {
+      "tabLabel": "Consolidation",
+      "accounts": {
+        "title": "Consolidation Accounts",
+        "description": "Define accounts used for intercompany consolidation and elimination.",
+        "newAccount": "New account",
+        "editAccount": "Edit account",
+        "empty": "No consolidation accounts yet.",
+        "colCode": "Code",
+        "colName": "Name",
+        "colType": "Type",
+        "colRate": "Rate",
+        "colIntercompany": "Intercompany",
+        "colActive": "Active"
+      },
+      "journals": {
+        "title": "Consolidation Journals",
+        "description": "Manage consolidation periods and journal entries.",
+        "newJournal": "New journal",
+        "empty": "No consolidation journals yet.",
+        "colName": "Name",
+        "colPeriod": "Period",
+        "colState": "State",
+        "colDebit": "Debit",
+        "colCredit": "Credit",
+        "process": "Process",
+        "validate": "Validate",
+        "cancelTitle": "Cancel consolidation",
+        "cancelHint": "Provide a reason for cancellation.",
+        "cancelReasonPlaceholder": "Reason for cancellation…",
+        "confirmCancel": "Confirm cancel"
+      },
+      "elimination": {
+        "title": "Elimination Entries",
+        "newEntry": "New entry",
+        "empty": "No elimination entries for this journal.",
+        "colName": "Name",
+        "colAccount": "Account",
+        "colType": "Type",
+        "colDebit": "Debit",
+        "colCredit": "Credit",
+        "colMatched": "Matched",
+        "match": "Match",
+        "unmatch": "Unmatch",
+        "matchIdPlaceholder": "Entry ID to match…"
+      },
+      "forms": {
+        "newAccount": {
+          "title": "New Consolidation Account",
+          "description": "Create an account for intercompany consolidation.",
+          "fields": {
+            "name": "Name",
+            "code": "Account Code",
+            "accountType": "Account Type",
+            "consolidationRate": "Consolidation Rate (%)",
+            "currencyId": "Currency ID",
+            "eliminationMethod": "Elimination Method",
+            "isIntercompany": "Intercompany Account"
+          }
+        },
+        "editAccount": {
+          "title": "Edit Consolidation Account"
+        },
+        "newJournal": {
+          "title": "New Consolidation Journal",
+          "description": "Define a consolidation period and journal.",
+          "fields": {
+            "name": "Journal Name",
+            "periodName": "Period Name",
+            "dateFrom": "Date From",
+            "dateTo": "Date To",
+            "currencyId": "Currency ID",
+            "exchangeRate": "Exchange Rate"
+          }
+        },
+        "newElimination": {
+          "title": "New Elimination Entry",
+          "description": "Add an intercompany elimination entry to a consolidation journal.",
+          "fields": {
+            "journalId": "Journal ID",
+            "name": "Description",
+            "accountId": "Account ID",
+            "accountCode": "Account Code",
+            "accountName": "Account Name",
+            "companyId": "Company ID",
+            "debit": "Debit",
+            "credit": "Credit",
+            "currencyId": "Currency ID",
+            "eliminationType": "Elimination Type",
+            "reference": "Reference"
+          }
+        }
+      },
+      "accountTypes": {
+        "asset": "Asset",
+        "liability": "Liability",
+        "equity": "Equity",
+        "income": "Income",
+        "expense": "Expense"
+      },
+      "eliminationMethods": {
+        "full": "Full",
+        "partial": "Partial",
+        "proportional": "Proportional"
+      },
+      "eliminationTypes": {
+        "intercompany": "Intercompany",
+        "investment": "Investment",
+        "dividend": "Dividend",
+        "profit": "Profit",
+        "other": "Other"
+      }
     },
     "states": {
       "draft": "Draft",
@@ -675,7 +957,20 @@
       "customerInvoices": "Customer Invoices",
       "vendorBills": "Vendor Bills",
       "taxes": "Taxes",
-      "budgets": "Budgets"
+      "budgets": "Budgets",
+      "consolidation": "Consolidation"
+    },
+    "tabs": {
+      "analyticAccounts": "Analytic accounts",
+      "analyticLines": "Analytic lines",
+      "analyticDistribution": "Distribution models",
+      "reconciliationWidgets": "Reconciliation",
+      "fiscalYears": "Fiscal years",
+      "accountPeriods": "Periods",
+      "taxGroups": "Tax Groups",
+      "taxJurisdictions": "Jurisdictions",
+      "taxSchedules": "Schedules",
+      "taxDeadlines": "Deadlines"
     },
     "actions": {
       "newInvoice": "New Invoice",
@@ -683,9 +978,20 @@
       "newEntry": "New Journal Entry",
       "newAccount": "New Account",
       "newTax": "New Tax",
+      "newTaxGroup": "New Tax Group",
+      "newTaxJurisdiction": "New Jurisdiction",
+      "newTaxSchedule": "New Schedule",
+      "newTaxDeadline": "New Deadline",
       "newBudget": "New Budget",
+      "newAnalyticAccount": "New analytic account",
+      "newAnalyticLine": "New analytic line",
+      "newAnalyticDistribution": "New distribution model",
+      "newReconciliationWidget": "New widget",
+      "newFiscalYear": "New fiscal year",
+      "newAccountPeriod": "New period",
       "post": "Post",
-      "registerPayment": "Register Payment"
+      "registerPayment": "Register Payment",
+      "importTaxRateCsv": "Import Tax Rates (CSV)"
     },
     "overview": {
       "title": "Accounting",
@@ -743,6 +1049,43 @@
           "Confirm": "Confirmed"
         }
       },
+      "reconciliationWidgets": {
+        "title": "Reconciliation widgets",
+        "description": "Group journal lines for bank / GL reconciliation review.",
+        "searchPlaceholder": "Search by mode or account…",
+        "emptyMessage": "No reconciliation widgets yet.",
+        "columns": {
+          "accountId": "Account",
+          "mode": "Mode",
+          "toCheck": "To check",
+          "partnerId": "Partner",
+          "moveLineIds": "Move line IDs"
+        }
+      },
+      "analyticLines": {
+        "title": "Analytic lines",
+        "description": "Entries posted to analytic accounts",
+        "searchPlaceholder": "Search lines…",
+        "emptyMessage": "No analytic lines found.",
+        "columns": {
+          "name": "Label",
+          "accountId": "Analytic account",
+          "amount": "Amount",
+          "date": "Date"
+        }
+      },
+      "analyticDistributionModels": {
+        "title": "Analytic distribution models",
+        "description": "Rules to split analytic amounts (JSON distribution)",
+        "searchPlaceholder": "Search models…",
+        "emptyMessage": "No distribution models found.",
+        "columns": {
+          "name": "Name",
+          "isActive": "Active",
+          "analyticPrecision": "Precision",
+          "analyticDistribution": "Distribution"
+        }
+      },
       "fixedAssets": {
         "title": "Fixed Assets",
         "description": "Property, plant, and equipment register",
@@ -769,6 +1112,174 @@
           "Draft": "Draft",
           "Open": "Running",
           "Close": "Closed"
+        },
+        "actions": {
+          "confirmSelected": "Confirm Selected",
+          "closeSelected": "Close Selected",
+          "computeDepreciation": "Compute Depreciation",
+          "deleteSelected": "Delete Selected"
+        }
+      },
+      "intercompanyRules": {
+        "title": "Intercompany Rules",
+        "description": "Rules for cross-company transactions and transfers",
+        "searchPlaceholder": "Search by name or type…",
+        "emptyMessage": "No intercompany rules found.",
+        "columns": {
+          "name": "Rule Name",
+          "ruleType": "Type",
+          "sourceCompanyId": "Source Company",
+          "destinationCompanyId": "Destination Company",
+          "isActive": "Active",
+          "autoValidation": "Auto-validate",
+          "autoGenerateInvoice": "Auto-invoice",
+          "autoGenerateBill": "Auto-bill"
+        },
+        "filters": {
+          "ruleType": "Type",
+          "ruleType.options": {
+            "Sale": "Sale",
+            "Purchase": "Purchase",
+            "Transfer": "Transfer",
+            "Service": "Service"
+          },
+          "isActive": "Status",
+          "isActive.options": {
+            "true": "Active",
+            "false": "Inactive"
+          }
+        },
+        "states": {
+          "Sale": "Sale",
+          "Purchase": "Purchase",
+          "Transfer": "Transfer",
+          "Service": "Service"
+        },
+        "actions": {
+          "activateSelected": "Activate Selected",
+          "deactivateSelected": "Deactivate Selected",
+          "deleteSelected": "Delete Selected"
+        }
+      },
+      "intercompanyTransactions": {
+        "title": "Intercompany Transactions",
+        "description": "Cross-company transactions and their lifecycle",
+        "searchPlaceholder": "Search by document or company…",
+        "emptyMessage": "No intercompany transactions found.",
+        "columns": {
+          "originDocumentId": "Origin Document",
+          "originDocumentModel": "Document Type",
+          "destinationCompanyId": "Destination Company",
+          "amount": "Amount",
+          "currencyId": "Currency",
+          "transactionType": "Type",
+          "state": "Status",
+          "autoProcess": "Auto-process",
+          "requiresApproval": "Requires Approval"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "Draft": "Draft",
+            "Pending": "Pending",
+            "Approved": "Approved",
+            "Processing": "Processing",
+            "Completed": "Completed",
+            "Error": "Error",
+            "Cancelled": "Cancelled"
+          },
+          "transactionType": "Type",
+          "transactionType.options": {
+            "Sale": "Sale",
+            "Purchase": "Purchase",
+            "Transfer": "Transfer",
+            "Service": "Service"
+          }
+        },
+        "states": {
+          "Draft": "Draft",
+          "Pending": "Pending",
+          "Approved": "Approved",
+          "Processing": "Processing",
+          "Completed": "Completed",
+          "Error": "Error",
+          "Cancelled": "Cancelled"
+        },
+        "actions": {
+          "approveSelected": "Approve Selected",
+          "processSelected": "Process Selected",
+          "completeSelected": "Complete Selected",
+          "retrySelected": "Retry Selected",
+          "cancelSelected": "Cancel Selected",
+          "errorSelected": "Mark as Error"
+        }
+      },
+      "fiscalYears": {
+        "title": "Fiscal years",
+        "description": "Company fiscal years — open, close, and manage periods",
+        "searchPlaceholder": "Search by name…",
+        "emptyMessage": "No fiscal years found.",
+        "columns": {
+          "name": "Name",
+          "dateFrom": "Start",
+          "dateTo": "End",
+          "state": "Status",
+          "type": "Type",
+          "isAdjustment": "Adjustment"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "Draft": "Draft",
+            "Running": "Running",
+            "Closed": "Closed",
+            "Locked": "Locked"
+          }
+        },
+        "states": {
+          "Draft": "Draft",
+          "Running": "Running",
+          "Closed": "Closed",
+          "Locked": "Locked"
+        },
+        "actions": {
+          "openSelected": "Open (draft → running)",
+          "closeSelected": "Close year",
+          "editForm": "Edit…",
+          "deleteSelected": "Delete draft"
+        }
+      },
+      "accountPeriods": {
+        "title": "Periods",
+        "description": "Accounting periods within fiscal years — open, close, and manage sub-periods",
+        "searchPlaceholder": "Search by name or code…",
+        "emptyMessage": "No periods found.",
+        "columns": {
+          "name": "Name",
+          "code": "Code",
+          "fiscalYear": "Fiscal year",
+          "dateFrom": "Start",
+          "dateTo": "End",
+          "state": "Status",
+          "isAdjustment": "Adjustment"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "Draft": "Draft",
+            "Open": "Open",
+            "Closed": "Closed"
+          }
+        },
+        "states": {
+          "Draft": "Draft",
+          "Open": "Open",
+          "Closed": "Closed"
+        },
+        "actions": {
+          "openSelected": "Open period (draft → open)",
+          "closeSelected": "Close period",
+          "deleteSelected": "Delete period"
         }
       }
     },
@@ -941,6 +1452,121 @@
           "descriptionPlaceholder": "Budget purpose or notes..."
         }
       },
+      "fiscalYear": {
+        "title": "New fiscal year",
+        "editTitle": "Edit fiscal year",
+        "description": "Create a fiscal year in draft; open it when ready. Dates must not overlap another year.",
+        "submitLabel": "Create fiscal year",
+        "submitEditLabel": "Save changes",
+        "sections": {
+          "main": "Fiscal year"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. FY 2027",
+          "dateFrom": "Start",
+          "dateTo": "End",
+          "fiscalYearType": "Year type",
+          "isAdjustment": "Adjustment year",
+          "notes": "Notes",
+          "notesPlaceholder": "Optional",
+          "metadata": "Metadata",
+          "metadataPlaceholder": "Optional JSON",
+          "fiscalYearId": "Fiscal year ID"
+        }
+      },
+      "accountPeriod": {
+        "title": "New period",
+        "editTitle": "Edit period",
+        "description": "Create a period in draft within a fiscal year. Dates must fall inside the fiscal year and not overlap other periods.",
+        "editDescription": "Update name, code, or dates while the period is not closed.",
+        "submitLabel": "Create period",
+        "submitEditLabel": "Save changes",
+        "sections": {
+          "main": "Period"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. January 2026",
+          "code": "Code",
+          "codePlaceholder": "e.g. 2026-01",
+          "fiscalYearId": "Fiscal year",
+          "fiscalYearPlaceholder": "Select fiscal year…",
+          "dateFrom": "Start",
+          "dateTo": "End",
+          "isAdjustment": "Adjustment period",
+          "notes": "Notes",
+          "notesPlaceholder": "Optional"
+        }
+      },
+      "budgetPost": {
+        "title": "New budget position",
+        "editTitle": "Edit budget position",
+        "description": "Group GL accounts for budget reporting.",
+        "submitLabel": "Create position",
+        "sections": {
+          "main": "Position"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. Operating expenses",
+          "code": "Code",
+          "codePlaceholder": "Optional short code",
+          "description": "Description",
+          "descriptionPlaceholder": "Optional notes",
+          "accountIds": "Account IDs",
+          "accountIdsPlaceholder": "Comma or space separated, e.g. 6010, 6020",
+          "isActive": "Active"
+        }
+      },
+      "updateBudgetLineActuals": {
+        "title": "Update line actuals",
+        "description": "Set practical and theoretical amounts for this budget line (confirmed or validated budgets).",
+        "submitLabel": "Save amounts",
+        "fields": {
+          "practicalAmount": "Actual (practical)",
+          "theoreticalAmount": "Theoretical"
+        }
+      },
+      "accountAccountType": {
+        "title": "New account type",
+        "editTitle": "Edit account type",
+        "description": "Define a user-facing account type (classification string and balance sheet group).",
+        "submitLabel": "Create type",
+        "sections": {
+          "main": "Type"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. Fixed assets",
+          "typeKey": "Type key",
+          "typeKeyPlaceholder": "Stable code, e.g. asset_non_current",
+          "includeInitialBalance": "Include in opening balance",
+          "isDeprecated": "Deprecated",
+          "metadata": "Metadata",
+          "metadataPlaceholder": "Optional JSON or notes"
+        }
+      },
+      "accountGroup": {
+        "title": "New account group",
+        "editTitle": "Edit account group",
+        "description": "Organize accounts in a hierarchy; parent is set when creating the group.",
+        "submitLabel": "Create group",
+        "noParent": "No parent (root)",
+        "sections": {
+          "main": "Group"
+        },
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g. 60 — Expenses",
+          "level": "Level",
+          "codePrefixStart": "Code prefix from",
+          "codePrefixEnd": "Code prefix to",
+          "parentId": "Parent group",
+          "metadata": "Metadata",
+          "metadataPlaceholder": "Optional JSON or notes"
+        }
+      },
       "postMove": {
         "title": "Confirm Posting",
         "description": "Post this entry to the general ledger. This action cannot be undone.",
@@ -961,7 +1587,178 @@
           "memo": "Memo",
           "memoPlaceholder": "Optional note"
         }
+      },
+      "analyticAccount": {
+        "createTitle": "New analytic account",
+        "createDescription": "Cost center or analytic dimension for project / department tracking.",
+        "submitLabel": "Create analytic account",
+        "editTitle": "Edit analytic account",
+        "sections": {
+          "main": "Account"
+        },
+        "fields": {
+          "name": "Name",
+          "code": "Code",
+          "currencyId": "Currency ID",
+          "active": "Active",
+          "isRequiredInMoveLines": "Required on journal lines",
+          "isRequiredInDistribution": "Required in analytic distribution",
+          "isRootPlan": "Root analytic plan",
+          "accountActive": "Active"
+        }
+      },
+      "analyticLine": {
+        "createTitle": "New analytic line",
+        "createDescription": "Post an amount against an analytic account.",
+        "submitLabel": "Create line",
+        "editTitle": "Edit analytic line",
+        "sections": {
+          "main": "Line"
+        },
+        "fields": {
+          "name": "Label",
+          "accountId": "Analytic account",
+          "amount": "Amount",
+          "unitAmount": "Unit amount",
+          "date": "Date",
+          "description": "Description"
+        }
+      },
+      "analyticDistribution": {
+        "createTitle": "New distribution model",
+        "createDescription": "Rule to allocate 100% to one analytic account (extend JSON on the server for multi-split).",
+        "submitLabel": "Create model",
+        "editTitle": "Edit distribution model",
+        "sections": {
+          "main": "Model"
+        },
+        "fields": {
+          "name": "Name",
+          "analyticAccountId": "Target analytic account",
+          "analyticPrecision": "Percentage decimals",
+          "analyticDistributionJson": "Distribution JSON",
+          "isActive": "Active"
+        }
+      },
+      "bankStatementLine": {
+        "createTitle": "New bank statement line",
+        "createDescription": "Add a transaction line to this statement (only while the statement is open).",
+        "editTitle": "Edit statement line",
+        "editDescription": "Update amounts and reference fields for this line.",
+        "submitLabel": "Add line",
+        "sections": {
+          "main": "Line"
+        },
+        "fields": {
+          "date": "Date",
+          "amount": "Amount",
+          "amountCurrency": "Amount in currency",
+          "partnerId": "Partner ID",
+          "partnerIdPlaceholder": "Optional contact / partner row id",
+          "accountNumber": "Account / mask",
+          "transactionType": "Transaction type",
+          "transactionTypePlaceholder": "e.g. debit, credit"
+        }
+      },
+      "reconciliationWidget": {
+        "createTitle": "New reconciliation widget",
+        "createDescription": "Pin a GL account and a set of move lines for reconciliation.",
+        "editTitle": "Edit reconciliation widget",
+        "editDescription": "Update move lines or flags for this widget.",
+        "submitLabel": "Create widget",
+        "sections": {
+          "main": "Widget"
+        },
+        "fields": {
+          "accountId": "GL account",
+          "partnerId": "Partner ID",
+          "partnerIdPlaceholder": "Optional",
+          "mode": "Mode",
+          "moveLineIds": "Move line IDs",
+          "moveLineIdsHint": "Comma-separated numeric ids (journal items).",
+          "toCheck": "Needs review"
+        }
       }
+    },
+    "bankStatementDetail": {
+      "title": "Bank statement",
+      "columnReconciled": "Reconciled",
+      "linesHeading": "Lines",
+      "emptyLines": "No lines yet. Add a line to build the statement.",
+      "balanceMismatch": "Ending balance does not match computed total — adjust totals on the statement before posting.",
+      "postedHint": "This statement is posted; lines cannot be added or removed.",
+      "deleteStatementConfirm": "Delete this bank statement? This cannot be undone.",
+      "deleteLineConfirm": "Delete this statement line?",
+      "addLineButton": "Add line",
+      "reconciliationRuleId": "Rule ID (optional)",
+      "reconciliationRuleIdHint": "Optional reconciliation rule id passed to match / rules reducers.",
+      "focusLineForMatches": "Select a line, then run match or rules.",
+      "focusLineButton": "Focus line",
+      "matchBankLine": "Match bank line",
+      "applyRules": "Apply rules",
+      "matchCandidatesHeading": "Match candidates",
+      "noCandidates": "No candidates — run Match or Apply rules for the selected line.",
+      "candidateType": "Type",
+      "candidateMoveLine": "Move line",
+      "candidateAmount": "Amount",
+      "candidateScore": "Score",
+      "reconcileWithCandidate": "Reconcile",
+      "manualReconcileHeading": "Manual reconcile",
+      "manualMoveLineIds": "Move line IDs",
+      "manualMoveLineIdsHint": "Comma-separated journal item (move line) ids.",
+      "manualAmountResidual": "Amount residual",
+      "reconcileManual": "Reconcile (manual)",
+      "unreconcileLine": "Unreconcile",
+      "unreconcileConfirm": "Clear reconciliation for this line?"
+    },
+    "fiscalYears": {
+      "title": "Fiscal Years",
+      "description": "Manage fiscal year periods",
+      "columns": {
+        "name": "Name",
+        "dateFrom": "Start Date",
+        "dateTo": "End Date",
+        "state": "Status"
+      }
+    },
+    "accountPeriods": {
+      "title": "Accounting Periods",
+      "description": "Manage accounting period closures",
+      "columns": {
+        "name": "Name",
+        "dateFrom": "Start Date",
+        "dateTo": "End Date",
+        "state": "Status"
+      }
+    },
+    "reconciliation": {
+      "title": "Reconciliation",
+      "description": "Bank and account reconciliation",
+      "widgets": {
+        "toReconcile": "Items to Reconcile",
+        "reconciled": "Reconciled Items"
+      }
+    },
+    "fixedAssets": {
+      "title": "Fixed Assets",
+      "description": "Asset management and depreciation",
+      "columns": {
+        "name": "Asset Name",
+        "originalValue": "Original Value",
+        "bookValue": "Book Value",
+        "depreciationMethod": "Method",
+        "state": "Status"
+      }
+    },
+    "actions": {
+      "postStatement": "Post Statement",
+      "reconcile": "Reconcile",
+      "depreciate": "Calculate Depreciation",
+      "dispose": "Dispose Asset",
+      "closePeriod": "Close Period",
+      "reopenPeriod": "Reopen Period",
+      "closeFiscalYear": "Close Fiscal Year",
+      "createPeriod": "Create Period"
     }
   },
   "crm": {
@@ -1493,6 +2290,23 @@
             "open": "Open"
           }
         }
+      },
+      "newDepartment": {
+        "title": "New Department",
+        "description": "Create a new department or team",
+        "sections": {
+          "departmentDetails": "Department Details"
+        },
+        "fields": {
+          "name": "Department Name",
+          "namePlaceholder": "e.g. Engineering",
+          "parentId": "Parent Department",
+          "parentPlaceholder": "Select parent (optional)",
+          "managerId": "Department Manager",
+          "managerPlaceholder": "Select manager (optional)",
+          "note": "Notes",
+          "notePlaceholder": "Additional information..."
+        }
       }
     }
   },
@@ -1646,6 +2460,22 @@
         "view": "View"
       }
     },
+    "lotActions": {
+      "editNote": "Edit note…",
+      "notePrompt": "Lot note",
+      "confirmDelete": "Delete this lot? Quants may still reference it."
+    },
+    "serialActions": {
+      "editNote": "Edit note…",
+      "notePrompt": "Serial note",
+      "confirmDelete": "Delete this serial number?"
+    },
+    "z3dActions": {
+      "addZone": "Add 3D zone",
+      "editZone": "Edit zone (by ID)…",
+      "zoneIdPrompt": "Zone ID",
+      "deleteZone": "Deactivate zone (by ID)…"
+    },
     "productionLots": {
       "title": "Lots & Serials",
       "description": "Batch lots and serial number tracking",
@@ -1657,6 +2487,19 @@
         "ref": "Internal Ref",
         "createDate": "Created",
         "expirationDate": "Expiry"
+      }
+    },
+    "productionSerials": {
+      "tabLabel": "Serial numbers",
+      "title": "Serial numbers",
+      "description": "Serialized unit tracking",
+      "searchPlaceholder": "Search serial…",
+      "emptyMessage": "No serial numbers found.",
+      "columns": {
+        "name": "Serial #",
+        "productId": "Product",
+        "state": "State",
+        "createDate": "Created"
       }
     },
     "qualityChecks": {
@@ -1814,10 +2657,20 @@
     },
     "productActions": {
       "confirmDelete": "Delete this product? This cannot be undone.",
-      "addVariant": "Add variant"
+      "addVariant": "Add variant",
+      "addSupplierLine": "Add supplier line",
+      "addPackaging": "Add packaging",
+      "updateSupplierLineById": "Update supplier line (by ID)…",
+      "supplierLineIdPrompt": "Supplier info row ID",
+      "updatePackagingById": "Update packaging (by ID)…",
+      "packagingIdPrompt": "Packaging row ID"
     },
     "warehouseActions": {
-      "confirmDelete": "Delete this warehouse?"
+      "confirmDelete": "Delete this warehouse?",
+      "setGeo": "Set map location…",
+      "geoLatPrompt": "Latitude",
+      "geoLngPrompt": "Longitude",
+      "geoAddressPrompt": "Address (optional)"
     },
     "stockMoveActions": {
       "done": "Mark done",
@@ -1833,10 +2686,71 @@
     },
     "stockActions": {
       "reserve": "Reserve 1",
-      "unreserve": "Unreserve 1"
+      "unreserve": "Unreserve 1",
+      "setQuantity": "Set quantity…",
+      "quantityPrompt": "New on-hand quantity"
     },
     "adjustmentActions": {
       "process": "Post adjustment"
+    },
+    "qualityActions": {
+      "pass": "Pass check",
+      "fail": "Fail check",
+      "failReason": "Reason for failure:",
+      "confirmDeleteCheck": "Delete this quality check?",
+      "startCheck": "Start check",
+      "linkDevice": "Link IoT device…",
+      "deviceIdPrompt": "IoT device ID",
+      "checkIdForDevicePrompt": "Quality check ID to link",
+      "openAlertById": "Open alert (by ID)…",
+      "solveAlertById": "Solve alert (by ID)…",
+      "alertIdPrompt": "Quality alert ID",
+      "solveDescriptionPrompt": "Resolution notes (optional)",
+      "addAlertReason": "New alert reason…",
+      "alertReasonNamePrompt": "Reason name",
+      "alertReasonDescPrompt": "Description (optional)",
+      "updateAlertReason": "Update alert reason (by ID)…",
+      "reasonIdPrompt": "Reason ID",
+      "newReasonNamePrompt": "New name (leave empty to skip)",
+      "deleteAlertReason": "Delete alert reason (by ID)…",
+      "addTeamMember": "Add member to team (by IDs)…",
+      "removeTeamMember": "Remove member from team (by IDs)…",
+      "teamIdPrompt": "Quality team ID",
+      "memberIdentityPrompt": "Member identity (hex)"
+    },
+    "replenishmentActions": {
+      "trigger": "Trigger now",
+      "executeRule": "Stamp rule run",
+      "executeRuleHint": "Updates last_run / next_run for this rule (not the same as “Trigger now”, which evaluates stock).",
+      "confirmDelete": "Delete this replenishment rule?"
+    },
+    "pickingWaveActions": {
+      "confirm": "Confirm wave",
+      "process": "Process wave",
+      "complete": "Complete wave",
+      "confirmDelete": "Delete this picking wave?"
+    },
+    "categoryActions": {
+      "confirmDelete": "Delete this product category?",
+      "restoreById": "Restore category (by ID)…",
+      "categoryIdPrompt": "Category ID"
+    },
+    "routeActions": {
+      "confirmDelete": "Delete this stock route?"
+    },
+    "ruleActions": {
+      "confirmDelete": "Delete this stock rule?"
+    },
+    "barcodeActions": {
+      "confirmDelete": "Delete this barcode rule?"
+    },
+    "taskActions": {
+      "start": "Start task",
+      "complete": "Complete task",
+      "cancel": "Cancel task",
+      "confirmDelete": "Delete this warehouse task?",
+      "setStatus": "Set status…",
+      "statusPrompt": "New status string (e.g. done, in_progress)"
     },
     "forms": {
       "newProduct": {
@@ -1995,6 +2909,252 @@
         "fields": {
           "userIdentity": "User"
         }
+      },
+      "newQualityCheck": {
+        "title": "New quality check",
+        "description": "Create a new quality control check for a product",
+        "sections": {
+          "main": "Check details"
+        },
+        "fields": {
+          "name": "Check name",
+          "namePlaceholder": "e.g., Incoming Inspection",
+          "productId": "Product",
+          "productPlaceholder": "Select product",
+          "pointId": "Control point",
+          "pointPlaceholder": "Select quality control point",
+          "lotId": "Lot/Serial",
+          "lotPlaceholder": "Select lot",
+          "teamId": "Quality team",
+          "teamPlaceholder": "Select team"
+        }
+      },
+      "newQualityAlert": {
+        "title": "New quality alert",
+        "description": "Create an alert for quality issues",
+        "sections": {
+          "main": "Alert details"
+        },
+        "fields": {
+          "name": "Alert title",
+          "namePlaceholder": "Describe the quality issue",
+          "productId": "Product",
+          "productPlaceholder": "Select affected product",
+          "pickingId": "Transfer",
+          "pickingPlaceholder": "Related transfer",
+          "description": "Description",
+          "priority": "Priority",
+          "priorities": {
+            "normal": "Normal",
+            "low": "Low",
+            "high": "High",
+            "critical": "Critical"
+          }
+        }
+      },
+      "newQualityPoint": {
+        "title": "New quality control point",
+        "description": "Define a quality control checkpoint",
+        "sections": {
+          "main": "Control point"
+        },
+        "fields": {
+          "name": "Point name",
+          "namePlaceholder": "e.g., Pre-shipment inspection",
+          "productId": "Product",
+          "productPlaceholder": "Select product (optional)",
+          "productCategId": "Product category",
+          "categoryPlaceholder": "Select category",
+          "teamId": "Team",
+          "teamPlaceholder": "Responsible team",
+          "checkType": "Check type",
+          "checkTypes": {
+            "random": "Random sampling",
+            "all": "All items"
+          }
+        }
+      },
+      "newQualityTeam": {
+        "title": "New quality team",
+        "description": "Create a team responsible for quality control",
+        "sections": {
+          "main": "Team details"
+        },
+        "fields": {
+          "name": "Team name",
+          "namePlaceholder": "e.g., Quality Assurance",
+          "email": "Email",
+          "companyId": "Company",
+          "companyPlaceholder": "Select company"
+        }
+      },
+      "newBarcodeRule": {
+        "title": "New barcode rule",
+        "description": "Define a barcode pattern rule",
+        "sections": {
+          "main": "Rule configuration"
+        },
+        "fields": {
+          "name": "Rule name",
+          "namePlaceholder": "e.g., EAN-13 Product Barcode",
+          "pattern": "Pattern (regex)",
+          "patternPlaceholder": "e.g., ^[0-9]{13}$",
+          "encoding": "Encoding",
+          "encodings": {
+            "any": "Any"
+          },
+          "type": "Barcode type",
+          "types": {
+            "product": "Product",
+            "lot": "Lot/Serial",
+            "package": "Package",
+            "location": "Location"
+          },
+          "sequence": "Sequence"
+        }
+      },
+      "newReplenishmentRule": {
+        "title": "New replenishment rule",
+        "description": "Set up automatic stock replenishment",
+        "sections": {
+          "main": "Replenishment settings"
+        },
+        "fields": {
+          "productId": "Product",
+          "productPlaceholder": "Select product",
+          "locationId": "Location",
+          "locationPlaceholder": "Stock location",
+          "minQty": "Minimum quantity",
+          "maxQty": "Maximum quantity",
+          "qtyToOrder": "Quantity to order",
+          "routeId": "Route",
+          "routePlaceholder": "Select route",
+          "trigger": "Trigger mode",
+          "triggers": {
+            "auto": "Automatic",
+            "manual": "Manual",
+            "scheduled": "Scheduled"
+          }
+        }
+      },
+      "newPickingWave": {
+        "title": "New picking wave",
+        "description": "Create a batch of pickings to process together",
+        "sections": {
+          "main": "Wave configuration"
+        },
+        "fields": {
+          "name": "Wave name",
+          "namePlaceholder": "e.g., Morning Pick Wave",
+          "scheduledDate": "Scheduled date",
+          "warehouseId": "Warehouse",
+          "warehousePlaceholder": "Select warehouse",
+          "userId": "Assigned to",
+          "userPlaceholder": "Select user",
+          "pickingTypeId": "Operation type",
+          "pickingTypePlaceholder": "e.g., Pick, Pack, Ship"
+        }
+      },
+      "newProductCategory": {
+        "title": "New product category",
+        "description": "Create a category for organizing products",
+        "sections": {
+          "main": "Category details"
+        },
+        "fields": {
+          "name": "Category name",
+          "namePlaceholder": "e.g., Electronics",
+          "parentId": "Parent category",
+          "parentPlaceholder": "Select parent (optional)",
+          "removalStrategyId": "Removal strategy",
+          "removalStrategyPlaceholder": "FIFO, LIFO, etc.",
+          "costingMethod": "Costing method",
+          "costingMethods": {
+            "standard": "Standard",
+            "fifo": "FIFO",
+            "average": "Average",
+            "lifo": "LIFO"
+          },
+          "propertyValuation": "Valuation",
+          "valuations": {
+            "manualPeriodic": "Manual (periodic)",
+            "realTime": "Real-time"
+          }
+        }
+      },
+      "newStockQuant": {
+        "createLabel": "New stock line",
+        "title": "Add stock quant",
+        "description": "Create on-hand quantity at a location",
+        "sections": {
+          "main": "Quant"
+        },
+        "fields": {
+          "productId": "Product",
+          "locationId": "Location",
+          "quantity": "Quantity",
+          "reservedQuantity": "Reserved",
+          "cost": "Unit cost"
+        }
+      },
+      "newWarehouse3dZone": {
+        "title": "Add 3D zone",
+        "description": "Map a stock location to a rack/floor/bin in the viewer",
+        "sections": {
+          "main": "Zone"
+        },
+        "fields": {
+          "warehouseId": "Warehouse",
+          "locationId": "Stock location",
+          "displayType": "Display type",
+          "displayTypes": {
+            "rack": "Rack",
+            "floor": "Floor",
+            "bin": "Bin"
+          },
+          "color": "Color (hex)",
+          "width": "Width",
+          "height": "Height",
+          "depth": "Depth",
+          "rows": "Rows",
+          "columns": "Columns",
+          "levels": "Levels"
+        }
+      },
+      "newProductSupplierLine": {
+        "title": "Supplier line",
+        "description": "Vendor pricing for this product",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "productTmplId": "Product template ID",
+          "productTmplIdHint": "Optional; leave blank when linking to a variant via product context",
+          "partnerId": "Vendor / partner ID",
+          "minQty": "Minimum qty",
+          "price": "Price",
+          "currencyId": "Currency",
+          "delay": "Lead time (days)",
+          "sequence": "Sequence"
+        }
+      },
+      "newProductPackaging": {
+        "title": "Packaging",
+        "description": "Carton or inner pack for this product",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "name": "Name",
+          "qty": "Units per pack",
+          "uomId": "Unit of measure",
+          "barcode": "Barcode",
+          "length": "Length",
+          "width": "Width",
+          "height": "Height",
+          "weight": "Weight",
+          "maxWeight": "Max weight"
+        }
       }
     }
   },
@@ -2109,6 +3269,30 @@
         "taxId": "Tax ID"
       }
     },
+    "landedCosts": {
+      "title": "Landed Costs",
+      "description": "Allocate additional costs to receipts and inventory value.",
+      "searchPlaceholder": "Search landed costs…",
+      "emptyMessage": "No landed costs found.",
+      "columns": {
+        "name": "Name",
+        "state": "Status",
+        "amountTotal": "Total",
+        "vendorBillId": "Vendor Bill"
+      }
+    },
+    "supplierIntakes": {
+      "title": "Supplier Intakes",
+      "description": "Review and process supplier intake requests.",
+      "searchPlaceholder": "Search supplier intake requests…",
+      "emptyMessage": "No supplier intake requests found.",
+      "columns": {
+        "reference": "Reference",
+        "state": "Status",
+        "requestedAt": "Requested At",
+        "requestedBy": "Requested By"
+      }
+    },
     "actions": {
       "sendSelected": "Send",
       "confirmSelected": "Confirm",
@@ -2122,7 +3306,15 @@
       "receiveGoodsForm": "Receive goods…",
       "addLineForm": "Add line…",
       "invoiceQtyForm": "Invoice qty…",
-      "receiveFullOpenQty": "Receive all open qty"
+      "receiveFullOpenQty": "Receive all open qty",
+      "lockSelected": "Lock",
+      "unlockSelected": "Unlock",
+      "editLineForm": "Edit draft line…",
+      "createBillsFromSelected": "Create bills",
+      "postSelected": "Post",
+      "applySelected": "Apply",
+      "rejectSelected": "Reject",
+      "holdSelected": "Hold"
     },
     "forms": {
       "newPurchaseOrder": {
@@ -2166,6 +3358,23 @@
           "orderingDate": "Ordering Date",
           "dateEnd": "Expiry Date",
           "scheduleDate": "Scheduled Date"
+        }
+      },
+      "editPurchaseOrderLine": {
+        "title": "Edit purchase order line",
+        "description": "Change quantity, price, product, or UoM on a draft line.",
+        "sections": {
+          "line": "Line"
+        },
+        "fields": {
+          "lineId": "Line",
+          "linePlaceholder": "Select a draft line…",
+          "productId": "Product",
+          "productPlaceholder": "Select product…",
+          "uomId": "Unit of measure",
+          "uomPlaceholder": "Select UoM…",
+          "quantity": "Quantity",
+          "priceUnit": "Unit price"
         }
       },
       "addPurchaseOrderLine": {
@@ -2558,7 +3767,7 @@
         "woDescription": "Work order #{{id}} — status: {{state}}",
         "noActionsAvailable": "No actions available for this status",
         "wcDescription": "Work center #{{id}}",
-        "wcParamsHint": "Name applies to “Save name”. Reason applies to “Block”. IDs apply to “Log productivity”.",
+        "wcParamsHint": "Name applies to “Save name”. Reason applies to “Block”. IDs apply to “Log productivity”. Device applies to “Link IoT device”.",
         "workorderId": "Work order ID",
         "csvFile": "CSV file"
       },
@@ -2589,6 +3798,10 @@
       "block": "Block",
       "unblock": "Unblock",
       "logProductivity": "Log productivity",
+      "linkIotDevice": "Link IoT device",
+      "linkIotDeviceSelect": "IoT device",
+      "noIotDevices": "No IoT devices in this organization",
+      "iotDeviceUntitled": "Unnamed device",
       "duration": "Duration",
       "lossId": "Loss ID",
       "logTime": "Log time"
@@ -2827,6 +4040,7 @@
     }
   },
   "calendar": {
+    "confirmDelete": "Are you sure you want to delete this event?",
     "dashboard": {
       "totalEvents": "Total Events",
       "confirmed": "Confirmed",
@@ -2891,6 +4105,32 @@
             "confidential": "Confidential"
           }
         }
+      },
+      "editEvent": {
+        "title": "Edit Event",
+        "description": "Update the event details"
+      }
+    },
+    "eventDetail": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "closeAria": "Close",
+      "relatedTo": "Related {{type}}"
+    },
+    "view": {
+      "today": "Today",
+      "newEvent": "New Event",
+      "noEventsScheduled": "No events scheduled",
+      "moreEvents": "+{{count}} more",
+      "attendeesCount": "{{count}} attendees",
+      "weekdaysShort": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
       }
     }
   },
@@ -4160,6 +5400,75 @@
         "delete": "Delete"
       }
     },
+    "ai": {
+      "title": "AI",
+      "description": "Configure AI agents, personas, review insights, and inspect usage spend.",
+      "loadError": "Could not load AI data",
+      "loadErrorDescription": "Check your connection and permissions.",
+      "mutationError": "Action failed",
+      "spendNote": "Monthly spend is updated when something calls record_ai_spend (for example after a model API round-trip). You can record test tokens below to simulate usage.",
+      "agentsTitle": "Agents",
+      "agentsDescription": "Model configurations for your organization.",
+      "addAgent": "Add agent",
+      "noAgents": "No AI agents yet. Create one to get started.",
+      "default": "Default",
+      "monthlySpend": "Monthly spend",
+      "budget": "Budget",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "recordSpend": "Record spend",
+      "tokensPlaceholder": "Tokens",
+      "agentCreated": "Agent created",
+      "agentUpdated": "Agent saved",
+      "agentActivated": "Agent activated",
+      "agentDeactivated": "Agent deactivated",
+      "teamTitle": "Team members",
+      "teamDescription": "Personas linked to an agent.",
+      "addMember": "Add member",
+      "noMembers": "No team members yet.",
+      "memberCreated": "Team member created",
+      "insightsTitle": "Insights",
+      "insightsDescription": "Open items (dismissed insights are hidden). Acknowledgement flows are handled from the documents area when wired.",
+      "addSampleInsight": "Create sample insight",
+      "noInsights": "No open insights.",
+      "dismiss": "Dismiss",
+      "insightDismissed": "Insight dismissed",
+      "insightCreated": "Insight created",
+      "sampleInsightTitle": "Sample insight",
+      "sampleInsightDescription": "Creates a tenant-wide insight (no company) for testing the list and dismiss actions.",
+      "sampleInsightDefaultTitle": "Sample insight",
+      "sampleInsightDefaultDescription": "Created from Settings → AI for UI testing.",
+      "severity": "Severity",
+      "insightTitleField": "Title",
+      "insightDescriptionField": "Description",
+      "createAgentTitle": "New AI agent",
+      "createAgentDescription": "Registers a model configuration. API keys should stay in your secret store; use a reference name only.",
+      "editAgentTitle": "Edit agent",
+      "name": "Name",
+      "provider": "Provider",
+      "model": "Model",
+      "description": "Description",
+      "systemPrompt": "System prompt",
+      "temperature": "Temperature",
+      "maxTokens": "Max tokens",
+      "monthlyBudget": "Monthly budget",
+      "costPer1K": "Cost per 1k tokens",
+      "optional": "Optional",
+      "rateLimit": "Rate limit / minute",
+      "create": "Create",
+      "createMemberTitle": "New team member",
+      "createMemberDescription": "Adds a persona that uses an existing agent.",
+      "agent": "Agent",
+      "pickAgent": "Select an agent",
+      "role": "Role",
+      "responseStyle": "Response style",
+      "responsibilities": "Responsibilities",
+      "expertiseAreas": "Expertise areas",
+      "csvHint": "Comma-separated",
+      "tokensInvalid": "Enter a positive token count.",
+      "spendRecorded": "Spend recorded"
+    },
     "auditLog": {
       "searchPlaceholder": "Search logs...",
       "filter": "Filter",
@@ -4440,6 +5749,7 @@
       "filteredHint": "Filtered to report #{{id}}.",
       "searchPlaceholder": "Search accounts…",
       "emptyMessage": "No trial balance lines.",
+      "createEntryLabel": "Add entry",
       "columns": {
         "accountCode": "Code",
         "accountName": "Account",
@@ -4644,6 +5954,28 @@
         },
         "fields": {
           "nextRun": "Next run at"
+        }
+      },
+      "trialBalanceEntry": {
+        "title": "Add trial balance entry",
+        "description": "Manually add an account line to a trial balance report",
+        "sections": {
+          "main": "Entry details"
+        },
+        "fields": {
+          "reportId": "Report ID",
+          "accountId": "Account ID",
+          "accountCode": "Account code",
+          "accountName": "Account name",
+          "openingDebit": "Opening debit",
+          "openingCredit": "Opening credit",
+          "periodDebit": "Period debit",
+          "periodCredit": "Period credit",
+          "closingDebit": "Closing debit",
+          "closingCredit": "Closing credit",
+          "currencyId": "Currency ID",
+          "level": "Level",
+          "isLeaf": "Leaf account"
         }
       }
     }
