@@ -17,17 +17,28 @@
 
 import type {
   AccountAccount,
+  AccountAccountType,
+  AccountGroup,
   AccountAnalyticAccount,
+  AccountAnalyticDistributionModel,
+  AccountAnalyticLine,
+  AccountAsset,
+  AccountBankStatement,
+  AccountBankStatementLine,
   AccountJournal,
+  AccountReconciliationWidget,
   AccountMove,
   AccountTax,
   CalendarEvent,
   CasbinRule,
   Contact,
   CrossoveredBudget,
+  CrossoveredBudgetLines,
+  BudgetPost,
   DeferredRevenueLine,
   DeferredRevenueSchedule,
   Document,
+  FleetVehicle,
   FinancialReport,
   HelpdeskSla,
   HelpdeskStage,
@@ -37,9 +48,16 @@ import type {
   HrDepartment,
   HrEmployee,
   HrExpense,
+  HrJobPosition,
   HrExpenseSheet,
   HrLeave,
   HrPayslip,
+  IoTAction,
+  IoTAlert,
+  IoTDevice,
+  IoTHub,
+  IoTTelemetry,
+  IoTThreshold,
   InventoryAdjustment,
   KnowledgeArticle,
   Lead,
@@ -51,10 +69,17 @@ import type {
   MrpWorkorder,
   Opportunity,
   OpportunityStage,
+  PosTerminal,
   Product,
   ProductCategory,
   ProductPricelist,
   ProductPricelistItem,
+  ProposalComment,
+  ProposalLineItem,
+  ProposalPresence,
+  ProposalSection,
+  ProposalSourceDoc,
+  ProposalVersion,
   ProjectProject,
   ProjectTask,
   ProjectTimesheet,
@@ -76,6 +101,7 @@ import type {
   AccountPayment,
   Activity,
   AnalyticsMetric,
+  BankMatchCandidate,
   BarcodeRule,
   ReportTemplate,
   ScheduledReport,
@@ -89,8 +115,10 @@ import type {
   StockMove,
   StockProductionLot,
   StockProductionSerial,
+  StockLandedCost,
   StockRoute,
   StockRule,
+  SupplierIntakeRequest,
   UserOrganization,
   UserProfile,
   UserRoleAssignment,
@@ -102,18 +130,40 @@ import type {
   WorkflowInstance,
   WorkflowTransition,
   WorkflowWorkitem,
+  ConsolidationAccount,
+  ConsolidationJournal,
+  ConsolidationEliminationEntry,
+  AccountFiscalYear,
+  AccountPeriod,
+  AiAgent,
+  AiInsight,
+  AiTeamMember,
 } from './generated/types'
 
 import { sqlFieldNames } from './sql-field-names'
 
 export type QueryResourceKey =
   | 'account-accounts'
+  | 'account-account-types'
+  | 'account-groups'
   | 'account-journals'
   | 'account-moves'
   | 'account-taxes'
   | 'account-payments'
   | 'budgets'
+  | 'budget-lines'
+  | 'budget-posts'
   | 'analytic-accounts'
+  | 'analytic-lines'
+  | 'analytic-distribution-models'
+  | 'bank-statements'
+  | 'bank-statement-lines'
+  | 'bank-match-candidates'
+  | 'account-reconciliation-widgets'
+  | 'account-assets'
+  | 'consolidation-accounts'
+  | 'consolidation-journals'
+  | 'consolidation-elimination-entries'
   | 'sale-orders'
   | 'sale-order-lines'
   | 'pricelists'
@@ -152,6 +202,8 @@ export type QueryResourceKey =
   | 'purchase-orders'
   | 'purchase-order-lines'
   | 'purchase-requisitions'
+  | 'landed-costs'
+  | 'supplier-intakes'
   | 'mrp-productions'
   | 'mrp-boms'
   | 'mrp-bom-lines'
@@ -159,6 +211,7 @@ export type QueryResourceKey =
   | 'mrp-workcenters'
   | 'employees'
   | 'departments'
+  | 'job-positions'
   | 'leave-requests'
   | 'contracts'
   | 'payslips'
@@ -184,16 +237,35 @@ export type QueryResourceKey =
   | 'workflow-transitions'
   | 'workflow-workitems'
   | 'proposals'
+  | 'proposal-sections'
+  | 'proposal-line-items'
+  | 'proposal-versions'
+  | 'proposal-source-docs'
+  | 'proposal-presence'
+  | 'proposal-comments'
   | 'calendar-events'
   | 'mail-messages'
   | 'expenses'
   | 'expense-sheets'
+  | 'fleet-vehicles'
+  | 'pos-terminals'
   | 'roles'
   | 'user-roles'
   | 'user-profile'
   | 'user-role-assignment'
   | 'user-organization'
   | 'casbin-rule'
+  | 'iot-devices'
+  | 'iot-hubs'
+  | 'iot-alerts'
+  | 'iot-actions'
+  | 'iot-telemetry'
+  | 'iot-thresholds'
+  | 'ai-agents'
+  | 'ai-team-members'
+  | 'ai-insights'
+  | 'fiscal-years'
+  | 'account-periods'
 
 export interface FieldAccessContext {
   organizationId: number
@@ -259,6 +331,19 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'account-accounts': orgEntry<AccountAccount>('account_account', ['account-accounts', 'account_account'], [
     'code', 'name', 'deprecated', 'used', 'companyId', 'internalGroup', 'isBankAccount',
   ]),
+  'account-account-types': orgEntry<AccountAccountType>(
+    'account_account_type',
+    ['account-account-types', 'account_account_type'],
+    ['name', 'type', 'internalGroup', 'companyId', 'includeInitialBalance', 'isDeprecated'],
+  ),
+  'account-groups': orgEntry<AccountGroup>('account_group', ['account-groups', 'account_group'], [
+    'name',
+    'companyId',
+    'level',
+    'parentId',
+    'codePrefixStart',
+    'codePrefixEnd',
+  ]),
   'account-journals': orgEntry<AccountJournal>('account_journal', ['account-journals', 'account_journal'], [
     'code', 'name', 'companyId',
   ]),
@@ -274,11 +359,57 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   budgets: orgEntry<CrossoveredBudget>('crossovered_budget', ['budgets', 'crossovered_budget'], [
     'name', 'companyId', 'state',
   ]),
+  'budget-lines': orgEntry<CrossoveredBudgetLines>(
+    'crossovered_budget_lines',
+    ['budget-lines', 'crossovered_budget_lines'],
+    [
+      'generalBudgetId',
+      'analyticAccountId',
+      'plannedAmount',
+      'practicalAmount',
+      'theoreticalAmount',
+      'companyId',
+    ],
+  ),
+  'budget-posts': orgEntry<BudgetPost>('budget_post', ['budget-posts', 'budget_post'], [
+    'name',
+    'code',
+    'companyId',
+    'isActive',
+    'accountIds',
+  ]),
   'analytic-accounts': orgEntry<AccountAnalyticAccount>(
     'account_analytic_account',
     ['analytic-accounts', 'account_analytic_account'],
     ['name', 'code', 'companyId', 'balance'],
   ),
+  'analytic-lines': orgEntry<AccountAnalyticLine>('account_analytic_line', ['analytic-lines', 'account_analytic_line'], [
+    'name', 'amount', 'accountId', 'companyId', 'date',
+  ]),
+  'analytic-distribution-models': orgEntry<AccountAnalyticDistributionModel>(
+    'account_analytic_distribution_model',
+    ['analytic-distribution-models', 'account_analytic_distribution_model'],
+    ['name', 'companyId', 'analyticDistribution', 'isActive'],
+  ),
+  'bank-statements': orgEntry<AccountBankStatement>('account_bank_statement', ['bank-statements', 'account_bank_statement'], [
+    'name', 'reference', 'date', 'balanceStart', 'balanceEnd', 'state', 'journalId', 'companyId',
+  ]),
+  'bank-statement-lines': orgEntry<AccountBankStatementLine>(
+    'account_bank_statement_line',
+    ['bank-statement-lines', 'account_bank_statement_line'],
+    ['amount', 'amountCurrency', 'partnerId', 'statementId', 'journalId', 'isReconciled', 'transactionType', 'accountNumber'],
+  ),
+  'bank-match-candidates': orgEntry<BankMatchCandidate>('bank_match_candidate', ['bank-match-candidates', 'bank_match_candidate'], [
+    'statementLineId', 'matchType', 'entityId', 'amount', 'score', 'ruleId',
+  ]),
+  'account-reconciliation-widgets': orgEntry<AccountReconciliationWidget>(
+    'account_reconciliation_widget',
+    ['account-reconciliation-widgets', 'account_reconciliation_widget'],
+    ['accountId', 'moveLineIds', 'toCheck', 'mode', 'partnerId', 'companyId'],
+  ),
+  'account-assets': orgEntry<AccountAsset>('account_asset', ['account-assets', 'account_asset'], [
+    'name', 'code', 'assetType', 'state', 'acquisitionDate', 'purchaseValue', 'companyId',
+  ]),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
     'reference', 'state', 'partnerId', 'companyId', 'dateOrder',
   ]),
@@ -424,6 +555,14 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['purchase-requisitions', 'purchase_requisition'],
     ['state', 'companyId', 'description'],
   ),
+  'landed-costs': orgEntry<StockLandedCost>('stock_landed_cost', ['landed-costs', 'stock_landed_cost'], [
+    'state', 'companyId', 'amountTotal', 'currencyId', 'description', 'date',
+  ]),
+  'supplier-intakes': orgEntry<SupplierIntakeRequest>(
+    'supplier_intake_request',
+    ['supplier-intakes', 'supplier_intake_request'],
+    ['state', 'companyName', 'contactName', 'email', 'phone'],
+  ),
   'mrp-productions': orgEntry<MrpProduction>('mrp_production', ['mrp-productions', 'mrp_production'], [
     'state', 'productId', 'companyId',
   ]),
@@ -443,6 +582,9 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'name', 'workEmail', 'departmentId', 'companyId',
   ]),
   departments: orgEntry<HrDepartment>('hr_department', ['departments', 'hr_department'], ['name', 'companyId']),
+  'job-positions': orgEntry<HrJobPosition>('hr_job_position', ['job-positions', 'hr_job_position'], [
+    'name', 'companyId', 'departmentId',
+  ]),
   'leave-requests': orgEntry<HrLeave>('hr_leave', ['leave-requests', 'hr_leave'], [
     'name', 'employeeId', 'state', 'companyId',
   ]),
@@ -542,6 +684,24 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['instanceId', 'actId', 'state'],
   ),
   proposals: orgEntry<Proposal>('proposal', ['proposals', 'proposal'], ['title', 'status', 'clientName']),
+  'proposal-sections': orgEntry<ProposalSection>('proposal_section', ['proposal-sections', 'proposal_section'], [
+    'title', 'status', 'proposalId', 'sequence', 'wordCount',
+  ]),
+  'proposal-line-items': orgEntry<ProposalLineItem>('proposal_line_item', ['proposal-line-items', 'proposal_line_item'], [
+    'proposalId', 'sectionId', 'productId', 'productName', 'quantity', 'priceUnit', 'subtotal', 'discount',
+  ]),
+  'proposal-versions': orgEntry<ProposalVersion>('proposal_version', ['proposal-versions', 'proposal_version'], [
+    'proposalId', 'versionNumber', 'message', 'authorId',
+  ]),
+  'proposal-source-docs': orgEntry<ProposalSourceDoc>('proposal_source_doc', ['proposal-source-docs', 'proposal_source_doc'], [
+    'proposalId', 'name', 'docType', 'wordCount',
+  ]),
+  'proposal-presence': orgEntry<ProposalPresence>('proposal_presence', ['proposal-presence', 'proposal_presence'], [
+    'proposalId', 'sectionId', 'userName', 'cursorPosition', 'lastSeen',
+  ]),
+  'proposal-comments': orgEntry<ProposalComment>('proposal_comment', ['proposal-comments', 'proposal_comment'], [
+    'proposalId', 'sectionId', 'authorName', 'content', 'isResolved', 'parentId',
+  ]),
   'calendar-events': orgEntry<CalendarEvent>('calendar_event', ['calendar-events', 'calendar_event'], [
     'name', 'start', 'stop', 'state',
   ]),
@@ -553,6 +713,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   ]),
   'expense-sheets': orgEntry<HrExpenseSheet>('expense_sheet', ['expense-sheets', 'expense_sheet'], [
     'name', 'state', 'companyId',
+  ]),
+  'fleet-vehicles': orgEntry<FleetVehicle>('fleet_vehicle', ['fleet-vehicles', 'fleet_vehicle'], [
+    'name', 'licensePlate', 'driverName', 'status', 'latitude', 'longitude', 'vehicleType', 'companyId',
+  ]),
+  'pos-terminals': orgEntry<PosTerminal>('pos_terminal', ['pos-terminals', 'pos_terminal'], [
+    'name', 'locationLabel', 'status', 'latitude', 'longitude', 'dailyRevenue', 'openOrders', 'companyId',
   ]),
   roles: orgEntry<Role>('role', ['roles', 'role'], ['name', 'description', 'isActive', 'isSystem']),
   'user-roles': entry<UserRoleAssignment>(
@@ -584,6 +750,89 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['casbin-rule', 'casbin_rule'],
     ['ptype', 'v0', 'v1', 'v2', 'v3', 'v4', 'v5', 'createdAt'],
     ['id'],
+  ),
+  'iot-devices': orgEntry<IoTDevice>('iot_device', ['iot-devices', 'iot_device'], [
+    'name', 'deviceType', 'identifier', 'status', 'hubId', 'workcenterId', 'stockLocationId',
+  ]),
+  'iot-hubs': orgEntry<IoTHub>('iot_hub', ['iot-hubs', 'iot_hub'], [
+    'name', 'serial', 'ipAddress', 'firmwareVersion', 'status', 'lastHeartbeat', 'connectivityQuality',
+  ]),
+  'iot-alerts': orgEntry<IoTAlert>('iot_alert', ['iot-alerts', 'iot_alert'], [
+    'deviceId', 'alertType', 'severity', 'message', 'triggeredAt', 'resolvedAt',
+  ]),
+  'iot-actions': orgEntry<IoTAction>('iot_action', ['iot-actions', 'iot_action'], [
+    'deviceId', 'actionType', 'status', 'triggeredBy', 'createdAt', 'sentAt', 'acknowledgedAt',
+  ]),
+  'iot-telemetry': orgEntry<IoTTelemetry>('iot_telemetry', ['iot-telemetry', 'iot_telemetry'], [
+    'deviceId', 'sensorType', 'value', 'unit', 'quality', 'recordedAt',
+  ]),
+  'iot-thresholds': orgEntry<IoTThreshold>('iot_threshold', ['iot-thresholds', 'iot_threshold'], [
+    'deviceId', 'sensorType', 'minValue', 'maxValue', 'severity', 'active',
+  ]),
+  'ai-agents': orgEntry<AiAgent>('ai_agent', ['ai-agents', 'ai_agent'], [
+    'name',
+    'model',
+    'provider',
+    'isActive',
+    'isDefault',
+    'temperature',
+    'maxTokens',
+    'monthlySpend',
+    'monthlyBudget',
+    'costPer1KTokens',
+  ]),
+  'ai-team-members': orgEntry<AiTeamMember>('ai_team_member', ['ai-team-members', 'ai_team_member'], [
+    'name',
+    'role',
+    'aiAgentId',
+    'isActive',
+    'responseStyle',
+  ]),
+  'ai-insights': entry<AiInsight>(
+    'ai_insight',
+    ['ai-insights', 'ai_insight'],
+    [
+      'title',
+      'description',
+      'severity',
+      'relatedModel',
+      'confidence',
+      'dismissed',
+      'isAcknowledged',
+      'generatedAt',
+      'tags',
+    ],
+    ['id', 'companyId'] as readonly (keyof AiInsight)[],
+  ),
+  'consolidation-accounts': entry<ConsolidationAccount>(
+    'consolidation_account',
+    ['consolidation-accounts', 'consolidation_account'],
+    ['name', 'code', 'accountType', 'isActive', 'isIntercompany'],
+    ['id'] as readonly (keyof ConsolidationAccount)[],
+  ),
+  'consolidation-journals': entry<ConsolidationJournal>(
+    'consolidation_journal',
+    ['consolidation-journals', 'consolidation_journal'],
+    ['name', 'periodName', 'state', 'totalDebit', 'totalCredit'],
+    ['id'] as readonly (keyof ConsolidationJournal)[],
+  ),
+  'consolidation-elimination-entries': entry<ConsolidationEliminationEntry>(
+    'consolidation_elimination_entry',
+    ['consolidation-elimination-entries', 'consolidation_elimination_entry'],
+    ['name', 'accountCode', 'accountName', 'debit', 'credit', 'eliminationType', 'isMatched'],
+    ['id', 'journalId'] as readonly (keyof ConsolidationEliminationEntry)[],
+  ),
+  'fiscal-years': entry<AccountFiscalYear>(
+    'account_fiscal_year',
+    ['fiscal-years', 'account_fiscal_year'],
+    ['name', 'dateFrom', 'dateTo', 'state', 'type', 'isAdjustment', 'companyId'],
+    ['id', 'companyId'] as readonly (keyof AccountFiscalYear)[],
+  ),
+  'account-periods': entry<AccountPeriod>(
+    'account_period',
+    ['account-periods', 'account_period'],
+    ['name', 'code', 'dateFrom', 'dateTo', 'state', 'fiscalYearId', 'isAdjustment', 'companyId'],
+    ['id', 'companyId'] as readonly (keyof AccountPeriod)[],
   ),
 }
 

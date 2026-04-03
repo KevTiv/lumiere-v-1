@@ -29,10 +29,14 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "user-organization",
   "casbin-rule",
   "account-accounts",
+  "account-account-types",
+  "account-groups",
   "account-journals",
   "account-moves",
   "account-taxes",
   "budgets",
+  "budget-lines",
+  "budget-posts",
   "analytic-accounts",
   "sale-orders",
   "sale-order-lines",
@@ -109,6 +113,24 @@ const AUTH_SINGLE: Record<string, string> = {
 const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessContext) => string> = {
   "account-accounts": (id, fa) =>
     selectOrgScopedSql("account-accounts", "account_account", id, fa, "", " ORDER BY code"),
+  "account-account-types": (id, fa) =>
+    selectOrgScopedSql(
+      "account-account-types",
+      "account_account_type",
+      id,
+      fa,
+      "",
+      " ORDER BY name ASC",
+    ),
+  "account-groups": (id, fa) =>
+    selectOrgScopedSql(
+      "account-groups",
+      "account_group",
+      id,
+      fa,
+      "",
+      " ORDER BY level ASC, name ASC",
+    ),
   "account-journals": (id, fa) =>
     selectOrgScopedSql("account-journals", "account_journal", id, fa, ""),
   "account-moves": (id, fa) =>
@@ -117,6 +139,17 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("account-taxes", "account_tax", id, fa, ""),
   budgets: (id, fa) =>
     selectOrgScopedSql("budgets", "crossovered_budget", id, fa, ""),
+  "budget-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "budget-lines",
+      "crossovered_budget_lines",
+      id,
+      fa,
+      "",
+      " ORDER BY general_budget_id ASC, id ASC",
+    ),
+  "budget-posts": (id, fa) =>
+    selectOrgScopedSql("budget-posts", "budget_post", id, fa, "", " ORDER BY name ASC"),
   "analytic-accounts": (id, fa) =>
     selectOrgScopedSql("analytic-accounts", "account_analytic_account", id, fa, ""),
   "sale-orders": (id, fa) =>

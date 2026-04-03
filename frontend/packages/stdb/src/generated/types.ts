@@ -10045,6 +10045,30 @@ export const UpdateBudgetPostParams = __t.object("UpdateBudgetPostParams", {
 });
 export type UpdateBudgetPostParams = __Infer<typeof UpdateBudgetPostParams>;
 
+export const UpdateCalendarEventParams = __t.object("UpdateCalendarEventParams", {
+  name: __t.option(__t.string()),
+  start: __t.option(__t.timestamp()),
+  stop: __t.option(__t.timestamp()),
+  allday: __t.option(__t.bool()),
+  privacy: __t.option(__t.string()),
+  showAs: __t.option(__t.string()),
+  state: __t.option(__t.string()),
+  recurrency: __t.option(__t.bool()),
+  partnerIds: __t.option(__t.array(__t.u64())),
+  alarmIds: __t.option(__t.array(__t.u64())),
+  userId: __t.option(__t.identity()),
+  description: __t.option(__t.string()),
+  location: __t.option(__t.string()),
+  videocallLocation: __t.option(__t.string()),
+  color: __t.option(__t.string()),
+  recurrenceId: __t.option(__t.u64()),
+  rrule: __t.option(__t.string()),
+  rruleType: __t.option(__t.string()),
+  finalDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateCalendarEventParams = __Infer<typeof UpdateCalendarEventParams>;
+
 export const UpdateCompanyAddressParams = __t.object("UpdateCompanyAddressParams", {
   addressStreet: __t.option(__t.string()),
   addressCity: __t.option(__t.string()),
@@ -10324,6 +10348,17 @@ export const UpdateKnowledgeCategoryParams = __t.object("UpdateKnowledgeCategory
 });
 export type UpdateKnowledgeCategoryParams = __Infer<typeof UpdateKnowledgeCategoryParams>;
 
+export const UpdateLandedCostParams = __t.object("UpdateLandedCostParams", {
+  date: __t.option(__t.timestamp()),
+  targetMove: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
+  amountTotal: __t.option(__t.f64()),
+  pickingIds: __t.option(__t.array(__t.u64())),
+  description: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateLandedCostParams = __Infer<typeof UpdateLandedCostParams>;
+
 export const UpdateLeadAddressParams = __t.object("UpdateLeadAddressParams", {
   street: __t.option(__t.string()),
   city: __t.option(__t.string()),
@@ -10506,6 +10541,36 @@ export const UpdateProjectParams = __t.object("UpdateProjectParams", {
 });
 export type UpdateProjectParams = __Infer<typeof UpdateProjectParams>;
 
+export const UpdatePurchaseOrderLineParams = __t.object("UpdatePurchaseOrderLineParams", {
+  productId: __t.option(__t.u64()),
+  quantity: __t.option(__t.f64()),
+  uomId: __t.option(__t.u64()),
+  priceUnit: __t.option(__t.f64()),
+  taxIds: __t.option(__t.array(__t.u64())),
+  datePlanned: __t.option(__t.timestamp()),
+  productVariantId: __t.option(__t.u64()),
+  accountAnalyticId: __t.option(__t.u64()),
+  displayType: __t.option(__t.string()),
+  propagateCancel: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdatePurchaseOrderLineParams = __Infer<typeof UpdatePurchaseOrderLineParams>;
+
+export const UpdatePurchaseOrderParams = __t.object("UpdatePurchaseOrderParams", {
+  origin: __t.option(__t.string()),
+  partnerRef: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+  datePlanned: __t.option(__t.timestamp()),
+  paymentTermId: __t.option(__t.u64()),
+  fiscalPositionId: __t.option(__t.u64()),
+  incotermId: __t.option(__t.u64()),
+  incotermLocation: __t.option(__t.string()),
+  partnerId: __t.option(__t.u64()),
+  currencyId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdatePurchaseOrderParams = __Infer<typeof UpdatePurchaseOrderParams>;
+
 export const UpdateQualityAlertReasonParams = __t.object("UpdateQualityAlertReasonParams", {
   name: __t.option(__t.string()),
   description: __t.option(__t.string()),
@@ -10656,6 +10721,33 @@ export const UpdateStockRuleParams = __t.object("UpdateStockRuleParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateStockRuleParams = __Infer<typeof UpdateStockRuleParams>;
+
+export const UpdateSupplierIntakeParams = __t.object("UpdateSupplierIntakeParams", {
+  companyName: __t.option(__t.string()),
+  contactName: __t.option(__t.string()),
+  email: __t.option(__t.string()),
+  phone: __t.option(__t.string()),
+  website: __t.option(__t.string()),
+  industry: __t.option(__t.string()),
+  productCategories: __t.option(__t.array(__t.string())),
+  taxId: __t.option(__t.string()),
+  companyRegistry: __t.option(__t.string()),
+  street: __t.option(__t.string()),
+  city: __t.option(__t.string()),
+  zip: __t.option(__t.string()),
+  countryCode: __t.option(__t.string()),
+  bankAccountNumber: __t.option(__t.string()),
+  bankName: __t.option(__t.string()),
+  paymentTermsId: __t.option(__t.u64()),
+  currencyId: __t.option(__t.u64()),
+  minOrderValue: __t.option(__t.f64()),
+  leadTimeDays: __t.option(__t.u32()),
+  qualityCertificates: __t.option(__t.array(__t.string())),
+  documents: __t.option(__t.array(__t.string())),
+  notes: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSupplierIntakeParams = __Infer<typeof UpdateSupplierIntakeParams>;
 
 export const UpdateTaskParams = __t.object("UpdateTaskParams", {
   companyId: __t.option(__t.u64()),

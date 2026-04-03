@@ -304,6 +304,7 @@ import DeleteBarcodeNomenclatureReducer from "./delete_barcode_nomenclature_redu
 import DeleteBarcodeRuleReducer from "./delete_barcode_rule_reducer";
 import DeleteBomReducer from "./delete_bom_reducer";
 import DeleteBudgetLineReducer from "./delete_budget_line_reducer";
+import DeleteCalendarEventReducer from "./delete_calendar_event_reducer";
 import DeleteCompanyReducer from "./delete_company_reducer";
 import DeleteContactReducer from "./delete_contact_reducer";
 import DeleteDocumentReducer from "./delete_document_reducer";
@@ -316,6 +317,7 @@ import DeleteIotDeviceReducer from "./delete_iot_device_reducer";
 import DeleteIotHubReducer from "./delete_iot_hub_reducer";
 import DeleteKnowledgeArticleReducer from "./delete_knowledge_article_reducer";
 import DeleteKnowledgeCategoryReducer from "./delete_knowledge_category_reducer";
+import DeleteLandedCostReducer from "./delete_landed_cost_reducer";
 import DeletePartnerBankReducer from "./delete_partner_bank_reducer";
 import DeletePaymentTermReducer from "./delete_payment_term_reducer";
 import DeletePaymentTermLineReducer from "./delete_payment_term_line_reducer";
@@ -335,6 +337,7 @@ import DeleteStockProductionLotReducer from "./delete_stock_production_lot_reduc
 import DeleteStockProductionSerialReducer from "./delete_stock_production_serial_reducer";
 import DeleteStockRouteReducer from "./delete_stock_route_reducer";
 import DeleteStockRuleReducer from "./delete_stock_rule_reducer";
+import DeleteSupplierIntakeReducer from "./delete_supplier_intake_reducer";
 import DeleteTaxDeadlineReducer from "./delete_tax_deadline_reducer";
 import DeleteUserCustomFieldReducer from "./delete_user_custom_field_reducer";
 import DeleteWarehouseReducer from "./delete_warehouse_reducer";
@@ -433,6 +436,7 @@ import LinkDeviceToWorkcenterReducer from "./link_device_to_workcenter_reducer";
 import LinkWorkosUserReducer from "./link_workos_user_reducer";
 import LockDocumentReducer from "./lock_document_reducer";
 import LockKnowledgeArticleReducer from "./lock_knowledge_article_reducer";
+import LockPurchaseOrderReducer from "./lock_purchase_order_reducer";
 import LogAuditEventReducer from "./log_audit_event_reducer";
 import LogTimesheetReducer from "./log_timesheet_reducer";
 import LogWorkcenterProductivityReducer from "./log_workcenter_productivity_reducer";
@@ -552,6 +556,7 @@ import UnblockWorkcenterReducer from "./unblock_workcenter_reducer";
 import UnlinkDeviceReducer from "./unlink_device_reducer";
 import UnlockDocumentReducer from "./unlock_document_reducer";
 import UnlockKnowledgeArticleReducer from "./unlock_knowledge_article_reducer";
+import UnlockPurchaseOrderReducer from "./unlock_purchase_order_reducer";
 import UnmatchEliminationEntryReducer from "./unmatch_elimination_entry_reducer";
 import UnreconciledAccountBankStatementLineReducer from "./unreconciled_account_bank_statement_line_reducer";
 import UnreserveStockQuantReducer from "./unreserve_stock_quant_reducer";
@@ -579,6 +584,7 @@ import UpdateBomReducer from "./update_bom_reducer";
 import UpdateBudgetLineReducer from "./update_budget_line_reducer";
 import UpdateBudgetLineActualsReducer from "./update_budget_line_actuals_reducer";
 import UpdateBudgetPostReducer from "./update_budget_post_reducer";
+import UpdateCalendarEventReducer from "./update_calendar_event_reducer";
 import UpdateCompanyReducer from "./update_company_reducer";
 import UpdateCompanyAddressReducer from "./update_company_address_reducer";
 import UpdateCompanyBusinessReducer from "./update_company_business_reducer";
@@ -606,6 +612,7 @@ import UpdateIntercompanyRuleReducer from "./update_intercompany_rule_reducer";
 import UpdateJobPositionReducer from "./update_job_position_reducer";
 import UpdateKnowledgeArticleReducer from "./update_knowledge_article_reducer";
 import UpdateKnowledgeCategoryReducer from "./update_knowledge_category_reducer";
+import UpdateLandedCostReducer from "./update_landed_cost_reducer";
 import UpdateLeadAddressReducer from "./update_lead_address_reducer";
 import UpdateLeadDetailsReducer from "./update_lead_details_reducer";
 import UpdateLeadRevenueReducer from "./update_lead_revenue_reducer";
@@ -633,6 +640,8 @@ import UpdateProposalReducer from "./update_proposal_reducer";
 import UpdateProposalLineItemReducer from "./update_proposal_line_item_reducer";
 import UpdateProposalPresenceReducer from "./update_proposal_presence_reducer";
 import UpdateProposalStatusReducer from "./update_proposal_status_reducer";
+import UpdatePurchaseOrderReducer from "./update_purchase_order_reducer";
+import UpdatePurchaseOrderLineReducer from "./update_purchase_order_line_reducer";
 import UpdateQualityAlertReasonReducer from "./update_quality_alert_reason_reducer";
 import UpdateQualityPointReducer from "./update_quality_point_reducer";
 import UpdateQualityTeamReducer from "./update_quality_team_reducer";
@@ -646,6 +655,7 @@ import UpdateStockProductionSerialReducer from "./update_stock_production_serial
 import UpdateStockQuantQuantityReducer from "./update_stock_quant_quantity_reducer";
 import UpdateStockRouteReducer from "./update_stock_route_reducer";
 import UpdateStockRuleReducer from "./update_stock_rule_reducer";
+import UpdateSupplierIntakeReducer from "./update_supplier_intake_reducer";
 import UpdateTaskReducer from "./update_task_reducer";
 import UpdateTaskStateReducer from "./update_task_state_reducer";
 import UpdateTaxDeadlineReducer from "./update_tax_deadline_reducer";
@@ -5280,6 +5290,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_barcode_rule", DeleteBarcodeRuleReducer),
   __reducerSchema("delete_bom", DeleteBomReducer),
   __reducerSchema("delete_budget_line", DeleteBudgetLineReducer),
+  __reducerSchema("delete_calendar_event", DeleteCalendarEventReducer),
   __reducerSchema("delete_company", DeleteCompanyReducer),
   __reducerSchema("delete_contact", DeleteContactReducer),
   __reducerSchema("delete_document", DeleteDocumentReducer),
@@ -5292,6 +5303,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_iot_hub", DeleteIotHubReducer),
   __reducerSchema("delete_knowledge_article", DeleteKnowledgeArticleReducer),
   __reducerSchema("delete_knowledge_category", DeleteKnowledgeCategoryReducer),
+  __reducerSchema("delete_landed_cost", DeleteLandedCostReducer),
   __reducerSchema("delete_partner_bank", DeletePartnerBankReducer),
   __reducerSchema("delete_payment_term", DeletePaymentTermReducer),
   __reducerSchema("delete_payment_term_line", DeletePaymentTermLineReducer),
@@ -5311,6 +5323,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_stock_production_serial", DeleteStockProductionSerialReducer),
   __reducerSchema("delete_stock_route", DeleteStockRouteReducer),
   __reducerSchema("delete_stock_rule", DeleteStockRuleReducer),
+  __reducerSchema("delete_supplier_intake", DeleteSupplierIntakeReducer),
   __reducerSchema("delete_tax_deadline", DeleteTaxDeadlineReducer),
   __reducerSchema("delete_user_custom_field", DeleteUserCustomFieldReducer),
   __reducerSchema("delete_warehouse", DeleteWarehouseReducer),
@@ -5409,6 +5422,7 @@ const reducersSchema = __reducers(
   __reducerSchema("link_workos_user", LinkWorkosUserReducer),
   __reducerSchema("lock_document", LockDocumentReducer),
   __reducerSchema("lock_knowledge_article", LockKnowledgeArticleReducer),
+  __reducerSchema("lock_purchase_order", LockPurchaseOrderReducer),
   __reducerSchema("log_audit_event", LogAuditEventReducer),
   __reducerSchema("log_timesheet", LogTimesheetReducer),
   __reducerSchema("log_workcenter_productivity", LogWorkcenterProductivityReducer),
@@ -5528,6 +5542,7 @@ const reducersSchema = __reducers(
   __reducerSchema("unlink_device", UnlinkDeviceReducer),
   __reducerSchema("unlock_document", UnlockDocumentReducer),
   __reducerSchema("unlock_knowledge_article", UnlockKnowledgeArticleReducer),
+  __reducerSchema("unlock_purchase_order", UnlockPurchaseOrderReducer),
   __reducerSchema("unmatch_elimination_entry", UnmatchEliminationEntryReducer),
   __reducerSchema("unreconciled_account_bank_statement_line", UnreconciledAccountBankStatementLineReducer),
   __reducerSchema("unreserve_stock_quant", UnreserveStockQuantReducer),
@@ -5555,6 +5570,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_budget_line", UpdateBudgetLineReducer),
   __reducerSchema("update_budget_line_actuals", UpdateBudgetLineActualsReducer),
   __reducerSchema("update_budget_post", UpdateBudgetPostReducer),
+  __reducerSchema("update_calendar_event", UpdateCalendarEventReducer),
   __reducerSchema("update_company", UpdateCompanyReducer),
   __reducerSchema("update_company_address", UpdateCompanyAddressReducer),
   __reducerSchema("update_company_business", UpdateCompanyBusinessReducer),
@@ -5582,6 +5598,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_job_position", UpdateJobPositionReducer),
   __reducerSchema("update_knowledge_article", UpdateKnowledgeArticleReducer),
   __reducerSchema("update_knowledge_category", UpdateKnowledgeCategoryReducer),
+  __reducerSchema("update_landed_cost", UpdateLandedCostReducer),
   __reducerSchema("update_lead_address", UpdateLeadAddressReducer),
   __reducerSchema("update_lead_details", UpdateLeadDetailsReducer),
   __reducerSchema("update_lead_revenue", UpdateLeadRevenueReducer),
@@ -5609,6 +5626,8 @@ const reducersSchema = __reducers(
   __reducerSchema("update_proposal_line_item", UpdateProposalLineItemReducer),
   __reducerSchema("update_proposal_presence", UpdateProposalPresenceReducer),
   __reducerSchema("update_proposal_status", UpdateProposalStatusReducer),
+  __reducerSchema("update_purchase_order", UpdatePurchaseOrderReducer),
+  __reducerSchema("update_purchase_order_line", UpdatePurchaseOrderLineReducer),
   __reducerSchema("update_quality_alert_reason", UpdateQualityAlertReasonReducer),
   __reducerSchema("update_quality_point", UpdateQualityPointReducer),
   __reducerSchema("update_quality_team", UpdateQualityTeamReducer),
@@ -5622,6 +5641,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_stock_quant_quantity", UpdateStockQuantQuantityReducer),
   __reducerSchema("update_stock_route", UpdateStockRouteReducer),
   __reducerSchema("update_stock_rule", UpdateStockRuleReducer),
+  __reducerSchema("update_supplier_intake", UpdateSupplierIntakeReducer),
   __reducerSchema("update_task", UpdateTaskReducer),
   __reducerSchema("update_task_state", UpdateTaskStateReducer),
   __reducerSchema("update_tax_deadline", UpdateTaxDeadlineReducer),

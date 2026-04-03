@@ -124,4 +124,8 @@ export type {
   CreateSubscriptionPlanParams,
   GenerateSubscriptionInvoiceParams,
   RecognizeDeferredRevenueParams,
+  AccountMoveLine,
+  CreateAccountBankStatementParams,
+  CreateAccountTaxParams,
+  CreateAccountJournalParams,
 } from './generated/types';
