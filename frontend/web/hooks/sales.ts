@@ -72,6 +72,63 @@ export function usePickingBatches(
   })
 }
 
+export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['delivery-carriers', companyId.toString()],
+    queryFn: () => fetchQueryList('/api/query/delivery-carriers', 'Failed to fetch delivery carriers'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['delivery-price-rules', companyId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/delivery-price-rules', 'Failed to fetch delivery price rules'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['shipping-methods', companyId.toString()],
+    queryFn: () => fetchQueryList('/api/query/shipping-methods', 'Failed to fetch shipping methods'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['pos-payment-methods', companyId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/pos-payment-methods', 'Failed to fetch POS payment methods'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['pos-loyalty-programs', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/pos-loyalty-programs', 'Failed to fetch loyalty programs'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['pos-loyalty-cards', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/pos-loyalty-cards', 'Failed to fetch loyalty cards'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
@@ -423,6 +480,189 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
       void qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] })
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
     },
+  })
+}
+
+// ── CSV imports (organization_id, company_id, csv_data) ───────────────────────
+
+async function parseCallErrorSales(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+export function useImportSaleOrderCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_sale_order_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorSales(res))
+    },
+    onSuccess: () => {
+      const k = companyId.toString()
+      void qc.invalidateQueries({ queryKey: ['sale-orders', k] })
+    },
+  })
+}
+
+export function useImportSaleOrderLineCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_sale_order_line_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorSales(res))
+    },
+    onSuccess: () => {
+      const k = companyId.toString()
+      void qc.invalidateQueries({ queryKey: ['sale-order-lines', k] })
+    },
+  })
+}
+
+export function useSalesCsvImportMutations(organizationId: bigint, companyId: bigint) {
+  return {
+    importSaleOrder: useImportSaleOrderCsv(organizationId, companyId),
+    importSaleOrderLine: useImportSaleOrderLineCsv(organizationId, companyId),
+  }
+}
+
+function invalidateSalesLogistics(qc: ReturnType<typeof useQueryClient>, orgId: bigint, companyId: bigint) {
+  const o = orgId.toString()
+  const c = companyId.toString()
+  void qc.invalidateQueries({ queryKey: ['delivery-carriers', c] })
+  void qc.invalidateQueries({ queryKey: ['delivery-price-rules', c] })
+  void qc.invalidateQueries({ queryKey: ['shipping-methods', c] })
+  void qc.invalidateQueries({ queryKey: ['pos-payment-methods', c] })
+  void qc.invalidateQueries({ queryKey: ['pos-loyalty-programs', o] })
+  void qc.invalidateQueries({ queryKey: ['pos-loyalty-cards', o] })
+}
+
+export function useCreateDeliveryCarrier(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_delivery_carrier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          companyId.toString(),
+          params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to create delivery carrier')
+    },
+    onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
+  })
+}
+
+export function useCreateDeliveryPriceRule(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_delivery_price_rule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          companyId.toString(),
+          params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to create delivery price rule')
+    },
+    onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
+  })
+}
+
+export function useCreateShippingMethod(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_shipping_method', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          companyId.toString(),
+          params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to create shipping method')
+    },
+    onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
+  })
+}
+
+export function useCreatePaymentMethod(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_payment_method', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          companyId.toString(),
+          params,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to create payment method')
+    },
+    onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
+  })
+}
+
+export function useCreateLoyaltyProgram(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_loyalty_program', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create loyalty program')
+    },
+    onSuccess: () => {
+      invalidateSalesLogistics(qc, organizationId, organizationId)
+    },
+  })
+}
+
+export function useCreateLoyaltyCard(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { partnerId: bigint | number | string | null; programId: bigint | number | string; code: string; points: number }
+  >({
+    mutationFn: async ({ partnerId, programId, code, points }) => {
+      const r = await fetch('/api/call/create_loyalty_card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          partnerId === null || partnerId === '' ? null : Number(partnerId),
+          Number(programId),
+          code,
+          points,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to create loyalty card')
+    },
+    onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
   })
 }
 

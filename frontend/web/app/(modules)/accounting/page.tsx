@@ -12,11 +12,11 @@ import {
 import { AccountingClient } from "./accounting-client"
 
 export default async function AccountingPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <AccountingClient />
   }
+  const { organizationId, opts } = session
 
   const [accounts, moves, taxes, budgets, analytic, journals, fiscalYears, accountPeriods] =
     await Promise.all([

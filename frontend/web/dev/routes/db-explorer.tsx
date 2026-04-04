@@ -7,12 +7,20 @@ const RESOURCE_GROUPS: Record<string, string[]> = {
   Sales: ['sale-orders', 'sale-order-lines', 'pricelists', 'pricelist-items', 'picking-batches'],
   Purchasing: ['purchase-orders', 'purchase-order-lines', 'purchase-requisitions', 'landed-costs', 'supplier-intakes'],
   Accounting: ['account-accounts', 'account-journals', 'account-moves', 'account-taxes', 'account-payments', 'budgets', 'analytic-accounts', 'bank-statements', 'bank-statement-lines', 'bank-match-candidates', 'account-reconciliation-widgets', 'account-assets'],
-  Inventory: ['products', 'product-categories', 'uoms', 'stock-quants', 'stock-pickings', 'warehouses', 'inventory-adjustments', 'stock-locations', 'stock-production-lots', 'stock-production-serials', 'quality-checks', 'stock-cycle-counts', 'stock-inventories', 'stock-moves', 'stock-routes', 'stock-rules', 'picking-waves', 'warehouse-tasks', 'replenishment-rules', 'barcode-rules'],
-  Manufacturing: ['mrp-productions', 'mrp-boms', 'mrp-bom-lines', 'mrp-workorders', 'mrp-workcenters'],
+  Inventory: ['products', 'product-categories', 'uoms', 'stock-quants', 'stock-pickings', 'warehouses', 'inventory-adjustments', 'stock-locations', 'stock-production-lots', 'stock-production-serials', 'quality-checks', 'stock-cycle-counts', 'stock-inventories', 'stock-moves', 'stock-routes', 'stock-rules', 'picking-waves', 'warehouse-tasks', 'replenishment-rules', 'barcode-rules', 'adjustment-reasons', 'barcode-nomenclatures', 'serial-lot-traceability', 'stock-traceability-reports'],
+  Manufacturing: ['mrp-productions', 'mrp-boms', 'mrp-bom-lines', 'mrp-workorders', 'mrp-workcenters', 'mrp-routing-workcenters'],
   HR: ['employees', 'departments', 'leave-requests', 'contracts', 'payslips'],
   Projects: ['projects', 'tasks', 'timesheets'],
   Reports: ['financial-reports', 'trial-balances'],
-  IoT: ['iot-devices', 'iot-hubs', 'iot-alerts', 'iot-actions', 'iot-telemetry', 'iot-thresholds'],
+  IoT: [
+    'iot-devices',
+    'iot-hubs',
+    'iot-alerts',
+    'iot-actions',
+    'iot-telemetry',
+    'iot-thresholds',
+    'iot-pairing-tokens',
+  ],
   Other: ['documents', 'knowledge-articles', 'helpdesk-tickets', 'helpdesk-teams', 'helpdesk-stages', 'helpdesk-slas', 'subscriptions', 'subscription-plans', 'workflows', 'workflow-instances', 'proposals', 'calendar-events', 'mail-messages', 'expenses', 'expense-sheets', 'roles', 'user-roles'],
 }
 

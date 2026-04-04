@@ -78,6 +78,19 @@ export function useMrpWorkcenters(
   })
 }
 
+export function useMrpRoutingWorkcenters(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['mrp-routing-workcenters', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/mrp-routing-workcenters', 'Failed to fetch routing operations'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useQualityChecks(
   organizationId: bigint,
   initialData?: QueryRows,
@@ -424,6 +437,7 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
 
 export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
+  const orgKey = organizationId.toString()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const r = await fetch('/api/call/create_routing_workcenter', {
@@ -433,7 +447,10 @@ export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bi
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['mrp-routing-workcenters', orgKey] })
+      void qc.invalidateQueries({ queryKey: ['mrp-workcenters', orgKey] })
+    },
   })
 }
 
@@ -489,6 +506,7 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
 
 export function useCompleteProductivityLog(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
+  const orgKey = organizationId.toString()
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
       const r = await fetch('/api/call/complete_productivity_log', {
@@ -498,8 +516,7 @@ export function useCompleteProductivityLog(organizationId: bigint, companyId: bi
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['mrp-workcenters', orgKey] }),
   })
 }
 
@@ -622,6 +639,8 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     importBomLineCsv: useImportBomLineCsv(organizationId, companyId),
     importMoCsv: useImportManufacturingOrderCsv(organizationId, companyId),
     linkDeviceToWorkcenter: useLinkDeviceToWorkcenter(organizationId),
+    createRoutingWorkcenter: useCreateRoutingWorkcenter(organizationId, companyId),
+    completeProductivityLog: useCompleteProductivityLog(organizationId, companyId),
   }
 }
 

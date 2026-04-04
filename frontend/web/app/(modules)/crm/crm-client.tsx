@@ -28,11 +28,14 @@ import {
   useLeads,
   useOpportunities,
   useOpportunityStages,
+  useCrmCsvImportMutations,
 } from "@/hooks/crm"
 import { usePricelists } from "@/hooks/sales"
 import { useWarehouses } from "@/hooks/inventory"
 import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
+  CrmRecordChatterDialog,
+  CrmUtmSettings,
   FormModal,
   ModuleView,
   MissingOrganization,
@@ -50,8 +53,9 @@ import {
   contactsTableConfig,
   leadsTableConfig,
   opportunitiesTableConfig,
+  csvImportForm,
 } from "@lumiere/ui"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface CrmClientProps {
@@ -78,6 +82,37 @@ function rowIdBigInt(row: Record<string, unknown>): bigint {
   return BigInt(String(r ?? 0))
 }
 
+function crmTabToResModel(tabId: string): string | null {
+  if (tabId === "leads") return "lead"
+  if (tabId === "opportunities") return "opportunity"
+  if (tabId === "contacts") return "contact"
+  if (tabId === "activities") return "activity"
+  return null
+}
+
+function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string {
+  const id = String(row.id ?? "")
+  if (tabId === "activities") {
+    const s = String(row.summary ?? row.name ?? "").trim()
+    return s || `Activity #${id}`
+  }
+  if (tabId === "leads") {
+    const s = String(
+      row.contactName ?? row.contact_name ?? row.name ?? row.emailFrom ?? row.email_from ?? "",
+    ).trim()
+    return s || `Lead #${id}`
+  }
+  if (tabId === "opportunities") {
+    const s = String(row.name ?? "").trim()
+    return s || `Opportunity #${id}`
+  }
+  if (tabId === "contacts") {
+    const s = String(row.name ?? "").trim()
+    return s || `Contact #${id}`
+  }
+  return id ? `Record #${id}` : "Record"
+}
+
 function leadStateRaw(row: Record<string, unknown>): string {
   return String(row.state ?? row.State ?? "").toLowerCase()
 }
@@ -85,6 +120,8 @@ function leadStateRaw(row: Record<string, unknown>): string {
 function partnerId(row: Record<string, unknown>): unknown {
   return row.partnerId ?? row.partner_id
 }
+
+type CrmCsvImportKind = "contact" | "lead" | "opportunity"
 
 export function CrmClient(props: CrmClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -103,6 +140,13 @@ function CrmClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
+  const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+  const [chatterTarget, setChatterTarget] = useState<{
+    resModel: string
+    resId: bigint
+    recordTitle: string
+  } | null>(null)
 
   const { data: leads = [] } = useLeads(orgId, initialLeads)
   const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
@@ -164,6 +208,21 @@ function CrmClientLoaded({
   const assignTag = useAssignTagToContact(orgId)
   const addToSegment = useAddContactToSegment(orgId)
   const completeActivity = useCompleteActivity(orgId)
+  const csvImports = useCrmCsvImportMutations(orgId)
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<CrmCsvImportKind, string> = {
+      contact: "crm.csvImport.contactsTitle",
+      lead: "crm.csvImport.leadsTitle",
+      opportunity: "crm.csvImport.opportunitiesTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
 
   const openConvertLeadModal = useCallback(
     (rows: Record<string, unknown>[]) => {
@@ -248,6 +307,11 @@ function CrmClientLoaded({
         ...(leadsCfg.view as EntityTableConfig),
         actions: [
           {
+            id: "csv-leads",
+            label: t("crm.csvImport.toolbarLeads"),
+            onClick: () => setCsvKind("lead"),
+          },
+          {
             id: "convert-lead",
             label: t("crm.actions.convertToCustomer"),
             requiresSelection: true,
@@ -263,6 +327,11 @@ function CrmClientLoaded({
         ...(oppCfg.view as EntityTableConfig),
         actions: [
           {
+            id: "csv-opportunities",
+            label: t("crm.csvImport.toolbarOpportunities"),
+            onClick: () => setCsvKind("opportunity"),
+          },
+          {
             id: "convert-opp-order",
             label: t("crm.actions.convertToSaleOrder"),
             requiresSelection: true,
@@ -277,6 +346,11 @@ function CrmClientLoaded({
       view: {
         ...(contactCfg.view as EntityTableConfig),
         actions: [
+          {
+            id: "csv-contacts",
+            label: t("crm.csvImport.toolbarContacts"),
+            onClick: () => setCsvKind("contact"),
+          },
           {
             id: "assign-tag",
             label: t("crm.actions.assignTag"),
@@ -328,18 +402,29 @@ function CrmClientLoaded({
       },
     }
 
+    const coreTabs = base.tabs.map((tab) => {
+      if (tab.id === "leads") return { ...tab, entityConfig: leadsEntity }
+      if (tab.id === "opportunities") return { ...tab, entityConfig: oppEntity }
+      if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
+      if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
+      return tab
+    })
+
     return {
       ...base,
-      tabs: base.tabs.map((tab) => {
-        if (tab.id === "leads") return { ...tab, entityConfig: leadsEntity }
-        if (tab.id === "opportunities") return { ...tab, entityConfig: oppEntity }
-        if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
-        if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
-        return tab
-      }),
+      tabs: [
+        ...coreTabs,
+        {
+          id: "attribution",
+          label: t("crm.attribution.tabLabel"),
+          type: "custom" as const,
+          customContent: <CrmUtmSettings organizationId={organizationId} />,
+        },
+      ],
     }
   }, [
     t,
+    organizationId,
     openConvertLeadModal,
     openConvertOppModal,
     openAssignTagModal,
@@ -529,7 +614,29 @@ function CrmClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        onRowClick={(tabId, row) => {
+          const resModel = crmTabToResModel(tabId)
+          if (!resModel) return
+          setChatterTarget({
+            resModel,
+            resId: rowIdBigInt(row),
+            recordTitle: crmRowChatterLabel(tabId, row),
+          })
+        }}
       />
+      {chatterTarget ? (
+        <CrmRecordChatterDialog
+          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) setChatterTarget(null)
+          }}
+          organizationId={organizationId}
+          resModel={chatterTarget.resModel}
+          resId={chatterTarget.resId}
+          recordTitle={chatterTarget.recordTitle}
+        />
+      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -550,6 +657,34 @@ function CrmClientLoaded({
           handleWorkflowSubmit(formData)
         }}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "contact") await csvImports.importContact.mutateAsync(text)
+              else if (csvKind === "lead") await csvImports.importLead.mutateAsync(text)
+              else await csvImports.importOpportunity.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

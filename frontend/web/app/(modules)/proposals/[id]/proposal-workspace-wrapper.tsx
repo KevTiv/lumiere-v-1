@@ -13,6 +13,7 @@ import {
   useDeleteProposalSection,
   useAddProposalSourceDoc,
   useDeleteProposalSourceDoc,
+  useUpdateProposalSourceDoc,
   useSaveProposalVersion,
   useUpdateProposalStatus,
   useAddProposalLineItem,
@@ -73,6 +74,19 @@ const httpHooks: ProposalWorkspaceHooks = {
     const mutation = useDeleteProposalSourceDoc()
     return {
       mutate: (params: { docId: bigint | number | string }) => mutation.mutate(params.docId),
+      isPending: (mutation as { isPending?: boolean }).isPending,
+    }
+  },
+  useUpdateProposalSourceDoc: () => {
+    const mutation = useUpdateProposalSourceDoc()
+    return {
+      mutate: (params: {
+        docId: bigint | number | string
+        name?: string
+        content?: string
+        docType?: string
+        wordCount?: number
+      }) => mutation.mutate(params),
       isPending: (mutation as { isPending?: boolean }).isPending,
     }
   },

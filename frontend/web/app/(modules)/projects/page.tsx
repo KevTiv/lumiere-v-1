@@ -9,11 +9,11 @@ import {
 import { ProjectsClient } from "./projects-client"
 
 export default async function ProjectsPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <ProjectsClient />
   }
+  const { organizationId, opts } = session
 
   const [projects, tasks, timesheets, pricelists, contacts] = await Promise.all([
     serverQueryProjects(organizationId, opts),

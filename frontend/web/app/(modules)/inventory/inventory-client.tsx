@@ -19,7 +19,7 @@ import {
   newQualityAlertForm,
   newQualityPointForm,
   newQualityTeamForm,
-  newBarcodeRuleForm,
+  newTraceabilityRecordForm,
   newReplenishmentRuleForm,
   newPickingWaveForm,
   newProductCategoryForm,
@@ -29,6 +29,8 @@ import {
   newProductPackagingForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  csvImportForm,
+  Button,
 } from "@lumiere/ui"
 import type { EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
@@ -56,6 +58,10 @@ import {
   useInventoryValuations,
   useReplenishmentRules,
   useBarcodeRules,
+  useAdjustmentReasons,
+  useBarcodeNomenclatures,
+  useSerialLotTraceability,
+  useStockTraceabilityReports,
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
@@ -96,6 +102,12 @@ import {
   useUpdateBarcodeRule,
   useDeleteBarcodeRule,
   useRecordBarcodeScan,
+  useRemoveRuleFromNomenclature,
+  useCreateAdjustmentReason,
+  useUseSerial,
+  useCreateTraceabilityRecord,
+  useCreateTraceabilityReport,
+  useRunTraceabilityReport,
   // Replenishment
   useCreateReplenishmentRule,
   useUpdateReplenishmentRule,
@@ -152,11 +164,23 @@ import {
   useUpdateProductPackaging,
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
+  useInventoryCsvImportMutations,
 } from "@/hooks/inventory"
 import { usePricelists } from "@/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 type ScalarId = bigint | number | string
+
+type InventoryCsvImportKind =
+  | "uomCategory"
+  | "uom"
+  | "productCategory"
+  | "product"
+  | "productVariant"
+  | "warehouse"
+  | "stockLocation"
+  | "stockQuant"
+  | "lot"
 
 /** SpacetimeDB sum-type encoding for `ZoneDisplayType` (warehouse 3D zones). */
 function zoneDisplayTypeForReducer(tag: string): Record<string, unknown> {
@@ -177,8 +201,15 @@ import {
 import {
   CheckCircle, ListChecks, Pencil, Plus, Trash2, UserCircle2, UserPlus, XCircle,
   ShieldCheck, AlertTriangle, ScanLine, RefreshCw, PackageOpen, FolderTree, Route, ClipboardList,
+  Play,
 } from "lucide-react"
 import { buildCreateWarehouseParamsFromTemplate } from "@/lib/warehouse-create-params"
+import {
+  toCreateAdjustmentReasonParamsFromForm,
+  toCreateTraceabilityRecordParamsFromForm,
+  toCreateStockTraceabilityReportParamsFromForm,
+} from "@/lib/inventory-ext-params"
+import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { CycleCountWizard } from "./cycle-count-wizard"
 
@@ -252,6 +283,8 @@ function InventoryClientLoaded({
   const [editStockRuleId, setEditStockRuleId] = useState<ScalarId | null>(null)
   const [supplierLineProductId, setSupplierLineProductId] = useState<ScalarId | null>(null)
   const [packagingProductId, setPackagingProductId] = useState<ScalarId | null>(null)
+  const [csvKind, setCsvKind] = useState<InventoryCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
 
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
@@ -273,8 +306,33 @@ function InventoryClientLoaded({
   const { data: inventoryValuations = [] } = useInventoryValuations(orgId, initialInventoryValuations)
   const { data: replenishmentRulesList = [] } = useReplenishmentRules(orgId, initialReplenishmentRules)
   const { data: barcodeRules = [] } = useBarcodeRules(orgId)
+  const { data: adjustmentReasons = [] } = useAdjustmentReasons(orgId)
+  const { data: barcodeNomenclatures = [] } = useBarcodeNomenclatures(orgId)
+  const { data: serialLotTraceability = [] } = useSerialLotTraceability(orgId)
+  const { data: stockTraceabilityReports = [] } = useStockTraceabilityReports(orgId)
   const { data: orgUsers = [] } = useOrgUsers()
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
+  const csvImports = useInventoryCsvImportMutations(orgId, companyId)
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<InventoryCsvImportKind, string> = {
+      uomCategory: "inventory.csvImport.uomCategoriesTitle",
+      uom: "inventory.csvImport.uomsTitle",
+      productCategory: "inventory.csvImport.productCategoriesTitle",
+      product: "inventory.csvImport.productsTitle",
+      productVariant: "inventory.csvImport.variantsTitle",
+      warehouse: "inventory.csvImport.warehousesTitle",
+      stockLocation: "inventory.csvImport.locationsTitle",
+      stockQuant: "inventory.csvImport.quantsTitle",
+      lot: "inventory.csvImport.lotsTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -302,6 +360,14 @@ function InventoryClientLoaded({
       ...base,
     ]
   }, [uoms, t])
+
+  const traceRecordFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newTraceabilityRecordForm(t), {
+        uomId: uomFieldOptions,
+      }),
+    [t, uomFieldOptions],
+  )
 
   const productFormConfig = useMemo(
     () =>
@@ -470,6 +536,12 @@ function InventoryClientLoaded({
   const updateBarcodeRule = useUpdateBarcodeRule(orgId, companyId)
   const deleteBarcodeRule = useDeleteBarcodeRule(orgId, companyId)
   const recordBarcodeScan = useRecordBarcodeScan(orgId, companyId)
+  const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(orgId, companyId)
+  const createAdjustmentReason = useCreateAdjustmentReason(orgId, companyId)
+  const useSerial = useUseSerial(orgId, companyId)
+  const createTraceabilityRecord = useCreateTraceabilityRecord(orgId, companyId)
+  const createTraceabilityReport = useCreateTraceabilityReport(orgId, companyId)
+  const runTraceabilityReport = useRunTraceabilityReport(orgId, companyId)
 
   // Replenishment hooks
   const createReplenishmentRule = useCreateReplenishmentRule(orgId, companyId)
@@ -904,6 +976,31 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "csv-uom-category",
+                  label: t("inventory.csvImport.toolbarUomCategories"),
+                  onClick: () => setCsvKind("uomCategory"),
+                },
+                {
+                  id: "csv-uom",
+                  label: t("inventory.csvImport.toolbarUoms"),
+                  onClick: () => setCsvKind("uom"),
+                },
+                {
+                  id: "csv-product-category",
+                  label: t("inventory.csvImport.toolbarProductCategories"),
+                  onClick: () => setCsvKind("productCategory"),
+                },
+                {
+                  id: "csv-product",
+                  label: t("inventory.csvImport.toolbarProducts"),
+                  onClick: () => setCsvKind("product"),
+                },
+                {
+                  id: "csv-product-variant",
+                  label: t("inventory.csvImport.toolbarVariants"),
+                  onClick: () => setCsvKind("productVariant"),
+                },
+                {
                   id: "edit-product",
                   label: t("common.edit"),
                   icon: Pencil,
@@ -1014,6 +1111,11 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "csv-warehouse",
+                  label: t("inventory.csvImport.toolbarWarehouses"),
+                  onClick: () => setCsvKind("warehouse"),
+                },
+                {
                   id: "edit-warehouse",
                   label: t("common.edit"),
                   icon: Pencil,
@@ -1118,6 +1220,11 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "csv-stock-quant",
+                  label: t("inventory.csvImport.toolbarQuants"),
+                  onClick: () => setCsvKind("stockQuant"),
+                },
+                {
                   id: "reserve-qty",
                   label: t("inventory.stockActions.reserve"),
                   icon: CheckCircle,
@@ -1190,6 +1297,11 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "csv-stock-location",
+                  label: t("inventory.csvImport.toolbarLocations"),
+                  onClick: () => setCsvKind("stockLocation"),
+                },
+                {
                   id: "delete-location",
                   label: t("common.delete"),
                   variant: "destructive",
@@ -1212,6 +1324,11 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                {
+                  id: "csv-lot",
+                  label: t("inventory.csvImport.toolbarLots"),
+                  onClick: () => setCsvKind("lot"),
+                },
                 {
                   id: "edit-lot-note",
                   label: t("inventory.lotActions.editNote"),
@@ -1255,6 +1372,16 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                {
+                  id: "use-serial",
+                  label: t("inventory.productionSerials.actions.markInUse"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void useSerial.mutateAsync(id)
+                  },
+                },
                 {
                   id: "edit-serial-note",
                   label: t("inventory.serialActions.editNote"),
@@ -1609,6 +1736,11 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "csv-product-category-tab",
+                  label: t("inventory.csvImport.toolbarProductCategories"),
+                  onClick: () => setCsvKind("productCategory"),
+                },
+                {
                   id: "delete-category",
                   label: t("common.delete"),
                   icon: Trash2,
@@ -1697,7 +1829,6 @@ function InventoryClientLoaded({
       if (tab.id === "barcode-rules") {
         return {
           ...tab,
-          createForm: newBarcodeRuleForm(t),
           entityConfig: {
             ...tab.entityConfig,
             view: {
@@ -1714,6 +1845,65 @@ function InventoryClientLoaded({
                     if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.barcodeActions.confirmDelete"))) {
                       void deleteBarcodeRule.mutateAsync(id)
                     }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "traceability-records") {
+        return {
+          ...tab,
+          createForm: traceRecordFormConfig,
+        }
+      }
+      if (tab.id === "barcode-nomenclatures") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "remove-rule-from-nomenclature",
+                  label: t("inventory.barcodeNomenclatures.actions.removeRule"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const nomenclatureId = rows[0]?.id as ScalarId | undefined
+                    if (nomenclatureId == null || typeof window === "undefined") return
+                    const raw = window.prompt(t("inventory.barcodeNomenclatures.actions.ruleIdPrompt"))
+                    if (raw == null || raw.trim() === "") return
+                    const ruleId = Number(raw.trim())
+                    if (!Number.isFinite(ruleId)) return
+                    void removeRuleFromNomenclature.mutateAsync({ nomenclatureId, ruleId })
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
+      if (tab.id === "traceability-reports") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "run-traceability-report",
+                  label: t("inventory.traceabilityReports.actions.runSelected"),
+                  icon: Play,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    const id = row?.id as ScalarId | undefined
+                    if (id == null || String(row?.state ?? "") !== "draft") return
+                    void runTraceabilityReport.mutateAsync(id)
                   },
                 },
               ],
@@ -1816,6 +2006,10 @@ function InventoryClientLoaded({
           if (tab.id === "routes") return withTransferActions(tab)
           if (tab.id === "rules") return withTransferActions(tab)
           if (tab.id === "barcode-rules") return withTransferActions(tab)
+          if (tab.id === "adjustment-reasons") return withTransferActions(tab)
+          if (tab.id === "barcode-nomenclatures") return withTransferActions(tab)
+          if (tab.id === "traceability-records") return withTransferActions(tab)
+          if (tab.id === "traceability-reports") return withTransferActions(tab)
           if (tab.id === "warehouse-tasks") return withTransferActions(tab)
           return tab
         }),
@@ -1894,12 +2088,17 @@ function InventoryClientLoaded({
     updateProductSupplierInfo,
     updateProductPackaging,
     stockQuantFormConfig,
+    traceRecordFormConfig,
+    useSerial,
+    removeRuleFromNomenclature,
+    runTraceabilityReport,
     // Data dependencies for form configs
     products,
     warehouses,
     locations,
     productCategories,
     pricelists,
+    setCsvKind,
   ])
 
   const data = useMemo(
@@ -1923,6 +2122,10 @@ function InventoryClientLoaded({
       replenishment: replenishmentRulesList as unknown as Record<string, unknown>[],
       "barcode-rules": barcodeRules as unknown as Record<string, unknown>[],
       "product-categories": productCategories as unknown as Record<string, unknown>[],
+      "adjustment-reasons": adjustmentReasons as unknown as Record<string, unknown>[],
+      "barcode-nomenclatures": barcodeNomenclatures as unknown as Record<string, unknown>[],
+      "traceability-records": serialLotTraceability as unknown as Record<string, unknown>[],
+      "traceability-reports": stockTraceabilityReports as unknown as Record<string, unknown>[],
     }),
     [
       products,
@@ -1944,6 +2147,10 @@ function InventoryClientLoaded({
       replenishmentRulesList,
       barcodeRules,
       productCategories,
+      adjustmentReasons,
+      barcodeNomenclatures,
+      serialLotTraceability,
+      stockTraceabilityReports,
     ]
   )
 
@@ -2242,6 +2449,15 @@ function InventoryClientLoaded({
         type: String(formData.type ?? "product"),
         sequence: Number(formData.sequence ?? 100),
       } as never)
+    } else if (action === "createAdjustmentReason") {
+      const p = toCreateAdjustmentReasonParamsFromForm(formData)
+      if (p) createAdjustmentReason.mutate(stdbParamsToJson(p))
+    } else if (action === "createTraceabilityRecord") {
+      const p = toCreateTraceabilityRecordParamsFromForm(formData)
+      if (p) createTraceabilityRecord.mutate(stdbParamsToJson(p))
+    } else if (action === "createTraceabilityReport") {
+      const p = toCreateStockTraceabilityReportParamsFromForm(formData)
+      if (p) createTraceabilityReport.mutate(stdbParamsToJson(p))
     } else if (action === "createStockQuant") {
       const p = formData.productId
       const l = formData.locationId
@@ -2276,10 +2492,10 @@ function InventoryClientLoaded({
       if (wid === "" || wid == null || lid === "" || lid == null) return
       const dt = String(formData.displayType ?? "Rack")
       createWarehouse3dZone.mutate({
-        warehouseId: wid,
-        locationId: lid,
+        warehouseId: BigInt(String(wid)),
+        locationId: BigInt(String(lid)),
         params: {
-          display_type: zoneDisplayTypeForReducer(dt),
+          displayType: zoneDisplayTypeForReducer(dt),
           color: String(formData.color ?? "#0e7490"),
           width: Number(formData.width ?? 10),
           height: Number(formData.height ?? 3),
@@ -2287,7 +2503,7 @@ function InventoryClientLoaded({
           rows: Math.max(0, Math.floor(Number(formData.rows ?? 4))),
           columns: Math.max(0, Math.floor(Number(formData.columns ?? 8))),
           levels: Math.max(0, Math.floor(Number(formData.levels ?? 3))),
-        },
+        } as never,
       })
     }
   }
@@ -2472,6 +2688,52 @@ function InventoryClientLoaded({
           setPackagingProductId(null)
         }}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "uomCategory") await csvImports.importUomCategory.mutateAsync(text)
+              else if (csvKind === "uom") await csvImports.importUom.mutateAsync(text)
+              else if (csvKind === "productCategory") await csvImports.importProductCategory.mutateAsync(text)
+              else if (csvKind === "productVariant") await csvImports.importProductVariant.mutateAsync(text)
+              else if (csvKind === "warehouse") await csvImports.importWarehouse.mutateAsync(text)
+              else if (csvKind === "stockLocation") await csvImports.importStockLocation.mutateAsync(text)
+              else if (csvKind === "stockQuant") await csvImports.importStockQuant.mutateAsync(text)
+              else if (csvKind === "lot") await csvImports.importLot.mutateAsync(text)
+              else if (csvKind === "product") {
+                const pl = pricelists.find(
+                  (p) => p.currencyId != null && String(p.currencyId).trim() !== "",
+                )
+                if (pl == null || pl.currencyId == null) {
+                  setCsvError(t("inventory.csvImport.noPricelistCurrency"))
+                  return
+                }
+                await csvImports.importProduct.mutateAsync({
+                  csvData: text,
+                  currencyId: Number(pl.currencyId),
+                })
+              }
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

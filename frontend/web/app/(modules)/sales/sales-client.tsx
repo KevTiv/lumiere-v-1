@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
 import {
@@ -9,12 +9,14 @@ import {
   newSaleOrderForm,
   newPricelistForm,
   newPickingBatchForm,
+  newLoyaltyCardForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   saleOrdersTableConfig,
   pricelistsTableConfig,
   pricelistItemsTableConfig,
   deliveriesTableConfig,
+  csvImportForm,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
@@ -28,6 +30,14 @@ import {
   toCreatePricelistParams,
   toCreateSaleOrderParams,
 } from '@/lib/sales-create-params';
+import {
+  logisticsParamsToJson,
+  toCreateDeliveryCarrierParams,
+  toCreateDeliveryPriceRuleParams,
+  toCreateLoyaltyProgramParams,
+  toCreatePaymentMethodParams,
+  toCreateShippingMethodParams,
+} from '@/lib/sales-logistics-params';
 import { salesModuleConfig } from '@/lib/module-dashboard-configs';
 import { groupBy, groupByMonth } from '@/lib/utils';
 import {
@@ -56,6 +66,19 @@ import {
   useUpdateSaleOrderLine,
   useDeleteSaleOrderLine,
   useCreateInvoiceFromSaleOrder,
+  useSalesCsvImportMutations,
+  useDeliveryCarriers,
+  useDeliveryPriceRules,
+  useShippingMethods,
+  usePosPaymentMethods,
+  usePosLoyaltyPrograms,
+  usePosLoyaltyCards,
+  useCreateDeliveryCarrier,
+  useCreateDeliveryPriceRule,
+  useCreateShippingMethod,
+  useCreatePaymentMethod,
+  useCreateLoyaltyProgram,
+  useCreateLoyaltyCard,
 } from '@/hooks/sales';
 import { useContacts } from '@/hooks/crm';
 import { useWarehouses } from '@/hooks/inventory';
@@ -64,6 +87,7 @@ import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
   warehouseRowsToSelectOptions,
+  loyaltyProgramRowsToSelectOptions,
 } from '@/lib/form-lookup';
 
 function saleOrderState(row: Record<string, unknown>): string {
@@ -86,6 +110,12 @@ interface SalesClientProps {
   initialPricelists?: Record<string, unknown>[];
   initialPricelistItems?: Record<string, unknown>[];
   initialDeliveries?: Record<string, unknown>[];
+  initialDeliveryCarriers?: Record<string, unknown>[];
+  initialDeliveryPriceRules?: Record<string, unknown>[];
+  initialShippingMethods?: Record<string, unknown>[];
+  initialPosPaymentMethods?: Record<string, unknown>[];
+  initialLoyaltyPrograms?: Record<string, unknown>[];
+  initialLoyaltyCards?: Record<string, unknown>[];
   initialContacts?: Record<string, unknown>[];
   initialWarehouses?: Record<string, unknown>[];
   organizationId?: number;
@@ -94,6 +124,8 @@ interface SalesClientProps {
 type SalesClientLoadedProps = Omit<SalesClientProps, 'organizationId'> & {
   organizationId: number;
 };
+
+type SalesCsvImportKind = 'order' | 'orderLine';
 
 export function SalesClient(props: SalesClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -108,6 +140,12 @@ function SalesClientLoaded({
   initialPricelists,
   initialPricelistItems,
   initialDeliveries,
+  initialDeliveryCarriers,
+  initialDeliveryPriceRules,
+  initialShippingMethods,
+  initialPosPaymentMethods,
+  initialLoyaltyPrograms,
+  initialLoyaltyCards,
   initialContacts,
   initialWarehouses,
   organizationId,
@@ -119,6 +157,8 @@ function SalesClientLoaded({
     form: FormConfig;
     action: string;
   } | null>(null);
+  const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
 
   const { data: orders = [] } = useSaleOrders(companyId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
@@ -134,6 +174,27 @@ function SalesClientLoaded({
     companyId,
     initialDeliveries,
   );
+  const { data: deliveryCarriers = [] } = useDeliveryCarriers(
+    companyId,
+    initialDeliveryCarriers,
+  );
+  const { data: deliveryPriceRules = [] } = useDeliveryPriceRules(
+    companyId,
+    initialDeliveryPriceRules,
+  );
+  const { data: shippingMethods = [] } = useShippingMethods(
+    companyId,
+    initialShippingMethods,
+  );
+  const { data: posPaymentMethods = [] } = usePosPaymentMethods(
+    companyId,
+    initialPosPaymentMethods,
+  );
+  const { data: loyaltyPrograms = [] } = usePosLoyaltyPrograms(
+    orgId,
+    initialLoyaltyPrograms,
+  );
+  const { data: loyaltyCards = [] } = usePosLoyaltyCards(orgId, initialLoyaltyCards);
   const { data: contacts = [] } = useContacts(companyId, initialContacts);
   const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses);
 
@@ -158,6 +219,27 @@ function SalesClientLoaded({
   const updateSaleOrderLine = useUpdateSaleOrderLine(orgId);
   const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
   const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
+  const csvImports = useSalesCsvImportMutations(orgId, companyId);
+
+  const createDeliveryCarrier = useCreateDeliveryCarrier(orgId, companyId);
+  const createDeliveryPriceRule = useCreateDeliveryPriceRule(orgId, companyId);
+  const createShippingMethod = useCreateShippingMethod(orgId, companyId);
+  const createPaymentMethod = useCreatePaymentMethod(orgId, companyId);
+  const createLoyaltyProgram = useCreateLoyaltyProgram(orgId);
+  const createLoyaltyCard = useCreateLoyaltyCard(orgId, companyId);
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null);
+  }, [csvKind]);
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null;
+    const titleKey: Record<SalesCsvImportKind, string> = {
+      order: 'sales.csvImport.ordersTitle',
+      orderLine: 'sales.csvImport.orderLinesTitle',
+    };
+    return csvImportForm(t, t(titleKey[csvKind]));
+  }, [csvKind, t]);
 
   const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
 
@@ -197,6 +279,26 @@ function SalesClientLoaded({
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 
+  const loyaltyProgramFieldOptions = useMemo(() => {
+    const fromApi = loyaltyProgramRowsToSelectOptions(loyaltyPrograms);
+    if (fromApi.length > 0) return fromApi;
+    return [
+      {
+        value: '',
+        label: t('sales.forms.newLoyaltyCard.noPrograms'),
+        disabled: true,
+      },
+    ];
+  }, [loyaltyPrograms, t]);
+
+  const loyaltyCardFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newLoyaltyCardForm(t), {
+        programId: loyaltyProgramFieldOptions,
+      }),
+    [t, loyaltyProgramFieldOptions],
+  );
+
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t);
     const view = base.view as EntityTableConfig;
@@ -205,6 +307,11 @@ function SalesClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: 'csv-sale-orders',
+            label: t('sales.csvImport.toolbarOrders'),
+            onClick: () => setCsvKind('order'),
+          },
           {
             id: 'confirm-orders',
             label: t('sales.actions.confirmSelected'),
@@ -250,7 +357,7 @@ function SalesClientLoaded({
         ],
       },
     };
-  }, [t, confirmSaleOrder, cancelSaleOrder, computeSoTotals]);
+  }, [t, confirmSaleOrder, cancelSaleOrder, computeSoTotals, setCsvKind]);
 
   const pricelistsEntityConfig = useMemo((): EntityViewConfig => {
     const base = pricelistsTableConfig(t);
@@ -558,6 +665,28 @@ function SalesClientLoaded({
               createForm: saleOrderFormConfig,
             };
           }
+          if (tab.id === 'order-lines' && tab.type === 'entity' && tab.entityConfig) {
+            const base = tab.entityConfig;
+            const view = base.view as EntityTableConfig;
+            return {
+              ...tab,
+              entityConfig: {
+                ...base,
+                view: {
+                  ...view,
+                  rowSelectionToggleOnClick: false,
+                  actions: [
+                    {
+                      id: 'csv-sale-order-lines',
+                      label: t('sales.csvImport.toolbarOrderLines'),
+                      onClick: () => setCsvKind('orderLine'),
+                    },
+                    ...(view.actions ?? []),
+                  ],
+                },
+              },
+            };
+          }
           if (tab.id === 'pricelists' && tab.type === 'entity') {
             return { ...tab, entityConfig: pricelistsEntityConfig };
           }
@@ -571,6 +700,9 @@ function SalesClientLoaded({
               createForm: pickingBatchFormConfig,
             };
           }
+          if (tab.id === 'loyalty-cards' && tab.type === 'entity') {
+            return { ...tab, createForm: loyaltyCardFormConfig };
+          }
           return tab;
         }),
       }) as ModuleConfig,
@@ -582,6 +714,9 @@ function SalesClientLoaded({
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
       deliveriesEntityConfig,
+      loyaltyCardFormConfig,
+      t,
+      setCsvKind,
       // New mutations
       updateSaleOrder,
       lockSaleOrder,
@@ -598,8 +733,32 @@ function SalesClientLoaded({
       pricelists: pricelists as unknown as Record<string, unknown>[],
       'pricelist-items': pricelistItems as unknown as Record<string, unknown>[],
       deliveries: deliveries as unknown as Record<string, unknown>[],
+      'delivery-price-rules': deliveryPriceRules as unknown as Record<
+        string,
+        unknown
+      >[],
+      'delivery-carriers': deliveryCarriers as unknown as Record<string, unknown>[],
+      'shipping-methods': shippingMethods as unknown as Record<string, unknown>[],
+      'pos-payment-methods': posPaymentMethods as unknown as Record<
+        string,
+        unknown
+      >[],
+      'loyalty-programs': loyaltyPrograms as unknown as Record<string, unknown>[],
+      'loyalty-cards': loyaltyCards as unknown as Record<string, unknown>[],
     }),
-    [orders, orderLines, pricelists, pricelistItems, deliveries],
+    [
+      orders,
+      orderLines,
+      pricelists,
+      pricelistItems,
+      deliveries,
+      deliveryPriceRules,
+      deliveryCarriers,
+      shippingMethods,
+      posPaymentMethods,
+      loyaltyPrograms,
+      loyaltyCards,
+    ],
   );
 
   const handleFormSubmit = (
@@ -608,7 +767,7 @@ function SalesClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === 'createSaleOrder') {
-      const p = toCreateSaleOrderParams(formData, pricelists);
+      const p = toCreateSaleOrderParams(formData, pricelists, companyId);
       if (p) createSaleOrder.mutate(salesParamsToJson(p));
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData);
@@ -616,6 +775,34 @@ function SalesClientLoaded({
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParamsJson(formData);
       if (p) createPickingBatch.mutate(p);
+    } else if (action === 'createDeliveryPriceRule') {
+      const p = toCreateDeliveryPriceRuleParams(formData);
+      if (p) createDeliveryPriceRule.mutate(logisticsParamsToJson(p));
+    } else if (action === 'createDeliveryCarrier') {
+      const p = toCreateDeliveryCarrierParams(formData);
+      if (p) createDeliveryCarrier.mutate(logisticsParamsToJson(p));
+    } else if (action === 'createShippingMethod') {
+      const p = toCreateShippingMethodParams(formData);
+      if (p) createShippingMethod.mutate(logisticsParamsToJson(p));
+    } else if (action === 'createPaymentMethod') {
+      const p = toCreatePaymentMethodParams(formData);
+      if (p) createPaymentMethod.mutate(logisticsParamsToJson(p));
+    } else if (action === 'createLoyaltyProgram') {
+      const p = toCreateLoyaltyProgramParams(formData);
+      if (p) createLoyaltyProgram.mutate(logisticsParamsToJson(p));
+    } else if (action === 'createLoyaltyCard') {
+      const programId = formData.programId;
+      const code = String(formData.code ?? '').trim();
+      const points = Number(formData.points);
+      if (programId === '' || programId == null || !code || !Number.isFinite(points)) return;
+      const partnerRaw = formData.partnerId;
+      createLoyaltyCard.mutate({
+        partnerId:
+          partnerRaw === '' || partnerRaw == null ? null : Number(partnerRaw),
+        programId,
+        code,
+        points,
+      });
     }
   };
 
@@ -633,6 +820,36 @@ function SalesClientLoaded({
           }
         }}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null);
+            const files = data.csvFile as FileList | undefined;
+            const file = files?.[0];
+            if (!file) {
+              setCsvError(t('common.validation.required'));
+              return;
+            }
+            try {
+              const text = await file.text();
+              if (csvKind === 'order') {
+                await csvImports.importSaleOrder.mutateAsync(text);
+              } else {
+                await csvImports.importSaleOrderLine.mutateAsync(text);
+              }
+              setCsvKind(null);
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
     </>
   );
 }

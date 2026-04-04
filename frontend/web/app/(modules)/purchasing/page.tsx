@@ -8,25 +8,28 @@ import {
   serverQueryPricelists,
   serverQueryProducts,
   serverQueryUoms,
+  serverQueryPartnerBanks,
 } from "@lumiere/stdb/server"
 import { PurchasingClient } from "./purchasing-client"
 
 export default async function PurchasingPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <Suspense><PurchasingClient /></Suspense>
   }
+  const { organizationId, opts } = session
 
-  const [orders, lines, requisitions, contacts, pricelists, products, uoms] = await Promise.all([
-    serverQueryPurchaseOrders(organizationId, opts),
-    serverQueryPurchaseOrderLines(organizationId, opts),
-    serverQueryPurchaseRequisitions(organizationId, opts),
-    serverQueryContacts(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryProducts(organizationId, opts),
-    serverQueryUoms(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], []])
+  const [orders, lines, requisitions, contacts, pricelists, products, uoms, partnerBanks] =
+    await Promise.all([
+      serverQueryPurchaseOrders(organizationId, opts),
+      serverQueryPurchaseOrderLines(organizationId, opts),
+      serverQueryPurchaseRequisitions(organizationId, opts),
+      serverQueryContacts(organizationId, opts),
+      serverQueryPricelists(organizationId, opts),
+      serverQueryProducts(organizationId, opts),
+      serverQueryUoms(organizationId, opts),
+      serverQueryPartnerBanks(organizationId, opts),
+    ]).catch(() => [[], [], [], [], [], [], [], []])
 
   return (
     <Suspense>
@@ -38,6 +41,7 @@ export default async function PurchasingPage() {
         initialPricelists={pricelists as Record<string, unknown>[]}
         initialProducts={products as Record<string, unknown>[]}
         initialUoms={uoms as Record<string, unknown>[]}
+        initialPartnerBanks={partnerBanks as Record<string, unknown>[]}
         organizationId={organizationId}
       />
     </Suspense>

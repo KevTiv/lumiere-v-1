@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -13,8 +13,9 @@ import {
   newDepartmentForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  hrCsvImportForm,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { groupBy } from "@/lib/utils"
 import {
@@ -32,7 +33,9 @@ import {
   useCreatePayslip,
   useCreateJobPosition,
   useCreateDepartment,
+  useHrCsvImportMutations,
 } from "@/hooks/hr"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@/hooks/sales"
 import {
@@ -76,6 +79,8 @@ function HrClientLoaded({
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
 
   const { data: employees = [] } = useEmployees(companyId, initialEmployees)
   const { data: departments = [] } = useDepartments(companyId, initialDepartments)
@@ -93,8 +98,28 @@ function HrClientLoaded({
   const createPayslip = useCreatePayslip(orgId, companyId)
   const createJobPosition = useCreateJobPosition(orgId, companyId)
   const createDepartment = useCreateDepartment(orgId, companyId)
+  const csvImports = useHrCsvImportMutations(orgId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const addCsvToolbar = (
+    ec: EntityViewConfig,
+    actions: Array<{ id: string; label: string; onClick: () => void }>,
+  ): EntityViewConfig => {
+    if (ec.view.mode !== "table") return ec
+    return {
+      ...ec,
+      view: {
+        ...ec.view,
+        rowSelectionToggleOnClick: false,
+        actions,
+      },
+    }
+  }
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -276,22 +301,130 @@ function HrClientLoaded({
     jobFormConfig,
   ])
 
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    return hrCsvImportForm(t, csvKind)
+  }, [csvKind, t])
+
   const config = useMemo(
     () =>
       ({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "employees") return { ...tab, createForm: employeeFormConfig }
-          if (tab.id === "departments") return { ...tab, createForm: newDepartmentForm(t), createLabel: "New Department", createAction: "createDepartment" }
-          if (tab.id === "leaves") return { ...tab, createForm: leaveFormConfig }
-          if (tab.id === "contracts") return { ...tab, createForm: contractFormConfig }
-          if (tab.id === "payslips") return { ...tab, createForm: payslipFormConfig }
-          if (tab.id === "job-positions") return { ...tab, createForm: jobFormConfig }
+          if (tab.id === "employees" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: employeeFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-employee",
+                  label: t("hr.toolbar.importEmployeeCsv"),
+                  onClick: () => setCsvKind("employee"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "departments" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: newDepartmentForm(t),
+              createLabel: "New Department",
+              createAction: "createDepartment",
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-department",
+                  label: t("hr.toolbar.importDepartmentCsv"),
+                  onClick: () => setCsvKind("department"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "leaves" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: leaveFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-leave-type",
+                  label: t("hr.toolbar.importLeaveTypeCsv"),
+                  onClick: () => setCsvKind("leave_type"),
+                },
+                {
+                  id: "csv-leave",
+                  label: t("hr.toolbar.importLeaveCsv"),
+                  onClick: () => setCsvKind("leave"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "contracts" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: contractFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-contract",
+                  label: t("hr.toolbar.importContractCsv"),
+                  onClick: () => setCsvKind("contract"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "payslips" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: payslipFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-payroll-structure",
+                  label: t("hr.toolbar.importPayrollStructureCsv"),
+                  onClick: () => setCsvKind("payroll_structure"),
+                },
+                {
+                  id: "csv-salary-rule",
+                  label: t("hr.toolbar.importSalaryRuleCsv"),
+                  onClick: () => setCsvKind("salary_rule"),
+                },
+                {
+                  id: "csv-payslip",
+                  label: t("hr.toolbar.importPayslipCsv"),
+                  onClick: () => setCsvKind("payslip"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "job-positions" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: jobFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-job-position",
+                  label: t("hr.toolbar.importJobPositionCsv"),
+                  onClick: () => setCsvKind("job_position"),
+                },
+                {
+                  id: "csv-resource",
+                  label: t("hr.toolbar.importResourceCsv"),
+                  onClick: () => setCsvKind("resource"),
+                },
+              ]),
+            }
+          }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, employeeFormConfig, leaveFormConfig, contractFormConfig, payslipFormConfig, jobFormConfig, t],
+    [
+      moduleConfig,
+      liveSections,
+      employeeFormConfig,
+      leaveFormConfig,
+      contractFormConfig,
+      payslipFormConfig,
+      jobFormConfig,
+      t,
+    ],
   )
 
   const data = useMemo(
@@ -315,14 +448,14 @@ function HrClientLoaded({
       const deptRaw = formData.departmentId
       createEmployee.mutate({
         name: String(formData.name ?? ""),
-        jobId: undefined,
+        jobId: optionalBigIntU64(formData.jobId),
         departmentId:
           deptRaw !== "" && deptRaw != null ? Number(deptRaw) : undefined,
         employmentType: String(formData.employmentType ?? "FullTime"),
         workEmail: formData.workEmail ? String(formData.workEmail) : undefined,
         employeeNumber: undefined,
         jobTitle: formData.jobTitle ? String(formData.jobTitle) : undefined,
-        parentId: undefined,
+        parentId: optionalBigIntU64(formData.parentId),
         coachId: undefined,
         workPhone: formData.workPhone ? String(formData.workPhone) : undefined,
         mobilePhone: undefined,
@@ -424,6 +557,65 @@ function HrClientLoaded({
           }
         }}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              switch (csvKind) {
+                case "resource":
+                  await csvImports.importResource.mutateAsync(text)
+                  break
+                case "department":
+                  await csvImports.importDepartment.mutateAsync(text)
+                  break
+                case "job_position":
+                  await csvImports.importJobPosition.mutateAsync(text)
+                  break
+                case "employee":
+                  await csvImports.importEmployee.mutateAsync(text)
+                  break
+                case "contract":
+                  await csvImports.importContract.mutateAsync(text)
+                  break
+                case "leave_type":
+                  await csvImports.importLeaveType.mutateAsync(text)
+                  break
+                case "leave":
+                  await csvImports.importLeave.mutateAsync(text)
+                  break
+                case "payroll_structure":
+                  await csvImports.importPayrollStructure.mutateAsync(text)
+                  break
+                case "salary_rule":
+                  await csvImports.importSalaryRule.mutateAsync(text)
+                  break
+                case "payslip":
+                  await csvImports.importPayslip.mutateAsync(text)
+                  break
+                default:
+                  break
+              }
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

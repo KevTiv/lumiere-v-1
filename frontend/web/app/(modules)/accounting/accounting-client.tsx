@@ -30,6 +30,13 @@ import {
   budgetsTableConfig,
   bankStatementsTableConfig,
   fixedAssetsTableConfig,
+  accountPaymentsTableConfig,
+  paymentTermsTableConfig,
+  paymentTermLinesTableConfig,
+  newAccountPaymentForm,
+  newPaymentTermLineForm,
+  newCurrencyRateForm,
+  registerPaymentInvoicesForm,
   intercompanyRulesTableConfig,
   intercompanyTransactionsTableConfig,
   Dialog,
@@ -37,6 +44,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  csvImportForm,
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
@@ -81,7 +89,13 @@ import {
   intercompanyTransactionParamsToJson,
   toUpdateAccountMoveLineParams,
   updateAccountMoveLineParamsToJson,
+  toCreatePaymentParamsFromManualForm,
+  toCreatePaymentTermParamsFromForm,
+  toCreatePaymentTermLineParamsFromForm,
+  toCreateCurrencyRateParamsFromForm,
+  createCurrencyRateParamsToJson,
 } from "@/lib/accounting-create-params"
+import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useAccountAccounts,
@@ -173,7 +187,25 @@ import {
   useCancelIntercompanyTransaction,
   useRetryIntercompanyTransaction,
   useUpdateAccountMoveLine,
+  useComputeInvoiceTotals,
   useReconcilePaymentWithInvoice,
+  useRefreshTaxDeadlineStatuses,
+  useScheduleTaxDeadlineUpdates,
+  useAccountingCsvImportMutations,
+  useAccountPayments,
+  useAccountPaymentTerms,
+  useAccountPaymentTermLines,
+  useCreateAccountPayment,
+  usePostAccountPayment,
+  useCancelAccountPayment,
+  useRegisterPaymentOnInvoice,
+  useCreatePaymentTerm,
+  useUpdatePaymentTerm,
+  useDeletePaymentTerm,
+  useCreatePaymentTermLine,
+  useDeletePaymentTermLine,
+  useCreateCurrencyRate,
+  useSetAccountAssetActive,
 } from "@/hooks/accounting"
 import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
 import type { AccountMove } from "@/hooks/accounting"
@@ -221,6 +253,33 @@ function assetStateTag(row: Record<string, unknown>): string {
   return String(v ?? "")
 }
 
+function paymentStateTag(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function paymentTermIsActive(row: Record<string, unknown>): boolean {
+  if (row.isActive === true || row.isActive === false) return Boolean(row.isActive)
+  if (row.is_active === true || row.is_active === false) return Boolean(row.is_active)
+  return true
+}
+
+function parseCommaSeparatedBigInts(raw: unknown): bigint[] {
+  const s = String(raw ?? "").trim()
+  if (!s) return []
+  const parts = s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean)
+  const out: bigint[] = []
+  for (const p of parts) {
+    try {
+      out.push(BigInt(p))
+    } catch {
+      /* skip invalid token */
+    }
+  }
+  return out
+}
+
 function parseOptionalRuleId(s: string): number | null {
   const x = s.trim()
   if (x === "") return null
@@ -233,6 +292,15 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
   if (!Array.isArray(raw)) return []
   return raw.map((id) => BigInt(String(id)))
 }
+
+type AccountingCsvImportKind =
+  | "account"
+  | "accountMove"
+  | "accountMoveLine"
+  | "tax"
+  | "budget"
+  | "budgetLine"
+  | "analytic"
 
 interface AccountingClientProps {
   initialAccounts?: Record<string, unknown>[]
@@ -293,6 +361,10 @@ function AccountingClientLoaded({
   const [reconciliationWidgetEdit, setReconciliationWidgetEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalYearEdit, setFiscalYearEdit] = useState<Record<string, unknown> | null>(null)
   const [accountPeriodEdit, setAccountPeriodEdit] = useState<Record<string, unknown> | null>(null)
+  const [csvKind, setCsvKind] = useState<AccountingCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+  const [registerPaymentForId, setRegisterPaymentForId] = useState<bigint | null>(null)
+  const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(companyId, { enabled: !!companyId })
@@ -309,6 +381,9 @@ function AccountingClientLoaded({
   const { data: bankMatchCandidates = [] } = useBankMatchCandidates(companyId, { enabled: !!companyId })
   const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(companyId, { enabled: !!companyId })
   const { data: fixedAssets = [] } = useAccountFixedAssets(companyId, { enabled: !!companyId })
+  const { data: accountPayments = [] } = useAccountPayments(companyId, { enabled: !!companyId })
+  const { data: paymentTerms = [] } = useAccountPaymentTerms(companyId, { enabled: !!companyId })
+  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(companyId, { enabled: !!companyId })
   const { data: depreciationLines = [] } = useDepreciationLines(companyId, { enabled: !!companyId })
   const { data: intercompanyRules = [] } = useIntercompanyRules(companyId, { enabled: !!companyId })
   const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(companyId, { enabled: !!companyId })
@@ -435,6 +510,34 @@ function AccountingClientLoaded({
     return cid != null ? BigInt(String(cid)) : 1n
   }, [accounts])
 
+  const paymentTermSelectOptions = useMemo(() => {
+    const rows = paymentTerms as Record<string, unknown>[]
+    if (rows.length === 0) {
+      return [{ value: "", label: t("common.noData"), disabled: true }]
+    }
+    return rows.map((pt) => ({
+      value: String(pt.id ?? ""),
+      label: String(pt.name ?? pt.id ?? ""),
+    }))
+  }, [paymentTerms, t])
+
+  const accountPaymentFormConfig = useMemo(() => {
+    const merged = mergeSelectOptionsByFieldName(
+      newAccountPaymentForm(t),
+      "journalId",
+      journalFieldOptionsForModularForm,
+    )
+    return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
+  }, [t, journalFieldOptionsForModularForm, defaultCurrencyId])
+
+  const paymentTermLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsByFieldName(newPaymentTermLineForm(t), "paymentTermId", paymentTermSelectOptions),
+    [t, paymentTermSelectOptions],
+  )
+
+  const currencyRateFormConfig = useMemo(() => newCurrencyRateForm(t), [t])
+
   const analyticAccountSelectOptions = useMemo(
     () =>
       analytic.map((a) => ({
@@ -475,6 +578,9 @@ function AccountingClientLoaded({
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const postMove = usePostAccountMove()
   const cancelMove = useCancelAccountMove()
+  const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, companyId)
+  const refreshTaxDeadlineStatuses = useRefreshTaxDeadlineStatuses(organizationId)
+  const scheduleTaxDeadlineUpdates = useScheduleTaxDeadlineUpdates(organizationId)
   const createAnalyticAccount = useCreateAnalyticAccount(organizationId)
   const updateAnalyticAccount = useUpdateAnalyticAccount(organizationId)
   const setAnalyticAccountActive = useSetAnalyticAccountActive(organizationId)
@@ -525,6 +631,19 @@ function AccountingClientLoaded({
 
   const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, companyId)
   const reconcilePaymentWithInvoice = useReconcilePaymentWithInvoice(organizationId, companyId)
+  const csvImports = useAccountingCsvImportMutations(organizationId, companyId)
+
+  const createAccountPayment = useCreateAccountPayment(organizationId)
+  const postAccountPayment = usePostAccountPayment(organizationId)
+  const cancelAccountPayment = useCancelAccountPayment(organizationId)
+  const registerPaymentOnInvoice = useRegisterPaymentOnInvoice(organizationId)
+  const createPaymentTerm = useCreatePaymentTerm(organizationId)
+  const updatePaymentTerm = useUpdatePaymentTerm(organizationId)
+  const deletePaymentTerm = useDeletePaymentTerm(organizationId)
+  const createPaymentTermLine = useCreatePaymentTermLine(organizationId)
+  const deletePaymentTermLine = useDeletePaymentTermLine(organizationId)
+  const createCurrencyRate = useCreateCurrencyRate(organizationId, companyId)
+  const setAccountAssetActive = useSetAccountAssetActive(organizationId, companyId)
 
   const analyticAccountEditFormConfig = useMemo(() => {
     const base = editAnalyticAccountForm(t)
@@ -541,10 +660,16 @@ function AccountingClientLoaded({
   const analyticLineEditFormConfig = useMemo(() => {
     const base = editAnalyticLineForm(t)
     if (!analyticLineEdit) return base
+    const rawTags = analyticLineEdit.tagIds
+    const tagIdsStr =
+      Array.isArray(rawTags) && rawTags.length > 0
+        ? rawTags.map((x) => String(x)).join(", ")
+        : ""
     return mergeFieldDefaultValues(base, {
       lineId: String(analyticLineEdit.id ?? ""),
       name: String(analyticLineEdit.name ?? ""),
       amount: Number(analyticLineEdit.amount ?? 0),
+      tagIds: tagIdsStr,
     })
   }, [analyticLineEdit, t])
 
@@ -677,11 +802,14 @@ function AccountingClientLoaded({
       const id = BigInt(String(idRaw))
       const prevActive = analyticAccountEdit?.active === true
       const nextActive = Boolean(formData.active)
-      const params = toUpdateAnalyticAccountParams({
-        name: formData.name,
-        code: formData.code,
-        isRequiredInMoveLines: formData.isRequiredInMoveLines,
-      })
+      const params = toUpdateAnalyticAccountParams(
+        {
+          name: formData.name,
+          code: formData.code,
+          isRequiredInMoveLines: formData.isRequiredInMoveLines,
+        },
+        companyId,
+      )
       await updateAnalyticAccount.mutateAsync({
         accountId: id,
         params: analyticParamsToJson(params),
@@ -691,7 +819,7 @@ function AccountingClientLoaded({
       }
       setAnalyticAccountEdit(null)
     },
-    [analyticAccountEdit, updateAnalyticAccount, setAnalyticAccountActive],
+    [analyticAccountEdit, companyId, updateAnalyticAccount, setAnalyticAccountActive],
   )
 
   const onSubmitAnalyticLineEdit = useCallback(
@@ -700,9 +828,8 @@ function AccountingClientLoaded({
       if (lineIdRaw === "" || lineIdRaw == null) return
       const id = BigInt(String(lineIdRaw))
       const params = toUpdateAnalyticLineParams({
-        name: formData.name,
-        amount: formData.amount,
-        unitAmount: formData.amount,
+        ...formData,
+        unitAmount: formData.unitAmount ?? formData.amount,
       })
       await updateAnalyticLine.mutateAsync({
         lineId: id,
@@ -718,18 +845,21 @@ function AccountingClientLoaded({
       const modelIdRaw = formData.modelId
       if (modelIdRaw === "" || modelIdRaw == null) return
       const id = BigInt(String(modelIdRaw))
-      const params = toUpdateAnalyticDistributionModelParams({
-        name: formData.name,
-        analyticDistribution: formData.analyticDistribution,
-        isActive: formData.isActive,
-      })
+      const params = toUpdateAnalyticDistributionModelParams(
+        {
+          name: formData.name,
+          analyticDistribution: formData.analyticDistribution,
+          isActive: formData.isActive,
+        },
+        companyId,
+      )
       await updateAnalyticDistributionModel.mutateAsync({
         modelId: id,
         params: analyticParamsToJson(params),
       })
       setAnalyticDistEdit(null)
     },
-    [updateAnalyticDistributionModel],
+    [companyId, updateAnalyticDistributionModel],
   )
 
   const onSubmitNewBankStatementLine = useCallback(
@@ -924,6 +1054,38 @@ function AccountingClientLoaded({
         ...view,
         actions: [
           {
+            id: "asset-activate",
+            label: t("accounting.entities.fixedAssets.actions.activateSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                const row = r as Record<string, unknown>
+                if (row.active === false) {
+                  void setAccountAssetActive.mutateAsync({
+                    assetId: BigInt(String(row.id)),
+                    active: true,
+                  })
+                }
+              }
+            },
+          },
+          {
+            id: "asset-deactivate",
+            label: t("accounting.entities.fixedAssets.actions.deactivateSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                const row = r as Record<string, unknown>
+                if (row.active === true) {
+                  void setAccountAssetActive.mutateAsync({
+                    assetId: BigInt(String(row.id)),
+                    active: false,
+                  })
+                }
+              }
+            },
+          },
+          {
             id: "asset-confirm",
             label: t("accounting.entities.fixedAssets.actions.confirmSelected"),
             requiresSelection: true,
@@ -973,7 +1135,148 @@ function AccountingClientLoaded({
         ],
       },
     }
-  }, [t, confirmAccountAsset, closeAccountAsset, deleteAccountAsset, computeDepreciationBoard])
+  }, [
+    t,
+    setAccountAssetActive,
+    confirmAccountAsset,
+    closeAccountAsset,
+    deleteAccountAsset,
+    computeDepreciationBoard,
+  ])
+
+  const accountPaymentsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = accountPaymentsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "pay-post",
+            label: t("accounting.entities.payments.actions.postSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (paymentStateTag(r as Record<string, unknown>) === "NotPaid") {
+                  void postAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                }
+              }
+            },
+          },
+          {
+            id: "pay-cancel",
+            label: t("accounting.entities.payments.actions.cancelSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              for (const r of rows) {
+                const st = paymentStateTag(r as Record<string, unknown>)
+                if (st === "NotPaid" || st === "Paid") {
+                  void cancelAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                }
+              }
+            },
+          },
+          {
+            id: "pay-link",
+            label: t("accounting.entities.payments.actions.linkInvoices"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return
+              const r = rows[0] as Record<string, unknown>
+              if (r.id == null) return
+              if (paymentStateTag(r) !== "Paid") return
+              setRegisterPaymentError(null)
+              setRegisterPaymentForId(BigInt(String(r.id)))
+            },
+          },
+        ],
+      },
+    }
+  }, [t, postAccountPayment, cancelAccountPayment])
+
+  const paymentTermsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = paymentTermsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "pt-activate",
+            label: t("accounting.entities.paymentTerms.actions.activateSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (!paymentTermIsActive(r as Record<string, unknown>)) {
+                  void updatePaymentTerm.mutateAsync({
+                    termId: BigInt(String((r as Record<string, unknown>).id)),
+                    name: null,
+                    note: null,
+                    isActive: true,
+                  })
+                }
+              }
+            },
+          },
+          {
+            id: "pt-deactivate",
+            label: t("accounting.entities.paymentTerms.actions.deactivateSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (paymentTermIsActive(r as Record<string, unknown>)) {
+                  void updatePaymentTerm.mutateAsync({
+                    termId: BigInt(String((r as Record<string, unknown>).id)),
+                    name: null,
+                    note: null,
+                    isActive: false,
+                  })
+                }
+              }
+            },
+          },
+          {
+            id: "pt-delete",
+            label: t("accounting.entities.paymentTerms.actions.deleteSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              for (const r of rows) {
+                void deletePaymentTerm.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+              }
+            },
+          },
+        ],
+      },
+    }
+  }, [t, updatePaymentTerm, deletePaymentTerm])
+
+  const paymentTermLinesEntityConfig = useMemo((): EntityViewConfig => {
+    const base = paymentTermLinesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "ptl-delete",
+            label: t("accounting.entities.paymentTerms.actions.deleteLinesSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              for (const r of rows) {
+                void deletePaymentTermLine.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+              }
+            },
+          },
+        ],
+      },
+    }
+  }, [t, deletePaymentTermLine])
 
   // Helper to get intercompany rule active state
   const intercompanyRuleIsActive = (row: Record<string, unknown>): boolean => {
@@ -1130,10 +1433,10 @@ function AccountingClientLoaded({
     (move: unknown) => {
       const row = move as Record<string, unknown>
       if (row.id) {
-        postMove.mutate(BigInt(String(row.id)))
+        postMove.mutate([String(organizationId), String(row.id)])
       }
     },
-    [postMove],
+    [postMove, organizationId],
   )
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -1185,6 +1488,8 @@ function AccountingClientLoaded({
             create_bill: () => setShowCreateBill(true),
             journal_entry: () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }),
             create_tax: () => setQuickActionForm({ form: newTaxForm(t), action: "createTax" }),
+            currency_rate: () =>
+              setQuickActionForm({ form: currencyRateFormConfig, action: "createCurrencyRate" }),
           }
 
           return {
@@ -1228,7 +1533,7 @@ function AccountingClientLoaded({
         return w
       }),
     }))
-  }, [accounts, invoices, bills, budgets, moduleConfigBase, t, journalEntryFormConfig])
+  }, [accounts, invoices, bills, budgets, moduleConfigBase, t, journalEntryFormConfig, currencyRateFormConfig])
 
   const chartStructurePanel = useMemo(
     () => (
@@ -1248,7 +1553,7 @@ function AccountingClientLoaded({
           })
         }}
         onCreateAccountGroup={async (fd) => {
-          const p = toCreateAccountGroupParams(fd)
+          const p = toCreateAccountGroupParams(fd, companyId)
           if (p.name.trim()) {
             await createAccountGroup.mutateAsync(p as unknown as Record<string, unknown>)
           }
@@ -1256,7 +1561,7 @@ function AccountingClientLoaded({
         onUpdateAccountGroup={async (groupId, fd) => {
           await updateAccountGroup.mutateAsync({
             groupId,
-            params: toUpdateAccountGroupParams(fd) as unknown as Record<string, unknown>,
+            params: toUpdateAccountGroupParams(fd, companyId) as unknown as Record<string, unknown>,
           })
         }}
       />
@@ -1264,6 +1569,7 @@ function AccountingClientLoaded({
     [
       accountTypes,
       accountGroups,
+      companyId,
       createAccountType,
       updateAccountType,
       createAccountGroup,
@@ -1279,12 +1585,16 @@ function AccountingClientLoaded({
   ) => {
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData)
-      if (p) createAccount.mutate(accountingParamsToJson(p))
+      if (p) createAccount.mutate([String(organizationId), accountingParamsToJson(p)])
     } else if (action === "createMove") {
       const p = toCreateJournalEntryMoveParams(formData)
-      if (p) createMove.mutate(accountingParamsToJson(p))
+      if (p) createMove.mutate([String(organizationId), accountingParamsToJson(p)])
     } else if (action === "createTax") {
-      createTax.mutate(accountingParamsToJson(toCreateAccountTaxParams(formData)))
+      createTax.mutate([
+        String(organizationId),
+        String(companyId),
+        accountingParamsToJson(toCreateAccountTaxParams(formData)),
+      ])
     } else if (action === "createBudget") {
       createBudget.mutate(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData)))
     } else if (action === "createAnalyticAccount") {
@@ -1292,13 +1602,13 @@ function AccountingClientLoaded({
       if (fd.currencyId === "" || fd.currencyId == null) {
         fd.currencyId = defaultCurrencyId.toString()
       }
-      const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId)
+      const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId, companyId)
       if (p) createAnalyticAccount.mutate(analyticParamsToJson(p))
     } else if (action === "createAnalyticLine") {
       const p = toCreateAnalyticLineParams(formData, defaultCurrencyId)
       if (p) createAnalyticLine.mutate(analyticParamsToJson(p))
     } else if (action === "createAnalyticDistributionModel") {
-      const p = toCreateAnalyticDistributionModelParams(formData)
+      const p = toCreateAnalyticDistributionModelParams(formData, companyId)
       if (p) createAnalyticDistributionModel.mutate(analyticParamsToJson(p))
     } else if (action === "createReconciliationWidget") {
       const p = toCreateAccountReconciliationWidgetParams(formData)
@@ -1309,8 +1619,53 @@ function AccountingClientLoaded({
     } else if (action === "createAccountPeriod") {
       const p = toCreateAccountPeriodParams(formData)
       if (p) createAccountPeriod.mutate(accountingParamsToJson(p))
+    } else if (action === "createAccountPayment") {
+      const p = toCreatePaymentParamsFromManualForm(formData, companyId)
+      if (p) createAccountPayment.mutate(p)
+    } else if (action === "createPaymentTerm") {
+      const p = toCreatePaymentTermParamsFromForm(formData)
+      if (p) createPaymentTerm.mutate(stdbParamsToJson(p))
+    } else if (action === "createPaymentTermLine") {
+      const p = toCreatePaymentTermLineParamsFromForm(formData)
+      if (p) createPaymentTermLine.mutate(stdbParamsToJson(p))
+    } else if (action === "createCurrencyRate") {
+      const p = toCreateCurrencyRateParamsFromForm(formData)
+      if (p) createCurrencyRate.mutate(createCurrencyRateParamsToJson(p))
     }
   }
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const addCsvToolbar = (
+    ec: EntityViewConfig,
+    actions: Array<{ id: string; label: string; onClick: () => void }>,
+  ): EntityViewConfig => {
+    if (ec.view.mode !== "table") return ec
+    return {
+      ...ec,
+      view: {
+        ...ec.view,
+        rowSelectionToggleOnClick: false,
+        actions,
+      },
+    }
+  }
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<AccountingCsvImportKind, string> = {
+      account: "accounting.csvImport.accountsTitle",
+      accountMove: "accounting.csvImport.movesTitle",
+      accountMoveLine: "accounting.csvImport.moveLinesTitle",
+      tax: "accounting.csvImport.taxTitle",
+      budget: "accounting.csvImport.budgetTitle",
+      budgetLine: "accounting.csvImport.budgetLineTitle",
+      analytic: "accounting.csvImport.analyticTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
   const config = useMemo(
@@ -1335,6 +1690,9 @@ function AccountingClientLoaded({
                 invoices={invoices as unknown as AccountMove[]}
                 onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
                 onCreateInvoice={() => setShowCreateInvoice(true)}
+                onRecalculateTotals={(inv) =>
+                  void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
+                }
               />
             ),
           }
@@ -1347,6 +1705,9 @@ function AccountingClientLoaded({
               <BillsListView
                 bills={bills as unknown as AccountMove[]}
                 onCreateBill={() => setShowCreateBill(true)}
+                onRecalculateTotals={(bill) =>
+                  void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
+                }
               />
             ),
           }
@@ -1359,9 +1720,10 @@ function AccountingClientLoaded({
               <ChartOfAccountsView
                 accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
                 chartStructureContent={chartStructurePanel}
+                onImportAccountsCsv={() => setCsvKind("account")}
                 onCreate={(data) => {
                   const p = toCreateAccountAccountParams(data as Record<string, unknown>)
-                  if (p) createAccount.mutate(accountingParamsToJson(p))
+                  if (p) createAccount.mutate([String(organizationId), accountingParamsToJson(p)])
                 }}
               />
             ),
@@ -1374,17 +1736,73 @@ function AccountingClientLoaded({
             customContent: (
               <GeneralLedgerView
                 moves={allMoves as unknown as AccountMove[]}
+                onImportMovesCsv={() => setCsvKind("accountMove")}
+                onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
                 onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                 onPostMove={(move) => postDraft(move)}
-                onCancelMove={(move) => cancelMove.mutate(move.id)}
+                onCancelMove={(move) =>
+                  cancelMove.mutate([String(organizationId), String(move.id)])
+                }
+                onComputeInvoiceTotals={(move) =>
+                  void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
+                }
                 postMovePending={postMove.isPending}
                 cancelMovePending={cancelMove.isPending}
+                computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
               />
             ),
           }
         }
         if (tab.id === "budgets") {
-          return { ...tab, entityConfig: budgetsEntityConfig }
+          return {
+            ...tab,
+            entityConfig: addCsvToolbar(budgetsEntityConfig, [
+              {
+                id: "csv-budget",
+                label: t("accounting.csvImport.toolbarBudgets"),
+                onClick: () => setCsvKind("budget"),
+              },
+              {
+                id: "csv-budget-line",
+                label: t("accounting.csvImport.toolbarBudgetLines"),
+                onClick: () => setCsvKind("budgetLine"),
+              },
+            ]),
+          }
+        }
+        if (tab.id === "taxes" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: addCsvToolbar(tab.entityConfig, [
+              {
+                id: "csv-tax",
+                label: t("accounting.csvImport.toolbarTaxRates"),
+                onClick: () => setCsvKind("tax"),
+              },
+              {
+                id: "tax-refresh-deadline-statuses",
+                label: t("accounting.taxes.refreshDeadlineStatuses"),
+                onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
+              },
+              {
+                id: "tax-schedule-deadline-updates",
+                label: t("accounting.taxes.scheduleDeadlineUpdates"),
+                onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
+              },
+            ]),
+          }
+        }
+        if (tab.id === "analytic" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: addCsvToolbar(tab.entityConfig, [
+              {
+                id: "csv-analytic",
+                label: t("accounting.csvImport.toolbarAnalytic"),
+                onClick: () => setCsvKind("analytic"),
+              },
+            ]),
+          }
         }
         if (tab.id === "fiscal-years") {
           return { ...tab, entityConfig: fiscalYearsEntityConfig }
@@ -1398,6 +1816,23 @@ function AccountingClientLoaded({
         }
         if (tab.id === "fixed-assets") {
           return { ...tab, entityConfig: fixedAssetsEntityConfig }
+        }
+        if (tab.id === "payments") {
+          return {
+            ...tab,
+            createForm: accountPaymentFormConfig,
+            entityConfig: accountPaymentsEntityConfig,
+          }
+        }
+        if (tab.id === "payment-terms") {
+          return { ...tab, entityConfig: paymentTermsEntityConfig }
+        }
+        if (tab.id === "payment-term-lines") {
+          return {
+            ...tab,
+            createForm: paymentTermLineFormConfig,
+            entityConfig: paymentTermLinesEntityConfig,
+          }
         }
         if (tab.id === "intercompany-rules") {
           return { ...tab, entityConfig: intercompanyRulesEntityConfig }
@@ -1486,10 +1921,18 @@ function AccountingClientLoaded({
       accountPeriodsEntityConfig,
       accountPeriodCreateFormConfig,
       fixedAssetsEntityConfig,
+      accountPaymentFormConfig,
+      accountPaymentsEntityConfig,
+      paymentTermsEntityConfig,
+      paymentTermLineFormConfig,
+      paymentTermLinesEntityConfig,
       intercompanyRulesEntityConfig,
       intercompanyTransactionsEntityConfig,
       postMove,
       cancelMove,
+      computeInvoiceTotals.mutateAsync,
+      refreshTaxDeadlineStatuses.mutateAsync,
+      scheduleTaxDeadlineUpdates.mutateAsync,
       postDraft,
       analyticLineFormConfig,
       analyticDistFormConfig,
@@ -1526,6 +1969,9 @@ function AccountingClientLoaded({
       "account-periods": accountPeriodsDisplay as unknown as Record<string, unknown>[],
       "intercompany-rules": intercompanyRules as unknown as Record<string, unknown>[],
       "intercompany-transactions": intercompanyTransactions as unknown as Record<string, unknown>[],
+      payments: accountPayments as unknown as Record<string, unknown>[],
+      "payment-terms": paymentTerms as unknown as Record<string, unknown>[],
+      "payment-term-lines": paymentTermLines as unknown as Record<string, unknown>[],
     }),
     [
       taxes,
@@ -1535,6 +1981,9 @@ function AccountingClientLoaded({
       analyticDistribution,
       reconciliationWidgets,
       fixedAssets,
+      accountPayments,
+      paymentTerms,
+      paymentTermLines,
       fiscalYearsDisplay,
       accountPeriodsDisplay,
       intercompanyRules,
@@ -1565,13 +2014,89 @@ function AccountingClientLoaded({
         onRowClick={handleEntityRowClick}
       />
 
+      {registerPaymentForId != null ? (
+        <FormModal
+          key={`reg-pay-${registerPaymentForId.toString()}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setRegisterPaymentForId(null)
+              setRegisterPaymentError(null)
+            }
+          }}
+          config={registerPaymentInvoicesForm(t)}
+          closeOnSubmit={false}
+          submitError={registerPaymentError}
+          onSubmit={async (fd) => {
+            setRegisterPaymentError(null)
+            const ids = parseCommaSeparatedBigInts(fd.invoiceIds)
+            if (ids.length === 0) {
+              setRegisterPaymentError(t("common.validation.required"))
+              return
+            }
+            try {
+              await registerPaymentOnInvoice.mutateAsync({
+                paymentId: registerPaymentForId,
+                invoiceIds: ids,
+                isBill: Boolean(fd.isBill),
+              })
+              setRegisterPaymentForId(null)
+            } catch (e) {
+              setRegisterPaymentError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
+              else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)
+              else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
+              else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
+              else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
+              else if (csvKind === "budgetLine") await csvImports.importBudgetLine.mutateAsync(text)
+              else await csvImports.importAnalyticAccount.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+
       {/* Invoice detail */}
       <InvoiceDetailModal
         invoice={selectedInvoice}
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
         onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onRecalculateTotals={
+          selectedInvoice
+            ? () =>
+                void computeInvoiceTotals.mutateAsync(
+                  selectedInvoice.id as string | number | bigint,
+                )
+            : undefined
+        }
         postDraftPending={postMove.isPending}
+        recalculateTotalsPending={computeInvoiceTotals.isPending}
       />
 
       {/* Create invoice */}
@@ -1590,7 +2115,7 @@ function AccountingClientLoaded({
             journalId,
             "Customer Invoice",
           )
-          createMove.mutate(accountingParamsToJson(p))
+          createMove.mutate([String(organizationId), accountingParamsToJson(p)])
         }}
       />
 
@@ -1610,7 +2135,7 @@ function AccountingClientLoaded({
             journalId,
             "Vendor Bill",
           )
-          createMove.mutate(accountingParamsToJson(p))
+          createMove.mutate([String(organizationId), accountingParamsToJson(p)])
         }}
       />
 

@@ -9,6 +9,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
 
+async function parseCallErrorDocuments(r: Response): Promise<string> {
+  try {
+    const body = (await r.json()) as { error?: string; message?: string }
+    return body.error ?? body.message ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useDocuments(
@@ -30,6 +39,32 @@ export function useKnowledgeArticles(
   return useQuery<QueryRows>({
     queryKey: ['knowledge-articles', organizationId.toString()],
     queryFn: () => fetchQueryList('/api/query/knowledge-articles', 'Failed to fetch knowledge articles'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useAiDocumentProcessingJobs(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['ai-document-processing-jobs', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/ai-document-processing-jobs',
+        'Failed to fetch document processing jobs',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+/** Same rows as Settings → AI; shared query key keeps cache in sync across the app. */
+export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['ai-insights', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/ai-insights', 'Failed to fetch AI insights'),
     staleTime: 30_000,
     initialData,
   })
@@ -397,6 +432,182 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
       qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId.toString()] }),
   })
 }
+
+function useImportKnowledgeCategoryCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_knowledge_category_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId.toString()] }),
+  })
+}
+
+function useImportKnowledgeArticleCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_knowledge_article_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId.toString()] }),
+  })
+}
+
+/** Knowledge base CSV import mutations (org-scoped reducers). */
+export function useDocumentsCsvImportMutations(organizationId: bigint) {
+  return {
+    importKnowledgeCategory: useImportKnowledgeCategoryCsv(organizationId),
+    importKnowledgeArticle: useImportKnowledgeArticleCsv(organizationId),
+  }
+}
+
+function companyIdArg(row: Record<string, unknown>): number | null {
+  const v = row.companyId
+  if (v == null || v === '') return null
+  const n = typeof v === 'bigint' ? Number(v) : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function rowId(row: Record<string, unknown>): number {
+  const v = row.id
+  const n = typeof v === 'bigint' ? Number(v) : Number(v)
+  if (!Number.isFinite(n)) throw new Error('Invalid row id')
+  return n
+}
+
+export function useCreateDocumentProcessingJob(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const aiRaw = params.aiAgentId
+      let aiAgentId: number | null = null
+      if (aiRaw != null && String(aiRaw).trim() !== '') {
+        const n = Number(String(aiRaw).trim())
+        if (!Number.isFinite(n) || n <= 0) throw new Error('AI agent id must be a positive number')
+        aiAgentId = n
+      }
+      const body = [
+        Number(companyId),
+        {
+          documentType: String(params.documentType ?? '').trim(),
+          jobType: String(params.jobType ?? '').trim(),
+          aiAgentId,
+          inputData:
+            typeof params.inputData === 'string' && params.inputData.trim() !== ''
+              ? params.inputData.trim()
+              : null,
+          metadata:
+            typeof params.metadata === 'string' && params.metadata.trim() !== ''
+              ? params.metadata.trim()
+              : null,
+        },
+      ]
+      const r = await fetch('/api/call/create_document_processing_job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId.toString()] }),
+  })
+}
+
+export function useCompleteDocumentProcessingJob(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      row,
+      extractedData,
+      modelUsed,
+      confidenceScore,
+      tokensUsed,
+      cost,
+      errorMessage,
+    }: {
+      row: Record<string, unknown>
+      extractedData: string | null
+      modelUsed: string | null
+      confidenceScore: number | null
+      tokensUsed: number | null
+      cost: number | null
+      errorMessage: string | null
+    }) => {
+      const jobId = rowId(row)
+      const params: Record<string, unknown> = {
+        extractedData,
+        modelUsed,
+        confidenceScore,
+        tokensUsed,
+        cost,
+        errorMessage,
+      }
+      const r = await fetch('/api/call/complete_document_processing_job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([companyIdArg(row), jobId, params]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId.toString()] }),
+  })
+}
+
+export function useApproveDocumentProcessingJob(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (row: Record<string, unknown>) => {
+      const jobId = rowId(row)
+      const r = await fetch('/api/call/approve_document_processing_job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([companyIdArg(row), jobId]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId.toString()] }),
+  })
+}
+
+export function useAcknowledgeInsight(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      row,
+      actionTaken,
+    }: {
+      row: Record<string, unknown>
+      actionTaken: string | null
+    }) => {
+      const insightId = rowId(row)
+      const r = await fetch('/api/call/acknowledge_insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([companyIdArg(row), insightId, actionTaken]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['ai-insights', organizationId.toString()] }),
+  })
+}
+
+export type DocumentsCsvImportMutations = ReturnType<typeof useDocumentsCsvImportMutations>
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {

@@ -1,16 +1,36 @@
-"use client"
+import { getStdbSession } from "@/lib/api-session"
+import {
+  serverQueryIotActions,
+  serverQueryIotDevices,
+  serverQueryIotHubs,
+  serverQueryIotPairingTokens,
+  serverQueryIotTelemetry,
+} from "@lumiere/stdb/server"
+import { IotClient } from "./iot-client"
 
-import { DashboardHeader, DashboardGrid } from "@lumiere/ui"
-import { iotDashboard } from "@/lib/module-dashboard-configs"
+export default async function IotPage() {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
+    return <IotClient />
+  }
+  const { organizationId, opts } = session
 
-export default function IotPage() {
+  const [devices, hubs, pairingTokens, actions, telemetry] = await Promise.all([
+    serverQueryIotDevices(organizationId, opts),
+    serverQueryIotHubs(organizationId, opts),
+    serverQueryIotPairingTokens(organizationId, opts),
+    serverQueryIotActions(organizationId, opts),
+    serverQueryIotTelemetry(organizationId, opts),
+  ]).catch(() => [[], [], [], [], []])
+
   return (
-    <div className="flex flex-col min-h-full">
-      <DashboardHeader
-        title={iotDashboard.title}
-        description={iotDashboard.description}
-      />
-      <DashboardGrid sections={iotDashboard.sections} />
-    </div>
+    <IotClient
+      initialDevices={devices as Record<string, unknown>[]}
+      initialHubs={hubs as Record<string, unknown>[]}
+      initialPairingTokens={pairingTokens as Record<string, unknown>[]}
+      initialActions={actions as Record<string, unknown>[]}
+      initialTelemetry={telemetry as Record<string, unknown>[]}
+      organizationId={organizationId}
+    />
   )
 }

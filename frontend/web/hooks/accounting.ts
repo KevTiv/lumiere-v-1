@@ -1,7 +1,9 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { paymentParamsToJson } from "@/lib/accounting-create-params"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
+import type { CreatePaymentParams } from "@lumiere/stdb/generated/types"
 import { useStdbQuery, useStdbReducer } from "./stdb"
 
 // ── Type Imports from @lumiere/stdb ─────────────────────────────────────────
@@ -31,7 +33,7 @@ export type {
  */
 export function useAccountAccounts(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean }
+  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
 ) {
   return useStdbQuery("account-accounts", organizationId, options)
 }
@@ -168,12 +170,36 @@ export function useAccountFixedAssets(
   return useStdbQuery("fixed-assets", organizationId, options)
 }
 
+/** AP/AR payment terms for the organization. */
+export function useAccountPaymentTerms(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("account-payment-terms", organizationId, options)
+}
+
+/** Installment lines for payment terms in this organization. */
+export function useAccountPaymentTermLines(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("account-payment-term-lines", organizationId, options)
+}
+
+/** Customer/vendor payments (draft and posted). */
+export function useAccountPayments(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("account-payments", organizationId, options)
+}
+
 /**
  * Fetch all account journals for the organization.
  */
 export function useAccountJournals(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean }
+  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
 ) {
   return useStdbQuery("account-journals", organizationId, options)
 }
@@ -1334,6 +1360,26 @@ export function useCloseAccountAsset(organizationId: number, companyId: bigint) 
   })
 }
 
+export function useSetAccountAssetActive(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { assetId: bigint; active: boolean }) => {
+      const r = await fetch("/api/call/set_asset_active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          String(companyId),
+          String(args.assetId),
+          args.active,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateFixedAssetQueries(qc, companyId),
+  })
+}
+
 export function useCreateDepreciationLine(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -1606,6 +1652,22 @@ function invalidateMoveQueries(qc: ReturnType<typeof useQueryClient>, companyId:
   void qc.invalidateQueries({ queryKey: ["stdb", "account-move-lines", k] })
 }
 
+/** Recompute `amount_untaxed` / `amount_tax` / `amount_total` from lines (invoice/refund moves only). */
+export function useComputeInvoiceTotals(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (moveId: bigint | number | string) => {
+      const r = await fetch("/api/call/compute_invoice_totals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), Number(moveId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateMoveQueries(qc, companyId),
+  })
+}
+
 export function useUpdateAccountMoveLine(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -1637,6 +1699,232 @@ export function useReconcilePaymentWithInvoice(organizationId: number, companyId
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, companyId),
+  })
+}
+
+function invalidateAccountPaymentQueries(qc: ReturnType<typeof useQueryClient>, orgKey: string) {
+  void qc.invalidateQueries({ queryKey: ["stdb", "account-payments", orgKey] })
+  void qc.invalidateQueries({ queryKey: ["stdb", "account-payment-terms", orgKey] })
+  void qc.invalidateQueries({ queryKey: ["stdb", "account-payment-term-lines", orgKey] })
+}
+
+/** Draft customer/vendor payment — call {@link usePostAccountPayment} to post. */
+export function useCreateAccountPayment(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: CreatePaymentParams) => {
+      const r = await fetch("/api/call/create_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), paymentParamsToJson(params)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function usePostAccountPayment(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (paymentId: bigint) => {
+      const r = await fetch("/api/call/post_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(paymentId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      invalidateAccountPaymentQueries(qc, k)
+      void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
+    },
+  })
+}
+
+export function useCancelAccountPayment(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (paymentId: bigint) => {
+      const r = await fetch("/api/call/cancel_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(paymentId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      invalidateAccountPaymentQueries(qc, k)
+      void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
+    },
+  })
+}
+
+/** Link posted payment to invoice/bill move IDs (`isBill: true` for vendor bills). */
+export function useRegisterPaymentOnInvoice(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (args: { paymentId: bigint; invoiceIds: bigint[]; isBill: boolean }) => {
+      const r = await fetch("/api/call/register_payment_on_invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          String(args.paymentId),
+          args.invoiceIds.map((id) => String(id)),
+          args.isBill,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useCreatePaymentTerm(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const r = await fetch("/api/call/create_payment_term", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), params]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useUpdatePaymentTerm(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (args: {
+      termId: bigint
+      name: string | null
+      note: string | null
+      isActive: boolean | null
+    }) => {
+      const r = await fetch("/api/call/update_payment_term", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          String(args.termId),
+          args.name,
+          args.note,
+          args.isActive,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useDeletePaymentTerm(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (termId: bigint) => {
+      const r = await fetch("/api/call/delete_payment_term", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(termId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useCreatePaymentTermLine(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const r = await fetch("/api/call/create_payment_term_line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), params]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useUpdatePaymentTermLine(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (args: {
+      lineId: bigint
+      value: Record<string, unknown> | null
+      valueAmount: number | null
+      days: number | null
+      months: number | null
+      daysAfterEndOfMonth: boolean | null
+      sequence: number | null
+    }) => {
+      const r = await fetch("/api/call/update_payment_term_line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          String(args.lineId),
+          args.value,
+          args.valueAmount,
+          args.days,
+          args.months,
+          args.daysAfterEndOfMonth,
+          args.sequence,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+export function useDeletePaymentTermLine(organizationId: number) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (lineId: bigint) => {
+      const r = await fetch("/api/call/delete_payment_term_line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(lineId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+  })
+}
+
+/** Org-level FX rate (optional company scope — pass `null` for org-wide). */
+export function useCreateCurrencyRate(organizationId: number, companyId: bigint | null) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const r = await fetch("/api/call/create_currency_rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), companyId === null ? null : String(companyId), params]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "account-accounts", k] })
+    },
   })
 }
 
@@ -1978,4 +2266,62 @@ export function useImportAnalyticAccountCsv(organizationId: number, companyId: b
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
   })
+}
+
+export function useImportAccountCsv(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const r = await fetch("/api/call/import_account_csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
+  })
+}
+
+export function useImportAccountMoveCsv(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const r = await fetch("/api/call/import_account_move_csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateMoveQueries(qc, companyId),
+  })
+}
+
+export function useImportAccountMoveLineCsv(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const r = await fetch("/api/call/import_account_move_line_csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateMoveQueries(qc, companyId),
+  })
+}
+
+/** Chart / journal / tax / budget / analytic CSV imports for accounting UI toolbars. */
+export function useAccountingCsvImportMutations(organizationId: number, companyId: bigint) {
+  return {
+    importAccount: useImportAccountCsv(organizationId, companyId),
+    importAccountMove: useImportAccountMoveCsv(organizationId, companyId),
+    importAccountMoveLine: useImportAccountMoveLineCsv(organizationId, companyId),
+    importTaxRate: useImportTaxRateCsv(organizationId, companyId),
+    importBudget: useImportBudgetCsv(organizationId, companyId),
+    importBudgetLine: useImportBudgetLineCsv(organizationId, companyId),
+    importAnalyticAccount: useImportAnalyticAccountCsv(organizationId, companyId),
+  }
 }

@@ -8,11 +8,11 @@ import {
 import { HelpdeskClient } from "./helpdesk-client"
 
 export default async function HelpdeskPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <HelpdeskClient />
   }
+  const { organizationId, opts } = session
 
   const [tickets, teams, stages, slas] = await Promise.all([
     serverQueryHelpdeskTickets(organizationId, opts),

@@ -49,6 +49,7 @@
     "@tanstack/react-router": "^1.168.10",
     "@vercel/analytics": "1.6.1",
     "@workos-inc/authkit-nextjs": "^3.0.0",
+    "@workos-inc/node": "^1.6.0",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",

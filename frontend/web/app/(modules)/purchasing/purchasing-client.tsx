@@ -8,6 +8,8 @@ import {
   FormModal,
   newPurchaseOrderForm,
   newPurchaseRequisitionForm,
+  newPartnerBankForm,
+  editPartnerBankForm,
   addPurchaseOrderLineForm,
   editPurchaseOrderLineForm,
   receivePurchaseOrderLineForm,
@@ -17,6 +19,7 @@ import {
   purchaseOrdersTableConfig,
   purchaseOrderLinesTableConfig,
   purchaseRequisitionsTableConfig,
+  csvImportForm,
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
@@ -59,6 +62,13 @@ import {
   useLockPurchaseOrder,
   useUnlockPurchaseOrder,
   useUpdatePurchaseOrderLine,
+  usePurchasingCsvImportMutations,
+  usePartnerBanks,
+  useUpdatePoReceiptStatus,
+  useUpdatePoInvoiceStatus,
+  useCreatePartnerBank,
+  useUpdatePartnerBank,
+  useDeletePartnerBank,
 } from "@/hooks/purchasing"
 import { usePricelists } from "@/hooks/sales"
 import { useProducts, useUoms } from "@/hooks/inventory"
@@ -72,6 +82,7 @@ import {
   purchaseOrderLineRowsToEditOptions,
   purchaseOrderLineRowsToReceiveOptions,
   purchaseOrderLineRowsToInvoiceOptions,
+  partnerBankRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   toAddPurchaseOrderLineParams,
@@ -79,6 +90,10 @@ import {
   toReceivePoLineArgs,
   toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
+import {
+  createPartnerBankParamsJson,
+  toUpdatePartnerBankParams,
+} from "@/lib/purchasing-partner-bank-params"
 
 function poState(row: Record<string, unknown>): string {
   const v = row.state
@@ -112,12 +127,15 @@ interface PurchasingClientProps {
   initialPricelists?: Record<string, unknown>[]
   initialProducts?: Record<string, unknown>[]
   initialUoms?: Record<string, unknown>[]
+  initialPartnerBanks?: Record<string, unknown>[]
   organizationId?: number
 }
 
 type PurchasingClientLoadedProps = Omit<PurchasingClientProps, "organizationId"> & {
   organizationId: number
 }
+
+type PurchasingCsvImportKind = "order" | "orderLine" | "supplierInfo"
 
 export function PurchasingClient(props: PurchasingClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -134,6 +152,7 @@ function PurchasingClientLoaded({
   initialPricelists,
   initialProducts,
   initialUoms,
+  initialPartnerBanks,
   organizationId,
 }: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
@@ -147,12 +166,18 @@ function PurchasingClientLoaded({
     null,
   )
   const [formModalKey, setFormModalKey] = useState(0)
+  const [csvKind, setCsvKind] = useState<PurchasingCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
       setFormModalKey((k) => k + 1)
     }
   }, [quickActionForm])
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
 
   const { data: orders = [] } = usePurchaseOrders(companyId, initialOrders)
   const { data: lines = [] } = usePurchaseOrderLines(companyId, initialLines)
@@ -163,6 +188,7 @@ function PurchasingClientLoaded({
   const { data: uoms = [] } = useUoms(companyId, initialUoms)
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
+  const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, companyId)
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, companyId)
@@ -198,6 +224,23 @@ function PurchasingClientLoaded({
   const unlockPurchaseOrder = useUnlockPurchaseOrder(orgId)
   const createBillFromPurchaseOrder = useCreateBillFromPurchaseOrder(orgId)
   const updatePurchaseOrderLine = useUpdatePurchaseOrderLine(orgId)
+  const csvImports = usePurchasingCsvImportMutations(orgId, companyId)
+
+  const updatePoReceiptStatus = useUpdatePoReceiptStatus(orgId)
+  const updatePoInvoiceStatus = useUpdatePoInvoiceStatus(orgId)
+  const createPartnerBank = useCreatePartnerBank(orgId)
+  const updatePartnerBank = useUpdatePartnerBank(orgId)
+  const deletePartnerBank = useDeletePartnerBank(orgId)
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<PurchasingCsvImportKind, string> = {
+      order: "purchasing.csvImport.ordersTitle",
+      orderLine: "purchasing.csvImport.orderLinesTitle",
+      supplierInfo: "purchasing.csvImport.supplierInfoTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
 
   const vendors = useMemo(
     () => allContacts.filter((c) => c.isVendor || (c.supplierRank != null && Number(c.supplierRank) > 0)),
@@ -312,6 +355,27 @@ function PurchasingClientLoaded({
     [t, editLineOptions, productFieldOptions, uomFieldOptions],
   )
 
+  const partnerBankFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPartnerBankForm(t), {
+        partnerId: vendorFieldOptions,
+      }),
+    [t, vendorFieldOptions],
+  )
+
+  const partnerBankEditOptions = useMemo(
+    () => partnerBankRowsToSelectOptions(partnerBanks as Record<string, unknown>[]),
+    [partnerBanks],
+  )
+
+  const editPartnerBankFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(editPartnerBankForm(t), {
+        bankId: partnerBankEditOptions,
+      }),
+    [t, partnerBankEditOptions],
+  )
+
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseOrdersTableConfig(t)
     const view = base.view as EntityTableConfig
@@ -320,6 +384,11 @@ function PurchasingClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: "csv-purchase-orders",
+            label: t("purchasing.csvImport.toolbarOrders"),
+            onClick: () => setCsvKind("order"),
+          },
           {
             id: "po-send",
             label: t("purchasing.actions.sendSelected"),
@@ -380,6 +449,26 @@ function PurchasingClientLoaded({
             },
           },
           {
+            id: "po-refresh-receipt-status",
+            label: t("purchasing.actions.refreshReceiptStatus"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
+              }
+            },
+          },
+          {
+            id: "po-refresh-invoice-status",
+            label: t("purchasing.actions.refreshInvoiceStatus"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
+              }
+            },
+          },
+          {
             id: "po-lock",
             label: t("purchasing.actions.lockSelected"),
             requiresSelection: true,
@@ -424,9 +513,13 @@ function PurchasingClientLoaded({
     cancelPurchaseOrder,
     computePoTotals,
     computePoLineTotals,
+    updatePoReceiptStatus,
+    updatePoInvoiceStatus,
     lockPurchaseOrder,
     unlockPurchaseOrder,
     createBillFromPurchaseOrder,
+    setCsvKind,
+    t,
   ])
 
   const linesEntityConfig = useMemo((): EntityViewConfig => {
@@ -437,6 +530,11 @@ function PurchasingClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: "csv-purchase-order-lines",
+            label: t("purchasing.csvImport.toolbarOrderLines"),
+            onClick: () => setCsvKind("orderLine"),
+          },
           {
             id: "pol-add-form",
             label: t("purchasing.actions.addLineForm"),
@@ -500,6 +598,8 @@ function PurchasingClientLoaded({
     invoiceLineFormConfig,
     removePurchaseOrderLine,
     receivePurchaseOrderLine,
+    setCsvKind,
+    t,
   ])
 
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {
@@ -825,6 +925,73 @@ function PurchasingClientLoaded({
           if (tab.id === "requisitions" && tab.type === "entity") {
             return { ...tab, entityConfig: requisitionsEntityConfig, createForm: purchaseRequisitionFormConfig }
           }
+          if (tab.id === "vendors" && tab.type === "entity" && tab.entityConfig) {
+            const base = tab.entityConfig
+            const view = base.view as EntityTableConfig
+            return {
+              ...tab,
+              entityConfig: {
+                ...base,
+                view: {
+                  ...view,
+                  rowSelectionToggleOnClick: false,
+                  actions: [
+                    {
+                      id: "csv-supplier-info",
+                      label: t("purchasing.csvImport.toolbarSupplierInfo"),
+                      onClick: () => setCsvKind("supplierInfo"),
+                    },
+                    ...(view.actions ?? []),
+                  ],
+                },
+              },
+            }
+          }
+          if (tab.id === "partner-banks" && tab.type === "entity" && tab.entityConfig) {
+            const base = tab.entityConfig
+            const view = base.view as EntityTableConfig
+            return {
+              ...tab,
+              createForm: partnerBankFormConfig,
+              entityConfig: {
+                ...base,
+                view: {
+                  ...view,
+                  actions: [
+                    {
+                      id: "pb-edit-form",
+                      label: t("purchasing.partnerBanks.editForm"),
+                      onClick: () =>
+                        setQuickActionForm({
+                          form: editPartnerBankFormConfig,
+                          action: "updatePartnerBank",
+                        }),
+                    },
+                    {
+                      id: "pb-delete",
+                      label: t("common.delete"),
+                      requiresSelection: true,
+                      variant: "destructive",
+                      onClick: (rows) => {
+                        if (
+                          typeof window !== "undefined" &&
+                          !window.confirm(
+                            t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
+                          )
+                        ) {
+                          return
+                        }
+                        for (const r of rows) {
+                          void deletePartnerBank.mutateAsync(r.id as string | number | bigint)
+                        }
+                      },
+                    },
+                    ...(view.actions ?? []),
+                  ],
+                },
+              },
+            }
+          }
           return tab
           }),
           {
@@ -851,7 +1018,11 @@ function PurchasingClientLoaded({
       requisitionsEntityConfig,
       landedCostsEntityConfig,
       supplierIntakesEntityConfig,
+      partnerBankFormConfig,
+      editPartnerBankFormConfig,
+      deletePartnerBank,
       t,
+      setCsvKind,
     ],
   )
 
@@ -863,8 +1034,9 @@ function PurchasingClientLoaded({
       vendors: vendors as unknown as Record<string, unknown>[],
       "landed-costs": landedCosts as unknown as Record<string, unknown>[],
       "supplier-intakes": supplierIntakes as unknown as Record<string, unknown>[],
+      "partner-banks": partnerBanks as unknown as Record<string, unknown>[],
     }),
-    [orders, lines, requisitions, vendors, landedCosts, supplierIntakes],
+    [orders, lines, requisitions, vendors, landedCosts, supplierIntakes, partnerBanks],
   )
 
   const handleFormSubmit = (
@@ -956,6 +1128,12 @@ function PurchasingClientLoaded({
       const args = toInvoicePoLineArgs(formData)
       if (args == null) return
       void invoicePurchaseOrderLine.mutateAsync(args)
+    } else if (action === "createPartnerBank") {
+      const params = createPartnerBankParamsJson(formData, companyId)
+      if (params) createPartnerBank.mutate(params)
+    } else if (action === "updatePartnerBank") {
+      const u = toUpdatePartnerBankParams(formData)
+      if (u) void updatePartnerBank.mutateAsync({ bankId: u.bankId, params: u.params })
     }
   }
 
@@ -982,6 +1160,34 @@ function PurchasingClientLoaded({
           }
         }}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)
+              else if (csvKind === "orderLine") await csvImports.importPurchaseOrderLine.mutateAsync(text)
+              else await csvImports.importSupplierInfo.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

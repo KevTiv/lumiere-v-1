@@ -383,6 +383,73 @@ export function useCompleteActivity(organizationId: bigint) {
   })
 }
 
+// ── CSV imports (organization_id + csv_data) ─────────────────────────────────
+
+async function parseCallErrorCrm(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+export function useImportContactCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_contact_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorCrm(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+  })
+}
+
+export function useImportLeadCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_lead_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorCrm(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+  })
+}
+
+export function useImportOpportunityCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_opportunity_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorCrm(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] }),
+  })
+}
+
+export function useCrmCsvImportMutations(organizationId: bigint) {
+  return {
+    importContact: useImportContactCsv(organizationId),
+    importLead: useImportLeadCsv(organizationId),
+    importOpportunity: useImportOpportunityCsv(organizationId),
+  }
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   CreateLeadParams,

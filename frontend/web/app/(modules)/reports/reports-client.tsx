@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -13,6 +13,12 @@ import {
   updateReportTemplateForm,
   updateMetricValuesForm,
   recordScheduledRunForm,
+  newDashboardForm,
+  newDashboardWidgetForm,
+  addWidgetToDashboardForm,
+  updateWidgetLayoutForm,
+  shareDashboardForm,
+  updateFinancialReportForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   financialReportsTableConfig,
@@ -20,6 +26,7 @@ import {
   analyticsMetricsTableConfig,
   trialBalancesTableConfig,
   scheduledReportsTableConfig,
+  csvImportForm,
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
@@ -41,6 +48,13 @@ import {
   useUpdateMetricValues,
   useRecordReportRun,
   useCreateTrialBalanceEntry,
+  useReportsCsvImportMutations,
+  useUpdateFinancialReport,
+  useCreateDashboard,
+  useCreateDashboardWidget,
+  useAddWidgetToDashboard,
+  useUpdateWidgetLayout,
+  useShareDashboard,
 } from "@/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -54,6 +68,11 @@ import {
   Pencil,
   Gauge,
   PlayCircle,
+  Upload,
+  LayoutDashboard,
+  Share2,
+  Plus,
+  Grid3X3,
 } from "lucide-react"
 
 interface ReportsClientProps {
@@ -95,6 +114,18 @@ function ReportsClientLoaded({
   const [metricValuesId, setMetricValuesId] = useState<string | null>(null)
   const [recordRunOpen, setRecordRunOpen] = useState(false)
   const [recordRunScheduledId, setRecordRunScheduledId] = useState<string | null>(null)
+  const [csvKind, setCsvKind] = useState<"report_template" | "analytics_metric" | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+
+  // Dashboard modal states
+  const [editReportOpen, setEditReportOpen] = useState(false)
+  const [editReportId, setEditReportId] = useState<string | null>(null)
+  const [createDashboardOpen, setCreateDashboardOpen] = useState(false)
+  const [createWidgetOpen, setCreateWidgetOpen] = useState(false)
+  const [addWidgetOpen, setAddWidgetOpen] = useState(false)
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null)
+  const [shareDashboardOpen, setShareDashboardOpen] = useState(false)
+  const [shareDashboardId, setShareDashboardId] = useState<string | null>(null)
 
   const { data: reportsRaw = [] } = useFinancialReports(companyId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(companyId, initialBalances)
@@ -123,6 +154,19 @@ function ReportsClientLoaded({
   const updateReportTemplate = useUpdateReportTemplate(companyId)
   const updateMetricValues = useUpdateMetricValues(companyId)
   const recordReportRun = useRecordReportRun(companyId)
+  const csvImports = useReportsCsvImportMutations(companyId)
+
+  // Dashboard hooks (6 missing reducers)
+  const updateFinancialReport = useUpdateFinancialReport(companyId)
+  const createDashboard = useCreateDashboard(companyId)
+  const createDashboardWidget = useCreateDashboardWidget(companyId)
+  const addWidgetToDashboard = useAddWidgetToDashboard(companyId)
+  const updateWidgetLayout = useUpdateWidgetLayout(companyId)
+  const shareDashboard = useShareDashboard(companyId)
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
 
   const templateSelectOptions = useMemo(
     () =>
@@ -145,6 +189,14 @@ function ReportsClientLoaded({
     if (selectedReportId == null) return trialBalances
     return trialBalances.filter((row) => String(row.reportId) === selectedReportId)
   }, [trialBalances, selectedReportId])
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    if (csvKind === "report_template") {
+      return csvImportForm(t, t("reports.csvImport.templateTitle"))
+    }
+    return csvImportForm(t, t("reports.csvImport.metricTitle"))
+  }, [csvKind, t])
 
   const financialReportsEntityConfig = useMemo((): EntityViewConfig => {
     const base = financialReportsTableConfig(t)
@@ -243,6 +295,18 @@ function ReportsClientLoaded({
               }
             },
           },
+          {
+            id: "edit",
+            label: t("reports.actions.edit"),
+            icon: Pencil,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setEditReportId(String(first.id))
+              setEditReportOpen(true)
+            },
+          },
         ],
       },
     }
@@ -264,6 +328,12 @@ function ReportsClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: "imp-tpl-csv",
+            label: t("reports.toolbar.importTemplateCsv"),
+            icon: Upload,
+            onClick: (_rows) => setCsvKind("report_template"),
+          },
           {
             id: "edit-tpl",
             label: t("reports.actions.editTemplate"),
@@ -291,6 +361,12 @@ function ReportsClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: "imp-metric-csv",
+            label: t("reports.toolbar.importMetricCsv"),
+            icon: Upload,
+            onClick: (_rows) => setCsvKind("analytics_metric"),
+          },
           {
             id: "upd-metric",
             label: t("reports.actions.refreshMetric"),
@@ -413,12 +489,14 @@ function ReportsClientLoaded({
               }),
             new_metric: () =>
               setQuickActionForm({ form: newAnalyticsMetricForm(t), action: "createAnalyticsMetric" }),
+            new_dashboard: () => setCreateDashboardOpen(true),
+            new_widget: () => setCreateWidgetOpen(true),
           }
           return {
             ...w,
             data: {
               ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
+              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] || (() => {}) })),
             },
           }
         }
@@ -494,6 +572,12 @@ function ReportsClientLoaded({
       await createAnalyticsMetric.mutateAsync(formData)
     } else if (action === "createTrialBalanceEntry") {
       await createTrialBalanceEntry.mutateAsync(formData)
+    } else if (action === "createDashboard") {
+      await createDashboard.mutateAsync(formData)
+      setCreateDashboardOpen(false)
+    } else if (action === "createDashboardWidget") {
+      await createDashboardWidget.mutateAsync(formData)
+      setCreateWidgetOpen(false)
     }
   }
 
@@ -595,6 +679,131 @@ function ReportsClientLoaded({
           })
           setRecordRunOpen(false)
           setRecordRunScheduledId(null)
+        }}
+      />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "report_template") {
+                await csvImports.importReportTemplate.mutateAsync(text)
+              } else {
+                await csvImports.importAnalyticsMetric.mutateAsync(text)
+              }
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+
+      {/* Update Financial Report Modal */}
+      <FormModal
+        open={editReportOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditReportOpen(false)
+            setEditReportId(null)
+          }
+        }}
+        config={updateFinancialReportForm(t)}
+        onSubmit={async (formData) => {
+          if (editReportId == null) return
+          await updateFinancialReport.mutateAsync({
+            reportId: editReportId,
+            params: {
+              name: formData.name ? String(formData.name) : undefined,
+              reportType: formData.reportType ? String(formData.reportType) : undefined,
+              state: formData.state ? String(formData.state) : undefined,
+            },
+          })
+          setEditReportOpen(false)
+          setEditReportId(null)
+        }}
+      />
+
+      {/* Create Dashboard Modal */}
+      <FormModal
+        open={createDashboardOpen}
+        onOpenChange={(open) => !open && setCreateDashboardOpen(false)}
+        config={newDashboardForm(t)}
+        onSubmit={async (formData) => {
+          await handleFormSubmit("dashboard", "createDashboard", formData)
+        }}
+      />
+
+      {/* Create Dashboard Widget Modal */}
+      <FormModal
+        open={createWidgetOpen}
+        onOpenChange={(open) => !open && setCreateWidgetOpen(false)}
+        config={newDashboardWidgetForm(t)}
+        onSubmit={async (formData) => {
+          await handleFormSubmit("dashboard", "createDashboardWidget", formData)
+        }}
+      />
+
+      {/* Add Widget to Dashboard Modal */}
+      <FormModal
+        open={addWidgetOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddWidgetOpen(false)
+            setSelectedDashboardId(null)
+          }
+        }}
+        config={addWidgetToDashboardForm(t)}
+        onSubmit={async (formData) => {
+          if (selectedDashboardId == null) return
+          await addWidgetToDashboard.mutateAsync({
+            dashboardId: selectedDashboardId,
+            widgetId: String(formData.widgetId),
+            layout: {
+              x: Number(formData.x ?? 0),
+              y: Number(formData.y ?? 0),
+              width: String(formData.width ?? "1/2"),
+              height: Number(formData.height ?? 200),
+            },
+          })
+          setAddWidgetOpen(false)
+          setSelectedDashboardId(null)
+        }}
+      />
+
+      {/* Share Dashboard Modal */}
+      <FormModal
+        open={shareDashboardOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShareDashboardOpen(false)
+            setShareDashboardId(null)
+          }
+        }}
+        config={shareDashboardForm(t)}
+        onSubmit={async (formData) => {
+          if (shareDashboardId == null) return
+          await shareDashboard.mutateAsync({
+            dashboardId: shareDashboardId,
+            userId: formData.userId ? String(formData.userId) : undefined,
+            teamId: formData.teamId ? String(formData.teamId) : undefined,
+            permissions: formData.permissions ? String(formData.permissions) : "read",
+          })
+          setShareDashboardOpen(false)
+          setShareDashboardId(null)
         }}
       />
     </>

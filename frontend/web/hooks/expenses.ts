@@ -221,5 +221,54 @@ export function usePostExpenseSheet(organizationId: bigint) {
   })
 }
 
+// ── CSV imports (organization_id, csv_data) ───────────────────────────────────
+
+async function parseCallErrorExpenses(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+export function useImportExpenseCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_expense_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+  })
+}
+
+export function useImportExpenseSheetCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_expense_sheet_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+  })
+}
+
+export function useExpensesCsvImportMutations(organizationId: bigint) {
+  return {
+    importExpense: useImportExpenseCsv(organizationId),
+    importExpenseSheet: useImportExpenseSheetCsv(organizationId),
+  }
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type { CreateExpenseParams, CreateExpenseSheetParams } from '@lumiere/stdb'

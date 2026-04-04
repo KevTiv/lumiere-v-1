@@ -3,11 +3,11 @@ import { serverQueryProducts, serverQueryPosTerminals } from "@lumiere/stdb/serv
 import { PosClient } from "./pos-client"
 
 export default async function PosPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <PosClient />
   }
+  const { organizationId, opts } = session
 
   const [products, terminals] = await Promise.all([
     serverQueryProducts(organizationId, opts),

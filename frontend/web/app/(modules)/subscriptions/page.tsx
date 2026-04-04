@@ -14,11 +14,11 @@ import {
 import { SubscriptionsClient } from "./subscriptions-client"
 
 export default async function SubscriptionsPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <SubscriptionsClient />
   }
+  const { organizationId, opts } = session
 
   const [
     subscriptions,

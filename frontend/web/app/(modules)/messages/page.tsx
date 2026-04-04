@@ -3,11 +3,11 @@ import { serverQueryMailMessages } from "@lumiere/stdb/server"
 import { MessagesClient } from "./messages-client"
 
 export default async function MessagesPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <MessagesClient />
   }
+  const { organizationId, opts } = session
 
   const [messages] = await Promise.all([
     serverQueryMailMessages(organizationId, opts),

@@ -8,11 +8,11 @@ import {
 import { ExpensesClient } from "./expenses-client"
 
 export default async function ExpensesPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <ExpensesClient />
   }
+  const { organizationId, opts } = session
 
   const [expenses, sheets, pricelists, employees] = await Promise.all([
     serverQueryExpenses(organizationId, opts),

@@ -3,7 +3,7 @@
  * (same layout as packages/stdb useWarehouse3D + queryWarehouse3DZones).
  */
 
-import type { Zone, StorageSlot, StockItem, ZoneType, StockCategory } from "@lumiere/ui"
+import type { Zone, StorageSlot, StockItem, ZoneType, StockCategory } from "@lumiere/stdb"
 import type { QueryRows } from "@/lib/query-fetch"
 
 function toZoneType(displayType: unknown): ZoneType {

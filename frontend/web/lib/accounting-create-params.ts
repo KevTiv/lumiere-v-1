@@ -22,7 +22,10 @@ import type {
   CreateBudgetPostParams,
   CreateFiscalYearParams,
   CreateAccountPeriodParams,
+  CreateCurrencyRateParams,
   CreatePaymentParams,
+  CreatePaymentTermLineParams,
+  CreatePaymentTermParams,
   UpdateAccountAccountTypeParams,
   UpdateAccountGroupParams,
   UpdateBudgetPostParams,
@@ -30,24 +33,17 @@ import type {
 import { Timestamp } from 'spacetimedb'
 
 import { userTypeIdFromInternalGroup } from '@/lib/accounting-defaults'
+import {
+  optionalBigIntU64,
+  parseDelimitedU64Ids,
+  u64IdArrayFromForm,
+} from '@/lib/form-coercion'
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
   const s = String(v).trim()
   return s === '' ? undefined : s
-}
-
-function optionalBigIntU64(v: unknown): bigint | undefined {
-  if (v == null || v === '') return undefined
-  if (typeof v === 'bigint') return v
-  const n = Number(v)
-  if (Number.isFinite(n) && n >= 0) return BigInt(Math.trunc(n))
-  try {
-    return BigInt(String(v).trim())
-  } catch {
-    return undefined
-  }
 }
 
 function requiredBigIntU64(v: unknown): bigint | null {
@@ -296,13 +292,32 @@ export function toCreateCrossoveredBudgetParams(
   }
 }
 
-function parseAccountIdList(raw: unknown): number[] {
-  const s = String(raw ?? '').trim()
-  if (!s) return []
-  return s
-    .split(/[\s,]+/)
-    .map((x) => Number(x.trim()))
-    .filter((n) => Number.isFinite(n) && n >= 0)
+function parseAccountIdList(raw: unknown): bigint[] {
+  return parseDelimitedU64Ids(raw)
+}
+
+/** When `tagIds` is absent from the form payload, do not change tags on update. */
+function optionalTagIdsForAnalyticLineUpdate(
+  formData: Record<string, unknown>,
+): bigint[] | undefined {
+  if (!('tagIds' in formData)) return undefined
+  return u64IdArrayFromForm(formData.tagIds)
+}
+
+function analyticLineTagIdsForCreate(formData: Record<string, unknown>): bigint[] {
+  if (!('tagIds' in formData)) return []
+  return u64IdArrayFromForm(formData.tagIds)
+}
+
+function updateAccountGroupParentId(
+  formData: Record<string, unknown>,
+): UpdateAccountGroupParams['parentId'] {
+  if (!('parentId' in formData)) return undefined
+  const raw = formData.parentId
+  if (raw === '' || raw == null) {
+    return null as unknown as UpdateAccountGroupParams['parentId']
+  }
+  return optionalBigIntU64(raw)
 }
 
 export function toCreateBudgetPostParams(formData: Record<string, unknown>): CreateBudgetPostParams {
@@ -367,6 +382,7 @@ export function toUpdateAccountAccountTypeParams(
 
 export function toCreateAccountGroupParams(
   formData: Record<string, unknown>,
+  companyId?: bigint,
 ): CreateAccountGroupParams {
   const levelRaw = Number(formData.level ?? 0)
   return {
@@ -375,17 +391,18 @@ export function toCreateAccountGroupParams(
     codePrefixEnd: optionalTrimmedString(formData.codePrefixEnd),
     level: Number.isFinite(levelRaw) ? Math.max(0, Math.trunc(levelRaw)) : 0,
     parentId: optionalBigIntU64(formData.parentId),
-    companyId: undefined,
+    companyId,
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
-/** Parent hierarchy is only set on create; updates omit `parentId` so the server keeps the existing parent. */
+/** `parentId` on the form updates hierarchy; empty string clears the parent (inner none). */
 export function toUpdateAccountGroupParams(
   formData: Record<string, unknown>,
+  companyId?: bigint,
 ): UpdateAccountGroupParams {
   return {
-    companyId: undefined,
+    companyId,
     name: optionalTrimmedString(formData.name),
     codePrefixStart: optionalTrimmedString(formData.codePrefixStart),
     codePrefixEnd: optionalTrimmedString(formData.codePrefixEnd),
@@ -393,6 +410,7 @@ export function toUpdateAccountGroupParams(
       formData.level === '' || formData.level == null
         ? undefined
         : Math.max(0, Math.trunc(Number(formData.level))),
+    parentId: updateAccountGroupParentId(formData),
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
@@ -416,12 +434,13 @@ export function analyticParamsToJson(params: object): Record<string, unknown> {
 export function toCreateAnalyticAccountParams(
   formData: Record<string, unknown>,
   defaultCurrencyId: bigint,
+  companyId?: bigint,
 ): CreateAnalyticAccountParams | null {
   const name = String(formData.name ?? '').trim()
   if (!name) return null
   const currencyId = optionalBigIntU64(formData.currencyId) ?? defaultCurrencyId
   return {
-    companyId: undefined,
+    companyId,
     name,
     code: optionalTrimmedString(formData.code),
     active: formData.active !== false,
@@ -480,7 +499,7 @@ export function toCreateAnalyticLineParams(
     sheetId: optionalBigIntU64(formData.sheetId),
     isTimesheet: Boolean(formData.isTimesheet),
     category: optionalTrimmedString(formData.category),
-    tagIds: [],
+    tagIds: analyticLineTagIdsForCreate(formData),
     analyticRef: optionalTrimmedString(formData.analyticRef),
     metadata: optionalTrimmedString(formData.metadata),
   }
@@ -489,6 +508,7 @@ export function toCreateAnalyticLineParams(
 /** Single analytic account @ 100% — matches server validation (total percentage = 100). */
 export function toCreateAnalyticDistributionModelParams(
   formData: Record<string, unknown>,
+  companyId?: bigint,
 ): CreateAnalyticDistributionModelParams | null {
   const accountId = optionalBigIntU64(formData.analyticAccountId)
   if (accountId === undefined) return null
@@ -500,7 +520,7 @@ export function toCreateAnalyticDistributionModelParams(
     ? Math.min(255, Math.max(0, Math.trunc(precRaw)))
     : 2
   return {
-    companyId: undefined,
+    companyId,
     name: optionalTrimmedString(formData.name),
     partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
     productId: optionalBigIntU64(formData.productId),
@@ -513,9 +533,10 @@ export function toCreateAnalyticDistributionModelParams(
 
 export function toUpdateAnalyticAccountParams(
   formData: Record<string, unknown>,
+  companyId?: bigint,
 ): UpdateAnalyticAccountParams {
   return {
-    companyId: undefined,
+    companyId,
     name: optionalTrimmedString(formData.name),
     code:
       formData.code === '' || formData.code == null
@@ -555,16 +576,18 @@ export function toUpdateAnalyticLineParams(
     projectId: optionalBigIntU64(formData.projectId),
     taskId: optionalBigIntU64(formData.taskId),
     category: optionalTrimmedString(formData.category),
+    tagIds: optionalTagIdsForAnalyticLineUpdate(formData),
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
 export function toUpdateAnalyticDistributionModelParams(
   formData: Record<string, unknown>,
+  companyId?: bigint,
 ): UpdateAnalyticDistributionModelParams {
   const dist = optionalTrimmedString(formData.analyticDistribution)
   return {
-    companyId: undefined,
+    companyId,
     name: optionalTrimmedString(formData.name),
     partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
     productId: optionalBigIntU64(formData.productId),
@@ -763,6 +786,83 @@ export function paymentParamsToJson(params: CreatePaymentParams): Record<string,
   return stdbParamsToJson(params)
 }
 
+/** Manual payment (Payments tab) — journal, partner, and currency from form. */
+export function toCreatePaymentParamsFromManualForm(
+  formData: Record<string, unknown>,
+  companyId: bigint,
+): CreatePaymentParams | null {
+  const journalId = optionalBigIntU64(formData.journalId)
+  const partnerId = optionalBigIntU64(formData.partnerId)
+  const currencyId = optionalBigIntU64(formData.currencyId)
+  const amount = Number(formData.amount)
+  if (!journalId || !partnerId || !currencyId || !Number.isFinite(amount) || amount <= 0) return null
+  const pt = String(formData.paymentType ?? 'InBound').trim()
+  const pty = String(formData.partnerType ?? 'Customer').trim()
+  return {
+    companyId,
+    paymentType: pt === 'OutBound' ? { tag: 'OutBound' as const } : { tag: 'InBound' as const },
+    partnerType: pty === 'Supplier' ? { tag: 'Supplier' as const } : { tag: 'Customer' as const },
+    partnerId,
+    amount,
+    currencyId,
+    date: undefined,
+    journalId,
+    ref: optionalTrimmedString(formData.ref),
+    memo: optionalTrimmedString(formData.memo),
+  }
+}
+
+export function toCreatePaymentTermParamsFromForm(formData: Record<string, unknown>): CreatePaymentTermParams | null {
+  const name = optionalTrimmedString(formData.name)
+  if (!name) return null
+  return { name, note: optionalTrimmedString(formData.note) }
+}
+
+function paymentTermValueFromSelect(raw: unknown): { tag: 'Balance' } | { tag: 'Percent' } | { tag: 'Fixed' } {
+  const s = String(raw ?? 'Balance').trim()
+  if (s === 'Percent') return { tag: 'Percent' as const }
+  if (s === 'Fixed') return { tag: 'Fixed' as const }
+  return { tag: 'Balance' as const }
+}
+
+export function toCreatePaymentTermLineParamsFromForm(
+  formData: Record<string, unknown>,
+): CreatePaymentTermLineParams | null {
+  const paymentTermId = optionalBigIntU64(formData.paymentTermId)
+  if (!paymentTermId) return null
+  const days = Math.max(0, Math.trunc(Number(formData.days ?? 0)))
+  const months = Math.max(0, Math.trunc(Number(formData.months ?? 0)))
+  const sequence = Math.max(0, Math.trunc(Number(formData.sequence ?? 0)))
+  const valueAmount = Number(formData.valueAmount ?? 0)
+  if (!Number.isFinite(valueAmount)) return null
+  return {
+    paymentTermId,
+    value: paymentTermValueFromSelect(formData.value),
+    valueAmount,
+    days,
+    months,
+    daysAfterEndOfMonth: Boolean(formData.daysAfterEndOfMonth),
+    sequence,
+  }
+}
+
+export function toCreateCurrencyRateParamsFromForm(formData: Record<string, unknown>): CreateCurrencyRateParams | null {
+  const fromCurrency = optionalTrimmedString(formData.fromCurrency)?.toUpperCase()
+  const toCurrency = optionalTrimmedString(formData.toCurrency)?.toUpperCase()
+  const rate = Number(formData.rate)
+  if (!fromCurrency || !toCurrency || !Number.isFinite(rate) || rate <= 0) return null
+  return {
+    fromCurrency,
+    toCurrency,
+    rate,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function createCurrencyRateParamsToJson(params: CreateCurrencyRateParams): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
 // ── Fiscal years ─────────────────────────────────────────────────────────────
 
 function fiscalYearTypeFromSelect(raw: unknown): string {
@@ -927,14 +1027,28 @@ import type {
   ProcessIntercompanyTransactionParams,
 } from '@lumiere/stdb/generated/types'
 
-function toRuleType(raw: unknown): { tag: 'Sale' | 'Purchase' | 'Transfer' | 'Service' } | undefined {
+/** Maps UI / legacy labels to SpacetimeDB `RuleType` for intercompany reducers. */
+function toIntercompanyRuleType(
+  raw: unknown,
+):
+  | { tag: 'Invoice' }
+  | { tag: 'Bill' }
+  | { tag: 'Payment' }
+  | { tag: 'Transfer' }
+  | undefined {
   const s = String(raw ?? '').trim()
   switch (s) {
-    case 'Sale':
-    case 'Purchase':
+    case 'Invoice':
+    case 'Bill':
+    case 'Payment':
     case 'Transfer':
-    case 'Service':
       return { tag: s }
+    case 'Sale':
+      return { tag: 'Invoice' }
+    case 'Purchase':
+      return { tag: 'Bill' }
+    case 'Service':
+      return { tag: 'Payment' }
     default:
       return undefined
   }
@@ -946,7 +1060,7 @@ export function toCreateIntercompanyRuleParams(
   const name = String(formData.name ?? '').trim()
   if (!name) return null
 
-  const ruleType = toRuleType(formData.ruleType)
+  const ruleType = toIntercompanyRuleType(formData.ruleType)
   if (!ruleType) return null
 
   return {
@@ -984,7 +1098,7 @@ export function toCreateIntercompanyTransactionParams(
   const currencyId = requiredBigIntU64(formData.currencyId)
   if (currencyId === null) return null
 
-  const transactionType = toRuleType(formData.transactionType)
+  const transactionType = toIntercompanyRuleType(formData.transactionType)
   if (!transactionType) return null
 
   return {

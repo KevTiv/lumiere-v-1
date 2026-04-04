@@ -501,5 +501,194 @@ export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
   })
 }
 
+// ── CSV imports (org + csv_data — no company_id in reducers) ───────────────────
+
+async function parseCallError(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+function useImportHrResourceCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_resource_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-resources', organizationId.toString()] }),
+  })
+}
+
+function useImportHrDepartmentCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_department_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-departments', organizationId.toString()] }),
+  })
+}
+
+function useImportHrJobPositionCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_job_position_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['job-positions', organizationId.toString()] }),
+  })
+}
+
+function useImportHrEmployeeCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_employee_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-employees', organizationId.toString()] }),
+  })
+}
+
+function useImportHrContractCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_contract_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+  })
+}
+
+function useImportHrLeaveTypeCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_leave_type_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId.toString()] }),
+  })
+}
+
+function useImportHrLeaveCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_leave_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] }),
+  })
+}
+
+function useImportHrPayrollStructureCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_payroll_structure_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId.toString()] }),
+  })
+}
+
+function useImportHrSalaryRuleCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_salary_rule_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId.toString()] }),
+  })
+}
+
+function useImportHrPayslipCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_hr_payslip_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallError(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
+  })
+}
+
+/** HR CSV import mutations for module toolbar (org-scoped reducers). */
+export function useHrCsvImportMutations(organizationId: bigint) {
+  return {
+    importResource: useImportHrResourceCsv(organizationId),
+    importDepartment: useImportHrDepartmentCsv(organizationId),
+    importJobPosition: useImportHrJobPositionCsv(organizationId),
+    importEmployee: useImportHrEmployeeCsv(organizationId),
+    importContract: useImportHrContractCsv(organizationId),
+    importLeaveType: useImportHrLeaveTypeCsv(organizationId),
+    importLeave: useImportHrLeaveCsv(organizationId),
+    importPayrollStructure: useImportHrPayrollStructureCsv(organizationId),
+    importSalaryRule: useImportHrSalaryRuleCsv(organizationId),
+    importPayslip: useImportHrPayslipCsv(organizationId),
+  }
+}
+
+export type HrCsvImportMutations = ReturnType<typeof useHrCsvImportMutations>
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type { CreateJobPositionParams } from '@lumiere/stdb'

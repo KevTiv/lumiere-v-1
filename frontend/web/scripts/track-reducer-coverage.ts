@@ -72,6 +72,118 @@ const EXCLUDED_PREFIXES = [
   /^delete_user_custom_field/,
 ]
 
+/**
+ * [reducer-ui-platform] Exact reducer → module bucket (was `uncategorized`).
+ * @see .cursor/plans/reducer-coverage-triage-reference.md (platform triage encoded here + script)
+ */
+const EXPLICIT_REDUCER_MODULE: Record<string, string> = {
+  // Company & org structure
+  create_company: 'settings',
+  update_company: 'settings',
+  update_company_address: 'settings',
+  update_company_business: 'settings',
+  update_company_hierarchy: 'settings',
+  delete_company: 'settings',
+  migrate_all_organizations: 'forms',
+  // Reference masters (often seeded)
+  create_country: 'settings',
+  create_currency: 'settings',
+  create_currency_rate: 'accounting',
+  // UTM / attribution
+  create_utm_campaign: 'crm',
+  update_utm_campaign: 'crm',
+  create_utm_medium: 'crm',
+  update_utm_medium: 'crm',
+  create_utm_source: 'crm',
+  update_utm_source: 'crm',
+  // Privacy / compliance
+  create_data_classification: 'settings',
+  create_data_classification_rule: 'settings',
+  // Payment terms & payments
+  create_payment_term: 'accounting',
+  update_payment_term: 'accounting',
+  delete_payment_term: 'accounting',
+  create_payment_term_line: 'accounting',
+  update_payment_term_line: 'accounting',
+  delete_payment_term_line: 'accounting',
+  create_payment: 'accounting',
+  create_payment_method: 'sales',
+  cancel_payment: 'accounting',
+  post_payment: 'accounting',
+  register_payment_on_invoice: 'accounting',
+  compute_invoice_totals: 'accounting',
+  // Bank & fiscal periods
+  unreconciled_account_bank_statement_line: 'accounting',
+  match_bank_line: 'accounting',
+  open_account_period: 'accounting',
+  // Partners / PO workflow
+  create_partner_bank: 'purchasing',
+  update_partner_bank: 'purchasing',
+  delete_partner_bank: 'purchasing',
+  update_po_receipt_status: 'purchasing',
+  update_po_invoice_status: 'purchasing',
+  // Logistics & loyalty (POS / sales)
+  create_delivery_carrier: 'sales',
+  create_delivery_price_rule: 'sales',
+  create_shipping_method: 'sales',
+  create_loyalty_program: 'sales',
+  create_loyalty_card: 'sales',
+  // Inventory masters & traceability
+  create_adjustment_reason: 'inventory',
+  use_serial: 'inventory',
+  create_traceability_record: 'inventory',
+  create_traceability_report: 'inventory',
+  run_traceability_report: 'inventory',
+  remove_rule_from_nomenclature: 'inventory',
+  process_pending_scans: 'inventory',
+  // Fixed assets
+  set_asset_active: 'accounting',
+  // IoT
+  update_device_status: 'iot',
+  mark_action_sent: 'iot',
+  // Search / embeddings
+  upsert_search_embedding: 'ai',
+  mark_embedding_synced: 'ai',
+  delete_search_embedding: 'ai',
+  request_embedding_job: 'ai',
+  // Messaging / follow
+  post_internal_note: 'crm',
+  subscribe_to_record: 'crm',
+  unsubscribe_from_record: 'crm',
+  // Auth / dev (non–end-user surfaces)
+  dev_promote_caller_superuser: 'auth',
+  link_workos_user: 'auth',
+  mark_reset_token_used: 'auth',
+  // Workers
+  worker_heartbeat: 'internal',
+}
+
+/**
+ * [reducer-ui-platform] Excluded from **product** UI coverage expectations (API, worker, defer).
+ * Still bucketed in {@link EXPLICIT_REDUCER_MODULE} for `byModule.rust`.
+ */
+const PLATFORM_TRIAGE_EXCLUDED_FROM_PRODUCT: Record<string, string> = {
+  migrate_all_organizations: 'platform_api',
+  create_country: 'platform_defer',
+  create_currency: 'platform_defer',
+  /**
+   * Scheduled reducer (`TaxDeadlineStatusJob`). Browsers call `refresh_tax_deadline_statuses`
+   * (Taxes tab) for the same status refresh logic.
+   */
+  update_tax_deadlines: 'platform_api',
+  update_device_status: 'platform_api',
+  upsert_search_embedding: 'platform_api',
+  mark_embedding_synced: 'platform_api',
+  delete_search_embedding: 'platform_api',
+  request_embedding_job: 'platform_api',
+  mark_action_sent: 'platform_api',
+  process_pending_scans: 'platform_api',
+  dev_promote_caller_superuser: 'platform_api',
+  link_workos_user: 'platform_api',
+  mark_reset_token_used: 'platform_api',
+  worker_heartbeat: 'platform_api',
+}
+
 // Patterns for detecting reducer usage in TypeScript
 const WEB_DETECTION_PATTERNS = {
   // Direct fetch calls like '/api/call/create_account_account'
@@ -130,6 +242,10 @@ function isExcludedReducer(name: string): { excluded: boolean; category: string 
       else if (/^add_user_custom_field|^delete_user_custom_field/.test(name)) category = 'user_custom_fields'
       return { excluded: true, category }
     }
+  }
+  const platformCat = PLATFORM_TRIAGE_EXCLUDED_FROM_PRODUCT[name]
+  if (platformCat) {
+    return { excluded: true, category: platformCat }
   }
   return { excluded: false, category: '' }
 }
@@ -232,7 +348,45 @@ function extractWebReducers(): {
   return { reducers: allReducers, sources }
 }
 
+/** Map generated client method names (camelCase) to Rust reducer names (snake_case). */
+function camelReducerMethodToSnake(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+}
+
+/**
+ * SpacetimeDB TS client calls look like `conn.reducers.createFormConfiguration({ ... })`.
+ * Those live under frontend/packages/stdb and frontend/packages/ui (not only frontend/web).
+ */
+function mergeWorkspacePackageReducerCalls(webResult: ReturnType<typeof extractWebReducers>): void {
+  const extraRoots = [
+    path.join(REPO_ROOT, 'frontend/packages/stdb/src'),
+    path.join(REPO_ROOT, 'frontend/packages/ui/src'),
+  ]
+  const pattern = /\.reducers\.([a-z][a-zA-Z0-9]*)\s*\(/g
+  for (const root of extraRoots) {
+    const files = [
+      ...globSync('**/*.ts', { cwd: root, absolute: true }),
+      ...globSync('**/*.tsx', { cwd: root, absolute: true }),
+    ]
+    for (const file of files) {
+      try {
+        const content = readFileSync(file, 'utf-8')
+        let match
+        while ((match = pattern.exec(content)) !== null) {
+          webResult.reducers.add(camelReducerMethodToSnake(match[1]))
+        }
+        pattern.lastIndex = 0
+      } catch {
+        // skip unreadable
+      }
+    }
+  }
+}
+
 function categorizeByModule(reducerName: string): string {
+  const explicit = EXPLICIT_REDUCER_MODULE[reducerName]
+  if (explicit) return explicit
+
   // Map reducer prefixes to modules
   const prefixMap: Record<string, string> = {
     create_account_: 'accounting',
@@ -632,6 +786,10 @@ function categorizeByModule(reducerName: string): string {
     create_document_folder: 'documents',
     update_document_folder: 'documents',
     delete_document_folder: 'documents',
+    create_document_processing_job: 'documents',
+    approve_document_processing_job: 'documents',
+    complete_document_processing_job: 'documents',
+    acknowledge_insight: 'documents',
 
     create_subscription: 'subscriptions',
     update_subscription: 'subscriptions',
@@ -783,7 +941,6 @@ function categorizeByModule(reducerName: string): string {
     create_ai_: 'ai',
     update_ai_: 'ai',
     delete_ai_: 'ai',
-    acknowledge_insight: 'ai',
     dismiss_insight: 'ai',
     ai_spend: 'ai',
     create_ai_insight: 'ai',
@@ -802,6 +959,7 @@ function categorizeByModule(reducerName: string): string {
     update_form_configuration: 'forms',
     delete_form_configuration: 'forms',
     get_form_configuration: 'forms',
+    get_organization_form_configs: 'forms',
     initialize_default_form_configs: 'forms',
 
     import_: 'imports',
@@ -976,7 +1134,7 @@ function printReport(report: CoverageReport): void {
   }
 
   console.log('\n=== Top Missing (UI Priority - Product Only) ===\n')
-  const uiPriorityModules = ['projects', 'inventory', 'sales', 'purchasing', 'crm', 'accounting']
+  const uiPriorityModules = ['projects', 'inventory', 'sales', 'purchasing', 'crm', 'accounting', 'settings']
   for (const mod of uiPriorityModules) {
     const data = report.byModule[mod]
     if (!data) continue
@@ -1053,7 +1211,8 @@ function main(): void {
 
   console.log('Scanning Web reducer usage...')
   const webResult = extractWebReducers()
-  console.log(`Found ${webResult.reducers.size} reducer calls in Web`)
+  mergeWorkspacePackageReducerCalls(webResult)
+  console.log(`Found ${webResult.reducers.size} reducer calls in Web + workspace packages`)
 
   const report = generateReport(rustReducers, webResult)
   printReport(report)

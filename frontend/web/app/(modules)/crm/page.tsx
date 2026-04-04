@@ -7,11 +7,11 @@ import {
 import { CrmClient } from "./crm-client"
 
 export default async function CrmPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <CrmClient />
   }
+  const { organizationId, opts } = session
 
   const [leads, opportunities, contacts] = await Promise.all([
     serverQueryLeads(organizationId, opts),

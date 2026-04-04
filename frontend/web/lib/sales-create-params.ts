@@ -46,6 +46,7 @@ function discountPolicyFromForm(raw: unknown): CreatePricelistParams['discountPo
 export function toCreateSaleOrderParams(
   formData: Record<string, unknown>,
   pricelists: ReadonlyArray<Record<string, unknown>>,
+  companyId: bigint,
 ): CreateSaleOrderParams | null {
   const partnerRaw = formData.partnerId
   const pricelistRaw = formData.pricelistId
@@ -73,6 +74,7 @@ export function toCreateSaleOrderParams(
   const commitmentDate = optionalTimestampFromFormDate(formData.commitmentDate)
 
   return {
+    companyId,
     partnerId,
     partnerInvoiceId: partnerId,
     partnerShippingId: partnerId,

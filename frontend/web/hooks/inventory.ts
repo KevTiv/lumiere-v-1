@@ -9,7 +9,6 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
 import { buildWarehouse3DView } from '@/lib/warehouse-3d-from-api'
-
 type ScalarId = bigint | number | string
 
 function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
@@ -27,6 +26,10 @@ function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organ
   void qc.invalidateQueries({ queryKey: ['stock-inventories', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-moves', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-production-serials', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['adjustment-reasons', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['barcode-nomenclatures', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['serial-lot-traceability', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] })
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -275,6 +278,46 @@ export function useBarcodeRules(organizationId: bigint, initialData?: QueryRows)
   return useQuery<QueryRows>({
     queryKey: ['barcode-rules', organizationId.toString()],
     queryFn: () => fetchQueryList('/api/query/barcode-rules', 'Failed to fetch barcode rules'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useAdjustmentReasons(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['adjustment-reasons', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/adjustment-reasons', 'Failed to fetch adjustment reasons'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useBarcodeNomenclatures(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['barcode-nomenclatures', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/barcode-nomenclatures', 'Failed to fetch barcode nomenclatures'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useSerialLotTraceability(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['serial-lot-traceability', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/serial-lot-traceability', 'Failed to fetch traceability rows'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useStockTraceabilityReports(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-traceability-reports', organizationId.toString()],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-traceability-reports', 'Failed to fetch traceability reports'),
     staleTime: 30_000,
     initialData,
   })
@@ -1315,6 +1358,104 @@ export function useAddRuleToNomenclature(organizationId: bigint, _companyId?: bi
   })
 }
 
+export function useRemoveRuleFromNomenclature(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  const orgKey = organizationId.toString()
+  return useMutation<void, Error, { nomenclatureId: ScalarId; ruleId: ScalarId }>({
+    mutationFn: async ({ nomenclatureId, ruleId }) => {
+      const r = await fetch('/api/call/remove_rule_from_nomenclature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(nomenclatureId), Number(ruleId)]),
+      })
+      if (!r.ok) throw new Error('Failed to remove rule from nomenclature')
+    },
+    onSuccess: () => {
+      invalidateInventoryQueries(qc, organizationId)
+      void qc.invalidateQueries({ queryKey: ['barcode-nomenclatures', orgKey] })
+    },
+  })
+}
+
+export function useCreateAdjustmentReason(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  const orgKey = organizationId.toString()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_adjustment_reason', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create adjustment reason')
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['adjustment-reasons', orgKey] }),
+  })
+}
+
+export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (serialId) => {
+      const r = await fetch('/api/call/use_serial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(serialId)]),
+      })
+      if (!r.ok) throw new Error('Failed to mark serial in use')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useCreateTraceabilityRecord(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  const orgKey = organizationId.toString()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_traceability_record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create traceability record')
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['serial-lot-traceability', orgKey] }),
+  })
+}
+
+export function useCreateTraceabilityReport(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  const orgKey = organizationId.toString()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_traceability_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error('Failed to create traceability report')
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] }),
+  })
+}
+
+export function useRunTraceabilityReport(organizationId: bigint, _companyId?: bigint) {
+  const qc = useQueryClient()
+  const orgKey = organizationId.toString()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (reportId) => {
+      const r = await fetch('/api/call/run_traceability_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(reportId)]),
+      })
+      if (!r.ok) throw new Error('Failed to run traceability report')
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] }),
+  })
+}
+
 // ── UOM Management ─────────────────────────────────────────────────────────────
 
 export function useCreateUomCategory(organizationId: bigint, _companyId?: bigint) {
@@ -2337,6 +2478,186 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })
+}
+
+// ── CSV imports (inventory + UOM masters) ─────────────────────────────────────
+
+async function parseCallErrorInv(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+export function useImportUomCategoryCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_uom_category_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', organizationId.toString()] }),
+  })
+}
+
+export function useImportUomCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_uom_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', organizationId.toString()] }),
+  })
+}
+
+export function useImportProductCategoryCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_product_category_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['product-categories', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['products', organizationId.toString()] })
+    },
+  })
+}
+
+export function useImportProductCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { csvData: string; currencyId: number }) => {
+      const res = await fetch('/api/call/import_product_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          String(args.currencyId),
+          args.csvData,
+        ]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', organizationId.toString()] }),
+  })
+}
+
+export function useImportProductVariantCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_product_variant_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', organizationId.toString()] }),
+  })
+}
+
+export function useImportWarehouseCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_warehouse_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => {
+      const k = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['warehouses', k] })
+      void qc.invalidateQueries({ queryKey: ['stock-locations', k] })
+    },
+  })
+}
+
+export function useImportStockLocationCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_stock_location_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => {
+      const k = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['stock-locations', k] })
+    },
+  })
+}
+
+export function useImportStockQuantCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_stock_quant_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => {
+      const k = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['stock-quants', k] })
+    },
+  })
+}
+
+export function useImportLotCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_lot_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorInv(res))
+    },
+    onSuccess: () => {
+      const k = organizationId.toString()
+      void qc.invalidateQueries({ queryKey: ['stock-production-lots', k] })
+    },
+  })
+}
+
+export function useInventoryCsvImportMutations(organizationId: bigint, companyId: bigint) {
+  return {
+    importUomCategory: useImportUomCategoryCsv(organizationId),
+    importUom: useImportUomCsv(organizationId),
+    importProductCategory: useImportProductCategoryCsv(organizationId),
+    importProduct: useImportProductCsv(organizationId),
+    importProductVariant: useImportProductVariantCsv(organizationId),
+    importWarehouse: useImportWarehouseCsv(organizationId, companyId),
+    importStockLocation: useImportStockLocationCsv(organizationId, companyId),
+    importStockQuant: useImportStockQuantCsv(organizationId, companyId),
+    importLot: useImportLotCsv(organizationId, companyId),
+  }
 }
 
 /** Integration / admin: Meta WhatsApp quality score — no inventory tab UI. */

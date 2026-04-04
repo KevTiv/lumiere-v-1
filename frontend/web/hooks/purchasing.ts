@@ -28,6 +28,15 @@ function invalidateSupplierIntakes(qc: QueryClient, organizationId: bigint) {
   void qc.invalidateQueries({ queryKey: ['contacts', k] })
 }
 
+async function parseCallErrorPo(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
 async function postSubmitSupplierIntake(
   organizationId: bigint,
   params: Record<string, unknown>,
@@ -91,6 +100,15 @@ export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRo
   return useQuery<QueryRows>({
     queryKey: ['supplier-intakes', organizationId.toString()],
     queryFn: () => fetchQueryList('/api/query/supplier-intakes', 'Failed to fetch supplier intakes'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['partner-banks', organizationId.toString()],
+    queryFn: () => fetchQueryList('/api/query/partner-banks', 'Failed to fetch partner bank accounts'),
     staleTime: 30_000,
     initialData,
   })
@@ -754,6 +772,158 @@ export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
       const orgKey = organizationId.toString()
       void qc.invalidateQueries({ queryKey: ['purchase-orders', orgKey] })
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
+    },
+  })
+}
+
+// ── CSV imports ───────────────────────────────────────────────────────────────
+
+export function useImportPurchaseOrderCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_purchase_order_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorPo(res))
+    },
+    onSuccess: () => {
+      const k = companyId.toString()
+      void qc.invalidateQueries({ queryKey: ['purchase-orders', k] })
+    },
+  })
+}
+
+export function useImportPurchaseOrderLineCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_purchase_order_line_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorPo(res))
+    },
+    onSuccess: () => {
+      const k = companyId.toString()
+      void qc.invalidateQueries({ queryKey: ['purchase-order-lines', k] })
+    },
+  })
+}
+
+export function useImportSupplierInfoCsv(organizationId: bigint, productsQueryKeyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_supplier_info_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorPo(res))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['products', productsQueryKeyId.toString()] })
+    },
+  })
+}
+
+export function usePurchasingCsvImportMutations(organizationId: bigint, companyId: bigint) {
+  return {
+    importPurchaseOrder: useImportPurchaseOrderCsv(organizationId, companyId),
+    importPurchaseOrderLine: useImportPurchaseOrderLineCsv(organizationId, companyId),
+    importSupplierInfo: useImportSupplierInfoCsv(organizationId, companyId),
+  }
+}
+
+export function useUpdatePoReceiptStatus(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: ScalarId) => {
+      const r = await fetch('/api/call/update_po_receipt_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId.toString()] })
+    },
+  })
+}
+
+export function useUpdatePoInvoiceStatus(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: ScalarId) => {
+      const r = await fetch('/api/call/update_po_invoice_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId.toString()] })
+    },
+  })
+}
+
+export function useCreatePartnerBank(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const r = await fetch('/api/call/create_partner_bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), params]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId.toString()] })
+    },
+  })
+}
+
+export function useUpdatePartnerBank(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { bankId: ScalarId; params: Record<string, unknown> }) => {
+      const r = await fetch('/api/call/update_partner_bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          Number(args.bankId),
+          args.params,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId.toString()] })
+    },
+  })
+}
+
+export function useDeletePartnerBank(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (bankId: ScalarId) => {
+      const r = await fetch('/api/call/delete_partner_bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), Number(bankId)]),
+      })
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId.toString()] })
     },
   })
 }

@@ -7,6 +7,7 @@ import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
 import { useMailMessages, usePostMessage } from "@/hooks/messages"
 import type { PostMessageParams } from "@/hooks/messages"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface MessagesClientProps {
@@ -109,7 +110,7 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
         model: formData.model ? String(formData.model) : "mail.message",
         resId: BigInt(Math.floor(resNum)),
         body,
-        parentId: undefined,
+        parentId: optionalBigIntU64(formData.parentId),
         attachmentIds: [],
       })
     }

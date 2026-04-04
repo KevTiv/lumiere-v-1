@@ -19,11 +19,11 @@ import {
 import { InventoryClient } from "./inventory-client"
 
 export default async function InventoryPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <InventoryClient />
   }
+  const { organizationId, opts } = session
 
   const [
     products,

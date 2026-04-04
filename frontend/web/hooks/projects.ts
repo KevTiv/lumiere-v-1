@@ -321,6 +321,76 @@ export function useBillTimesheets(organizationId: bigint) {
   })
 }
 
+// ── CSV imports (organization_id, company_id, csv_data) ───────────────────────
+
+async function parseCallErrorProjects(r: Response): Promise<string> {
+  try {
+    const j = (await r.json()) as { error?: string }
+    return j.error ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_project_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorProjects(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['projects', companyId.toString()] }),
+  })
+}
+
+export function useImportTaskCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_task_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorProjects(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['tasks', companyId.toString()] }),
+  })
+}
+
+export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_timesheet_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorProjects(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['timesheets', companyId.toString()] }),
+  })
+}
+
+/** Projects / tasks / timesheet CSV import mutations. */
+export function useProjectsCsvImportMutations(organizationId: bigint, companyId: bigint) {
+  return {
+    importProject: useImportProjectCsv(organizationId, companyId),
+    importTask: useImportTaskCsv(organizationId, companyId),
+    importTimesheet: useImportTimesheetCsv(organizationId, companyId),
+  }
+}
+
+export type ProjectsCsvImportMutations = ReturnType<typeof useProjectsCsvImportMutations>
+
 // Re-export cross-domain dependency so callers import from one place
 export { useEmployees } from "@/hooks/hr"
 

@@ -6,7 +6,7 @@ export const metadata = {
 }
 
 export default async function MapPage() {
-  const { organizationId } = await getStdbSession()
-  const org = organizationId != null ? organizationId : undefined
+  const session = await getStdbSession()
+  const org = session?.organizationId != null ? session.organizationId : undefined
   return <MapClient organizationId={org} />
 }

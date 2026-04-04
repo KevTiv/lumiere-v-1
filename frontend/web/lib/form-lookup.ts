@@ -132,6 +132,27 @@ export function purchaseOrderRowsToSelectOptions(
   }))
 }
 
+export function partnerBankRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const acct = row.sanitizedAccNumber != null ? String(row.sanitizedAccNumber) : "—"
+    return {
+      value: String(row.id),
+      label: `#${row.id} · ${acct}`,
+    }
+  })
+}
+
+export function loyaltyProgramRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? `Program ${row.id}`),
+  }))
+}
+
 /** Draft PO lines (for editing qty/price before confirmation). */
 export function purchaseOrderLineRowsToEditOptions(
   lines: Record<string, unknown>[],

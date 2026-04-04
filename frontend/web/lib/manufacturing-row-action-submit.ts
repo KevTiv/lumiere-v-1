@@ -6,6 +6,22 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+function trimOpt(v: unknown): string | undefined {
+  const s = String(v ?? "").trim()
+  return s === "" ? undefined : s
+}
+
+function parseU64List(raw: unknown): number[] {
+  const str = String(raw ?? "").trim()
+  if (!str) return []
+  const out: number[] = []
+  for (const p of str.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean)) {
+    const n = Number(p)
+    if (Number.isFinite(n) && n >= 0) out.push(Math.floor(n))
+  }
+  return out
+}
+
 function idFrom(values: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
     const v = values[k]
@@ -142,6 +158,32 @@ export async function submitManufacturingRowAction(
             duration: num(values.logDuration, 0),
           },
         })
+        return
+      }
+      case "create_routing": {
+        const name = String(values.routingOpName ?? "").trim()
+        if (!name) throw new Error("Operation name is required")
+        await m.createRoutingWorkcenter.mutateAsync({
+          workcenterId: Number(wcId),
+          name,
+          worksheetType: String(values.routingWorksheetType ?? "text"),
+          timeMode: String(values.routingTimeMode ?? "manual"),
+          timeModeBatch: num(values.routingTimeModeBatch, 1) || 1,
+          timeCycleManual: num(values.routingTimeCycleManual, 0),
+          timeCycle: num(values.routingTimeCycle, 60),
+          sequence: num(values.routingSequence, 10) || 1,
+          worksheet: trimOpt(values.routingWorksheetBody),
+          worksheetGoogleSlide: undefined,
+          worksheetUrl: trimOpt(values.routingWorksheetUrl),
+          blockedByOperationIds: parseU64List(values.routingBlockedByIds),
+          metadata: undefined,
+        })
+        return
+      }
+      case "complete_productivity_log": {
+        const logId = num(values.completeLogId, NaN)
+        if (!Number.isFinite(logId)) throw new Error("Productivity log ID is required")
+        await m.completeProductivityLog.mutateAsync(logId)
         return
       }
       case "link_iot_device": {

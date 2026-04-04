@@ -3,11 +3,11 @@ import { serverQueryProposals } from "@lumiere/stdb/server"
 import { ProposalsClient } from "./proposals-client"
 
 export default async function ProposalsPage() {
-  const { organizationId } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <ProposalsClient />
   }
+  const { organizationId } = session
 
   const initialProposals = await serverQueryProposals(BigInt(organizationId))
 

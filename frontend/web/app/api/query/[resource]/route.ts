@@ -11,7 +11,7 @@
  *
  * Available resources:
  *   Accounting: account-accounts, account-account-types, account-groups, account-journals, account-moves, account-taxes,
- *               account-payments, budgets, budget-lines, budget-posts, analytic-accounts, analytic-lines,
+ *               account-payments, account-payment-terms, account-payment-term-lines, budgets, budget-lines, budget-posts, analytic-accounts, analytic-lines,
  *               analytic-distribution-models, bank-statements, bank-statement-lines,
  *               bank-match-candidates, account-reconciliation-widgets, account-assets, fiscal-years, account-periods
  *   Sales:      sale-orders, sale-order-lines, pricelists, pricelist-items, picking-batches
@@ -20,13 +20,16 @@
  *   Inventory:  products, product-categories, uoms, stock-quants, stock-pickings, warehouses, inventory-adjustments,
  *               stock-locations, stock-production-lots, stock-production-serials, quality-checks, warehouse-3d-zones,
  *               stock-cycle-counts, stock-inventories, stock-moves, stock-routes, stock-rules, picking-waves,
- *               warehouse-tasks, replenishment-rules, barcode-rules, inventory-valuations
+ *               warehouse-tasks, replenishment-rules, barcode-rules, barcode-nomenclatures,
+ *               adjustment-reasons, serial-lot-traceability, stock-traceability-reports, inventory-valuations
  *   Purchasing: purchase-orders, purchase-order-lines, purchase-requisitions, landed-costs, supplier-intakes
- *   Manufacturing: mrp-productions, mrp-boms, mrp-bom-lines, mrp-workorders, mrp-workcenters
+ *   Manufacturing: mrp-productions, mrp-boms, mrp-bom-lines, mrp-workorders, mrp-workcenters,
+ *               mrp-routing-workcenters
  *   HR:         employees, departments, leave-requests, contracts, payslips
  *   Reports:    financial-reports, trial-balances
- *   IoT:        iot-devices, iot-hubs, iot-alerts, iot-actions, iot-telemetry, iot-thresholds
- *   AI:         ai-agents, ai-team-members, ai-insights
+ *   IoT:        iot-devices, iot-hubs, iot-alerts, iot-actions, iot-telemetry, iot-thresholds,
+ *               iot-pairing-tokens
+ *   AI:         ai-agents, ai-team-members, ai-insights, ai-document-processing-jobs
  *   Other:      documents, knowledge-articles, helpdesk-tickets, helpdesk-teams,
  *               helpdesk-stages, helpdesk-slas, subscriptions,
  *               subscription-plans, deferred-revenue-schedules, deferred-revenue-lines,
@@ -46,6 +49,8 @@ import {
   serverQueryAccountMoves,
   serverQueryAccountTaxes,
   serverQueryAccountPayments,
+  serverQueryAccountPaymentTerms,
+  serverQueryAccountPaymentTermLines,
   serverQueryBudgets,
   serverQueryBudgetLines,
   serverQueryBudgetPosts,
@@ -57,6 +62,13 @@ import {
   serverQueryPricelists,
   serverQueryPricelistItems,
   serverQueryPickingBatches,
+  serverQueryDeliveryCarriers,
+  serverQueryDeliveryPriceRules,
+  serverQueryShippingMethods,
+  serverQueryPosPaymentMethods,
+  serverQueryPosLoyaltyPrograms,
+  serverQueryPosLoyaltyCards,
+  serverQueryPartnerBanks,
   serverQueryLeads,
   serverQueryOpportunities,
   serverQueryOpportunityStages,
@@ -72,6 +84,7 @@ import {
   serverQueryStockPickings,
   serverQueryWarehouses,
   serverQueryInventoryAdjustments,
+  serverQueryAdjustmentReasons,
   serverQueryStockLocations,
   serverQueryStockProductionLots,
   serverQueryStockProductionSerials,
@@ -86,6 +99,9 @@ import {
   serverQueryWarehouseTasks,
   serverQueryReplenishmentRules,
   serverQueryBarcodeRules,
+  serverQueryBarcodeNomenclatures,
+  serverQuerySerialLotTraceability,
+  serverQueryStockTraceabilityReports,
   serverQueryInventoryValuations,
   serverQueryPurchaseOrders,
   serverQueryPurchaseOrderLines,
@@ -97,6 +113,7 @@ import {
   serverQueryMrpBomLines,
   serverQueryMrpWorkorders,
   serverQueryMrpWorkcenters,
+  serverQueryMrpRoutingWorkcenters,
   serverQueryEmployees,
   serverQueryDepartments,
   serverQueryJobPositions,
@@ -149,9 +166,11 @@ import {
   serverQueryIotActions,
   serverQueryIotTelemetry,
   serverQueryIotThresholds,
+  serverQueryIotPairingTokens,
   serverQueryAiAgents,
   serverQueryAiTeamMembers,
   serverQueryAiInsights,
+  serverQueryAiDocumentProcessingJobs,
   serverQueryBankStatements,
   serverQueryBankStatementLines,
   serverQueryBankMatchCandidates,
@@ -180,6 +199,8 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'account-moves': (orgId, opts) => serverQueryAccountMoves(orgId, String(opts)),
   'account-taxes': (orgId, opts) => serverQueryAccountTaxes(orgId, opts),
   'account-payments': (orgId, opts) => serverQueryAccountPayments(orgId, opts),
+  'account-payment-terms': (orgId, opts) => serverQueryAccountPaymentTerms(orgId, opts),
+  'account-payment-term-lines': (orgId, opts) => serverQueryAccountPaymentTermLines(orgId, opts),
   'budgets': (orgId, opts) => serverQueryBudgets(orgId, opts),
   'budget-lines': (orgId, opts) => serverQueryBudgetLines(orgId, opts),
   'budget-posts': (orgId, opts) => serverQueryBudgetPosts(orgId, opts),
@@ -205,6 +226,13 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'pricelists': (orgId, opts) => serverQueryPricelists(orgId, opts),
   'pricelist-items': (orgId, opts) => serverQueryPricelistItems(orgId, opts),
   'picking-batches': (orgId, opts) => serverQueryPickingBatches(orgId, opts),
+  'delivery-carriers': (orgId, opts) => serverQueryDeliveryCarriers(orgId, opts),
+  'delivery-price-rules': (orgId, opts) => serverQueryDeliveryPriceRules(orgId, opts),
+  'shipping-methods': (orgId, opts) => serverQueryShippingMethods(orgId, opts),
+  'pos-payment-methods': (orgId, opts) => serverQueryPosPaymentMethods(orgId, opts),
+  'pos-loyalty-programs': (orgId, opts) => serverQueryPosLoyaltyPrograms(orgId, opts),
+  'pos-loyalty-cards': (orgId, opts) => serverQueryPosLoyaltyCards(orgId, opts),
+  'partner-banks': (orgId, opts) => serverQueryPartnerBanks(orgId, opts),
   // CRM
   'leads': (orgId, opts) => serverQueryLeads(orgId, opts),
   'opportunities': (orgId, opts) => serverQueryOpportunities(orgId, opts),
@@ -223,6 +251,7 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'stock-pickings': (orgId, opts) => serverQueryStockPickings(orgId, opts),
   'warehouses': (orgId, opts) => serverQueryWarehouses(orgId, opts),
   'inventory-adjustments': (orgId, opts) => serverQueryInventoryAdjustments(orgId, opts),
+  'adjustment-reasons': (orgId, opts) => serverQueryAdjustmentReasons(orgId, opts),
   'stock-locations': (orgId, opts) => serverQueryStockLocations(orgId, opts),
   'stock-production-lots': (orgId, opts) => serverQueryStockProductionLots(orgId, opts),
   'stock-production-serials': (orgId, opts) => serverQueryStockProductionSerials(orgId, opts),
@@ -237,6 +266,9 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'warehouse-tasks': (orgId, opts) => serverQueryWarehouseTasks(orgId, opts),
   'replenishment-rules': (orgId, opts) => serverQueryReplenishmentRules(orgId, opts),
   'barcode-rules': (orgId, opts) => serverQueryBarcodeRules(orgId, opts),
+  'barcode-nomenclatures': (orgId, opts) => serverQueryBarcodeNomenclatures(orgId, opts),
+  'serial-lot-traceability': (orgId, opts) => serverQuerySerialLotTraceability(orgId, opts),
+  'stock-traceability-reports': (orgId, opts) => serverQueryStockTraceabilityReports(orgId, opts),
   'inventory-valuations': (orgId, opts) => serverQueryInventoryValuations(orgId, opts),
   // Purchasing
   'purchase-orders': (orgId, opts) => serverQueryPurchaseOrders(orgId, opts),
@@ -250,6 +282,7 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'mrp-bom-lines': (orgId, opts) => serverQueryMrpBomLines(orgId, opts),
   'mrp-workorders': (orgId, opts) => serverQueryMrpWorkorders(orgId, opts),
   'mrp-workcenters': (orgId, opts) => serverQueryMrpWorkcenters(orgId, opts),
+  'mrp-routing-workcenters': (orgId, opts) => serverQueryMrpRoutingWorkcenters(orgId, opts),
   // HR
   'employees': (orgId, opts) => serverQueryEmployees(orgId, opts),
   'departments': (orgId, opts) => serverQueryDepartments(orgId, opts),
@@ -302,9 +335,12 @@ const QUERY_MAP: Record<string, QueryFn> = {
   'iot-actions': (orgId, opts) => serverQueryIotActions(orgId, opts),
   'iot-telemetry': (orgId, opts) => serverQueryIotTelemetry(orgId, opts),
   'iot-thresholds': (orgId, opts) => serverQueryIotThresholds(orgId, opts),
+  'iot-pairing-tokens': (orgId, opts) => serverQueryIotPairingTokens(orgId, opts),
   'ai-agents': (orgId, opts) => serverQueryAiAgents(orgId, opts),
   'ai-team-members': (orgId, opts) => serverQueryAiTeamMembers(orgId, opts),
   'ai-insights': (orgId, opts) => serverQueryAiInsights(orgId, opts),
+  'ai-document-processing-jobs': (orgId, opts) =>
+    serverQueryAiDocumentProcessingJobs(orgId, opts),
   'calendar-events': (orgId, opts) => serverQueryCalendarEvents(orgId, opts),
   'mail-messages': (orgId, opts) => serverQueryMailMessages(orgId, opts),
   'expenses': (orgId, opts) => serverQueryExpenses(orgId, opts),

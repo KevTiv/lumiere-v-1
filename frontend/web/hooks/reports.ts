@@ -411,6 +411,215 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
   })
 }
 
+// ── Mutations — dashboard & widgets (6 missing reducers) ────────────────────
+
+export function useUpdateFinancialReport(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { reportId: string | number | bigint; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ reportId, params }) => {
+      const r = await fetch('/api/call/update_financial_report?withCompany=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([String(reportId), stdbParamsToJson(params)]),
+      })
+      if (!r.ok) throw new Error('Failed to update financial report')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useCreateDashboard(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        name: String(formData.name ?? ''),
+        description: formData.description ? String(formData.description) : null,
+        isActive: Boolean(formData.isActive ?? true),
+      }
+      const companyId = formData.companyId != null ? String(formData.companyId) : null
+      const r = await fetch('/api/call/create_dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId, stdbParamsToJson(params)]),
+      })
+      if (!r.ok) throw new Error('Failed to create dashboard')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useCreateDashboardWidget(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        name: String(formData.name ?? ''),
+        widgetType: String(formData.widgetType ?? 'kpi'),
+        dataSource: String(formData.dataSource ?? ''),
+        config: formData.config ? JSON.stringify(formData.config) : null,
+      }
+      const companyId = formData.companyId != null ? String(formData.companyId) : null
+      const r = await fetch('/api/call/create_dashboard_widget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), companyId, stdbParamsToJson(params)]),
+      })
+      if (!r.ok) throw new Error('Failed to create dashboard widget')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useAddWidgetToDashboard(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
+  >({
+    mutationFn: async ({ dashboardId, widgetId, layout }) => {
+      const r = await fetch('/api/call/add_widget_to_dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          String(dashboardId),
+          String(widgetId),
+          layout ? stdbParamsToJson(layout) : null,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to add widget to dashboard')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useUpdateWidgetLayout(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      dashboardId: string | number | bigint
+      widgetId: string | number | bigint
+      layout: Record<string, unknown>
+    }
+  >({
+    mutationFn: async ({ dashboardId, widgetId, layout }) => {
+      const r = await fetch('/api/call/update_widget_layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          String(dashboardId),
+          String(widgetId),
+          stdbParamsToJson(layout),
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to update widget layout')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useShareDashboard(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      dashboardId: string | number | bigint
+      userId?: string | number | bigint
+      teamId?: string | number | bigint
+      permissions?: string
+    }
+  >({
+    mutationFn: async ({ dashboardId, userId, teamId, permissions = 'read' }) => {
+      const r = await fetch('/api/call/share_dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          organizationId.toString(),
+          String(dashboardId),
+          userId ? String(userId) : null,
+          teamId ? String(teamId) : null,
+          permissions,
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to share dashboard')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+async function parseCallErrorReports(r: Response): Promise<string> {
+  try {
+    const body = (await r.json()) as { error?: string; message?: string }
+    return body.error ?? body.message ?? r.statusText
+  } catch {
+    return r.statusText
+  }
+}
+
+function useImportReportTemplateCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_report_template_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorReports(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['report-templates', organizationId.toString()] }),
+  })
+}
+
+function useImportAnalyticsMetricCsv(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await fetch('/api/call/import_analytics_metric_csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([organizationId.toString(), csvData]),
+      })
+      if (!res.ok) throw new Error(await parseCallErrorReports(res))
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['analytics-metrics', organizationId.toString()] }),
+  })
+}
+
+/** Report templates / analytics metrics CSV import (same org id as module query hooks). */
+export function useReportsCsvImportMutations(organizationId: bigint) {
+  return {
+    importReportTemplate: useImportReportTemplateCsv(organizationId),
+    importAnalyticsMetric: useImportAnalyticsMetricCsv(organizationId),
+  }
+}
+
+export type ReportsCsvImportMutations = ReturnType<typeof useReportsCsvImportMutations>
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   CreateReportTemplateParams,

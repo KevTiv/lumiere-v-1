@@ -10,11 +10,11 @@ import {
 import { HrClient } from "./hr-client"
 
 export default async function HrPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <HrClient />
   }
+  const { organizationId, opts } = session
 
   const [employees, departments, leaves, contracts, payslips, pricelists] = await Promise.all([
     serverQueryEmployees(organizationId, opts),

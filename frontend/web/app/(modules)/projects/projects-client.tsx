@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -12,8 +12,9 @@ import {
   logTimesheetForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  projectsCsvImportForm,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -42,6 +43,7 @@ import {
   useValidateTimesheets,
   useBillTimesheets,
   useEmployees,
+  useProjectsCsvImportMutations,
 } from "@/hooks/projects"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@/hooks/sales"
@@ -92,6 +94,8 @@ function ProjectsClientLoaded({
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const [modal, setModal] = useState<ModalState>({ type: null })
+  const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
 
   const { data: projects = [] } = useProjects(companyId, initialProjects)
   const { data: tasks = [] } = useTasks(companyId, initialTasks)
@@ -115,8 +119,28 @@ function ProjectsClientLoaded({
   const assignTaskUsers = useAssignTaskUsers(orgId)
   const validateTimesheets = useValidateTimesheets(orgId)
   const billTimesheets = useBillTimesheets(orgId)
+  const csvImports = useProjectsCsvImportMutations(orgId, companyId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const addCsvToolbar = (
+    ec: EntityViewConfig,
+    actions: Array<{ id: string; label: string; onClick: () => void }>,
+  ): EntityViewConfig => {
+    if (ec.view.mode !== "table") return ec
+    return {
+      ...ec,
+      view: {
+        ...ec.view,
+        rowSelectionToggleOnClick: false,
+        actions,
+      },
+    }
+  }
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -337,19 +361,60 @@ function ProjectsClientLoaded({
     }))
   }, [projects, tasks, timesheets, t, moduleConfig, projectFormConfig, taskFormConfig, timesheetFormConfig])
 
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    return projectsCsvImportForm(t, csvKind)
+  }, [csvKind, t])
+
   const config = useMemo(
     () =>
       ({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "projects") return { ...tab, createForm: projectFormConfig }
-          if (tab.id === "tasks") return { ...tab, createForm: taskFormConfig }
-          if (tab.id === "timesheets") return { ...tab, createForm: timesheetFormConfig }
+          if (tab.id === "projects" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: projectFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-project",
+                  label: t("projects.toolbar.importProjectCsv"),
+                  onClick: () => setCsvKind("project"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "tasks" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: taskFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-task",
+                  label: t("projects.toolbar.importTaskCsv"),
+                  onClick: () => setCsvKind("task"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "timesheets" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: timesheetFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-timesheet",
+                  label: t("projects.toolbar.importTimesheetCsv"),
+                  onClick: () => setCsvKind("timesheet"),
+                },
+              ]),
+            }
+          }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, projectFormConfig, taskFormConfig, timesheetFormConfig],
+    [moduleConfig, liveSections, projectFormConfig, taskFormConfig, timesheetFormConfig, t],
   )
 
   const data = useMemo(
@@ -410,6 +475,34 @@ function ProjectsClientLoaded({
         config={modal.type ? modal.form : projectFormConfig}
         onSubmit={handleModalSubmit}
       />
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
+              else if (csvKind === "task") await csvImports.importTask.mutateAsync(text)
+              else await csvImports.importTimesheet.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

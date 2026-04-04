@@ -22,6 +22,7 @@ import {
   useMrpBomLines,
   useMrpWorkorders,
   useMrpWorkcenters,
+  useMrpRoutingWorkcenters,
   useQualityChecks,
   useManufacturingMutations,
 } from "@/hooks/manufacturing"
@@ -48,6 +49,7 @@ interface ManufacturingClientProps {
   initialBomLines?: Record<string, unknown>[]
   initialWorkorders?: Record<string, unknown>[]
   initialWorkcenters?: Record<string, unknown>[]
+  initialRoutingOperations?: Record<string, unknown>[]
   initialIotDevices?: Record<string, unknown>[]
   initialProducts?: Record<string, unknown>[]
   initialWarehouses?: Record<string, unknown>[]
@@ -73,6 +75,7 @@ function ManufacturingClientLoaded({
   initialBomLines,
   initialWorkorders,
   initialWorkcenters,
+  initialRoutingOperations,
   initialIotDevices,
   initialProducts,
   initialWarehouses,
@@ -93,6 +96,7 @@ function ManufacturingClientLoaded({
   const { data: bomLines = [] } = useMrpBomLines(companyId, initialBomLines)
   const { data: workorders = [] } = useMrpWorkorders(companyId, initialWorkorders)
   const { data: workcenters = [] } = useMrpWorkcenters(companyId, initialWorkcenters)
+  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(companyId, initialRoutingOperations)
   const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices)
   const { data: qualityChecks = [] } = useQualityChecks(companyId)
   const { data: products = [] } = useProducts(orgId, initialProducts)
@@ -355,9 +359,10 @@ function ManufacturingClientLoaded({
       "bom-lines": bomLines as unknown as Record<string, unknown>[],
       workorders: workorders as unknown as Record<string, unknown>[],
       workcenters: workcenters as unknown as Record<string, unknown>[],
+      "routing-operations": routingOperations as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
     }),
-    [productions, boms, bomLines, workorders, workcenters, qualityChecks]
+    [productions, boms, bomLines, workorders, workcenters, routingOperations, qualityChecks]
   )
 
   const handleFormSubmit = (

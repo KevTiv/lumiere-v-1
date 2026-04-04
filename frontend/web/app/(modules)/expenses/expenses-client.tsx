@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -21,8 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  csvImportForm,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useExpenses,
@@ -35,6 +36,7 @@ import {
   useApproveExpenseSheet,
   useRefuseExpenseSheet,
   usePostExpenseSheet,
+  useExpensesCsvImportMutations,
 } from "@/hooks/expenses"
 import type { CreateExpenseParams, CreateExpenseSheetParams } from "@/hooks/expenses"
 import { hasValidOrganizationId, orgBigInts, withCompanyScope } from "@/lib/org-scoped"
@@ -68,6 +70,8 @@ type WorkflowForm =
   | { kind: "addToReport"; row: Record<string, unknown> }
   | { kind: "submitReport"; row: Record<string, unknown> }
   | { kind: "postReport"; row: Record<string, unknown> }
+
+type ExpensesCsvImportKind = "expense" | "sheet"
 
 export function ExpensesClient(props: ExpensesClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -106,6 +110,8 @@ function ExpensesClientLoaded({
   const [confirmDialog, setConfirmDialog] = useState<
     { kind: "approve" | "refuse"; row: Record<string, unknown> } | null
   >(null)
+  const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
 
   const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
   const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
@@ -129,6 +135,35 @@ function ExpensesClientLoaded({
   const approveExpenseSheet = useApproveExpenseSheet(orgId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
   const postExpenseSheet = usePostExpenseSheet(orgId)
+  const csvImports = useExpensesCsvImportMutations(orgId)
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const addCsvToolbar = (
+    ec: EntityViewConfig,
+    actions: Array<{ id: string; label: string; onClick: () => void }>,
+  ): EntityViewConfig => {
+    if (ec.view.mode !== "table") return ec
+    return {
+      ...ec,
+      view: {
+        ...ec.view,
+        rowSelectionToggleOnClick: false,
+        actions,
+      },
+    }
+  }
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<ExpensesCsvImportKind, string> = {
+      expense: "expenses.csvImport.expenseTitle",
+      sheet: "expenses.csvImport.sheetTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -216,12 +251,36 @@ function ExpensesClientLoaded({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "expenses") return { ...tab, createForm: expenseFormConfig }
-          if (tab.id === "expense-sheets") return { ...tab, createForm: expenseSheetFormConfig }
+          if (tab.id === "expenses" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: expenseFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-expenses",
+                  label: t("expenses.csvImport.toolbarExpenses"),
+                  onClick: () => setCsvKind("expense"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "expense-sheets" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: expenseSheetFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-sheets",
+                  label: t("expenses.csvImport.toolbarSheets"),
+                  onClick: () => setCsvKind("sheet"),
+                },
+              ]),
+            }
+          }
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig],
+    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, t],
   )
 
   const data = useMemo(
@@ -401,6 +460,34 @@ function ExpensesClientLoaded({
           }
         }}
       />
+
+      {csvKind && csvFormConfig ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
+              else await csvImports.importExpenseSheet.mutateAsync(text)
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
 
       <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
         <DialogContent className="sm:max-w-md">

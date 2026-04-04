@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { fetchQueryList, type QueryRows } from '@/lib/query-fetch'
+import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -368,6 +369,38 @@ export function useDeleteProposalSourceDoc() {
       if (!r.ok) throw new Error('Failed to delete proposal source document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+  })
+}
+
+export function useUpdateProposalSourceDoc() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      docId: bigint | number | string
+      name?: string
+      content?: string
+      docType?: string
+      wordCount?: number
+    }) => {
+      const r = await fetch('/api/call/update_proposal_source_doc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          Number(params.docId),
+          stdbParamsToJson({
+            name: params.name ?? null,
+            content: params.content ?? null,
+            docType: params.docType ?? null,
+            wordCount: params.wordCount ?? null,
+          }),
+        ]),
+      })
+      if (!r.ok) throw new Error('Failed to update proposal source document')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-source-docs'] })
+    },
   })
 }
 

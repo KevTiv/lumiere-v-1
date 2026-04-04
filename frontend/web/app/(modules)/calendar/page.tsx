@@ -3,11 +3,11 @@ import { serverQueryCalendarEvents } from "@lumiere/stdb/server"
 import { CalendarClient } from "./calendar-client"
 
 export default async function CalendarPage() {
-  const { organizationId, opts } = await getStdbSession()
-
-  if (!organizationId) {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
     return <CalendarClient />
   }
+  const { organizationId, opts } = session
 
   const [events] = await Promise.all([
     serverQueryCalendarEvents(organizationId, opts),
