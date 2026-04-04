@@ -35,6 +35,8 @@ import type {
   CrossoveredBudget,
   CrossoveredBudgetLines,
   BudgetPost,
+  DeliveryCarrier,
+  DeliveryPriceRule,
   DeferredRevenueLine,
   DeferredRevenueSchedule,
   Document,
@@ -51,11 +53,16 @@ import type {
   HrJobPosition,
   HrExpenseSheet,
   HrLeave,
+  HrLeaveType,
+  HrPayrollStructure,
   HrPayslip,
+  HrResource,
+  HrSalaryRule,
   IoTAction,
   IoTAlert,
   IoTDevice,
   IoTHub,
+  IoTPairingToken,
   IoTTelemetry,
   IoTThreshold,
   InventoryAdjustment,
@@ -65,10 +72,14 @@ import type {
   MrpBom,
   MrpBomLine,
   MrpProduction,
+  MrpRoutingWorkcenter,
   MrpWorkcenter,
   MrpWorkorder,
   Opportunity,
   OpportunityStage,
+  PosLoyaltyCard,
+  PosLoyaltyProgram,
+  PosPaymentMethod,
   PosTerminal,
   Product,
   ProductCategory,
@@ -87,6 +98,7 @@ import type {
   PurchaseOrder,
   PurchaseOrderLine,
   PurchaseRequisition,
+  ResPartnerBank,
   RevenueRecognitionRule,
   Role,
   SaleOrder,
@@ -99,9 +111,13 @@ import type {
   TrialBalance,
   Uom,
   AccountPayment,
+  AccountPaymentTerm,
+  AccountPaymentTermLine,
   Activity,
+  AdjustmentReason,
   AnalyticsMetric,
   BankMatchCandidate,
+  BarcodeNomenclature,
   BarcodeRule,
   ReportTemplate,
   ScheduledReport,
@@ -115,9 +131,12 @@ import type {
   StockMove,
   StockProductionLot,
   StockProductionSerial,
+  SerialLotTraceability,
+  ShippingMethod,
   StockLandedCost,
   StockRoute,
   StockRule,
+  StockTraceabilityReport,
   SupplierIntakeRequest,
   UserOrganization,
   UserProfile,
@@ -136,6 +155,7 @@ import type {
   AccountFiscalYear,
   AccountPeriod,
   AiAgent,
+  AiDocumentProcessingJob,
   AiInsight,
   AiTeamMember,
 } from './generated/types'
@@ -150,6 +170,8 @@ export type QueryResourceKey =
   | 'account-moves'
   | 'account-taxes'
   | 'account-payments'
+  | 'account-payment-terms'
+  | 'account-payment-term-lines'
   | 'budgets'
   | 'budget-lines'
   | 'budget-posts'
@@ -164,11 +186,17 @@ export type QueryResourceKey =
   | 'consolidation-accounts'
   | 'consolidation-journals'
   | 'consolidation-elimination-entries'
+  | 'delivery-carriers'
+  | 'delivery-price-rules'
   | 'sale-orders'
   | 'sale-order-lines'
   | 'pricelists'
   | 'pricelist-items'
   | 'picking-batches'
+  | 'partner-banks'
+  | 'pos-loyalty-cards'
+  | 'pos-loyalty-programs'
+  | 'pos-payment-methods'
   | 'leads'
   | 'opportunities'
   | 'opportunity-stages'
@@ -184,6 +212,7 @@ export type QueryResourceKey =
   | 'stock-pickings'
   | 'warehouses'
   | 'inventory-adjustments'
+  | 'adjustment-reasons'
   | 'stock-locations'
   | 'stock-production-lots'
   | 'stock-production-serials'
@@ -198,10 +227,14 @@ export type QueryResourceKey =
   | 'warehouse-tasks'
   | 'replenishment-rules'
   | 'barcode-rules'
+  | 'barcode-nomenclatures'
+  | 'serial-lot-traceability'
+  | 'stock-traceability-reports'
   | 'inventory-valuations'
   | 'purchase-orders'
   | 'purchase-order-lines'
   | 'purchase-requisitions'
+  | 'shipping-methods'
   | 'landed-costs'
   | 'supplier-intakes'
   | 'mrp-productions'
@@ -209,12 +242,17 @@ export type QueryResourceKey =
   | 'mrp-bom-lines'
   | 'mrp-workorders'
   | 'mrp-workcenters'
+  | 'mrp-routing-workcenters'
   | 'employees'
   | 'departments'
   | 'job-positions'
   | 'leave-requests'
   | 'contracts'
   | 'payslips'
+  | 'leave-types'
+  | 'payroll-structures'
+  | 'salary-rules'
+  | 'hr-resources'
   | 'financial-reports'
   | 'trial-balances'
   | 'report-templates'
@@ -261,9 +299,11 @@ export type QueryResourceKey =
   | 'iot-actions'
   | 'iot-telemetry'
   | 'iot-thresholds'
+  | 'iot-pairing-tokens'
   | 'ai-agents'
   | 'ai-team-members'
   | 'ai-insights'
+  | 'ai-document-processing-jobs'
   | 'fiscal-years'
   | 'account-periods'
 
@@ -356,6 +396,17 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'account-payments': orgEntry<AccountPayment>('account_payment', ['account-payments', 'account_payment'], [
     'name', 'amount', 'companyId', 'state', 'ref', 'journalId', 'currencyId', 'partnerId',
   ]),
+  'account-payment-terms': orgEntry<AccountPaymentTerm>(
+    'account_payment_term',
+    ['account-payment-terms', 'account_payment_term'],
+    ['name', 'note', 'isActive'],
+  ),
+  'account-payment-term-lines': entry<AccountPaymentTermLine>(
+    'account_payment_term_line',
+    ['account-payment-term-lines', 'account_payment_term_line'],
+    ['value', 'valueAmount', 'days', 'months', 'daysAfterEndOfMonth', 'sequence'],
+    ['id', 'paymentTermId'],
+  ),
   budgets: orgEntry<CrossoveredBudget>('crossovered_budget', ['budgets', 'crossovered_budget'], [
     'name', 'companyId', 'state',
   ]),
@@ -407,9 +458,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['account-reconciliation-widgets', 'account_reconciliation_widget'],
     ['accountId', 'moveLineIds', 'toCheck', 'mode', 'partnerId', 'companyId'],
   ),
-  'account-assets': orgEntry<AccountAsset>('account_asset', ['account-assets', 'account_asset'], [
-    'name', 'code', 'assetType', 'state', 'acquisitionDate', 'purchaseValue', 'companyId',
-  ]),
+  'account-assets': entry<AccountAsset>(
+    'account_asset',
+    ['account-assets', 'account_asset'],
+    ['name', 'code', 'assetType', 'state', 'acquisitionDate', 'originalValue', 'companyId'],
+    ['id', 'companyId'] as readonly (keyof AccountAsset)[],
+  ),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
     'reference', 'state', 'partnerId', 'companyId', 'dateOrder',
   ]),
@@ -430,6 +484,47 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['name', 'state'],
     ['id', 'companyId'] as readonly (keyof StockPickingBatch)[],
   ),
+  'delivery-carriers': entry<DeliveryCarrier>(
+    'delivery_carrier',
+    ['delivery-carriers', 'delivery_carrier'],
+    ['name', 'deliveryType', 'active', 'currencyId', 'productId'],
+    ['id', 'companyId'] as readonly (keyof DeliveryCarrier)[],
+  ),
+  'delivery-price-rules': entry<DeliveryPriceRule>(
+    'delivery_price_rule',
+    ['delivery-price-rules', 'delivery_price_rule'],
+    ['variable', 'operator', 'carrierId', 'listPrice'],
+    ['id', 'companyId'] as readonly (keyof DeliveryPriceRule)[],
+  ),
+  'shipping-methods': entry<ShippingMethod>(
+    'shipping_method',
+    ['shipping-methods', 'shipping_method'],
+    ['name', 'provider', 'deliveryType', 'active', 'fixedPrice'],
+    ['id', 'companyId'] as readonly (keyof ShippingMethod)[],
+  ),
+  'pos-payment-methods': entry<PosPaymentMethod>(
+    'pos_payment_method',
+    ['pos-payment-methods', 'pos_payment_method'],
+    ['name', 'paymentMethodType', 'active', 'sequence'],
+    ['id', 'companyId'] as readonly (keyof PosPaymentMethod)[],
+  ),
+  'pos-loyalty-programs': orgEntry<PosLoyaltyProgram>(
+    'pos_loyalty_program',
+    ['pos-loyalty-programs', 'pos_loyalty_program'],
+    ['name', 'currencyId', 'programType', 'isActive'],
+  ),
+  'pos-loyalty-cards': orgEntry<PosLoyaltyCard>(
+    'pos_loyalty_card',
+    ['pos-loyalty-cards', 'pos_loyalty_card'],
+    ['code', 'points', 'currencyId', 'partnerId', 'isActive'],
+  ),
+  'partner-banks': orgEntry<ResPartnerBank>('res_partner_bank', ['partner-banks', 'res_partner_bank'], [
+    'partnerId',
+    'sanitizedAccNumber',
+    'accHolderName',
+    'active',
+    'allowOutPayment',
+  ]),
   leads: orgEntry<Lead>('lead', ['leads', 'lead'], [
     'name', 'contactName', 'email', 'phone', 'state', 'probability',
   ]),
@@ -477,6 +572,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['inventory-adjustments', 'inventory_adjustment'],
     ['name', 'state'],
   ),
+  'adjustment-reasons': orgEntry<AdjustmentReason>('adjustment_reason', ['adjustment-reasons', 'adjustment_reason'], [
+    'code',
+    'description',
+    'isActive',
+    'isSystem',
+  ]),
   'stock-locations': orgEntry<StockLocation>('stock_location', ['stock-locations', 'stock_location'], [
     'name', 'usage', 'completeName', 'companyId', 'locationId',
   ]),
@@ -537,6 +638,21 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['barcode-rules', 'barcode_rule'],
     ['name', 'pattern', 'encoding', 'isActive'],
   ),
+  'barcode-nomenclatures': orgEntry<BarcodeNomenclature>(
+    'barcode_nomenclature',
+    ['barcode-nomenclatures', 'barcode_nomenclature'],
+    ['name', 'description', 'isDefault', 'ruleIds', 'isActive', 'upcEanConv'],
+  ),
+  'serial-lot-traceability': orgEntry<SerialLotTraceability>(
+    'serial_lot_traceability',
+    ['serial-lot-traceability', 'serial_lot_traceability'],
+    ['productId', 'documentType', 'documentId', 'quantity', 'uomId', 'date', 'serialId', 'lotId', 'moveId'],
+  ),
+  'stock-traceability-reports': orgEntry<StockTraceabilityReport>(
+    'stock_traceability_report',
+    ['stock-traceability-reports', 'stock_traceability_report'],
+    ['name', 'state', 'dateFrom', 'dateTo', 'productIds', 'lotIds', 'serialIds'],
+  ),
   'inventory-valuations': orgEntry<InventoryValuation>(
     'inventory_valuation',
     ['inventory-valuations', 'inventory_valuation'],
@@ -578,6 +694,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'mrp-workcenters': orgEntry<MrpWorkcenter>('mrp_workcenter', ['mrp-workcenters', 'mrp_workcenter'], [
     'name', 'companyId',
   ]),
+  'mrp-routing-workcenters': orgEntry<MrpRoutingWorkcenter>(
+    'mrp_routing_workcenter',
+    ['mrp-routing-workcenters', 'mrp_routing_workcenter'],
+    ['workcenterId', 'companyId', 'name', 'sequence'],
+  ),
   employees: orgEntry<HrEmployee>('hr_employee', ['employees', 'hr_employee'], [
     'name', 'workEmail', 'departmentId', 'companyId',
   ]),
@@ -593,6 +714,20 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   ]),
   payslips: orgEntry<HrPayslip>('hr_payslip', ['payslips', 'hr_payslip'], [
     'name', 'employeeId', 'state', 'companyId',
+  ]),
+  'leave-types': orgEntry<HrLeaveType>('hr_leave_type', ['leave-types', 'hr_leave_type'], [
+    'name', 'code', 'allocationType', 'companyId',
+  ]),
+  'payroll-structures': orgEntry<HrPayrollStructure>(
+    'hr_payroll_structure',
+    ['payroll-structures', 'hr_payroll_structure'],
+    ['name', 'type'],
+  ),
+  'salary-rules': orgEntry<HrSalaryRule>('hr_salary_rule', ['salary-rules', 'hr_salary_rule'], [
+    'name', 'code', 'structureId', 'category',
+  ]),
+  'hr-resources': orgEntry<HrResource>('hr_resource', ['hr-resources', 'hr_resource'], [
+    'name', 'resourceType',
   ]),
   'financial-reports': entry<FinancialReport>(
     'financial_report',
@@ -769,6 +904,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'iot-thresholds': orgEntry<IoTThreshold>('iot_threshold', ['iot-thresholds', 'iot_threshold'], [
     'deviceId', 'sensorType', 'minValue', 'maxValue', 'severity', 'active',
   ]),
+  'iot-pairing-tokens': entry<IoTPairingToken>(
+    'iot_pairing_token',
+    ['iot-pairing-tokens', 'iot_pairing_token'],
+    ['companyId', 'expiresAt', 'used', 'createdAt'],
+    ['organizationId', 'token'],
+  ),
   'ai-agents': orgEntry<AiAgent>('ai_agent', ['ai-agents', 'ai_agent'], [
     'name',
     'model',
@@ -803,6 +944,23 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
       'tags',
     ],
     ['id', 'companyId'] as readonly (keyof AiInsight)[],
+  ),
+  'ai-document-processing-jobs': entry<AiDocumentProcessingJob>(
+    'ai_document_processing_job',
+    ['ai-document-processing-jobs', 'ai_document_processing_job'],
+    [
+      'documentType',
+      'jobType',
+      'status',
+      'isApproved',
+      'confidenceScore',
+      'modelUsed',
+      'errorMessage',
+      'processingCompletedAt',
+      'tokensUsed',
+      'cost',
+    ],
+    ['id', 'companyId'] as readonly (keyof AiDocumentProcessingJob)[],
   ),
   'consolidation-accounts': entry<ConsolidationAccount>(
     'consolidation_account',

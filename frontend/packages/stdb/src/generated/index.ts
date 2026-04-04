@@ -639,6 +639,7 @@ import UpdateProjectReducer from "./update_project_reducer";
 import UpdateProposalReducer from "./update_proposal_reducer";
 import UpdateProposalLineItemReducer from "./update_proposal_line_item_reducer";
 import UpdateProposalPresenceReducer from "./update_proposal_presence_reducer";
+import UpdateProposalSourceDocReducer from "./update_proposal_source_doc_reducer";
 import UpdateProposalStatusReducer from "./update_proposal_status_reducer";
 import UpdatePurchaseOrderReducer from "./update_purchase_order_reducer";
 import UpdatePurchaseOrderLineReducer from "./update_purchase_order_line_reducer";
@@ -3226,11 +3227,12 @@ const tablesSchema = __schema({
   pos_loyalty_card: __table({
     name: 'pos_loyalty_card',
     indexes: [
-      { name: 'loyalty_card_by_code', algorithm: 'btree', columns: [
-        'code',
-      ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'loyalty_card_by_org_code', algorithm: 'btree', columns: [
+        'organizationId',
+        'code',
       ] },
     ],
     constraints: [
@@ -3240,11 +3242,11 @@ const tablesSchema = __schema({
   pos_loyalty_program: __table({
     name: 'pos_loyalty_program',
     indexes: [
-      { name: 'loyalty_program_by_currency', algorithm: 'btree', columns: [
-        'currencyId',
-      ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'loyalty_program_by_organization_id', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -5625,6 +5627,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_proposal", UpdateProposalReducer),
   __reducerSchema("update_proposal_line_item", UpdateProposalLineItemReducer),
   __reducerSchema("update_proposal_presence", UpdateProposalPresenceReducer),
+  __reducerSchema("update_proposal_source_doc", UpdateProposalSourceDocReducer),
   __reducerSchema("update_proposal_status", UpdateProposalStatusReducer),
   __reducerSchema("update_purchase_order", UpdatePurchaseOrderReducer),
   __reducerSchema("update_purchase_order_line", UpdatePurchaseOrderLineReducer),

@@ -70,7 +70,7 @@ export function queryInventoryAdjustments(): InventoryAdjustment[] {
   const conn = getStdbConnection();
   if (!conn) return [];
   return [...conn.db.inventory_adjustment.iter()].sort(
-    (a, b) => Number(b.date ?? 0) - Number(a.date ?? 0),
+    (a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0),
   );
 }
 

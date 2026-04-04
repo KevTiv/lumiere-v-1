@@ -55,7 +55,7 @@ export function queryMrpWorkorders(): MrpWorkorder[] {
   const conn = getStdbConnection();
   if (!conn) return [];
   return [...conn.db.mrp_workorder.iter()].sort(
-    (a, b) => Number(a.sequence ?? 0) - Number(b.sequence ?? 0),
+    (a, b) => Number(a.id) - Number(b.id),
   );
 }
 

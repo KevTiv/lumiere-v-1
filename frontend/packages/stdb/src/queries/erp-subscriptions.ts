@@ -40,6 +40,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "analytic-accounts",
   "sale-orders",
   "sale-order-lines",
+  "pos-loyalty-programs",
+  "pos-loyalty-cards",
   "pricelists",
   "picking-batches",
   "leads",
@@ -58,11 +60,13 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "inventory-adjustments",
   "purchase-orders",
   "purchase-order-lines",
+  "partner-banks",
   "purchase-requisitions",
   "mrp-productions",
   "mrp-boms",
   "mrp-workorders",
   "mrp-workcenters",
+  "mrp-routing-workcenters",
   "employees",
   "departments",
   "leave-requests",
@@ -94,6 +98,13 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "mail-messages",
   "expenses",
   "expense-sheets",
+  "iot-devices",
+  "iot-hubs",
+  "iot-alerts",
+  "iot-actions",
+  "iot-telemetry",
+  "iot-thresholds",
+  "iot-pairing-tokens",
   "roles",
   "user-roles",
 ] as const;
@@ -156,6 +167,24 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
+  "pos-loyalty-programs": (id, fa) =>
+    selectOrgScopedSql(
+      "pos-loyalty-programs",
+      "pos_loyalty_program",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "pos-loyalty-cards": (id, fa) =>
+    selectOrgScopedSql(
+      "pos-loyalty-cards",
+      "pos_loyalty_card",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
   pricelists: (id, fa) =>
     selectOrgScopedSql("pricelists", "product_pricelist", id, fa, ""),
   "pricelist-items": (id, fa) =>
@@ -221,6 +250,8 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "partner-banks": (id, fa) =>
+    selectOrgScopedSql("partner-banks", "res_partner_bank", id, fa, ""),
   "purchase-requisitions": (id, fa) =>
     selectOrgScopedSql(
       "purchase-requisitions",
@@ -236,6 +267,15 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("mrp-workorders", "mrp_workorder", id, fa, ""),
   "mrp-workcenters": (id, fa) =>
     selectOrgScopedSql("mrp-workcenters", "mrp_workcenter", id, fa, ""),
+  "mrp-routing-workcenters": (id, fa) =>
+    selectOrgScopedSql(
+      "mrp-routing-workcenters",
+      "mrp_routing_workcenter",
+      id,
+      fa,
+      "",
+      " ORDER BY workcenter_id ASC, sequence ASC",
+    ),
   employees: (id, fa) =>
     selectOrgScopedSql("employees", "hr_employee", id, fa, ""),
   departments: (id, fa) =>
@@ -361,6 +401,24 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   expenses: (id, fa) => selectOrgScopedSql("expenses", "hr_expense", id, fa, ""),
   "expense-sheets": (id, fa) =>
     selectOrgScopedSql("expense-sheets", "expense_sheet", id, fa, ""),
+  "iot-devices": (id, fa) =>
+    selectOrgScopedSql("iot-devices", "iot_device", id, fa, ""),
+  "iot-hubs": (id, fa) => selectOrgScopedSql("iot-hubs", "iot_hub", id, fa, ""),
+  "iot-alerts": (id, fa) => selectOrgScopedSql("iot-alerts", "iot_alert", id, fa, ""),
+  "iot-actions": (id, fa) => selectOrgScopedSql("iot-actions", "iot_action", id, fa, ""),
+  "iot-telemetry": (id, fa) =>
+    selectOrgScopedSql("iot-telemetry", "iot_telemetry", id, fa, "", " ORDER BY recorded_at DESC"),
+  "iot-thresholds": (id, fa) =>
+    selectOrgScopedSql("iot-thresholds", "iot_threshold", id, fa, ""),
+  "iot-pairing-tokens": (id, fa) =>
+    selectOrgScopedSql(
+      "iot-pairing-tokens",
+      "iot_pairing_token",
+      id,
+      fa,
+      "",
+      " ORDER BY created_at DESC",
+    ),
 };
 
 /**

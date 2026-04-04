@@ -31,7 +31,7 @@ export function queryLeads(): Lead[] {
   const conn = getStdbConnection();
   if (!conn) return [];
   return [...conn.db.lead.iter()].sort(
-    (a, b) => Number(b.createDate ?? 0) - Number(a.createDate ?? 0),
+    (a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0),
   );
 }
 

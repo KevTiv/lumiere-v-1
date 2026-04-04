@@ -6866,6 +6866,7 @@ export type PosConfig = __Infer<typeof PosConfig>;
 
 export const PosLoyaltyCard = __t.object("PosLoyaltyCard", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   partnerId: __t.option(__t.u64()),
   code: __t.string(),
   points: __t.f64(),
@@ -6888,6 +6889,7 @@ export type PosLoyaltyCard = __Infer<typeof PosLoyaltyCard>;
 
 export const PosLoyaltyProgram = __t.object("PosLoyaltyProgram", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   name: __t.string(),
   currencyId: __t.u64(),
   programType: __t.string(),
@@ -10540,6 +10542,14 @@ export const UpdateProjectParams = __t.object("UpdateProjectParams", {
   metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateProjectParams = __Infer<typeof UpdateProjectParams>;
+
+export const UpdateProposalSourceDocParams = __t.object("UpdateProposalSourceDocParams", {
+  name: __t.option(__t.string()),
+  content: __t.option(__t.string()),
+  docType: __t.option(__t.string()),
+  wordCount: __t.option(__t.u32()),
+});
+export type UpdateProposalSourceDocParams = __Infer<typeof UpdateProposalSourceDocParams>;
 
 export const UpdatePurchaseOrderLineParams = __t.object("UpdatePurchaseOrderLineParams", {
   productId: __t.option(__t.u64()),

@@ -418,6 +418,40 @@ export function serverQueryAccountPayments(
   )
 }
 
+export function serverQueryAccountPaymentTerms(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'account-payment-terms',
+      'account_payment_term',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY name ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+/** Payment term lines for terms belonging to the organization (join on parent term). */
+export function serverQueryAccountPaymentTermLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const org = typeof organizationId === 'bigint' ? organizationId : BigInt(organizationId)
+  const sql = selectRawSql(
+    'account-payment-term-lines',
+    `FROM account_payment_term_line l
+     INNER JOIN account_payment_term t ON l.payment_term_id = t.id
+     WHERE t.organization_id = ${org}
+     ORDER BY l.payment_term_id ASC, l.sequence ASC`,
+    fq(opts),
+  )
+  return stdbSql(sql, httpOpts(opts))
+}
+
 export function serverQueryBudgets(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
@@ -672,6 +706,91 @@ export function serverQueryPickingBatches(
 ) {
   return stdbSql(
     selectOrgScopedSql('picking-batches', 'stock_picking_batch', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+/** `company_id` scoped (pass the same numeric scope as sale pickings / `orgBigInts().companyId`). */
+export function serverQueryDeliveryCarriers(
+  companyId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectCompanyScopedSql('delivery-carriers', 'delivery_carrier', companyId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDeliveryPriceRules(
+  companyId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectCompanyScopedSql('delivery-price-rules', 'delivery_price_rule', companyId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryShippingMethods(
+  companyId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectCompanyScopedSql('shipping-methods', 'shipping_method', companyId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPosPaymentMethods(
+  companyId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectCompanyScopedSql('pos-payment-methods', 'pos_payment_method', companyId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPosLoyaltyPrograms(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'pos-loyalty-programs',
+      'pos_loyalty_program',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPosLoyaltyCards(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'pos-loyalty-cards',
+      'pos_loyalty_card',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryPartnerBanks(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('partner-banks', 'res_partner_bank', organizationId, fq(opts), ''),
     httpOpts(opts),
   )
 }
@@ -1042,6 +1161,74 @@ export function serverQueryBarcodeRules(
   )
 }
 
+export function serverQueryAdjustmentReasons(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'adjustment-reasons',
+      'adjustment_reason',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY code ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryBarcodeNomenclatures(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'barcode-nomenclatures',
+      'barcode_nomenclature',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY name ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQuerySerialLotTraceability(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'serial-lot-traceability',
+      'serial_lot_traceability',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryStockTraceabilityReports(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'stock-traceability-reports',
+      'stock_traceability_report',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
 export function serverQueryInventoryValuations(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
@@ -1184,6 +1371,23 @@ export function serverQueryMrpWorkcenters(
 ) {
   return stdbSql(
     selectOrgScopedSql('mrp-workcenters', 'mrp_workcenter', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryMrpRoutingWorkcenters(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'mrp-routing-workcenters',
+      'mrp_routing_workcenter',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY workcenter_id ASC, sequence ASC',
+    ),
     httpOpts(opts),
   )
 }
@@ -1797,6 +2001,23 @@ export function serverQueryIotThresholds(
   )
 }
 
+export function serverQueryIotPairingTokens(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'iot-pairing-tokens',
+      'iot_pairing_token',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY created_at DESC',
+    ),
+    httpOpts(opts),
+  )
+}
+
 /** AI agent configurations (org-scoped). */
 export function serverQueryAiAgents(
   organizationId: bigint | number,
@@ -1829,6 +2050,22 @@ export function serverQueryAiInsights(
   const sql = selectRawSql(
     'ai-insights',
     `FROM ai_insight WHERE (
+      company_id IN (SELECT id FROM company WHERE organization_id = ${organizationId})
+      OR company_id IS NULL
+    )`,
+    fq(opts),
+  )
+  return stdbSql(sql, httpOpts(opts))
+}
+
+/** Document AI processing jobs (org companies + tenant-wide null company). */
+export function serverQueryAiDocumentProcessingJobs(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const sql = selectRawSql(
+    'ai-document-processing-jobs',
+    `FROM ai_document_processing_job WHERE (
       company_id IN (SELECT id FROM company WHERE organization_id = ${organizationId})
       OR company_id IS NULL
     )`,

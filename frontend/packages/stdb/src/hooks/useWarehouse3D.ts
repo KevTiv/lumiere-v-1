@@ -27,7 +27,7 @@ import type {
   StockItem,
   ZoneType,
   StockCategory,
-} from "@lumiere/ui";
+} from "../warehouse-3d-types";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -303,11 +303,14 @@ export function useMoveStockItem3D(organizationId: bigint) {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return conn.reducers.moveStockItem3d({
+      return conn.reducers.moveStockQuant({
         organizationId,
         quantId,
-        targetLocationId,
-        quantity,
+        params: {
+          companyId: undefined,
+          destLocationId: targetLocationId,
+          quantity,
+        },
       });
     },
     onSuccess: () => {
@@ -317,13 +320,15 @@ export function useMoveStockItem3D(organizationId: bigint) {
   });
 }
 
-export function useCreateWarehouse3DZone(organizationId: bigint, warehouseId: bigint) {
+export function useCreateWarehouse3DZone(organizationId: bigint) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
+      warehouseId,
       locationId,
       params,
     }: {
+      warehouseId: bigint;
       locationId: bigint;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       params: any; // CreateWarehouse3DZoneParams — available after bindings regeneration
@@ -331,7 +336,7 @@ export function useCreateWarehouse3DZone(organizationId: bigint, warehouseId: bi
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return conn.reducers.createWarehouse3dZone({
+      return conn.reducers.createWarehouse3DZone({
         organizationId,
         warehouseId,
         locationId,

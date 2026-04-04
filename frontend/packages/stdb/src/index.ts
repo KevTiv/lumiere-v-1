@@ -43,6 +43,7 @@ export * from './hooks/useInventoryAdjustments';
 export * from './hooks/useStockLocations';
 export * from './hooks/useProductionLots';
 export * from './hooks/useQualityChecks';
+export * from './warehouse-3d-types';
 export * from './hooks/useWarehouse3D';
 export * from './mutations/inventory';
 export * from './queries/purchasing';
@@ -112,6 +113,9 @@ export * from './hooks/usePosTerminals';
 export * from './hooks/useWarehouseGeo';
 export * from './mutations/form-config';
 
+/** Form config enums / structs live in `generated/types.ts`, not the SpacetimeDB `generated/index` barrel. */
+export { FieldType, FieldWidth, FieldOption, FieldValidation } from './generated/types';
+
 export type {
   CreateActivityParams,
   CreateJobPositionParams,
@@ -128,4 +132,19 @@ export type {
   CreateAccountBankStatementParams,
   CreateAccountTaxParams,
   CreateAccountJournalParams,
+  CreateAnalyticAccountParams,
+  CreateAnalyticLineParams,
+  CreateAnalyticDistributionModelParams,
+  UpdateAnalyticAccountParams,
+  UpdateAnalyticLineParams,
+  UpdateAnalyticDistributionModelParams,
+  ConvertLeadParams,
+  ConvertOpportunityParams,
+  CreatePartnerBankParams,
+  UpdatePartnerBankParams,
+  CreateDeliveryCarrierParams,
+  CreateDeliveryPriceRuleParams,
+  CreateLoyaltyProgramParams,
+  CreatePaymentMethodParams,
+  CreateShippingMethodParams,
 } from './generated/types';

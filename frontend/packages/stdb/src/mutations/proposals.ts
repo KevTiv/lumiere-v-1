@@ -45,6 +45,14 @@ export interface AddProposalSourceDocParams {
   wordCount: number;
 }
 
+export interface UpdateProposalSourceDocParams {
+  docId: bigint;
+  name?: string;
+  content?: string;
+  docType?: string;
+  wordCount?: number;
+}
+
 export interface AddProposalLineItemParams {
   proposalId: bigint;
   sectionId?: bigint;
@@ -202,6 +210,26 @@ export function useDeleteProposalSourceDoc() {
       const conn = getStdbConnection();
       if (!conn) throw new Error("Not connected");
       return conn.reducers.deleteProposalSourceDoc({ docId });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useUpdateProposalSourceDoc() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: UpdateProposalSourceDocParams) => {
+      const conn = getStdbConnection();
+      if (!conn) throw new Error("Not connected");
+      return conn.reducers.updateProposalSourceDoc({
+        docId: params.docId,
+        params: {
+          name: params.name,
+          content: params.content,
+          docType: params.docType,
+          wordCount: params.wordCount,
+        },
+      });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["proposals"] }),
   });
