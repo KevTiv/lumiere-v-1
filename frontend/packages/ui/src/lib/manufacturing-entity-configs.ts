@@ -217,6 +217,42 @@ export const workcentersTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const routingOperationsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "routing-operations-table",
+  title: t("manufacturing.routingOperations.title"),
+  description: t("manufacturing.routingOperations.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("manufacturing.routingOperations.searchPlaceholder"),
+    searchKeys: ["name", "worksheetType", "timeMode"],
+    columns: [
+      {
+        key: "workcenterId",
+        label: t("manufacturing.routingOperations.columns.workcenterId"),
+        width: "min-w-28",
+      },
+      { key: "name", label: t("manufacturing.routingOperations.columns.name"), width: "min-w-40" },
+      {
+        key: "sequence",
+        label: t("manufacturing.routingOperations.columns.sequence"),
+        type: "number",
+        align: "right",
+      },
+      {
+        key: "timeCycle",
+        label: t("manufacturing.routingOperations.columns.timeCycle"),
+        type: "number",
+        align: "right",
+      },
+      { key: "worksheetType", label: t("manufacturing.routingOperations.columns.worksheetType"), width: "min-w-24" },
+      { key: "timeMode", label: t("manufacturing.routingOperations.columns.timeMode"), width: "min-w-24" },
+    ],
+    emptyMessage: t("manufacturing.routingOperations.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "manufacturing-orders-table": manufacturingOrdersTableConfig(t),
@@ -224,4 +260,5 @@ export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityV
   "bom-lines-table": bomLinesTableConfig(t),
   "workorders-table": workordersTableConfig(t),
   "workcenters-table": workcentersTableConfig(t),
+  "routing-operations-table": routingOperationsTableConfig(t),
 })

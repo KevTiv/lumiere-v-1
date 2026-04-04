@@ -346,6 +346,111 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newPartnerBankForm = (t: TFunction): FormConfig => ({
+  id: "new-partner-bank",
+  title: t("purchasing.forms.newPartnerBank.title"),
+  description: t("purchasing.forms.newPartnerBank.description"),
+  sections: [
+    {
+      id: "pb-main",
+      title: t("purchasing.forms.newPartnerBank.sections.main"),
+      fields: [
+        {
+          id: "partnerId",
+          name: "partnerId",
+          type: "select",
+          label: t("purchasing.forms.newPartnerBank.fields.partnerId"),
+          placeholder: t("purchasing.forms.newPartnerBank.fields.partnerPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "accNumber",
+          name: "accNumber",
+          type: "text",
+          label: t("purchasing.forms.newPartnerBank.fields.accNumber"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "accHolderName",
+          name: "accHolderName",
+          type: "text",
+          label: t("purchasing.forms.newPartnerBank.fields.accHolderName"),
+          width: "1/2",
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "number",
+          label: t("purchasing.forms.newPartnerBank.fields.currencyId"),
+          width: "1/2",
+        },
+        {
+          id: "allowOutPayment",
+          name: "allowOutPayment",
+          type: "checkbox",
+          label: t("purchasing.forms.newPartnerBank.fields.allowOutPayment"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editPartnerBankForm = (t: TFunction): FormConfig => ({
+  id: "edit-partner-bank",
+  title: t("purchasing.forms.editPartnerBank.title"),
+  description: t("purchasing.forms.editPartnerBank.description"),
+  sections: [
+    {
+      id: "epb-main",
+      title: t("purchasing.forms.editPartnerBank.sections.main"),
+      fields: [
+        {
+          id: "bankId",
+          name: "bankId",
+          type: "select",
+          label: t("purchasing.forms.editPartnerBank.fields.bankId"),
+          placeholder: t("purchasing.forms.editPartnerBank.fields.bankPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "accNumber",
+          name: "accNumber",
+          type: "text",
+          label: t("purchasing.forms.editPartnerBank.fields.accNumber"),
+          width: "full",
+        },
+        {
+          id: "accHolderName",
+          name: "accHolderName",
+          type: "text",
+          label: t("purchasing.forms.editPartnerBank.fields.accHolderName"),
+          width: "1/2",
+        },
+        {
+          id: "allowOutPayment",
+          name: "allowOutPayment",
+          type: "checkbox",
+          label: t("purchasing.forms.editPartnerBank.fields.allowOutPayment"),
+          width: "1/3",
+        },
+        {
+          id: "active",
+          name: "active",
+          type: "checkbox",
+          label: t("purchasing.forms.editPartnerBank.fields.active"),
+          width: "1/3",
+        },
+      ],
+    },
+  ],
+})
+
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
@@ -353,4 +458,6 @@ export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "receive-purchase-order-line": receivePurchaseOrderLineForm(t),
   "invoice-purchase-order-line": invoicePurchaseOrderLineForm(t),
   "edit-purchase-order-line": editPurchaseOrderLineForm(t),
+  "new-partner-bank": newPartnerBankForm(t),
+  "edit-partner-bank": editPartnerBankForm(t),
 })

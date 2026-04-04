@@ -39,6 +39,14 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
+          id: "parentId",
+          name: "parentId",
+          type: "text",
+          label: t("messages.forms.newMessage.fields.parentId"),
+          placeholder: t("messages.forms.newMessage.fields.parentIdHint"),
+          width: "1/2",
+        },
+        {
           id: "subtype",
           name: "subtype",
           type: "text",

@@ -186,6 +186,131 @@ export const deliveriesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Delivery & POS masters ────────────────────────────────────────────────────
+export const deliveryPriceRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "delivery-price-rules-table",
+  title: t("sales.deliveryPriceRules.title"),
+  description: t("sales.deliveryPriceRules.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.deliveryPriceRules.searchPlaceholder"),
+    searchKeys: ["variable", "operator"],
+    columns: [
+      { key: "id", label: t("sales.deliveryPriceRules.columns.id"), width: "min-w-16" },
+      { key: "carrierId", label: t("sales.deliveryPriceRules.columns.carrierId"), width: "min-w-20" },
+      { key: "variable", label: t("sales.deliveryPriceRules.columns.variable"), width: "min-w-28" },
+      { key: "operator", label: t("sales.deliveryPriceRules.columns.operator"), width: "min-w-16" },
+      { key: "maxValue", label: t("sales.deliveryPriceRules.columns.maxValue"), type: "number", align: "right" },
+      { key: "listPrice", label: t("sales.deliveryPriceRules.columns.listPrice"), type: "currency", align: "right" },
+    ],
+    emptyMessage: t("sales.deliveryPriceRules.emptyMessage"),
+  },
+})
+
+export const deliveryCarriersTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "delivery-carriers-table",
+  title: t("sales.deliveryCarriers.title"),
+  description: t("sales.deliveryCarriers.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.deliveryCarriers.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("sales.deliveryCarriers.columns.name"), width: "min-w-40" },
+      { key: "deliveryType", label: t("sales.deliveryCarriers.columns.deliveryType"), width: "min-w-24" },
+      { key: "active", label: t("sales.deliveryCarriers.columns.active"), type: "boolean" },
+      { key: "currencyId", label: t("sales.deliveryCarriers.columns.currencyId"), width: "min-w-20" },
+      { key: "productId", label: t("sales.deliveryCarriers.columns.productId"), width: "min-w-20" },
+    ],
+    emptyMessage: t("sales.deliveryCarriers.emptyMessage"),
+  },
+})
+
+export const shippingMethodsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "shipping-methods-table",
+  title: t("sales.shippingMethods.title"),
+  description: t("sales.shippingMethods.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.shippingMethods.searchPlaceholder"),
+    searchKeys: ["name", "provider"],
+    columns: [
+      { key: "name", label: t("sales.shippingMethods.columns.name"), width: "min-w-40" },
+      { key: "provider", label: t("sales.shippingMethods.columns.provider"), width: "min-w-28" },
+      { key: "deliveryType", label: t("sales.shippingMethods.columns.deliveryType"), width: "min-w-24" },
+      { key: "active", label: t("sales.shippingMethods.columns.active"), type: "boolean" },
+      { key: "fixedPrice", label: t("sales.shippingMethods.columns.fixedPrice"), type: "currency", align: "right" },
+    ],
+    emptyMessage: t("sales.shippingMethods.emptyMessage"),
+  },
+})
+
+export const posPaymentMethodsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pos-payment-methods-table",
+  title: t("sales.posPaymentMethods.title"),
+  description: t("sales.posPaymentMethods.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.posPaymentMethods.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("sales.posPaymentMethods.columns.name"), width: "min-w-40" },
+      { key: "sequence", label: t("sales.posPaymentMethods.columns.sequence"), type: "number", align: "right" },
+      { key: "active", label: t("sales.posPaymentMethods.columns.active"), type: "boolean" },
+    ],
+    emptyMessage: t("sales.posPaymentMethods.emptyMessage"),
+  },
+})
+
+export const posLoyaltyProgramsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pos-loyalty-programs-table",
+  title: t("sales.loyaltyPrograms.title"),
+  description: t("sales.loyaltyPrograms.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.loyaltyPrograms.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("sales.loyaltyPrograms.columns.name"), width: "min-w-40" },
+      { key: "currencyId", label: t("sales.loyaltyPrograms.columns.currencyId"), width: "min-w-20" },
+      { key: "programType", label: t("sales.loyaltyPrograms.columns.programType"), width: "min-w-24" },
+      { key: "isActive", label: t("sales.loyaltyPrograms.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("sales.loyaltyPrograms.emptyMessage"),
+  },
+})
+
+export const posLoyaltyCardsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pos-loyalty-cards-table",
+  title: t("sales.loyaltyCards.title"),
+  description: t("sales.loyaltyCards.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("sales.loyaltyCards.searchPlaceholder"),
+    searchKeys: ["code"],
+    columns: [
+      { key: "code", label: t("sales.loyaltyCards.columns.code"), width: "min-w-32" },
+      { key: "points", label: t("sales.loyaltyCards.columns.points"), type: "number", align: "right" },
+      { key: "partnerId", label: t("sales.loyaltyCards.columns.partnerId"), width: "min-w-20" },
+      { key: "currencyId", label: t("sales.loyaltyCards.columns.currencyId"), width: "min-w-20" },
+      { key: "isActive", label: t("sales.loyaltyCards.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("sales.loyaltyCards.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "sale-orders-table": saleOrdersTableConfig(t),
@@ -193,4 +318,10 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
   "pricelists-table": pricelistsTableConfig(t),
   "pricelist-items-table": pricelistItemsTableConfig(t),
   "deliveries-table": deliveriesTableConfig(t),
+  "delivery-price-rules-table": deliveryPriceRulesTableConfig(t),
+  "delivery-carriers-table": deliveryCarriersTableConfig(t),
+  "shipping-methods-table": shippingMethodsTableConfig(t),
+  "pos-payment-methods-table": posPaymentMethodsTableConfig(t),
+  "pos-loyalty-programs-table": posLoyaltyProgramsTableConfig(t),
+  "pos-loyalty-cards-table": posLoyaltyCardsTableConfig(t),
 })

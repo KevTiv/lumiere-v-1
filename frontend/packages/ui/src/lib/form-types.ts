@@ -51,6 +51,8 @@ export interface NumberField extends BaseField {
   type: "number"
   defaultValue?: number
   step?: number
+  min?: number
+  max?: number
 }
 
 export interface TextareaField extends BaseField {
@@ -62,7 +64,7 @@ export interface TextareaField extends BaseField {
 export interface SelectField extends BaseField {
   type: "select"
   defaultValue?: string
-  options: Array<{
+  options: ReadonlyArray<{
     value: string
     label: string
     disabled?: boolean

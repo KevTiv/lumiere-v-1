@@ -14,7 +14,7 @@ export function radixSelectItemValue(option: SelectOptionLike, index: number): s
 /** Maps stored form value to the string Radix Select should receive. */
 export function radixSelectControlledValue(
   stored: string | undefined,
-  options: SelectOptionLike[] | undefined,
+  options: readonly SelectOptionLike[] | undefined,
 ): string {
   if (stored == null || stored !== "") {
     return stored ?? ""

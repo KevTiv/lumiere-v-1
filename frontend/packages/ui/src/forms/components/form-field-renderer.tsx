@@ -228,7 +228,10 @@ export function FormFieldRenderer({
           <div className="space-y-2">
             <Slider
               value={[(value as number) || field.validation?.min || 0]}
-              onValueChange={([v]) => onChange(v)}
+              onValueChange={(next) => {
+                const v = Array.isArray(next) ? next[0] : next
+                onChange(v)
+              }}
               min={field.validation?.min || 0}
               max={field.validation?.max || 10}
               step={1}
@@ -236,7 +239,9 @@ export function FormFieldRenderer({
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{field.validation?.min || 0}</span>
-              <span className="font-medium">{value || field.validation?.min || 0}</span>
+              <span className="font-medium">
+                {String((value as number) || field.validation?.min || 0)}
+              </span>
               <span>{field.validation?.max || 10}</span>
             </div>
           </div>
@@ -358,19 +363,21 @@ function DatePicker({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !value && "text-muted-foreground"
-          )}
-          disabled={disabled}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP") : <span>Pick a date</span>}
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !value && "text-muted-foreground"
+            )}
+            disabled={disabled}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date ? format(date, "PPP") : <span>Pick a date</span>}
+          </Button>
+        }
+      />
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
@@ -397,19 +404,21 @@ function DateTimePicker({
   return (
     <div className="flex gap-2">
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "flex-1 justify-start text-left font-normal",
-              !value && "text-muted-foreground"
-            )}
-            disabled={disabled}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date ? format(date, "PPP") : <span>Pick date</span>}
-          </Button>
-        </PopoverTrigger>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="outline"
+              className={cn(
+                "flex-1 justify-start text-left font-normal",
+                !value && "text-muted-foreground"
+              )}
+              disabled={disabled}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? format(date, "PPP") : <span>Pick date</span>}
+            </Button>
+          }
+        />
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"

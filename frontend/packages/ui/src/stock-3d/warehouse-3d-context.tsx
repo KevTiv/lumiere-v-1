@@ -12,7 +12,7 @@ import type { Zone, StorageSlot, StockItem, StockCategory } from './types'
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-export type ViewMode = 'all' | 'low-stock' | 'empty-slots' | 'category'
+export type Warehouse3DViewMode = 'all' | 'low-stock' | 'empty-slots' | 'category'
 
 interface UIState {
   selectedItemId: string | null
@@ -20,7 +20,7 @@ interface UIState {
   hoveredItemId: string | null
   searchQuery: string
   highlightedItemIds: string[]
-  viewMode: ViewMode
+  viewMode: Warehouse3DViewMode
   filterCategory: StockCategory | null
 }
 
@@ -29,7 +29,7 @@ type Action =
   | { type: 'SET_SELECTED_SLOT'; id: string | null }
   | { type: 'SET_HOVERED_ITEM'; id: string | null }
   | { type: 'SET_SEARCH_QUERY'; query: string; matchIds: string[] }
-  | { type: 'SET_VIEW_MODE'; mode: ViewMode }
+  | { type: 'SET_VIEW_MODE'; mode: Warehouse3DViewMode }
   | { type: 'SET_FILTER_CATEGORY'; category: StockCategory | null }
 
 function uiReducer(state: UIState, action: Action): UIState {
@@ -83,7 +83,7 @@ interface Warehouse3DContextValue extends UIState {
   setSelectedSlot: (id: string | null) => void
   setHoveredItem: (id: string | null) => void
   setSearchQuery: (query: string) => void
-  setViewMode: (mode: ViewMode) => void
+  setViewMode: (mode: Warehouse3DViewMode) => void
   setFilterCategory: (category: StockCategory | null) => void
 
   // External callbacks (wired to SpacetimeDB reducers by parent)
@@ -149,7 +149,7 @@ export function Warehouse3DProvider({
     [items],
   )
 
-  const setViewMode = useCallback((mode: ViewMode) => {
+  const setViewMode = useCallback((mode: Warehouse3DViewMode) => {
     dispatch({ type: 'SET_VIEW_MODE', mode })
   }, [])
 

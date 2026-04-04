@@ -12,7 +12,10 @@ import type {
   TenderSection,
   SectionStatus,
   ProposalStatus,
+  SourceDocument,
+  WorkspaceAction,
 } from "@/lib/proposal-workspace-types"
+import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb"
 import { SECTION_TEMPLATES } from "@/lib/proposal-workspace-types"
 import { SectionSidebar } from "./section-sidebar"
 import { SectionEditor } from "./section-editor"
@@ -25,6 +28,18 @@ import { DocumentInputPanel } from "./document-input-panel"
 
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length
+}
+
+function mapSourceDocRow(d: unknown): SourceDocument {
+  const row = d as ProposalSourceDoc
+  return {
+    id: String(row.id),
+    name: row.name,
+    content: row.content,
+    type: row.docType === "uploaded" ? "uploaded" : "pasted",
+    wordCount: row.wordCount,
+    addedAt: new Date(Number(row.addedAt ?? 0) / 1000),
+  }
 }
 
 // Keep diff utilities for version history
@@ -116,6 +131,13 @@ export interface ProposalWorkspaceHooks {
     wordCount: number
   }>
   useDeleteProposalSourceDoc: () => MutationResult<{ docId: bigint | number | string }>
+  useUpdateProposalSourceDoc: () => MutationResult<{
+    docId: bigint | number | string
+    name?: string
+    content?: string
+    docType?: string
+    wordCount?: number
+  }>
   useSaveProposalVersion: () => MutationResult<{
     proposalId: bigint | number | string
     message: string
@@ -212,6 +234,7 @@ export function ProposalWorkspace({
     useDeleteProposalSection,
     useAddProposalSourceDoc,
     useDeleteProposalSourceDoc,
+    useUpdateProposalSourceDoc,
     useSaveProposalVersion,
     useUpdateProposalStatus,
     useAddProposalLineItem,
@@ -242,6 +265,12 @@ export function ProposalWorkspace({
   const proposalComments = comments.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId)
   const proposalPresence = presenceRows.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId)
 
+  const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
+
+  useEffect(() => {
+    setDraftSources(proposalSourceDocs.map(mapSourceDocRow))
+  }, [proposalSourceDocs])
+
   // Active section data
   const activeSection = activeSectionId
     ? proposalSections.find((s) => String((s as { id?: unknown }).id) === String(activeSectionId)) ?? null
@@ -259,9 +288,10 @@ export function ProposalWorkspace({
 
   // Presence by section (for sidebar)
   const presenceBySection = useMemo(() => {
-    const map = new Map<string, typeof proposalPresence>()
-    for (const p of proposalPresence) {
-      const sectionId = (p as { sectionId?: bigint | null }).sectionId
+    const map = new Map<string, ProposalPresence[]>()
+    const rows = proposalPresence as ProposalPresence[]
+    for (const p of rows) {
+      const sectionId = p.sectionId
       if (sectionId) {
         const key = String(sectionId)
         const arr = map.get(key) ?? []
@@ -285,6 +315,7 @@ export function ProposalWorkspace({
   const deleteSection = useDeleteProposalSection()
   const addSourceDoc = useAddProposalSourceDoc()
   const deleteSourceDoc = useDeleteProposalSourceDoc()
+  const updateSourceDoc = useUpdateProposalSourceDoc()
   const saveVersion = useSaveProposalVersion()
   const updateStatus = useUpdateProposalStatus()
   const addLineItem = useAddProposalLineItem()
@@ -294,6 +325,60 @@ export function ProposalWorkspace({
   const clearPresence = useClearProposalPresence()
   const addComment = useAddProposalComment()
   const resolveComment = useResolveProposalComment()
+
+  const sourceDispatch = useCallback(
+    (action: WorkspaceAction) => {
+      switch (action.type) {
+        case "ADD_SOURCE":
+          addSourceDoc.mutate({
+            proposalId: proposalIdBig,
+            name: action.source.name,
+            content: action.source.content,
+            docType: action.source.type,
+            wordCount: action.source.wordCount,
+          })
+          break
+        case "REMOVE_SOURCE": {
+          const id = action.id
+          if (/^\d+$/.test(id)) {
+            deleteSourceDoc.mutate({ docId: BigInt(id) })
+          }
+          break
+        }
+        case "UPDATE_SOURCE_CONTENT": {
+          const id = action.id
+          if (/^\d+$/.test(id)) {
+            updateSourceDoc.mutate({
+              docId: BigInt(id),
+              content: action.content,
+              wordCount: countWords(action.content),
+            })
+          }
+          break
+        }
+        default:
+          break
+      }
+
+      setDraftSources((prev) => {
+        switch (action.type) {
+          case "ADD_SOURCE":
+            return [...prev, action.source]
+          case "REMOVE_SOURCE":
+            return prev.filter((s) => s.id !== action.id)
+          case "UPDATE_SOURCE_CONTENT":
+            return prev.map((s) =>
+              s.id === action.id
+                ? { ...s, content: action.content, wordCount: countWords(action.content) }
+                : s,
+            )
+          default:
+            return prev
+        }
+      })
+    },
+    [addSourceDoc, deleteSourceDoc, updateSourceDoc, proposalIdBig],
+  )
 
   // ── Presence cleanup on unmount ─────────────────────────────────────────────
   useEffect(() => {
@@ -393,7 +478,7 @@ export function ProposalWorkspace({
   }, [analysis, proposalIdBig, upsertSection])
 
   const handleAnalyze = useCallback(async () => {
-    const combinedText = proposalSourceDocs.map((d) => String((d as { content?: string }).content ?? "")).join("\n\n---\n\n")
+    const combinedText = draftSources.map((d) => d.content).join("\n\n---\n\n")
     if (!combinedText.trim()) return
     setIsAnalyzing(true)
     setAnalyzeError(null)
@@ -405,7 +490,7 @@ export function ProposalWorkspace({
     } finally {
       setIsAnalyzing(false)
     }
-  }, [proposalSourceDocs, onAnalyze, t])
+  }, [draftSources, onAnalyze, t])
 
   const handleStatusChange = useCallback((newStatus: ProposalStatus) => {
     setStatus(newStatus)
@@ -496,7 +581,11 @@ export function ProposalWorkspace({
           <h1 className="text-sm font-medium text-foreground truncate">{proposalTitle}</h1>
 
           <div className="ml-auto flex items-center gap-2">
-            <PresenceBar presence={proposalPresence.map((p) => ({ userId: String((p as { userId?: unknown }).userId), userName: String((p as { userName?: string }).userName ?? "") }))} currentUserId={currentUserId} />
+            <PresenceBar
+              presenceRows={proposalPresence as ProposalPresence[]}
+              sections={proposalSections as Record<string, unknown>[]}
+              currentUserId={currentUserId}
+            />
 
             <Badge variant={STATUS_VARIANT[status]} className="capitalize text-xs">
               {status}
@@ -509,7 +598,11 @@ export function ProposalWorkspace({
               <Button variant="ghost" size="sm" onClick={handleExportText} title={t("proposalWorkspace.exportText")}>
                 <Download className="h-4 w-4" />
               </Button>
-              <SaveVersionButton onSave={handleSaveVersion} />
+              <SaveVersionButton
+                onSave={handleSaveVersion}
+                isDirty={proposalSections.length > 0}
+                versionCount={localVersions.length}
+              />
             </div>
 
             <div className="relative group">
@@ -542,12 +635,16 @@ export function ProposalWorkspace({
         {/* ── Main workspace ─────────────────────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">
           <SectionSidebar
-            sections={proposalSections as unknown as TenderSection[]}
+            sections={proposalSections as Record<string, unknown>[]}
+            sourceDocs={proposalSourceDocs as ProposalSourceDoc[]}
             activeSectionId={effectiveActiveSectionId}
-            onSelect={handleSelectSection}
-            onAdd={handleAddSection}
-            onDelete={(id) => deleteSection.mutate({ sectionId: id })}
             presenceBySection={presenceBySection}
+            totalValue={totalValue}
+            onSelectSection={handleSelectSection}
+            onAddSection={handleAddSection}
+            onDeleteSection={(id) => deleteSection.mutate({ sectionId: id })}
+            onAddSourceDoc={() => setShowDocInput(true)}
+            onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -560,8 +657,27 @@ export function ProposalWorkspace({
               onSaveContent={handleSaveContent}
               onSaveTitle={handleSaveTitle}
               onFocus={handleEditorFocus}
-              onAddLineItem={(params) => addLineItem.mutate({ proposalId: proposalIdBig, sectionId: effectiveActiveSectionId, ...params })}
-              onUpdateLineItem={(id, params) => updateLineItem.mutate({ lineItemId: id, ...params })}
+              onAddLineItem={(productId, productName, priceUnit) =>
+                addLineItem.mutate({
+                  proposalId: proposalIdBig,
+                  sectionId: effectiveActiveSectionId,
+                  productId,
+                  productName,
+                  quantity: 1,
+                  priceUnit,
+                  discount: 0,
+                  notes: null,
+                })
+              }
+              onUpdateLineItem={(id, quantity, priceUnit, discount, notes) =>
+                updateLineItem.mutate({
+                  lineItemId: id,
+                  quantity,
+                  priceUnit,
+                  discount,
+                  notes: notes ?? null,
+                })
+              }
               onDeleteLineItem={(id) => deleteLineItem.mutate({ lineItemId: id })}
               onAddComment={(content) => {
                 if (!effectiveActiveSectionId) return
@@ -606,9 +722,10 @@ export function ProposalWorkspace({
 
                   {showDocInput && (
                     <DocumentInputPanel
-                      docs={proposalSourceDocs as unknown as { id: string; name: string; content: string; docType: string; wordCount: number }[]}
-                      onAdd={(d) => addSourceDoc.mutate({ proposalId: proposalIdBig, ...d })}
-                      onDelete={(id) => deleteSourceDoc.mutate({ docId: id })}
+                      sources={draftSources}
+                      dispatch={sourceDispatch}
+                      onAnalyze={handleAnalyze}
+                      isAnalyzing={isAnalyzing}
                     />
                   )}
 
@@ -620,8 +737,11 @@ export function ProposalWorkspace({
 
                   <AIPanel
                     analysis={analysis}
-                    isLoading={isAnalyzing}
+                    isAnalyzing={isAnalyzing}
+                    analyzeError={analyzeError}
                     onApplyStructure={handleApplyStructure}
+                    collapsed={false}
+                    onToggleCollapse={() => setAiPanelCollapsed(true)}
                   />
                 </div>
               </div>
@@ -632,7 +752,8 @@ export function ProposalWorkspace({
           <div className="w-64 border-l border-border bg-muted/10 flex flex-col">
             <VersionHistoryBar
               versions={localVersions}
-              currentSectionId={effectiveActiveSectionId ? String(effectiveActiveSectionId) : undefined}
+              activeVersionId={null}
+              currentSections={proposalSections as unknown as TenderSection[]}
             />
           </div>
         </div>

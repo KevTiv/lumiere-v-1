@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
 import { settingsSections } from "@/lib/rbac-defaults"
@@ -50,6 +51,7 @@ interface SettingsModuleProps {
 
 export function SettingsModule({ className }: SettingsModuleProps) {
   const { t } = useTranslation()
+
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const { checkPermission, isAdmin } = useRBAC()
 

@@ -3,7 +3,16 @@
 //! React hooks for accessing and managing form configurations from SpacetimeDB.
 
 import { useEffect, useMemo, useReducer, useState } from "react"
-import { getStdbConnection, useStdbConnection } from "@lumiere/stdb"
+import {
+  addUserCustomField,
+  deleteUserCustomField,
+  getFormConfiguration,
+  getOrganizationFormConfigs,
+  getStdbConnection,
+  useStdbConnection,
+  type FieldType as StdbFieldType,
+  type FieldWidth as StdbFieldWidth,
+} from "@lumiere/stdb"
 import type {
   FormConfig,
   FormConfigField,
@@ -24,6 +33,7 @@ import {
   isCustomField,
 } from "../config/types"
 import { getDefaultFormConfig } from "../config/registry"
+import { formOptionsToStdb, formValidationToStdb } from "../utils/stdb-field-params"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // STATE REDUCERS
@@ -408,6 +418,10 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           customFields,
         },
       })
+
+      void getFormConfiguration(BigInt(organizationId), moduleId, formId).catch(() => {
+        /* reducer may fail if row removed concurrently; table subscription is source of truth */
+      })
     }
 
     syncFromDb()
@@ -529,6 +543,7 @@ export function useOrganizationFormConfigs(organizationId: number): {
       const rows = [...db.db.form_config.iter()].filter(c => Number(c.organizationId) === organizationId)
       setConfigs(rows.map(mapStdbFormConfigRow))
       setIsLoading(false)
+      void getOrganizationFormConfigs(BigInt(organizationId)).catch(() => {})
     }
 
     load()
@@ -576,22 +591,103 @@ export function useUserCustomFields(
 } {
   const [customFields, setCustomFields] = useReducer(listReducer<ParsedFormField>, [])
   const [isLoading, setIsLoading] = useState(true)
+  const { organizationId: sessionOrgId, identity, connected } = useStdbConnection()
 
   useEffect(() => {
-    setIsLoading(true)
-    setCustomFields([])
-    setIsLoading(false)
-  }, [configurationId, userId])
+    if (!sessionOrgId || !configurationId) {
+      setCustomFields([])
+      setIsLoading(false)
+      return
+    }
+
+    const conn = getStdbConnection()
+    if (!conn) {
+      setCustomFields([])
+      setIsLoading(false)
+      return
+    }
+
+    const db = conn
+    const effectiveUser = userId ?? identity ?? ""
+
+    function load() {
+      const rows = [...db.db.user_custom_field.iter()].filter(
+        cf =>
+          Number(cf.organizationId) === sessionOrgId &&
+          Number(cf.configurationId) === configurationId &&
+          (!effectiveUser || cf.userId?.toHexString?.() === effectiveUser),
+      )
+      const parsed = rows.map(mapStdbUserCustomFieldRow).map(cf => {
+        const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
+        return parseFormField({
+          id: cf.id,
+          configurationId: cf.configurationId,
+          fieldId: String(data.fieldId ?? ""),
+          name: String(data.name ?? ""),
+          label: String(data.label ?? ""),
+          fieldType: (data.type as FieldType) ?? "Text",
+          description: String(data.description ?? ""),
+          placeholder: String(data.placeholder ?? ""),
+          defaultValue:
+            typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
+          optionsJson: JSON.stringify(data.options || []),
+          validationJson: JSON.stringify(data.validation || { required: false }),
+          aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
+          order: Number(data.order ?? 0),
+          isSystem: false,
+          isEnabled: true,
+          category: "",
+          showInList: false,
+          width: (data.width as FieldWidth) || "Full",
+          sectionId: String(data.sectionId ?? ""),
+          createdAt: cf.createdAt,
+          updatedAt: cf.updatedAt,
+        } as FormConfigField)
+      })
+      setCustomFields(parsed)
+      setIsLoading(false)
+    }
+
+    load()
+    const t = db.db.user_custom_field
+    t.onInsert(() => load())
+    t.onUpdate(() => load())
+    t.onDelete(() => load())
+  }, [configurationId, userId, identity, sessionOrgId, connected])
 
   const addCustomField = async (field: CreateFormFieldParams) => {
     if (!isCustomField(field.fieldId)) {
       throw new Error("Custom field IDs must start with 'custom:'")
     }
-    console.warn("addCustomField: wire add_user_custom_field reducer when needed", field)
+    if (!sessionOrgId) throw new Error("No organization")
+    await addUserCustomField(BigInt(sessionOrgId), {
+      configurationId: BigInt(configurationId),
+      fieldId: field.fieldId,
+      name: field.name,
+      label: field.label,
+      fieldType: { tag: field.fieldType } as StdbFieldType,
+      description: field.description,
+      placeholder: field.placeholder,
+      defaultValue: field.defaultValue,
+      options: formOptionsToStdb(field.options),
+      validation: formValidationToStdb(field.validation ?? { required: false }),
+      order: field.order,
+      width: { tag: field.width } as StdbFieldWidth,
+    })
   }
 
   const removeCustomField = async (fieldId: string) => {
-    console.warn("removeCustomField: wire delete_user_custom_field reducer when needed", fieldId)
+    if (!sessionOrgId) throw new Error("No organization")
+    const conn = getStdbConnection()
+    if (!conn) throw new Error("Not connected to SpacetimeDB")
+    const row = [...conn.db.user_custom_field.iter()].find(
+      cf =>
+        Number(cf.organizationId) === sessionOrgId &&
+        Number(cf.configurationId) === configurationId &&
+        cf.fieldId === fieldId,
+    )
+    if (!row) throw new Error("Custom field not found")
+    await deleteUserCustomField(BigInt(sessionOrgId), row.id)
   }
 
   return {

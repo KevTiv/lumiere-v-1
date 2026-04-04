@@ -41,10 +41,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Filter,
+  Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
+import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 // State display mapping
@@ -88,9 +90,15 @@ interface InvoiceListViewProps {
   invoices: AccountMove[]
   onSelectInvoice?: (invoice: AccountMove) => void
   onCreateInvoice?: () => void
+  onRecalculateTotals?: (invoice: AccountMove) => void
 }
 
-export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: InvoiceListViewProps) {
+export function InvoiceListView({
+  invoices,
+  onSelectInvoice,
+  onCreateInvoice,
+  onRecalculateTotals,
+}: InvoiceListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
@@ -233,6 +241,19 @@ export function InvoiceListView({ invoices, onSelectInvoice, onCreateInvoice }: 
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectInvoice?.(inv) }}>
                             <Eye className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.viewDetails")}
                           </DropdownMenuItem>
+                          {onRecalculateTotals &&
+                            moveStateIsDraft(inv.state) &&
+                            moveTypeIsInvoiceOrRefund(inv.moveType) && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onRecalculateTotals(inv)
+                                }}
+                              >
+                                <Calculator className="h-4 w-4 mr-2" />
+                                {t("accounting.invoices.invoiceActions.recalculateTotals")}
+                              </DropdownMenuItem>
+                            )}
                           <DropdownMenuItem><Send className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.sendInvoice")}</DropdownMenuItem>
                           <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.downloadPDF")}</DropdownMenuItem>
                           <DropdownMenuSeparator />

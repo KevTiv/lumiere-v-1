@@ -3,15 +3,27 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@lumiere/ui": ["./src/index.ts"],
       "@lumiere/ui/*": ["./src/*"],
       "@/components/ui/*": ["./src/components/*"],
       "@/components/*": ["./src/*"],
       "@/lib/*": ["./src/lib/*"],
-      "@/hooks/*": ["./src/hooks/*"]
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/hooks/auth": ["../../web/hooks/auth.ts"],
+      "@/hooks/org-master-csv-imports": ["../../web/hooks/org-master-csv-imports.ts"],
+      "@/lib/org-scoped": ["../../web/lib/org-scoped.ts"],
+      "@/lib/query-fetch": ["../../web/lib/query-fetch.ts"],
+      "@/lib/stdb-params-json": ["../../web/lib/stdb-params-json.ts"]
     },
     "jsx": "react-jsx",
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["."],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/native",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }

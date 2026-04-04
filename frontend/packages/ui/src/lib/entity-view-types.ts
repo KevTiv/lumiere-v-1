@@ -25,8 +25,8 @@ export interface EntityColumn {
   /** Tailwind min-width class e.g. "min-w-32" */
   width?: string
   sortable?: boolean
-  /** Map raw value → badge variant for type="badge" */
-  badgeVariants?: Record<string, BadgeVariant>
+  /** Map raw value → badge variant key (semantic names resolved in the table renderer) */
+  badgeVariants?: Record<string, string>
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
   /** Override rendering entirely */
@@ -83,7 +83,7 @@ export interface EntityDetailField {
   label: string
   type?: ColumnType
   width?: FieldWidth
-  badgeVariants?: Record<string, BadgeVariant>
+  badgeVariants?: Record<string, string>
   badgeLabels?: Record<string, string>
   render?: (value: unknown, record: Record<string, unknown>) => ReactNode
 }

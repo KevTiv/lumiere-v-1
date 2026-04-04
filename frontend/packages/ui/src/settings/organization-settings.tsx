@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,11 +8,24 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Building, Save, Loader2 } from "lucide-react"
+import { Building, Save, Loader2, Cloud, MessageCircle, ExternalLink, Upload } from "lucide-react"
+import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials } from "@/hooks/auth"
+import { useOrgMasterCsvImportMutations } from "@/hooks/org-master-csv-imports"
+import { useStdbConnection } from "@lumiere/stdb"
+import { csvImportForm, FormModal } from "@lumiere/ui"
+import { hasValidOrganizationId } from "@/lib/org-scoped"
+
+type OrgMasterCsvKind =
+  | "country"
+  | "currency"
+  | "currencyRate"
+  | "company"
+  | "role"
+  | "aiAgent"
 
 /**
  * Organization Settings Component
- * 
+ *
  * Manages organization-level settings via the upsert_organization_settings reducer.
  * This connects to SpacetimeDB for persistent organization configuration.
  */
@@ -20,6 +33,36 @@ export function OrganizationSettings() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const { organizationId } = useStdbConnection()
+  const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+
+  const orgReady = hasValidOrganizationId(organizationId)
+  const orgId = orgReady ? organizationId : 0
+  const orgBigInt = orgReady ? BigInt(organizationId) : 0n
+  const csvImports = useOrgMasterCsvImportMutations(orgId)
+
+  useEffect(() => {
+    if (csvKind) setCsvError(null)
+  }, [csvKind])
+
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    const titleKey: Record<OrgMasterCsvKind, string> = {
+      country: "settings.organization.csvImport.countriesTitle",
+      currency: "settings.organization.csvImport.currenciesTitle",
+      currencyRate: "settings.organization.csvImport.currencyRatesTitle",
+      company: "settings.organization.csvImport.companiesTitle",
+      role: "settings.organization.csvImport.rolesTitle",
+      aiAgent: "settings.organization.csvImport.aiAgentsTitle",
+    }
+    return csvImportForm(t, t(titleKey[csvKind]))
+  }, [csvKind, t])
+
+  // Integration hooks
+  const updateGoogleDriveCredentials = useUpdateGoogleDriveCredentials(orgBigInt)
+  const updateWhatsappCredentials = useUpdateWhatsappCredentials(orgBigInt)
+
   const [settings, setSettings] = useState({
     name: "",
     description: "",
@@ -43,11 +86,16 @@ export function OrganizationSettings() {
   })
 
   const handleSave = async () => {
+    if (!orgReady) {
+      toast({
+        title: t("settings.organization.saveError"),
+        description: t("settings.organization.saveErrorDescription"),
+        variant: "destructive",
+      })
+      return
+    }
     setIsLoading(true)
     try {
-      // Get organization ID from session - in real implementation this comes from context
-      const organizationId = 1 // Placeholder - should come from session context
-      
       const response = await fetch('/api/call/upsert_organization_settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,10 +122,16 @@ export function OrganizationSettings() {
   }
 
   const handleUpdateOrganization = async () => {
+    if (!orgReady) {
+      toast({
+        title: t("settings.organization.updateError"),
+        description: t("settings.organization.updateErrorDescription"),
+        variant: "destructive",
+      })
+      return
+    }
     setIsLoading(true)
     try {
-      const organizationId = 1 // Placeholder - should come from session context
-      
       const response = await fetch('/api/call/update_organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,8 +234,8 @@ export function OrganizationSettings() {
             <Input
               id="org-street"
               value={settings.address.street}
-              onChange={(e) => setSettings({ 
-                ...settings, 
+              onChange={(e) => setSettings({
+                ...settings,
                 address: { ...settings.address, street: e.target.value }
               })}
               placeholder={t("settings.organization.streetPlaceholder")}
@@ -193,8 +247,8 @@ export function OrganizationSettings() {
               <Input
                 id="org-city"
                 value={settings.address.city}
-                onChange={(e) => setSettings({ 
-                  ...settings, 
+                onChange={(e) => setSettings({
+                  ...settings,
                   address: { ...settings.address, city: e.target.value }
                 })}
                 placeholder={t("settings.organization.cityPlaceholder")}
@@ -205,8 +259,8 @@ export function OrganizationSettings() {
               <Input
                 id="org-state"
                 value={settings.address.state}
-                onChange={(e) => setSettings({ 
-                  ...settings, 
+                onChange={(e) => setSettings({
+                  ...settings,
                   address: { ...settings.address, state: e.target.value }
                 })}
                 placeholder={t("settings.organization.statePlaceholder")}
@@ -217,8 +271,8 @@ export function OrganizationSettings() {
               <Input
                 id="org-zip"
                 value={settings.address.zip}
-                onChange={(e) => setSettings({ 
-                  ...settings, 
+                onChange={(e) => setSettings({
+                  ...settings,
                   address: { ...settings.address, zip: e.target.value }
                 })}
                 placeholder={t("settings.organization.zipPlaceholder")}
@@ -230,8 +284,8 @@ export function OrganizationSettings() {
             <Input
               id="org-country"
               value={settings.address.country}
-              onChange={(e) => setSettings({ 
-                ...settings, 
+              onChange={(e) => setSettings({
+                ...settings,
                 address: { ...settings.address, country: e.target.value }
               })}
               placeholder={t("settings.organization.countryPlaceholder")}
@@ -253,8 +307,8 @@ export function OrganizationSettings() {
                 id="org-email"
                 type="email"
                 value={settings.contact.email}
-                onChange={(e) => setSettings({ 
-                  ...settings, 
+                onChange={(e) => setSettings({
+                  ...settings,
                   contact: { ...settings.contact, email: e.target.value }
                 })}
                 placeholder={t("settings.organization.emailPlaceholder")}
@@ -265,8 +319,8 @@ export function OrganizationSettings() {
               <Input
                 id="org-phone"
                 value={settings.contact.phone}
-                onChange={(e) => setSettings({ 
-                  ...settings, 
+                onChange={(e) => setSettings({
+                  ...settings,
                   contact: { ...settings.contact, phone: e.target.value }
                 })}
                 placeholder={t("settings.organization.phonePlaceholder")}
@@ -278,12 +332,187 @@ export function OrganizationSettings() {
             <Input
               id="org-website"
               value={settings.contact.website}
-              onChange={(e) => setSettings({ 
-                ...settings, 
+              onChange={(e) => setSettings({
+                ...settings,
                 contact: { ...settings.contact, website: e.target.value }
               })}
               placeholder={t("settings.organization.websitePlaceholder")}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {hasValidOrganizationId(organizationId) ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Upload className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>{t("settings.organization.csvImport.sectionTitle")}</CardTitle>
+                <CardDescription>{t("settings.organization.csvImport.sectionDescription")}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("country")}>
+              {t("settings.organization.csvImport.toolbarCountries")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currency")}>
+              {t("settings.organization.csvImport.toolbarCurrencies")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currencyRate")}>
+              {t("settings.organization.csvImport.toolbarCurrencyRates")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("company")}>
+              {t("settings.organization.csvImport.toolbarCompanies")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("role")}>
+              {t("settings.organization.csvImport.toolbarRoles")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
+              {t("settings.organization.csvImport.toolbarAiAgents")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Integrations */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.organization.integrations.title")}</CardTitle>
+          <CardDescription>{t("settings.organization.integrations.description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Google Drive Integration */}
+          <div className="flex items-start justify-between p-4 border rounded-lg">
+            <div className="flex items-start gap-4">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
+                <Cloud className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+              </div>
+              <div>
+                <h4 className="font-medium">{t("settings.organization.integrations.googleDrive.title")}</h4>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.organization.integrations.googleDrive.description")}
+                </p>
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="gdrive-token">{t("settings.organization.integrations.accessToken")}</Label>
+                  <Input
+                    id="gdrive-token"
+                    type="password"
+                    placeholder={t("settings.organization.integrations.tokenPlaceholder")}
+                  />
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const token = (document.getElementById('gdrive-token') as HTMLInputElement)?.value
+                if (!token) {
+                  toast({
+                    title: t("settings.organization.integrations.error"),
+                    description: t("settings.organization.integrations.tokenRequired"),
+                    variant: "destructive",
+                  })
+                  return
+                }
+                try {
+                  if (!orgReady) return
+                  await updateGoogleDriveCredentials.mutateAsync({
+                    userId: organizationId.toString(),
+                    credentials: { accessToken: token },
+                  })
+                  toast({
+                    title: t("settings.organization.integrations.success"),
+                    description: t("settings.organization.integrations.googleDrive.saved"),
+                  })
+                } catch (error) {
+                  toast({
+                    title: t("settings.organization.integrations.error"),
+                    description: error instanceof Error ? error.message : t("settings.organization.integrations.saveError"),
+                    variant: "destructive",
+                  })
+                }
+              }}
+              disabled={updateGoogleDriveCredentials.isPending}
+            >
+              {updateGoogleDriveCredentials.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {t("settings.organization.integrations.connect")}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* WhatsApp Integration */}
+          <div className="flex items-start justify-between p-4 border rounded-lg">
+            <div className="flex items-start gap-4">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900">
+                <MessageCircle className="h-5 w-5 text-green-600 dark:text-green-300" />
+              </div>
+              <div>
+                <h4 className="font-medium">{t("settings.organization.integrations.whatsapp.title")}</h4>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.organization.integrations.whatsapp.description")}
+                </p>
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="wa-api-key">{t("settings.organization.integrations.apiKey")}</Label>
+                  <Input
+                    id="wa-api-key"
+                    type="password"
+                    placeholder={t("settings.organization.integrations.apiKeyPlaceholder")}
+                  />
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const apiKey = (document.getElementById('wa-api-key') as HTMLInputElement)?.value
+                if (!apiKey) {
+                  toast({
+                    title: t("settings.organization.integrations.error"),
+                    description: t("settings.organization.integrations.apiKeyRequired"),
+                    variant: "destructive",
+                  })
+                  return
+                }
+                try {
+                  if (!orgReady) return
+                  await updateWhatsappCredentials.mutateAsync({
+                    userId: organizationId.toString(),
+                    credentials: { apiKey },
+                  })
+                  toast({
+                    title: t("settings.organization.integrations.success"),
+                    description: t("settings.organization.integrations.whatsapp.saved"),
+                  })
+                } catch (error) {
+                  toast({
+                    title: t("settings.organization.integrations.error"),
+                    description: error instanceof Error ? error.message : t("settings.organization.integrations.saveError"),
+                    variant: "destructive",
+                  })
+                }
+              }}
+              disabled={updateWhatsappCredentials.isPending}
+            >
+              {updateWhatsappCredentials.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {t("settings.organization.integrations.connect")}
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -303,6 +532,42 @@ export function OrganizationSettings() {
           )}
         </Button>
       </div>
+
+      {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
+        <FormModal
+          key={csvKind}
+          open
+          onOpenChange={(o) => !o && setCsvKind(null)}
+          config={csvFormConfig}
+          closeOnSubmit={false}
+          submitError={csvError}
+          onSubmit={async (data) => {
+            setCsvError(null)
+            const files = data.csvFile as FileList | undefined
+            const file = files?.[0]
+            if (!file) {
+              setCsvError(t("common.validation.required"))
+              return
+            }
+            try {
+              const text = await file.text()
+              if (csvKind === "country") await csvImports.importCountry.mutateAsync(text)
+              else if (csvKind === "currency") await csvImports.importCurrency.mutateAsync(text)
+              else if (csvKind === "currencyRate") await csvImports.importCurrencyRate.mutateAsync(text)
+              else if (csvKind === "company") await csvImports.importCompany.mutateAsync(text)
+              else if (csvKind === "role") await csvImports.importRole.mutateAsync(text)
+              else await csvImports.importAiAgent.mutateAsync(text)
+              toast({
+                title: t("settings.organization.csvImport.successTitle"),
+                description: t("settings.organization.csvImport.successDescription"),
+              })
+              setCsvKind(null)
+            } catch (e) {
+              setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

@@ -6,6 +6,10 @@ import type { FormConfig, FormConfigField, FormRoleConfig } from "../config/type
 vi.mock("@lumiere/stdb", () => ({
   getStdbConnection: () => null,
   useStdbConnection: () => ({ identity: null, connected: false, organizationId: undefined }),
+  getFormConfiguration: vi.fn().mockResolvedValue(undefined),
+  getOrganizationFormConfigs: vi.fn().mockResolvedValue(undefined),
+  addUserCustomField: vi.fn(),
+  deleteUserCustomField: vi.fn(),
 }))
 
 vi.mock("@lumiere/ui/forms", async () => {

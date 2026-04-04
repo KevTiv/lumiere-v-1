@@ -30,8 +30,11 @@ import {
   FileText,
   ArrowUpRight,
   Trash2,
+  Upload,
+  Calculator,
 } from "lucide-react"
 import type { AccountMove } from "../lib/accounting-types"
+import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
@@ -61,19 +64,28 @@ function moveStateStr(state: unknown): string {
 interface GeneralLedgerViewProps {
   moves: AccountMove[]
   onCreate?: (data: Record<string, unknown>) => void
+  onImportMovesCsv?: () => void
+  onImportMoveLinesCsv?: () => void
   onPostMove?: (move: AccountMove) => void
   onCancelMove?: (move: AccountMove) => void
+  /** Recompute invoice totals from lines (draft invoice/refund moves only). */
+  onComputeInvoiceTotals?: (move: AccountMove) => void
   postMovePending?: boolean
   cancelMovePending?: boolean
+  computeInvoiceTotalsPending?: boolean
 }
 
 export function GeneralLedgerView({
   moves,
   onCreate,
+  onImportMovesCsv,
+  onImportMoveLinesCsv,
   onPostMove,
   onCancelMove,
+  onComputeInvoiceTotals,
   postMovePending,
   cancelMovePending,
+  computeInvoiceTotalsPending,
 }: GeneralLedgerViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
@@ -144,9 +156,26 @@ export function GeneralLedgerView({
       {/* Table */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>{t("accounting.journalEntries.title")}</CardTitle>
-            <Button onClick={() => setShowCreateModal(true)} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newEntry")}</Button>
+            <div className="flex flex-wrap gap-2">
+              {onImportMovesCsv ? (
+                <Button type="button" variant="outline" onClick={onImportMovesCsv} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  {t("accounting.csvImport.toolbarMoves")}
+                </Button>
+              ) : null}
+              {onImportMoveLinesCsv ? (
+                <Button type="button" variant="outline" onClick={onImportMoveLinesCsv} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  {t("accounting.csvImport.toolbarMoveLines")}
+                </Button>
+              ) : null}
+              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t("accounting.actions.newEntry")}
+              </Button>
+            </div>
           </div>
           <div className="relative mt-4 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -250,8 +279,22 @@ export function GeneralLedgerView({
                   </div>
                 </div>
               </div>
-              {selectedMove && (onPostMove || onCancelMove) && (
+              {selectedMove &&
+                (onPostMove || onCancelMove || onComputeInvoiceTotals) && (
                 <DialogFooter className="gap-2 sm:gap-2">
+                  {moveStateIsDraft(selectedMove.state) &&
+                    moveTypeIsInvoiceOrRefund(selectedMove.moveType) &&
+                    onComputeInvoiceTotals && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={computeInvoiceTotalsPending}
+                        onClick={() => onComputeInvoiceTotals(selectedMove)}
+                      >
+                        <Calculator className="h-4 w-4 mr-2" />
+                        {t("accounting.journalEntries.recalculateInvoiceTotals")}
+                      </Button>
+                    )}
                   {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
                     <Button
                       type="button"

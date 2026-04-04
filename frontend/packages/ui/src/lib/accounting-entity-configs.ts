@@ -89,6 +89,7 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
     ],
     columns: [
       { key: "name", label: t("accounting.entities.fixedAssets.columns.name"), width: "min-w-48" },
+      { key: "active", label: t("accounting.entities.fixedAssets.columns.active"), type: "boolean", align: "center" },
       { key: "state", label: t("accounting.entities.fixedAssets.columns.state"), type: "badge", ...assetStateBadges(t) },
       { key: "acquisitionDate", label: t("accounting.entities.fixedAssets.columns.acquisitionDate"), type: "date" },
       { key: "originalValue", label: t("accounting.entities.fixedAssets.columns.originalValue"), type: "currency", align: "right" },
@@ -97,6 +98,108 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "methodNumberMonth", label: t("accounting.entities.fixedAssets.columns.methodNumberMonth"), type: "number", align: "right" },
     ],
     emptyMessage: t("accounting.entities.fixedAssets.emptyMessage"),
+  },
+})
+
+const paymentStateBadges = (t: TFunction) => ({
+  badgeVariants: {
+    NotPaid: "secondary",
+    Paid: "default",
+    Reversed: "destructive",
+  },
+  badgeLabels: {
+    NotPaid: t("accounting.entities.payments.states.NotPaid"),
+    Paid: t("accounting.entities.payments.states.Paid"),
+    Reversed: t("accounting.entities.payments.states.Reversed"),
+  },
+}) as const
+
+export const accountPaymentsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "account-payments-table",
+  title: t("accounting.entities.payments.title"),
+  description: t("accounting.entities.payments.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.payments.searchPlaceholder"),
+    searchKeys: ["name", "ref"],
+    filters: [
+      {
+        key: "state",
+        label: t("accounting.entities.payments.filters.state"),
+        type: "select",
+        options: [
+          { value: "NotPaid", label: t("accounting.entities.payments.filters.state.options.NotPaid") },
+          { value: "Paid", label: t("accounting.entities.payments.filters.state.options.Paid") },
+          { value: "Reversed", label: t("accounting.entities.payments.filters.state.options.Reversed") },
+        ],
+      },
+    ],
+    columns: [
+      { key: "name", label: t("accounting.entities.payments.columns.name"), width: "min-w-28" },
+      { key: "amount", label: t("accounting.entities.payments.columns.amount"), type: "currency", align: "right" },
+      { key: "state", label: t("accounting.entities.payments.columns.state"), type: "badge", ...paymentStateBadges(t) },
+      { key: "partnerId", label: t("accounting.entities.payments.columns.partnerId"), width: "min-w-24" },
+      { key: "journalId", label: t("accounting.entities.payments.columns.journalId"), width: "min-w-24" },
+      { key: "currencyId", label: t("accounting.entities.payments.columns.currencyId"), width: "min-w-20" },
+    ],
+    emptyMessage: t("accounting.entities.payments.emptyMessage"),
+  },
+})
+
+export const paymentTermsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "payment-terms-table",
+  title: t("accounting.entities.paymentTerms.title"),
+  description: t("accounting.entities.paymentTerms.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.paymentTerms.searchPlaceholder"),
+    searchKeys: ["name", "note"],
+    columns: [
+      { key: "name", label: t("accounting.entities.paymentTerms.columns.name"), width: "min-w-40" },
+      { key: "isActive", label: t("accounting.entities.paymentTerms.columns.isActive"), type: "boolean", align: "center" },
+      { key: "note", label: t("accounting.entities.paymentTerms.columns.note"), width: "min-w-48" },
+    ],
+    emptyMessage: t("accounting.entities.paymentTerms.emptyMessage"),
+  },
+})
+
+const paymentTermLineValueBadges = (t: TFunction) => ({
+  badgeVariants: {
+    Balance: "default",
+    Percent: "secondary",
+    Fixed: "outline",
+  },
+  badgeLabels: {
+    Balance: t("accounting.forms.newPaymentTermLine.fields.valueBalance"),
+    Percent: t("accounting.forms.newPaymentTermLine.fields.valuePercent"),
+    Fixed: t("accounting.forms.newPaymentTermLine.fields.valueFixed"),
+  },
+}) as const
+
+export const paymentTermLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "payment-term-lines-table",
+  title: t("accounting.entities.paymentTerms.lineTitle"),
+  description: t("accounting.entities.paymentTerms.lineDescription"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.paymentTerms.searchPlaceholder"),
+    searchKeys: ["paymentTermId"],
+    columns: [
+      { key: "paymentTermId", label: "Term ID", width: "min-w-24" },
+      { key: "value", label: "Type", type: "badge", ...paymentTermLineValueBadges(t) },
+      { key: "valueAmount", label: "Amount / %", type: "number", align: "right" },
+      { key: "days", label: "Days", type: "number", align: "right" },
+      { key: "months", label: "Months", type: "number", align: "right" },
+      { key: "sequence", label: "Seq", type: "number", align: "right" },
+      { key: "daysAfterEndOfMonth", label: "EOM", type: "boolean", align: "center" },
+    ],
+    emptyMessage: t("accounting.entities.paymentTerms.emptyMessage"),
   },
 })
 
@@ -327,6 +430,9 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "fiscal-years-table": fiscalYearsTableConfig(t),
   "account-periods-table": accountPeriodsTableConfig(t),
   "fixed-assets-table": fixedAssetsTableConfig(t),
+  "account-payments-table": accountPaymentsTableConfig(t),
+  "payment-terms-table": paymentTermsTableConfig(t),
+  "payment-term-lines-table": paymentTermLinesTableConfig(t),
   "analytic-lines-table": analyticLinesTableConfig(t),
   "analytic-distribution-models-table": analyticDistributionModelsTableConfig(t),
   "reconciliation-widgets-table": reconciliationWidgetsTableConfig(t),

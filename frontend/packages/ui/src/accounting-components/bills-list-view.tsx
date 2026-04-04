@@ -42,10 +42,12 @@ import {
   Filter,
   CreditCard,
   Building,
+  Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
+import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 type BillStatus = "draft" | "pending" | "approved" | "partial" | "paid" | "overdue" | "cancelled"
@@ -88,9 +90,16 @@ interface BillsListViewProps {
   onSelectBill?: (bill: AccountMove) => void
   onCreateBill?: () => void
   onPayBill?: (bill: AccountMove) => void
+  onRecalculateTotals?: (bill: AccountMove) => void
 }
 
-export function BillsListView({ bills, onSelectBill, onCreateBill, onPayBill }: BillsListViewProps) {
+export function BillsListView({
+  bills,
+  onSelectBill,
+  onCreateBill,
+  onPayBill,
+  onRecalculateTotals,
+}: BillsListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
@@ -234,6 +243,19 @@ export function BillsListView({ bills, onSelectBill, onCreateBill, onPayBill }: 
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectBill?.(bill) }}>
                             <Eye className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.viewDetails")}
                           </DropdownMenuItem>
+                          {onRecalculateTotals &&
+                            moveStateIsDraft(bill.state) &&
+                            moveTypeIsInvoiceOrRefund(bill.moveType) && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onRecalculateTotals(bill)
+                                }}
+                              >
+                                <Calculator className="h-4 w-4 mr-2" />
+                                {t("accounting.bills.billActions.recalculateTotals")}
+                              </DropdownMenuItem>
+                            )}
                           {bill.amountResidual > 0 && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPayBill?.(bill) }}>
                               <CreditCard className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.payBill")}

@@ -60,6 +60,9 @@ export * from "./lib/purchasing-form-configs";
 export * from "./lib/manufacturing-entity-configs";
 export * from "./lib/manufacturing-form-configs";
 export * from "./lib/manufacturing-row-action-forms";
+export * from "./lib/hr-csv-import-forms";
+export * from "./lib/projects-csv-import-forms";
+export * from "./lib/csv-import-form";
 export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
@@ -83,6 +86,9 @@ export * from "./lib/messages-form-configs";
 export * from "./lib/proposals-entity-configs";
 export * from "./lib/proposals-form-configs";
 export * from "./lib/proposal-workspace-types";
+export * from "./lib/auth-form-configs";
+export * from "./lib/iot-entity-configs";
+export * from "./lib/iot-form-configs";
 
 // Dashboard pages & widgets
 export * from "./pages/dashboard-grid";
@@ -189,6 +195,8 @@ export * from "./accounting-components/invoice-list-view";
 export * from "./accounting-components/invoice-detail-modal";
 export * from "./accounting-components/create-invoice-modal";
 export * from "./accounting-components/bills-list-view";
+export * from "./crm-components/crm-utm-settings";
+export * from "./crm-components/crm-record-chatter";
 export * from "./accounting-components/chart-of-accounts-view";
 export * from "./accounting-components/chart-structure-workspace";
 export * from "./accounting-components/general-ledger-view";

@@ -39,6 +39,7 @@ import {
   CreditCard,
   PiggyBank,
   Receipt,
+  Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -171,11 +172,17 @@ function AccountsTable({ accounts, t }: AccountsTableProps) {
 interface ChartOfAccountsViewProps {
   accounts: AccountAccount[]
   onCreate?: (data: Record<string, unknown>) => void
+  onImportAccountsCsv?: () => void
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
 }
 
-export function ChartOfAccountsView({ accounts, onCreate, chartStructureContent }: ChartOfAccountsViewProps) {
+export function ChartOfAccountsView({
+  accounts,
+  onCreate,
+  onImportAccountsCsv,
+  chartStructureContent,
+}: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -232,9 +239,20 @@ export function ChartOfAccountsView({ accounts, onCreate, chartStructureContent 
       {/* Table */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>{t("accounting.accounts.title")}</CardTitle>
-            <Button onClick={() => setShowCreateModal(true)} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newAccount")}</Button>
+            <div className="flex flex-wrap gap-2">
+              {onImportAccountsCsv ? (
+                <Button type="button" variant="outline" onClick={onImportAccountsCsv} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  {t("accounting.csvImport.toolbarAccounts")}
+                </Button>
+              ) : null}
+              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t("accounting.actions.newAccount")}
+              </Button>
+            </div>
           </div>
           <div className="relative mt-4 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

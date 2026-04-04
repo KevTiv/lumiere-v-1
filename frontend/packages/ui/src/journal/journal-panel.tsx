@@ -1,5 +1,21 @@
 "use client"
 
+/** Minimal Web Speech API typing (Chrome `webkitSpeechRecognition`). */
+interface WebkitSpeechRecognitionInstance {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((ev: WebkitSpeechRecognitionResultEvent) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+interface WebkitSpeechRecognitionResultEvent {
+  resultIndex: number
+  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>
+}
+
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -42,8 +58,8 @@ import {
   workNotesConfigs,
   defaultWorkNotesConfig,
   noteTypeConfig,
-  priorityConfig,
-  statusConfig,
+  notePriorityConfig,
+  noteStatusConfig,
   sampleWorkNotes,
   type WorkNote,
   type NoteType,
@@ -120,7 +136,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   const [filterStatus, setFilterStatus] = useState<NoteStatus | "all">("all")
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<WebkitSpeechRecognitionInstance | null>(null)
 
   // Floating panel state
   const [position, setPosition] = useState<Position>({ x: -1, y: -1 })
@@ -269,12 +285,16 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
-      const SpeechRecognition = window.webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
+      const Ctor = (
+        window as unknown as {
+          webkitSpeechRecognition: new () => WebkitSpeechRecognitionInstance
+        }
+      ).webkitSpeechRecognition
+      recognitionRef.current = new Ctor()
       recognitionRef.current.continuous = true
       recognitionRef.current.interimResults = true
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: WebkitSpeechRecognitionResultEvent) => {
         let transcript = ""
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript
@@ -507,7 +527,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                     <Circle className={cn("h-3 w-3 mr-2", filterStatus === "all" && "text-primary")} />
                     All Status
                   </DropdownMenuItem>
-                  {Object.entries(statusConfig).map(([status, config]) => (
+                  {Object.entries(noteStatusConfig).map(([status, config]) => (
                     <DropdownMenuItem key={status} onClick={() => setFilterStatus(status as NoteStatus)}>
                       <span className={cn("h-3 w-3 mr-2", config.color)}>
                         {status === "active" ? <Circle className="h-3 w-3" /> :
@@ -581,7 +601,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                     {/* Priority */}
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-muted-foreground">Priority:</span>
-                      {Object.entries(priorityConfig).map(([p, pConfig]) => (
+                      {Object.entries(notePriorityConfig).map(([p, pConfig]) => (
                         <button
                           key={p}
                           onClick={() => setPriority(p as NotePriority)}
@@ -699,9 +719,9 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                             {noteTypeConfig[note.type].label}
                           </Badge>
                           {note.priority !== "normal" && (
-                            <span className={cn("flex items-center gap-1 text-[10px]", priorityConfig[note.priority].color)}>
-                              <span className={cn("w-1.5 h-1.5 rounded-full", priorityConfig[note.priority].dotColor)} />
-                              {priorityConfig[note.priority].label}
+                            <span className={cn("flex items-center gap-1 text-[10px]", notePriorityConfig[note.priority].color)}>
+                              <span className={cn("w-1.5 h-1.5 rounded-full", notePriorityConfig[note.priority].dotColor)} />
+                              {notePriorityConfig[note.priority].label}
                             </span>
                           )}
                           {note.linkedTaskId && (

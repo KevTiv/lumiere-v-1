@@ -27,10 +27,12 @@ import {
   FileText,
   Clock,
   CheckCircle2,
+  Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
+import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
@@ -58,8 +60,10 @@ interface InvoiceDetailModalProps {
   onClose: () => void
   onPostDraft?: () => void
   onRecordPayment?: () => void
+  onRecalculateTotals?: () => void
   postDraftPending?: boolean
   recordPaymentPending?: boolean
+  recalculateTotalsPending?: boolean
 }
 
 export function InvoiceDetailModal({
@@ -68,8 +72,10 @@ export function InvoiceDetailModal({
   onClose,
   onPostDraft,
   onRecordPayment,
+  onRecalculateTotals,
   postDraftPending,
   recordPaymentPending,
+  recalculateTotalsPending,
 }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
 
@@ -138,6 +144,21 @@ export function InvoiceDetailModal({
             <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
               <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
             </Button>
+            {isDraft &&
+              moveTypeIsInvoiceOrRefund(invoice.moveType) &&
+              onRecalculateTotals && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={recalculateTotalsPending}
+                  onClick={() => onRecalculateTotals()}
+                >
+                  <Calculator className="h-4 w-4" />
+                  {t("accounting.invoices.invoiceActions.recalculateTotals")}
+                </Button>
+              )}
             {isDraft && onPostDraft && (
               <Button
                 type="button"

@@ -66,6 +66,22 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           label: t("documents.forms.newDocument.fields.isShared"),
           width: "1/2",
         },
+        {
+          id: "folderId",
+          name: "folderId",
+          type: "text",
+          label: t("documents.forms.newDocument.fields.folderId"),
+          placeholder: t("documents.forms.newDocument.fields.folderIdHint"),
+          width: "1/2",
+        },
+        {
+          id: "tagIds",
+          name: "tagIds",
+          type: "text",
+          label: t("documents.forms.newDocument.fields.tagIds"),
+          placeholder: t("documents.forms.newDocument.fields.tagIdsHint"),
+          width: "full",
+        },
       ],
     },
   ],
@@ -114,6 +130,163 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
           label: t("documents.forms.newArticle.fields.isPublished"),
           width: "1/2",
         },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "text",
+          label: t("documents.forms.newArticle.fields.parentId"),
+          placeholder: t("documents.forms.newArticle.fields.parentIdHint"),
+          width: "1/2",
+        },
+        {
+          id: "categoryId",
+          name: "categoryId",
+          type: "text",
+          label: t("documents.forms.newArticle.fields.categoryId"),
+          placeholder: t("documents.forms.newArticle.fields.categoryIdHint"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
+  id: "new-document-processing-job",
+  title: t("documents.forms.newProcessingJob.title"),
+  description: t("documents.forms.newProcessingJob.description"),
+  sections: [
+    {
+      id: "job-params",
+      title: t("documents.forms.newProcessingJob.sections.params"),
+      fields: [
+        {
+          id: "documentType",
+          name: "documentType",
+          type: "text",
+          label: t("documents.forms.newProcessingJob.fields.documentType"),
+          placeholder: t("documents.forms.newProcessingJob.fields.documentTypePlaceholder"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "jobType",
+          name: "jobType",
+          type: "text",
+          label: t("documents.forms.newProcessingJob.fields.jobType"),
+          placeholder: t("documents.forms.newProcessingJob.fields.jobTypePlaceholder"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "aiAgentId",
+          name: "aiAgentId",
+          type: "text",
+          label: t("documents.forms.newProcessingJob.fields.aiAgentId"),
+          placeholder: t("documents.forms.newProcessingJob.fields.aiAgentIdPlaceholder"),
+          width: "full",
+        },
+        {
+          id: "inputData",
+          name: "inputData",
+          type: "textarea",
+          label: t("documents.forms.newProcessingJob.fields.inputData"),
+          placeholder: t("documents.forms.newProcessingJob.fields.inputDataPlaceholder"),
+          width: "full",
+          rows: 4,
+        },
+        {
+          id: "metadata",
+          name: "metadata",
+          type: "textarea",
+          label: t("documents.forms.newProcessingJob.fields.metadata"),
+          placeholder: t("documents.forms.newProcessingJob.fields.metadataPlaceholder"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const completeDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
+  id: "complete-document-processing-job",
+  title: t("documents.forms.completeProcessingJob.title"),
+  description: t("documents.forms.completeProcessingJob.description"),
+  sections: [
+    {
+      id: "result",
+      title: t("documents.forms.completeProcessingJob.sections.result"),
+      fields: [
+        {
+          id: "extractedData",
+          name: "extractedData",
+          type: "textarea",
+          label: t("documents.forms.completeProcessingJob.fields.extractedData"),
+          placeholder: t("documents.forms.completeProcessingJob.fields.extractedDataPlaceholder"),
+          width: "full",
+          rows: 6,
+        },
+        {
+          id: "modelUsed",
+          name: "modelUsed",
+          type: "text",
+          label: t("documents.forms.completeProcessingJob.fields.modelUsed"),
+          width: "1/2",
+        },
+        {
+          id: "confidenceScore",
+          name: "confidenceScore",
+          type: "number",
+          label: t("documents.forms.completeProcessingJob.fields.confidenceScore"),
+          width: "1/2",
+        },
+        {
+          id: "tokensUsed",
+          name: "tokensUsed",
+          type: "number",
+          label: t("documents.forms.completeProcessingJob.fields.tokensUsed"),
+          width: "1/2",
+        },
+        {
+          id: "cost",
+          name: "cost",
+          type: "number",
+          label: t("documents.forms.completeProcessingJob.fields.cost"),
+          width: "1/2",
+        },
+        {
+          id: "errorMessage",
+          name: "errorMessage",
+          type: "textarea",
+          label: t("documents.forms.completeProcessingJob.fields.errorMessage"),
+          placeholder: t("documents.forms.completeProcessingJob.fields.errorMessagePlaceholder"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const acknowledgeDocumentInsightForm = (t: TFunction): FormConfig => ({
+  id: "acknowledge-document-insight",
+  title: t("documents.forms.acknowledgeInsight.title"),
+  description: t("documents.forms.acknowledgeInsight.description"),
+  sections: [
+    {
+      id: "note",
+      title: t("documents.forms.acknowledgeInsight.sections.note"),
+      fields: [
+        {
+          id: "actionTaken",
+          name: "actionTaken",
+          type: "textarea",
+          label: t("documents.forms.acknowledgeInsight.fields.actionTaken"),
+          placeholder: t("documents.forms.acknowledgeInsight.fields.actionTakenPlaceholder"),
+          width: "full",
+          rows: 3,
+        },
       ],
     },
   ],
@@ -122,4 +295,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
 export const documentsFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-document": newDocumentForm(t),
   "new-knowledge-article": newKnowledgeArticleForm(t),
+  "new-document-processing-job": newDocumentProcessingJobForm(t),
+  "complete-document-processing-job": completeDocumentProcessingJobForm(t),
+  "acknowledge-document-insight": acknowledgeDocumentInsightForm(t),
 })

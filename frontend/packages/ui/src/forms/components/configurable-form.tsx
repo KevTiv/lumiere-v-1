@@ -38,6 +38,8 @@ interface ConfigurableFormProps {
   className?: string
   layout?: "vertical" | "horizontal" | "sections"
   showDescription?: boolean
+  /** When false, hides cancel/submit footer (e.g. read-only preview). */
+  showActions?: boolean
 }
 
 export function ConfigurableForm({
@@ -52,6 +54,7 @@ export function ConfigurableForm({
   className,
   layout = "vertical",
   showDescription = true,
+  showActions = true,
 }: ConfigurableFormProps) {
   const { t } = useTranslation()
   const resolvedSubmitLabel = submitLabel ?? t("common.submit")
@@ -249,18 +252,19 @@ export function ConfigurableForm({
           />
         )}
 
-        {/* Form Actions */}
-        <div className="flex justify-end gap-4 pt-4">
-          {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel} disabled={disabled}>
-              {resolvedCancelLabel}
+        {showActions ? (
+          <div className="flex justify-end gap-4 pt-4">
+            {onCancel && (
+              <Button type="button" variant="outline" onClick={onCancel} disabled={disabled}>
+                {resolvedCancelLabel}
+              </Button>
+            )}
+            <Button type="submit" disabled={disabled || form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {resolvedSubmitLabel}
             </Button>
-          )}
-          <Button type="submit" disabled={disabled || form.formState.isSubmitting}>
-            {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {resolvedSubmitLabel}
-          </Button>
-        </div>
+          </div>
+        ) : null}
       </form>
     </Form>
   )

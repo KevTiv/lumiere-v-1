@@ -35,7 +35,8 @@ export interface Calendar {
   description?: string
 }
 
-export interface CalendarView {
+/** Persisted calendar UI state (not the React `CalendarView` component). */
+export interface CalendarViewportState {
   mode: ViewMode
   date: Date
   eventsCount?: number

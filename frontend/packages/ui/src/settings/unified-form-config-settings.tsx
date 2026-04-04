@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
 import {
@@ -8,7 +8,11 @@ import {
   seedOrganizationFormConfigs,
   addFormField,
   setFormRoleConfig,
+  updateFormField,
+  deleteFormField,
+  initializeDefaultFormConfigs,
   type CreateFormFieldParams as StdbCreateFormFieldParams,
+  type UpdateFormFieldParams,
 } from "@lumiere/stdb"
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
@@ -16,6 +20,9 @@ import { formRegistry } from "../forms/config/registry"
 import type { FormRegistryEntry, FormModuleMetadata, FieldType, ParsedFormField } from "../forms/config/types"
 import { generateCustomFieldId, parseRoleConfig } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
+import { ConfigurableForm } from "../forms/components/configurable-form"
+import { pushRegistryFormToDatabase } from "../forms/utils/push-registry-form"
+import { formValidationToStdb } from "../forms/utils/stdb-field-params"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -344,6 +351,15 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
     return out
   }, [sourceRoleConfigs, formEntry])
 
+  const roleKeysForPreview = useMemo(() => Object.keys(roleConfigsForTabs), [roleConfigsForTabs])
+  const [previewRoleId, setPreviewRoleId] = useState("role-admin")
+  useEffect(() => {
+    if (roleKeysForPreview.length === 0) return
+    if (!roleKeysForPreview.includes(previewRoleId)) {
+      setPreviewRoleId(roleKeysForPreview[0])
+    }
+  }, [roleKeysForPreview, previewRoleId])
+
   const handleSeed = useCallback(async () => {
     if (!organizationId) {
       toast.error(t("settings.formConfig.noOrganization"))
@@ -360,6 +376,81 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       setIsSaving(false)
     }
   }, [organizationId, refetch, t])
+
+  const handlePushRegistry = useCallback(async () => {
+    if (!organizationId) {
+      toast.error(t("settings.formConfig.noOrganization"))
+      return
+    }
+    if (!canEditForms) {
+      toast.error(t("settings.formConfig.noPermission"))
+      return
+    }
+    try {
+      setIsSaving(true)
+      await pushRegistryFormToDatabase(organizationId, formEntry)
+      toast.success(t("settings.formConfig.pushRegistrySuccess"))
+      refetch()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("settings.formConfig.pushRegistryError"))
+    } finally {
+      setIsSaving(false)
+    }
+  }, [organizationId, canEditForms, formEntry, refetch, t])
+
+  const handleInitJournalForensic = useCallback(async () => {
+    if (!organizationId) {
+      toast.error(t("settings.formConfig.noOrganization"))
+      return
+    }
+    try {
+      setIsSaving(true)
+      await initializeDefaultFormConfigs(BigInt(organizationId))
+      toast.success(t("settings.formConfig.initDefaultsSuccess"))
+      refetch()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("settings.formConfig.initDefaultsError"))
+    } finally {
+      setIsSaving(false)
+    }
+  }, [organizationId, refetch, t])
+
+  const handleToggleFieldEnabled = useCallback(
+    async (field: ParsedFormField, next: boolean) => {
+      if (!organizationId || !dbConfigurationId || !canEditForms) return
+      try {
+        setIsSaving(true)
+        await updateFormField(BigInt(organizationId), BigInt(dbConfigurationId), field.fieldId, {
+          isEnabled: next,
+        } as UpdateFormFieldParams)
+        toast.success(t("settings.formConfig.fieldEnabledUpdated"))
+        refetch()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t("settings.formConfig.fieldUpdateError"))
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [organizationId, dbConfigurationId, canEditForms, refetch, t],
+  )
+
+  const handleDeleteField = useCallback(
+    async (field: ParsedFormField) => {
+      if (!organizationId || !dbConfigurationId || !canEditForms) return
+      if (field.isSystem) return
+      try {
+        setIsSaving(true)
+        await deleteFormField(BigInt(organizationId), BigInt(dbConfigurationId), field.fieldId)
+        toast.success(t("settings.formConfig.fieldDeleted"))
+        refetch()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t("settings.formConfig.fieldDeleteError"))
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [organizationId, dbConfigurationId, canEditForms, refetch, t],
+  )
 
   const handleAddCustomField = useCallback(async () => {
     if (!organizationId || !dbConfigurationId) {
@@ -386,7 +477,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       placeholder: undefined,
       defaultValue: undefined,
       options: [],
-      validation: { required: fieldRequired },
+      validation: formValidationToStdb({ required: fieldRequired }),
       aiSuggestions: [],
       order: maxOrder + 1,
       isSystem: false,
@@ -395,7 +486,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       showInList: false,
       width: { tag: "Full" as const },
       sectionId: undefined,
-    } as StdbCreateFormFieldParams
+    } as unknown as StdbCreateFormFieldParams
 
     try {
       setIsSaving(true)
@@ -457,12 +548,33 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
           <h3 className="text-lg font-semibold">{formEntry.name}</h3>
           <p className="text-sm text-muted-foreground">{formEntry.description}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {organizationId && dbConfigurationId === 0 && (
-            <Button variant="outline" size="sm" className="gap-2" disabled={isSaving || !connected} onClick={() => void handleSeed()}>
-              <RefreshCw className={cn("h-4 w-4", isSaving && "animate-spin")} />
-              {t("settings.formConfig.seedDatabase")}
-            </Button>
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-2"
+                disabled={isSaving || !connected || !canEditForms}
+                onClick={() => void handlePushRegistry()}
+              >
+                <Save className={cn("h-4 w-4", isSaving && "animate-spin")} />
+                {t("settings.formConfig.createFromRegistry")}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" disabled={isSaving || !connected} onClick={() => void handleSeed()}>
+                <RefreshCw className={cn("h-4 w-4", isSaving && "animate-spin")} />
+                {t("settings.formConfig.seedDatabase")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={isSaving || !connected}
+                onClick={() => void handleInitJournalForensic()}
+              >
+                {t("settings.formConfig.initJournalForensic")}
+              </Button>
+            </>
           )}
           <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
             <RotateCcw className="h-4 w-4" />
@@ -493,9 +605,10 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       ) : null}
 
       <Tabs defaultValue="fields" className="w-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 lg:w-100">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:max-w-3xl">
           <TabsTrigger value="fields">{t("settings.formConfig.tabs.fields")}</TabsTrigger>
           <TabsTrigger value="roles">{t("settings.formConfig.tabs.roles")}</TabsTrigger>
+          <TabsTrigger value="preview">{t("settings.formConfig.tabs.preview")}</TabsTrigger>
           <TabsTrigger value="import">{t("settings.formConfig.tabs.importExport")}</TabsTrigger>
         </TabsList>
 
@@ -539,8 +652,10 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
                     key={field.fieldId}
                     field={field}
                     index={index}
+                    canMutate={canEditForms && !!dbConfigurationId && !isSaving}
                     onEdit={() => setIsFieldDialogOpen(true)}
-                    onToggleEnabled={() => {}}
+                    onToggleEnabled={(f, next) => void handleToggleFieldEnabled(f, next)}
+                    onDelete={(f) => void handleDeleteField(f)}
                   />
                 ))}
               </div>
@@ -587,6 +702,38 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="preview" className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t("settings.formConfig.preview.description")}</p>
+          {roleKeysForPreview.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Label className="text-sm shrink-0">{t("settings.formConfig.preview.asRole")}</Label>
+              <Select value={previewRoleId} onValueChange={setPreviewRoleId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleKeysForPreview.map((rid) => (
+                    <SelectItem key={rid} value={rid}>
+                      {rid}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          <div className="border rounded-lg p-4 max-h-125 overflow-y-auto bg-muted/20">
+            <FormConfigLivePreview
+              organizationId={organizationId ?? 0}
+              formEntry={formEntry}
+              roleId={
+                roleKeysForPreview.includes(previewRoleId)
+                  ? previewRoleId
+                  : roleKeysForPreview[0]
+              }
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="import" className="space-y-4">
@@ -692,26 +839,71 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
   )
 }
 
+// ── Live preview (persisted + role-filtered fields) ──────────────────────────
+function FormConfigLivePreview({
+  organizationId,
+  formEntry,
+  roleId,
+}: {
+  organizationId: number
+  formEntry: FormRegistryEntry
+  roleId: string | undefined
+}) {
+  const { t } = useTranslation()
+  const { config, isLoading, error } = useFormConfiguration({
+    moduleId: formEntry.moduleId,
+    formId: formEntry.formId,
+    organizationId,
+    roleId,
+    useDefaultIfMissing: true,
+    forAdminSettings: false,
+  })
+
+  if (!organizationId) {
+    return <p className="text-sm text-muted-foreground">{t("settings.formConfig.noOrganization")}</p>
+  }
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>
+  }
+
+  return (
+    <ConfigurableForm
+      config={config}
+      isLoading={isLoading}
+      onSubmit={async () => {}}
+      showActions={false}
+      disabled
+      submitLabel={t("settings.formConfig.preview.submitHidden")}
+    />
+  )
+}
+
 // ── Field Config Card ───────────────────────────────────────────────────────
 // Defined outside UnifiedFormConfigSettings to avoid re-creating on each render
 interface FieldConfigCardProps {
   field: ParsedFormField
   index: number
+  canMutate: boolean
   onEdit: () => void
-  onToggleEnabled: () => void
+  onToggleEnabled: (field: ParsedFormField, next: boolean) => void
+  onDelete: (field: ParsedFormField) => void
 }
 
-function FieldConfigCard({ field, index, onEdit, onToggleEnabled }: FieldConfigCardProps) {
+function FieldConfigCard({
+  field,
+  onEdit,
+  onToggleEnabled,
+  onDelete,
+  canMutate,
+}: FieldConfigCardProps) {
   const { t } = useTranslation()
-  const [isEnabled, setIsEnabled] = useState(field.isEnabled)
 
   const handleToggle = () => {
-    setIsEnabled(!isEnabled)
-    onToggleEnabled()
+    onToggleEnabled(field, !field.isEnabled)
   }
 
   return (
-    <Card className={cn("transition-all", !isEnabled && "opacity-50")}>
+    <Card className={cn("transition-all", !field.isEnabled && "opacity-50")}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="mt-1 cursor-move">
@@ -738,8 +930,8 @@ function FieldConfigCard({ field, index, onEdit, onToggleEnabled }: FieldConfigC
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={handleToggle}>
-              {isEnabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            <Button variant="ghost" size="icon" onClick={handleToggle} disabled={!canMutate}>
+              {field.isEnabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -757,7 +949,11 @@ function FieldConfigCard({ field, index, onEdit, onToggleEnabled }: FieldConfigC
                   {t("settings.formConfig.fieldCard.duplicate")}
                 </DropdownMenuItem>
                 {!field.isSystem && (
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    disabled={!canMutate}
+                    onClick={() => onDelete(field)}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     {t("settings.formConfig.fieldCard.delete")}
                   </DropdownMenuItem>

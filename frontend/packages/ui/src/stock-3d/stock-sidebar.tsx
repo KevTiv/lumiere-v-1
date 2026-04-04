@@ -114,7 +114,7 @@ export function StockSidebar({ className }: StockSidebarProps) {
                   key={mode}
                   onClick={() => {
                     setViewMode(mode)
-                    if (mode !== 'category') setFilterCategory(null)
+                    setFilterCategory(null)
                   }}
                   className={cn(
                     'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',

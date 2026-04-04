@@ -103,14 +103,14 @@ export const noteTypeConfig: Record<NoteType, { label: string; icon: string; col
   },
 }
 
-export const priorityConfig: Record<NotePriority, { label: string; color: string; dotColor: string }> = {
+export const notePriorityConfig: Record<NotePriority, { label: string; color: string; dotColor: string }> = {
   low: { label: "Low", color: "text-muted-foreground", dotColor: "bg-muted-foreground" },
   normal: { label: "Normal", color: "text-foreground", dotColor: "bg-foreground" },
   high: { label: "High", color: "text-warning", dotColor: "bg-warning" },
   urgent: { label: "Urgent", color: "text-destructive", dotColor: "bg-destructive" },
 }
 
-export const statusConfig: Record<NoteStatus, { label: string; color: string }> = {
+export const noteStatusConfig: Record<NoteStatus, { label: string; color: string }> = {
   active: { label: "Active", color: "text-info" },
   resolved: { label: "Resolved", color: "text-success" },
   archived: { label: "Archived", color: "text-muted-foreground" },

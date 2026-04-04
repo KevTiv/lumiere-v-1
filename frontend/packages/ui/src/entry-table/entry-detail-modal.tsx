@@ -136,7 +136,9 @@ export function EntryDetailModal({
           displayValue = value ? "Yes" : "No"
           break
         case "select": {
-          const selectField = field as { options?: Array<{ value: string; label: string }> }
+          const selectField = field as unknown as {
+            options?: ReadonlyArray<{ value: string; label: string }>
+          }
           const option = selectField.options?.find((o) => o.value === String(value))
           displayValue = option?.label || String(value)
           break

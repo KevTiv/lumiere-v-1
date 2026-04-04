@@ -500,6 +500,142 @@ export const replenishmentRulesTableConfig = (t: TFunction): EntityViewConfig =>
   },
 })
 
+export const productCategoriesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "product-categories-table",
+  title: t("inventory.productCategories.title"),
+  description: t("inventory.productCategories.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.productCategories.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("inventory.productCategories.columns.name"), width: "min-w-48" },
+      { key: "parentId", label: t("inventory.productCategories.columns.parentId"), width: "min-w-24" },
+      { key: "active", label: t("inventory.productCategories.columns.active"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.productCategories.emptyMessage"),
+  },
+})
+
+export const barcodeRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "barcode-rules-table",
+  title: t("inventory.barcodeRules.title"),
+  description: t("inventory.barcodeRules.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.barcodeRules.searchPlaceholder"),
+    searchKeys: ["name", "pattern"],
+    columns: [
+      { key: "name", label: t("inventory.barcodeRules.columns.name"), width: "min-w-40" },
+      { key: "pattern", label: t("inventory.barcodeRules.columns.pattern"), width: "min-w-36" },
+      { key: "encoding", label: t("inventory.barcodeRules.columns.encoding"), width: "min-w-24" },
+      { key: "isActive", label: t("inventory.barcodeRules.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.barcodeRules.emptyMessage"),
+  },
+})
+
+export const adjustmentReasonsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "adjustment-reasons-table",
+  title: t("inventory.adjustmentReasons.title"),
+  description: t("inventory.adjustmentReasons.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.adjustmentReasons.searchPlaceholder"),
+    searchKeys: ["code", "description"],
+    columns: [
+      { key: "code", label: t("inventory.adjustmentReasons.columns.code"), width: "min-w-28" },
+      { key: "description", label: t("inventory.adjustmentReasons.columns.description"), width: "min-w-48" },
+      { key: "isActive", label: t("inventory.adjustmentReasons.columns.isActive"), type: "boolean" },
+      { key: "isSystem", label: t("inventory.adjustmentReasons.columns.isSystem"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.adjustmentReasons.emptyMessage"),
+  },
+})
+
+export const barcodeNomenclaturesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "barcode-nomenclatures-table",
+  title: t("inventory.barcodeNomenclatures.title"),
+  description: t("inventory.barcodeNomenclatures.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.barcodeNomenclatures.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("inventory.barcodeNomenclatures.columns.name"), width: "min-w-40" },
+      { key: "ruleIds", label: t("inventory.barcodeNomenclatures.columns.ruleIds"), width: "min-w-36" },
+      { key: "isDefault", label: t("inventory.barcodeNomenclatures.columns.isDefault"), type: "boolean" },
+      { key: "isActive", label: t("inventory.barcodeNomenclatures.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("inventory.barcodeNomenclatures.emptyMessage"),
+  },
+})
+
+export const traceabilityRecordsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "traceability-records-table",
+  title: t("inventory.traceabilityRecords.title"),
+  description: t("inventory.traceabilityRecords.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.traceabilityRecords.searchPlaceholder"),
+    searchKeys: ["documentType", "origin"],
+    columns: [
+      { key: "productId", label: t("inventory.traceabilityRecords.columns.productId"), width: "min-w-24" },
+      { key: "documentType", label: t("inventory.traceabilityRecords.columns.documentType"), width: "min-w-28" },
+      { key: "documentId", label: t("inventory.traceabilityRecords.columns.documentId"), width: "min-w-24" },
+      {
+        key: "quantity",
+        label: t("inventory.traceabilityRecords.columns.quantity"),
+        type: "number",
+        align: "right",
+      },
+      { key: "uomId", label: t("inventory.traceabilityRecords.columns.uomId"), width: "min-w-20" },
+      { key: "date", label: t("inventory.traceabilityRecords.columns.date"), type: "datetime" },
+    ],
+    emptyMessage: t("inventory.traceabilityRecords.emptyMessage"),
+  },
+})
+
+const traceReportStateBadges = (t: TFunction) => ({
+  badgeVariants: { draft: "secondary", running: "outline", done: "default", error: "destructive" },
+  badgeLabels: {
+    draft: t("inventory.traceabilityReports.states.draft"),
+    running: t("inventory.traceabilityReports.states.running"),
+    done: t("inventory.traceabilityReports.states.done"),
+    error: t("inventory.traceabilityReports.states.error"),
+  },
+})
+
+export const traceabilityReportsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "traceability-reports-table",
+  title: t("inventory.traceabilityReports.title"),
+  description: t("inventory.traceabilityReports.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.traceabilityReports.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("inventory.traceabilityReports.columns.name"), width: "min-w-40" },
+      { key: "state", label: t("inventory.traceabilityReports.columns.state"), type: "badge", ...traceReportStateBadges(t) },
+      { key: "dateFrom", label: t("inventory.traceabilityReports.columns.dateFrom"), type: "datetime" },
+      { key: "dateTo", label: t("inventory.traceabilityReports.columns.dateTo"), type: "datetime" },
+    ],
+    emptyMessage: t("inventory.traceabilityReports.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "products-table": productsTableConfig(t),
@@ -519,4 +655,10 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "stock-moves-table": stockMovesTableConfig(t),
   "inventory-valuations-table": inventoryValuationsTableConfig(t),
   "replenishment-rules-table": replenishmentRulesTableConfig(t),
+  "product-categories-table": productCategoriesTableConfig(t),
+  "barcode-rules-table": barcodeRulesTableConfig(t),
+  "adjustment-reasons-table": adjustmentReasonsTableConfig(t),
+  "barcode-nomenclatures-table": barcodeNomenclaturesTableConfig(t),
+  "traceability-records-table": traceabilityRecordsTableConfig(t),
+  "traceability-reports-table": traceabilityReportsTableConfig(t),
 })

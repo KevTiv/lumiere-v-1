@@ -212,7 +212,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
                 className="flex-1 text-xs font-medium bg-transparent border-0 outline-none text-foreground"
               />
               <span className="text-xs text-muted-foreground shrink-0">
-                {t("proposalWorkspace.documentInputPanel.wordCount", { count: activeSource.wordCount.toLocaleString() })}
+                {t("proposalWorkspace.documentInputPanel.wordCount", { count: activeSource.wordCount })}
               </span>
               <Button size="sm" variant="ghost" onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
                 <Clipboard className="h-3.5 w-3.5" />

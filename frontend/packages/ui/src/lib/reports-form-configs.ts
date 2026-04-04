@@ -683,6 +683,298 @@ export const newTrialBalanceEntryForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newDashboardForm = (t: TFunction): FormConfig => ({
+  id: "new-dashboard",
+  title: t("reports.forms.dashboard.title"),
+  description: t("reports.forms.dashboard.description"),
+  sections: [
+    {
+      id: "dashboard-main",
+      title: t("reports.forms.dashboard.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("reports.forms.dashboard.fields.name"),
+          placeholder: t("reports.forms.dashboard.fields.namePlaceholder"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("reports.forms.dashboard.fields.description"),
+          placeholder: t("reports.forms.dashboard.fields.descriptionPlaceholder"),
+          width: "full",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("reports.forms.dashboard.fields.isActive"),
+          width: "1/2",
+          defaultValue: true,
+        },
+      ],
+    },
+  ],
+})
+
+export const newDashboardWidgetForm = (t: TFunction): FormConfig => ({
+  id: "new-dashboard-widget",
+  title: t("reports.forms.dashboardWidget.title"),
+  description: t("reports.forms.dashboardWidget.description"),
+  sections: [
+    {
+      id: "widget-main",
+      title: t("reports.forms.dashboardWidget.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("reports.forms.dashboardWidget.fields.name"),
+          placeholder: t("reports.forms.dashboardWidget.fields.namePlaceholder"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "widgetType",
+          name: "widgetType",
+          type: "select",
+          label: t("reports.forms.dashboardWidget.fields.widgetType"),
+          required: true,
+          width: "1/2",
+          defaultValue: "kpi",
+          options: [
+            { value: "kpi", label: t("reports.forms.dashboardWidget.types.kpi") },
+            { value: "chart", label: t("reports.forms.dashboardWidget.types.chart") },
+            { value: "table", label: t("reports.forms.dashboardWidget.types.table") },
+            { value: "metric", label: t("reports.forms.dashboardWidget.types.metric") },
+            { value: "area-chart", label: t("reports.forms.dashboardWidget.types.areaChart") },
+            { value: "bar-chart", label: t("reports.forms.dashboardWidget.types.barChart") },
+          ],
+        },
+        {
+          id: "dataSource",
+          name: "dataSource",
+          type: "text",
+          label: t("reports.forms.dashboardWidget.fields.dataSource"),
+          placeholder: t("reports.forms.dashboardWidget.fields.dataSourcePlaceholder"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const addWidgetToDashboardForm = (t: TFunction): FormConfig => ({
+  id: "add-widget-to-dashboard",
+  title: t("reports.forms.addWidgetToDashboard.title"),
+  description: t("reports.forms.addWidgetToDashboard.description"),
+  sections: [
+    {
+      id: "add-widget",
+      title: t("reports.forms.addWidgetToDashboard.sections.layout"),
+      fields: [
+        {
+          id: "widgetId",
+          name: "widgetId",
+          type: "select",
+          label: t("reports.forms.addWidgetToDashboard.fields.widgetId"),
+          required: true,
+          width: "full",
+          options: [],
+        },
+        {
+          id: "x",
+          name: "x",
+          type: "text",
+          label: t("reports.forms.addWidgetToDashboard.fields.x"),
+          width: "1/4",
+          defaultValue: "0",
+        },
+        {
+          id: "y",
+          name: "y",
+          type: "text",
+          label: t("reports.forms.addWidgetToDashboard.fields.y"),
+          width: "1/4",
+          defaultValue: "0",
+        },
+        {
+          id: "width",
+          name: "width",
+          type: "select",
+          label: t("reports.forms.addWidgetToDashboard.fields.width"),
+          width: "1/4",
+          defaultValue: "1/2",
+          options: [
+            { value: "1/4", label: "25%" },
+            { value: "1/3", label: "33%" },
+            { value: "1/2", label: "50%" },
+            { value: "2/3", label: "66%" },
+            { value: "3/4", label: "75%" },
+            { value: "full", label: "100%" },
+          ],
+        },
+        {
+          id: "height",
+          name: "height",
+          type: "text",
+          label: t("reports.forms.addWidgetToDashboard.fields.height"),
+          width: "1/4",
+          defaultValue: "200",
+        },
+      ],
+    },
+  ],
+})
+
+export const updateWidgetLayoutForm = (t: TFunction): FormConfig => ({
+  id: "update-widget-layout",
+  title: t("reports.forms.updateWidgetLayout.title"),
+  description: t("reports.forms.updateWidgetLayout.description"),
+  sections: [
+    {
+      id: "layout",
+      title: t("reports.forms.updateWidgetLayout.sections.layout"),
+      fields: [
+        {
+          id: "x",
+          name: "x",
+          type: "text",
+          label: t("reports.forms.updateWidgetLayout.fields.x"),
+          width: "1/4",
+        },
+        {
+          id: "y",
+          name: "y",
+          type: "text",
+          label: t("reports.forms.updateWidgetLayout.fields.y"),
+          width: "1/4",
+        },
+        {
+          id: "width",
+          name: "width",
+          type: "select",
+          label: t("reports.forms.updateWidgetLayout.fields.width"),
+          width: "1/4",
+          options: [
+            { value: "1/4", label: "25%" },
+            { value: "1/3", label: "33%" },
+            { value: "1/2", label: "50%" },
+            { value: "2/3", label: "66%" },
+            { value: "3/4", label: "75%" },
+            { value: "full", label: "100%" },
+          ],
+        },
+        {
+          id: "height",
+          name: "height",
+          type: "text",
+          label: t("reports.forms.updateWidgetLayout.fields.height"),
+          width: "1/4",
+        },
+      ],
+    },
+  ],
+})
+
+export const shareDashboardForm = (t: TFunction): FormConfig => ({
+  id: "share-dashboard",
+  title: t("reports.forms.shareDashboard.title"),
+  description: t("reports.forms.shareDashboard.description"),
+  sections: [
+    {
+      id: "share",
+      title: t("reports.forms.shareDashboard.sections.share"),
+      fields: [
+        {
+          id: "userId",
+          name: "userId",
+          type: "select",
+          label: t("reports.forms.shareDashboard.fields.userId"),
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "teamId",
+          name: "teamId",
+          type: "select",
+          label: t("reports.forms.shareDashboard.fields.teamId"),
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "permissions",
+          name: "permissions",
+          type: "select",
+          label: t("reports.forms.shareDashboard.fields.permissions"),
+          width: "full",
+          defaultValue: "read",
+          options: [
+            { value: "read", label: t("reports.forms.shareDashboard.permissions.read") },
+            { value: "write", label: t("reports.forms.shareDashboard.permissions.write") },
+            { value: "admin", label: t("reports.forms.shareDashboard.permissions.admin") },
+          ],
+        },
+      ],
+    },
+  ],
+})
+
+export const updateFinancialReportForm = (t: TFunction): FormConfig => ({
+  id: "update-financial-report",
+  title: t("reports.forms.updateFinancialReport.title"),
+  description: t("reports.forms.updateFinancialReport.description"),
+  sections: [
+    {
+      id: "update",
+      title: t("reports.forms.updateFinancialReport.sections.update"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("reports.forms.updateFinancialReport.fields.name"),
+          width: "full",
+        },
+        {
+          id: "reportType",
+          name: "reportType",
+          type: "select",
+          label: t("reports.forms.updateFinancialReport.fields.reportType"),
+          width: "1/2",
+          options: [
+            { value: "trialBalance", label: t("reports.forms.generateReport.fields.reportTypes.trialBalance") },
+            { value: "balanceSheet", label: t("reports.forms.generateReport.fields.reportTypes.balanceSheet") },
+            { value: "profitAndLoss", label: t("reports.forms.generateReport.fields.reportTypes.profitAndLoss") },
+            { value: "cashFlow", label: t("reports.forms.generateReport.fields.reportTypes.cashFlow") },
+            { value: "generalLedger", label: t("reports.forms.generateReport.fields.reportTypes.generalLedger") },
+          ],
+        },
+        {
+          id: "state",
+          name: "state",
+          type: "select",
+          label: t("reports.forms.updateFinancialReport.fields.state"),
+          width: "1/2",
+          options: [
+            { value: "draft", label: t("reports.states.draft") },
+            { value: "generated", label: t("reports.states.generated") },
+            { value: "exported", label: t("reports.states.exported") },
+            { value: "archived", label: t("reports.states.archived") },
+          ],
+        },
+      ],
+    },
+  ],
+})
+
 export const reportsFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-financial-report": newFinancialReportForm(t),
   "new-report-template": newReportTemplateForm(t),
@@ -692,4 +984,10 @@ export const reportsFormConfigs = (t: TFunction): Record<string, FormConfig> => 
   "update-metric-values": updateMetricValuesForm(t),
   "record-scheduled-run": recordScheduledRunForm(t),
   "new-trial-balance-entry": newTrialBalanceEntryForm(t),
+  "new-dashboard": newDashboardForm(t),
+  "new-dashboard-widget": newDashboardWidgetForm(t),
+  "add-widget-to-dashboard": addWidgetToDashboardForm(t),
+  "update-widget-layout": updateWidgetLayoutForm(t),
+  "share-dashboard": shareDashboardForm(t),
+  "update-financial-report": updateFinancialReportForm(t),
 })

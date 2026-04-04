@@ -2,6 +2,19 @@ import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
+const poInvoiceStatusBadges = (t: TFunction) => ({
+  badgeVariants: {
+    No: "secondary",
+    Partial: "outline",
+    Invoiced: "default",
+  },
+  badgeLabels: {
+    No: t("purchasing.purchaseOrders.invoiceStatus.No"),
+    Partial: t("purchasing.purchaseOrders.invoiceStatus.Partial"),
+    Invoiced: t("purchasing.purchaseOrders.invoiceStatus.Invoiced"),
+  },
+}) as const
+
 const poStateBadges = (t: TFunction) => ({
   badgeVariants: {
     Draft: "secondary",
@@ -89,6 +102,13 @@ export const purchaseOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "datePlanned", label: t("purchasing.purchaseOrders.columns.datePlanned"), type: "date" },
       { key: "amountUntaxed", label: t("purchasing.purchaseOrders.columns.amountUntaxed"), type: "currency", align: "right" },
       { key: "amountTotal", label: t("purchasing.purchaseOrders.columns.amountTotal"), type: "currency", align: "right" },
+      { key: "receiptStatus", label: t("purchasing.purchaseOrders.columns.receiptStatus"), type: "text" },
+      {
+        key: "invoiceStatus",
+        label: t("purchasing.purchaseOrders.columns.invoiceStatus"),
+        type: "badge",
+        ...poInvoiceStatusBadges(t),
+      },
     ],
     emptyMessage: t("purchasing.purchaseOrders.emptyMessage"),
   },
@@ -178,10 +198,37 @@ export const vendorsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const partnerBanksTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "partner-banks-table",
+  title: t("purchasing.partnerBanks.title"),
+  description: t("purchasing.partnerBanks.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("purchasing.partnerBanks.searchPlaceholder"),
+    searchKeys: ["sanitizedAccNumber", "accHolderName"],
+    columns: [
+      { key: "id", label: t("purchasing.partnerBanks.columns.id"), width: "min-w-16" },
+      { key: "partnerId", label: t("purchasing.partnerBanks.columns.partnerId"), width: "min-w-20" },
+      {
+        key: "sanitizedAccNumber",
+        label: t("purchasing.partnerBanks.columns.account"),
+        width: "min-w-36",
+      },
+      { key: "accHolderName", label: t("purchasing.partnerBanks.columns.holder"), width: "min-w-32" },
+      { key: "active", label: t("purchasing.partnerBanks.columns.active"), type: "boolean" },
+      { key: "allowOutPayment", label: t("purchasing.partnerBanks.columns.allowOutPayment"), type: "boolean" },
+    ],
+    emptyMessage: t("purchasing.partnerBanks.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const purchasingEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "purchase-orders-table": purchaseOrdersTableConfig(t),
   "purchase-order-lines-table": purchaseOrderLinesTableConfig(t),
   "purchase-requisitions-table": purchaseRequisitionsTableConfig(t),
   "vendors-table": vendorsTableConfig(t),
+  "partner-banks-table": partnerBanksTableConfig(t),
 })
