@@ -768,7 +768,12 @@ pub fn move_stock_quant(
 
     // Find an existing quant at destination with the same product / variant / lot / package / owner.
     let mut dest_id: Option<u64> = None;
-    for q in ctx.db.stock_quant().quant_by_product().filter(&src.product_id) {
+    for q in ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&src.product_id)
+    {
         if q.organization_id != organization_id || q.company_id != company_id {
             continue;
         }

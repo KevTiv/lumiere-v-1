@@ -5,7 +5,7 @@
 ///   - PosOrder          Customer orders/transactions
 ///   - PosOrderLine      Order line items
 ///   - PosPayment        Payment records
-///   - PosLoyaltyCard    Customer loyalty cards
+///   - PosLoyaltyCard    Customer loyalty cards (`organization_id` scoped)
 ///
 /// Key Features:
 ///   - Session lifecycle management
@@ -250,12 +250,16 @@ pub struct PosPayment {
 #[table(
     accessor = pos_loyalty_card,
     public,
-    index(accessor = loyalty_card_by_code, btree(columns = [code]))
+    index(
+        accessor = loyalty_card_by_org_code,
+        btree(columns = [organization_id, code])
+    )
 )]
 pub struct PosLoyaltyCard {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub partner_id: Option<u64>,
     pub code: String,
     pub points: f64,
@@ -277,6 +281,7 @@ pub struct PosLoyaltyCard {
 
 fn update_loyalty_points(
     ctx: &ReducerContext,
+    organization_id: u64,
     partner_id: u64,
     points: f64,
     currency_id: u64,
@@ -286,7 +291,8 @@ fn update_loyalty_points(
         .pos_loyalty_card()
         .iter()
         .filter(|c| {
-            c.partner_id == Some(partner_id)
+            c.organization_id == organization_id
+                && c.partner_id == Some(partner_id)
                 && c.currency_id == currency_id
                 && c.is_active
                 && c.state == CardState::Active
@@ -709,7 +715,13 @@ pub fn create_pos_order(
 
     if let Some(partner_id) = params.partner_id {
         if config.module_pos_loyalty {
-            let _ = update_loyalty_points(ctx, partner_id, loyalty_points, config.currency_id);
+            let _ = update_loyalty_points(
+                ctx,
+                organization_id,
+                partner_id,
+                loyalty_points,
+                config.currency_id,
+            );
         }
     }
 
@@ -805,6 +817,8 @@ pub fn create_loyalty_card(
     code: String,
     points: f64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_loyalty_card", "create")?;
+
     let program = ctx
         .db
         .pos_loyalty_program()
@@ -812,13 +826,15 @@ pub fn create_loyalty_card(
         .find(&program_id)
         .ok_or("Loyalty program not found")?;
 
-    check_permission(ctx, organization_id, "pos_loyalty_card", "create")?;
+    if program.organization_id != organization_id {
+        return Err("Loyalty program does not belong to this organization".to_string());
+    }
 
     let existing: Vec<_> = ctx
         .db
         .pos_loyalty_card()
         .iter()
-        .filter(|c| c.code == code)
+        .filter(|c| c.organization_id == organization_id && c.code == code)
         .collect();
 
     if !existing.is_empty() {
@@ -837,6 +853,7 @@ pub fn create_loyalty_card(
 
     ctx.db.pos_loyalty_card().insert(PosLoyaltyCard {
         id: 0,
+        organization_id,
         partner_id,
         code,
         points,

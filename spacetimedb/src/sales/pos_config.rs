@@ -3,7 +3,7 @@
 /// Tables:
 ///   - PosConfig            POS terminal configuration
 ///   - PosPaymentMethod     Payment method definitions
-///   - PosLoyaltyProgram    Loyalty and reward programs
+///   - PosLoyaltyProgram    Loyalty programs (scoped by `organization_id`)
 ///
 /// Key Features:
 ///   - Multi-terminal POS setup
@@ -222,12 +222,16 @@ pub struct PosPaymentMethod {
 #[spacetimedb::table(
     accessor = pos_loyalty_program,
     public,
-    index(accessor = loyalty_program_by_currency, btree(columns = [currency_id]))
+    index(
+        accessor = loyalty_program_by_organization_id,
+        btree(columns = [organization_id])
+    )
 )]
 pub struct PosLoyaltyProgram {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub currency_id: u64,
     pub program_type: String,
@@ -421,7 +425,11 @@ pub fn create_loyalty_program(
         .db
         .pos_loyalty_program()
         .iter()
-        .filter(|p| p.name == params.name && p.currency_id == params.currency_id)
+        .filter(|p| {
+            p.organization_id == organization_id
+                && p.name == params.name
+                && p.currency_id == params.currency_id
+        })
         .collect();
 
     if !existing.is_empty() {
@@ -430,6 +438,7 @@ pub fn create_loyalty_program(
 
     ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
         id: 0,
+        organization_id,
         name: params.name,
         currency_id: params.currency_id,
         program_type: params.program_type,

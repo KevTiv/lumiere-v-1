@@ -150,11 +150,9 @@ pub fn log_timesheet(
             TimesheetInvoiceType::from_str(t)?;
             t.clone()
         }
-        None => {
-            TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
-                .as_str()
-                .to_string()
-        }
+        None => TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
+            .as_str()
+            .to_string(),
     };
 
     // Validate task belongs to project
@@ -294,11 +292,9 @@ pub fn start_timesheet_timer(
             TimesheetInvoiceType::from_str(t)?;
             t.clone()
         }
-        None => {
-            TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
-                .as_str()
-                .to_string()
-        }
+        None => TimesheetInvoiceType::default_for_bill_type(&project.bill_type)
+            .as_str()
+            .to_string(),
     };
 
     if let Some(tid) = params.task_id {

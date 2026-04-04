@@ -437,10 +437,7 @@ pub(crate) fn legacy_currency_id_for_code(code: &str) -> u64 {
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).
-pub(crate) fn require_currency_row(
-    ctx: &ReducerContext,
-    code: &str,
-) -> Result<Currency, String> {
+pub(crate) fn require_currency_row(ctx: &ReducerContext, code: &str) -> Result<Currency, String> {
     let normalized = code.trim().to_uppercase();
     if normalized.is_empty() {
         return Err("Currency code cannot be empty".to_string());

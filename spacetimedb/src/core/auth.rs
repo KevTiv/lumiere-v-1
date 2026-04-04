@@ -155,7 +155,13 @@ pub fn store_user_credential(
     if ctx.db.user_credential().email().find(&email).is_some() {
         return Err("Email already registered".to_string());
     }
-    if ctx.db.user_credential().identity().find(&new_identity).is_some() {
+    if ctx
+        .db
+        .user_credential()
+        .identity()
+        .find(&new_identity)
+        .is_some()
+    {
         return Err("Identity already has credentials".to_string());
     }
 
@@ -193,7 +199,13 @@ pub fn store_sso_user_credential(
     if ctx.db.user_credential().email().find(&email).is_some() {
         return Err("Email already registered".to_string());
     }
-    if ctx.db.user_credential().identity().find(&new_identity).is_some() {
+    if ctx
+        .db
+        .user_credential()
+        .identity()
+        .find(&new_identity)
+        .is_some()
+    {
         return Err("Identity already has credentials".to_string());
     }
 
@@ -373,10 +385,13 @@ pub fn mark_reset_token_used(ctx: &ReducerContext, token_id: u64) -> Result<(), 
         .find(&token_id)
         .ok_or("Reset token not found")?;
 
-    ctx.db.password_reset_token().id().update(PasswordResetToken {
-        used_at: Some(ctx.timestamp),
-        ..token
-    });
+    ctx.db
+        .password_reset_token()
+        .id()
+        .update(PasswordResetToken {
+            used_at: Some(ctx.timestamp),
+            ..token
+        });
 
     Ok(())
 }

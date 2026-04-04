@@ -252,7 +252,10 @@ fn project_audit_json(project: &ProjectProject) -> Value {
     );
     values.insert("active".to_string(), Value::from(project.active));
     values.insert("sequence".to_string(), Value::from(project.sequence));
-    values.insert("organization_id".to_string(), Value::from(project.organization_id));
+    values.insert(
+        "organization_id".to_string(),
+        Value::from(project.organization_id),
+    );
     values.insert("company_id".to_string(), Value::from(project.company_id));
     values.insert("currency_id".to_string(), Value::from(project.currency_id));
     values.insert(

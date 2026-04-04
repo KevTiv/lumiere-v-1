@@ -1216,7 +1216,9 @@ pub fn update_warehouse_3d_zone(
     check_permission(ctx, organization_id, "warehouse", "write")?;
 
     ctx.db.warehouse_3d_zone().id().update(Warehouse3DZone {
-        display_type: params.display_type.unwrap_or_else(|| zone.display_type.clone()),
+        display_type: params
+            .display_type
+            .unwrap_or_else(|| zone.display_type.clone()),
         color: params.color.unwrap_or_else(|| zone.color.clone()),
         width: params.width.unwrap_or(zone.width),
         height: params.height.unwrap_or(zone.height),

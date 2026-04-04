@@ -82,8 +82,8 @@ pub fn check_permission(
         .casbin_by_ptype()
         .filter(&"p".to_string())
         .any(|r| {
-            let subject_ok = r.v0.as_deref() == Some(role_str.as_str())
-                || r.v0.as_deref() == Some(role_name);
+            let subject_ok =
+                r.v0.as_deref() == Some(role_str.as_str()) || r.v0.as_deref() == Some(role_name);
             subject_ok
                 && r.v1.as_deref() == Some(&org_str)
                 && r.v2.as_deref() == Some(resource)

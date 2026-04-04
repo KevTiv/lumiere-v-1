@@ -1,3 +1,4 @@
+use serde_json::json;
 /// Proposals & Tenders Module — proposal lifecycle + AI-assisted drafting
 ///
 /// # Tables
@@ -95,7 +96,7 @@ pub struct Proposal {
     pub owner_id: Identity, // User responsible
     pub version_count: u32, // Cached version counter
     pub template_id: Option<u64>,
-    pub partner_id: Option<u64>, // linked CRM partner
+    pub partner_id: Option<u64>,         // linked CRM partner
     pub document_folder_id: Option<u64>, // optional link into DocumentFolder
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -176,6 +177,16 @@ pub struct ProposalSourceDoc {
     pub added_at: Timestamp,
 }
 
+// ── Input params (proposal source documents) ─────────────────────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateProposalSourceDocParams {
+    pub name: Option<String>,
+    pub content: Option<String>,
+    pub doc_type: Option<String>,
+    pub word_count: Option<u32>,
+}
+
 /// ProposalLineItem — ERP product/service linked to a proposal (optionally to a section)
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -193,7 +204,7 @@ pub struct ProposalLineItem {
     pub proposal_id: u64,
     pub section_id: Option<u64>, // None = proposal-level line item
     pub product_id: u64,
-    pub product_name: String,           // Snapshot at time of linking
+    pub product_name: String, // Snapshot at time of linking
     pub product_variant_id: Option<u64>,
     pub description: Option<String>,
     pub quantity: f64,
@@ -564,6 +575,79 @@ pub fn delete_proposal_source_doc(ctx: &ReducerContext, doc_id: u64) -> Result<(
     check_permission(ctx, proposal.organization_id, "proposal", "write")?;
 
     ctx.db.proposal_source_doc().id().delete(&doc_id);
+
+    Ok(())
+}
+
+/// Update an existing source document (partial update via optional fields)
+#[reducer]
+pub fn update_proposal_source_doc(
+    ctx: &ReducerContext,
+    doc_id: u64,
+    params: UpdateProposalSourceDocParams,
+) -> Result<(), String> {
+    let doc = ctx
+        .db
+        .proposal_source_doc()
+        .id()
+        .find(&doc_id)
+        .ok_or_else(|| format!("Source doc {} not found", doc_id))?;
+
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&doc.proposal_id)
+        .ok_or_else(|| format!("Proposal {} not found", doc.proposal_id))?;
+
+    check_permission(ctx, proposal.organization_id, "proposal", "write")?;
+
+    let name = params.name.unwrap_or_else(|| doc.name.clone());
+    let content = params.content.unwrap_or_else(|| doc.content.clone());
+    let doc_type = params.doc_type.unwrap_or_else(|| doc.doc_type.clone());
+    let word_count = params.word_count.unwrap_or(doc.word_count);
+
+    let old_values_json = json!({
+        "name": doc.name,
+        "word_count": doc.word_count,
+    })
+    .to_string();
+
+    let new_row = ProposalSourceDoc {
+        name,
+        content,
+        doc_type,
+        word_count,
+        ..doc
+    };
+
+    let new_values_json = json!({
+        "name": new_row.name,
+        "word_count": new_row.word_count,
+    })
+    .to_string();
+
+    ctx.db.proposal_source_doc().id().update(new_row);
+
+    write_audit_log_v2(
+        ctx,
+        proposal.organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "proposal_source_doc",
+            record_id: doc_id,
+            action: "UPDATE",
+            old_values: Some(old_values_json),
+            new_values: Some(new_values_json),
+            changed_fields: vec![
+                "name".to_string(),
+                "content".to_string(),
+                "doc_type".to_string(),
+                "word_count".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

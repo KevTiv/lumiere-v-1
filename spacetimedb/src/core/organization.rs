@@ -6,9 +6,9 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
+use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
 use crate::core::users::{user_organization, UserOrganization};
 use crate::forms::migrations::run_seed_organization_form_configs;
-use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -305,9 +305,11 @@ pub fn bootstrap_new_tenant(
     ctx: &ReducerContext,
     params: BootstrapNewTenantParams,
 ) -> Result<(), String> {
-    let already_member = ctx.db.user_organization().iter().any(|uo| {
-        uo.user_identity == ctx.sender() && uo.is_active
-    });
+    let already_member = ctx
+        .db
+        .user_organization()
+        .iter()
+        .any(|uo| uo.user_identity == ctx.sender() && uo.is_active);
     if already_member {
         return Err("Already a member of an organization".to_string());
     }
@@ -415,7 +417,6 @@ pub fn bootstrap_new_tenant(
 
     Ok(())
 }
-
 
 #[spacetimedb::reducer]
 pub fn update_organization(

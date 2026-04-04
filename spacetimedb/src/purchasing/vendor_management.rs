@@ -223,6 +223,10 @@ pub fn update_partner_bank(
         .find(&bank_id)
         .ok_or("Bank account not found")?;
 
+    if bank.organization_id != organization_id {
+        return Err("Bank account does not belong to this organization".to_string());
+    }
+
     let sanitized = params
         .acc_number
         .map(|n| n.replace(' ', "").replace('-', ""));
@@ -271,6 +275,10 @@ pub fn delete_partner_bank(
         .id()
         .find(&bank_id)
         .ok_or("Bank account not found")?;
+
+    if bank.organization_id != organization_id {
+        return Err("Bank account does not belong to this organization".to_string());
+    }
 
     ctx.db.res_partner_bank().id().delete(&bank_id);
 
