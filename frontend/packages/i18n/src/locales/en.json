@@ -61,6 +61,11 @@
       "max": "Maximum value is {{max}}",
       "invalidFormat": "Invalid format",
       "invalidEmail": "Invalid email address"
+    },
+    "csvImport": {
+      "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
+      "submit": "Import",
+      "fileLabel": "CSV file"
     }
   },
   "navigation": {
@@ -546,6 +551,22 @@
   },
   "accounting": {
     "title": "Accounting",
+    "csvImport": {
+      "toolbarAccounts": "Import accounts (CSV)",
+      "toolbarMoves": "Import entries (CSV)",
+      "toolbarMoveLines": "Import lines (CSV)",
+      "accountsTitle": "Import chart of accounts (CSV)",
+      "movesTitle": "Import journal entries (CSV)",
+      "moveLinesTitle": "Import journal entry lines (CSV)",
+      "taxTitle": "Import tax rates (CSV)",
+      "toolbarTaxRates": "Import taxes (CSV)",
+      "budgetTitle": "Import budgets (CSV)",
+      "toolbarBudgets": "Import budgets (CSV)",
+      "budgetLineTitle": "Import budget lines (CSV)",
+      "toolbarBudgetLines": "Import budget lines (CSV)",
+      "analyticTitle": "Import analytic accounts (CSV)",
+      "toolbarAnalytic": "Import analytic accounts (CSV)"
+    },
     "dashboard": {
       "accountsReceivable": "Accounts Receivable",
       "accountsPayable": "Accounts Payable",
@@ -612,7 +633,8 @@
       "residual": "Residual",
       "payment": "Payment",
       "postEntry": "Post",
-      "cancelEntry": "Cancel"
+      "cancelEntry": "Cancel",
+      "recalculateInvoiceTotals": "Recalculate totals"
     },
     "invoices": {
       "title": "Invoices",
@@ -652,7 +674,8 @@
         "download": "Download",
         "print": "Print",
         "recordPayment": "Record Payment",
-        "postDraft": "Post"
+        "postDraft": "Post",
+        "recalculateTotals": "Recalculate totals"
       }
     },
     "bills": {
@@ -667,14 +690,17 @@
       "billDate": "Bill Date",
       "billActions": {
         "payBill": "Pay Bill",
-        "download": "Download"
+        "download": "Download",
+        "recalculateTotals": "Recalculate totals"
       }
     },
     "taxes": {
       "title": "Taxes",
       "rate": "Rate",
       "taxUse": "Type",
-      "priceInclude": "Price Inc."
+      "priceInclude": "Price Inc.",
+      "refreshDeadlineStatuses": "Refresh tax deadline statuses",
+      "scheduleDeadlineUpdates": "Schedule daily deadline updates"
     },
     "taxGroups": {
       "title": "Tax Groups",
@@ -970,7 +996,10 @@
       "taxGroups": "Tax Groups",
       "taxJurisdictions": "Jurisdictions",
       "taxSchedules": "Schedules",
-      "taxDeadlines": "Deadlines"
+      "taxDeadlines": "Deadlines",
+      "payments": "Payments",
+      "paymentTerms": "Payment terms",
+      "paymentTermLines": "Term lines"
     },
     "actions": {
       "newInvoice": "New Invoice",
@@ -991,7 +1020,11 @@
       "newAccountPeriod": "New period",
       "post": "Post",
       "registerPayment": "Register Payment",
-      "importTaxRateCsv": "Import Tax Rates (CSV)"
+      "importTaxRateCsv": "Import Tax Rates (CSV)",
+      "newPayment": "New payment",
+      "newPaymentTerm": "New payment term",
+      "newPaymentTermLine": "Add installment line",
+      "newCurrencyRate": "New currency rate"
     },
     "overview": {
       "title": "Accounting",
@@ -1093,6 +1126,7 @@
         "emptyMessage": "No fixed assets found.",
         "columns": {
           "name": "Asset Name",
+          "active": "Active",
           "state": "Status",
           "acquisitionDate": "Acquired",
           "originalValue": "Original Value",
@@ -1117,7 +1151,61 @@
           "confirmSelected": "Confirm Selected",
           "closeSelected": "Close Selected",
           "computeDepreciation": "Compute Depreciation",
-          "deleteSelected": "Delete Selected"
+          "deleteSelected": "Delete Selected",
+          "activateSelected": "Set active",
+          "deactivateSelected": "Set inactive"
+        }
+      },
+      "payments": {
+        "title": "Payments",
+        "description": "Customer and vendor payments (draft → post → reconcile to invoices)",
+        "searchPlaceholder": "Search by reference or partner…",
+        "emptyMessage": "No payments found.",
+        "columns": {
+          "name": "Reference",
+          "amount": "Amount",
+          "state": "Status",
+          "partnerId": "Partner",
+          "journalId": "Journal",
+          "currencyId": "Currency"
+        },
+        "filters": {
+          "state": "Status",
+          "state.options": {
+            "NotPaid": "Draft",
+            "Paid": "Posted",
+            "Reversed": "Cancelled"
+          }
+        },
+        "states": {
+          "NotPaid": "Draft",
+          "Paid": "Posted",
+          "Reversed": "Cancelled"
+        },
+        "actions": {
+          "postSelected": "Post selected",
+          "cancelSelected": "Cancel selected",
+          "linkInvoices": "Link to invoices…"
+        }
+      },
+      "paymentTerms": {
+        "title": "Payment terms",
+        "description": "Installment rules (e.g. net 30, split payments)",
+        "searchPlaceholder": "Search terms…",
+        "emptyMessage": "No payment terms found.",
+        "columns": {
+          "name": "Name",
+          "isActive": "Active",
+          "note": "Note"
+        },
+        "lineTitle": "Installment lines",
+        "lineDescription": "Lines define percent/balance splits and due offsets.",
+        "actions": {
+          "deleteSelected": "Delete selected",
+          "deleteLinesSelected": "Delete selected lines",
+          "addLine": "Add line",
+          "deactivateSelected": "Deactivate",
+          "activateSelected": "Activate"
         }
       },
       "intercompanyRules": {
@@ -1588,6 +1676,86 @@
           "memoPlaceholder": "Optional note"
         }
       },
+      "newAccountPayment": {
+        "title": "New payment",
+        "description": "Create a draft payment. Post it to generate the journal entry.",
+        "submitLabel": "Create draft",
+        "sections": {
+          "main": "Payment"
+        },
+        "fields": {
+          "paymentType": "Direction",
+          "paymentTypeInbound": "Inbound (customer)",
+          "paymentTypeOutbound": "Outbound (vendor)",
+          "partnerType": "Partner type",
+          "partnerTypeCustomer": "Customer",
+          "partnerTypeSupplier": "Supplier",
+          "partnerId": "Partner ID",
+          "amount": "Amount",
+          "currencyId": "Currency ID",
+          "journalId": "Journal",
+          "ref": "Internal reference",
+          "memo": "Memo"
+        }
+      },
+      "newPaymentTerm": {
+        "title": "New payment term",
+        "description": "Name a term, then add installment lines.",
+        "submitLabel": "Create term",
+        "sections": {
+          "main": "Term"
+        },
+        "fields": {
+          "name": "Name",
+          "note": "Note"
+        }
+      },
+      "newPaymentTermLine": {
+        "title": "Installment line",
+        "description": "Define split (balance / percent / fixed) and due offset.",
+        "submitLabel": "Add line",
+        "sections": {
+          "main": "Line"
+        },
+        "fields": {
+          "paymentTermId": "Payment term",
+          "value": "Value type",
+          "valueBalance": "Remaining balance",
+          "valuePercent": "Percent",
+          "valueFixed": "Fixed amount",
+          "valueAmount": "Amount / %",
+          "days": "Days from invoice date",
+          "months": "Months",
+          "daysAfterEndOfMonth": "From end of month",
+          "sequence": "Sequence"
+        }
+      },
+      "newCurrencyRate": {
+        "title": "New currency rate",
+        "description": "Record an exchange rate for this organization.",
+        "submitLabel": "Save rate",
+        "sections": {
+          "main": "Rate"
+        },
+        "fields": {
+          "fromCurrency": "From currency code",
+          "toCurrency": "To currency code",
+          "rate": "Rate",
+          "metadata": "Metadata (optional)"
+        }
+      },
+      "registerPaymentInvoices": {
+        "title": "Link invoices",
+        "description": "Attach posted payment to invoice or bill move IDs.",
+        "submitLabel": "Link",
+        "sections": {
+          "main": "Moves"
+        },
+        "fields": {
+          "invoiceIds": "Invoice/bill move IDs (comma-separated)",
+          "isBill": "These are vendor bills (AP)"
+        }
+      },
       "analyticAccount": {
         "createTitle": "New analytic account",
         "createDescription": "Cost center or analytic dimension for project / department tracking.",
@@ -1621,7 +1789,9 @@
           "amount": "Amount",
           "unitAmount": "Unit amount",
           "date": "Date",
-          "description": "Description"
+          "description": "Description",
+          "tagIds": "Tag IDs",
+          "tagIdsHint": "Comma-separated numeric ids (optional)"
         }
       },
       "analyticDistribution": {
@@ -1762,6 +1932,46 @@
     }
   },
   "crm": {
+    "attribution": {
+      "tabLabel": "Attribution",
+      "title": "UTM attribution",
+      "subtitle": "Manage campaign, medium, and source values used for marketing attribution.",
+      "nameLabel": "Name",
+      "activeByDefault": "Active when created",
+      "add": "Add",
+      "empty": "No values yet.",
+      "toggleActive": "Toggle active",
+      "needOrg": "Select an organization to manage attribution.",
+      "needConnection": "Connect to the database to load attribution values.",
+      "campaigns": "Campaigns",
+      "campaignsHint": "Named campaigns (e.g. spring_launch).",
+      "campaignPlaceholder": "Campaign name",
+      "media": "Media",
+      "mediaHint": "Channels such as email, social, or paid search.",
+      "mediumPlaceholder": "Medium name",
+      "sources": "Sources",
+      "sourcesHint": "Referral sources or publishers.",
+      "sourcePlaceholder": "Source name"
+    },
+    "chatter": {
+      "dialogTitle": "Notes & followers",
+      "needOrg": "Select an organization to use chatter.",
+      "needConnection": "Connect to the database to use chatter.",
+      "follow": "Follow",
+      "unfollow": "Unfollow",
+      "notePlaceholder": "Write an internal note…",
+      "postNote": "Post note",
+      "timeline": "Activity",
+      "noMessages": "No messages on this record yet."
+    },
+    "csvImport": {
+      "contactsTitle": "Import contacts (CSV)",
+      "toolbarContacts": "Import contacts (CSV)",
+      "leadsTitle": "Import leads (CSV)",
+      "toolbarLeads": "Import leads (CSV)",
+      "opportunitiesTitle": "Import opportunities (CSV)",
+      "toolbarOpportunities": "Import opportunities (CSV)"
+    },
     "dashboard": {
       "activeLeads": "Active Leads",
       "pipelineValue": "Pipeline Value",
@@ -2019,6 +2229,191 @@
       }
     }
   },
+  "iot": {
+    "title": "IoT",
+    "description": "Hubs, devices, sensor data, and gateway integration",
+    "tabs": {
+      "dashboard": "Dashboard",
+      "pairing": "Pairing tokens",
+      "hubs": "Hubs",
+      "devices": "Devices",
+      "actions": "Actions",
+      "telemetry": "Telemetry"
+    },
+    "dashboard": {
+      "stats": {
+        "devices": "Devices",
+        "hubs": "Hubs",
+        "pendingActions": "Pending actions",
+        "unusedTokens": "Unused pairing tokens"
+      }
+    },
+    "entities": {
+      "pairingTokens": {
+        "title": "Pairing tokens",
+        "description": "One-time tokens for hub self-registration",
+        "searchPlaceholder": "Search by token…",
+        "company": "Company"
+      },
+      "hubs": {
+        "title": "Hubs",
+        "description": "Edge gateways and connectivity",
+        "searchPlaceholder": "Search hubs…",
+        "ip": "IP",
+        "lastHeartbeat": "Last heartbeat",
+        "empty": "No hubs registered."
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Sensors, printers, and peripherals",
+        "searchPlaceholder": "Search devices…",
+        "identifier": "Identifier",
+        "hub": "Hub",
+        "stockLocation": "Stock location",
+        "posConfig": "POS config",
+        "empty": "No devices yet."
+      },
+      "actions": {
+        "title": "Device actions",
+        "description": "Queued commands for output devices",
+        "searchPlaceholder": "Search actions…",
+        "device": "Device",
+        "created": "Created",
+        "sent": "Sent",
+        "empty": "No actions."
+      },
+      "telemetry": {
+        "title": "Telemetry",
+        "description": "Recent sensor readings",
+        "searchPlaceholder": "Search telemetry…",
+        "device": "Device",
+        "sensor": "Sensor",
+        "value": "Value",
+        "unit": "Unit",
+        "quality": "Quality",
+        "recorded": "Recorded",
+        "empty": "No telemetry yet."
+      }
+    },
+    "forms": {
+      "newHub": {
+        "title": "Register hub",
+        "description": "Create a hub record manually (alternative to token pairing).",
+        "section": "Hub details",
+        "ip": "IP address",
+        "firmware": "Firmware version"
+      },
+      "newDevice": {
+        "title": "Register device",
+        "description": "Attach a device to an existing hub.",
+        "section": "Device",
+        "hubId": "Hub ID",
+        "identifier": "Hardware identifier"
+      },
+      "claimHub": {
+        "title": "Claim hub (developer)",
+        "description": "Simulates gateway pairing — normally called without ERP auth."
+      },
+      "syncDevices": {
+        "title": "Sync hub devices (developer)",
+        "description": "POST the same payload the gateway sends to sync_hub_devices.",
+        "hubId": "Hub ID",
+        "json": "Detected devices (JSON array)",
+        "jsonHint": "Each entry: identifier, name, device_type, capabilities[]"
+      },
+      "deviceRow": {
+        "title": "Device actions",
+        "description": "Device #{{id}}",
+        "section": "Operation",
+        "operation": "What do you want to do?",
+        "sensorType": "Sensor type",
+        "telemetryValue": "Value",
+        "done": "Done.",
+        "ops": {
+          "linkLocation": "Link to stock location",
+          "linkPos": "Link to POS config",
+          "unlink": "Clear integration links",
+          "setStatus": "Set status",
+          "telemetry": "Record test telemetry",
+          "test": "Send test action",
+          "delete": "Delete device"
+        }
+      },
+      "errors": {
+        "invalidHubId": "Enter a valid hub ID.",
+        "invalidPosId": "Enter a valid POS config ID.",
+        "pickLocation": "Choose a stock location.",
+        "invalidTelemetryValue": "Enter a numeric value.",
+        "invalidJson": "Invalid JSON.",
+        "jsonNotArray": "JSON must be an array.",
+        "badSyncEntry": "Each array item must be an object.",
+        "unknownOperation": "Unknown operation."
+      }
+    },
+    "toolbar": {
+      "selectOneHub": "Select exactly one hub.",
+      "selectOneAction": "Select exactly one action.",
+      "actionNotPending": "Only Pending actions can be marked sent."
+    },
+    "table": {
+      "token": "Token",
+      "used": "Used",
+      "expires": "Expires",
+      "name": "Name",
+      "serial": "Serial",
+      "status": "Status",
+      "type": "Type",
+      "actions": "Actions"
+    },
+    "hubs": {
+      "generatePairing": "Generate pairing token",
+      "pairingGenerated": "Pairing token created. Copy the latest unused token below for your hub.",
+      "registerManual": "Register hub manually",
+      "pairingTokens": "Pairing tokens",
+      "noTokens": "No tokens yet. Generate one to pair a physical hub.",
+      "registeredHubs": "Hubs",
+      "pingHeartbeat": "Simulate heartbeat",
+      "heartbeatOk": "Heartbeat recorded.",
+      "confirmDeleteHub": "Delete this hub and all of its devices?",
+      "hubDeleted": "Hub removed.",
+      "hubRegistered": "Hub registered."
+    },
+    "devices": {
+      "register": "Register device",
+      "manage": "Manage",
+      "test": "Send test action",
+      "unlinkAll": "Unlink integrations",
+      "confirmDelete": "Delete this device permanently?",
+      "deleted": "Device deleted.",
+      "unlinked": "Integration links cleared.",
+      "linkLocation": "Stock location",
+      "pickLocation": "Select location…",
+      "applyLocation": "Link location",
+      "linkedLocation": "Location linked.",
+      "posConfigId": "POS config ID",
+      "applyPos": "Link POS",
+      "linkedPos": "POS linked.",
+      "applyStatus": "Update status",
+      "statusUpdated": "Status updated.",
+      "recordReading": "Record telemetry (test)",
+      "submitTelemetry": "Submit reading",
+      "telemetryRecorded": "Telemetry saved.",
+      "registered": "Device registered."
+    },
+    "actions": {
+      "markSent": "Mark sent",
+      "markedSent": "Action marked as sent."
+    },
+    "developer": {
+      "blurb": "These tools mirror what the IoT gateway calls. Use them for local testing only; production traffic should go through the gateway.",
+      "claimTitle": "Claim hub with pairing token",
+      "claimSubmit": "Claim hub",
+      "claimOk": "Hub claimed (check Hubs tab).",
+      "syncTitle": "Sync hub devices (JSON)",
+      "syncSubmit": "Run sync",
+      "syncOk": "Device list synced."
+    }
+  },
   "hr": {
     "dashboard": {
       "totalHeadcount": "Total Headcount",
@@ -2186,6 +2581,33 @@
         "open": "Open"
       }
     },
+    "csvImport": {
+      "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
+      "submit": "Import",
+      "fileLabel": "CSV file",
+      "resourceTitle": "Import HR resources (CSV)",
+      "departmentTitle": "Import departments (CSV)",
+      "job_positionTitle": "Import job positions (CSV)",
+      "employeeTitle": "Import employees (CSV)",
+      "contractTitle": "Import contracts (CSV)",
+      "leave_typeTitle": "Import leave types (CSV)",
+      "leaveTitle": "Import leave requests (CSV)",
+      "payroll_structureTitle": "Import payroll structures (CSV)",
+      "salary_ruleTitle": "Import salary rules (CSV)",
+      "payslipTitle": "Import payslips (CSV)"
+    },
+    "toolbar": {
+      "importResourceCsv": "Import resources (CSV)",
+      "importDepartmentCsv": "Import departments (CSV)",
+      "importJobPositionCsv": "Import job positions (CSV)",
+      "importEmployeeCsv": "Import employees (CSV)",
+      "importContractCsv": "Import contracts (CSV)",
+      "importLeaveTypeCsv": "Import leave types (CSV)",
+      "importLeaveCsv": "Import leave requests (CSV)",
+      "importPayrollStructureCsv": "Import payroll structures (CSV)",
+      "importSalaryRuleCsv": "Import salary rules (CSV)",
+      "importPayslipCsv": "Import payslips (CSV)"
+    },
     "forms": {
       "newEmployee": {
         "title": "New Employee",
@@ -2311,6 +2733,27 @@
     }
   },
   "inventory": {
+    "csvImport": {
+      "uomCategoriesTitle": "Import UOM categories (CSV)",
+      "toolbarUomCategories": "Import UOM categories (CSV)",
+      "uomsTitle": "Import units of measure (CSV)",
+      "toolbarUoms": "Import UOMs (CSV)",
+      "productCategoriesTitle": "Import product categories (CSV)",
+      "toolbarProductCategories": "Import categories (CSV)",
+      "productsTitle": "Import products (CSV)",
+      "toolbarProducts": "Import products (CSV)",
+      "variantsTitle": "Import product variants (CSV)",
+      "toolbarVariants": "Import variants (CSV)",
+      "warehousesTitle": "Import warehouses (CSV)",
+      "toolbarWarehouses": "Import warehouses (CSV)",
+      "locationsTitle": "Import stock locations (CSV)",
+      "toolbarLocations": "Import locations (CSV)",
+      "quantsTitle": "Import stock quants (CSV)",
+      "toolbarQuants": "Import stock (CSV)",
+      "lotsTitle": "Import lots (CSV)",
+      "toolbarLots": "Import lots (CSV)",
+      "noPricelistCurrency": "Add a pricelist with a currency, or ensure one exists, before importing products."
+    },
     "3dView": "3D View",
     "dashboard": {
       "totalSKUs": "Total SKUs",
@@ -2319,6 +2762,14 @@
       "pendingTransfers": "Pending Transfers",
       "skuFallback": "SKU-{{id}}",
       "productFallback": "Product {{id}}"
+    },
+    "tabs": {
+      "productCategories": "Categories",
+      "barcodeRules": "Barcode rules",
+      "adjustmentReasons": "Adjustment reasons",
+      "barcodeNomenclatures": "Barcode nomenclatures",
+      "traceabilityRecords": "Traceability lines",
+      "traceabilityReports": "Traceability reports"
     },
     "products": {
       "title": "Products",
@@ -2345,6 +2796,17 @@
         "consu": "Consumable",
         "service": "Service",
         "product": "Storable"
+      }
+    },
+    "productCategories": {
+      "title": "Product categories",
+      "description": "Hierarchy for catalog and stock rules",
+      "searchPlaceholder": "Search categories…",
+      "emptyMessage": "No categories found.",
+      "columns": {
+        "name": "Name",
+        "parentId": "Parent ID",
+        "active": "Active"
       }
     },
     "stockOnHand": {
@@ -2500,6 +2962,84 @@
         "productId": "Product",
         "state": "State",
         "createDate": "Created"
+      },
+      "actions": {
+        "markInUse": "Mark in use (reserved → in use)"
+      }
+    },
+    "barcodeRules": {
+      "title": "Barcode rules",
+      "description": "Patterns used to parse scanned barcodes",
+      "searchPlaceholder": "Search rules…",
+      "emptyMessage": "No barcode rules found.",
+      "columns": {
+        "name": "Name",
+        "pattern": "Pattern",
+        "encoding": "Encoding",
+        "isActive": "Active"
+      }
+    },
+    "adjustmentReasons": {
+      "title": "Adjustment reasons",
+      "description": "Codes explaining inventory adjustments",
+      "searchPlaceholder": "Search reasons…",
+      "emptyMessage": "No adjustment reasons found.",
+      "columns": {
+        "code": "Code",
+        "description": "Description",
+        "isActive": "Active",
+        "isSystem": "System"
+      }
+    },
+    "barcodeNomenclatures": {
+      "title": "Barcode nomenclatures",
+      "description": "Ordered rule sets applied when scanning",
+      "searchPlaceholder": "Search nomenclatures…",
+      "emptyMessage": "No nomenclatures found.",
+      "columns": {
+        "name": "Name",
+        "ruleIds": "Rule IDs",
+        "isDefault": "Default",
+        "isActive": "Active"
+      },
+      "actions": {
+        "removeRule": "Remove rule from selected…",
+        "ruleIdPrompt": "Rule ID to remove from this nomenclature"
+      }
+    },
+    "traceabilityRecords": {
+      "title": "Serial/lot trace rows",
+      "description": "Movement history linked to serials or lots",
+      "searchPlaceholder": "Search…",
+      "emptyMessage": "No traceability rows found.",
+      "columns": {
+        "productId": "Product",
+        "documentType": "Document type",
+        "documentId": "Document ID",
+        "quantity": "Qty",
+        "uomId": "UoM",
+        "date": "Date"
+      }
+    },
+    "traceabilityReports": {
+      "title": "Traceability reports",
+      "description": "Saved filters for trace analysis (draft → run)",
+      "searchPlaceholder": "Search reports…",
+      "emptyMessage": "No reports found.",
+      "columns": {
+        "name": "Name",
+        "state": "State",
+        "dateFrom": "From",
+        "dateTo": "To"
+      },
+      "actions": {
+        "runSelected": "Run selected (draft only)"
+      },
+      "states": {
+        "draft": "Draft",
+        "running": "Running",
+        "done": "Done",
+        "error": "Error"
       }
     },
     "qualityChecks": {
@@ -3013,6 +3553,68 @@
           "sequence": "Sequence"
         }
       },
+      "newAdjustmentReason": {
+        "title": "New adjustment reason",
+        "description": "Create a code used on inventory adjustments",
+        "submitLabel": "Create reason",
+        "sections": {
+          "main": "Reason"
+        },
+        "fields": {
+          "code": "Code",
+          "codePlaceholder": "e.g., SHRINK",
+          "description": "Description",
+          "isActive": "Active",
+          "isSystem": "System reason",
+          "metadata": "Metadata (optional)"
+        }
+      },
+      "newTraceabilityRecord": {
+        "title": "New traceability row",
+        "description": "Log serial/lot movement against a document",
+        "submitLabel": "Add row",
+        "sections": {
+          "main": "Line"
+        },
+        "fields": {
+          "productId": "Product ID",
+          "documentType": "Document type",
+          "documentTypePlaceholder": "e.g., picking, move",
+          "documentId": "Document ID",
+          "quantity": "Quantity",
+          "uomId": "UoM ID",
+          "date": "Event date",
+          "serialId": "Serial ID (optional)",
+          "lotId": "Lot ID (optional)",
+          "documentLineId": "Line ID (optional)",
+          "moveId": "Stock move ID (optional)",
+          "partnerId": "Partner ID (optional)",
+          "origin": "Origin (optional)",
+          "notes": "Notes (optional)",
+          "metadata": "Metadata (optional)"
+        }
+      },
+      "newTraceabilityReport": {
+        "title": "New traceability report",
+        "description": "Save filter criteria, then run from the reports tab",
+        "submitLabel": "Save draft report",
+        "sections": {
+          "main": "Scope"
+        },
+        "fields": {
+          "name": "Report name",
+          "dateFrom": "From",
+          "dateTo": "To",
+          "productIds": "Product IDs (comma-separated, optional)",
+          "lotIds": "Lot IDs (optional)",
+          "serialIds": "Serial IDs (optional)",
+          "locationIds": "Location IDs (optional)",
+          "warehouseIds": "Warehouse IDs (optional)",
+          "partnerIds": "Partner IDs (optional)",
+          "pickingTypeIds": "Picking type IDs (optional)",
+          "metadata": "Metadata (optional)"
+        }
+      },
       "newReplenishmentRule": {
         "title": "New replenishment rule",
         "description": "Set up automatic stock replenishment",
@@ -3159,6 +3761,14 @@
     }
   },
   "purchasing": {
+    "csvImport": {
+      "ordersTitle": "Import purchase orders (CSV)",
+      "toolbarOrders": "Import orders (CSV)",
+      "orderLinesTitle": "Import purchase order lines (CSV)",
+      "toolbarOrderLines": "Import order lines (CSV)",
+      "supplierInfoTitle": "Import supplier info (CSV)",
+      "toolbarSupplierInfo": "Import supplier info (CSV)"
+    },
     "dashboard": {
       "openPOs": "Open POs",
       "spendMTD": "Spend MTD",
@@ -3178,7 +3788,14 @@
         "dateOrder": "Order Date",
         "datePlanned": "Expected",
         "amountUntaxed": "Subtotal",
-        "amountTotal": "Total"
+        "amountTotal": "Total",
+        "receiptStatus": "Receipt",
+        "invoiceStatus": "Billing"
+      },
+      "invoiceStatus": {
+        "No": "Not billed",
+        "Partial": "Partially billed",
+        "Invoiced": "Fully billed"
       },
       "filters": {
         "state": "Status",
@@ -3293,6 +3910,26 @@
         "requestedBy": "Requested By"
       }
     },
+    "tabs": {
+      "partnerBanks": "Vendor bank accounts",
+      "createPartnerBank": "New bank account"
+    },
+    "partnerBanks": {
+      "title": "Vendor bank accounts",
+      "description": "Bank accounts linked to suppliers and partners",
+      "searchPlaceholder": "Search account or partner…",
+      "emptyMessage": "No bank accounts yet.",
+      "editForm": "Edit account…",
+      "deleteConfirm": "Delete {{count}} bank account(s)?",
+      "columns": {
+        "id": "ID",
+        "partnerId": "Partner",
+        "account": "Account",
+        "holder": "Holder",
+        "active": "Active",
+        "allowOutPayment": "Outgoing"
+      }
+    },
     "actions": {
       "sendSelected": "Send",
       "confirmSelected": "Confirm",
@@ -3314,9 +3951,41 @@
       "postSelected": "Post",
       "applySelected": "Apply",
       "rejectSelected": "Reject",
-      "holdSelected": "Hold"
+      "holdSelected": "Hold",
+      "refreshReceiptStatus": "Refresh receipt status",
+      "refreshInvoiceStatus": "Refresh billing status"
     },
     "forms": {
+      "newPartnerBank": {
+        "title": "New vendor bank account",
+        "description": "Register a bank account for a partner / vendor",
+        "sections": {
+          "main": "Account"
+        },
+        "fields": {
+          "partnerId": "Vendor / partner",
+          "partnerPlaceholder": "Select partner…",
+          "accNumber": "Account number / IBAN",
+          "accHolderName": "Account holder",
+          "currencyId": "Currency ID (optional)",
+          "allowOutPayment": "Allow outgoing payments"
+        }
+      },
+      "editPartnerBank": {
+        "title": "Edit bank account",
+        "description": "Update account details or deactivate",
+        "sections": {
+          "main": "Account"
+        },
+        "fields": {
+          "bankId": "Bank account",
+          "bankPlaceholder": "Select account…",
+          "accNumber": "Account number / IBAN",
+          "accHolderName": "Account holder",
+          "allowOutPayment": "Allow outgoing payments",
+          "active": "Active"
+        }
+      },
       "newPurchaseOrder": {
         "title": "New Purchase Order",
         "description": "Create a new purchase order",
@@ -3422,6 +4091,12 @@
     }
   },
   "sales": {
+    "csvImport": {
+      "ordersTitle": "Import sale orders (CSV)",
+      "toolbarOrders": "Import orders (CSV)",
+      "orderLinesTitle": "Import sale order lines (CSV)",
+      "toolbarOrderLines": "Import order lines (CSV)"
+    },
     "salesOrders": {
       "title": "Sales Orders",
       "description": "All sales orders",
@@ -3538,6 +4213,96 @@
         "Cancel": "Cancelled"
       }
     },
+    "tabs": {
+      "deliveryPriceRules": "Shipping price rules",
+      "createDeliveryPriceRule": "New price rule",
+      "deliveryCarriers": "Carriers",
+      "createDeliveryCarrier": "New carrier",
+      "shippingMethods": "Shipping methods",
+      "createShippingMethod": "New method",
+      "posPaymentMethods": "POS payments",
+      "createPaymentMethod": "New payment method",
+      "loyaltyPrograms": "Loyalty programs",
+      "createLoyaltyProgram": "New program",
+      "loyaltyCards": "Loyalty cards",
+      "createLoyaltyCard": "New card"
+    },
+    "deliveryPriceRules": {
+      "title": "Delivery price rules",
+      "description": "Rules used by delivery carriers (create rules first, then reference IDs on a carrier)",
+      "searchPlaceholder": "Search rules…",
+      "emptyMessage": "No price rules yet.",
+      "columns": {
+        "id": "ID",
+        "carrierId": "Carrier",
+        "variable": "Variable",
+        "operator": "Op",
+        "maxValue": "Max",
+        "listPrice": "List price"
+      }
+    },
+    "deliveryCarriers": {
+      "title": "Delivery carriers",
+      "description": "Shipping carriers and delivery options",
+      "searchPlaceholder": "Search carriers…",
+      "emptyMessage": "No carriers yet.",
+      "columns": {
+        "name": "Name",
+        "deliveryType": "Type",
+        "active": "Active",
+        "currencyId": "Currency",
+        "productId": "Product"
+      }
+    },
+    "shippingMethods": {
+      "title": "Shipping methods",
+      "description": "Named shipping methods for sales and deliveries",
+      "searchPlaceholder": "Search methods…",
+      "emptyMessage": "No shipping methods yet.",
+      "columns": {
+        "name": "Name",
+        "provider": "Provider",
+        "deliveryType": "Type",
+        "active": "Active",
+        "fixedPrice": "Fixed price"
+      }
+    },
+    "posPaymentMethods": {
+      "title": "POS payment methods",
+      "description": "Payment methods available at the point of sale",
+      "searchPlaceholder": "Search methods…",
+      "emptyMessage": "No POS payment methods yet.",
+      "columns": {
+        "name": "Name",
+        "sequence": "Seq",
+        "active": "Active"
+      }
+    },
+    "loyaltyPrograms": {
+      "title": "Loyalty programs",
+      "description": "Reward programs (tenant-wide list per current schema)",
+      "searchPlaceholder": "Search programs…",
+      "emptyMessage": "No loyalty programs yet.",
+      "columns": {
+        "name": "Name",
+        "currencyId": "Currency",
+        "programType": "Type",
+        "isActive": "Active"
+      }
+    },
+    "loyaltyCards": {
+      "title": "Loyalty cards",
+      "description": "Customer loyalty cards and point balances",
+      "searchPlaceholder": "Search by code…",
+      "emptyMessage": "No loyalty cards yet.",
+      "columns": {
+        "code": "Code",
+        "points": "Points",
+        "partnerId": "Partner",
+        "currencyId": "Currency",
+        "isActive": "Active"
+      }
+    },
     "forms": {
       "newSaleOrder": {
         "title": "New Sale Order",
@@ -3596,6 +4361,130 @@
           "pickingIdsPlaceholder": "101, 102, 103",
           "pickingIdsHint": "Comma-separated IDs from Inventory → deliveries / pickings. Leave empty to create an empty batch."
         }
+      },
+      "newDeliveryPriceRule": {
+        "title": "New delivery price rule",
+        "description": "Create a pricing rule (link to a carrier after creation using carrier settings)",
+        "sections": {
+          "main": "Rule"
+        },
+        "fields": {
+          "variable": "Variable",
+          "variablePlaceholder": "e.g. weight, price, quantity",
+          "operator": "Operator",
+          "maxValue": "Maximum value",
+          "listBasePrice": "List base price",
+          "listPrice": "List price",
+          "standardPrice": "Standard price"
+        }
+      },
+      "newDeliveryCarrier": {
+        "title": "New delivery carrier",
+        "description": "Configure a shipping carrier for your company",
+        "sections": {
+          "main": "Carrier"
+        },
+        "fields": {
+          "name": "Name",
+          "productId": "Delivery product ID",
+          "currencyId": "Currency ID",
+          "deliveryType": "Delivery type",
+          "integrationLevel": "Integration level",
+          "invoicePolicy": "Invoice policy",
+          "priceRuleIds": "Price rule IDs",
+          "priceRuleIdsHint": "Comma-separated rule IDs from the Shipping price rules tab",
+          "margin": "Margin",
+          "amount": "Amount",
+          "fixedCharge": "Fixed charge",
+          "fixedWeight": "Fixed weight",
+          "shippingInsurance": "Shipping insurance",
+          "freeOver": "Free shipping over threshold",
+          "shippingInsuranceIsPercentage": "Insurance is a percentage",
+          "canGenerateReturn": "Can generate return label",
+          "returnLabelOnDelivery": "Return label on delivery",
+          "getReturnLabelFromPortal": "Return label from portal",
+          "useDetailedDeliveryDescription": "Detailed delivery description",
+          "countryIds": "Country IDs (comma-separated)",
+          "stateIds": "State IDs (comma-separated)",
+          "zipPrefixIds": "ZIP prefixes (comma-separated)"
+        }
+      },
+      "newShippingMethod": {
+        "title": "New shipping method",
+        "description": "Add a shipping method",
+        "sections": {
+          "main": "Method"
+        },
+        "fields": {
+          "name": "Name",
+          "provider": "Provider",
+          "productId": "Product ID",
+          "deliveryType": "Delivery type",
+          "integrationLevel": "Integration level",
+          "invoicePolicy": "Invoice policy",
+          "fixedPrice": "Fixed price",
+          "margin": "Margin",
+          "amount": "Amount",
+          "freeOver": "Free over threshold"
+        }
+      },
+      "newPosPaymentMethod": {
+        "title": "New POS payment method",
+        "description": "Payment method for point-of-sale terminals",
+        "sections": {
+          "main": "Payment method"
+        },
+        "fields": {
+          "name": "Name",
+          "paymentMethodType": "Type",
+          "sequence": "Sequence",
+          "isCashCount": "Cash count",
+          "isCardPayment": "Card payment",
+          "splitTransactions": "Split transactions",
+          "openCashbox": "Open cashbox",
+          "receivableAccountId": "Receivable account ID",
+          "outstandingAccountId": "Outstanding account ID",
+          "journalId": "Journal ID",
+          "cashJournalId": "Cash journal ID",
+          "usePaymentTerminal": "Payment terminal driver"
+        }
+      },
+      "newLoyaltyProgram": {
+        "title": "New loyalty program",
+        "description": "Create a loyalty / rewards program",
+        "sections": {
+          "main": "Program"
+        },
+        "fields": {
+          "name": "Name",
+          "currencyId": "Currency ID",
+          "programType": "Program type",
+          "limitUsage": "Usage limit (0 = none)",
+          "validityDuration": "Validity duration",
+          "validityDurationType": "Duration unit",
+          "durationDays": "Days",
+          "durationWeeks": "Weeks",
+          "durationMonths": "Months",
+          "dateTo": "End date",
+          "isNominative": "Nominative (named participants)",
+          "triggerProductIds": "Trigger product IDs",
+          "triggerProductIdsHint": "Comma-separated product IDs"
+        }
+      },
+      "newLoyaltyCard": {
+        "title": "New loyalty card",
+        "description": "Issue a loyalty card for a program",
+        "sections": {
+          "main": "Card"
+        },
+        "fields": {
+          "programId": "Program",
+          "programPlaceholder": "Select program…",
+          "code": "Card code",
+          "points": "Starting points",
+          "partnerId": "Partner ID (optional)"
+        },
+        "noPrograms": "Create a loyalty program first"
       }
     },
     "actions": {
@@ -3750,6 +4639,21 @@
         "workorderCount": "WO Count"
       }
     },
+    "routingOperations": {
+      "tabLabel": "Routing operations",
+      "title": "Routing operations",
+      "description": "Work center routing steps (sequence, cycle times)",
+      "searchPlaceholder": "Search operations…",
+      "emptyMessage": "No routing operations found.",
+      "columns": {
+        "workcenterId": "Work center",
+        "name": "Operation",
+        "sequence": "Sequence",
+        "timeCycle": "Cycle time",
+        "worksheetType": "Worksheet type",
+        "timeMode": "Time mode"
+      }
+    },
     "rowActions": {
       "description": "Run workflow actions for the selected record.",
       "runAction": "Run action",
@@ -3767,8 +4671,19 @@
         "woDescription": "Work order #{{id}} — status: {{state}}",
         "noActionsAvailable": "No actions available for this status",
         "wcDescription": "Work center #{{id}}",
-        "wcParamsHint": "Name applies to “Save name”. Reason applies to “Block”. IDs apply to “Log productivity”. Device applies to “Link IoT device”.",
+        "wcParamsHint": "Name applies to “Save name”. Reason applies to “Block”. Work order / duration / loss apply to “Log productivity”. Log ID applies to “Complete productivity log”. Routing fields apply to “Add routing operation”. Device applies to “Link IoT device”.",
         "workorderId": "Work order ID",
+        "routingOpName": "Operation name",
+        "routingWorksheetType": "Worksheet type",
+        "routingTimeMode": "Time mode",
+        "routingTimeModeBatch": "Time mode batch",
+        "routingTimeCycleManual": "Manual cycle time",
+        "routingTimeCycle": "Cycle time",
+        "routingSequence": "Sequence",
+        "routingWorksheetBody": "Worksheet text (optional)",
+        "routingWorksheetUrl": "Worksheet URL (optional)",
+        "routingBlockedByIds": "Blocked by operation IDs (comma-separated, optional)",
+        "completeLogId": "Open productivity log ID",
         "csvFile": "CSV file"
       },
       "titleOrder": "Manufacturing order",
@@ -3798,6 +4713,8 @@
       "block": "Block",
       "unblock": "Unblock",
       "logProductivity": "Log productivity",
+      "createRoutingOperation": "Add routing operation",
+      "completeProductivityLog": "Complete productivity log",
       "linkIotDevice": "Link IoT device",
       "linkIotDeviceSelect": "IoT device",
       "noIotDevices": "No IoT devices in this organization",
@@ -3901,6 +4818,19 @@
       "overdueTasks": "Overdue Tasks",
       "hoursLogged": "Hours Logged",
       "projectFallback": "Project {{number}}"
+    },
+    "csvImport": {
+      "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
+      "submit": "Import",
+      "fileLabel": "CSV file",
+      "projectTitle": "Import projects (CSV)",
+      "taskTitle": "Import tasks (CSV)",
+      "timesheetTitle": "Import timesheets (CSV)"
+    },
+    "toolbar": {
+      "importProjectCsv": "Import projects (CSV)",
+      "importTaskCsv": "Import tasks (CSV)",
+      "importTimesheetCsv": "Import timesheets (CSV)"
     },
     "projects": {
       "title": "Projects",
@@ -4179,6 +5109,82 @@
         }
       }
     },
+    "toolbar": {
+      "importCategoryCsv": "Import categories (CSV)",
+      "importArticleCsv": "Import articles (CSV)"
+    },
+    "csvImport": {
+      "categoryTitle": "Import knowledge categories",
+      "articleTitle": "Import knowledge articles"
+    },
+    "tabs": {
+      "processing": "Processing jobs",
+      "insights": "AI insights"
+    },
+    "processing": {
+      "title": "Document processing jobs",
+      "description": "AI extraction pipeline: submit jobs, record completion (for integrations or testing), then approve reviewed results. Status updates from the server.",
+      "newJob": "New processing job",
+      "searchPlaceholder": "Search jobs…",
+      "emptyMessage": "No processing jobs yet.",
+      "columns": {
+        "id": "ID",
+        "documentType": "Document type",
+        "jobType": "Job type",
+        "status": "Status",
+        "approved": "Approved",
+        "confidence": "Confidence",
+        "modelUsed": "Model",
+        "created": "Created"
+      },
+      "filters": {
+        "isApproved": "Approved",
+        "isApproved.options": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "actions": {
+        "recordCompletion": "Record completion",
+        "approve": "Approve extraction"
+      },
+      "errors": {
+        "selectOneJob": "Select exactly one job to record completion.",
+        "noneApprovable": "No selected job is completed and awaiting approval."
+      }
+    },
+    "insights": {
+      "title": "AI insights",
+      "description": "Acknowledge insights when you have acted on them. To hide an insight from lists here and in Settings → AI, use Dismiss in Settings → AI (not here).",
+      "searchPlaceholder": "Search insights…",
+      "emptyMessage": "No insights found.",
+      "columns": {
+        "title": "Title",
+        "severity": "Severity",
+        "relatedModel": "Related model",
+        "acknowledged": "Acknowledged",
+        "dismissed": "Dismissed",
+        "generatedAt": "Generated"
+      },
+      "filters": {
+        "dismissed": "Dismissed",
+        "dismissed.options": {
+          "open": "Open",
+          "dismissed": "Dismissed"
+        },
+        "isAcknowledged": "Acknowledged",
+        "isAcknowledged.options": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "actions": {
+        "acknowledge": "Acknowledge"
+      },
+      "errors": {
+        "noneAcknowledgable": "Selected insights are already acknowledged or dismissed."
+      }
+    },
     "forms": {
       "newDocument": {
         "title": "Upload Document",
@@ -4196,6 +5202,10 @@
           "descriptionPlaceholder": "Brief description of this document…",
           "isFavorite": "Mark as Favorite",
           "isShared": "Share with Team",
+          "folderId": "Folder ID",
+          "folderIdHint": "Optional document folder row id",
+          "tagIds": "Tag IDs",
+          "tagIdsHint": "Comma-separated numeric ids (optional)",
           "options": {
             "pdf": "PDF",
             "excel": "Excel",
@@ -4204,6 +5214,26 @@
             "jpeg": "JPEG",
             "text": "Text"
           }
+        }
+      },
+      "newArticle": {
+        "title": "New Article",
+        "description": "Create a knowledge base article",
+        "sections": {
+          "article": "Article"
+        },
+        "fields": {
+          "name": "Article Title",
+          "namePlaceholder": "How to process refunds",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief summary of this article…",
+          "body": "Body",
+          "bodyPlaceholder": "Article content…",
+          "isPublished": "Publish immediately",
+          "parentId": "Parent article ID",
+          "parentIdHint": "Optional hierarchy",
+          "categoryId": "Category ID",
+          "categoryIdHint": "Optional knowledge category row id"
         }
       },
       "newKnowledgeArticle": {
@@ -4217,7 +5247,61 @@
           "namePlaceholder": "How to process refunds",
           "description": "Description",
           "descriptionPlaceholder": "Brief summary of this article…",
-          "isPublished": "Publish immediately"
+          "isPublished": "Publish immediately",
+          "parentId": "Parent article ID",
+          "parentIdHint": "Optional hierarchy",
+          "categoryId": "Category ID",
+          "categoryIdHint": "Optional knowledge category row id"
+        }
+      },
+      "newProcessingJob": {
+        "title": "New document processing job",
+        "description": "Queues work for the AI document pipeline (status starts as pending).",
+        "sections": {
+          "params": "Job parameters"
+        },
+        "fields": {
+          "documentType": "Document type",
+          "documentTypePlaceholder": "e.g. invoice, contract",
+          "jobType": "Job type",
+          "jobTypePlaceholder": "e.g. extract_entities, summarize",
+          "aiAgentId": "AI agent id (optional)",
+          "aiAgentIdPlaceholder": "Numeric id of an agent from Settings → AI",
+          "inputData": "Input payload (optional)",
+          "inputDataPlaceholder": "Text or JSON consumed by the worker",
+          "metadata": "Metadata (optional)",
+          "metadataPlaceholder": "Opaque JSON string for your integration"
+        }
+      },
+      "completeProcessingJob": {
+        "title": "Record job completion",
+        "description": "Sets extracted results or an error; use after an integration finishes processing, or for testing.",
+        "sections": {
+          "result": "Result"
+        },
+        "fields": {
+          "extractedData": "Extracted data (JSON or text)",
+          "extractedDataPlaceholder": "{\"vendor\":\"…\",\"total\":…}",
+          "modelUsed": "Model used",
+          "confidenceScore": "Confidence (0–1)",
+          "tokensUsed": "Tokens used",
+          "cost": "Cost",
+          "errorMessage": "Error message",
+          "errorMessagePlaceholder": "If set, job is marked failed and extracted data is optional"
+        },
+        "validation": {
+          "needResultOrError": "Provide extracted data and/or an error message."
+        }
+      },
+      "acknowledgeInsight": {
+        "title": "Acknowledge insight",
+        "description": "Marks the insight as acknowledged and optionally records what you did.",
+        "sections": {
+          "note": "Follow-up"
+        },
+        "fields": {
+          "actionTaken": "Action taken (optional)",
+          "actionTakenPlaceholder": "e.g. Updated policy doc, notified finance…"
         }
       }
     }
@@ -4738,6 +5822,12 @@
     }
   },
   "expenses": {
+    "csvImport": {
+      "expenseTitle": "Import expenses (CSV)",
+      "toolbarExpenses": "Import expenses (CSV)",
+      "sheetTitle": "Import expense reports (CSV)",
+      "toolbarSheets": "Import reports (CSV)"
+    },
     "dashboard": {
       "totalExpenses": "Total Expenses",
       "pendingApproval": "Pending Approval",
@@ -5191,6 +6281,8 @@
           "model": "Related Model",
           "modelPlaceholder": "e.g. sale.order",
           "resId": "Record ID",
+          "parentId": "Parent message ID",
+          "parentIdHint": "Optional — reply thread",
           "messageType": "Message Type",
           "body": "Message Body",
           "bodyPlaceholder": "Write your message…",
@@ -5325,16 +6417,32 @@
       "tabs": {
         "fields": "Fields",
         "roles": "Role Access",
+        "preview": "Live preview",
         "importExport": "Import/Export"
       },
+      "preview": {
+        "description": "How this form appears for a role after saved configuration is loaded from the database (falls back to built-in defaults when no row exists).",
+        "asRole": "Preview as role",
+        "submitHidden": "Preview"
+      },
+      "createFromRegistry": "Create in database",
+      "pushRegistrySuccess": "Form configuration was created from the built-in registry.",
+      "pushRegistryError": "Could not create form configuration from the registry.",
+      "initJournalForensic": "Init journal & forensic defaults",
+      "initDefaultsSuccess": "Journal and forensic default forms were initialized.",
+      "initDefaultsError": "Could not initialize default form configurations.",
+      "fieldEnabledUpdated": "Field visibility updated.",
+      "fieldUpdateError": "Could not update field.",
+      "fieldDeleted": "Field removed.",
+      "fieldDeleteError": "Could not delete field.",
       "addField": "Add Field",
       "noOrganization": "No active organization in session. Sign in again or select an organization.",
       "seedDatabase": "Seed form configs",
       "seedSuccess": "Default form configurations were created for your organization.",
       "seedError": "Could not seed form configurations.",
       "refresh": "Refresh",
-      "registryOnlyHint": "Showing built-in defaults only. Seed form configurations in the database to add custom fields.",
-      "needDbConfig": "Seed form configurations first (button above), then add custom fields.",
+      "registryOnlyHint": "Showing built-in defaults only. Use Create in database or Seed to persist configs, then you can add custom fields.",
+      "needDbConfig": "Create or seed form configurations in the database first, then add custom fields.",
       "noPermission": "You do not have permission to change form configuration.",
       "fieldKeyRequired": "Enter a field key (letters, numbers, underscores).",
       "customFieldAdded": "Custom field added.",
@@ -5429,7 +6537,7 @@
       "noMembers": "No team members yet.",
       "memberCreated": "Team member created",
       "insightsTitle": "Insights",
-      "insightsDescription": "Open items (dismissed insights are hidden). Acknowledgement flows are handled from the documents area when wired.",
+      "insightsDescription": "Dismiss removes an insight from this list. To record that you acted on an insight, open Documents → AI insights and use Acknowledge.",
       "addSampleInsight": "Create sample insight",
       "noInsights": "No open insights.",
       "dismiss": "Dismiss",
@@ -5673,11 +6781,191 @@
         "maxValue": "Max Value",
         "addField": "Add Field"
       }
+    },
+    "organization": {
+      "title": "Organization",
+      "description": "Manage your organization settings and configuration",
+      "generalInfo": "General Information",
+      "generalInfoDescription": "Basic organization details",
+      "name": "Organization Name",
+      "namePlaceholder": "Acme Inc.",
+      "description": "Description",
+      "descriptionPlaceholder": "Brief description of your organization",
+      "defaultCurrency": "Default Currency",
+      "updateOrg": "Update Organization",
+      "address": "Address",
+      "addressDescription": "Physical address for billing and shipping",
+      "street": "Street Address",
+      "streetPlaceholder": "123 Main St",
+      "city": "City",
+      "cityPlaceholder": "New York",
+      "state": "State/Province",
+      "statePlaceholder": "NY",
+      "zip": "ZIP/Postal Code",
+      "zipPlaceholder": "10001",
+      "country": "Country",
+      "countryPlaceholder": "United States",
+      "contact": "Contact Information",
+      "contactDescription": "How to reach your organization",
+      "email": "Email",
+      "emailPlaceholder": "contact@company.com",
+      "phone": "Phone",
+      "phonePlaceholder": "+1 (555) 123-4567",
+      "website": "Website",
+      "websitePlaceholder": "https://www.company.com",
+      "saveSettings": "Save Settings",
+      "saveSuccess": "Settings saved",
+      "saveSuccessDescription": "Your organization settings have been updated.",
+      "saveError": "Failed to save",
+      "saveErrorDescription": "An error occurred while saving settings.",
+      "updateSuccess": "Organization updated",
+      "updateSuccessDescription": "Organization details have been updated.",
+      "updateError": "Update failed",
+      "csvImport": {
+        "sectionTitle": "CSV import (organization)",
+        "sectionDescription": "Bulk-load reference data for this organization. Each import checks SpacetimeDB permissions on the target resource. Use UTF-8 CSV with headers expected by the module.",
+        "toolbarCountries": "Countries",
+        "toolbarCurrencies": "Currencies",
+        "toolbarCurrencyRates": "Currency rates",
+        "toolbarCompanies": "Companies",
+        "toolbarRoles": "Roles",
+        "toolbarAiAgents": "AI agents",
+        "countriesTitle": "Import countries",
+        "currenciesTitle": "Import currencies",
+        "currencyRatesTitle": "Import currency rates",
+        "companiesTitle": "Import companies",
+        "rolesTitle": "Import roles",
+        "aiAgentsTitle": "Import AI agents",
+        "successTitle": "Import started",
+        "successDescription": "The CSV was submitted. Check import jobs or server logs for row-level results."
+      },
+      "integrations": {
+        "title": "Integrations",
+        "description": "Connect third-party services to extend functionality",
+        "googleDrive": {
+          "title": "Google Drive",
+          "description": "Store and access documents from Google Drive",
+          "saved": "Google Drive credentials saved successfully"
+        },
+        "whatsapp": {
+          "title": "WhatsApp Business",
+          "description": "Send notifications and messages via WhatsApp",
+          "saved": "WhatsApp credentials saved successfully"
+        },
+        "accessToken": "Access Token",
+        "tokenPlaceholder": "Enter your access token",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "Enter your API key",
+        "connect": "Connect",
+        "success": "Connected",
+        "error": "Connection failed",
+        "tokenRequired": "Access token is required",
+        "apiKeyRequired": "API key is required",
+        "saveError": "Failed to save credentials"
+      }
+    }
+  },
+  "auth": {
+    "forms": {
+      "newRole": {
+        "title": "Create Role",
+        "description": "Define a new role with permissions",
+        "sections": {
+          "main": "Role Details"
+        },
+        "fields": {
+          "name": "Role Name",
+          "namePlaceholder": "e.g. Sales Manager",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief description of this role's responsibilities"
+        }
+      },
+      "updateRole": {
+        "title": "Update Role",
+        "description": "Edit role details and permissions",
+        "sections": {
+          "main": "Role Details"
+        },
+        "fields": {
+          "isActive": "Active"
+        }
+      },
+      "newAuditRule": {
+        "title": "Create Audit Rule",
+        "description": "Define a rule for auditing system events",
+        "sections": {
+          "main": "Rule Configuration"
+        },
+        "fields": {
+          "name": "Rule Name",
+          "namePlaceholder": "e.g. Track user logins",
+          "resourceType": "Resource Type",
+          "actionType": "Action Type",
+          "severity": "Severity",
+          "isActive": "Active"
+        },
+        "resourceTypes": {
+          "user": "User",
+          "role": "Role",
+          "document": "Document",
+          "invoice": "Invoice",
+          "product": "Product",
+          "order": "Order",
+          "all": "All Resources"
+        },
+        "actionTypes": {
+          "create": "Create",
+          "update": "Update",
+          "delete": "Delete",
+          "login": "Login",
+          "logout": "Logout",
+          "export": "Export",
+          "all": "All Actions"
+        },
+        "severities": {
+          "debug": "Debug",
+          "info": "Info",
+          "warning": "Warning",
+          "error": "Error",
+          "critical": "Critical"
+        }
+      },
+      "newUserInvite": {
+        "title": "Invite User",
+        "description": "Send an invitation to join the organization",
+        "sections": {
+          "main": "Invite Details"
+        },
+        "fields": {
+          "email": "Email Address",
+          "emailPlaceholder": "user@example.com",
+          "expiresInDays": "Expires In"
+        }
+      },
+      "updateUserPassword": {
+        "title": "Update Password",
+        "description": "Set a new password for this user",
+        "sections": {
+          "password": "Password"
+        },
+        "fields": {
+          "newPassword": "New Password",
+          "requireReset": "Require password change on next login"
+        }
+      }
     }
   },
   "reports": {
     "moduleTitle": "Reports",
     "moduleDescription": "Financial reports, templates, schedules, and metrics",
+    "toolbar": {
+      "importTemplateCsv": "Import templates (CSV)",
+      "importMetricCsv": "Import metrics (CSV)"
+    },
+    "csvImport": {
+      "templateTitle": "Import report templates",
+      "metricTitle": "Import analytics metrics"
+    },
     "dashboard": {
       "quickActionsTitle": "Quick actions",
       "kpiTitle": "Key metrics",
@@ -5685,7 +6973,9 @@
         "generate": "Generate report",
         "newTemplate": "New template",
         "scheduleReport": "Schedule report",
-        "newMetric": "New metric"
+        "newMetric": "New metric",
+        "newDashboard": "New dashboard",
+        "newWidget": "New widget"
       },
       "kpis": {
         "totalReports": "Total reports",
@@ -5810,9 +7100,15 @@
       "archive": "Archive",
       "delete": "Delete",
       "regenerate": "Regenerate",
+      "edit": "Edit report",
       "editTemplate": "Edit template layout",
       "refreshMetric": "Update metric values",
-      "recordRun": "Record run"
+      "recordRun": "Record run",
+      "newDashboard": "New Dashboard",
+      "newWidget": "New Widget",
+      "addWidget": "Add Widget",
+      "shareDashboard": "Share Dashboard",
+      "updateLayout": "Update Layout"
     },
     "forms": {
       "generateReport": {
@@ -5976,6 +7272,98 @@
           "currencyId": "Currency ID",
           "level": "Level",
           "isLeaf": "Leaf account"
+        }
+      },
+      "dashboard": {
+        "title": "Create Dashboard",
+        "description": "Create a new dashboard for reports and analytics",
+        "sections": {
+          "main": "Dashboard Details"
+        },
+        "fields": {
+          "name": "Dashboard Name",
+          "namePlaceholder": "e.g. Executive Overview",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief description of this dashboard",
+          "isActive": "Active"
+        }
+      },
+      "dashboardWidget": {
+        "title": "Create Widget",
+        "description": "Add a new widget to dashboards",
+        "sections": {
+          "main": "Widget Details"
+        },
+        "fields": {
+          "name": "Widget Name",
+          "namePlaceholder": "e.g. Revenue KPI",
+          "widgetType": "Widget Type",
+          "types": {
+            "kpi": "KPI Card",
+            "chart": "Chart",
+            "table": "Data Table",
+            "metric": "Progress Metric",
+            "areaChart": "Area Chart",
+            "barChart": "Bar Chart"
+          },
+          "dataSource": "Data Source",
+          "dataSourcePlaceholder": "e.g. account.move or analytics query"
+        }
+      },
+      "addWidgetToDashboard": {
+        "title": "Add Widget to Dashboard",
+        "description": "Configure widget placement on the dashboard",
+        "sections": {
+          "layout": "Layout & Position"
+        },
+        "fields": {
+          "widgetId": "Select Widget",
+          "x": "X Position",
+          "y": "Y Position",
+          "width": "Width",
+          "height": "Height (px)"
+        }
+      },
+      "updateWidgetLayout": {
+        "title": "Update Widget Layout",
+        "description": "Adjust widget position and size",
+        "sections": {
+          "layout": "Layout"
+        },
+        "fields": {
+          "x": "X Position",
+          "y": "Y Position",
+          "width": "Width",
+          "height": "Height (px)"
+        }
+      },
+      "shareDashboard": {
+        "title": "Share Dashboard",
+        "description": "Share this dashboard with users or teams",
+        "sections": {
+          "share": "Sharing Options"
+        },
+        "fields": {
+          "userId": "User (optional)",
+          "teamId": "Team (optional)",
+          "permissions": "Permissions"
+        },
+        "permissions": {
+          "read": "View only",
+          "write": "View and edit",
+          "admin": "Full control"
+        }
+      },
+      "updateFinancialReport": {
+        "title": "Update Financial Report",
+        "description": "Edit report details and settings",
+        "sections": {
+          "update": "Report Details"
+        },
+        "fields": {
+          "name": "Report Name",
+          "reportType": "Report Type",
+          "state": "Status"
         }
       }
     }
