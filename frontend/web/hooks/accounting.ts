@@ -281,6 +281,13 @@ export function usePostAccountMove() {
 }
 
 /**
+ * Post a customer/vendor invoice or refund (totals + optional COGS lines).
+ */
+export function usePostInvoice() {
+  return useStdbReducer("post_invoice")
+}
+
+/**
  * Cancel an account move.
  */
 export function useCancelAccountMove() {

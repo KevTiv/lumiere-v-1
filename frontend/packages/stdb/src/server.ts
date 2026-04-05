@@ -379,6 +379,58 @@ export function serverQueryAccountPeriods(
   )
 }
 
+/** Legal entities (companies) for the tenant — excludes soft-deleted rows. */
+export function serverQueryCompanies(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'companies',
+      'company',
+      organizationId,
+      fq(opts),
+      ' AND deleted_at IS NULL',
+      ' ORDER BY is_parent DESC, id ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDataClassifications(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'data-classifications',
+      'data_classification',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY level ASC, id ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDataClassificationRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'data-classification-rules',
+      'data_classification_rule',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY id ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
 export function serverQueryAccountMoves(
   organizationId: bigint | number,
   moveType?: string,

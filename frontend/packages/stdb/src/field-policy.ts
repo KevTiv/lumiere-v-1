@@ -154,6 +154,9 @@ import type {
   ConsolidationEliminationEntry,
   AccountFiscalYear,
   AccountPeriod,
+  Company,
+  DataClassification,
+  DataClassificationRule,
   AiAgent,
   AiDocumentProcessingJob,
   AiInsight,
@@ -306,6 +309,9 @@ export type QueryResourceKey =
   | 'ai-document-processing-jobs'
   | 'fiscal-years'
   | 'account-periods'
+  | 'companies'
+  | 'data-classifications'
+  | 'data-classification-rules'
 
 export interface FieldAccessContext {
   organizationId: number
@@ -991,6 +997,32 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['account-periods', 'account_period'],
     ['name', 'code', 'dateFrom', 'dateTo', 'state', 'fiscalYearId', 'isAdjustment', 'companyId'],
     ['id', 'companyId'] as readonly (keyof AccountPeriod)[],
+  ),
+  companies: orgEntry<Company>('company', ['companies', 'company'], [
+    'name',
+    'code',
+    'currencyId',
+    'fiscalYearEndMonth',
+    'fiscalYearEndDay',
+    'isParent',
+    'parentId',
+    'taxId',
+    'companyRegistry',
+    'addressStreet',
+    'addressCity',
+    'addressZip',
+    'addressCountryCode',
+    'deletedAt',
+  ]),
+  'data-classifications': orgEntry<DataClassification>(
+    'data_classification',
+    ['data-classifications', 'data_classification'],
+    ['name', 'level', 'description', 'retentionDays', 'encryptionRequired'],
+  ),
+  'data-classification-rules': orgEntry<DataClassificationRule>(
+    'data_classification_rule',
+    ['data-classification-rules', 'data_classification_rule'],
+    ['tableName', 'columnName', 'classificationId', 'appliesTo'],
   ),
 }
 

@@ -116,6 +116,7 @@ import {
   useCreateAccountTax,
   useCreateCrossoveredBudget,
   usePostAccountMove,
+  usePostInvoice,
   useCancelAccountMove,
   useCreateAnalyticAccount,
   useUpdateAnalyticAccount,
@@ -220,6 +221,10 @@ import {
   ConsolidationWorkspace,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  isInvoiceLikeMoveType,
+  resolveDefaultCogsInventoryAccountIds,
+} from "@/lib/accounting-post-draft"
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 
@@ -577,6 +582,7 @@ function AccountingClientLoaded({
   const createTax = useCreateAccountTax()
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const postMove = usePostAccountMove()
+  const postInvoice = usePostInvoice()
   const cancelMove = useCancelAccountMove()
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, companyId)
   const refreshTaxDeadlineStatuses = useRefreshTaxDeadlineStatuses(organizationId)
@@ -1432,11 +1438,21 @@ function AccountingClientLoaded({
   const postDraft = useCallback(
     (move: unknown) => {
       const row = move as Record<string, unknown>
-      if (row.id) {
-        postMove.mutate([String(organizationId), String(row.id)])
+      if (!row.id) return
+      const id = String(row.id)
+      const mt = moveTypeTag(row)
+      if (isInvoiceLikeMoveType(mt)) {
+        const resolved = resolveDefaultCogsInventoryAccountIds(
+          accounts as readonly Record<string, unknown>[],
+        )
+        const cogsId = resolved?.cogsAccountId ?? 0
+        const invId = resolved?.inventoryAccountId ?? 0
+        postInvoice.mutate([String(organizationId), id, String(cogsId), String(invId)])
+      } else {
+        postMove.mutate([String(organizationId), id])
       }
     },
-    [postMove, organizationId],
+    [postMove, postInvoice, organizationId, accounts],
   )
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -1746,7 +1762,7 @@ function AccountingClientLoaded({
                 onComputeInvoiceTotals={(move) =>
                   void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
                 }
-                postMovePending={postMove.isPending}
+                postMovePending={postMove.isPending || postInvoice.isPending}
                 cancelMovePending={cancelMove.isPending}
                 computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
               />
@@ -1929,6 +1945,7 @@ function AccountingClientLoaded({
       intercompanyRulesEntityConfig,
       intercompanyTransactionsEntityConfig,
       postMove,
+      postInvoice,
       cancelMove,
       computeInvoiceTotals.mutateAsync,
       refreshTaxDeadlineStatuses.mutateAsync,
@@ -2095,7 +2112,7 @@ function AccountingClientLoaded({
                 )
             : undefined
         }
-        postDraftPending={postMove.isPending}
+        postDraftPending={postMove.isPending || postInvoice.isPending}
         recalculateTotalsPending={computeInvoiceTotals.isPending}
       />
 

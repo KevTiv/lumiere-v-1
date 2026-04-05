@@ -144,6 +144,10 @@ export interface FormConfig {
   id: string
   title: string
   description?: string
+  /** When true, default layout omits the top title row (use inside another card). */
+  hideTitle?: boolean
+  /** When false, omits the footer (submit / cancel / reset). Default true. */
+  showActions?: boolean
   sections: FormSection[]
   submitLabel?: string
   cancelLabel?: string

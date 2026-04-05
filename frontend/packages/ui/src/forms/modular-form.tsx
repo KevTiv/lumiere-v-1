@@ -19,6 +19,8 @@ interface ModularFormProps {
   className?: string
   /** Renders at the start of the footer row (e.g. destructive actions beside Cancel / Submit). */
   leadingActions?: React.ReactNode
+  /** Called after any field change with the full values object (e.g. sync a parent select). */
+  onValuesChange?: (values: Record<string, unknown>) => void
 }
 
 export function ModularForm({
@@ -27,6 +29,7 @@ export function ModularForm({
   onCancel,
   className,
   leadingActions,
+  onValuesChange,
 }: ModularFormProps) {
   const { t } = useTranslation()
   // Initialize form state with default values
@@ -63,7 +66,11 @@ export function ModularForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = (name: string, value: unknown) => {
-    setValues((prev) => ({ ...prev, [name]: value }))
+    setValues((prev) => {
+      const next = { ...prev, [name]: value }
+      onValuesChange?.(next)
+      return next
+    })
     // Clear error when field is modified
     if (errors[name]) {
       setErrors((prev) => {
@@ -210,57 +217,59 @@ export function ModularForm({
         )
       })}
 
-      <div
-        className={cn(
-          "flex items-center gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50",
-          leadingActions ? "justify-between" : "justify-end",
-        )}
-      >
-        {leadingActions ? <div className="flex items-center gap-2">{leadingActions}</div> : null}
-        <div className="flex items-center gap-3">
-          {config.showReset && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              disabled={isSubmitting}
-            >
-              {t("common.reset")}
-            </Button>
+      {config.showActions !== false ? (
+        <div
+          className={cn(
+            "flex items-center gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50",
+            leadingActions ? "justify-between" : "justify-end",
           )}
-          {(onCancel || config.onCancel) && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCancel}
-              disabled={isSubmitting}
-            >
-              {config.cancelLabel || t("common.cancel")}
+        >
+          {leadingActions ? <div className="flex items-center gap-2">{leadingActions}</div> : null}
+          <div className="flex items-center gap-3">
+            {config.showReset && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                disabled={isSubmitting}
+              >
+                {t("common.reset")}
+              </Button>
+            )}
+            {(onCancel || config.onCancel) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+              >
+                {config.cancelLabel || t("common.cancel")}
+              </Button>
+            )}
+            <Button type="submit" size="sm" disabled={isSubmitting}>
+              {isSubmitting
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Check className="mr-2 h-4 w-4" />
+              }
+              {config.submitLabel || t("common.submit")}
             </Button>
-          )}
-          <Button type="submit" size="sm" disabled={isSubmitting}>
-            {isSubmitting
-              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              : <Check className="mr-2 h-4 w-4" />
-            }
-            {config.submitLabel || t("common.submit")}
-          </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </form>
   )
 
   if (config.layout === "card") {
     return (
       <Card className={cn("bg-card border-border/50", className)}>
-        <CardHeader>
-          <CardTitle>{config.title}</CardTitle>
-          {config.description && (
-            <CardDescription>{config.description}</CardDescription>
-          )}
-        </CardHeader>
+        {!config.hideTitle && (config.title || config.description) ? (
+          <CardHeader>
+            {config.title ? <CardTitle>{config.title}</CardTitle> : null}
+            {config.description ? <CardDescription>{config.description}</CardDescription> : null}
+          </CardHeader>
+        ) : null}
         <CardContent>{formContent}</CardContent>
       </Card>
     )
@@ -268,12 +277,16 @@ export function ModularForm({
 
   return (
     <div className={cn("space-y-6", className)}>
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold text-foreground">{config.title}</h2>
-        {config.description && (
-          <p className="text-sm text-muted-foreground">{config.description}</p>
-        )}
-      </div>
+      {!config.hideTitle && (config.title || config.description) ? (
+        <div className="space-y-1">
+          {config.title ? (
+            <h2 className="text-xl font-semibold text-foreground">{config.title}</h2>
+          ) : null}
+          {config.description ? (
+            <p className="text-sm text-muted-foreground">{config.description}</p>
+          ) : null}
+        </div>
+      ) : null}
       {formContent}
     </div>
   )

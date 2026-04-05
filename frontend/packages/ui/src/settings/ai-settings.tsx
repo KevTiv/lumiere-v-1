@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useStdbConnection } from "@lumiere/stdb"
+import { FormModal, mergeFieldDefaultValues } from "@lumiere/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { useAiAgents, useCreateAiAgent, useSetAiAgentActive, useUpdateAiAgent } from "@/hooks/ai-agents"
+import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
 import {
   Dialog,
   DialogContent,
@@ -43,6 +46,74 @@ function str(v: unknown): string {
 
 function bool(v: unknown): boolean {
   return v === true
+}
+
+function numFromForm(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v
+  const n = Number.parseFloat(String(v ?? ""))
+  return Number.isFinite(n) ? n : 0
+}
+
+function u32FromForm(v: unknown): number {
+  return Math.round(numFromForm(v))
+}
+
+function strOrNull(v: unknown): string | null {
+  const s = String(v ?? "").trim()
+  return s === "" ? null : s
+}
+
+function optF64(v: unknown): number | null {
+  const s = String(v ?? "").trim()
+  if (s === "") return null
+  const n = Number.parseFloat(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function optU32(v: unknown): number | null {
+  const s = String(v ?? "").trim()
+  if (s === "") return null
+  const n = Math.round(Number.parseFloat(s))
+  return Number.isFinite(n) ? n : null
+}
+
+function buildCreateAiAgentParams(data: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: String(data.name ?? "").trim() || "Unnamed agent",
+    model: String(data.model ?? "").trim(),
+    provider: String(data.provider ?? "").trim(),
+    temperature: numFromForm(data.temperature),
+    maxTokens: u32FromForm(data.maxTokens),
+    rateLimitPerMinute: u32FromForm(data.rateLimitPerMinute),
+    costPer1KTokens: numFromForm(data.costPer1KTokens),
+    contextWindow: u32FromForm(data.contextWindow),
+    topP: numFromForm(data.topP),
+    frequencyPenalty: numFromForm(data.frequencyPenalty),
+    presencePenalty: numFromForm(data.presencePenalty),
+    isActive: true,
+    isDefault: false,
+    allowedModels: [] as string[],
+    allowedActions: [] as string[],
+    description: strOrNull(data.description),
+    apiKeyReference: null,
+    systemPrompt: strOrNull(data.systemPrompt),
+    monthlyBudget: optF64(data.monthlyBudget),
+    metadata: null,
+  }
+}
+
+function buildUpdateAiAgentParams(data: Record<string, unknown>): Record<string, unknown> {
+  return {
+    temperature: numFromForm(data.temperature),
+    maxTokens: u32FromForm(data.maxTokens),
+    rateLimitPerMinute: u32FromForm(data.rateLimitPerMinute),
+    contextWindow: optU32(data.contextWindow),
+    topP: optF64(data.topP),
+    frequencyPenalty: optF64(data.frequencyPenalty),
+    presencePenalty: optF64(data.presencePenalty),
+    systemPrompt: strOrNull(data.systemPrompt),
+    monthlyBudget: optF64(data.monthlyBudget),
+  }
 }
 
 function severityLabel(v: unknown): string {
@@ -88,45 +159,52 @@ export function AiSettings() {
   const { toast } = useToast()
   const { organizationId } = useStdbConnection()
 
-  const [agents, setAgents] = useState<Row[]>([])
+  const orgReady = organizationId != null && organizationId > 0
+  const orgId = organizationId ?? 0
+
+  const agentsQuery = useAiAgents(orgId, orgReady)
+  const refetchAgents = agentsQuery.refetch
+  const createAgentMutation = useCreateAiAgent(orgId)
+  const updateAgentMutation = useUpdateAiAgent(orgId)
+  const setActiveMutation = useSetAiAgentActive(orgId)
+
+  const agents = agentsQuery.data ?? []
+
   const [members, setMembers] = useState<Row[]>([])
   const [insights, setInsights] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [mutating, setMutating] = useState(false)
 
   const [createAgentOpen, setCreateAgentOpen] = useState(false)
+  const [createFormKey, setCreateFormKey] = useState(0)
+  const [createAgentError, setCreateAgentError] = useState<string | null>(null)
   const [editAgent, setEditAgent] = useState<Row | null>(null)
+  const [editAgentError, setEditAgentError] = useState<string | null>(null)
   const [createMemberOpen, setCreateMemberOpen] = useState(false)
   const [sampleInsightOpen, setSampleInsightOpen] = useState(false)
 
-  const [newAgent, setNewAgent] = useState({
-    name: "",
-    model: "gpt-4o",
-    provider: "OpenAI",
-    temperature: 0.7,
-    maxTokens: 4096,
-    rateLimitPerMinute: 60,
-    costPer1KTokens: 0.005,
-    contextWindow: 128000,
-    topP: 1,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    systemPrompt: "",
-    monthlyBudget: "",
-    description: "",
-  })
-
-  const [editFields, setEditFields] = useState({
-    temperature: 0.7,
-    maxTokens: 4096,
-    rateLimitPerMinute: 60,
-    contextWindow: "" as string,
-    topP: "" as string,
-    frequencyPenalty: "" as string,
-    presencePenalty: "" as string,
-    systemPrompt: "" as string,
-    monthlyBudget: "" as string,
-  })
+  const createFormConfig = useMemo(() => aiAgentCreateFormConfig(t), [t])
+  const editFormBase = useMemo(() => aiAgentEditFormConfig(t), [t])
+  const editFormConfig = useMemo(() => {
+    if (!editAgent) return editFormBase
+    const id = num(editAgent.id)
+    const merged = mergeFieldDefaultValues(editFormBase, {
+      agentId: String(id),
+      temperature: Number(editAgent.temperature ?? 0.7),
+      maxTokens: num(editAgent.maxTokens),
+      rateLimitPerMinute: num(editAgent.rateLimitPerMinute),
+      contextWindow: editAgent.contextWindow != null ? String(editAgent.contextWindow) : "",
+      topP: editAgent.topP != null ? String(editAgent.topP) : "",
+      frequencyPenalty: editAgent.frequencyPenalty != null ? String(editAgent.frequencyPenalty) : "",
+      presencePenalty: editAgent.presencePenalty != null ? String(editAgent.presencePenalty) : "",
+      systemPrompt: str(editAgent.systemPrompt),
+      monthlyBudget:
+        editAgent.monthlyBudget != null && editAgent.monthlyBudget !== undefined
+          ? String(editAgent.monthlyBudget)
+          : "",
+    })
+    return { ...merged, description: str(editAgent.name) }
+  }, [editAgent, editFormBase])
 
   const [newMember, setNewMember] = useState({
     name: "",
@@ -143,15 +221,11 @@ export function AiSettings() {
 
   const [spendByAgent, setSpendByAgent] = useState<Record<string, string>>({})
 
-  const load = useCallback(async () => {
+  const loadSecondary = useCallback(async () => {
+    if (!orgReady) return
     setLoading(true)
     try {
-      const [a, m, i] = await Promise.all([
-        fetchQuery("ai-agents"),
-        fetchQuery("ai-team-members"),
-        fetchQuery("ai-insights"),
-      ])
-      setAgents(a)
+      const [m, i] = await Promise.all([fetchQuery("ai-team-members"), fetchQuery("ai-insights")])
       setMembers(m)
       setInsights(i)
     } catch (e) {
@@ -163,142 +237,36 @@ export function AiSettings() {
     } finally {
       setLoading(false)
     }
-  }, [t, toast])
+  }, [orgReady, t, toast])
+
+  const refreshAll = useCallback(async () => {
+    if (!orgReady) return
+    setLoading(true)
+    try {
+      const [m, i] = await Promise.all([fetchQuery("ai-team-members"), fetchQuery("ai-insights")])
+      setMembers(m)
+      setInsights(i)
+      await refetchAgents()
+    } catch (e) {
+      toast({
+        title: t("settings.ai.loadError"),
+        description: e instanceof Error ? e.message : t("settings.ai.loadErrorDescription"),
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [orgReady, refetchAgents, t, toast])
 
   useEffect(() => {
-    if (organizationId == null) return
-    void load()
-  }, [organizationId, load])
-
-  const orgId = organizationId ?? 0
+    if (!orgReady) return
+    void loadSecondary()
+  }, [orgReady, loadSecondary])
 
   const activeInsights = useMemo(
     () => insights.filter((r) => !bool(r.dismissed)),
     [insights],
   )
-
-  const openEdit = (row: Row) => {
-    setEditAgent(row)
-    setEditFields({
-      temperature: Number(row.temperature ?? 0.7),
-      maxTokens: num(row.maxTokens),
-      rateLimitPerMinute: num(row.rateLimitPerMinute),
-      contextWindow: row.contextWindow != null ? String(row.contextWindow) : "",
-      topP: row.topP != null ? String(row.topP) : "",
-      frequencyPenalty: row.frequencyPenalty != null ? String(row.frequencyPenalty) : "",
-      presencePenalty: row.presencePenalty != null ? String(row.presencePenalty) : "",
-      systemPrompt: str(row.systemPrompt),
-      monthlyBudget:
-        row.monthlyBudget != null && row.monthlyBudget !== undefined
-          ? String(row.monthlyBudget)
-          : "",
-    })
-  }
-
-  const handleCreateAgent = async () => {
-    if (!orgId) return
-    setMutating(true)
-    try {
-      const params = {
-        name: newAgent.name.trim() || "Unnamed agent",
-        model: newAgent.model.trim(),
-        provider: newAgent.provider.trim(),
-        temperature: newAgent.temperature,
-        maxTokens: Math.round(newAgent.maxTokens),
-        rateLimitPerMinute: Math.round(newAgent.rateLimitPerMinute),
-        costPer1KTokens: newAgent.costPer1KTokens,
-        contextWindow: Math.round(newAgent.contextWindow),
-        topP: newAgent.topP,
-        frequencyPenalty: newAgent.frequencyPenalty,
-        presencePenalty: newAgent.presencePenalty,
-        isActive: true,
-        isDefault: false,
-        allowedModels: [] as string[],
-        allowedActions: [] as string[],
-        description: newAgent.description.trim() ? newAgent.description.trim() : null,
-        apiKeyReference: null,
-        systemPrompt: newAgent.systemPrompt.trim() ? newAgent.systemPrompt.trim() : null,
-        monthlyBudget:
-          newAgent.monthlyBudget.trim() !== ""
-            ? Number.parseFloat(newAgent.monthlyBudget)
-            : null,
-        metadata: null,
-      }
-      await callReducer("create_ai_agent", [orgId, null, params])
-      toast({ title: t("settings.ai.agentCreated") })
-      setCreateAgentOpen(false)
-      await load()
-    } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
-        description: e instanceof Error ? e.message : "",
-        variant: "destructive",
-      })
-    } finally {
-      setMutating(false)
-    }
-  }
-
-  const handleUpdateAgent = async () => {
-    if (!orgId || !editAgent) return
-    const id = num(editAgent.id)
-    setMutating(true)
-    try {
-      const params: Record<string, unknown> = {
-        temperature: editFields.temperature,
-        maxTokens: Math.round(editFields.maxTokens),
-        rateLimitPerMinute: Math.round(editFields.rateLimitPerMinute),
-        contextWindow:
-          editFields.contextWindow.trim() !== ""
-            ? Math.round(Number.parseFloat(editFields.contextWindow))
-            : null,
-        topP: editFields.topP.trim() !== "" ? Number.parseFloat(editFields.topP) : null,
-        frequencyPenalty:
-          editFields.frequencyPenalty.trim() !== ""
-            ? Number.parseFloat(editFields.frequencyPenalty)
-            : null,
-        presencePenalty:
-          editFields.presencePenalty.trim() !== ""
-            ? Number.parseFloat(editFields.presencePenalty)
-            : null,
-        systemPrompt: editFields.systemPrompt.trim() ? editFields.systemPrompt.trim() : null,
-        monthlyBudget:
-          editFields.monthlyBudget.trim() !== ""
-            ? Number.parseFloat(editFields.monthlyBudget)
-            : null,
-      }
-      await callReducer("update_ai_agent", [orgId, id, params])
-      toast({ title: t("settings.ai.agentUpdated") })
-      setEditAgent(null)
-      await load()
-    } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
-        description: e instanceof Error ? e.message : "",
-        variant: "destructive",
-      })
-    } finally {
-      setMutating(false)
-    }
-  }
-
-  const handleSetActive = async (row: Row, isActive: boolean) => {
-    if (!orgId) return
-    setMutating(true)
-    try {
-      await callReducer("set_ai_agent_active", [orgId, num(row.id), isActive])
-      toast({ title: isActive ? t("settings.ai.agentActivated") : t("settings.ai.agentDeactivated") })
-      await load()
-    } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
-        description: e instanceof Error ? e.message : "",
-        variant: "destructive",
-      })
-    } finally {
-      setMutating(false)
-    }
-  }
 
   const handleCreateMember = async () => {
     if (!orgId) return
@@ -339,7 +307,7 @@ export function AiSettings() {
         responsibilities: "",
         expertiseAreas: "",
       })
-      await load()
+      await refreshAll()
     } catch (e) {
       toast({
         title: t("settings.ai.mutationError"),
@@ -357,7 +325,7 @@ export function AiSettings() {
       const cid = row.companyId != null && row.companyId !== undefined ? num(row.companyId) : null
       await callReducer("dismiss_insight", [cid, num(row.id)])
       toast({ title: t("settings.ai.insightDismissed") })
-      await load()
+      await refreshAll()
     } catch (e) {
       toast({
         title: t("settings.ai.mutationError"),
@@ -391,7 +359,7 @@ export function AiSettings() {
       setSampleInsightOpen(false)
       setSampleTitle("")
       setSampleDescription("")
-      await load()
+      await refreshAll()
     } catch (e) {
       toast({
         title: t("settings.ai.mutationError"),
@@ -416,7 +384,7 @@ export function AiSettings() {
       await callReducer("record_ai_spend", [orgId, agentId, tokens])
       toast({ title: t("settings.ai.spendRecorded") })
       setSpendByAgent((prev) => ({ ...prev, [String(agentId)]: "" }))
-      await load()
+      await refreshAll()
     } catch (e) {
       toast({
         title: t("settings.ai.mutationError"),
@@ -438,6 +406,10 @@ export function AiSettings() {
     )
   }
 
+  const listLoading = loading || agentsQuery.isLoading
+  const agentOpsPending =
+    createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -450,8 +422,14 @@ export function AiSettings() {
             <p className="text-muted-foreground text-sm">{t("settings.ai.description")}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => void refreshAll()}
+          disabled={listLoading}
+        >
+          {listLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           {t("settings.formConfig.refresh")}
         </Button>
       </div>
@@ -469,13 +447,21 @@ export function AiSettings() {
             </CardTitle>
             <CardDescription>{t("settings.ai.agentsDescription")}</CardDescription>
           </div>
-          <Button size="sm" className="gap-1" onClick={() => setCreateAgentOpen(true)}>
+          <Button
+            size="sm"
+            className="gap-1"
+            onClick={() => {
+              setCreateFormKey((k) => k + 1)
+              setCreateAgentError(null)
+              setCreateAgentOpen(true)
+            }}
+          >
             <Plus className="h-4 w-4" />
             {t("settings.ai.addAgent")}
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading ? (
+          {listLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -507,12 +493,29 @@ export function AiSettings() {
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={bool(a.isActive)}
-                          onCheckedChange={(c) => void handleSetActive(a, c)}
-                          disabled={mutating}
+                          onCheckedChange={(c) => {
+                            void (async () => {
+                              try {
+                                await setActiveMutation.mutateAsync({ agentId: id, isActive: c })
+                                toast({
+                                  title: c
+                                    ? t("settings.ai.agentActivated")
+                                    : t("settings.ai.agentDeactivated"),
+                                })
+                              } catch (e) {
+                                toast({
+                                  title: t("settings.ai.mutationError"),
+                                  description: e instanceof Error ? e.message : "",
+                                  variant: "destructive",
+                                })
+                              }
+                            })()
+                          }}
+                          disabled={mutating || agentOpsPending}
                         />
                         <span className="text-sm text-muted-foreground">{t("settings.ai.active")}</span>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => openEdit(a)}>
+                      <Button variant="outline" size="sm" onClick={() => setEditAgent(a)}>
                         {t("settings.ai.edit")}
                       </Button>
                       <div className="flex items-center gap-2">
@@ -640,175 +643,63 @@ export function AiSettings() {
         </CardContent>
       </Card>
 
-      <Dialog open={createAgentOpen} onOpenChange={setCreateAgentOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t("settings.ai.createAgentTitle")}</DialogTitle>
-            <DialogDescription>{t("settings.ai.createAgentDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.name")}</Label>
-              <Input value={newAgent.name} onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.provider")}</Label>
-                <Input
-                  value={newAgent.provider}
-                  onChange={(e) => setNewAgent({ ...newAgent, provider: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.model")}</Label>
-                <Input value={newAgent.model} onChange={(e) => setNewAgent({ ...newAgent, model: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.description")}</Label>
-              <Input
-                value={newAgent.description}
-                onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.systemPrompt")}</Label>
-              <Textarea
-                rows={3}
-                value={newAgent.systemPrompt}
-                onChange={(e) => setNewAgent({ ...newAgent, systemPrompt: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.temperature")}</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={newAgent.temperature}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, temperature: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.maxTokens")}</Label>
-                <Input
-                  type="number"
-                  value={newAgent.maxTokens}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, maxTokens: Number.parseInt(e.target.value, 10) || 0 })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.monthlyBudget")}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder={t("settings.ai.optional")}
-                  value={newAgent.monthlyBudget}
-                  onChange={(e) => setNewAgent({ ...newAgent, monthlyBudget: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.costPer1K")}</Label>
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={newAgent.costPer1KTokens}
-                  onChange={(e) =>
-                    setNewAgent({ ...newAgent, costPer1KTokens: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateAgentOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => void handleCreateAgent()} disabled={mutating}>
-              {mutating ? <Loader2 className="h-4 w-4 animate-spin" /> : t("settings.ai.create")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FormModal
+        key={createFormKey}
+        open={createAgentOpen}
+        onOpenChange={(o) => {
+          setCreateAgentOpen(o)
+          if (!o) setCreateAgentError(null)
+        }}
+        config={createFormConfig}
+        closeOnSubmit={false}
+        submitError={createAgentError}
+        onSubmit={async (data) => {
+          setCreateAgentError(null)
+          if (!orgId) return
+          try {
+            await createAgentMutation.mutateAsync(buildCreateAiAgentParams(data))
+            toast({ title: t("settings.ai.agentCreated") })
+            setCreateAgentOpen(false)
+          } catch (e) {
+            setCreateAgentError(e instanceof Error ? e.message : t("settings.ai.mutationError"))
+          }
+        }}
+      />
 
-      <Dialog open={!!editAgent} onOpenChange={(o) => !o && setEditAgent(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("settings.ai.editAgentTitle")}</DialogTitle>
-            <DialogDescription>{str(editAgent?.name)}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.temperature")}</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={editFields.temperature}
-                  onChange={(e) =>
-                    setEditFields({ ...editFields, temperature: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>{t("settings.ai.maxTokens")}</Label>
-                <Input
-                  type="number"
-                  value={editFields.maxTokens}
-                  onChange={(e) =>
-                    setEditFields({ ...editFields, maxTokens: Number.parseInt(e.target.value, 10) || 0 })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.rateLimit")}</Label>
-              <Input
-                type="number"
-                value={editFields.rateLimitPerMinute}
-                onChange={(e) =>
-                  setEditFields({
-                    ...editFields,
-                    rateLimitPerMinute: Number.parseInt(e.target.value, 10) || 0,
-                  })
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.systemPrompt")}</Label>
-              <Textarea
-                rows={4}
-                value={editFields.systemPrompt}
-                onChange={(e) => setEditFields({ ...editFields, systemPrompt: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("settings.ai.monthlyBudget")}</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder={t("settings.ai.optional")}
-                value={editFields.monthlyBudget}
-                onChange={(e) => setEditFields({ ...editFields, monthlyBudget: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditAgent(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => void handleUpdateAgent()} disabled={mutating}>
-              {mutating ? <Loader2 className="h-4 w-4 animate-spin" /> : t("settings.formConfig.saveChanges")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editAgent != null ? (
+        <FormModal
+          key={`edit-${num(editAgent.id)}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setEditAgent(null)
+              setEditAgentError(null)
+            }
+          }}
+          config={editFormConfig}
+          closeOnSubmit={false}
+          submitError={editAgentError}
+          onSubmit={async (data) => {
+            setEditAgentError(null)
+            if (!orgId) return
+            const aid = Number.parseInt(String(data.agentId), 10)
+            if (!Number.isFinite(aid)) {
+              setEditAgentError(t("settings.ai.mutationError"))
+              return
+            }
+            try {
+              await updateAgentMutation.mutateAsync({
+                agentId: aid,
+                params: buildUpdateAiAgentParams(data),
+              })
+              toast({ title: t("settings.ai.agentUpdated") })
+              setEditAgent(null)
+            } catch (e) {
+              setEditAgentError(e instanceof Error ? e.message : t("settings.ai.mutationError"))
+            }
+          }}
+        />
+      ) : null}
 
       <Dialog open={createMemberOpen} onOpenChange={setCreateMemberOpen}>
         <DialogContent>

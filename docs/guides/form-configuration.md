@@ -4,6 +4,10 @@
 
 The Unified Form Configuration System allows you to create configurable forms that can be customized per organization with role-based visibility and user custom fields.
 
+## Policy — use the form builder for new ERP UI
+
+Any **new or unfinished** module work that needs structured create/edit input should ship through the **same stack** used across accounting and shared modules: **`FormConfig`** definitions, **`FormModal`** + **`ModularForm`**, **`mergeFieldDefaultValues`** for edit defaults, and **`mergeSelectOptionsByFieldName`** for live-backed selects. Do not add parallel one-off dialog forms for CRUD unless product explicitly requires it. This aligns with `FORM_CONFIGURATION_REMAINING_WORK.md`, `ERP_FRONTEND_PLAN.md`, and `.cursor/plan-construction.md`.
+
 ## Architecture
 
 ```

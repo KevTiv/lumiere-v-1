@@ -112,6 +112,7 @@ const EXPLICIT_REDUCER_MODULE: Record<string, string> = {
   post_payment: 'accounting',
   register_payment_on_invoice: 'accounting',
   compute_invoice_totals: 'accounting',
+  post_invoice: 'accounting',
   // Bank & fiscal periods
   unreconciled_account_bank_statement_line: 'accounting',
   match_bank_line: 'accounting',
@@ -952,6 +953,7 @@ function categorizeByModule(reducerName: string): string {
     train_ai_agent: 'ai',
     activate_ai_agent: 'ai',
     deactivate_ai_agent: 'ai',
+    set_ai_agent_active: 'ai',
 
     form_: 'forms',
     field: 'forms',
