@@ -12,6 +12,7 @@ import {
   getRoleNameInOrganization,
 } from '@/lib/stdb-auth-server'
 import { saveStdbSession } from '@/app/actions/save-stdb-token'
+import { authRateLimitExceeded } from '@/lib/auth-rate-limit'
 
 const schema = z.object({
   token: z.string().min(1),
@@ -21,6 +22,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimitExceeded(req, 'accept_invite')
+    if (limited) return limited
+
     if (process.env.WORKOS_CLIENT_ID) {
       return NextResponse.json(
         {

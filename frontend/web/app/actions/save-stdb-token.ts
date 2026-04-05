@@ -3,9 +3,12 @@
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
+const cookieSecure =
+  process.env.NODE_ENV === 'production' || process.env['COOKIE_FORCE_SECURE'] === 'true'
+
 const COOKIE_OPTS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: cookieSecure,
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 60 * 60 * 24 * 30, // 30 days

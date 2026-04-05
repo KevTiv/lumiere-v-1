@@ -3,6 +3,7 @@ import type SubscriptionPlanRow from "../generated/subscription_plan_table";
 import type SubscriptionLineRow from "../generated/subscription_line_table";
 import type { Infer } from "spacetimedb";
 import { getStdbConnection } from "../connection";
+import { resolveHttpSqlColumns, sqlColumnListForGeneratedType } from "../field-policy";
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 export type Subscription = Infer<typeof SubscriptionRow>;
@@ -12,10 +13,13 @@ export type SubscriptionLine = Infer<typeof SubscriptionLineRow>;
 // ── Subscription SQL ──────────────────────────────────────────────────────────
 export function subscriptionsSubscriptions(organizationId: bigint): string[] {
   const id = String(organizationId);
+  const sCols = resolveHttpSqlColumns("subscriptions", undefined).join(", ");
+  const pCols = resolveHttpSqlColumns("subscription-plans", undefined).join(", ");
+  const lineCols = sqlColumnListForGeneratedType("SubscriptionLine").join(", ");
   return [
-    `SELECT * FROM subscription WHERE organization_id = ${id}`,
-    `SELECT * FROM subscription_plan WHERE organization_id = ${id}`,
-    `SELECT * FROM subscription_line WHERE organization_id = ${id}`,
+    `SELECT ${sCols} FROM subscription WHERE organization_id = ${id}`,
+    `SELECT ${pCols} FROM subscription_plan WHERE organization_id = ${id}`,
+    `SELECT ${lineCols} FROM subscription_line WHERE organization_id = ${id}`,
   ];
 }
 

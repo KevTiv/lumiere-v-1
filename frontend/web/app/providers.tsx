@@ -87,12 +87,14 @@ export function Providers({
   serverIdentity,
   serverRoleNames,
   organizationId,
+  companyIds,
   stdbModule,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
   organizationId?: number
+  companyIds?: readonly number[]
   /** Must match server `STDB_MODULE` / upstream database name */
   stdbModule?: string
 }) {
@@ -107,6 +109,7 @@ export function Providers({
             serverIdentity={serverIdentity}
             serverRoleNames={serverRoleNames}
             organizationId={organizationId}
+            companyIds={companyIds}
             subscriptionResources={FULL_CLIENT_SUBSCRIPTION_RESOURCES}
             onTokenPersisted={(token, identityHex) => {
               void saveStdbSession(token, identityHex)

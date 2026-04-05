@@ -1,14 +1,22 @@
 import { authSubscriptions } from "./auth";
 import {
   type FieldAccessContext,
+  resolveHttpSqlColumns,
   selectOrgScopedSql,
   selectRolesActiveSql,
   selectUserRoleAssignmentsForIdentitySql,
+  sqlColumnListForGeneratedType,
 } from "../field-policy";
 
 /** Context for building subscription SQL (org + identity where needed). */
 export interface SubscriptionQueryContext {
   organizationId?: number;
+  /**
+   * Company row ids for this organization (from e.g. RSC `serverQueryCompanies`).
+   * Required for WebSocket SQL on resources that scope by `company_id` without `organization_id`
+   * (fixed assets, intercompany, etc.) — SpacetimeDB HTTP/SQL does not support `IN (SELECT …)`.
+   */
+  companyIds?: readonly number[];
   /** Required for `user-roles` resource. */
   identityHex?: string;
   /** Passed to {@link authSubscriptions} when resource is `auth`. */
@@ -32,12 +40,21 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "account-account-types",
   "account-groups",
   "account-journals",
+  "account-move-lines",
   "account-moves",
   "account-taxes",
   "budgets",
   "budget-lines",
   "budget-posts",
   "analytic-accounts",
+  "depreciation-lines",
+  "fixed-assets",
+  "intercompany-rules",
+  "intercompany-transactions",
+  "tax-deadlines",
+  "tax-groups",
+  "tax-jurisdictions",
+  "tax-schedules",
   "sale-orders",
   "sale-order-lines",
   "pos-loyalty-programs",
@@ -111,13 +128,18 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
 
 export type SubscriptionResourceKey = (typeof SUBSCRIPTION_RESOURCE_KEYS)[number];
 
+function authSelectAll(table: string, typeName: string): string {
+  const cols = sqlColumnListForGeneratedType(typeName).join(", ");
+  return `SELECT ${cols} FROM ${table}`;
+}
+
 const AUTH_SINGLE: Record<string, string> = {
-  "user-profile": "SELECT * FROM user_profile",
-  "user-role-assignment": "SELECT * FROM user_role_assignment",
+  "user-profile": authSelectAll("user_profile", "UserProfile"),
+  "user-role-assignment": authSelectAll("user_role_assignment", "UserRoleAssignment"),
   /** Full `role` table (matches auth bundle); for active-only use `roles`. */
-  "auth-role-table": "SELECT * FROM role",
-  "user-organization": "SELECT * FROM user_organization",
-  "casbin-rule": "SELECT * FROM casbin_rule",
+  "auth-role-table": authSelectAll("role", "Role"),
+  "user-organization": authSelectAll("user_organization", "UserOrganization"),
+  "casbin-rule": authSelectAll("casbin_rule", "CasbinRule"),
 };
 
 /** Org-scoped ERP resources (matches `/api/query/[resource]` for data tables). */
@@ -144,6 +166,15 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "account-journals": (id, fa) =>
     selectOrgScopedSql("account-journals", "account_journal", id, fa, ""),
+  "account-move-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "account-move-lines",
+      "account_move_line",
+      id,
+      fa,
+      "",
+      " ORDER BY move_id ASC, sequence ASC",
+    ),
   "account-moves": (id, fa) =>
     selectOrgScopedSql("account-moves", "account_move", id, fa, ""),
   "account-taxes": (id, fa) =>
@@ -163,6 +194,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("budget-posts", "budget_post", id, fa, "", " ORDER BY name ASC"),
   "analytic-accounts": (id, fa) =>
     selectOrgScopedSql("analytic-accounts", "account_analytic_account", id, fa, ""),
+  "tax-groups": (id, fa) =>
+    selectOrgScopedSql("tax-groups", "account_tax_group", id, fa, ""),
+  "tax-jurisdictions": (id, fa) =>
+    selectOrgScopedSql("tax-jurisdictions", "tax_jurisdiction", id, fa, ""),
+  "tax-schedules": (id, fa) =>
+    selectOrgScopedSql("tax-schedules", "tax_schedule", id, fa, ""),
+  "tax-deadlines": (id, fa) =>
+    selectOrgScopedSql("tax-deadlines", "tax_deadline", id, fa, ""),
   "sale-orders": (id, fa) =>
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
@@ -421,6 +460,41 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
 };
 
+/** Resources scoped by `company_id` lists (no SQL subqueries). */
+function subscriptionSqlForCompanyScopedResource(
+  resource: string,
+  ctx: SubscriptionQueryContext,
+): string[] | null | undefined {
+  const ids = ctx.companyIds
+  const fa = ctx.fieldAccess
+  if (resource === "fixed-assets") {
+    if (!ids?.length) return null
+    const list = ids.join(", ")
+    const c = resolveHttpSqlColumns("fixed-assets", fa).join(", ")
+    return [`SELECT ${c} FROM account_asset WHERE company_id IN (${list})`]
+  }
+  if (resource === "intercompany-rules") {
+    if (!ids?.length) return null
+    const list = ids.join(", ")
+    const c = resolveHttpSqlColumns("intercompany-rules", fa).join(", ")
+    return [
+      `SELECT ${c} FROM intercompany_rule WHERE source_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY sequence ASC`,
+    ]
+  }
+  if (resource === "intercompany-transactions") {
+    if (!ids?.length) return null
+    const list = ids.join(", ")
+    const c = resolveHttpSqlColumns("intercompany-transactions", fa).join(", ")
+    return [
+      `SELECT ${c} FROM intercompany_transaction WHERE origin_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY id DESC`,
+    ]
+  }
+  if (resource === "depreciation-lines") {
+    return null
+  }
+  return undefined
+}
+
 /**
  * Returns subscription SQL for a single resource key.
  * - Most ERP keys require `organizationId`.
@@ -436,7 +510,7 @@ export function subscriptionQueriesForResource(
   if (!r) return null;
 
   if (r === "auth") {
-    return authSubscriptions(ctx.identityHex, ctx.roleNames);
+    return authSubscriptions(ctx.identityHex, ctx.roleNames, ctx.organizationId);
   }
 
   if (AUTH_SINGLE[r] !== undefined) {
@@ -447,18 +521,18 @@ export function subscriptionQueriesForResource(
     return [selectRolesActiveSql(ctx.fieldAccess)];
   }
 
-  /** Form configuration tables: org-scoped via form_config + subqueries for child tables. */
+  /** Org-scoped roots only; child tables used `IN (SELECT …)` which SpacetimeDB SQL rejects. */
   if (r === "form-configuration") {
     const org = ctx.organizationId;
     if (org === undefined || org === null || Number.isNaN(Number(org))) {
       return null;
     }
     const id = String(org);
+    const fc = sqlColumnListForGeneratedType("FormConfig").join(", ");
+    const ucf = sqlColumnListForGeneratedType("UserCustomField").join(", ");
     return [
-      `SELECT * FROM form_config WHERE organization_id = ${id}`,
-      `SELECT * FROM form_config_field WHERE configuration_id IN (SELECT id FROM form_config WHERE organization_id = ${id})`,
-      `SELECT * FROM form_role_config WHERE configuration_id IN (SELECT id FROM form_config WHERE organization_id = ${id})`,
-      `SELECT * FROM user_custom_field WHERE organization_id = ${id}`,
+      `SELECT ${fc} FROM form_config WHERE organization_id = ${id}`,
+      `SELECT ${ucf} FROM user_custom_field WHERE organization_id = ${id}`,
     ];
   }
 
@@ -472,14 +546,26 @@ export function subscriptionQueriesForResource(
     return null;
   }
 
+  const companyScoped = subscriptionSqlForCompanyScopedResource(r, ctx);
+  if (companyScoped !== undefined) return companyScoped;
+
   const builder = ERP_ORG_SQL[r];
   if (!builder) return null;
 
   return [builder(Number(org), ctx.fieldAccess)];
 }
 
-/** Keys for org-scoped ERP tables (same as {@link ERP_ORG_SQL}). */
-export const ALL_ERP_RESOURCE_KEYS: string[] = Object.keys(ERP_ORG_SQL);
+const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
+  "fixed-assets",
+  "depreciation-lines",
+  "intercompany-rules",
+  "intercompany-transactions",
+] as const
+
+/** Keys for org-scoped ERP tables ({@link ERP_ORG_SQL} plus company-scoped resources). */
+export const ALL_ERP_RESOURCE_KEYS: string[] = Array.from(
+  new Set([...Object.keys(ERP_ORG_SQL), ...EXTRA_COMPANY_SCOPED_ERP_KEYS]),
+)
 
 /**
  * Opt-in “full mirror” resource list: `auth` bundle + every org-scoped ERP table.

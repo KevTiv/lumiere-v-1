@@ -12,7 +12,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { useAiAgents, useCreateAiAgent, useSetAiAgentActive, useUpdateAiAgent } from "@/hooks/ai-agents"
+import {
+  useAiAgents,
+  useCreateAiAgent,
+  useCreateAiInsight,
+  useCreateAiTeamMember,
+  useDismissAiInsight,
+  useRecordAiSpend,
+  useSetAiAgentActive,
+  useUpdateAiAgent,
+} from "@/hooks/ai-agents"
 import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
 import {
   Dialog,
@@ -142,18 +151,6 @@ async function fetchQuery(resource: string): Promise<Row[]> {
   return j.data ?? []
 }
 
-async function callReducer(name: string, args: unknown[]): Promise<void> {
-  const r = await fetch(`/api/call/${name}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  })
-  if (!r.ok) {
-    const j = (await r.json().catch(() => ({}))) as { error?: string }
-    throw new Error(j.error ?? `${name} failed`)
-  }
-}
-
 export function AiSettings() {
   const { t } = useTranslation()
   const { toast } = useToast()
@@ -167,13 +164,16 @@ export function AiSettings() {
   const createAgentMutation = useCreateAiAgent(orgId)
   const updateAgentMutation = useUpdateAiAgent(orgId)
   const setActiveMutation = useSetAiAgentActive(orgId)
+  const createTeamMemberMutation = useCreateAiTeamMember(orgId)
+  const dismissInsightMutation = useDismissAiInsight()
+  const createInsightMutation = useCreateAiInsight()
+  const recordSpendMutation = useRecordAiSpend(orgId)
 
   const agents = agentsQuery.data ?? []
 
   const [members, setMembers] = useState<Row[]>([])
   const [insights, setInsights] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
-  const [mutating, setMutating] = useState(false)
 
   const [createAgentOpen, setCreateAgentOpen] = useState(false)
   const [createFormKey, setCreateFormKey] = useState(0)
@@ -275,7 +275,6 @@ export function AiSettings() {
       toast({ title: t("settings.ai.pickAgent"), variant: "destructive" })
       return
     }
-    setMutating(true)
     try {
       const params = {
         name: newMember.name.trim() || "Member",
@@ -296,7 +295,7 @@ export function AiSettings() {
         personality: null,
         metadata: null,
       }
-      await callReducer("create_ai_team_member", [orgId, null, params])
+      await createTeamMemberMutation.mutateAsync({ companyId: null, params })
       toast({ title: t("settings.ai.memberCreated") })
       setCreateMemberOpen(false)
       setNewMember({
@@ -314,16 +313,13 @@ export function AiSettings() {
         description: e instanceof Error ? e.message : "",
         variant: "destructive",
       })
-    } finally {
-      setMutating(false)
     }
   }
 
   const handleDismissInsight = async (row: Row) => {
-    setMutating(true)
     try {
       const cid = row.companyId != null && row.companyId !== undefined ? num(row.companyId) : null
-      await callReducer("dismiss_insight", [cid, num(row.id)])
+      await dismissInsightMutation.mutateAsync({ companyId: cid, insightId: num(row.id) })
       toast({ title: t("settings.ai.insightDismissed") })
       await refreshAll()
     } catch (e) {
@@ -332,13 +328,10 @@ export function AiSettings() {
         description: e instanceof Error ? e.message : "",
         variant: "destructive",
       })
-    } finally {
-      setMutating(false)
     }
   }
 
   const handleCreateSampleInsight = async () => {
-    setMutating(true)
     try {
       const params = {
         severity: insightSeverityJson(sampleSeverity),
@@ -354,7 +347,7 @@ export function AiSettings() {
         priority: null,
         metadata: null,
       }
-      await callReducer("create_ai_insight", [null, params])
+      await createInsightMutation.mutateAsync({ companyId: null, params })
       toast({ title: t("settings.ai.insightCreated") })
       setSampleInsightOpen(false)
       setSampleTitle("")
@@ -366,8 +359,6 @@ export function AiSettings() {
         description: e instanceof Error ? e.message : "",
         variant: "destructive",
       })
-    } finally {
-      setMutating(false)
     }
   }
 
@@ -379,9 +370,8 @@ export function AiSettings() {
       toast({ title: t("settings.ai.tokensInvalid"), variant: "destructive" })
       return
     }
-    setMutating(true)
     try {
-      await callReducer("record_ai_spend", [orgId, agentId, tokens])
+      await recordSpendMutation.mutateAsync({ agentId, tokensUsed: tokens })
       toast({ title: t("settings.ai.spendRecorded") })
       setSpendByAgent((prev) => ({ ...prev, [String(agentId)]: "" }))
       await refreshAll()
@@ -391,8 +381,6 @@ export function AiSettings() {
         description: e instanceof Error ? e.message : "",
         variant: "destructive",
       })
-    } finally {
-      setMutating(false)
     }
   }
 
@@ -409,6 +397,11 @@ export function AiSettings() {
   const listLoading = loading || agentsQuery.isLoading
   const agentOpsPending =
     createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending
+  const mutating =
+    createTeamMemberMutation.isPending ||
+    dismissInsightMutation.isPending ||
+    createInsightMutation.isPending ||
+    recordSpendMutation.isPending
 
   return (
     <div className="space-y-6">

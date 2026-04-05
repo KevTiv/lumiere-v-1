@@ -6,6 +6,7 @@ import { getStdbSession } from '@/lib/api-session'
 import {
   serverQueryUserRoleAssignments,
   serverQueryRoles,
+  serverQueryCompanies,
 } from '@lumiere/stdb/server'
 import './globals.css'
 import { cookies } from "next/headers"
@@ -68,6 +69,20 @@ export default async function RootLayout({
     }
   }
 
+  let companyIds: readonly number[] | undefined
+  if (organizationId != null) {
+    try {
+      const rows = (await serverQueryCompanies(organizationId, opts)) as Array<
+        Record<string, unknown>
+      >
+      companyIds = rows
+        .map((r) => Number(r['id']))
+        .filter((id) => Number.isFinite(id))
+    } catch {
+      companyIds = undefined
+    }
+  }
+
   const store = await cookies()
   const hasStdbCookie = Boolean(store.get("stdb_token")?.value)
   const devAdmin = process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
@@ -82,6 +97,7 @@ export default async function RootLayout({
           serverIdentity={identityHex}
           serverRoleNames={serverRoleNames}
           organizationId={organizationId}
+          companyIds={companyIds}
           stdbModule={stdbModule}
         >
           {children}

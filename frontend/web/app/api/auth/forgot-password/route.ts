@@ -7,6 +7,7 @@ import {
   nowMicros,
 } from '@/lib/stdb-auth-server'
 import { sendPasswordResetEmail } from '@/lib/email'
+import { authRateLimitExceeded } from '@/lib/auth-rate-limit'
 
 const schema = z.object({
   email: z.string().email(),
@@ -14,6 +15,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimitExceeded(req, 'forgot_password')
+    if (limited) return limited
+
     if (process.env.WORKOS_CLIENT_ID) {
       return NextResponse.json(
         {

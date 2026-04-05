@@ -12,30 +12,84 @@ export type StdbRole = Infer<typeof RoleRow>;
 export type UserRoleAssignment = Infer<typeof UserRoleAssignmentRow>;
 export type UserOrganization = Infer<typeof UserOrganizationRow>;
 
+function sqlQuoteIdentityHex(s: string): string {
+  return s.replace(/'/g, "''");
+}
+
+function sqlQuoteStr(s: string): string {
+  return `'${s.replace(/'/g, "''")}'`;
+}
+
+function isNarrowIdentityHex(s: string | undefined): s is string {
+  return typeof s === "string" && /^[0-9a-fA-F]{64}$/.test(s);
+}
+
 /**
  * Returns subscription SQL for the current user's auth data.
  *
- * When `identityHex` is provided, `casbin_rule` is filtered to only rules
- * where v0 matches the user's identity or their assigned role names.
- * This prevents broadcasting the full permission matrix to every client.
+ * When `identityHex` is a valid 64-char hex identity (and usually when the layout
+ * passes `organizationId`), queries are scoped so clients do not mirror every
+ * user's profile, memberships, or Casbin rows.
  *
- * When called without arguments (before identity is known), casbin_rule is
- * omitted — the server prefetch via serverQueryCasbinRulesForUser covers that.
+ * When identity is unknown (e.g. dev-first connect before cookies), falls back
+ * to broad `SELECT *` mirrors — same as historical behavior.
  */
 export function authSubscriptions(
-  _identityHex?: string,
-  _roleNames?: string[],
+  identityHex?: string,
+  roleNames?: string[],
+  organizationId?: number,
 ): string[] {
-  const base = [
-    "SELECT * FROM user_profile",
-    "SELECT * FROM user_role_assignment",
-    "SELECT * FROM role",
-    "SELECT * FROM user_organization",
-  ];
+  const id = isNarrowIdentityHex(identityHex) ? identityHex : undefined;
+  const escId = id ? sqlQuoteIdentityHex(id) : "";
+  const roles = (roleNames ?? []).filter((r) => r.length > 0 && r.length < 256);
 
-  // SpacetimeDB subscriptions don't support IN expressions — subscribe to
-  // all casbin_rule rows and filter client-side in queryCasbinRules().
-  return [...base, "SELECT * FROM casbin_rule"];
+  const userProfileSql = id
+    ? `SELECT * FROM user_profile WHERE identity = '${escId}'`
+    : "SELECT * FROM user_profile";
+
+  const userRoleAssignmentSql = id
+    ? `SELECT * FROM user_role_assignment WHERE user_identity = '${escId}' AND is_active = true`
+    : "SELECT * FROM user_role_assignment";
+
+  const orgIdNum =
+    organizationId !== undefined &&
+    organizationId !== null &&
+    Number.isFinite(Number(organizationId)) &&
+    Number(organizationId) > 0
+      ? Math.floor(Number(organizationId))
+      : undefined;
+
+  const roleSql =
+    orgIdNum !== undefined
+      ? `SELECT * FROM role WHERE organization_id = ${orgIdNum}`
+      : "SELECT * FROM role";
+
+  const userOrganizationSql = id
+    ? `SELECT * FROM user_organization WHERE user_identity = '${escId}' AND is_active = true`
+    : "SELECT * FROM user_organization";
+
+  const casbinSubjects: string[] = [];
+  if (id) {
+    casbinSubjects.push(id);
+    for (const r of roles) {
+      casbinSubjects.push(r);
+    }
+  }
+
+  const casbinSql =
+    casbinSubjects.length > 0
+      ? `SELECT * FROM casbin_rule WHERE (${casbinSubjects
+          .map((s) => `v0 = ${sqlQuoteStr(s)}`)
+          .join(" OR ")})`
+      : "SELECT * FROM casbin_rule";
+
+  return [
+    userProfileSql,
+    userRoleAssignmentSql,
+    roleSql,
+    userOrganizationSql,
+    casbinSql,
+  ];
 }
 
 export function queryUserProfile(identityHex: string): UserProfile | null {

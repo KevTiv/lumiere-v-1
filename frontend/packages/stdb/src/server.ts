@@ -16,10 +16,9 @@
 import { stdbSql, type StdbHttpOptions } from './http'
 import {
   type FieldAccessContext,
-  resolveReadColumns,
+  resolveHttpSqlColumns,
   selectOrgScopedSql,
   selectCompanyScopedSql,
-  selectRawSql,
   selectRolesActiveSql,
   selectUserProfileByIdentitySql,
   selectUserRoleAssignmentsForIdentitySql,
@@ -53,6 +52,28 @@ function httpOpts(opts?: StdbServerQueryOptions): StdbHttpOptions | undefined {
   if (!opts) return undefined
   const { fieldAccess: _fa, ...rest } = opts
   return rest as StdbHttpOptions
+}
+
+/** Company row ids for an organization (no SQL subqueries — SpacetimeDB HTTP SQL limitation). */
+async function companyIdsForOrganization(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+): Promise<bigint[]> {
+  const org = typeof organizationId === 'bigint' ? organizationId : BigInt(organizationId)
+  const sql = selectOrgScopedSql('companies', 'company', org, fq(opts), ' AND deleted_at IS NULL', '')
+  const rows = await stdbSql<Record<string, unknown>>(sql, httpOpts(opts))
+  const out: bigint[] = []
+  for (const r of rows) {
+    const v = r.id
+    if (v == null) continue
+    try {
+      const b = BigInt(String(v))
+      if (b > 0n) out.push(b)
+    } catch {
+      /* skip */
+    }
+  }
+  return out
 }
 
 // ── Entity type re-exports for API route handlers ────────────────────────────
@@ -443,6 +464,23 @@ export function serverQueryAccountMoves(
   )
 }
 
+export function serverQueryAccountMoveLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'account-move-lines',
+      'account_move_line',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY move_id ASC, sequence ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
 export function serverQueryAccountTaxes(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
@@ -487,21 +525,39 @@ export function serverQueryAccountPaymentTerms(
   )
 }
 
-/** Payment term lines for terms belonging to the organization (join on parent term). */
-export function serverQueryAccountPaymentTermLines(
+/** Payment term lines for terms belonging to the organization (no JOIN — HTTP SQL limitation). */
+export async function serverQueryAccountPaymentTermLines(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
   const org = typeof organizationId === 'bigint' ? organizationId : BigInt(organizationId)
-  const sql = selectRawSql(
-    'account-payment-term-lines',
-    `FROM account_payment_term_line l
-     INNER JOIN account_payment_term t ON l.payment_term_id = t.id
-     WHERE t.organization_id = ${org}
-     ORDER BY l.payment_term_id ASC, l.sequence ASC`,
+  const termSql = selectOrgScopedSql(
+    'account-payment-terms',
+    'account_payment_term',
+    org,
     fq(opts),
+    '',
+    '',
   )
-  return stdbSql(sql, httpOpts(opts))
+  const terms = await stdbSql<Record<string, unknown>>(termSql, httpOpts(opts))
+  const termIds: bigint[] = []
+  for (const t of terms) {
+    const v = t.id
+    if (v == null) continue
+    try {
+      const b = BigInt(String(v))
+      if (b > 0n) termIds.push(b)
+    } catch {
+      /* skip */
+    }
+  }
+  if (termIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('account-payment-term-lines', fq(opts)).join(', ')
+  const list = termIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM account_payment_term_line WHERE payment_term_id IN (${list}) ORDER BY payment_term_id ASC, sequence ASC`,
+    httpOpts(opts),
+  )
 }
 
 export function serverQueryBudgets(
@@ -657,12 +713,120 @@ export function serverQueryAccountReconciliationWidgets(
   )
 }
 
-export function serverQueryAccountAssets(
+export async function serverQueryAccountAssets(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('account-assets', fq(opts)).join(', ')
+  const list = companyIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM account_asset WHERE company_id IN (${list})`,
+    httpOpts(opts),
+  )
+}
+
+/** Same rows as {@link serverQueryAccountAssets} — alias for web hooks using `fixed-assets`. */
+export function serverQueryFixedAssets(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return serverQueryAccountAssets(organizationId, opts)
+}
+
+export async function serverQueryDepreciationLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const list = companyIds.map(String).join(', ')
+  const idRows = await stdbSql<Record<string, unknown>>(
+    `SELECT id FROM account_asset WHERE company_id IN (${list})`,
+    httpOpts(opts),
+  )
+  const assetIds: bigint[] = []
+  for (const r of idRows) {
+    const v = r.id
+    if (v == null) continue
+    try {
+      const b = BigInt(String(v))
+      if (b > 0n) assetIds.push(b)
+    } catch {
+      /* skip */
+    }
+  }
+  if (assetIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('depreciation-lines', fq(opts)).join(', ')
+  const alist = assetIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM account_asset_depreciation_line WHERE asset_id IN (${alist})`,
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryTaxGroups(organizationId: bigint | number, opts?: StdbServerQueryOptions) {
+  return stdbSql(
+    selectOrgScopedSql('tax-groups', 'account_tax_group', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryTaxJurisdictions(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
   return stdbSql(
-    selectOrgScopedSql('account-assets', 'account_asset', organizationId, fq(opts), ''),
+    selectOrgScopedSql('tax-jurisdictions', 'tax_jurisdiction', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryTaxSchedules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('tax-schedules', 'tax_schedule', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryTaxDeadlines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('tax-deadlines', 'tax_deadline', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryIntercompanyRules(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('intercompany-rules', fq(opts)).join(', ')
+  const list = companyIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM intercompany_rule WHERE source_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY sequence ASC`,
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryIntercompanyTransactions(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('intercompany-transactions', fq(opts)).join(', ')
+  const list = companyIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM intercompany_transaction WHERE origin_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY id DESC`,
     httpOpts(opts),
   )
 }
@@ -673,34 +837,24 @@ export function serverQueryConsolidationAccounts(
   _organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(
-    selectRawSql('consolidation-accounts', 'FROM consolidation_account', fq(opts)),
-    httpOpts(opts),
-  )
+  const colPart = resolveHttpSqlColumns('consolidation-accounts', fq(opts)).join(', ')
+  return stdbSql(`SELECT ${colPart} FROM consolidation_account`, httpOpts(opts))
 }
 
 export function serverQueryConsolidationJournals(
   _organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(
-    selectRawSql('consolidation-journals', 'FROM consolidation_journal', fq(opts)),
-    httpOpts(opts),
-  )
+  const colPart = resolveHttpSqlColumns('consolidation-journals', fq(opts)).join(', ')
+  return stdbSql(`SELECT ${colPart} FROM consolidation_journal`, httpOpts(opts))
 }
 
 export function serverQueryConsolidationEliminationEntries(
   _organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  return stdbSql(
-    selectRawSql(
-      'consolidation-elimination-entries',
-      'FROM consolidation_elimination_entry',
-      fq(opts),
-    ),
-    httpOpts(opts),
-  )
+  const colPart = resolveHttpSqlColumns('consolidation-elimination-entries', fq(opts)).join(', ')
+  return stdbSql(`SELECT ${colPart} FROM consolidation_elimination_entry`, httpOpts(opts))
 }
 
 // SALES
@@ -864,8 +1018,7 @@ export async function serverQueryLeadById(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  const cols = resolveReadColumns('leads', fq(opts))
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const colPart = resolveHttpSqlColumns('leads', fq(opts)).join(', ')
   const rows = await stdbSql<{ id: number }>(
     `SELECT ${colPart} FROM lead WHERE id = ${id} AND organization_id = ${organizationId} LIMIT 1`,
     httpOpts(opts),
@@ -2095,35 +2248,43 @@ export function serverQueryAiTeamMembers(
 /**
  * AI insights for companies in this organization, plus rows with no company (tenant-wide).
  */
-export function serverQueryAiInsights(
+export async function serverQueryAiInsights(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  const sql = selectRawSql(
-    'ai-insights',
-    `FROM ai_insight WHERE (
-      company_id IN (SELECT id FROM company WHERE organization_id = ${organizationId})
-      OR company_id IS NULL
-    )`,
-    fq(opts),
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  const colPart = resolveHttpSqlColumns('ai-insights', fq(opts)).join(', ')
+  if (companyIds.length === 0) {
+    return stdbSql(
+      `SELECT ${colPart} FROM ai_insight WHERE company_id IS NULL`,
+      httpOpts(opts),
+    )
+  }
+  const list = companyIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM ai_insight WHERE company_id IN (${list}) OR company_id IS NULL`,
+    httpOpts(opts),
   )
-  return stdbSql(sql, httpOpts(opts))
 }
 
 /** Document AI processing jobs (org companies + tenant-wide null company). */
-export function serverQueryAiDocumentProcessingJobs(
+export async function serverQueryAiDocumentProcessingJobs(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  const sql = selectRawSql(
-    'ai-document-processing-jobs',
-    `FROM ai_document_processing_job WHERE (
-      company_id IN (SELECT id FROM company WHERE organization_id = ${organizationId})
-      OR company_id IS NULL
-    )`,
-    fq(opts),
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  const colPart = resolveHttpSqlColumns('ai-document-processing-jobs', fq(opts)).join(', ')
+  if (companyIds.length === 0) {
+    return stdbSql(
+      `SELECT ${colPart} FROM ai_document_processing_job WHERE company_id IS NULL`,
+      httpOpts(opts),
+    )
+  }
+  const list = companyIds.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM ai_document_processing_job WHERE company_id IN (${list}) OR company_id IS NULL`,
+    httpOpts(opts),
   )
-  return stdbSql(sql, httpOpts(opts))
 }
 
 // AUTH (per-user — security-critical)
@@ -2183,8 +2344,7 @@ export async function serverQueryOrgUsers(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
-  const colsUo = resolveReadColumns('user-organization', fq(opts))
-  const colUo = colsUo === null ? '*' : colsUo.join(', ')
+  const colUo = resolveHttpSqlColumns('user-organization', fq(opts)).join(', ')
   const memberships = await stdbSql<{ userIdentity: string }>(
     `SELECT ${colUo} FROM user_organization WHERE organization_id = ${organizationId} AND is_active = true`,
     httpOpts(opts),
@@ -2194,51 +2354,11 @@ export async function serverQueryOrgUsers(
   const rawIds = memberships.map((m) => String(m.userIdentity))
   const uniqueIds = [...new Set(rawIds)]
   const esc = (s: string) => s.replace(/'/g, "''")
-  const colsP = resolveReadColumns('user-profile', fq(opts))
-  const colP = colsP === null ? '*' : colsP.join(', ')
+  const colP = resolveHttpSqlColumns('user-profile', fq(opts)).join(', ')
   const whereIdentity =
     uniqueIds.length === 1
       ? `identity = '${esc(uniqueIds[0])}'`
       : `(${uniqueIds.map((id) => `identity = '${esc(id)}'`).join(' OR ')})`
   const sqlProfile = `SELECT ${colP} FROM user_profile WHERE ${whereIdentity}`
-  // #region agent log
-  fetch('http://127.0.0.1:7671/ingest/07aebab7-6f69-4cbc-af66-6d5a65969c9c', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f240c9' },
-    body: JSON.stringify({
-      sessionId: 'f240c9',
-      location: 'server.ts:serverQueryOrgUsers',
-      message: 'org users: profile query built',
-      data: {
-        organizationId: String(organizationId),
-        membershipCount: memberships.length,
-        uniqueIdentityCount: uniqueIds.length,
-        identityPredicate: uniqueIds.length === 1 ? 'EQ' : 'OR_EQ',
-        colPWildcard: colP === '*',
-        sqlPreviewLen: sqlProfile.length,
-        sqlHead: sqlProfile.slice(0, 140),
-      },
-      timestamp: Date.now(),
-      runId: 'post-fix',
-      hypothesisId: 'A',
-    }),
-  }).catch(() => {})
-  // #endregion
-  const rows = await stdbSql(sqlProfile, httpOpts(opts))
-  // #region agent log
-  fetch('http://127.0.0.1:7671/ingest/07aebab7-6f69-4cbc-af66-6d5a65969c9c', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f240c9' },
-    body: JSON.stringify({
-      sessionId: 'f240c9',
-      location: 'server.ts:serverQueryOrgUsers',
-      message: 'org users: profile query ok',
-      data: { rowCount: rows.length },
-      timestamp: Date.now(),
-      runId: 'post-fix',
-      hypothesisId: 'A',
-    }),
-  }).catch(() => {})
-  // #endregion
-  return rows
+  return stdbSql(sqlProfile, httpOpts(opts))
 }

@@ -8,6 +8,7 @@ import {
   nowMicros,
 } from '@/lib/stdb-auth-server'
 import { sendInviteEmail } from '@/lib/email'
+import { authRateLimitExceeded } from '@/lib/auth-rate-limit'
 
 const schema = z.object({
   email: z.string().email(),
@@ -17,6 +18,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimitExceeded(req, 'invite')
+    if (limited) return limited
+
     const store = await cookies()
     const identityHex = store.get('stdb_identity')?.value
     if (!identityHex) {

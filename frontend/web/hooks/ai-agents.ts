@@ -83,3 +83,71 @@ export function useSetAiAgentActive(organizationId: number) {
     onSuccess: () => invalidateAiAgents(qc, organizationId),
   })
 }
+
+export function useCreateAiTeamMember(organizationId: number) {
+  return useMutation({
+    mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
+      const r = await fetch("/api/call/create_ai_team_member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          args.companyId != null ? String(args.companyId) : null,
+          stdbParamsToJson(args.params as object),
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+  })
+}
+
+export function useDismissAiInsight() {
+  return useMutation({
+    mutationFn: async (args: { companyId: number | null; insightId: number }) => {
+      const r = await fetch("/api/call/dismiss_insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          args.companyId != null ? String(args.companyId) : null,
+          String(args.insightId),
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+  })
+}
+
+export function useCreateAiInsight() {
+  return useMutation({
+    mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
+      const r = await fetch("/api/call/create_ai_insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          args.companyId != null ? String(args.companyId) : null,
+          stdbParamsToJson(args.params as object),
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+  })
+}
+
+export function useRecordAiSpend(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { agentId: number; tokensUsed: number }) => {
+      const r = await fetch("/api/call/record_ai_spend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          String(organizationId),
+          String(args.agentId),
+          args.tokensUsed,
+        ]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAiAgents(qc, organizationId),
+  })
+}

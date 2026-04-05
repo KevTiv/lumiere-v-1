@@ -1,74 +1,41 @@
 {
-  "totalRustReducers": 658,
-  "productRustReducers": 569,
-  "totalWebReducers": 619,
+  "totalRustReducers": 659,
+  "productRustReducers": 570,
+  "totalWebReducers": 652,
   "missingFromWeb": [
     "add_casbin_rule",
     "add_org_member",
     "add_user_to_organization",
-    "claim_hub_with_token",
     "claim_queue_job",
     "complete_queue_job",
-    "create_ai_agent",
-    "create_ai_insight",
-    "create_ai_team_member",
-    "create_company",
     "create_country",
     "create_currency",
-    "create_data_classification",
-    "create_data_classification_rule",
     "create_google_drive_connection",
     "create_password_reset_token",
     "create_whatsapp_business_account",
-    "delete_company",
     "delete_integration",
     "delete_search_embedding",
     "delete_whatsapp_business_account",
     "dev_promote_caller_superuser",
-    "dismiss_insight",
     "enqueue_job",
-    "generate_hub_pairing_token",
-    "import_ai_agent_csv",
-    "import_company_csv",
-    "import_country_csv",
-    "import_currency_csv",
-    "import_currency_rate_csv",
-    "import_role_csv",
-    "link_device_to_location",
-    "link_device_to_pos",
     "link_workos_user",
-    "mark_action_sent",
     "mark_embedding_synced",
     "mark_invite_accepted",
     "mark_reset_token_used",
     "migrate_all_organizations",
-    "post_invoice",
     "process_pending_scans",
-    "record_ai_spend",
     "record_google_drive_sync",
     "record_google_drive_sync_error",
-    "record_telemetry",
-    "record_telemetry_batch",
     "record_whatsapp_health_check",
     "record_whatsapp_message_sent",
     "register_queue_worker",
     "remove_casbin_rule",
     "request_embedding_job",
     "seed_dev_data",
-    "set_ai_agent_active",
     "set_whatsapp_primary_account",
     "store_sso_user_credential",
     "store_user_credential",
-    "sync_hub_devices",
-    "unlink_device",
-    "update_ai_agent",
-    "update_company",
-    "update_company_address",
-    "update_company_business",
-    "update_company_hierarchy",
-    "update_device_status",
     "update_google_drive_connection",
-    "update_hub_heartbeat",
     "update_integration_status",
     "update_tax_deadlines",
     "update_whatsapp_business_account",
@@ -163,6 +130,7 @@
         "retry_intercompany_transaction",
         "set_intercompany_rule_active",
         "compute_invoice_totals",
+        "post_invoice",
         "create_account_move",
         "add_account_move_line",
         "post_account_move",
@@ -309,6 +277,7 @@
         "update_account_account",
         "create_account_move",
         "post_account_move",
+        "post_invoice",
         "cancel_account_move",
         "add_account_move_line",
         "delete_account_move_line",
@@ -415,6 +384,7 @@
         "retry_intercompany_transaction",
         "set_intercompany_rule_active",
         "compute_invoice_totals",
+        "post_invoice",
         "create_account_move",
         "add_account_move_line",
         "post_account_move",
@@ -454,10 +424,8 @@
     "uncategorized": {
       "rust": [
         "deprecate_account_account",
-        "post_invoice",
         "create_invoice_from_sale_order",
         "create_bill_from_purchase_order",
-        "set_ai_agent_active",
         "record_report_run",
         "update_metric_values",
         "post_message",
@@ -515,8 +483,6 @@
         "name"
       ],
       "missing": [
-        "post_invoice",
-        "set_ai_agent_active",
         "create_google_drive_connection",
         "update_google_drive_connection",
         "record_google_drive_sync",
@@ -531,13 +497,11 @@
         "set_whatsapp_primary_account",
         "delete_whatsapp_business_account"
       ],
-      "coverage": 61,
+      "coverage": 65,
       "productReducers": [
         "deprecate_account_account",
-        "post_invoice",
         "create_invoice_from_sale_order",
         "create_bill_from_purchase_order",
-        "set_ai_agent_active",
         "record_report_run",
         "update_metric_values",
         "post_message",
@@ -570,7 +534,7 @@
         "remove_purchase_order_line",
         "compute_so_totals"
       ],
-      "productCoverage": 58
+      "productCoverage": 62
     },
     "reports": {
       "rust": [
@@ -689,6 +653,7 @@
       "rust": [
         "create_ai_agent",
         "update_ai_agent",
+        "set_ai_agent_active",
         "record_ai_spend",
         "create_ai_team_member",
         "create_ai_insight",
@@ -698,29 +663,32 @@
         "delete_search_embedding",
         "request_embedding_job"
       ],
-      "web": [],
-      "missing": [
+      "web": [
         "create_ai_agent",
-        "update_ai_agent",
-        "record_ai_spend",
-        "create_ai_team_member",
         "create_ai_insight",
+        "create_ai_team_member",
         "dismiss_insight",
+        "record_ai_spend",
+        "set_ai_agent_active",
+        "update_ai_agent"
+      ],
+      "missing": [
         "upsert_search_embedding",
         "mark_embedding_synced",
         "delete_search_embedding",
         "request_embedding_job"
       ],
-      "coverage": 0,
+      "coverage": 64,
       "productReducers": [
         "create_ai_agent",
         "update_ai_agent",
+        "set_ai_agent_active",
         "record_ai_spend",
         "create_ai_team_member",
         "create_ai_insight",
         "dismiss_insight"
       ],
-      "productCoverage": 0
+      "productCoverage": 100
     },
     "documents": {
       "rust": [
@@ -1024,20 +992,21 @@
         "create_country",
         "create_currency"
       ],
-      "web": [],
-      "missing": [
+      "web": [
         "create_company",
+        "create_data_classification",
+        "create_data_classification_rule",
+        "delete_company",
         "update_company",
         "update_company_address",
         "update_company_business",
-        "update_company_hierarchy",
-        "delete_company",
-        "create_data_classification",
-        "create_data_classification_rule",
+        "update_company_hierarchy"
+      ],
+      "missing": [
         "create_country",
         "create_currency"
       ],
-      "coverage": 0,
+      "coverage": 80,
       "productReducers": [
         "create_company",
         "update_company",
@@ -1048,7 +1017,7 @@
         "create_data_classification",
         "create_data_classification_rule"
       ],
-      "productCoverage": 0
+      "productCoverage": 100
     },
     "internal": {
       "rust": [
@@ -1330,13 +1299,12 @@
         "validate_cycle_count",
         "validate_stock_inventory",
         "validate_stock_picking",
-        "move_stock_item3d",
-        "create_warehouse3d_zone"
+        "create_warehouse3_dzone"
       ],
       "missing": [
         "process_pending_scans"
       ],
-      "coverage": 120,
+      "coverage": 119,
       "productReducers": [
         "create_uom_category",
         "create_uom",
@@ -1507,7 +1475,12 @@
         "import_account_csv",
         "import_account_move_csv",
         "import_account_move_line_csv",
+        "import_ai_agent_csv",
+        "import_company_csv",
         "import_contact_csv",
+        "import_country_csv",
+        "import_currency_csv",
+        "import_currency_rate_csv",
         "import_expense_csv",
         "import_expense_sheet_csv",
         "import_helpdesk_ticket_csv",
@@ -1524,6 +1497,7 @@
         "import_purchase_order_csv",
         "import_purchase_order_line_csv",
         "import_report_template_csv",
+        "import_role_csv",
         "import_sale_order_csv",
         "import_sale_order_line_csv",
         "import_subscription_csv",
@@ -1532,15 +1506,8 @@
         "import_task_csv",
         "import_workflow_csv"
       ],
-      "missing": [
-        "import_ai_agent_csv",
-        "import_country_csv",
-        "import_currency_csv",
-        "import_currency_rate_csv",
-        "import_company_csv",
-        "import_role_csv"
-      ],
-      "coverage": 82,
+      "missing": [],
+      "coverage": 100,
       "productReducers": [],
       "productCoverage": 0
     },
@@ -1980,32 +1947,31 @@
         "set_iot_threshold"
       ],
       "web": [
+        "claim_hub_with_token",
         "create_iot_action",
         "create_iot_alert",
         "delete_iot_device",
         "delete_iot_hub",
         "fail_iot_action",
+        "generate_hub_pairing_token",
+        "link_device_to_location",
+        "link_device_to_pos",
+        "mark_action_sent",
+        "record_telemetry",
+        "record_telemetry_batch",
         "register_iot_device",
         "register_iot_hub",
         "resolve_iot_alert",
         "retry_iot_action",
         "set_iot_threshold",
-        "test_iot_device"
-      ],
-      "missing": [
-        "mark_action_sent",
-        "link_device_to_location",
-        "link_device_to_pos",
-        "unlink_device",
-        "generate_hub_pairing_token",
-        "claim_hub_with_token",
-        "update_hub_heartbeat",
         "sync_hub_devices",
+        "test_iot_device",
+        "unlink_device",
         "update_device_status",
-        "record_telemetry",
-        "record_telemetry_batch"
+        "update_hub_heartbeat"
       ],
-      "coverage": 50,
+      "missing": [],
+      "coverage": 100,
       "productReducers": [
         "create_iot_action",
         "test_iot_device",
@@ -2028,7 +1994,7 @@
         "record_telemetry_batch",
         "set_iot_threshold"
       ],
-      "productCoverage": 55
+      "productCoverage": 100
     },
     "proposals": {
       "rust": [
@@ -2040,6 +2006,7 @@
         "save_proposal_version",
         "add_proposal_source_doc",
         "delete_proposal_source_doc",
+        "update_proposal_source_doc",
         "add_proposal_line_item",
         "update_proposal_line_item",
         "delete_proposal_line_item",
@@ -2064,6 +2031,7 @@
         "update_proposal",
         "update_proposal_line_item",
         "update_proposal_presence",
+        "update_proposal_source_doc",
         "update_proposal_status",
         "upsert_proposal_section"
       ],
@@ -2078,6 +2046,7 @@
         "save_proposal_version",
         "add_proposal_source_doc",
         "delete_proposal_source_doc",
+        "update_proposal_source_doc",
         "add_proposal_line_item",
         "update_proposal_line_item",
         "delete_proposal_line_item",
@@ -2401,8 +2370,8 @@
     }
   },
   "detectionSources": {
-    "apiCallLiteral": 572,
-    "useStdbReducer": 23,
+    "apiCallLiteral": 605,
+    "useStdbReducer": 24,
     "useStdbReducerWithInvalidation": 2,
     "callReducerLiteral": 13,
     "callReducersBatch": 1

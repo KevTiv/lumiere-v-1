@@ -8,6 +8,7 @@ import {
   serverQueryAnalyticAccounts,
   serverQueryFiscalYears,
   serverQueryAccountPeriods,
+  type StdbServerQueryOptions,
 } from "@lumiere/stdb/server"
 import { AccountingClient } from "./accounting-client"
 
@@ -16,18 +17,21 @@ export default async function AccountingPage() {
   if (!session?.organizationId) {
     return <AccountingClient />
   }
-  const { organizationId, opts } = session
+  const { organizationId, opts, fieldAccess } = session
+  const queryOpts: StdbServerQueryOptions | undefined = fieldAccess
+    ? { ...opts, fieldAccess }
+    : opts
 
   const [accounts, moves, taxes, budgets, analytic, journals, fiscalYears, accountPeriods] =
     await Promise.all([
-      serverQueryAccountAccounts(organizationId, opts),
-      serverQueryAccountMoves(organizationId, undefined, opts),
-      serverQueryAccountTaxes(organizationId, opts),
-      serverQueryBudgets(organizationId, opts),
-      serverQueryAnalyticAccounts(organizationId, opts),
-      serverQueryAccountJournals(organizationId, opts),
-      serverQueryFiscalYears(organizationId, opts),
-      serverQueryAccountPeriods(organizationId, opts),
+      serverQueryAccountAccounts(organizationId, queryOpts),
+      serverQueryAccountMoves(organizationId, undefined, queryOpts),
+      serverQueryAccountTaxes(organizationId, queryOpts),
+      serverQueryBudgets(organizationId, queryOpts),
+      serverQueryAnalyticAccounts(organizationId, queryOpts),
+      serverQueryAccountJournals(organizationId, queryOpts),
+      serverQueryFiscalYears(organizationId, queryOpts),
+      serverQueryAccountPeriods(organizationId, queryOpts),
     ]).catch(() => [[], [], [], [], [], [], [], []])
 
   return (

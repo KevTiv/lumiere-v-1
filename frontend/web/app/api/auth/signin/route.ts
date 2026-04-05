@@ -9,6 +9,7 @@ import { saveStdbSession } from '@/app/actions/save-stdb-token'
 import { postAuthDestinationAfterSession } from '@/lib/post-auth-destination'
 import { normalizeIdentityHexForSql } from '@/lib/stdb-http-env'
 import { serverQueryUserOrganizationWithFallback } from '@/lib/stdb-org-resolve'
+import { authRateLimitExceeded } from '@/lib/auth-rate-limit'
 
 const schema = z.object({
   email: z.string().email(),
@@ -17,6 +18,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimitExceeded(req, 'signin')
+    if (limited) return limited
+
     if (process.env.WORKOS_CLIENT_ID) {
       return NextResponse.json(
         {

@@ -2,7 +2,8 @@
  * Field-level read policy for SpacetimeDB SQL (API / subscriptions).
  *
  * - Admin: `user_profile.is_superuser`, role permission `*:*`, or Casbin `p` rule
- *   with v2=* and v3=* (and v4=allow when present) → full row (`SELECT *`).
+ *   with v2=* and v3=* (and v4=allow when present) → full row (explicit column list via
+ *   {@link resolveHttpSqlColumns}; SpacetimeDB HTTP SQL rejects `SELECT *`).
  * - Otherwise: Casbin `metadata` JSON `{ "fields": ["col_a", ...] }` on a `p` rule
  *   where v1=org id, v0 matches identity or role id or role name, v2 matches resource
  *   key or table name, v3 is `read` or `*`.
@@ -25,10 +26,13 @@ import type {
   AccountAsset,
   AccountBankStatement,
   AccountBankStatementLine,
+  AccountAssetDepreciationLine,
   AccountJournal,
-  AccountReconciliationWidget,
   AccountMove,
+  AccountMoveLine,
+  AccountReconciliationWidget,
   AccountTax,
+  AccountTaxGroup,
   CalendarEvent,
   CasbinRule,
   Contact,
@@ -47,6 +51,8 @@ import type {
   HelpdeskTeam,
   HelpdeskTicket,
   HrContract,
+  IntercompanyRule,
+  IntercompanyTransaction,
   HrDepartment,
   HrEmployee,
   HrExpense,
@@ -108,6 +114,9 @@ import type {
   StockQuant,
   Subscription,
   SubscriptionPlan,
+  TaxDeadline,
+  TaxJurisdiction,
+  TaxSchedule,
   TrialBalance,
   Uom,
   AccountPayment,
@@ -164,12 +173,15 @@ import type {
 } from './generated/types'
 
 import { sqlFieldNames } from './sql-field-names'
+import queryResourceRowType from './query-resource-row-type.json'
+import stdbGeneratedSqlColumns from './stdb-generated-sql-columns.json'
 
 export type QueryResourceKey =
   | 'account-accounts'
   | 'account-account-types'
   | 'account-groups'
   | 'account-journals'
+  | 'account-move-lines'
   | 'account-moves'
   | 'account-taxes'
   | 'account-payments'
@@ -186,6 +198,10 @@ export type QueryResourceKey =
   | 'bank-match-candidates'
   | 'account-reconciliation-widgets'
   | 'account-assets'
+  | 'depreciation-lines'
+  | 'fixed-assets'
+  | 'intercompany-rules'
+  | 'intercompany-transactions'
   | 'consolidation-accounts'
   | 'consolidation-journals'
   | 'consolidation-elimination-entries'
@@ -309,6 +325,10 @@ export type QueryResourceKey =
   | 'ai-document-processing-jobs'
   | 'fiscal-years'
   | 'account-periods'
+  | 'tax-groups'
+  | 'tax-jurisdictions'
+  | 'tax-schedules'
+  | 'tax-deadlines'
   | 'companies'
   | 'data-classifications'
   | 'data-classification-rules'
@@ -375,7 +395,19 @@ function orgEntry<T extends { id: unknown; organizationId: unknown }>(
  */
 export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'account-accounts': orgEntry<AccountAccount>('account_account', ['account-accounts', 'account_account'], [
-    'code', 'name', 'deprecated', 'used', 'companyId', 'internalGroup', 'isBankAccount',
+    'code',
+    'name',
+    'deprecated',
+    'used',
+    'companyId',
+    'internalGroup',
+    'isBankAccount',
+    'openingBalance',
+    'openingDebit',
+    'openingCredit',
+    'currencyId',
+    'userTypeId',
+    'groupId',
   ]),
   'account-account-types': orgEntry<AccountAccountType>(
     'account_account_type',
@@ -394,8 +426,27 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'code', 'name', 'companyId',
   ]),
   'account-moves': orgEntry<AccountMove>('account_move', ['account-moves', 'account_move'], [
-    'name', 'moveType', 'state', 'date', 'companyId',
+    'name',
+    'moveType',
+    'state',
+    'date',
+    'companyId',
+    'journalId',
+    'partnerId',
+    'currencyId',
+    'invoiceDate',
+    'invoiceDateDue',
+    'amountUntaxed',
+    'amountTax',
+    'amountTotal',
+    'amountResidual',
+    'paymentState',
   ]),
+  'account-move-lines': orgEntry<AccountMoveLine>(
+    'account_move_line',
+    ['account-move-lines', 'account_move_line'],
+    ['moveId', 'name', 'date', 'debit', 'credit', 'balance', 'accountId', 'partnerId', 'companyId'],
+  ),
   'account-taxes': orgEntry<AccountTax>('account_tax', ['account-taxes', 'account_tax'], [
     'name', 'amount', 'companyId',
   ]),
@@ -414,7 +465,15 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['id', 'paymentTermId'],
   ),
   budgets: orgEntry<CrossoveredBudget>('crossovered_budget', ['budgets', 'crossovered_budget'], [
-    'name', 'companyId', 'state',
+    'name',
+    'companyId',
+    'state',
+    'dateFrom',
+    'dateTo',
+    'totalPlanned',
+    'totalPractical',
+    'totalTheoretical',
+    'variancePercentage',
   ]),
   'budget-lines': orgEntry<CrossoveredBudgetLines>(
     'crossovered_budget_lines',
@@ -469,6 +528,58 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['account-assets', 'account_asset'],
     ['name', 'code', 'assetType', 'state', 'acquisitionDate', 'originalValue', 'companyId'],
     ['id', 'companyId'] as readonly (keyof AccountAsset)[],
+  ),
+  'fixed-assets': entry<AccountAsset>(
+    'account_asset',
+    ['fixed-assets', 'account_asset'],
+    ['name', 'code', 'assetType', 'state', 'acquisitionDate', 'originalValue', 'companyId'],
+    ['id', 'companyId'] as readonly (keyof AccountAsset)[],
+  ),
+  'depreciation-lines': entry<AccountAssetDepreciationLine>(
+    'account_asset_depreciation_line',
+    ['depreciation-lines', 'account_asset_depreciation_line'],
+    ['assetId', 'name', 'sequence', 'amount', 'depreciationDate', 'remainingValue', 'depreciatedValue'],
+    ['id', 'assetId'] as readonly (keyof AccountAssetDepreciationLine)[],
+  ),
+  'tax-groups': orgEntry<AccountTaxGroup>('account_tax_group', ['tax-groups', 'account_tax_group'], [
+    'name', 'sequence', 'companyId',
+  ]),
+  'tax-jurisdictions': orgEntry<TaxJurisdiction>(
+    'tax_jurisdiction',
+    ['tax-jurisdictions', 'tax_jurisdiction'],
+    ['name', 'code', 'countryCode', 'stateCode', 'isActive'],
+  ),
+  'tax-schedules': orgEntry<TaxSchedule>('tax_schedule', ['tax-schedules', 'tax_schedule'], [
+    'name', 'jurisdictionId', 'companyId', 'isActive',
+  ]),
+  'tax-deadlines': orgEntry<TaxDeadline>('tax_deadline', ['tax-deadlines', 'tax_deadline'], [
+    'title',
+    'dueDate',
+    'status',
+    'deadlineType',
+    'companyId',
+    'deletedAt',
+  ]),
+  'intercompany-rules': entry<IntercompanyRule>(
+    'intercompany_rule',
+    ['intercompany-rules', 'intercompany_rule'],
+    ['name', 'ruleType', 'sourceCompanyId', 'destinationCompanyId', 'isActive', 'sequence'],
+    ['id', 'sourceCompanyId', 'destinationCompanyId'] as readonly (keyof IntercompanyRule)[],
+  ),
+  'intercompany-transactions': entry<IntercompanyTransaction>(
+    'intercompany_transaction',
+    ['intercompany-transactions', 'intercompany_transaction'],
+    [
+      'name',
+      'originCompanyId',
+      'destinationCompanyId',
+      'originDocumentId',
+      'originDocumentModel',
+      'amount',
+      'state',
+      'transactionType',
+    ],
+    ['id', 'originCompanyId', 'destinationCompanyId'] as readonly (keyof IntercompanyTransaction)[],
   ),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
     'reference', 'state', 'partnerId', 'companyId', 'dateOrder',
@@ -1138,6 +1249,34 @@ export function resolveReadColumns(
   return assertSafeSqlIdentifiers([...reg.mandatory, ...reg.defaultRestricted])
 }
 
+/**
+ * Column list for SpacetimeDB HTTP SQL — never `*`. Uses Casbin/role restrictions when set;
+ * otherwise all columns for the row type (from generated schema JSON).
+ */
+export function resolveHttpSqlColumns(
+  resourceKey: QueryResourceKey,
+  fieldAccess: FieldAccessContext | undefined,
+): string[] {
+  const restricted = resolveReadColumns(resourceKey, fieldAccess)
+  if (restricted !== null) return restricted
+  const rowType = (queryResourceRowType as Record<string, string>)[resourceKey]
+  const fromSchema = rowType
+    ? (stdbGeneratedSqlColumns as Record<string, string[]>)[rowType]
+    : undefined
+  if (fromSchema?.length) return assertSafeSqlIdentifiers(fromSchema)
+  const reg = RESOURCE_REGISTRY[resourceKey]
+  return assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
+}
+
+/** Explicit column list for a generated row `typeName` (PascalCase, e.g. `UserProfile`). */
+export function sqlColumnListForGeneratedType(typeName: string): string[] {
+  const fromSchema = (stdbGeneratedSqlColumns as Record<string, string[]>)[typeName]
+  if (!fromSchema?.length) {
+    throw new Error(`sqlColumnListForGeneratedType: unknown type "${typeName}"`)
+  }
+  return assertSafeSqlIdentifiers(fromSchema)
+}
+
 export function selectOrgScopedSql(
   resourceKey: QueryResourceKey,
   table: string,
@@ -1146,8 +1285,8 @@ export function selectOrgScopedSql(
   extraWhere: string,
   orderBy = '',
 ): string {
-  const cols = resolveReadColumns(resourceKey, fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns(resourceKey, fieldAccess)
+  const colPart = cols.join(', ')
   const where = `organization_id = ${organizationId}${extraWhere}`
   return `SELECT ${colPart} FROM ${table} WHERE ${where}${orderBy}`
 }
@@ -1161,8 +1300,8 @@ export function selectCompanyScopedSql(
   extraWhere: string,
   orderBy = '',
 ): string {
-  const cols = resolveReadColumns(resourceKey, fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns(resourceKey, fieldAccess)
+  const colPart = cols.join(', ')
   const where = `company_id = ${companyId}${extraWhere}`
   return `SELECT ${colPart} FROM ${table} WHERE ${where}${orderBy}`
 }
@@ -1172,14 +1311,14 @@ export function selectRawSql(
   sqlBody: string,
   fieldAccess: FieldAccessContext | undefined,
 ): string {
-  const cols = resolveReadColumns(resourceKey, fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns(resourceKey, fieldAccess)
+  const colPart = cols.join(', ')
   return `SELECT ${colPart} ${sqlBody}`
 }
 
 export function selectRolesActiveSql(fieldAccess: FieldAccessContext | undefined): string {
-  const cols = resolveReadColumns('roles', fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns('roles', fieldAccess)
+  const colPart = cols.join(', ')
   return `SELECT ${colPart} FROM role WHERE is_active = true`
 }
 
@@ -1191,8 +1330,8 @@ export function selectUserProfileByIdentitySql(
   identityHex: string,
   fieldAccess: FieldAccessContext | undefined,
 ): string {
-  const cols = resolveReadColumns('user-profile', fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns('user-profile', fieldAccess)
+  const colPart = cols.join(', ')
   const id = sqlQuoteIdentityHex(identityHex)
   return `SELECT ${colPart} FROM user_profile WHERE identity = '${id}' LIMIT 1`
 }
@@ -1201,8 +1340,8 @@ export function selectUserRoleAssignmentsForIdentitySql(
   identityHex: string,
   fieldAccess: FieldAccessContext | undefined,
 ): string {
-  const cols = resolveReadColumns('user-roles', fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns('user-roles', fieldAccess)
+  const colPart = cols.join(', ')
   const id = sqlQuoteIdentityHex(identityHex)
   return `SELECT ${colPart} FROM user_role_assignment WHERE user_identity = '${id}' AND is_active = true`
 }
@@ -1211,8 +1350,8 @@ export function selectUserOrganizationForIdentitySql(
   identityHex: string,
   fieldAccess: FieldAccessContext | undefined,
 ): string {
-  const cols = resolveReadColumns('user-organization', fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns('user-organization', fieldAccess)
+  const colPart = cols.join(', ')
   const id = sqlQuoteIdentityHex(identityHex)
   return `SELECT ${colPart} FROM user_organization WHERE user_identity = '${id}' AND is_active = true`
 }
@@ -1221,7 +1360,7 @@ export function selectCasbinRulesInSubjectsSql(
   subjectsListSql: string,
   fieldAccess: FieldAccessContext | undefined,
 ): string {
-  const cols = resolveReadColumns('casbin-rule', fieldAccess)
-  const colPart = cols === null ? '*' : cols.join(', ')
+  const cols = resolveHttpSqlColumns('casbin-rule', fieldAccess)
+  const colPart = cols.join(', ')
   return `SELECT ${colPart} FROM casbin_rule WHERE v0 IN (${subjectsListSql})`
 }

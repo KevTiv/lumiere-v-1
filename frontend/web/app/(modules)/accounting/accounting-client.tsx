@@ -192,6 +192,7 @@ import {
   useReconcilePaymentWithInvoice,
   useRefreshTaxDeadlineStatuses,
   useScheduleTaxDeadlineUpdates,
+  useTaxDeadlines,
   useAccountingCsvImportMutations,
   useAccountPayments,
   useAccountPaymentTerms,
@@ -238,6 +239,20 @@ function moveStateStr(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
+}
+
+function taxDeadlineStatusStr(row: Record<string, unknown>): string {
+  const v = row.status
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+/** SpacetimeDB timestamp JSON → milliseconds since epoch. */
+function stdbTimestampToMs(ts: unknown): number | null {
+  if (ts == null) return null
+  const n = typeof ts === "bigint" ? Number(ts) : Number(ts)
+  if (!Number.isFinite(n)) return null
+  return n / 1000
 }
 
 function budgetStateStr(row: Record<string, unknown>): string {
@@ -372,10 +387,20 @@ function AccountingClientLoaded({
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { data: accounts = [] } = useAccountAccounts(companyId, { enabled: !!companyId })
-  const { data: allMoves = [] } = useAccountMoves(companyId, { enabled: !!companyId })
+  const { data: accounts = [] } = useAccountAccounts(companyId, {
+    enabled: !!companyId,
+    initialData: initialAccounts,
+  })
+  const { data: allMoves = [] } = useAccountMoves(companyId, {
+    enabled: !!companyId,
+    initialData: initialMoves,
+  })
   const { data: taxes = [] } = useAccountTaxes(companyId, { enabled: !!companyId })
-  const { data: budgets = [] } = useCrossoveredBudgets(companyId, { enabled: !!companyId })
+  const { data: budgets = [] } = useCrossoveredBudgets(companyId, {
+    enabled: !!companyId,
+    initialData: initialBudgets,
+  })
+  const { data: taxDeadlines = [] } = useTaxDeadlines(companyId, { enabled: !!companyId })
   const { data: analytic = [] } = useAccountAnalyticAccounts(companyId, { enabled: !!companyId })
   const { data: analyticLines = [] } = useAccountAnalyticLines(companyId, { enabled: !!companyId })
   const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(companyId, {
@@ -1546,10 +1571,48 @@ function AccountingClientLoaded({
           }))
           return { ...w, data: { accounts: accountRows } }
         }
+        if (w.id === "acc-tax-deadlines") {
+          const nowMs = Date.now()
+          const rows = (taxDeadlines as Record<string, unknown>[])
+            .filter((d) => d.deletedAt == null && d.deleted_at == null)
+            .filter((d) => {
+              const st = taxDeadlineStatusStr(d)
+              return st !== "Completed" && st !== "Waived"
+            })
+            .sort((a, b) => {
+              const ta = stdbTimestampToMs(a.dueDate ?? a.due_date) ?? Number.POSITIVE_INFINITY
+              const tb = stdbTimestampToMs(b.dueDate ?? b.due_date) ?? Number.POSITIVE_INFINITY
+              return ta - tb
+            })
+            .slice(0, 5)
+          const deadlines = rows.map((d) => {
+            const dueMs = stdbTimestampToMs(d.dueDate ?? d.due_date) ?? nowMs
+            const daysUntil = Math.round((dueMs - nowMs) / 86_400_000)
+            return {
+              title: String(d.title ?? ""),
+              dueDate: new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+                new Date(dueMs),
+              ),
+              status: taxDeadlineStatusStr(d),
+              daysUntil,
+            }
+          })
+          return { ...w, data: { deadlines } }
+        }
         return w
       }),
     }))
-  }, [accounts, invoices, bills, budgets, moduleConfigBase, t, journalEntryFormConfig, currencyRateFormConfig])
+  }, [
+    accounts,
+    invoices,
+    bills,
+    budgets,
+    taxDeadlines,
+    moduleConfigBase,
+    t,
+    journalEntryFormConfig,
+    currencyRateFormConfig,
+  ])
 
   const chartStructurePanel = useMemo(
     () => (

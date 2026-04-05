@@ -3,6 +3,10 @@
  *
  * Wraps REST API calls with React Query for the IoT module.
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
+ *
+ * Telemetry (`record_telemetry`, `record_telemetry_batch`): intended callers are the **IoT hub /
+ * gateway** (devices → hub → SpacetimeDB). The web UI exposes the same reducers for **admin
+ * debugging or demos** only; production ingestion should not rely on browser POST volume.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'

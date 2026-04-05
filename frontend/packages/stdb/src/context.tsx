@@ -37,19 +37,22 @@ interface StdbConnectionProviderProps {
   onTokenPersisted?: (token: string, identityHex: string) => void;
   /**
    * Identity hex pre-resolved by the server (from cookie) on the initial RSC render.
-   * Passed to authSubscriptions() to narrow the casbin_rule subscription to only
-   * this user's rules — preventing the full permission matrix from being broadcast.
+   * Passed to authSubscriptions() to scope profile, memberships, and Casbin rows.
    */
   serverIdentity?: string;
   /**
-   * Role names assigned to the server-resolved identity.
-   * Combined with serverIdentity to build the casbin_rule WHERE IN filter.
+   * Role names assigned to the server-resolved identity (Casbin `v0` subjects).
    */
   serverRoleNames?: string[];
   /**
    * Active organization (from server session). Required for org-scoped resource keys.
    */
   organizationId?: number;
+  /**
+   * Company row ids for this org (from RSC). Required for WebSocket SQL on `fixed-assets`,
+   * `intercompany-rules`, and `intercompany-transactions` (see {@link SubscriptionQueryContext}).
+   */
+  companyIds?: readonly number[];
   /**
    * Resource keys to subscribe to (see {@link SUBSCRIPTION_RESOURCE_KEYS}).
    * Pass an empty array for no subscriptions; there is no implicit “subscribe to everything”.
@@ -70,6 +73,7 @@ export function StdbConnectionProvider({
   serverIdentity,
   serverRoleNames,
   organizationId,
+  companyIds,
   subscriptionResources,
   sameOriginStdbProxy,
 }: StdbConnectionProviderProps) {
@@ -145,6 +149,7 @@ export function StdbConnectionProvider({
                 identityHex: serverIdentity,
                 roleNames: serverRoleNames,
                 organizationId,
+                companyIds,
               }),
             );
         })
@@ -173,6 +178,7 @@ export function StdbConnectionProvider({
     moduleName,
     onTokenPersisted,
     organizationId,
+    companyIds,
     subscriptionResources,
     sameOriginStdbProxy,
     serverIdentity,

@@ -59,7 +59,7 @@ export function useAccountGroups(
  */
 export function useAccountMoves(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean }
+  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
 ) {
   return useStdbQuery("account-moves", organizationId, options)
 }
@@ -89,7 +89,7 @@ export function useAccountTaxes(
  */
 export function useCrossoveredBudgets(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean }
+  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
 ) {
   return useStdbQuery("budgets", organizationId, options)
 }
