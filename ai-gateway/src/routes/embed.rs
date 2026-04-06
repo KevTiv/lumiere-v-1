@@ -12,6 +12,7 @@ use crate::{
     error::{AppError, AppResult},
     qdrant_client::EmbedPoint,
     state::AppState,
+    stdb_embed::LumiereStdbExt,
 };
 
 #[derive(Deserialize)]

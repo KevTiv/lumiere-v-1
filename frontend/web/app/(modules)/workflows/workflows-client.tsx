@@ -19,8 +19,8 @@ import {
   useSignalWorkflow,
   useCancelWorkflowInstance,
   useSetWorkitemException,
-} from "@/hooks/workflows"
-import type { CreateWorkflowParams } from "@/hooks/workflows"
+} from "@lumiere/query-hooks/hooks/workflows"
+import type { CreateWorkflowParams } from "@lumiere/query-hooks/hooks/workflows"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { instanceStateTag } from "@/lib/workflow-enum"
 import { WorkflowsRowDialog } from "./workflows-row-dialog"

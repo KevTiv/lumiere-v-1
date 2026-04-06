@@ -4,7 +4,6 @@
  */
 import 'server-only'
 
-import type { User } from '@workos-inc/node'
 import {
   callStdbReducer,
   decryptToken,
@@ -14,12 +13,13 @@ import {
   provisionStdbIdentity,
 } from '@/lib/stdb-auth-server'
 import { saveStdbSession } from '@/app/actions/save-stdb-token'
+import { workOsEmailVerified, workOsPrimaryEmail, type WorkOsAuthKitUser } from '@/lib/workos-user-fields'
 
 /**
  * Provisions or loads STDB identity and sets `stdb_token` / `stdb_identity` cookies.
  */
-export async function bridgeWorkOsUserToStdbSession(user: User): Promise<void> {
-  const email = user.email?.trim() ?? ''
+export async function bridgeWorkOsUserToStdbSession(user: WorkOsAuthKitUser): Promise<void> {
+  const email = workOsPrimaryEmail(user)
   const workosUserId = user.id?.trim()
   if (!email || !workosUserId) {
     throw new Error('WorkOS user is missing email or id')
@@ -54,7 +54,7 @@ export async function bridgeWorkOsUserToStdbSession(user: User): Promise<void> {
     canonicalEmail,
     tokenEnc,
     workosUserId,
-    Boolean(user.emailVerified),
+    workOsEmailVerified(user),
   ])
   await saveStdbSession(token, identity)
 }

@@ -68,7 +68,7 @@ export const productsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "type",
-        label: t("inventory.products.filters.type"),
+        label: t("inventory.products.filters.type.label"),
         type: "select",
         options: [
           { value: "product", label: t("inventory.products.filters.type.options.product") },
@@ -123,7 +123,7 @@ export const transfersTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("inventory.transfers.filters.state"),
+        label: t("inventory.transfers.filters.state.label"),
         type: "select",
         options: [
           { value: "draft", label: t("inventory.transfers.filters.state.options.draft") },
@@ -180,7 +180,7 @@ export const inventoryAdjustmentsTableConfig = (t: TFunction): EntityViewConfig 
     filters: [
       {
         key: "state",
-        label: t("inventory.inventoryAdjustments.filters.state"),
+        label: t("inventory.inventoryAdjustments.filters.state.label"),
         type: "select",
         options: [
           { value: "draft", label: t("inventory.inventoryAdjustments.filters.state.options.draft") },
@@ -214,7 +214,7 @@ export const stockLocationsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "usage",
-        label: t("inventory.stockLocations.filters.usage"),
+        label: t("inventory.stockLocations.filters.usage.label"),
         type: "select",
         options: [
           { value: "internal", label: t("inventory.stockLocations.filters.usage.options.internal") },
@@ -291,7 +291,7 @@ export const qualityChecksTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "qualityState",
-        label: t("inventory.qualityChecks.filters.qualityState"),
+        label: t("inventory.qualityChecks.filters.qualityState.label"),
         type: "select",
         options: [
           { value: "none", label: t("inventory.qualityChecks.filters.qualityState.options.none") },
@@ -425,7 +425,7 @@ export const stockMovesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("inventory.stockMoves.filters.state"),
+        label: t("inventory.stockMoves.filters.state.label"),
         type: "select",
         options: [
           { value: "draft", label: t("inventory.stockMoves.filters.state.options.draft") },

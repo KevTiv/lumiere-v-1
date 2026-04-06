@@ -262,7 +262,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "product_category",
       id,
       fa,
-      " AND deleted_at IS NULL",
+      "",
     ),
   uoms: (id, fa) => selectOrgScopedSql("uoms", "uom", id, fa, ""),
   "stock-quants": (id, fa) =>

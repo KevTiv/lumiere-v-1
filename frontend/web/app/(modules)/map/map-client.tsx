@@ -7,7 +7,7 @@ import { MapLayerLegend, MissingOrganization } from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
 import type { MapPinData } from "@lumiere/ui/lib/map-types"
 import { Warehouse, Truck, Monitor, Package, TrendingUp, MapPin } from "lucide-react"
-import { useFleetVehicles, usePosTerminals, useWarehouseGeo } from "@/hooks/map"
+import { useFleetVehicles, usePosTerminals, useWarehouseGeo } from "@lumiere/query-hooks/hooks/map"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
@@ -72,10 +72,10 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
         layerId: "vehicle",
         lat: Number(v.latitude),
         lng: Number(v.longitude),
-        label: v.name,
+        label: String(v.name ?? ""),
         data: {
-          name: v.name,
-          driver: v.driverName ?? "—",
+          name: String(v.name ?? ""),
+          driver: String(v.driverName ?? "—"),
           status: String(v.status ?? "idle").toLowerCase(),
           speed: Number(v.speedKmh ?? 0),
           last_updated: "live",
@@ -89,30 +89,34 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
         layerId: "pos",
         lat: Number(p.latitude),
         lng: Number(p.longitude),
-        label: p.name,
+        label: String(p.name ?? ""),
         data: {
-          name: p.name,
-          location: p.locationLabel ?? "—",
+          name: String(p.name ?? ""),
+          location: String(p.locationLabel ?? "—"),
           status: String(p.status ?? "closed").toLowerCase(),
           daily_revenue: Number(p.dailyRevenue ?? 0),
           open_orders: Number(p.openOrders ?? 0),
         },
       }))
 
-    const warehousePins: MapPinData[] = warehouseGeos.map((wg) => ({
-      id: `wh-${wg.warehouseId}`,
-      layerId: "warehouse",
-      lat: Number(wg.latitude),
-      lng: Number(wg.longitude),
-      label: wg.city ?? t("map.warehouseFallback", { id: wg.warehouseId }),
-      data: {
-        name: wg.city ?? t("map.warehouseFallback", { id: wg.warehouseId }),
-        city: wg.city ?? "—",
-        manager: wg.managerName ?? "—",
-        stock_value: 0,
-        total_products: 0,
-      },
-    }))
+    const warehousePins: MapPinData[] = warehouseGeos.map((wg) => {
+      const fallback = t("map.warehouseFallback", { id: wg.warehouseId })
+      const cityStr = wg.city != null && String(wg.city) !== "" ? String(wg.city) : fallback
+      return {
+        id: `wh-${wg.warehouseId}`,
+        layerId: "warehouse",
+        lat: Number(wg.latitude),
+        lng: Number(wg.longitude),
+        label: cityStr,
+        data: {
+          name: cityStr,
+          city: wg.city != null && String(wg.city) !== "" ? String(wg.city) : "—",
+          manager: String(wg.managerName ?? "—"),
+          stock_value: 0,
+          total_products: 0,
+        },
+      }
+    })
 
     const allLive = [...vehiclePins, ...posPins, ...warehousePins]
     return allLive.length > 0 ? allLive : DEMO_PINS

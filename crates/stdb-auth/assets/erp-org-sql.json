@@ -1,0 +1,583 @@
+[
+  {
+    "mapKey": "account-accounts",
+    "resource_key": "account-accounts",
+    "table": "account_account",
+    "extra_where": "",
+    "order_by": " ORDER BY code"
+  },
+  {
+    "mapKey": "account-account-types",
+    "resource_key": "account-account-types",
+    "table": "account_account_type",
+    "extra_where": "",
+    "order_by": " ORDER BY name ASC"
+  },
+  {
+    "mapKey": "account-groups",
+    "resource_key": "account-groups",
+    "table": "account_group",
+    "extra_where": "",
+    "order_by": " ORDER BY level ASC, name ASC"
+  },
+  {
+    "mapKey": "account-journals",
+    "resource_key": "account-journals",
+    "table": "account_journal",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "account-move-lines",
+    "resource_key": "account-move-lines",
+    "table": "account_move_line",
+    "extra_where": "",
+    "order_by": " ORDER BY move_id ASC, sequence ASC"
+  },
+  {
+    "mapKey": "account-moves",
+    "resource_key": "account-moves",
+    "table": "account_move",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "account-taxes",
+    "resource_key": "account-taxes",
+    "table": "account_tax",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "budgets",
+    "resource_key": "budgets",
+    "table": "crossovered_budget",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "budget-lines",
+    "resource_key": "budget-lines",
+    "table": "crossovered_budget_lines",
+    "extra_where": "",
+    "order_by": " ORDER BY general_budget_id ASC, id ASC"
+  },
+  {
+    "mapKey": "budget-posts",
+    "resource_key": "budget-posts",
+    "table": "budget_post",
+    "extra_where": "",
+    "order_by": " ORDER BY name ASC"
+  },
+  {
+    "mapKey": "analytic-accounts",
+    "resource_key": "analytic-accounts",
+    "table": "account_analytic_account",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "tax-groups",
+    "resource_key": "tax-groups",
+    "table": "account_tax_group",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "tax-jurisdictions",
+    "resource_key": "tax-jurisdictions",
+    "table": "tax_jurisdiction",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "tax-schedules",
+    "resource_key": "tax-schedules",
+    "table": "tax_schedule",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "tax-deadlines",
+    "resource_key": "tax-deadlines",
+    "table": "tax_deadline",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "sale-orders",
+    "resource_key": "sale-orders",
+    "table": "sale_order",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "sale-order-lines",
+    "resource_key": "sale-order-lines",
+    "table": "sale_order_line",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "pos-loyalty-programs",
+    "resource_key": "pos-loyalty-programs",
+    "table": "pos_loyalty_program",
+    "extra_where": "",
+    "order_by": " ORDER BY id DESC"
+  },
+  {
+    "mapKey": "pos-loyalty-cards",
+    "resource_key": "pos-loyalty-cards",
+    "table": "pos_loyalty_card",
+    "extra_where": "",
+    "order_by": " ORDER BY id DESC"
+  },
+  {
+    "mapKey": "pricelists",
+    "resource_key": "pricelists",
+    "table": "product_pricelist",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "pricelist-items",
+    "resource_key": "pricelist-items",
+    "table": "product_pricelist_item",
+    "extra_where": "",
+    "order_by": " ORDER BY pricelist_id ASC, sequence ASC"
+  },
+  {
+    "mapKey": "picking-batches",
+    "resource_key": "picking-batches",
+    "table": "stock_picking_batch",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "leads",
+    "resource_key": "leads",
+    "table": "lead",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "opportunities",
+    "resource_key": "opportunities",
+    "table": "opportunity",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "opportunity-stages",
+    "resource_key": "opportunity-stages",
+    "table": "opp_stage",
+    "extra_where": "",
+    "order_by": " ORDER BY sequence ASC"
+  },
+  {
+    "mapKey": "contacts",
+    "resource_key": "contacts",
+    "table": "contact",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "projects",
+    "resource_key": "projects",
+    "table": "project_project",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "tasks",
+    "resource_key": "tasks",
+    "table": "project_task",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "timesheets",
+    "resource_key": "timesheets",
+    "table": "project_timesheet",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "products",
+    "resource_key": "products",
+    "table": "product",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "product-categories",
+    "resource_key": "product-categories",
+    "table": "product_category",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "uoms",
+    "resource_key": "uoms",
+    "table": "uom",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "stock-quants",
+    "resource_key": "stock-quants",
+    "table": "stock_quant",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "stock-pickings",
+    "resource_key": "stock-pickings",
+    "table": "stock_picking",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "warehouses",
+    "resource_key": "warehouses",
+    "table": "warehouse",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "inventory-adjustments",
+    "resource_key": "inventory-adjustments",
+    "table": "inventory_adjustment",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "purchase-orders",
+    "resource_key": "purchase-orders",
+    "table": "purchase_order",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "purchase-order-lines",
+    "resource_key": "purchase-order-lines",
+    "table": "purchase_order_line",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "partner-banks",
+    "resource_key": "partner-banks",
+    "table": "res_partner_bank",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "purchase-requisitions",
+    "resource_key": "purchase-requisitions",
+    "table": "purchase_requisition",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "mrp-productions",
+    "resource_key": "mrp-productions",
+    "table": "mrp_production",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "mrp-boms",
+    "resource_key": "mrp-boms",
+    "table": "mrp_bom",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "mrp-workorders",
+    "resource_key": "mrp-workorders",
+    "table": "mrp_workorder",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "mrp-workcenters",
+    "resource_key": "mrp-workcenters",
+    "table": "mrp_workcenter",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "mrp-routing-workcenters",
+    "resource_key": "mrp-routing-workcenters",
+    "table": "mrp_routing_workcenter",
+    "extra_where": "",
+    "order_by": " ORDER BY workcenter_id ASC, sequence ASC"
+  },
+  {
+    "mapKey": "employees",
+    "resource_key": "employees",
+    "table": "hr_employee",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "departments",
+    "resource_key": "departments",
+    "table": "hr_department",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "leave-requests",
+    "resource_key": "leave-requests",
+    "table": "hr_leave",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "contracts",
+    "resource_key": "contracts",
+    "table": "hr_contract",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "payslips",
+    "resource_key": "payslips",
+    "table": "hr_payslip",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "financial-reports",
+    "resource_key": "financial-reports",
+    "table": "financial_report",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "trial-balances",
+    "resource_key": "trial-balances",
+    "table": "trial_balance",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "report-templates",
+    "resource_key": "report-templates",
+    "table": "report_template",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "scheduled-reports",
+    "resource_key": "scheduled-reports",
+    "table": "scheduled_report",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "analytics-metrics",
+    "resource_key": "analytics-metrics",
+    "table": "analytics_metric",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "documents",
+    "resource_key": "documents",
+    "table": "document",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "knowledge-articles",
+    "resource_key": "knowledge-articles",
+    "table": "knowledge_article",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "helpdesk-tickets",
+    "resource_key": "helpdesk-tickets",
+    "table": "helpdesk_ticket",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "helpdesk-teams",
+    "resource_key": "helpdesk-teams",
+    "table": "helpdesk_team",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "helpdesk-stages",
+    "resource_key": "helpdesk-stages",
+    "table": "helpdesk_stage",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "helpdesk-slas",
+    "resource_key": "helpdesk-slas",
+    "table": "helpdesk_sla",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "subscriptions",
+    "resource_key": "subscriptions",
+    "table": "subscription",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "subscription-plans",
+    "resource_key": "subscription-plans",
+    "table": "subscription_plan",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "deferred-revenue-schedules",
+    "resource_key": "deferred-revenue-schedules",
+    "table": "deferred_revenue_schedule",
+    "extra_where": "",
+    "order_by": " ORDER BY id DESC"
+  },
+  {
+    "mapKey": "deferred-revenue-lines",
+    "resource_key": "deferred-revenue-lines",
+    "table": "deferred_revenue_line",
+    "extra_where": "",
+    "order_by": " ORDER BY schedule_id ASC, sequence ASC"
+  },
+  {
+    "mapKey": "revenue-recognition-rules",
+    "resource_key": "revenue-recognition-rules",
+    "table": "revenue_recognition_rule",
+    "extra_where": "",
+    "order_by": " ORDER BY priority DESC, id DESC"
+  },
+  {
+    "mapKey": "workflows",
+    "resource_key": "workflows",
+    "table": "workflow",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "workflow-activities",
+    "resource_key": "workflow-activities",
+    "table": "workflow_activity",
+    "extra_where": "",
+    "order_by": " ORDER BY workflow_id ASC, sequence ASC"
+  },
+  {
+    "mapKey": "workflow-instances",
+    "resource_key": "workflow-instances",
+    "table": "workflow_instance",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "workflow-transitions",
+    "resource_key": "workflow-transitions",
+    "table": "workflow_transition",
+    "extra_where": "",
+    "order_by": " ORDER BY id ASC"
+  },
+  {
+    "mapKey": "workflow-workitems",
+    "resource_key": "workflow-workitems",
+    "table": "workflow_workitem",
+    "extra_where": "",
+    "order_by": " ORDER BY instance_id ASC, id ASC"
+  },
+  {
+    "mapKey": "proposals",
+    "resource_key": "proposals",
+    "table": "proposal",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "calendar-events",
+    "resource_key": "calendar-events",
+    "table": "calendar_event",
+    "extra_where": "",
+    "order_by": " ORDER BY start ASC"
+  },
+  {
+    "mapKey": "mail-messages",
+    "resource_key": "mail-messages",
+    "table": "mail_message",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "expenses",
+    "resource_key": "expenses",
+    "table": "hr_expense",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "expense-sheets",
+    "resource_key": "expense-sheets",
+    "table": "expense_sheet",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-devices",
+    "resource_key": "iot-devices",
+    "table": "iot_device",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-hubs",
+    "resource_key": "iot-hubs",
+    "table": "iot_hub",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-alerts",
+    "resource_key": "iot-alerts",
+    "table": "iot_alert",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-actions",
+    "resource_key": "iot-actions",
+    "table": "iot_action",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-telemetry",
+    "resource_key": "iot-telemetry",
+    "table": "iot_telemetry",
+    "extra_where": "",
+    "order_by": " ORDER BY recorded_at DESC"
+  },
+  {
+    "mapKey": "iot-thresholds",
+    "resource_key": "iot-thresholds",
+    "table": "iot_threshold",
+    "extra_where": "",
+    "order_by": ""
+  },
+  {
+    "mapKey": "iot-pairing-tokens",
+    "resource_key": "iot-pairing-tokens",
+    "table": "iot_pairing_token",
+    "extra_where": "",
+    "order_by": " ORDER BY created_at DESC"
+  }
+]

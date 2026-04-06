@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useStdbConnection } from "@lumiere/stdb"
+import { useErpSession } from "@lumiere/erp-session"
 import { FormModal, mergeFieldDefaultValues } from "@lumiere/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,8 +21,9 @@ import {
   useRecordAiSpend,
   useSetAiAgentActive,
   useUpdateAiAgent,
-} from "@/hooks/ai-agents"
+} from "@lumiere/query-hooks/hooks/ai-agents"
 import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
+import { apiFetch } from "@/lib/api-fetch"
 import {
   Dialog,
   DialogContent,
@@ -142,7 +143,7 @@ function insightSeverityJson(tag: string): Record<string, unknown> {
 }
 
 async function fetchQuery(resource: string): Promise<Row[]> {
-  const r = await fetch(`/api/query/${resource}`)
+  const r = await apiFetch(`/api/query/${resource}`)
   if (!r.ok) {
     const j = (await r.json().catch(() => ({}))) as { error?: string }
     throw new Error(j.error ?? `Query ${resource} failed`)
@@ -154,7 +155,7 @@ async function fetchQuery(resource: string): Promise<Row[]> {
 export function AiSettings() {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const { organizationId } = useStdbConnection()
+  const { organizationId } = useErpSession()
 
   const orgReady = organizationId != null && organizationId > 0
   const orgId = organizationId ?? 0

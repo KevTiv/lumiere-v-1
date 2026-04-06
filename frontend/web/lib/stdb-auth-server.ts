@@ -233,13 +233,9 @@ export async function findCredentialByEmail(email: string): Promise<StdbCredenti
   return rows[0] ?? null
 }
 
-/** Case-insensitive email match (e.g. WorkOS vs stored signup casing). */
+/** Case-insensitive at the app layer; SpacetimeDB SQL does not support `LOWER()`. */
 export async function findCredentialByEmailCaseInsensitive(email: string): Promise<StdbCredential | null> {
-  const safeEmail = email.replace(/'/g, "''")
-  const rows = await queryStdb<StdbCredential>(
-    `${CREDENTIAL_SELECT} WHERE LOWER(email) = LOWER('${safeEmail}')`
-  )
-  return rows[0] ?? null
+  return findCredentialByEmail(email.trim().toLowerCase())
 }
 
 /** Look up a user credential by identity hex. Returns null if not found. */

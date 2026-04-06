@@ -8,17 +8,19 @@ import type {
   CreateRevenueRecognitionRuleParams,
   GenerateSubscriptionInvoiceParams,
   RecognizeDeferredRevenueParams,
-} from '@lumiere/stdb'
-import { Timestamp } from 'spacetimedb'
+} from '@lumiere/stdb/generated/types'
+import type { Timestamp } from "spacetimedb"
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
 function timestampFromInput(v: unknown, fallback = new Date()): Timestamp {
   if (v != null && String(v).trim() !== '') {
     const d = new Date(String(v))
-    if (!Number.isNaN(d.getTime())) return Timestamp.fromDate(d)
+    if (!Number.isNaN(d.getTime())) return stbTimestampFromDate(d)
   }
-  return Timestamp.fromDate(fallback)
+  return stbTimestampFromDate(fallback)
 }
 
 function parseU64List(v: unknown): bigint[] {

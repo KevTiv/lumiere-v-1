@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { SectionStatus } from "@/lib/proposal-workspace-types"
 import { SECTION_TEMPLATES } from "@/lib/proposal-workspace-types"
-import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb"
+import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb/proposal-row-types"
+import { rowBigint, rowNumber, rowString } from "./row-field-utils"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Section = Record<string, any>
+type Section = Record<string, unknown>
 
 const STATUS_BADGE_VARIANT: Record<SectionStatus, "secondary" | "outline" | "default" | "destructive"> = {
   empty: "outline",
@@ -126,8 +126,15 @@ export function SectionSidebar({
           </li>
         )}
         {sections.map((section) => {
-          const sectionId: bigint = section.id
-          const status: SectionStatus = (section.status as string)?.toLowerCase() as SectionStatus ?? "empty"
+          const sectionId = rowBigint(section.id)
+          const statusRaw = rowString(section.status).toLowerCase()
+          const status: SectionStatus =
+            statusRaw === "empty" ||
+            statusRaw === "draft" ||
+            statusRaw === "complete" ||
+            statusRaw === "reviewed"
+              ? (statusRaw as SectionStatus)
+              : "empty"
           const badgeVariant = STATUS_BADGE_VARIANT[status] ?? STATUS_BADGE_VARIANT.empty
           const badgeLabel = getStatusLabel(status)
           const presenceRows = presenceBySection.get(String(sectionId)) ?? []
@@ -146,14 +153,14 @@ export function SectionSidebar({
               >
                 <div className="flex items-start justify-between gap-1">
                   <span className="truncate font-medium leading-tight flex-1">
-                    {section.title || t("proposalWorkspace.sectionSidebar.untitled")}
+                    {rowString(section.title) || t("proposalWorkspace.sectionSidebar.untitled")}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
                     {/* Presence avatars */}
                     {presenceRows.slice(0, 2).map((p) => (
                       <div
                         key={String(p.userId)}
-                        title={p.userName}
+                        title={rowString(p.userName)}
                         className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0"
                         style={{ backgroundColor: avatarColor(String(p.userId)) }}
                       >
@@ -172,8 +179,8 @@ export function SectionSidebar({
                   <Badge variant={badgeVariant} className="text-[10px] px-1 py-0 h-4">
                     {badgeLabel}
                   </Badge>
-                  {section.wordCount > 0 && (
-                    <span className="text-[10px] text-muted-foreground">{section.wordCount}w</span>
+                  {rowNumber(section.wordCount) > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{rowNumber(section.wordCount)}w</span>
                   )}
                 </div>
               </button>
@@ -198,10 +205,10 @@ export function SectionSidebar({
           <div className="px-2 pb-2 space-y-1">
             {sourceDocs.map((doc) => (
               <div key={String(doc.id)} className="flex items-center gap-1.5 group">
-                <span className="flex-1 text-xs truncate text-muted-foreground">{doc.name}</span>
-                <span className="text-[10px] text-muted-foreground">{doc.wordCount}w</span>
+                <span className="flex-1 text-xs truncate text-muted-foreground">{rowString(doc.name)}</span>
+                <span className="text-[10px] text-muted-foreground">{rowNumber(doc.wordCount)}w</span>
                 <button
-                  onClick={() => onDeleteSourceDoc(doc.id)}
+                  onClick={() => onDeleteSourceDoc(rowBigint(doc.id))}
                   className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-destructive transition-all"
                 >
                   <Trash2 className="h-3 w-3" />

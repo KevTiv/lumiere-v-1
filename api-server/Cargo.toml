@@ -1,0 +1,38 @@
+[package]
+name = "api-server"
+version.workspace = true
+edition.workspace = true
+description = "Axum API replacing Next.js /api routes (Phase 0–1)"
+
+[lib]
+name = "api_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "api-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+aes-gcm.workspace = true
+axum.workspace = true
+bcrypt.workspace = true
+reqwest.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+cookie = "0.18"
+base64.workspace = true
+dotenvy.workspace = true
+hex.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+stdb-auth.workspace = true
+stdb-client.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower-cookies = "0.10"
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+urlencoding = "2"

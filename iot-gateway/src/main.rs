@@ -222,6 +222,23 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
 
 // ── Action dispatcher ─────────────────────────────────────────────────────────
 
+/// Read numeric id from a SQL row object (SATS HTTP client uses camelCase keys).
+fn json_u64_row(obj: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
+    obj.get(camel)
+        .and_then(|v| v.as_u64())
+        .or_else(|| obj.get(snake).and_then(|v| v.as_u64()))
+        .or_else(|| {
+            obj.get(camel)
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+        })
+        .or_else(|| {
+            obj.get(snake)
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+        })
+}
+
 /// Poll SpacetimeDB for pending IoTAction rows and deliver them to their hubs.
 ///
 /// Delivery strategy (WS-first, MQTT fallback):
@@ -255,20 +272,20 @@ async fn dispatch_pending_actions(state: &AppState) {
     tracing::info!("Dispatching {} pending IoT actions", pending.len());
 
     for action in pending {
-        let Some(action_id) = action["id"].as_u64() else {
+        let Some(action_id) = json_u64_row(action, "id", "id") else {
             continue;
         };
-        let Some(device_id) = action["device_id"].as_u64() else {
+        let Some(device_id) = json_u64_row(action, "deviceId", "device_id") else {
             continue;
         };
-        let Some(org_id) = action["organization_id"].as_u64() else {
+        let Some(org_id) = json_u64_row(action, "organizationId", "organization_id") else {
             continue;
         };
 
         // Determine whether this action's hub is connected via WebSocket.
         // IoTAction rows are expected to carry a `hub_id` column that
         // identifies which hub manages the device.
-        let hub_id_opt = action["hub_id"].as_u64();
+        let hub_id_opt = json_u64_row(action, "hubId", "hub_id");
 
         let delivered_via_ws = if let Some(hub_id) = hub_id_opt {
             try_deliver_via_ws(state, hub_id, action_id, action)

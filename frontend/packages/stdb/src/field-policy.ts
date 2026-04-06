@@ -45,6 +45,9 @@ import type {
   DeferredRevenueSchedule,
   Document,
   FleetVehicle,
+  FormConfig,
+  FormConfigField,
+  FormRoleConfig,
   FinancialReport,
   HelpdeskSla,
   HelpdeskStage,
@@ -74,6 +77,7 @@ import type {
   InventoryAdjustment,
   KnowledgeArticle,
   Lead,
+  MailFollower,
   MailMessage,
   MrpBom,
   MrpBomLine,
@@ -119,6 +123,9 @@ import type {
   TaxSchedule,
   TrialBalance,
   Uom,
+  UtmCampaign,
+  UtmMedium,
+  UtmSource,
   AccountPayment,
   AccountPaymentTerm,
   AccountPaymentTermLine,
@@ -147,6 +154,7 @@ import type {
   StockRule,
   StockTraceabilityReport,
   SupplierIntakeRequest,
+  UserCustomField,
   UserOrganization,
   UserProfile,
   UserRoleAssignment,
@@ -304,6 +312,14 @@ export type QueryResourceKey =
   | 'mail-messages'
   | 'expenses'
   | 'expense-sheets'
+  | 'form-configs'
+  | 'form-config-fields'
+  | 'form-role-configs'
+  | 'user-custom-fields'
+  | 'mail-followers'
+  | 'utm-campaigns'
+  | 'utm-media'
+  | 'utm-sources'
   | 'fleet-vehicles'
   | 'pos-terminals'
   | 'roles'
@@ -960,6 +976,58 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'mail-messages': orgEntry<MailMessage>('mail_message', ['mail-messages', 'mail_message'], [
     'model', 'body', 'date', 'resId',
   ]),
+  'mail-followers': orgEntry<MailFollower>('mail_follower', ['mail-followers', 'mail_follower'], [
+    'resModel', 'resId', 'subtypes',
+  ]),
+  'form-configs': orgEntry<FormConfig>('form_config', ['form-configs', 'form_config'], [
+    'moduleId',
+    'formId',
+    'name',
+    'description',
+    'isActive',
+    'isSystemDefault',
+  ]),
+  'form-config-fields': entry<FormConfigField>(
+    'form_config_field',
+    ['form-config-fields', 'form_config_field'],
+    [
+      'fieldId',
+      'name',
+      'label',
+      'fieldType',
+      'order',
+      'isEnabled',
+      'sectionId',
+      'description',
+      'placeholder',
+      'defaultValue',
+      'optionsJson',
+      'validationJson',
+      'aiSuggestionsJson',
+      'isSystem',
+      'category',
+      'showInList',
+      'width',
+    ],
+    ['id', 'configurationId'],
+  ),
+  'form-role-configs': entry<FormRoleConfig>(
+    'form_role_config',
+    ['form-role-configs', 'form_role_config'],
+    ['roleId', 'enabledFieldsJson', 'requiredFieldsJson', 'defaultPromptsJson', 'isActive'],
+    ['id', 'configurationId'],
+  ),
+  'user-custom-fields': orgEntry<UserCustomField>(
+    'user_custom_field',
+    ['user-custom-fields', 'user_custom_field'],
+    ['configurationId', 'fieldId', 'fieldDataJson', 'userId'],
+  ),
+  'utm-campaigns': orgEntry<UtmCampaign>('utm_campaign', ['utm-campaigns', 'utm_campaign'], [
+    'name',
+    'isActive',
+  ]),
+  'utm-media': orgEntry<UtmMedium>('utm_medium', ['utm-media', 'utm_medium'], ['name', 'isActive']),
+  'utm-sources': orgEntry<UtmSource>('utm_source', ['utm-sources', 'utm_source'], ['name', 'isActive']),
   expenses: orgEntry<HrExpense>('hr_expense', ['expenses', 'hr_expense'], [
     'name', 'employeeId', 'state', 'companyId',
   ]),
@@ -1250,8 +1318,20 @@ export function resolveReadColumns(
 }
 
 /**
+ * Columns to exclude from HTTP SQL queries for specific resources.
+ * Identity columns (user_id, assigned_to, created_by) cause "Unsupported" errors in SpacetimeDB HTTP SQL.
+ */
+const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
+  // Activity table has Identity columns that cannot be queried via HTTP SQL
+  activities: new Set(['user_id', 'assigned_to', 'created_by']),
+  // Role.permissions is Vec<String>; HTTP SQL often rejects list-typed columns (parity with stdb-auth).
+  roles: new Set(['permissions']),
+}
+
+/**
  * Column list for SpacetimeDB HTTP SQL — never `*`. Uses Casbin/role restrictions when set;
  * otherwise all columns for the row type (from generated schema JSON).
+ * Automatically filters out problematic columns (e.g., Identity columns) for specific resources.
  */
 export function resolveHttpSqlColumns(
   resourceKey: QueryResourceKey,
@@ -1263,7 +1343,13 @@ export function resolveHttpSqlColumns(
   const fromSchema = rowType
     ? (stdbGeneratedSqlColumns as Record<string, string[]>)[rowType]
     : undefined
-  if (fromSchema?.length) return assertSafeSqlIdentifiers(fromSchema)
+  if (fromSchema?.length) {
+    const excluded = HTTP_SQL_EXCLUDED_COLUMNS[resourceKey]
+    if (excluded) {
+      return assertSafeSqlIdentifiers(fromSchema.filter(col => !excluded.has(col)))
+    }
+    return assertSafeSqlIdentifiers(fromSchema)
+  }
   const reg = RESOURCE_REGISTRY[resourceKey]
   return assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
 }
@@ -1322,8 +1408,13 @@ export function selectRolesActiveSql(fieldAccess: FieldAccessContext | undefined
   return `SELECT ${colPart} FROM role WHERE is_active = true`
 }
 
-function sqlQuoteIdentityHex(s: string): string {
-  return s.replace(/'/g, "''")
+/** SpacetimeDB HTTP SQL: Identity columns use `0x` + 64 hex, not quoted UUIDs. */
+function identitySqlLiteral(hex64: string): string {
+  const s = hex64.trim().replace(/^0x/i, '')
+  if (s.length !== 64 || !/^[0-9a-fA-F]+$/.test(s)) {
+    throw new Error(`invalid SpacetimeDB identity hex (expected 64 hex digits, got len ${s.length})`)
+  }
+  return `0x${s.toLowerCase()}`
 }
 
 export function selectUserProfileByIdentitySql(
@@ -1332,8 +1423,8 @@ export function selectUserProfileByIdentitySql(
 ): string {
   const cols = resolveHttpSqlColumns('user-profile', fieldAccess)
   const colPart = cols.join(', ')
-  const id = sqlQuoteIdentityHex(identityHex)
-  return `SELECT ${colPart} FROM user_profile WHERE identity = '${id}' LIMIT 1`
+  const id = identitySqlLiteral(identityHex)
+  return `SELECT ${colPart} FROM user_profile WHERE identity = ${id} LIMIT 1`
 }
 
 export function selectUserRoleAssignmentsForIdentitySql(
@@ -1342,8 +1433,8 @@ export function selectUserRoleAssignmentsForIdentitySql(
 ): string {
   const cols = resolveHttpSqlColumns('user-roles', fieldAccess)
   const colPart = cols.join(', ')
-  const id = sqlQuoteIdentityHex(identityHex)
-  return `SELECT ${colPart} FROM user_role_assignment WHERE user_identity = '${id}' AND is_active = true`
+  const id = identitySqlLiteral(identityHex)
+  return `SELECT ${colPart} FROM user_role_assignment WHERE user_identity = ${id} AND is_active = true`
 }
 
 export function selectUserOrganizationForIdentitySql(
@@ -1352,8 +1443,8 @@ export function selectUserOrganizationForIdentitySql(
 ): string {
   const cols = resolveHttpSqlColumns('user-organization', fieldAccess)
   const colPart = cols.join(', ')
-  const id = sqlQuoteIdentityHex(identityHex)
-  return `SELECT ${colPart} FROM user_organization WHERE user_identity = '${id}' AND is_active = true`
+  const id = identitySqlLiteral(identityHex)
+  return `SELECT ${colPart} FROM user_organization WHERE user_identity = ${id} AND is_active = true`
 }
 
 export function selectCasbinRulesInSubjectsSql(

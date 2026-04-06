@@ -8,8 +8,8 @@ use crate::{
     kaggle::{DownloadJobStatus, KaggleCacheEntry},
     qdrant_client::VectorStore,
     rig_agent::RigContext,
-    stdb_client::StdbClient,
 };
+use stdb_client::StdbClient;
 
 /// Shared application state injected into every Axum handler via Extension.
 #[derive(Clone)]

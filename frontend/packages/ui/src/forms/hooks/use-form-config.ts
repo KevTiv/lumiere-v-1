@@ -3,16 +3,18 @@
 //! React hooks for accessing and managing form configurations from SpacetimeDB.
 
 import { useEffect, useMemo, useReducer, useState } from "react"
+import { useErpSession } from "@lumiere/erp-session"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   addUserCustomField,
   deleteUserCustomField,
   getFormConfiguration,
   getOrganizationFormConfigs,
-  getStdbConnection,
-  useStdbConnection,
-  type FieldType as StdbFieldType,
-  type FieldWidth as StdbFieldWidth,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/client-ui-bridge"
+import type {
+  FieldType as StdbFieldType,
+  FieldWidth as StdbFieldWidth,
+} from "@lumiere/stdb/generated/types"
 import type {
   FormConfig,
   FormConfigField,
@@ -108,12 +110,25 @@ function enumTag(v: unknown): string {
   return String(v)
 }
 
-function ts(t: { toDate?: () => Date } | undefined): string {
-  try {
-    return t?.toDate?.()?.toISOString() ?? ""
-  } catch {
-    return ""
+function ts(t: unknown): string {
+  if (typeof t === "string" && t.length > 0) return t
+  if (t !== null && typeof t === "object" && "toDate" in t) {
+    const td = (t as { toDate?: () => Date }).toDate
+    if (typeof td === "function") {
+      try {
+        return td.call(t)?.toISOString() ?? ""
+      } catch {
+        return ""
+      }
+    }
   }
+  return ""
+}
+
+function n64(v: unknown): bigint {
+  if (typeof v === "bigint") return v
+  if (typeof v === "number") return BigInt(Math.trunc(v))
+  return BigInt(String(v ?? 0))
 }
 
 function mapStdbFormConfigRow(row: {
@@ -125,11 +140,13 @@ function mapStdbFormConfigRow(row: {
   description: string
   isActive: boolean
   isSystemDefault: boolean
-  createdAt: { toDate?: () => Date }
-  updatedAt: { toDate?: () => Date }
-  createdBy: { toHexString?: () => string }
-  updatedBy: { toHexString?: () => string }
+  createdAt: unknown
+  updatedAt: unknown
+  createdBy?: { toHexString?: () => string } | string
+  updatedBy?: { toHexString?: () => string } | string
 }): FormConfig {
+  const hex = (v: { toHexString?: () => string } | string | undefined) =>
+    typeof v === "string" ? v : v?.toHexString?.() ?? ""
   return {
     id: Number(row.id),
     organizationId: Number(row.organizationId),
@@ -141,8 +158,8 @@ function mapStdbFormConfigRow(row: {
     isSystemDefault: row.isSystemDefault,
     createdAt: ts(row.createdAt),
     updatedAt: ts(row.updatedAt),
-    createdBy: row.createdBy?.toHexString?.() ?? "",
-    updatedBy: row.updatedBy?.toHexString?.() ?? "",
+    createdBy: hex(row.createdBy),
+    updatedBy: hex(row.updatedBy),
   }
 }
 
@@ -166,8 +183,8 @@ function mapStdbFormConfigFieldRow(row: {
   showInList: boolean
   width: unknown
   sectionId: string
-  createdAt: { toDate?: () => Date }
-  updatedAt: { toDate?: () => Date }
+  createdAt: unknown
+  updatedAt: unknown
 }): FormConfigField {
   return {
     id: Number(row.id),
@@ -202,8 +219,8 @@ function mapStdbFormRoleConfigRow(row: {
   requiredFieldsJson: string
   defaultPromptsJson: string
   isActive: boolean
-  createdAt: { toDate?: () => Date }
-  updatedAt: { toDate?: () => Date }
+  createdAt: unknown
+  updatedAt: unknown
 }): FormRoleConfig {
   return {
     id: Number(row.id),
@@ -221,17 +238,20 @@ function mapStdbFormRoleConfigRow(row: {
 function mapStdbUserCustomFieldRow(row: {
   id: bigint
   organizationId: bigint
-  userId: { toHexString?: () => string }
+  userId: { toHexString?: () => string } | string
   configurationId: bigint
   fieldId: string
   fieldDataJson: string
-  createdAt: { toDate?: () => Date }
-  updatedAt: { toDate?: () => Date }
+  createdAt: unknown
+  updatedAt: unknown
 }): UserCustomField {
+  const uid = row.userId
+  const userIdStr =
+    typeof uid === "string" ? uid.toLowerCase() : uid?.toHexString?.().toLowerCase() ?? ""
   return {
     id: Number(row.id),
     organizationId: Number(row.organizationId),
-    userId: row.userId?.toHexString?.() ?? "",
+    userId: userIdStr,
     configurationId: Number(row.configurationId),
     fieldId: row.fieldId,
     fieldDataJson: row.fieldDataJson,
@@ -277,7 +297,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     useDefaultIfMissing = true,
     forAdminSettings = false,
   } = options
-  const { identity } = useStdbConnection()
+  const { identity } = useErpSession()
   const [state, dispatch] = useReducer(formConfigReducer, initialState)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -365,77 +385,137 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
       return
     }
 
-    const conn = getStdbConnection()
-    if (!conn) {
-      if (useDefaultIfMissing) loadDefaultConfig()
-      else dispatch({ type: "SET_ERROR", payload: "Not connected to SpacetimeDB" })
-      return
-    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [configRows, fieldRows, roleRows, allCustomRows] = await Promise.all([
+          stdbBrowserQuery("form-configs"),
+          stdbBrowserQuery("form-config-fields"),
+          stdbBrowserQuery("form-role-configs"),
+          stdbBrowserQuery("user-custom-fields"),
+        ])
+        if (cancelled) return
 
-    const db = conn
+        const configs = configRows.filter(
+          c =>
+            Number(c.organizationId) === organizationId &&
+            c.moduleId === moduleId &&
+            c.formId === formId &&
+            c.isActive === true,
+        )
 
-    function syncFromDb() {
-      const configs = [...db.db.form_config.iter()].filter(
-        c =>
-          Number(c.organizationId) === organizationId &&
-          c.moduleId === moduleId &&
-          c.formId === formId &&
-          c.isActive,
-      )
+        if (configs.length === 0) {
+          if (useDefaultIfMissing) loadDefaultConfig()
+          else dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
+          return
+        }
 
-      if (configs.length === 0) {
+        const cfg = configs[0] as Record<string, unknown>
+        const configurationId = Number(cfg.id)
+
+        const fields = fieldRows
+          .filter(f => Number(f.configurationId) === configurationId)
+          .map(f =>
+            mapStdbFormConfigFieldRow({
+              id: n64(f.id),
+              configurationId: n64(f.configurationId),
+              fieldId: String(f.fieldId ?? ""),
+              name: String(f.name ?? ""),
+              label: String(f.label ?? ""),
+              fieldType: f.fieldType,
+              description: String(f.description ?? ""),
+              placeholder: String(f.placeholder ?? ""),
+              defaultValue: String(f.defaultValue ?? ""),
+              optionsJson: String(f.optionsJson ?? ""),
+              validationJson: String(f.validationJson ?? ""),
+              aiSuggestionsJson: String(f.aiSuggestionsJson ?? ""),
+              order: Number(f.order ?? 0),
+              isSystem: Boolean(f.isSystem),
+              isEnabled: Boolean(f.isEnabled),
+              category: String(f.category ?? ""),
+              showInList: Boolean(f.showInList),
+              width: f.width,
+              sectionId: String(f.sectionId ?? ""),
+              createdAt: f.createdAt,
+              updatedAt: f.updatedAt,
+            }),
+          )
+
+        const roleConfigs = roleRows
+          .filter(r => Number(r.configurationId) === configurationId)
+          .map(r =>
+            mapStdbFormRoleConfigRow({
+              id: n64(r.id),
+              configurationId: n64(r.configurationId),
+              roleId: String(r.roleId ?? ""),
+              enabledFieldsJson: String(r.enabledFieldsJson ?? ""),
+              requiredFieldsJson: String(r.requiredFieldsJson ?? ""),
+              defaultPromptsJson: String(r.defaultPromptsJson ?? ""),
+              isActive: Boolean(r.isActive),
+              createdAt: r.createdAt,
+              updatedAt: r.updatedAt,
+            }),
+          )
+
+        const effectiveUser = (userId ?? identity ?? "").toLowerCase()
+        const customFields = allCustomRows
+          .filter(
+            cf =>
+              Number(cf.organizationId) === organizationId &&
+              Number(cf.configurationId) === configurationId &&
+              (!effectiveUser ||
+                String(cf.userId ?? "")
+                  .toLowerCase()
+                  .replace(/^0x/, "") === effectiveUser.replace(/^0x/, "")),
+          )
+          .map(cf =>
+            mapStdbUserCustomFieldRow({
+              id: n64(cf.id),
+              organizationId: n64(cf.organizationId),
+              userId: cf.userId as string,
+              configurationId: n64(cf.configurationId),
+              fieldId: String(cf.fieldId ?? ""),
+              fieldDataJson: String(cf.fieldDataJson ?? ""),
+              createdAt: cf.createdAt,
+              updatedAt: cf.updatedAt,
+            }),
+          )
+
+        dispatch({
+          type: "SET_DATA",
+          payload: {
+            config: mapStdbFormConfigRow({
+              id: n64(cfg.id),
+              organizationId: n64(cfg.organizationId),
+              moduleId: String(cfg.moduleId ?? ""),
+              formId: String(cfg.formId ?? ""),
+              name: String(cfg.name ?? ""),
+              description: String(cfg.description ?? ""),
+              isActive: Boolean(cfg.isActive),
+              isSystemDefault: Boolean(cfg.isSystemDefault),
+              createdAt: cfg.createdAt,
+              updatedAt: cfg.updatedAt,
+              createdBy: cfg.createdBy as string | { toHexString?: () => string } | undefined,
+              updatedBy: cfg.updatedBy as string | { toHexString?: () => string } | undefined,
+            }),
+            fields,
+            roleConfigs,
+            customFields,
+          },
+        })
+
+        void getFormConfiguration(BigInt(organizationId), moduleId, formId).catch(() => {
+          /* no-op: legacy reducer; HTTP load is source of truth */
+        })
+      } catch {
+        if (cancelled) return
         if (useDefaultIfMissing) loadDefaultConfig()
-        else dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
-        return
+        else dispatch({ type: "SET_ERROR", payload: "Failed to load form configuration" })
       }
+    })()
 
-      const cfg = configs[0]
-      const configurationId = Number(cfg.id)
-
-      const fields = [...db.db.form_config_field.iter()]
-        .filter(f => Number(f.configurationId) === configurationId)
-        .map(mapStdbFormConfigFieldRow)
-
-      const roleConfigs = [...db.db.form_role_config.iter()]
-        .filter(r => Number(r.configurationId) === configurationId)
-        .map(mapStdbFormRoleConfigRow)
-
-      const effectiveUser = userId ?? identity ?? ""
-      const customRows = [...db.db.user_custom_field.iter()].filter(
-        cf =>
-          Number(cf.organizationId) === organizationId &&
-          Number(cf.configurationId) === configurationId &&
-          (!effectiveUser || cf.userId?.toHexString?.() === effectiveUser),
-      )
-      const customFields = customRows.map(mapStdbUserCustomFieldRow)
-
-      dispatch({
-        type: "SET_DATA",
-        payload: {
-          config: mapStdbFormConfigRow(cfg),
-          fields,
-          roleConfigs,
-          customFields,
-        },
-      })
-
-      void getFormConfiguration(BigInt(organizationId), moduleId, formId).catch(() => {
-        /* reducer may fail if row removed concurrently; table subscription is source of truth */
-      })
-    }
-
-    syncFromDb()
-
-    const tables = [
-      db.db.form_config,
-      db.db.form_config_field,
-      db.db.form_role_config,
-      db.db.user_custom_field,
-    ] as const
-    for (const t of tables) {
-      t.onInsert(() => syncFromDb())
-      t.onUpdate(() => syncFromDb())
-      t.onDelete(() => syncFromDb())
+    return () => {
+      cancelled = true
     }
   }, [
     moduleId,
@@ -521,7 +601,6 @@ export function useOrganizationFormConfigs(organizationId: number): {
 } {
   const [configs, setConfigs] = useReducer(listReducer<FormConfig>, [])
   const [isLoading, setIsLoading] = useState(true)
-  const { connected } = useStdbConnection()
 
   useEffect(() => {
     if (!organizationId) {
@@ -530,27 +609,43 @@ export function useOrganizationFormConfigs(organizationId: number): {
       return
     }
 
-    const conn = getStdbConnection()
-    if (!conn) {
-      setConfigs([])
-      setIsLoading(false)
-      return
+    let cancelled = false
+    ;(async () => {
+      setIsLoading(true)
+      try {
+        const rows = await stdbBrowserQuery("form-configs")
+        if (cancelled) return
+        const filtered = rows.filter(c => Number(c.organizationId) === organizationId)
+        setConfigs(
+          filtered.map(c =>
+            mapStdbFormConfigRow({
+              id: n64(c.id),
+              organizationId: n64(c.organizationId),
+              moduleId: String(c.moduleId ?? ""),
+              formId: String(c.formId ?? ""),
+              name: String(c.name ?? ""),
+              description: String(c.description ?? ""),
+              isActive: Boolean(c.isActive),
+              isSystemDefault: Boolean(c.isSystemDefault),
+              createdAt: c.createdAt,
+              updatedAt: c.updatedAt,
+              createdBy: c.createdBy as string | { toHexString?: () => string } | undefined,
+              updatedBy: c.updatedBy as string | { toHexString?: () => string } | undefined,
+            }),
+          ),
+        )
+        void getOrganizationFormConfigs(BigInt(organizationId)).catch(() => {})
+      } catch {
+        if (!cancelled) setConfigs([])
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
-
-    const db = conn
-
-    function load() {
-      const rows = [...db.db.form_config.iter()].filter(c => Number(c.organizationId) === organizationId)
-      setConfigs(rows.map(mapStdbFormConfigRow))
-      setIsLoading(false)
-      void getOrganizationFormConfigs(BigInt(organizationId)).catch(() => {})
-    }
-
-    load()
-    db.db.form_config.onInsert(() => load())
-    db.db.form_config.onUpdate(() => load())
-    db.db.form_config.onDelete(() => load())
-  }, [organizationId, connected])
+  }, [organizationId])
 
   return { configs, isLoading }
 }
@@ -591,7 +686,8 @@ export function useUserCustomFields(
 } {
   const [customFields, setCustomFields] = useReducer(listReducer<ParsedFormField>, [])
   const [isLoading, setIsLoading] = useState(true)
-  const { organizationId: sessionOrgId, identity, connected } = useStdbConnection()
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const { organizationId: sessionOrgId, identity } = useErpSession()
 
   useEffect(() => {
     if (!sessionOrgId || !configurationId) {
@@ -600,60 +696,75 @@ export function useUserCustomFields(
       return
     }
 
-    const conn = getStdbConnection()
-    if (!conn) {
-      setCustomFields([])
-      setIsLoading(false)
-      return
+    let cancelled = false
+    const effectiveUser = (userId ?? identity ?? "").toLowerCase()
+
+    ;(async () => {
+      setIsLoading(true)
+      try {
+        const allRows = await stdbBrowserQuery("user-custom-fields")
+        if (cancelled) return
+        const rows = allRows.filter(
+          cf =>
+            Number(cf.organizationId) === sessionOrgId &&
+            Number(cf.configurationId) === configurationId &&
+            (!effectiveUser ||
+              String(cf.userId ?? "")
+                .toLowerCase()
+                .replace(/^0x/, "") === effectiveUser.replace(/^0x/, "")),
+        )
+        const parsed = rows
+          .map(cf =>
+            mapStdbUserCustomFieldRow({
+              id: n64(cf.id),
+              organizationId: n64(cf.organizationId),
+              userId: cf.userId as string,
+              configurationId: n64(cf.configurationId),
+              fieldId: String(cf.fieldId ?? ""),
+              fieldDataJson: String(cf.fieldDataJson ?? ""),
+              createdAt: cf.createdAt,
+              updatedAt: cf.updatedAt,
+            }),
+          )
+          .map(cf => {
+            const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
+            return parseFormField({
+              id: cf.id,
+              configurationId: cf.configurationId,
+              fieldId: String(data.fieldId ?? ""),
+              name: String(data.name ?? ""),
+              label: String(data.label ?? ""),
+              fieldType: (data.type as FieldType) ?? "Text",
+              description: String(data.description ?? ""),
+              placeholder: String(data.placeholder ?? ""),
+              defaultValue:
+                typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
+              optionsJson: JSON.stringify(data.options || []),
+              validationJson: JSON.stringify(data.validation || { required: false }),
+              aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
+              order: Number(data.order ?? 0),
+              isSystem: false,
+              isEnabled: true,
+              category: "",
+              showInList: false,
+              width: (data.width as FieldWidth) || "Full",
+              sectionId: String(data.sectionId ?? ""),
+              createdAt: cf.createdAt,
+              updatedAt: cf.updatedAt,
+            } as FormConfigField)
+          })
+        setCustomFields(parsed)
+      } catch {
+        if (!cancelled) setCustomFields([])
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
-
-    const db = conn
-    const effectiveUser = userId ?? identity ?? ""
-
-    function load() {
-      const rows = [...db.db.user_custom_field.iter()].filter(
-        cf =>
-          Number(cf.organizationId) === sessionOrgId &&
-          Number(cf.configurationId) === configurationId &&
-          (!effectiveUser || cf.userId?.toHexString?.() === effectiveUser),
-      )
-      const parsed = rows.map(mapStdbUserCustomFieldRow).map(cf => {
-        const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
-        return parseFormField({
-          id: cf.id,
-          configurationId: cf.configurationId,
-          fieldId: String(data.fieldId ?? ""),
-          name: String(data.name ?? ""),
-          label: String(data.label ?? ""),
-          fieldType: (data.type as FieldType) ?? "Text",
-          description: String(data.description ?? ""),
-          placeholder: String(data.placeholder ?? ""),
-          defaultValue:
-            typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
-          optionsJson: JSON.stringify(data.options || []),
-          validationJson: JSON.stringify(data.validation || { required: false }),
-          aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
-          order: Number(data.order ?? 0),
-          isSystem: false,
-          isEnabled: true,
-          category: "",
-          showInList: false,
-          width: (data.width as FieldWidth) || "Full",
-          sectionId: String(data.sectionId ?? ""),
-          createdAt: cf.createdAt,
-          updatedAt: cf.updatedAt,
-        } as FormConfigField)
-      })
-      setCustomFields(parsed)
-      setIsLoading(false)
-    }
-
-    load()
-    const t = db.db.user_custom_field
-    t.onInsert(() => load())
-    t.onUpdate(() => load())
-    t.onDelete(() => load())
-  }, [configurationId, userId, identity, sessionOrgId, connected])
+  }, [configurationId, userId, identity, sessionOrgId, reloadNonce])
 
   const addCustomField = async (field: CreateFormFieldParams) => {
     if (!isCustomField(field.fieldId)) {
@@ -674,20 +785,15 @@ export function useUserCustomFields(
       order: field.order,
       width: { tag: field.width } as StdbFieldWidth,
     })
+    setReloadNonce(n => n + 1)
   }
 
   const removeCustomField = async (fieldId: string) => {
     if (!sessionOrgId) throw new Error("No organization")
-    const conn = getStdbConnection()
-    if (!conn) throw new Error("Not connected to SpacetimeDB")
-    const row = [...conn.db.user_custom_field.iter()].find(
-      cf =>
-        Number(cf.organizationId) === sessionOrgId &&
-        Number(cf.configurationId) === configurationId &&
-        cf.fieldId === fieldId,
-    )
-    if (!row) throw new Error("Custom field not found")
-    await deleteUserCustomField(BigInt(sessionOrgId), row.id)
+    const rowId = customFields.find(f => f.fieldId === fieldId)?.id
+    if (!rowId) throw new Error("Custom field not found")
+    await deleteUserCustomField(BigInt(sessionOrgId), BigInt(rowId))
+    setReloadNonce(n => n + 1)
   }
 
   return {

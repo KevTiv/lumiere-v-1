@@ -36,7 +36,7 @@ export const subscriptionsTableConfig = (
     filters: [
       {
         key: "state",
-        label: t("subscriptions.subscriptions.filters.state"),
+        label: t("subscriptions.subscriptions.filters.state.label"),
         type: "select",
         options: [
           { value: "draft", label: t("subscriptions.subscriptions.filters.state.options.draft") },

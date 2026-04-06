@@ -1,4 +1,4 @@
-import type { ManufacturingMutations } from "@/hooks/manufacturing"
+import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
 
 function num(v: unknown, fallback = 0): number {
   if (v === "" || v === null || v === undefined) return fallback

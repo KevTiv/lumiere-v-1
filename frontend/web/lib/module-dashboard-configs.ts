@@ -2079,7 +2079,7 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
                     id: "new_widget",
                     label: t("reports.dashboard.quickActions.newWidget"),
                     icon: "widget",
-                    color: "pink",
+                    color: "purple",
                   },
                 ],
               },

@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-fetch'
 import { createRoute } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { Route as rootRoute } from './__root'
@@ -30,7 +31,7 @@ function LogViewerPage() {
     setError(null)
     try {
       const params = new URLSearchParams({ module: mod, tail: String(lines) })
-      const res = await fetch(`/api/dev/logs?${params}`)
+      const res = await apiFetch(`/api/dev/logs?${params}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error ?? `HTTP ${res.status}`)

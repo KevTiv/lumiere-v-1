@@ -15,15 +15,17 @@ const COOKIE_OPTS = {
 }
 
 /**
- * Bridges the SpacetimeDB WebSocket session to the server via HTTP-only cookies.
- * Called by StdbConnectionProvider after a successful WebSocket connection.
+ * Persists SpacetimeDB credentials in HTTP-only cookies for server-side and `/api/*` use.
+ *
+ * Called from auth routes (sign-in, sign-up, invite accept, password reset) and the
+ * WorkOS ↔ STDB bridge — not from a browser WebSocket client.
  *
  * Sets two cookies:
- *   stdb_token    — auth token (for authenticated HTTP SQL queries server-side)
- *   stdb_identity — identity hex (for per-user data scoping and Casbin filtering)
+ *   stdb_token    — bearer token for SpacetimeDB HTTP SQL / reducer calls
+ *   stdb_identity — identity hex (per-user scoping and Casbin field policy)
  *
- * Note: organization_id is resolved server-side from user_organization using
- * the identity, so it does not need to be stored separately here.
+ * `organization_id` is resolved server-side from `user_organization` using the identity;
+ * it is not stored in these cookies.
  */
 export async function saveStdbSession(
   token: string,

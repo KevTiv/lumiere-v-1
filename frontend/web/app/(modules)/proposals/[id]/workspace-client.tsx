@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from '@/lib/api-fetch'
 import { ProposalWorkspaceWrapper } from "./proposal-workspace-wrapper"
 import type { AIAnalysis } from "@lumiere/ui"
 
@@ -13,7 +14,7 @@ export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: W
   const orgId = BigInt(organizationId)
 
   const handleAnalyze = async (text: string): Promise<AIAnalysis> => {
-    const response = await fetch("/api/proposals/analyze", {
+    const response = await apiFetch("/api/proposals/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, proposalId }),

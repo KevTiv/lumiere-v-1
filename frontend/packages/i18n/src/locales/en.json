@@ -17,6 +17,9 @@
     "none": "None",
     "close": "Close",
     "submit": "Submit",
+    "create": "Create",
+    "notes": "Notes",
+    "saving": "Saving…",
     "reset": "Reset",
     "yes": "Yes",
     "no": "No",
@@ -51,7 +54,8 @@
       "noTaskStages": "No task stages yet — create a task with a stage first, or leave stage empty.",
       "noLeaveTypes": "No leave types configured — create leave types first.",
       "noDepartments": "No departments — create departments first.",
-      "noPayrollStructures": "No payroll structures — create a payroll structure first."
+      "noPayrollStructures": "No payroll structures — create a payroll structure first.",
+      "noTasks": "No tasks — create a task first."
     },
     "validation": {
       "required": "This field is required",
@@ -1001,31 +1005,6 @@
       "paymentTerms": "Payment terms",
       "paymentTermLines": "Term lines"
     },
-    "actions": {
-      "newInvoice": "New Invoice",
-      "newBill": "New Bill",
-      "newEntry": "New Journal Entry",
-      "newAccount": "New Account",
-      "newTax": "New Tax",
-      "newTaxGroup": "New Tax Group",
-      "newTaxJurisdiction": "New Jurisdiction",
-      "newTaxSchedule": "New Schedule",
-      "newTaxDeadline": "New Deadline",
-      "newBudget": "New Budget",
-      "newAnalyticAccount": "New analytic account",
-      "newAnalyticLine": "New analytic line",
-      "newAnalyticDistribution": "New distribution model",
-      "newReconciliationWidget": "New widget",
-      "newFiscalYear": "New fiscal year",
-      "newAccountPeriod": "New period",
-      "post": "Post",
-      "registerPayment": "Register Payment",
-      "importTaxRateCsv": "Import Tax Rates (CSV)",
-      "newPayment": "New payment",
-      "newPaymentTerm": "New payment term",
-      "newPaymentTermLine": "Add installment line",
-      "newCurrencyRate": "New currency rate"
-    },
     "overview": {
       "title": "Accounting",
       "description": "Financial overview and reporting",
@@ -1065,15 +1044,18 @@
           "state": "Status",
           "date": "Date",
           "balanceStart": "Opening Balance",
+          "balanceEnd": "Ending Balance",
           "balanceEndReal": "Closing Balance",
           "lineIds": "Lines"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "Open": "Open",
-            "Posted": "Posted",
-            "Confirm": "Confirmed"
+          "state": {
+            "label": "Status",
+            "options": {
+              "Open": "Open",
+              "Posted": "Posted",
+              "Confirm": "Confirmed"
+            }
           }
         },
         "states": {
@@ -1135,11 +1117,13 @@
           "methodNumberMonth": "Duration (months)"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "Draft": "Draft",
-            "Open": "Running",
-            "Close": "Closed"
+          "state": {
+            "label": "Status",
+            "options": {
+              "Draft": "Draft",
+              "Open": "Running",
+              "Close": "Closed"
+            }
           }
         },
         "states": {
@@ -1170,11 +1154,13 @@
           "currencyId": "Currency"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "NotPaid": "Draft",
-            "Paid": "Posted",
-            "Reversed": "Cancelled"
+          "state": {
+            "label": "Status",
+            "options": {
+              "NotPaid": "Draft",
+              "Paid": "Posted",
+              "Reversed": "Cancelled"
+            }
           }
         },
         "states": {
@@ -1224,17 +1210,21 @@
           "autoGenerateBill": "Auto-bill"
         },
         "filters": {
-          "ruleType": "Type",
-          "ruleType.options": {
-            "Sale": "Sale",
-            "Purchase": "Purchase",
-            "Transfer": "Transfer",
-            "Service": "Service"
+          "ruleType": {
+            "label": "Type",
+            "options": {
+              "Sale": "Sale",
+              "Purchase": "Purchase",
+              "Transfer": "Transfer",
+              "Service": "Service"
+            }
           },
-          "isActive": "Status",
-          "isActive.options": {
-            "true": "Active",
-            "false": "Inactive"
+          "isActive": {
+            "label": "Status",
+            "options": {
+              "true": "Active",
+              "false": "Inactive"
+            }
           }
         },
         "states": {
@@ -1266,22 +1256,26 @@
           "requiresApproval": "Requires Approval"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "Draft": "Draft",
-            "Pending": "Pending",
-            "Approved": "Approved",
-            "Processing": "Processing",
-            "Completed": "Completed",
-            "Error": "Error",
-            "Cancelled": "Cancelled"
+          "state": {
+            "label": "Status",
+            "options": {
+              "Draft": "Draft",
+              "Pending": "Pending",
+              "Approved": "Approved",
+              "Processing": "Processing",
+              "Completed": "Completed",
+              "Error": "Error",
+              "Cancelled": "Cancelled"
+            }
           },
-          "transactionType": "Type",
-          "transactionType.options": {
-            "Sale": "Sale",
-            "Purchase": "Purchase",
-            "Transfer": "Transfer",
-            "Service": "Service"
+          "transactionType": {
+            "label": "Type",
+            "options": {
+              "Sale": "Sale",
+              "Purchase": "Purchase",
+              "Transfer": "Transfer",
+              "Service": "Service"
+            }
           }
         },
         "states": {
@@ -1316,12 +1310,14 @@
           "isAdjustment": "Adjustment"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "Draft": "Draft",
-            "Running": "Running",
-            "Closed": "Closed",
-            "Locked": "Locked"
+          "state": {
+            "label": "Status",
+            "options": {
+              "Draft": "Draft",
+              "Running": "Running",
+              "Closed": "Closed",
+              "Locked": "Locked"
+            }
           }
         },
         "states": {
@@ -1352,11 +1348,13 @@
           "isAdjustment": "Adjustment"
         },
         "filters": {
-          "state": "Status",
-          "state.options": {
-            "Draft": "Draft",
-            "Open": "Open",
-            "Closed": "Closed"
+          "state": {
+            "label": "Status",
+            "options": {
+              "Draft": "Draft",
+              "Open": "Open",
+              "Closed": "Closed"
+            }
           }
         },
         "states": {
@@ -1411,12 +1409,15 @@
           "discount": "Discount",
           "tax": "Tax",
           "total": "Total"
-        }
+        },
+        "noJournalsHint": "Add at least one accounting journal (Accounting → Configuration) before creating invoices."
       },
       "newBill": {
         "title": "New Vendor Bill",
+        "createTitle": "Create Vendor Bill",
         "description": "Create a vendor bill",
         "submitLabel": "Create Bill",
+        "noJournalsHint": "Add at least one accounting journal (Accounting → Configuration) before recording vendor bills.",
         "sections": {
           "header": "Bill Details"
         },
@@ -1921,14 +1922,37 @@
       }
     },
     "actions": {
-      "postStatement": "Post Statement",
-      "reconcile": "Reconcile",
+      "closeFiscalYear": "Close Fiscal Year",
+      "closePeriod": "Close Period",
+      "createPeriod": "Create Period",
       "depreciate": "Calculate Depreciation",
       "dispose": "Dispose Asset",
-      "closePeriod": "Close Period",
-      "reopenPeriod": "Reopen Period",
-      "closeFiscalYear": "Close Fiscal Year",
-      "createPeriod": "Create Period"
+      "importTaxRateCsv": "Import Tax Rates (CSV)",
+      "newAccount": "New Account",
+      "newAccountPeriod": "New period",
+      "newAnalyticAccount": "New analytic account",
+      "newAnalyticDistribution": "New distribution model",
+      "newAnalyticLine": "New analytic line",
+      "newBill": "New Bill",
+      "newBudget": "New Budget",
+      "newCurrencyRate": "New currency rate",
+      "newEntry": "New Journal Entry",
+      "newFiscalYear": "New fiscal year",
+      "newInvoice": "New Invoice",
+      "newPayment": "New payment",
+      "newPaymentTerm": "New payment term",
+      "newPaymentTermLine": "Add installment line",
+      "newReconciliationWidget": "New widget",
+      "newTax": "New Tax",
+      "newTaxDeadline": "New Deadline",
+      "newTaxGroup": "New Tax Group",
+      "newTaxJurisdiction": "New Jurisdiction",
+      "newTaxSchedule": "New Schedule",
+      "post": "Post",
+      "postStatement": "Post Statement",
+      "reconcile": "Reconcile",
+      "registerPayment": "Register Payment",
+      "reopenPeriod": "Reopen Period"
     }
   },
   "crm": {
@@ -1993,13 +2017,15 @@
         "createDate": "Created"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "New": "New",
-          "Qualified": "Qualified",
-          "Won": "Won",
-          "Lost": "Lost",
-          "Converted": "Converted"
+        "state": {
+          "label": "Status",
+          "options": {
+            "New": "New",
+            "Qualified": "Qualified",
+            "Won": "Won",
+            "Lost": "Lost",
+            "Converted": "Converted"
+          }
         }
       },
       "states": {
@@ -2064,10 +2090,12 @@
         "done": "Done"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "planned": "Planned",
-          "done": "Done"
+        "state": {
+          "label": "Status",
+          "options": {
+            "planned": "Planned",
+            "done": "Done"
+          }
         }
       }
     },
@@ -2437,12 +2465,14 @@
         "isActive": "Active"
       },
       "filters": {
-        "employmentType": "Type",
-        "employmentType.options": {
-          "FullTime": "Full-Time",
-          "PartTime": "Part-Time",
-          "Contract": "Contract",
-          "Intern": "Intern"
+        "employmentType": {
+          "label": "Type",
+          "options": {
+            "FullTime": "Full-Time",
+            "PartTime": "Part-Time",
+            "Contract": "Contract",
+            "Intern": "Intern"
+          }
         }
       },
       "states": {
@@ -2479,13 +2509,15 @@
         "numberOfDays": "Days"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Confirm": "To Approve",
-          "ValidatedOne": "Second Approval",
-          "Validated": "Approved",
-          "Refused": "Refused"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Confirm": "To Approve",
+            "ValidatedOne": "Second Approval",
+            "Validated": "Approved",
+            "Refused": "Refused"
+          }
         }
       },
       "states": {
@@ -2510,12 +2542,14 @@
         "wage": "Wage"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "New": "New",
-          "Open": "Running",
-          "Expired": "Expired",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "New": "New",
+            "Open": "Running",
+            "Expired": "Expired",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -2541,12 +2575,14 @@
         "netWage": "Net"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Verify": "Waiting",
-          "Done": "Done",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Verify": "Waiting",
+            "Done": "Done",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -2570,10 +2606,12 @@
         "isActive": "Active"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "recruit": "Recruiting",
-          "open": "Open"
+        "state": {
+          "label": "Status",
+          "options": {
+            "recruit": "Recruiting",
+            "open": "Open"
+          }
         }
       },
       "states": {
@@ -2785,11 +2823,13 @@
         "purchaseOk": "Can Buy"
       },
       "filters": {
-        "type": "Type",
-        "type.options": {
-          "product": "Storable",
-          "consu": "Consumable",
-          "service": "Service"
+        "type": {
+          "label": "Type",
+          "options": {
+            "product": "Storable",
+            "consu": "Consumable",
+            "service": "Service"
+          }
         }
       },
       "states": {
@@ -2836,13 +2876,15 @@
         "moveType": "Move Type"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "draft": "Draft",
-          "confirmed": "Confirmed",
-          "assigned": "Ready",
-          "done": "Done",
-          "cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "draft": "Draft",
+            "confirmed": "Confirmed",
+            "assigned": "Ready",
+            "done": "Done",
+            "cancel": "Cancelled"
+          }
         }
       },
       "states": {
@@ -2877,12 +2919,14 @@
         "accountingDate": "Accounting Date"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "draft": "Draft",
-          "confirm": "In Progress",
-          "validate": "Validated",
-          "cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "draft": "Draft",
+            "confirm": "In Progress",
+            "validate": "Validated",
+            "cancel": "Cancelled"
+          }
         }
       },
       "states": {
@@ -2904,13 +2948,15 @@
         "active": "Active"
       },
       "filters": {
-        "usage": "Type",
-        "usage.options": {
-          "internal": "Internal",
-          "customer": "Customer",
-          "supplier": "Supplier",
-          "inventory": "Inventory",
-          "transit": "Transit"
+        "usage": {
+          "label": "Type",
+          "options": {
+            "internal": "Internal",
+            "customer": "Customer",
+            "supplier": "Supplier",
+            "inventory": "Inventory",
+            "transit": "Transit"
+          }
         }
       },
       "states": {
@@ -3055,11 +3101,13 @@
         "teamId": "QA Team"
       },
       "filters": {
-        "qualityState": "Result",
-        "qualityState.options": {
-          "none": "Pending",
-          "pass": "Pass",
-          "fail": "Fail"
+        "qualityState": {
+          "label": "Result",
+          "options": {
+            "none": "Pending",
+            "pass": "Pass",
+            "fail": "Fail"
+          }
         }
       },
       "states": {
@@ -3138,13 +3186,15 @@
         "productUomQty": "Demand qty"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "draft": "Draft",
-          "confirmed": "Confirmed",
-          "assigned": "Assigned",
-          "done": "Done",
-          "cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "draft": "Draft",
+            "confirmed": "Confirmed",
+            "assigned": "Assigned",
+            "done": "Done",
+            "cancel": "Cancelled"
+          }
         }
       }
     },
@@ -3798,14 +3848,16 @@
         "Invoiced": "Fully billed"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Sent": "Sent",
-          "ToApprove": "To Approve",
-          "Approved": "Purchase Order",
-          "Done": "Done",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Sent": "Sent",
+            "ToApprove": "To Approve",
+            "Approved": "Purchase Order",
+            "Done": "Done",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -3853,14 +3905,16 @@
         "orderCount": "Orders"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Sent": "Sent",
-          "InProgress": "In Progress",
-          "Approved": "Approved",
-          "Cancelled": "Cancelled",
-          "Closed": "Closed"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Sent": "Sent",
+            "InProgress": "In Progress",
+            "Approved": "Approved",
+            "Cancelled": "Cancelled",
+            "Closed": "Closed"
+          }
         }
       },
       "states": {
@@ -4113,13 +4167,15 @@
         "deliveryCount": "Deliveries"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Sent": "Sent",
-          "Sale": "Confirmed",
-          "Done": "Done",
-          "Cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Sent": "Sent",
+            "Sale": "Confirmed",
+            "Done": "Done",
+            "Cancel": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4198,12 +4254,14 @@
         "pickingType": "Operation"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "InProgress": "In Progress",
-          "Done": "Done",
-          "Cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "InProgress": "In Progress",
+            "Done": "Done",
+            "Cancel": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4526,14 +4584,16 @@
         "origin": "Source"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Confirmed": "Confirmed",
-          "Progress": "In Progress",
-          "ToClose": "To Close",
-          "Done": "Done",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Confirmed": "Confirmed",
+            "Progress": "In Progress",
+            "ToClose": "To Close",
+            "Done": "Done",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4559,12 +4619,14 @@
         "routingId": "Routing"
       },
       "filters": {
-        "type": "Type",
-        "type.options": {
-          "Normal": "Manufacture",
-          "Phantom": "Phantom",
-          "Kit": "Kit",
-          "Subcontracting": "Subcontracting"
+        "type": {
+          "label": "Type",
+          "options": {
+            "Normal": "Manufacture",
+            "Phantom": "Phantom",
+            "Kit": "Kit",
+            "Subcontracting": "Subcontracting"
+          }
         }
       },
       "states": {
@@ -4607,13 +4669,15 @@
         "dateFinished": "Finish"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Pending": "Pending",
-          "Ready": "Ready",
-          "Progress": "In Progress",
-          "Done": "Done",
-          "Cancel": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Pending": "Pending",
+            "Ready": "Ready",
+            "Progress": "In Progress",
+            "Done": "Done",
+            "Cancel": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4847,12 +4911,14 @@
         "taskCount": "Tasks"
       },
       "filters": {
-        "lastUpdateStatus": "Status",
-        "lastUpdateStatus.options": {
-          "InProgress": "In Progress",
-          "Paused": "Paused",
-          "Done": "Done",
-          "Cancelled": "Cancelled"
+        "lastUpdateStatus": {
+          "label": "Status",
+          "options": {
+            "InProgress": "In Progress",
+            "Paused": "Paused",
+            "Done": "Done",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4881,13 +4947,15 @@
         "dateDeadline": "Deadline"
       },
       "filters": {
-        "kanbanState": "Status",
-        "kanbanState.options": {
-          "InProgress": "In Progress",
-          "Changes": "Changes Requested",
-          "Approved": "Approved",
-          "Done": "Done",
-          "Cancelled": "Cancelled"
+        "kanbanState": {
+          "label": "Status",
+          "options": {
+            "InProgress": "In Progress",
+            "Changes": "Changes Requested",
+            "Approved": "Approved",
+            "Done": "Done",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
@@ -4965,6 +5033,80 @@
             "2": "High",
             "3": "Urgent"
           }
+        }
+      },
+      "editProject": {
+        "title": "Edit project",
+        "description": "Update project details and settings",
+        "sections": {
+          "projectDetails": "Project Details"
+        },
+        "fields": {
+          "name": "Project Name",
+          "namePlaceholder": "Website Redesign",
+          "pricelistId": "Pricelist",
+          "pricelistPlaceholder": "Select a pricelist",
+          "partnerId": "Customer",
+          "partnerIdPlaceholder": "Select a customer",
+          "allocatedHours": "Budget (hours)",
+          "allocatedHoursPlaceholder": "0",
+          "dateStart": "Start Date",
+          "dateEnd": "Deadline",
+          "description": "Description",
+          "descriptionPlaceholder": "Project scope and objectives…",
+          "active": "Active"
+        }
+      },
+      "editTask": {
+        "title": "Edit task",
+        "description": "Update task details",
+        "sections": {
+          "taskDetails": "Task Details"
+        },
+        "fields": {
+          "name": "Task Name",
+          "namePlaceholder": "Design homepage mockup",
+          "projectId": "Project",
+          "projectIdPlaceholder": "Select a project",
+          "stageId": "Stage",
+          "stagePlaceholder": "Reuse a stage from this project",
+          "priority": "Priority",
+          "plannedHours": "Planned Hours",
+          "plannedHoursPlaceholder": "0",
+          "dateDeadline": "Deadline",
+          "description": "Description",
+          "descriptionPlaceholder": "Task details and acceptance criteria…",
+          "kanbanState": "Board status",
+          "options": {
+            "0": "Normal",
+            "1": "Low",
+            "2": "High",
+            "3": "Urgent"
+          },
+          "states": {
+            "normal": "Normal",
+            "done": "Done",
+            "blocked": "Blocked"
+          }
+        }
+      },
+      "logTimesheet": {
+        "title": "Log time",
+        "description": "Record hours against a project and task",
+        "sections": {
+          "details": "Time entry"
+        },
+        "fields": {
+          "projectId": "Project",
+          "projectIdPlaceholder": "Select a project",
+          "taskId": "Task",
+          "taskIdPlaceholder": "Select a task",
+          "date": "Date",
+          "hours": "Hours",
+          "hoursPlaceholder": "0",
+          "description": "Description",
+          "descriptionPlaceholder": "What did you work on?",
+          "billable": "Billable"
         }
       }
     }
@@ -5081,10 +5223,12 @@
         "createDate": "Created"
       },
       "filters": {
-        "isDeleted": "Status",
-        "isDeleted.options": {
-          "false": "Active",
-          "true": "Deleted"
+        "isDeleted": {
+          "label": "Status",
+          "options": {
+            "false": "Active",
+            "true": "Deleted"
+          }
         }
       }
     },
@@ -5102,10 +5246,12 @@
         "createDate": "Created"
       },
       "filters": {
-        "isPublished": "Published",
-        "isPublished.options": {
-          "true": "Published",
-          "false": "Draft"
+        "isPublished": {
+          "label": "Published",
+          "options": {
+            "true": "Published",
+            "false": "Draft"
+          }
         }
       }
     },
@@ -5138,10 +5284,12 @@
         "created": "Created"
       },
       "filters": {
-        "isApproved": "Approved",
-        "isApproved.options": {
-          "yes": "Yes",
-          "no": "No"
+        "isApproved": {
+          "label": "Approved",
+          "options": {
+            "yes": "Yes",
+            "no": "No"
+          }
         }
       },
       "actions": {
@@ -5167,15 +5315,19 @@
         "generatedAt": "Generated"
       },
       "filters": {
-        "dismissed": "Dismissed",
-        "dismissed.options": {
-          "open": "Open",
-          "dismissed": "Dismissed"
+        "dismissed": {
+          "label": "Dismissed",
+          "options": {
+            "open": "Open",
+            "dismissed": "Dismissed"
+          }
         },
-        "isAcknowledged": "Acknowledged",
-        "isAcknowledged.options": {
-          "yes": "Yes",
-          "no": "No"
+        "isAcknowledged": {
+          "label": "Acknowledged",
+          "options": {
+            "yes": "Yes",
+            "no": "No"
+          }
         }
       },
       "actions": {
@@ -5381,20 +5533,24 @@
         "createdAt": "Created"
       },
       "filters": {
-        "state": "Status",
-        "priority": "Priority",
-        "state.options": {
-          "New": "New",
-          "InProgress": "In progress",
-          "OnHold": "On hold",
-          "Closed": "Closed",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "New": "New",
+            "InProgress": "In progress",
+            "OnHold": "On hold",
+            "Closed": "Closed",
+            "Cancelled": "Cancelled"
+          }
         },
-        "priority.options": {
-          "low": "Low",
-          "normal": "Normal",
-          "high": "High",
-          "urgent": "Urgent"
+        "priority": {
+          "label": "Priority",
+          "options": {
+            "low": "Low",
+            "normal": "Normal",
+            "high": "High",
+            "urgent": "Urgent"
+          }
         }
       },
       "states": {
@@ -5532,29 +5688,49 @@
       "emptyMessage": "No subscriptions found.",
       "columns": {
         "name": "Reference",
+        "code": "Code",
+        "description": "Description",
         "partnerId": "Customer",
         "productId": "Plan",
         "state": "Status",
+        "health": "Health",
+        "recurringMonthly": "Monthly recurring",
+        "isTrial": "Trial",
         "dateStart": "Start Date",
         "dateEnd": "End Date",
+        "recurringNextDate": "Next billing",
         "recurringTotal": "Recurring Total"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Open": "Active",
-          "Pending": "Pending",
-          "Close": "Closed",
-          "Cancelled": "Cancelled"
+        "state": {
+          "label": "Status",
+          "options": {
+            "draft": "Draft",
+            "active": "Active",
+            "paused": "Paused",
+            "closed": "Closed",
+            "Draft": "Draft",
+            "Open": "Active",
+            "Pending": "Pending",
+            "Close": "Closed",
+            "Cancelled": "Cancelled"
+          }
         }
       },
       "states": {
+        "draft": "Draft",
+        "active": "Active",
+        "paused": "Paused",
+        "closed": "Closed",
         "Draft": "Draft",
         "Open": "Active",
         "Pending": "Pending",
         "Close": "Closed",
         "Cancelled": "Cancelled"
+      },
+      "health": {
+        "good": "Good",
+        "bad": "At risk"
       }
     },
     "plans": {
@@ -5564,6 +5740,12 @@
       "emptyMessage": "No plans found.",
       "columns": {
         "name": "Plan Name",
+        "code": "Code",
+        "billingPeriod": "Billing period",
+        "billingPeriodUnit": "Period length",
+        "trialPeriod": "Has trial",
+        "trialDuration": "Trial days",
+        "isDefault": "Default plan",
         "productId": "Product",
         "recurrenceId": "Billing Cycle",
         "active": "Active"
@@ -5844,18 +6026,21 @@
         "employeeId": "Employee",
         "date": "Date",
         "totalAmount": "Amount",
+        "quantity": "Qty",
         "state": "Status",
         "sheetId": "Report"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Submitted": "Submitted",
-          "Approved": "Approved",
-          "Posted": "Posted",
-          "Done": "Done",
-          "Refused": "Refused"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Submitted": "Submitted",
+            "Approved": "Approved",
+            "Posted": "Posted",
+            "Done": "Done",
+            "Refused": "Refused"
+          }
         }
       },
       "states": {
@@ -5882,14 +6067,16 @@
         "createdAt": "Created"
       },
       "filters": {
-        "state": "Status",
-        "state.options": {
-          "Draft": "Draft",
-          "Submitted": "Submitted",
-          "Approved": "Approved",
-          "Posted": "Posted",
-          "Done": "Done",
-          "Refused": "Refused"
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Submitted": "Submitted",
+            "Approved": "Approved",
+            "Posted": "Posted",
+            "Done": "Done",
+            "Refused": "Refused"
+          }
         }
       },
       "states": {
@@ -5965,6 +6152,7 @@
           "name": "Report Name",
           "namePlaceholder": "e.g. March 2024 Expenses",
           "employeeId": "Employee",
+          "employeePlaceholder": "Select an employee",
           "accountingDate": "Accounting Date",
           "notes": "Notes",
           "notesPlaceholder": "Additional notes…"
@@ -6037,18 +6225,20 @@
         "active": "Active"
       },
       "filters": {
-        "state": "Status",
+        "state": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Active": "Active",
+            "Inactive": "Inactive"
+          }
+        },
         "isActiveLabel": "Active",
         "isActive": {
           "options": {
             "true": "Yes",
             "false": "No"
           }
-        },
-        "state.options": {
-          "Draft": "Draft",
-          "Active": "Active",
-          "Inactive": "Inactive"
         }
       },
       "states": {
@@ -6065,23 +6255,28 @@
       "columns": {
         "workflowId": "Workflow",
         "resModel": "Model",
+        "resType": "Resource type",
         "resId": "Record",
         "state": "Status",
+        "createDate": "Created",
+        "writeDate": "Updated",
         "dateStart": "Started",
         "dateEnd": "Completed"
       },
       "filters": {
-        "state": "Status",
-        "stateLabel": "Status",
-        "state.options": {
-          "Active": "Active",
-          "Complete": "Complete",
-          "Exception": "Exception",
-          "Running": "Running",
-          "Completed": "Completed",
-          "Cancelled": "Cancelled",
-          "Error": "Error"
-        }
+        "state": {
+          "label": "Status",
+          "options": {
+            "Active": "Active",
+            "Complete": "Complete",
+            "Exception": "Exception",
+            "Running": "Running",
+            "Completed": "Completed",
+            "Cancelled": "Cancelled",
+            "Error": "Error"
+          }
+        },
+        "stateLabel": "Status"
       },
       "states": {
         "Active": "Active",
@@ -6201,14 +6396,16 @@
         "writeDate": "Updated"
       },
       "filters": {
-        "status": "Status",
-        "status.options": {
-          "Draft": "Draft",
-          "Review": "Review",
-          "Submitted": "Submitted",
-          "Awarded": "Awarded",
-          "Rejected": "Rejected",
-          "Archived": "Archived"
+        "status": {
+          "label": "Status",
+          "options": {
+            "Draft": "Draft",
+            "Review": "Review",
+            "Submitted": "Submitted",
+            "Awarded": "Awarded",
+            "Rejected": "Rejected",
+            "Archived": "Archived"
+          }
         }
       },
       "states": {
@@ -6269,6 +6466,37 @@
       "emails": "Emails",
       "comments": "Comments",
       "notifications": "Notifications"
+    },
+    "messages": {
+      "title": "Messages",
+      "description": "Internal messages, comments, and notifications",
+      "searchPlaceholder": "Search messages…",
+      "emptyMessage": "No messages found.",
+      "filters": {
+        "messageType": {
+          "label": "Type",
+          "options": {
+            "email": "Email",
+            "comment": "Comment",
+            "notification": "Notification",
+            "user_notification": "User notification"
+          }
+        }
+      },
+      "columns": {
+        "body": "Message",
+        "model": "Model",
+        "resId": "Record ID",
+        "messageType": "Type",
+        "subtype": "Subtype",
+        "date": "Date"
+      },
+      "states": {
+        "email": "Email",
+        "comment": "Comment",
+        "notification": "Notification",
+        "user_notification": "User notification"
+      }
     },
     "forms": {
       "newMessage": {
@@ -6384,6 +6612,18 @@
     "warehouseFallback": "Warehouse {{id}}",
     "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
     "demoDataHint": "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates."
+  },
+  "tasks": {
+    "page": {
+      "title": "Tasks",
+      "description": "Board and list views for your work"
+    }
+  },
+  "trackers": {
+    "page": {
+      "title": "Trackers",
+      "description": "Dashboards and KPI trackers"
+    }
   },
   "overview": {
     "page": {
@@ -6510,7 +6750,7 @@
     },
     "ai": {
       "title": "AI",
-      "description": "Configure AI agents, personas, review insights, and inspect usage spend.",
+      "description": "Description",
       "loadError": "Could not load AI data",
       "loadErrorDescription": "Check your connection and permissions.",
       "mutationError": "Action failed",
@@ -6556,7 +6796,6 @@
       "name": "Name",
       "provider": "Provider",
       "model": "Model",
-      "description": "Description",
       "systemPrompt": "System prompt",
       "temperature": "Temperature",
       "maxTokens": "Max tokens",
@@ -6670,17 +6909,38 @@
       "emailNotifications": "Email Notifications",
       "emailNotificationsDesc": "Choose what updates you receive via email",
       "emailItems": {
-        "orders": { "label": "New Orders", "description": "Get notified when new orders are placed" },
-        "inventory": { "label": "Low Stock Alerts", "description": "Alert when products are running low" },
-        "reports": { "label": "Weekly Reports", "description": "Receive weekly performance summaries" },
-        "security": { "label": "Security Alerts", "description": "Important security notifications" }
+        "orders": {
+          "label": "New Orders",
+          "description": "Get notified when new orders are placed"
+        },
+        "inventory": {
+          "label": "Low Stock Alerts",
+          "description": "Alert when products are running low"
+        },
+        "reports": {
+          "label": "Weekly Reports",
+          "description": "Receive weekly performance summaries"
+        },
+        "security": {
+          "label": "Security Alerts",
+          "description": "Important security notifications"
+        }
       },
       "inAppNotifications": "In-App Notifications",
       "inAppNotificationsDesc": "Configure dashboard notification preferences",
       "inAppItems": {
-        "push": { "label": "Push Notifications", "description": "Browser push notifications" },
-        "sound": { "label": "Sound", "description": "Play sound for new notifications" },
-        "badge": { "label": "Badge Count", "description": "Show unread count on icon" }
+        "push": {
+          "label": "Push Notifications",
+          "description": "Browser push notifications"
+        },
+        "sound": {
+          "label": "Sound",
+          "description": "Play sound for new notifications"
+        },
+        "badge": {
+          "label": "Badge Count",
+          "description": "Show unread count on icon"
+        }
       },
       "theme": "Theme",
       "themeDesc": "Select your preferred color theme",
@@ -6704,15 +6964,30 @@
       "dashboardLayout": "Dashboard Layout",
       "dashboardLayoutDesc": "Customize your dashboard experience",
       "layout": {
-        "compactMode": { "label": "Compact Mode", "description": "Reduce spacing between elements" },
-        "sidebarCollapsed": { "label": "Sidebar Collapsed", "description": "Start with sidebar collapsed" },
-        "showQuickActions": { "label": "Show Quick Actions", "description": "Display quick action buttons on dashboard" }
+        "compactMode": {
+          "label": "Compact Mode",
+          "description": "Reduce spacing between elements"
+        },
+        "sidebarCollapsed": {
+          "label": "Sidebar Collapsed",
+          "description": "Start with sidebar collapsed"
+        },
+        "showQuickActions": {
+          "label": "Show Quick Actions",
+          "description": "Display quick action buttons on dashboard"
+        }
       },
       "accessibility": "Accessibility",
       "accessibilityDesc": "Adjust accessibility options",
       "a11y": {
-        "reduceMotion": { "label": "Reduce Motion", "description": "Minimize animations" },
-        "highContrast": { "label": "High Contrast", "description": "Increase color contrast" }
+        "reduceMotion": {
+          "label": "Reduce Motion",
+          "description": "Minimize animations"
+        },
+        "highContrast": {
+          "label": "High Contrast",
+          "description": "Increase color contrast"
+        }
       }
     },
     "customFields": {
@@ -6789,12 +7064,11 @@
     },
     "organization": {
       "title": "Organization",
-      "description": "Manage your organization settings and configuration",
+      "description": "Description",
       "generalInfo": "General Information",
       "generalInfoDescription": "Basic organization details",
       "name": "Organization Name",
       "namePlaceholder": "Acme Inc.",
-      "description": "Description",
       "descriptionPlaceholder": "Brief description of your organization",
       "defaultCurrency": "Default Currency",
       "updateOrg": "Update Organization",
@@ -6827,6 +7101,7 @@
       "updateSuccess": "Organization updated",
       "updateSuccessDescription": "Organization details have been updated.",
       "updateError": "Update failed",
+      "updateErrorDescription": "Could not update organization. Check your connection and try again.",
       "company": {
         "cardTitle": "Companies",
         "cardDescription": "Select a company and edit legal name, hierarchy, and subsidiaries.",
@@ -6930,96 +7205,6 @@
       }
     }
   },
-  "auth": {
-    "forms": {
-      "newRole": {
-        "title": "Create Role",
-        "description": "Define a new role with permissions",
-        "sections": {
-          "main": "Role Details"
-        },
-        "fields": {
-          "name": "Role Name",
-          "namePlaceholder": "e.g. Sales Manager",
-          "description": "Description",
-          "descriptionPlaceholder": "Brief description of this role's responsibilities"
-        }
-      },
-      "updateRole": {
-        "title": "Update Role",
-        "description": "Edit role details and permissions",
-        "sections": {
-          "main": "Role Details"
-        },
-        "fields": {
-          "isActive": "Active"
-        }
-      },
-      "newAuditRule": {
-        "title": "Create Audit Rule",
-        "description": "Define a rule for auditing system events",
-        "sections": {
-          "main": "Rule Configuration"
-        },
-        "fields": {
-          "name": "Rule Name",
-          "namePlaceholder": "e.g. Track user logins",
-          "resourceType": "Resource Type",
-          "actionType": "Action Type",
-          "severity": "Severity",
-          "isActive": "Active"
-        },
-        "resourceTypes": {
-          "user": "User",
-          "role": "Role",
-          "document": "Document",
-          "invoice": "Invoice",
-          "product": "Product",
-          "order": "Order",
-          "all": "All Resources"
-        },
-        "actionTypes": {
-          "create": "Create",
-          "update": "Update",
-          "delete": "Delete",
-          "login": "Login",
-          "logout": "Logout",
-          "export": "Export",
-          "all": "All Actions"
-        },
-        "severities": {
-          "debug": "Debug",
-          "info": "Info",
-          "warning": "Warning",
-          "error": "Error",
-          "critical": "Critical"
-        }
-      },
-      "newUserInvite": {
-        "title": "Invite User",
-        "description": "Send an invitation to join the organization",
-        "sections": {
-          "main": "Invite Details"
-        },
-        "fields": {
-          "email": "Email Address",
-          "emailPlaceholder": "user@example.com",
-          "expiresInDays": "Expires In"
-        }
-      },
-      "updateUserPassword": {
-        "title": "Update Password",
-        "description": "Set a new password for this user",
-        "sections": {
-          "password": "Password"
-        },
-        "fields": {
-          "newPassword": "New Password",
-          "requireReset": "Require password change on next login"
-        }
-      }
-    }
-  },
   "reports": {
     "moduleTitle": "Reports",
     "moduleDescription": "Financial reports, templates, schedules, and metrics",
@@ -7030,6 +7215,12 @@
     "csvImport": {
       "templateTitle": "Import report templates",
       "metricTitle": "Import analytics metrics"
+    },
+    "states": {
+      "draft": "Draft",
+      "generated": "Generated",
+      "exported": "Exported",
+      "archived": "Archived"
     },
     "dashboard": {
       "quickActionsTitle": "Quick actions",
@@ -7373,6 +7564,14 @@
           },
           "dataSource": "Data Source",
           "dataSourcePlaceholder": "e.g. account.move or analytics query"
+        },
+        "types": {
+          "kpi": "KPI Card",
+          "chart": "Chart",
+          "table": "Data Table",
+          "metric": "Progress Metric",
+          "areaChart": "Area Chart",
+          "barChart": "Bar Chart"
         }
       },
       "addWidgetToDashboard": {
@@ -7435,6 +7634,7 @@
   },
   "proposalWorkspace": {
     "status": {
+      "label": "Status",
       "draft": "Draft",
       "review": "In Review",
       "submitted": "Submitted",
@@ -7448,7 +7648,13 @@
     "exportMarkdown": "Export as Markdown",
     "exportText": "Export as Text",
     "addSourceDocument": "Add Source Document",
+    "analyze": "Analyze",
+    "analyzing": "Analyzing…",
     "analysisFailed": "Analysis failed",
+    "showAiPanel": "Show AI panel",
+    "hideAiPanel": "Hide AI panel",
+    "sourceDocs": "Source docs",
+    "hideSourceDocs": "Hide source docs",
     "sectionSidebar": {
       "sections": "Sections",
       "addSection": "Add section",
@@ -7723,6 +7929,94 @@
   },
   "auth": {
     "appName": "Lumiere ERP",
+    "forms": {
+      "newRole": {
+        "title": "Create Role",
+        "description": "Define a new role with permissions",
+        "sections": {
+          "main": "Role Details"
+        },
+        "fields": {
+          "name": "Role Name",
+          "namePlaceholder": "e.g. Sales Manager",
+          "description": "Description",
+          "descriptionPlaceholder": "Brief description of this role's responsibilities"
+        }
+      },
+      "updateRole": {
+        "title": "Update Role",
+        "description": "Edit role details and permissions",
+        "sections": {
+          "main": "Role Details"
+        },
+        "fields": {
+          "isActive": "Active"
+        }
+      },
+      "newAuditRule": {
+        "title": "Create Audit Rule",
+        "description": "Define a rule for auditing system events",
+        "sections": {
+          "main": "Rule Configuration"
+        },
+        "fields": {
+          "name": "Rule Name",
+          "namePlaceholder": "e.g. Track user logins",
+          "resourceType": "Resource Type",
+          "actionType": "Action Type",
+          "severity": "Severity",
+          "isActive": "Active"
+        },
+        "resourceTypes": {
+          "user": "User",
+          "role": "Role",
+          "document": "Document",
+          "invoice": "Invoice",
+          "product": "Product",
+          "order": "Order",
+          "all": "All Resources"
+        },
+        "actionTypes": {
+          "create": "Create",
+          "update": "Update",
+          "delete": "Delete",
+          "login": "Login",
+          "logout": "Logout",
+          "export": "Export",
+          "all": "All Actions"
+        },
+        "severities": {
+          "debug": "Debug",
+          "info": "Info",
+          "warning": "Warning",
+          "error": "Error",
+          "critical": "Critical"
+        }
+      },
+      "newUserInvite": {
+        "title": "Invite User",
+        "description": "Send an invitation to join the organization",
+        "sections": {
+          "main": "Invite Details"
+        },
+        "fields": {
+          "email": "Email Address",
+          "emailPlaceholder": "user@example.com",
+          "expiresInDays": "Expires In"
+        }
+      },
+      "updateUserPassword": {
+        "title": "Update Password",
+        "description": "Set a new password for this user",
+        "sections": {
+          "password": "Password"
+        },
+        "fields": {
+          "newPassword": "New Password",
+          "requireReset": "Require password change on next login"
+        }
+      }
+    },
     "fields": {
       "email": "Email",
       "emailPlaceholder": "you@company.com",
@@ -7748,7 +8042,7 @@
       "description": "Enter your email and password",
       "descriptionWorkOs": "Sign in with WorkOS to use email, password, Google, Microsoft, Apple, or your enterprise SSO.",
       "submit": "Sign in",
-      "submitting": "Signing in\u2026",
+      "submitting": "Signing in…",
       "continueWithSso": "Continue with SSO",
       "continueWithWorkOs": "Continue with WorkOS",
       "workOsProvidersHint": "Google, Microsoft, Apple, and enterprise SSO are configured in your WorkOS dashboard.",
@@ -7762,7 +8056,7 @@
       "description": "Set up your Lumiere ERP account",
       "descriptionWorkOs": "Create your account with WorkOS — email and password or social sign-in.",
       "submit": "Create account",
-      "submitting": "Creating account\u2026",
+      "submitting": "Creating account…",
       "continueWithWorkOs": "Continue with WorkOS",
       "hasAccount": "Already have an account?",
       "signIn": "Sign in"
@@ -7772,9 +8066,9 @@
       "description": "Enter your email and we'll send you a reset link.",
       "descriptionWorkOs": "Password resets are handled by WorkOS. Open the sign-in screen and use the forgot-password link there.",
       "openWorkOsReset": "Open WorkOS sign-in",
-      "workOsResetHint": "On the next screen, use WorkOS\u2019s forgot-password flow for email accounts or sign in with Google, Microsoft, or Apple.",
+      "workOsResetHint": "On the next screen, use WorkOS’s forgot-password flow for email accounts or sign in with Google, Microsoft, or Apple.",
       "submit": "Send reset link",
-      "submitting": "Sending\u2026",
+      "submitting": "Sending…",
       "backToSignIn": "Back to sign in",
       "successTitle": "Check your email",
       "successDescription": "If an account exists for <bold>{{email}}</bold>, we sent a password reset link. Check your spam folder if you don't see it."
@@ -7784,7 +8078,7 @@
       "description": "Enter your new password below.",
       "descriptionWorkOs": "Password reset links from the old app no longer apply. Use WorkOS to reset your password or sign in with a social provider.",
       "submit": "Reset password",
-      "submitting": "Resetting\u2026",
+      "submitting": "Resetting…",
       "invalidTitle": "Invalid reset link",
       "invalidDescription": "This reset link is missing or invalid.",
       "requestNewLink": "Request a new link",
@@ -7799,7 +8093,7 @@
       "workOsInviteHint": "You must use the same email address the invitation was sent to.",
       "emailPlaceholder": "The email your invite was sent to",
       "submit": "Join organization",
-      "submitting": "Joining\u2026",
+      "submitting": "Joining…",
       "invalidTitle": "Invalid invitation",
       "invalidDescription": "This invitation link is missing or invalid.",
       "goToSignIn": "Go to sign in",
@@ -7808,10 +8102,10 @@
     },
     "onboarding": {
       "title": "Set up your organization",
-      "description": "You are the first user \u2014 create your organization to get started.",
+      "description": "You are the first user — create your organization to get started.",
       "submit": "Create organization",
-      "submitting": "Creating\u2026",
-      "connectingToServer": "Connecting to server\u2026",
+      "submitting": "Creating…",
+      "connectingToServer": "Connecting to server…",
       "orgName": "Organization name",
       "orgNamePlaceholder": "Acme Inc.",
       "shortCode": "Short code",
@@ -7820,12 +8114,12 @@
       "timezone": "Timezone",
       "currency": "Currency",
       "currencies": {
-        "USD": "USD \u2014 US Dollar",
-        "EUR": "EUR \u2014 Euro",
-        "GBP": "GBP \u2014 British Pound",
-        "CAD": "CAD \u2014 Canadian Dollar",
-        "AUD": "AUD \u2014 Australian Dollar",
-        "JPY": "JPY \u2014 Japanese Yen"
+        "USD": "USD — US Dollar",
+        "EUR": "EUR — Euro",
+        "GBP": "GBP — British Pound",
+        "CAD": "CAD — Canadian Dollar",
+        "AUD": "AUD — Australian Dollar",
+        "JPY": "JPY — Japanese Yen"
       },
       "errors": {
         "notConnected": "Not connected to server. Please wait a moment and try again.",

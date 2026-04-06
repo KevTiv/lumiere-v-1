@@ -1,4 +1,4 @@
-// 3D Stock Visualization — core shapes live in @lumiere/stdb for useWarehouse3D / HTTP adapters.
+// 3D Stock Visualization — shapes shared with `useWarehouse3D` / HTTP adapters (`@lumiere/stdb/warehouse-3d`).
 
 import type {
   Dimensions3D,
@@ -6,7 +6,7 @@ import type {
   StockItem,
   StorageSlot,
   Zone,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/warehouse-3d"
 
 export type {
   ZoneType,
@@ -16,7 +16,7 @@ export type {
   StorageSlot,
   StockItem,
   StockCategory,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/warehouse-3d"
 
 export interface Warehouse {
   id: string

@@ -1,11 +1,11 @@
-import { getStdbConnection } from "../connection";
+import { stdbBrowserCall } from "../browser-http"
 import type {
   CreateFormConfigParams,
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
   UpdateFormFieldParams,
-} from "../generated/types";
+} from "../generated/types"
 
 export type {
   CreateFormConfigParams,
@@ -13,15 +13,13 @@ export type {
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
   UpdateFormFieldParams,
-};
+}
 
 export function createFormConfiguration(
   organizationId: bigint,
   params: CreateFormConfigParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.createFormConfiguration({ organizationId, params });
+  return stdbBrowserCall("create_form_configuration", [organizationId.toString(), params])
 }
 
 export function getFormConfiguration(
@@ -29,27 +27,19 @@ export function getFormConfiguration(
   moduleId: string,
   formId: string,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.getFormConfiguration({ organizationId, moduleId, formId });
+  return stdbBrowserCall("get_form_configuration", [organizationId.toString(), moduleId, formId])
 }
 
 export function getOrganizationFormConfigs(organizationId: bigint) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.getOrganizationFormConfigs({ organizationId });
+  return stdbBrowserCall("get_organization_form_configs", [organizationId.toString()])
 }
 
 export function initializeDefaultFormConfigs(organizationId: bigint) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.initializeDefaultFormConfigs({ organizationId });
+  return stdbBrowserCall("initialize_default_form_configs", [organizationId.toString()])
 }
 
 export function seedOrganizationFormConfigs(organizationId: bigint) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.seedOrganizationFormConfigs({ organizationId });
+  return stdbBrowserCall("seed_organization_form_configs", [organizationId.toString()])
 }
 
 export function addFormField(
@@ -57,9 +47,11 @@ export function addFormField(
   configurationId: bigint,
   params: CreateFormFieldParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.addFormField({ organizationId, configurationId, params });
+  return stdbBrowserCall("add_form_field", [
+    organizationId.toString(),
+    configurationId.toString(),
+    params,
+  ])
 }
 
 export function updateFormField(
@@ -68,14 +60,12 @@ export function updateFormField(
   fieldId: string,
   params: UpdateFormFieldParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.updateFormField({
-    organizationId,
-    configurationId,
+  return stdbBrowserCall("update_form_field", [
+    organizationId.toString(),
+    configurationId.toString(),
     fieldId,
     params,
-  });
+  ])
 }
 
 export function deleteFormField(
@@ -83,13 +73,11 @@ export function deleteFormField(
   configurationId: bigint,
   fieldId: string,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.deleteFormField({
-    organizationId,
-    configurationId,
+  return stdbBrowserCall("delete_form_field", [
+    organizationId.toString(),
+    configurationId.toString(),
     fieldId,
-  });
+  ])
 }
 
 export function setFormRoleConfig(
@@ -97,28 +85,26 @@ export function setFormRoleConfig(
   configurationId: bigint,
   params: CreateRoleConfigParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.setFormRoleConfig({ organizationId, configurationId, params });
+  return stdbBrowserCall("set_form_role_config", [
+    organizationId.toString(),
+    configurationId.toString(),
+    params,
+  ])
 }
 
 export function addUserCustomField(
   organizationId: bigint,
   params: CreateUserCustomFieldParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.addUserCustomField({ organizationId, params });
+  return stdbBrowserCall("add_user_custom_field", [organizationId.toString(), params])
 }
 
 export function deleteUserCustomField(
   organizationId: bigint,
   customFieldId: bigint,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected to SpacetimeDB");
-  return conn.reducers.deleteUserCustomField({
-    organizationId,
-    customFieldId,
-  });
+  return stdbBrowserCall("delete_user_custom_field", [
+    organizationId.toString(),
+    customFieldId.toString(),
+  ])
 }

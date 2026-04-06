@@ -8,8 +8,8 @@ import {
   type POSOrder,
   type POSPaymentMethod,
 } from "@lumiere/ui/lib/finance-types"
-import { useProducts } from "@/hooks/inventory"
-import { useCreatePosOrder, usePosTerminals } from "@/hooks/pos"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useCreatePosOrder, usePosTerminals } from "@lumiere/query-hooks/hooks/pos"
 
 export const POS_CATEGORIES = ["All", ...Array.from(new Set(posProducts.map((p) => p.category)))]
 

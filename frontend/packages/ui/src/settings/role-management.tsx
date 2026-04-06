@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import { resourceGroups } from "@/lib/rbac-defaults"
-import { useCreateRole, useUpdateRole } from "@/hooks/auth"
+import { useCreateRole, useUpdateRole } from "@lumiere/query-hooks/hooks/auth"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

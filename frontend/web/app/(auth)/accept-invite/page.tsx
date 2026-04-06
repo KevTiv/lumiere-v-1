@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -48,7 +49,7 @@ export default function AcceptInvitePage() {
     }
     setLoading(true)
     try {
-      const res = await fetch("/api/auth/accept-invite", {
+      const res = await apiFetch("/api/auth/accept-invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, email, password }),

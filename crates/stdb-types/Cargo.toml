@@ -1,0 +1,8 @@
+[package]
+name = "stdb-types"
+version.workspace = true
+edition.workspace = true
+description = "Shared value types for Lumiere Rust services (placeholders for generated row DTOs)"
+
+[dependencies]
+serde = { workspace = true }

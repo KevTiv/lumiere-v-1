@@ -36,10 +36,11 @@ import {
 import type { AccountMove } from "../lib/accounting-types"
 import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { NumberFieldIncrement } from "@base-ui/react"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch / 1000n)
+  const ms = Number(ts.microsSinceUnixEpoch) / 1000
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
@@ -97,8 +98,8 @@ export function GeneralLedgerView({
   ])
 
   const filtered = moves.filter((m) => {
-    const name = m.name?.toLowerCase() ?? ""
-    const ref = m.ref?.toLowerCase() ?? ""
+    const name = m?.name?.toLowerCase() ?? ""
+    const ref = String(m?.ref)?.toLowerCase() ?? ""
     return name.includes(searchQuery.toLowerCase()) || ref.includes(searchQuery.toLowerCase())
   })
 
@@ -281,43 +282,43 @@ export function GeneralLedgerView({
               </div>
               {selectedMove &&
                 (onPostMove || onCancelMove || onComputeInvoiceTotals) && (
-                <DialogFooter className="gap-2 sm:gap-2">
-                  {moveStateIsDraft(selectedMove.state) &&
-                    moveTypeIsInvoiceOrRefund(selectedMove.moveType) &&
-                    onComputeInvoiceTotals && (
+                  <DialogFooter className="gap-2 sm:gap-2">
+                    {moveStateIsDraft(selectedMove.state) &&
+                      moveTypeIsInvoiceOrRefund(selectedMove.moveType) &&
+                      onComputeInvoiceTotals && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={computeInvoiceTotalsPending}
+                          onClick={() => onComputeInvoiceTotals(selectedMove)}
+                        >
+                          <Calculator className="h-4 w-4 mr-2" />
+                          {t("accounting.journalEntries.recalculateInvoiceTotals")}
+                        </Button>
+                      )}
+                    {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
                       <Button
                         type="button"
-                        variant="secondary"
-                        disabled={computeInvoiceTotalsPending}
-                        onClick={() => onComputeInvoiceTotals(selectedMove)}
+                        disabled={postMovePending}
+                        onClick={() => onPostMove(selectedMove)}
                       >
-                        <Calculator className="h-4 w-4 mr-2" />
-                        {t("accounting.journalEntries.recalculateInvoiceTotals")}
+                        {t("accounting.journalEntries.postEntry")}
                       </Button>
                     )}
-                  {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
-                    <Button
-                      type="button"
-                      disabled={postMovePending}
-                      onClick={() => onPostMove(selectedMove)}
-                    >
-                      {t("accounting.journalEntries.postEntry")}
-                    </Button>
-                  )}
-                  {(moveStateStr(selectedMove.state) === 'Draft' ||
-                    moveStateStr(selectedMove.state) === 'Posted') &&
-                    onCancelMove && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        disabled={cancelMovePending}
-                        onClick={() => onCancelMove(selectedMove)}
-                      >
-                        {t("accounting.journalEntries.cancelEntry")}
-                      </Button>
-                    )}
-                </DialogFooter>
-              )}
+                    {(moveStateStr(selectedMove.state) === 'Draft' ||
+                      moveStateStr(selectedMove.state) === 'Posted') &&
+                      onCancelMove && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={cancelMovePending}
+                          onClick={() => onCancelMove(selectedMove)}
+                        >
+                          {t("accounting.journalEntries.cancelEntry")}
+                        </Button>
+                      )}
+                  </DialogFooter>
+                )}
             </>
           )}
         </DialogContent>

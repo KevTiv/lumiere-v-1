@@ -25,7 +25,7 @@ export const mailMessagesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "messageType",
-        label: t("messages.messages.filters.messageType"),
+        label: t("messages.messages.filters.messageType.label"),
         type: "select",
         options: [
           { value: "email", label: t("messages.messages.filters.messageType.options.email") },

@@ -1,0 +1,33 @@
+{
+  "name": "@lumiere/erp-shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./org-scoped": "./src/org-scoped.ts",
+    "./stdb-params-json": "./src/stdb-params-json.ts",
+    "./stb-timestamp": "./src/stb-timestamp.ts",
+    "./accounting-defaults": "./src/accounting-defaults.ts",
+    "./form-coercion": "./src/form-coercion.ts",
+    "./accounting-create-params": "./src/accounting-create-params.ts",
+    "./reports-create-params": "./src/reports-create-params.ts",
+    "./reports-template-params": "./src/reports-template-params.ts",
+    "./reports-scheduled-params": "./src/reports-scheduled-params.ts",
+    "./reports-analytics-params": "./src/reports-analytics-params.ts",
+    "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lumiere/api-client": "workspace:*",
+    "@lumiere/stdb": "workspace:*"
+  },
+  "devDependencies": {
+    "spacetimedb": "^2.0.3",
+    "typescript": "^5.9.0"
+  }
+}

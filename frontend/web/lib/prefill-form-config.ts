@@ -9,11 +9,11 @@ export function withDefaultsFromRow(
     ...base,
     sections: base.sections.map((section) => ({
       ...section,
-      fields: section.fields.map((field) => {
+      fields: section.fields.map((field): FormField => {
         const f = field as FormField & { defaultValue?: unknown }
         const raw = row[f.name]
         if (raw === undefined || raw === null) return f
-        return { ...f, defaultValue: raw }
+        return { ...f, defaultValue: raw } as FormField
       }),
     })),
   }

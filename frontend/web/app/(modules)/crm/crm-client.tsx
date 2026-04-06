@@ -29,9 +29,9 @@ import {
   useOpportunities,
   useOpportunityStages,
   useCrmCsvImportMutations,
-} from "@/hooks/crm"
-import { usePricelists } from "@/hooks/sales"
-import { useWarehouses } from "@/hooks/inventory"
+} from "@lumiere/query-hooks/hooks/crm"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   CrmRecordChatterDialog,

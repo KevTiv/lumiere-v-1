@@ -15,7 +15,7 @@ import type {
   SourceDocument,
   WorkspaceAction,
 } from "@/lib/proposal-workspace-types"
-import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb"
+import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb/proposal-row-types"
 import { SECTION_TEMPLATES } from "@/lib/proposal-workspace-types"
 import { SectionSidebar } from "./section-sidebar"
 import { SectionEditor } from "./section-editor"
@@ -23,6 +23,7 @@ import { AIPanel } from "./ai-panel"
 import { VersionHistoryBar, SaveVersionButton } from "./version-history-bar"
 import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
+import { rowNumber, rowString } from "./row-field-utils"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,11 +35,11 @@ function mapSourceDocRow(d: unknown): SourceDocument {
   const row = d as ProposalSourceDoc
   return {
     id: String(row.id),
-    name: row.name,
-    content: row.content,
-    type: row.docType === "uploaded" ? "uploaded" : "pasted",
-    wordCount: row.wordCount,
-    addedAt: new Date(Number(row.addedAt ?? 0) / 1000),
+    name: rowString(row.name),
+    content: rowString(row.content),
+    type: rowString(row.docType) === "uploaded" ? "uploaded" : "pasted",
+    wordCount: rowNumber(row.wordCount),
+    addedAt: new Date(rowNumber(row.addedAt, 0) / 1000),
   }
 }
 
@@ -89,9 +90,13 @@ const STATUS_VARIANT: Record<ProposalStatus, "secondary" | "outline" | "default"
 
 // ─── Hook Types ───────────────────────────────────────────────────────────────
 
-export type QueryResult<T> = { data: T[] }
-export type UseQueryHook<T> = (organizationId: bigint, initialData?: Record<string, unknown>[]) => QueryResult<T>
-export type UseQueryHookWithId<T> = (
+/** Subset of React Query shape — workspace only reads `data` (with `?? []`). */
+export type QueryResult<T = unknown> = { data: T[] | undefined }
+export type UseQueryHook<T = unknown> = (
+  organizationId: bigint,
+  initialData?: Record<string, unknown>[]
+) => QueryResult<T>
+export type UseQueryHookWithId<T = unknown> = (
   organizationId: bigint,
   id?: bigint,
   initialData?: Record<string, unknown>[]
@@ -695,7 +700,7 @@ export function ProposalWorkspace({
             {aiPanelCollapsed ? null : (
               <div className="w-80 border-l border-border bg-muted/20 flex flex-col">
                 <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                  <span className="text-sm font-medium">{t("proposalWorkspace.aiPanel")}</span>
+                  <span className="text-sm font-medium">{t("proposalWorkspace.aiPanel.aiAnalysis")}</span>
                   <Button variant="ghost" size="sm" onClick={() => setAiPanelCollapsed(true)}>✕</Button>
                 </div>
 

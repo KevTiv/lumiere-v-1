@@ -165,8 +165,8 @@ import {
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
   useInventoryCsvImportMutations,
-} from "@/hooks/inventory"
-import { usePricelists } from "@/hooks/sales"
+} from "@lumiere/query-hooks/hooks/inventory"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 type ScalarId = bigint | number | string

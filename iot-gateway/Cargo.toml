@@ -1,42 +1,23 @@
 [package]
 name = "iot-gateway"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [[bin]]
 name = "iot-gateway"
 path = "src/main.rs"
 
 [dependencies]
-# HTTP server
-axum = { version = "0.7", features = ["macros", "ws"] }
-tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
-
-# Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# MQTT client (IoT device communication)
+axum = { workspace = true, features = ["macros", "ws"] }
+tokio.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 rumqttc = "0.24"
-
-# HTTP client (SpacetimeDB REST API — used for calling reducers)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-
-# Config / environment
-dotenvy = "0.15"
-
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Error handling
-anyhow = "1"
-thiserror = "1"
-
-# Concurrent hash map — hub WebSocket connection registry
-dashmap = "6"
-
-[profile.release]
-opt-level = 3
-lto = true
+stdb-client.workspace = true
+dotenvy.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+dashmap.workspace = true

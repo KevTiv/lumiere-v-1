@@ -7,6 +7,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
+    "./browser-http": "./src/browser-http.ts",
+    "./client-ui-bridge": "./src/client-ui-bridge.ts",
+    "./erp-subscriptions": "./src/queries/erp-subscriptions.ts",
+    "./proposal-row-types": "./src/proposal-row-types.ts",
+    "./warehouse-3d": "./src/warehouse-3d-types.ts",
     "./generated/types": "./src/generated/types.ts",
     "./generated/types/reducers": "./src/generated/types/reducers.ts"
   },
@@ -14,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-query": "latest",
+    "@lumiere/api-client": "workspace:*",
     "spacetimedb": "^2.0.3"
   },
   "peerDependencies": {

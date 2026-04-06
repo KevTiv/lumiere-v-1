@@ -9,12 +9,9 @@
       "@/components/*": ["./src/*"],
       "@/lib/*": ["./src/lib/*"],
       "@/hooks/*": ["./src/hooks/*"],
-      "@/hooks/auth": ["../../web/hooks/auth.ts"],
-      "@/hooks/org-master-csv-imports": ["../../web/hooks/org-master-csv-imports.ts"],
-      "@/hooks/organization-company": ["../../web/hooks/organization-company.ts"],
-      "@/hooks/ai-agents": ["../../web/hooks/ai-agents.ts"],
       "@/lib/org-scoped": ["../../web/lib/org-scoped.ts"],
       "@/lib/query-fetch": ["../../web/lib/query-fetch.ts"],
+      "@/lib/api-fetch": ["../../web/lib/api-fetch.ts"],
       "@/lib/stdb-params-json": ["../../web/lib/stdb-params-json.ts"]
     },
     "jsx": "react-jsx",

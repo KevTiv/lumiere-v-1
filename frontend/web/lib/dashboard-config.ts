@@ -494,9 +494,10 @@ function t(key: string): string {
   }
   return typeof node === "string" ? node : key
 }
-const defaultSalesDashboard = salesDashboard(t)
-const defaultInventoryDashboard = inventoryDashboard(t)
-const defaultTrackersDashboard = trackersDashboard(t)
+const tFn = t as unknown as TFunction
+const defaultSalesDashboard = salesDashboard(tFn)
+const defaultInventoryDashboard = inventoryDashboard(tFn)
+const defaultTrackersDashboard = trackersDashboard(tFn)
 
 export const dashboardConfigs: Record<string, DashboardConfig> = {
   overview: defaultSalesDashboard,

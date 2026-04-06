@@ -98,10 +98,12 @@ export function productRowsToSelectOptions(
 export function productCategoryRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id),
-    label: String(row.name ?? row.id),
-  }))
+  return rows
+    .filter((r) => r.deletedAt == null)
+    .map((row) => ({
+      value: String(row.id),
+      label: String(row.name ?? row.id),
+    }))
 }
 
 export function uomRowsToSelectOptions(

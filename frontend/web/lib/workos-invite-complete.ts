@@ -3,7 +3,6 @@
  */
 import 'server-only'
 
-import type { User } from '@workos-inc/node'
 import {
   callStdbReducer,
   findCredentialByWorkosUserId,
@@ -11,9 +10,10 @@ import {
   getRoleNameInOrganization,
   microsToDate,
 } from '@/lib/stdb-auth-server'
+import { workOsPrimaryEmail, type WorkOsAuthKitUser } from '@/lib/workos-user-fields'
 
 export async function completeInviteAfterWorkOsAuth(
-  user: User,
+  user: WorkOsAuthKitUser,
   inviteTokenPlain: string | undefined,
 ): Promise<void> {
   if (!inviteTokenPlain?.trim()) {
@@ -38,7 +38,7 @@ export async function completeInviteAfterWorkOsAuth(
     throw new Error('Invitation has expired')
   }
 
-  const email = user.email?.trim() ?? ''
+  const email = workOsPrimaryEmail(user)
   if (invite.email.toLowerCase() !== email.toLowerCase()) {
     throw new Error('Signed-in email does not match invitation')
   }

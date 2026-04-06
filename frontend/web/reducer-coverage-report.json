@@ -1,11 +1,12 @@
 {
   "totalRustReducers": 659,
   "productRustReducers": 570,
-  "totalWebReducers": 652,
+  "totalWebReducers": 649,
   "missingFromWeb": [
     "add_casbin_rule",
     "add_org_member",
     "add_user_to_organization",
+    "bootstrap_new_tenant",
     "claim_queue_job",
     "complete_queue_job",
     "create_country",
@@ -479,8 +480,8 @@
         "update_metric_values",
         "update_organization",
         "upsert_organization_settings",
-        "deprecate_account_account",
-        "name"
+        "name",
+        "deprecate_account_account"
       ],
       "missing": [
         "create_google_drive_connection",
@@ -917,7 +918,6 @@
         "update_lead_address",
         "update_lead_details",
         "update_lead_revenue",
-        "delete_lead",
         "create_utm_campaign",
         "update_utm_campaign",
         "create_utm_medium",
@@ -929,7 +929,7 @@
         "unsubscribe_from_record"
       ],
       "missing": [],
-      "coverage": 104,
+      "coverage": 100,
       "productReducers": [
         "post_internal_note",
         "subscribe_to_record",
@@ -969,13 +969,13 @@
         "ensure_dev_admin"
       ],
       "web": [
-        "bootstrap_new_tenant",
         "ensure_dev_admin"
       ],
       "missing": [
+        "bootstrap_new_tenant",
         "seed_dev_data"
       ],
-      "coverage": 67,
+      "coverage": 33,
       "productReducers": [],
       "productCoverage": 0
     },
@@ -1298,13 +1298,12 @@
         "use_serial",
         "validate_cycle_count",
         "validate_stock_inventory",
-        "validate_stock_picking",
-        "create_warehouse3_dzone"
+        "validate_stock_picking"
       ],
       "missing": [
         "process_pending_scans"
       ],
-      "coverage": 119,
+      "coverage": 118,
       "productReducers": [
         "create_uom_category",
         "create_uom",
@@ -2373,7 +2372,8 @@
     "apiCallLiteral": 605,
     "useStdbReducer": 24,
     "useStdbReducerWithInvalidation": 2,
-    "callReducerLiteral": 13,
-    "callReducersBatch": 1
+    "callReducerLiteral": 3,
+    "callReducersBatch": 1,
+    "stdbBrowserCall": 20
   }
 }

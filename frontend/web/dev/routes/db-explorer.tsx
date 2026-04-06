@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-fetch'
 import { createRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Route as rootRoute } from './__root'
@@ -53,7 +54,7 @@ function DbExplorerPage() {
     try {
       const params = new URLSearchParams()
       if (org) params.set('organizationId', org)
-      const response = await fetch(`/api/query/${res}${params.toString() ? `?${params}` : ''}`)
+      const response = await apiFetch(`/api/query/${res}${params.toString() ? `?${params}` : ''}`)
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
         throw new Error(err.error ?? `HTTP ${response.status}`)

@@ -86,8 +86,8 @@ export default async function RootLayout({
   const store = await cookies()
   const hasStdbCookie = Boolean(store.get("stdb_token")?.value)
   const devAdmin = process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
-  // Dev admin: allow first paint without cookies so the client can connect from localStorage
-  // and bridge the token via saveStdbSession (WebSocket + /api/query then succeed).
+  // Dev admin: allow first paint without stdb cookies (local prototyping only).
+  // Production sessions rely on stdb_token from sign-in / WorkOS bridge (see saveStdbSession).
   if (!hasStdbCookie && !devAdmin) redirect("/sign-in")
 
   return (

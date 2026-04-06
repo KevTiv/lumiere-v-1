@@ -3,9 +3,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { useFormConfiguration } from "./use-form-config"
 import type { FormConfig, FormConfigField, FormRoleConfig } from "../config/types"
 
-vi.mock("@lumiere/stdb", () => ({
-  getStdbConnection: () => null,
-  useStdbConnection: () => ({ identity: null, connected: false, organizationId: undefined }),
+vi.mock("@lumiere/erp-session", () => ({
+  useErpSession: () => ({ identity: null, connected: false, organizationId: undefined }),
+}))
+
+vi.mock("@lumiere/stdb/browser-http", () => ({
+  stdbBrowserQuery: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock("@lumiere/stdb/client-ui-bridge", () => ({
   getFormConfiguration: vi.fn().mockResolvedValue(undefined),
   getOrganizationFormConfigs: vi.fn().mockResolvedValue(undefined),
   addUserCustomField: vi.fn(),

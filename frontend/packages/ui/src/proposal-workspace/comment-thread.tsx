@@ -5,7 +5,8 @@ import { useTranslation } from "@lumiere/i18n"
 import { CheckCheck, MessageSquare, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { ProposalComment } from "@lumiere/stdb"
+import type { ProposalComment } from "@lumiere/stdb/proposal-row-types"
+import { rowBigint, rowBool, rowString } from "./row-field-utils"
 
 interface CommentThreadProps {
   comments: ProposalComment[]
@@ -22,10 +23,15 @@ interface CommentCardProps {
   onResolve: (id: bigint) => void
 }
 
-function formatDate(ts: bigint | number | null | undefined): string {
-  if (!ts) return ""
-  const ms = Number(ts) / 1000 // micros → ms
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+function formatDate(ts: unknown): string {
+  if (ts == null || ts === "") return ""
+  try {
+    const micros = typeof ts === "bigint" ? ts : BigInt(String(ts))
+    const ms = Number(micros) / 1000 // micros → ms
+    return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  } catch {
+    return ""
+  }
 }
 
 function avatarColor(userId: string): string {
@@ -37,12 +43,12 @@ function avatarColor(userId: string): string {
 
 function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: CommentCardProps) {
   const { t } = useTranslation()
-  const isResolved = comment.isResolved
-  const initials = String(comment.authorName ?? "?").slice(0, 2).toUpperCase()
-  const userId = String(comment.authorId)
+  const isResolved = rowBool(comment.isResolved)
+  const initials = rowString(comment.authorName, "?").slice(0, 2).toUpperCase()
+  const userId = rowString(comment.authorId)
 
   return (
-    <div className={cn("space-y-2", isResolved && "opacity-50")}>
+    <div className={cn("space-y-2", isResolved ? "opacity-50" : undefined)}>
       <div className="flex items-start gap-2">
         <div
           className="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center shrink-0 mt-0.5"
@@ -52,7 +58,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-medium">{comment.authorName}</span>
+            <span className="text-xs font-medium">{rowString(comment.authorName)}</span>
             <span className="text-[10px] text-muted-foreground">{formatDate(comment.createDate)}</span>
             {isResolved && (
               <span className="text-[10px] text-success flex items-center gap-0.5">
@@ -60,13 +66,13 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
               </span>
             )}
           </div>
-          <p className={cn("text-xs mt-0.5 text-foreground", isResolved && "line-through decoration-muted-foreground")}>
-            {comment.content}
+          <p className={cn("text-xs mt-0.5 text-foreground", isResolved ? "line-through decoration-muted-foreground" : undefined)}>
+            {rowString(comment.content)}
           </p>
           {!isResolved && (
             <div className="flex items-center gap-2 mt-1">
               <button
-                onClick={() => onReply(comment.id)}
+                onClick={() => onReply(rowBigint(comment.id))}
                 className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
               >
                 <Reply className="h-2.5 w-2.5" />
@@ -74,7 +80,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
               </button>
               {(userId === currentUserId || !currentUserId) && (
                 <button
-                  onClick={() => onResolve(comment.id)}
+                  onClick={() => onResolve(rowBigint(comment.id))}
                   className="text-[10px] text-muted-foreground hover:text-success flex items-center gap-0.5 transition-colors"
                 >
                   <CheckCheck className="h-2.5 w-2.5" />
@@ -93,16 +99,16 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
             <div key={String(reply.id)} className="flex items-start gap-2">
               <div
                 className="w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0 mt-0.5"
-                style={{ backgroundColor: avatarColor(String(reply.authorId)) }}
+                style={{ backgroundColor: avatarColor(rowString(reply.authorId)) }}
               >
-                {String(reply.authorName ?? "?").slice(0, 2).toUpperCase()}
+                {rowString(reply.authorName, "?").slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium">{reply.authorName}</span>
+                  <span className="text-xs font-medium">{rowString(reply.authorName)}</span>
                   <span className="text-[10px] text-muted-foreground">{formatDate(reply.createDate)}</span>
                 </div>
-                <p className="text-xs mt-0.5">{reply.content}</p>
+                <p className="text-xs mt-0.5">{rowString(reply.content)}</p>
               </div>
             </div>
           ))}
@@ -121,7 +127,7 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
 
   // Only root comments (no parentId)
   const rootComments = comments.filter((c) => !c.parentId)
-  const openCount = comments.filter((c) => !c.isResolved && !c.parentId).length
+  const openCount = comments.filter((c) => !rowBool(c.isResolved) && !c.parentId).length
 
   const handleAddRoot = () => {
     if (!newComment.trim()) return

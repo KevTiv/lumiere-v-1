@@ -67,7 +67,7 @@ export const manufacturingOrdersTableConfig = (t: TFunction): EntityViewConfig =
     filters: [
       {
         key: "state",
-        label: t("manufacturing.manufacturingOrders.filters.state"),
+        label: t("manufacturing.manufacturingOrders.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("manufacturing.manufacturingOrders.filters.state.options.Draft") },
@@ -107,7 +107,7 @@ export const bomsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "type",
-        label: t("manufacturing.billsOfMaterials.filters.type"),
+        label: t("manufacturing.billsOfMaterials.filters.type.label"),
         type: "select",
         options: [
           { value: "Normal", label: t("manufacturing.billsOfMaterials.filters.type.options.Normal") },
@@ -168,7 +168,7 @@ export const workordersTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("manufacturing.workOrders.filters.state"),
+        label: t("manufacturing.workOrders.filters.state.label"),
         type: "select",
         options: [
           { value: "Pending", label: t("manufacturing.workOrders.filters.state.options.Pending") },

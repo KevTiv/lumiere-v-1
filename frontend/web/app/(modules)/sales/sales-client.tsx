@@ -79,9 +79,9 @@ import {
   useCreatePaymentMethod,
   useCreateLoyaltyProgram,
   useCreateLoyaltyCard,
-} from '@/hooks/sales';
-import { useContacts } from '@/hooks/crm';
-import { useWarehouses } from '@/hooks/inventory';
+} from '@lumiere/query-hooks/hooks/sales';
+import { useContacts } from '@lumiere/query-hooks/hooks/crm';
+import { useWarehouses } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import {
   contactRowsToPartnerSelectOptions,
@@ -160,34 +160,34 @@ function SalesClientLoaded({
   const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
 
-  const { data: orders = [] } = useSaleOrders(companyId, initialOrders);
+  const { data: orders = [] } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
-    companyId,
+    orgId,
     initialOrderLines,
   );
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
   const { data: pricelistItems = [] } = usePricelistItems(
-    companyId,
+    orgId,
     initialPricelistItems,
   );
   const { data: deliveries = [] } = usePickingBatches(
-    companyId,
+    orgId,
     initialDeliveries,
   );
   const { data: deliveryCarriers = [] } = useDeliveryCarriers(
-    companyId,
+    orgId,
     initialDeliveryCarriers,
   );
   const { data: deliveryPriceRules = [] } = useDeliveryPriceRules(
-    companyId,
+    orgId,
     initialDeliveryPriceRules,
   );
   const { data: shippingMethods = [] } = useShippingMethods(
-    companyId,
+    orgId,
     initialShippingMethods,
   );
   const { data: posPaymentMethods = [] } = usePosPaymentMethods(
-    companyId,
+    orgId,
     initialPosPaymentMethods,
   );
   const { data: loyaltyPrograms = [] } = usePosLoyaltyPrograms(
@@ -195,8 +195,8 @@ function SalesClientLoaded({
     initialLoyaltyPrograms,
   );
   const { data: loyaltyCards = [] } = usePosLoyaltyCards(orgId, initialLoyaltyCards);
-  const { data: contacts = [] } = useContacts(companyId, initialContacts);
-  const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses);
+  const { data: contacts = [] } = useContacts(orgId, initialContacts);
+  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
 
   const createSaleOrder = useCreateSaleOrder(orgId, companyId);
   const createPricelist = useCreatePricelist(orgId);
@@ -791,15 +791,15 @@ function SalesClientLoaded({
       const p = toCreateLoyaltyProgramParams(formData);
       if (p) createLoyaltyProgram.mutate(logisticsParamsToJson(p));
     } else if (action === 'createLoyaltyCard') {
-      const programId = formData.programId;
+      const programIdNum = Number(formData.programId);
       const code = String(formData.code ?? '').trim();
       const points = Number(formData.points);
-      if (programId === '' || programId == null || !code || !Number.isFinite(points)) return;
+      if (!Number.isFinite(programIdNum) || programIdNum <= 0 || !code || !Number.isFinite(points)) return;
       const partnerRaw = formData.partnerId;
       createLoyaltyCard.mutate({
         partnerId:
           partnerRaw === '' || partnerRaw == null ? null : Number(partnerRaw),
-        programId,
+        programId: programIdNum,
         code,
         points,
       });

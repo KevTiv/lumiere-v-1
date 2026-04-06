@@ -1,7 +1,11 @@
 {
   "name": "lumiere-frontend",
   "private": true,
+  "packageManager": "pnpm@10.31.0",
   "scripts": {
+    "i18n:check": "node scripts/check-json-duplicate-keys.mjs && node scripts/check-i18n-keys.mjs",
+    "i18n:check-json": "node scripts/check-json-duplicate-keys.mjs",
+    "i18n:normalize-filters": "node scripts/normalize-i18n-filter-options.mjs",
     "web": "pnpm --filter web dev",
     "mobile": "pnpm --filter mobile start",
     "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",
@@ -29,6 +33,10 @@
         "@react-leaflet/core>react": "19",
         "@react-leaflet/core>react-dom": "19"
       }
+    },
+    "overrides": {
+      "@tanstack/react-query": "5.96.2",
+      "@tanstack/query-core": "5.96.2"
     }
   },
   "dependencies": {

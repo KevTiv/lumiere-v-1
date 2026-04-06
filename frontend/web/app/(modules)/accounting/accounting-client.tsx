@@ -95,6 +95,7 @@ import {
   toCreateCurrencyRateParamsFromForm,
   createCurrencyRateParamsToJson,
 } from "@/lib/accounting-create-params"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
@@ -208,9 +209,10 @@ import {
   useDeletePaymentTermLine,
   useCreateCurrencyRate,
   useSetAccountAssetActive,
-} from "@/hooks/accounting"
+} from "@lumiere/query-hooks/hooks/accounting"
 import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
-import type { AccountMove } from "@/hooks/accounting"
+import { useToast } from "@/hooks/use-toast"
+import type { AccountMove } from "@lumiere/query-hooks/hooks/accounting"
 import {
   InvoiceListView,
   InvoiceDetailModal,
@@ -313,6 +315,19 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
   return raw.map((id) => BigInt(String(id)))
 }
 
+/** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
+function journalIdFromInvoiceModalSave(
+  params: Partial<{ journalId?: bigint }>,
+  journals: Record<string, unknown>[],
+): bigint | null {
+  const j = params.journalId
+  if (j != null) {
+    return typeof j === "bigint" ? j : BigInt(String(j))
+  }
+  const id = journals[0]?.id
+  return id != null ? BigInt(String(id)) : null
+}
+
 type AccountingCsvImportKind =
   | "account"
   | "accountMove"
@@ -357,8 +372,10 @@ function AccountingClientLoaded({
   organizationId,
 }: AccountingClientLoadedProps) {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
-  const { companyId } = orgBigInts(organizationId)
+  /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
+  const { orgId, companyId } = orgBigInts(organizationId)
 
   // Quick-action form modal (dashboard tab)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -387,54 +404,58 @@ function AccountingClientLoaded({
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { data: accounts = [] } = useAccountAccounts(companyId, {
-    enabled: !!companyId,
+  const { data: accounts = [] } = useAccountAccounts(orgId, {
+    enabled: organizationId > 0,
     initialData: initialAccounts,
   })
-  const { data: allMoves = [] } = useAccountMoves(companyId, {
-    enabled: !!companyId,
+  const { data: allMoves = [] } = useAccountMoves(orgId, {
+    enabled: organizationId > 0,
     initialData: initialMoves,
   })
-  const { data: taxes = [] } = useAccountTaxes(companyId, { enabled: !!companyId })
-  const { data: budgets = [] } = useCrossoveredBudgets(companyId, {
-    enabled: !!companyId,
+  const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
+  const { data: budgets = [] } = useCrossoveredBudgets(orgId, {
+    enabled: organizationId > 0,
     initialData: initialBudgets,
   })
-  const { data: taxDeadlines = [] } = useTaxDeadlines(companyId, { enabled: !!companyId })
-  const { data: analytic = [] } = useAccountAnalyticAccounts(companyId, { enabled: !!companyId })
-  const { data: analyticLines = [] } = useAccountAnalyticLines(companyId, { enabled: !!companyId })
-  const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(companyId, {
-    enabled: !!companyId,
+  const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
+  const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
+  const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
+  const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
+    enabled: organizationId > 0,
   })
-  const { data: bankStatements = [] } = useAccountBankStatements(companyId, { enabled: !!companyId })
-  const { data: bankStatementLines = [] } = useAccountBankStatementLines(companyId, { enabled: !!companyId })
-  const { data: bankMatchCandidates = [] } = useBankMatchCandidates(companyId, { enabled: !!companyId })
-  const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(companyId, { enabled: !!companyId })
-  const { data: fixedAssets = [] } = useAccountFixedAssets(companyId, { enabled: !!companyId })
-  const { data: accountPayments = [] } = useAccountPayments(companyId, { enabled: !!companyId })
-  const { data: paymentTerms = [] } = useAccountPaymentTerms(companyId, { enabled: !!companyId })
-  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(companyId, { enabled: !!companyId })
-  const { data: depreciationLines = [] } = useDepreciationLines(companyId, { enabled: !!companyId })
-  const { data: intercompanyRules = [] } = useIntercompanyRules(companyId, { enabled: !!companyId })
-  const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(companyId, { enabled: !!companyId })
-  const { data: journals = [] } = useAccountJournals(companyId, { enabled: !!companyId })
-  const { data: accountTypes = [] } = useAccountAccountTypes(companyId, { enabled: !!companyId })
-  const { data: accountGroups = [] } = useAccountGroups(companyId, { enabled: !!companyId })
-  const { data: consolidationAccounts = [] } = useConsolidationAccounts(companyId, {
-    enabled: !!companyId,
+  const { data: bankStatements = [] } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
+  const { data: bankStatementLines = [] } = useAccountBankStatementLines(orgId, { enabled: organizationId > 0 })
+  const { data: bankMatchCandidates = [] } = useBankMatchCandidates(orgId, { enabled: organizationId > 0 })
+  const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(orgId, {
+    enabled: organizationId > 0,
   })
-  const { data: consolidationJournals = [] } = useConsolidationJournals(companyId, {
-    enabled: !!companyId,
+  const { data: fixedAssets = [] } = useAccountFixedAssets(orgId, { enabled: organizationId > 0 })
+  const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
+  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
+  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
+  const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
+  const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
+  const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
+    enabled: organizationId > 0,
   })
-  const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(companyId, {
-    enabled: !!companyId,
+  const { data: journals = [] } = useAccountJournals(orgId, { enabled: organizationId > 0 })
+  const { data: accountTypes = [] } = useAccountAccountTypes(orgId, { enabled: organizationId > 0 })
+  const { data: accountGroups = [] } = useAccountGroups(orgId, { enabled: organizationId > 0 })
+  const { data: consolidationAccounts = [] } = useConsolidationAccounts(orgId, {
+    enabled: organizationId > 0,
   })
-  const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(companyId, {
-    enabled: !!companyId,
+  const { data: consolidationJournals = [] } = useConsolidationJournals(orgId, {
+    enabled: organizationId > 0,
+  })
+  const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(orgId, {
+    enabled: organizationId > 0,
+  })
+  const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
+    enabled: organizationId > 0,
     initialData: initialFiscalYears,
   })
-  const { data: accountPeriodsRaw = [] } = useAccountPeriods(companyId, {
-    enabled: !!companyId,
+  const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
+    enabled: organizationId > 0,
     initialData: initialAccountPeriods,
   })
 
@@ -536,8 +557,11 @@ function AccountingClientLoaded({
   )
 
   const defaultCurrencyId = useMemo(() => {
-    const cid = accounts.find((a) => a.currencyId != null)?.currencyId
-    return cid != null ? BigInt(String(cid)) : 1n
+    for (const a of accounts) {
+      const id = optionalBigIntU64((a as { currencyId?: unknown }).currencyId)
+      if (id !== undefined) return id
+    }
+    return 1n
   }, [accounts])
 
   const paymentTermSelectOptions = useMemo(() => {
@@ -598,17 +622,17 @@ function AccountingClientLoaded({
   )
 
   // ── Mutations ───────────────────────────────────────────────────────────────
-  const createAccount = useCreateAccountAccount()
+  const createAccount = useCreateAccountAccount(organizationId)
   const createAccountType = useCreateAccountAccountType(organizationId)
   const updateAccountType = useUpdateAccountAccountType(organizationId)
   const createAccountGroup = useCreateAccountGroup(organizationId)
   const updateAccountGroup = useUpdateAccountGroup(organizationId)
-  const createMove = useCreateAccountMove()
-  const createTax = useCreateAccountTax()
+  const createMove = useCreateAccountMove(organizationId)
+  const createTax = useCreateAccountTax(organizationId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
-  const postMove = usePostAccountMove()
-  const postInvoice = usePostInvoice()
-  const cancelMove = useCancelAccountMove()
+  const postMove = usePostAccountMove(organizationId)
+  const postInvoice = usePostInvoice(organizationId)
+  const cancelMove = useCancelAccountMove(organizationId)
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, companyId)
   const refreshTaxDeadlineStatuses = useRefreshTaxDeadlineStatuses(organizationId)
   const scheduleTaxDeadlineUpdates = useScheduleTaxDeadlineUpdates(organizationId)
@@ -1657,7 +1681,7 @@ function AccountingClientLoaded({
   )
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
@@ -1669,7 +1693,7 @@ function AccountingClientLoaded({
       const p = toCreateJournalEntryMoveParams(formData)
       if (p) createMove.mutate([String(organizationId), accountingParamsToJson(p)])
     } else if (action === "createTax") {
-      createTax.mutate([
+      await createTax.mutateAsync([
         String(organizationId),
         String(companyId),
         accountingParamsToJson(toCreateAccountTaxParams(formData)),
@@ -2170,9 +2194,9 @@ function AccountingClientLoaded({
         onRecalculateTotals={
           selectedInvoice
             ? () =>
-                void computeInvoiceTotals.mutateAsync(
-                  selectedInvoice.id as string | number | bigint,
-                )
+              void computeInvoiceTotals.mutateAsync(
+                selectedInvoice.id as string | number | bigint,
+              )
             : undefined
         }
         postDraftPending={postMove.isPending || postInvoice.isPending}
@@ -2183,16 +2207,29 @@ function AccountingClientLoaded({
       <CreateInvoiceModal
         open={showCreateInvoice}
         onClose={() => setShowCreateInvoice(false)}
-        journalOptions={journalRowsAsSelectOptions.length > 0 ? journalRowsAsSelectOptions : undefined}
+        journalOptions={journalRowsAsSelectOptions}
         onSave={(params) => {
-          if (journals.length === 0) return
-          const jid = params.journalId
-          if (jid == null) return
-          const journalId = typeof jid === "bigint" ? jid : BigInt(String(jid))
+          if (journals.length === 0) {
+            toast({
+              variant: "destructive",
+              title: t("accounting.forms.newInvoice.createTitle"),
+              description: t("accounting.forms.newInvoice.noJournalsHint"),
+            })
+            return
+          }
+          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          if (jid == null) {
+            toast({
+              variant: "destructive",
+              title: t("accounting.forms.newInvoice.createTitle"),
+              description: t("accounting.forms.newInvoice.fields.journalPlaceholder"),
+            })
+            return
+          }
           const p = toCreateAccountMoveFromInvoiceModal(
             params as Record<string, unknown>,
             "OutInvoice",
-            journalId,
+            jid,
             "Customer Invoice",
           )
           createMove.mutate([String(organizationId), accountingParamsToJson(p)])
@@ -2203,16 +2240,29 @@ function AccountingClientLoaded({
       <CreateInvoiceModal
         open={showCreateBill}
         onClose={() => setShowCreateBill(false)}
-        journalOptions={journalRowsAsSelectOptions.length > 0 ? journalRowsAsSelectOptions : undefined}
+        journalOptions={journalRowsAsSelectOptions}
         onSave={(params) => {
-          if (journals.length === 0) return
-          const jid = params.journalId
-          if (jid == null) return
-          const journalId = typeof jid === "bigint" ? jid : BigInt(String(jid))
+          if (journals.length === 0) {
+            toast({
+              variant: "destructive",
+              title: t("accounting.forms.newBill.createTitle"),
+              description: t("accounting.forms.newBill.noJournalsHint"),
+            })
+            return
+          }
+          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          if (jid == null) {
+            toast({
+              variant: "destructive",
+              title: t("accounting.forms.newBill.createTitle"),
+              description: t("accounting.forms.newBill.fields.journalPlaceholder"),
+            })
+            return
+          }
           const p = toCreateAccountMoveFromInvoiceModal(
             params as Record<string, unknown>,
             "InInvoice",
-            journalId,
+            jid,
             "Vendor Bill",
           )
           createMove.mutate([String(organizationId), accountingParamsToJson(p)])
@@ -2224,10 +2274,17 @@ function AccountingClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? journalEntryFormConfig}
-        onSubmit={(formData) => {
-          if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+        onSubmit={async (formData) => {
+          if (!quickActionForm) return
+          try {
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
+          } catch (e) {
+            toast({
+              variant: "destructive",
+              title: t("common.error"),
+              description: e instanceof Error ? e.message : String(e),
+            })
           }
         }}
       />

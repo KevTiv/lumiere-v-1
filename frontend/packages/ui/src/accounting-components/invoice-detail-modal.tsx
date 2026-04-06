@@ -37,7 +37,7 @@ import { useTranslation } from "@lumiere/i18n"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
   if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch / 1000n)
+  const ms = Number(ts.microsSinceUnixEpoch) / 1000
   return new Date(ms).toLocaleDateString("en-US", long
     ? { month: "long", day: "numeric", year: "numeric" }
     : { month: "short", day: "numeric", year: "numeric" }

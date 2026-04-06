@@ -42,7 +42,7 @@ export const bankStatementsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("accounting.entities.bankStatements.filters.state"),
+        label: t("accounting.entities.bankStatements.filters.state.label"),
         type: "select",
         options: [
           { value: "Open", label: t("accounting.entities.bankStatements.filters.state.options.Open") },
@@ -78,7 +78,7 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("accounting.entities.fixedAssets.filters.state"),
+        label: t("accounting.entities.fixedAssets.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("accounting.entities.fixedAssets.filters.state.options.Draft") },
@@ -127,7 +127,7 @@ export const accountPaymentsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("accounting.entities.payments.filters.state"),
+        label: t("accounting.entities.payments.filters.state.label"),
         type: "select",
         options: [
           { value: "NotPaid", label: t("accounting.entities.payments.filters.state.options.NotPaid") },
@@ -232,7 +232,7 @@ export const fiscalYearsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "stateLabel",
-        label: t("accounting.entities.fiscalYears.filters.state"),
+        label: t("accounting.entities.fiscalYears.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("accounting.entities.fiscalYears.filters.state.options.Draft") },
@@ -291,7 +291,7 @@ export const accountPeriodsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "stateLabel",
-        label: t("accounting.entities.accountPeriods.filters.state"),
+        label: t("accounting.entities.accountPeriods.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("accounting.entities.accountPeriods.filters.state.options.Draft") },
@@ -469,7 +469,7 @@ export const intercompanyRulesTableConfig = (t: TFunction): EntityViewConfig => 
     filters: [
       {
         key: "ruleType",
-        label: t("accounting.entities.intercompanyRules.filters.ruleType"),
+        label: t("accounting.entities.intercompanyRules.filters.ruleType.label"),
         type: "select",
         options: [
           { value: "Sale", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Sale") },
@@ -480,7 +480,7 @@ export const intercompanyRulesTableConfig = (t: TFunction): EntityViewConfig => 
       },
       {
         key: "isActive",
-        label: t("accounting.entities.intercompanyRules.filters.isActive"),
+        label: t("accounting.entities.intercompanyRules.filters.isActive.label"),
         type: "select",
         options: [
           { value: "true", label: t("accounting.entities.intercompanyRules.filters.isActive.options.true") },
@@ -532,10 +532,10 @@ const intercompanyTransactionTypeBadges = (t: TFunction) => ({
     Service: "default",
   },
   badgeLabels: {
-    Sale: t("accounting.entities.intercompanyTransactions.states.Sale"),
-    Purchase: t("accounting.entities.intercompanyTransactions.states.Purchase"),
-    Transfer: t("accounting.entities.intercompanyTransactions.states.Transfer"),
-    Service: t("accounting.entities.intercompanyTransactions.states.Service"),
+    Sale: t("accounting.entities.intercompanyTransactions.filters.transactionType.options.Sale"),
+    Purchase: t("accounting.entities.intercompanyTransactions.filters.transactionType.options.Purchase"),
+    Transfer: t("accounting.entities.intercompanyTransactions.filters.transactionType.options.Transfer"),
+    Service: t("accounting.entities.intercompanyTransactions.filters.transactionType.options.Service"),
   },
 }) as const
 
@@ -552,7 +552,7 @@ export const intercompanyTransactionsTableConfig = (t: TFunction): EntityViewCon
     filters: [
       {
         key: "state",
-        label: t("accounting.entities.intercompanyTransactions.filters.state"),
+        label: t("accounting.entities.intercompanyTransactions.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("accounting.entities.intercompanyTransactions.filters.state.options.Draft") },
@@ -566,7 +566,7 @@ export const intercompanyTransactionsTableConfig = (t: TFunction): EntityViewCon
       },
       {
         key: "transactionType",
-        label: t("accounting.entities.intercompanyTransactions.filters.transactionType"),
+        label: t("accounting.entities.intercompanyTransactions.filters.transactionType.label"),
         type: "select",
         options: [
           { value: "Sale", label: t("accounting.entities.intercompanyTransactions.filters.transactionType.options.Sale") },

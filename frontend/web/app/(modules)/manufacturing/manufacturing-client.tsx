@@ -25,7 +25,7 @@ import {
   useMrpRoutingWorkcenters,
   useQualityChecks,
   useManufacturingMutations,
-} from "@/hooks/manufacturing"
+} from "@lumiere/query-hooks/hooks/manufacturing"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -33,8 +33,8 @@ import {
   useStockQuants,
   useStockPickings,
   useWarehouses,
-} from "@/hooks/inventory"
-import { useIotDevices } from "@/hooks/iot"
+} from "@lumiere/query-hooks/hooks/inventory"
+import { useIotDevices } from "@lumiere/query-hooks/hooks/iot"
 import {
   productRowsToSelectOptions,
   warehouseRowsToSelectOptions,
@@ -91,18 +91,18 @@ function ManufacturingClientLoaded({
   const [csvError, setCsvError] = useState<string | null>(null)
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
-  const { data: productions = [] } = useMrpProductions(companyId, initialProductions)
-  const { data: boms = [] } = useMrpBoms(companyId, initialBoms)
-  const { data: bomLines = [] } = useMrpBomLines(companyId, initialBomLines)
-  const { data: workorders = [] } = useMrpWorkorders(companyId, initialWorkorders)
-  const { data: workcenters = [] } = useMrpWorkcenters(companyId, initialWorkcenters)
-  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(companyId, initialRoutingOperations)
+  const { data: productions = [] } = useMrpProductions(orgId, initialProductions)
+  const { data: boms = [] } = useMrpBoms(orgId, initialBoms)
+  const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines)
+  const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders)
+  const { data: workcenters = [] } = useMrpWorkcenters(orgId, initialWorkcenters)
+  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(orgId, initialRoutingOperations)
   const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices)
-  const { data: qualityChecks = [] } = useQualityChecks(companyId)
+  const { data: qualityChecks = [] } = useQualityChecks(orgId)
   const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: warehouses = [] } = useWarehouses(companyId, initialWarehouses)
-  const { data: transfers = [] } = useStockPickings(companyId, initialStockPickings)
-  const { data: stockQuants = [] } = useStockQuants(companyId, initialStockQuants)
+  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses)
+  const { data: transfers = [] } = useStockPickings(orgId, initialStockPickings)
+  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
 
   const m = useManufacturingMutations(orgId, companyId)
 

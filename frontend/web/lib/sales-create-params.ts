@@ -2,8 +2,10 @@
  * Maps Sales module form payloads to SpacetimeDB reducer param types.
  */
 
-import type { CreatePricelistParams, CreateSaleOrderParams } from '@lumiere/stdb'
-import { Timestamp } from 'spacetimedb'
+import type { CreatePricelistParams, CreateSaleOrderParams } from '@lumiere/stdb/generated/types'
+import type { Timestamp } from "spacetimedb"
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -34,7 +36,7 @@ function optionalTimestampFromFormDate(v: unknown): Timestamp | undefined {
   if (v == null || String(v).trim() === '') return undefined
   const d = new Date(String(v))
   if (Number.isNaN(d.getTime())) return undefined
-  return Timestamp.fromDate(d)
+  return stbTimestampFromDate(d)
 }
 
 function discountPolicyFromForm(raw: unknown): CreatePricelistParams['discountPolicy'] {

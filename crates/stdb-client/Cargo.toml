@@ -1,0 +1,12 @@
+[package]
+name = "stdb-client"
+version.workspace = true
+edition.workspace = true
+description = "SpacetimeDB HTTP client (SQL + reducers) with SATS-JSON row parsing"
+
+[dependencies]
+anyhow.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

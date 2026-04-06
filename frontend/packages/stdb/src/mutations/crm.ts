@@ -1,35 +1,26 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { stdbBrowserCall } from "../browser-http"
 import type {
-  CreateLeadParams,
-  CreateOpportunityParams,
-  CreateContactParams,
   CreateUtmCampaignParams,
   UpdateUtmCampaignParams,
   CreateUtmMediumParams,
   UpdateUtmMediumParams,
   CreateUtmSourceParams,
   UpdateUtmSourceParams,
-} from "../generated/types";
-import { getStdbConnection } from "../connection";
+} from "../generated/types"
 
 export type {
-  CreateLeadParams,
-  CreateOpportunityParams,
-  CreateContactParams,
   CreateUtmCampaignParams,
   UpdateUtmCampaignParams,
   CreateUtmMediumParams,
   UpdateUtmMediumParams,
   CreateUtmSourceParams,
   UpdateUtmSourceParams,
-};
+}
 
 // ── UTM (marketing attribution) ──────────────────────────────────────────────
 
 export function createUtmCampaign(organizationId: bigint, params: CreateUtmCampaignParams) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.createUtmCampaign({ organizationId, params });
+  return stdbBrowserCall("create_utm_campaign", [organizationId.toString(), params])
 }
 
 export function updateUtmCampaign(
@@ -37,15 +28,15 @@ export function updateUtmCampaign(
   campaignId: bigint,
   params: UpdateUtmCampaignParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.updateUtmCampaign({ organizationId, campaignId, params });
+  return stdbBrowserCall("update_utm_campaign", [
+    organizationId.toString(),
+    campaignId.toString(),
+    params,
+  ])
 }
 
 export function createUtmMedium(organizationId: bigint, params: CreateUtmMediumParams) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.createUtmMedium({ organizationId, params });
+  return stdbBrowserCall("create_utm_medium", [organizationId.toString(), params])
 }
 
 export function updateUtmMedium(
@@ -53,15 +44,15 @@ export function updateUtmMedium(
   mediumId: bigint,
   params: UpdateUtmMediumParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.updateUtmMedium({ organizationId, mediumId, params });
+  return stdbBrowserCall("update_utm_medium", [
+    organizationId.toString(),
+    mediumId.toString(),
+    params,
+  ])
 }
 
 export function createUtmSource(organizationId: bigint, params: CreateUtmSourceParams) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.createUtmSource({ organizationId, params });
+  return stdbBrowserCall("create_utm_source", [organizationId.toString(), params])
 }
 
 export function updateUtmSource(
@@ -69,9 +60,11 @@ export function updateUtmSource(
   sourceId: bigint,
   params: UpdateUtmSourceParams,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.updateUtmSource({ organizationId, sourceId, params });
+  return stdbBrowserCall("update_utm_source", [
+    organizationId.toString(),
+    sourceId.toString(),
+    params,
+  ])
 }
 
 // ── Chatter / followers ──────────────────────────────────────────────────────
@@ -82,9 +75,12 @@ export function postInternalNote(
   resId: bigint,
   body: string,
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.postInternalNote({ organizationId, model, resId, body });
+  return stdbBrowserCall("post_internal_note", [
+    organizationId.toString(),
+    model,
+    resId.toString(),
+    body,
+  ])
 }
 
 export function subscribeToRecord(
@@ -93,55 +89,18 @@ export function subscribeToRecord(
   resId: bigint,
   subtypes: string[],
 ) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.subscribeToRecord({ organizationId, resModel, resId, subtypes });
+  return stdbBrowserCall("subscribe_to_record", [
+    organizationId.toString(),
+    resModel,
+    resId.toString(),
+    subtypes,
+  ])
 }
 
 export function unsubscribeFromRecord(organizationId: bigint, resModel: string, resId: bigint) {
-  const conn = getStdbConnection();
-  if (!conn) throw new Error("Not connected");
-  return conn.reducers.unsubscribeFromRecord({ organizationId, resModel, resId });
-}
-
-export function useCreateLead(organizationId: bigint) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (params: CreateLeadParams) => {
-      const conn = getStdbConnection();
-      if (!conn) throw new Error("Not connected");
-      return conn.reducers.createLead({ organizationId, params });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-    },
-  });
-}
-
-export function useCreateOpportunity(organizationId: bigint) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (params: CreateOpportunityParams) => {
-      const conn = getStdbConnection();
-      if (!conn) throw new Error("Not connected");
-      return conn.reducers.createOpportunity({ organizationId, params });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["opportunities"] });
-    },
-  });
-}
-
-export function useCreateContact(organizationId: bigint) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (params: CreateContactParams) => {
-      const conn = getStdbConnection();
-      if (!conn) throw new Error("Not connected");
-      return conn.reducers.createContact({ organizationId, params });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
-    },
-  });
+  return stdbBrowserCall("unsubscribe_from_record", [
+    organizationId.toString(),
+    resModel,
+    resId.toString(),
+  ])
 }

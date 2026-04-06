@@ -40,6 +40,11 @@ function fq(opts?: StdbServerQueryOptions): FieldAccessContext | undefined {
   return opts?.fieldAccess
 }
 
+/** SpacetimeDB HTTP SQL does not support `deleted_at IS NULL` — filter after fetch (rows use camelCase keys). */
+function rowNotSoftDeleted(r: Record<string, unknown>): boolean {
+  return r.deletedAt == null
+}
+
 /** SpacetimeDB HTTP SQL rejects some `ORDER BY` shapes; sort client-side after fetch. */
 function sortSqlRows<T extends Record<string, unknown>>(
   rows: T[],
@@ -60,10 +65,11 @@ async function companyIdsForOrganization(
   opts?: StdbServerQueryOptions,
 ): Promise<bigint[]> {
   const org = typeof organizationId === 'bigint' ? organizationId : BigInt(organizationId)
-  const sql = selectOrgScopedSql('companies', 'company', org, fq(opts), ' AND deleted_at IS NULL', '')
+  const sql = selectOrgScopedSql('companies', 'company', org, fq(opts), '', '')
   const rows = await stdbSql<Record<string, unknown>>(sql, httpOpts(opts))
   const out: bigint[] = []
   for (const r of rows) {
+    if (!rowNotSoftDeleted(r)) continue
     const v = r.id
     if (v == null) continue
     try {
@@ -314,9 +320,13 @@ export function serverQueryAccountAccounts(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY code',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      String(a.code ?? '').localeCompare(String(b.code ?? '')),
+    ),
   )
 }
 
@@ -331,9 +341,13 @@ export function serverQueryAccountAccountTypes(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY name ASC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      String(a.name ?? '').localeCompare(String(b.name ?? '')),
+    ),
   )
 }
 
@@ -348,9 +362,16 @@ export function serverQueryAccountGroups(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY level ASC, name ASC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => {
+      const la = Number(a.level ?? 0)
+      const lb = Number(b.level ?? 0)
+      if (la !== lb) return la - lb
+      return String(a.name ?? '').localeCompare(String(b.name ?? ''))
+    }),
   )
 }
 
@@ -376,9 +397,13 @@ export function serverQueryFiscalYears(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY date_from DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.dateFrom ?? 0) - Number(a.dateFrom ?? 0),
+    ),
   )
 }
 
@@ -394,9 +419,13 @@ export function serverQueryAccountPeriods(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY date_from DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.dateFrom ?? 0) - Number(a.dateFrom ?? 0),
+    ),
   )
 }
 
@@ -411,11 +440,20 @@ export function serverQueryCompanies(
       'company',
       organizationId,
       fq(opts),
-      ' AND deleted_at IS NULL',
-      ' ORDER BY is_parent DESC, id ASC',
+      '',
+      '',
     ),
     httpOpts(opts),
-  )
+  ).then(rows => {
+    const live = (rows as Record<string, unknown>[]).filter(rowNotSoftDeleted)
+    return sortSqlRows(live, (a, b) => {
+      const pa = Boolean(a.isParent ?? a.is_parent)
+      const pb = Boolean(b.isParent ?? b.is_parent)
+      const byParent = Number(pb) - Number(pa)
+      if (byParent !== 0) return byParent
+      return Number(a.id ?? 0) - Number(b.id ?? 0)
+    })
+  })
 }
 
 export function serverQueryDataClassifications(
@@ -502,9 +540,13 @@ export function serverQueryAccountPayments(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY id DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.id ?? 0) - Number(a.id ?? 0),
+    ),
   )
 }
 
@@ -519,9 +561,13 @@ export function serverQueryAccountPaymentTerms(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY name ASC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      String(a.name ?? '').localeCompare(String(b.name ?? '')),
+    ),
   )
 }
 
@@ -553,11 +599,17 @@ export async function serverQueryAccountPaymentTermLines(
   }
   if (termIds.length === 0) return []
   const colPart = resolveHttpSqlColumns('account-payment-term-lines', fq(opts)).join(', ')
-  const list = termIds.map(String).join(', ')
-  return stdbSql(
-    `SELECT ${colPart} FROM account_payment_term_line WHERE payment_term_id IN (${list}) ORDER BY payment_term_id ASC, sequence ASC`,
+  const orClause = termIds.map(id => `payment_term_id = ${id}`).join(' OR ')
+  const rows = await stdbSql<Record<string, unknown>>(
+    `SELECT ${colPart} FROM account_payment_term_line WHERE ${orClause}`,
     httpOpts(opts),
   )
+  return sortSqlRows(rows, (a, b) => {
+    const pa = Number(a.paymentTermId ?? 0)
+    const pb = Number(b.paymentTermId ?? 0)
+    if (pa !== pb) return pa - pb
+    return Number(a.sequence ?? 0) - Number(b.sequence ?? 0)
+  })
 }
 
 export function serverQueryBudgets(
@@ -673,9 +725,13 @@ export function serverQueryBankStatementLines(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY date DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.date ?? 0) - Number(a.date ?? 0),
+    ),
   )
 }
 
@@ -690,9 +746,13 @@ export function serverQueryBankMatchCandidates(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY created_at DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0),
+    ),
   )
 }
 
@@ -707,9 +767,13 @@ export function serverQueryAccountReconciliationWidgets(
       organizationId,
       fq(opts),
       '',
-      ' ORDER BY id DESC',
+      '',
     ),
     httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) =>
+      Number(b.id ?? 0) - Number(a.id ?? 0),
+    ),
   )
 }
 
@@ -1019,7 +1083,7 @@ export async function serverQueryLeadById(
   opts?: StdbServerQueryOptions,
 ) {
   const colPart = resolveHttpSqlColumns('leads', fq(opts)).join(', ')
-  const rows = await stdbSql<{ id: number }>(
+  const rows = await stdbSql<Record<string, unknown>>(
     `SELECT ${colPart} FROM lead WHERE id = ${id} AND organization_id = ${organizationId} LIMIT 1`,
     httpOpts(opts),
   )
@@ -1073,11 +1137,11 @@ export function serverQueryActivities(
       'activity',
       organizationId,
       fq(opts),
-      ' AND deleted_at IS NULL',
+      '',
       ' ORDER BY id DESC',
     ),
     httpOpts(opts),
-  )
+  ).then(rows => (rows as Record<string, unknown>[]).filter(rowNotSoftDeleted))
 }
 
 // PROJECTS
@@ -1134,10 +1198,10 @@ export function serverQueryProductCategories(
       'product_category',
       organizationId,
       fq(opts),
-      ' AND deleted_at IS NULL',
+      '',
     ),
     httpOpts(opts),
-  )
+  ).then(rows => (rows as Record<string, unknown>[]).filter(rowNotSoftDeleted))
 }
 
 export function serverQueryUoms(
@@ -1818,6 +1882,111 @@ export function serverQueryMailMessages(
 ) {
   return stdbSql(
     selectOrgScopedSql('mail-messages', 'mail_message', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryMailFollowers(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('mail-followers', 'mail_follower', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+function formConfigurationIdsFromRows(configs: Record<string, unknown>[]): bigint[] {
+  const ids: bigint[] = []
+  for (const c of configs) {
+    const v = c.id
+    if (v == null) continue
+    try {
+      const b = BigInt(String(v))
+      if (b > 0n) ids.push(b)
+    } catch {
+      /* skip */
+    }
+  }
+  return ids
+}
+
+export function serverQueryFormConfigs(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('form-configs', 'form_config', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryFormConfigFields(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const configs = (await serverQueryFormConfigs(organizationId, opts)) as Record<string, unknown>[]
+  const ids = formConfigurationIdsFromRows(configs)
+  if (ids.length === 0) return []
+  const colPart = resolveHttpSqlColumns('form-config-fields', fq(opts)).join(', ')
+  const list = ids.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM form_config_field WHERE configuration_id IN (${list})`,
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryFormRoleConfigs(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const configs = (await serverQueryFormConfigs(organizationId, opts)) as Record<string, unknown>[]
+  const ids = formConfigurationIdsFromRows(configs)
+  if (ids.length === 0) return []
+  const colPart = resolveHttpSqlColumns('form-role-configs', fq(opts)).join(', ')
+  const list = ids.map(String).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM form_role_config WHERE configuration_id IN (${list})`,
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryUserCustomFields(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('user-custom-fields', 'user_custom_field', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryUtmCampaigns(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('utm-campaigns', 'utm_campaign', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryUtmMedia(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('utm-media', 'utm_medium', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryUtmSources(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('utm-sources', 'utm_source', organizationId, fq(opts), ''),
     httpOpts(opts),
   )
 }

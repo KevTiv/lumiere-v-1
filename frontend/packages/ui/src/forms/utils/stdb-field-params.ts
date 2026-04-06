@@ -1,7 +1,7 @@
 import type {
   FieldOption as StdbFieldOption,
   FieldValidation as StdbFieldValidation,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/generated/types"
 
 /** Maps UI/registry field options to the exact shape SpacetimeDB expects. */
 export function formOptionsToStdb(

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useLayoutEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -52,11 +52,16 @@ function calcLineTotal(item: LineItem) {
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
 
+const EMPTY_JOURNAL_OPTIONS: Array<{ value: string; label: string }> = []
+
 interface CreateInvoiceModalProps {
   open: boolean
   onClose: () => void
   onSave?: (params: Partial<CreateAccountMoveParams>) => void
-  /** Live journals from `/api/query/account-journals`; when non-empty, user must pick one. */
+  /**
+   * Journals from `/api/query/account-journals`. Pass an empty array when none exist —
+   * save stays disabled until there is at least one journal (invoice moves require `journal_id`).
+   */
   journalOptions?: Array<{ value: string; label: string }>
 }
 
@@ -72,14 +77,18 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
     { id: "1", description: "", quantity: 1, unitPrice: 0, taxRate: 8, discount: 0 },
   ])
 
-  useEffect(() => {
+  const journalList = journalOptions ?? EMPTY_JOURNAL_OPTIONS
+  const hasJournals = journalList.length > 0
+
+  /** Sync before paint so Submit is not stuck disabled while journals exist (avoids effect + disabled race). */
+  useLayoutEffect(() => {
     if (!open) return
-    const opts = journalOptions ?? []
-    if (opts.length > 0) {
-      setJournalId(opts[0].value)
-    } else {
+    const opts = journalOptions ?? EMPTY_JOURNAL_OPTIONS
+    if (opts.length === 0) {
       setJournalId("")
+      return
     }
+    setJournalId((prev) => (prev !== "" && opts.some((o) => o.value === prev) ? prev : opts[0].value))
   }, [open, journalOptions])
 
   const addLine = () =>
@@ -101,11 +110,16 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
   }, 0)
   const total = subtotal - totalDisc + totalTax
 
-  const needsJournal = (journalOptions?.length ?? 0) > 0
+  const resolvedJournalId =
+    journalId !== "" && journalList.some((o) => o.value === journalId)
+      ? journalId
+      : journalList[0]?.value ?? ""
+
   const canSave =
+    hasJournals &&
+    resolvedJournalId !== "" &&
     partnerName.trim() !== "" &&
-    lineItems.some((l) => l.description.trim() !== "") &&
-    (!needsJournal || journalId !== "")
+    lineItems.some((l) => l.description.trim() !== "")
 
   const handleSave = (asDraft: boolean) => {
     onSave?.({
@@ -116,7 +130,8 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
       amountTax: totalTax,
       amountTotal: total,
       amountResidual: total,
-      journalId: needsJournal && journalId ? BigInt(journalId) : undefined,
+      journalId:
+        hasJournals && resolvedJournalId !== "" ? BigInt(resolvedJournalId) : undefined,
       metadata: JSON.stringify({ notes, lineItems, invoiceDate, dueDate }),
     } as unknown as Partial<CreateAccountMoveParams>)
     handleReset()
@@ -128,17 +143,20 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
     setInvoiceDate(today)
     setDueDate("")
     setNotes("")
+    setJournalId("")
     setLineItems([{ id: "1", description: "", quantity: 1, unitPrice: 0, taxRate: 8, discount: 0 }])
   }
 
-  return (
+    return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { handleReset(); onClose() } }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <div className="shrink-0 space-y-2 px-4 pt-4">
         <DialogHeader>
           <DialogTitle>{t("accounting.forms.newInvoice.createTitle")}</DialogTitle>
         </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-4">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-4">
           {/* Customer & Dates */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -150,15 +168,15 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
               />
             </div>
             <div className="space-y-4">
-              {journalOptions && journalOptions.length > 0 && (
+              {hasJournals ? (
                 <div className="space-y-2">
                   <Label>{t("accounting.forms.newInvoice.fields.journal")}</Label>
-                  <Select value={journalId} onValueChange={setJournalId}>
+                  <Select modal={false} value={resolvedJournalId} onValueChange={setJournalId}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t("accounting.forms.newInvoice.fields.journalPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {journalOptions.map((o) => (
+                      {journalList.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                           {o.label}
                         </SelectItem>
@@ -166,6 +184,8 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
                     </SelectContent>
                   </Select>
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t("accounting.forms.newInvoice.noJournalsHint")}</p>
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -263,7 +283,7 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button variant="secondary" onClick={() => handleSave(true)} disabled={!canSave}>{t("accounting.forms.newInvoice.saveDraft")}</Button>
           <Button onClick={() => handleSave(false)} disabled={!canSave}>{t("accounting.forms.newInvoice.createAndSend")}</Button>

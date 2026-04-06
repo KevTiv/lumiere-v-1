@@ -10,7 +10,9 @@ import type {
   CreateLeadParams,
   CreateOpportunityParams,
 } from '@lumiere/stdb/generated/types';
-import { Timestamp } from 'spacetimedb';
+import type { Timestamp } from "spacetimedb";
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp";
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json';
 
@@ -113,7 +115,7 @@ export function toCreateOpportunityParams(
   if (rawDeadline != null && String(rawDeadline).trim() !== '') {
     const d = new Date(String(rawDeadline));
     if (!Number.isNaN(d.getTime())) {
-      dateDeadline = Timestamp.fromDate(d);
+      dateDeadline = stbTimestampFromDate(d);
     }
   }
 
@@ -230,7 +232,7 @@ export function toCreateActivityParams(
     isSystem: false,
     isDone: false,
     note: optionalTrimmedString(formData.note),
-    dateDeadline: Timestamp.fromDate(d),
+    dateDeadline: stbTimestampFromDate(d),
     dateDone: undefined,
     assignedTo: undefined,
     resModel: undefined,

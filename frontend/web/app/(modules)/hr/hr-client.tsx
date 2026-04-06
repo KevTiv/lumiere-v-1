@@ -34,10 +34,10 @@ import {
   useCreateJobPosition,
   useCreateDepartment,
   useHrCsvImportMutations,
-} from "@/hooks/hr"
+} from "@lumiere/query-hooks/hooks/hr"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { usePricelists } from "@/hooks/sales"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -82,14 +82,14 @@ function HrClientLoaded({
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
 
-  const { data: employees = [] } = useEmployees(companyId, initialEmployees)
-  const { data: departments = [] } = useDepartments(companyId, initialDepartments)
-  const { data: leaves = [] } = useLeaveRequests(companyId, initialLeaves)
-  const { data: contracts = [] } = useContracts(companyId, initialContracts)
-  const { data: payslips = [] } = usePayslips(companyId, initialPayslips)
-  const { data: jobPositions = [] } = useJobPositions(companyId)
-  const { data: leaveTypes = [] } = useLeaveTypes(companyId)
-  const { data: payrollStructures = [] } = usePayrollStructures(companyId)
+  const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: departments = [] } = useDepartments(orgId, initialDepartments)
+  const { data: leaves = [] } = useLeaveRequests(orgId, initialLeaves)
+  const { data: contracts = [] } = useContracts(orgId, initialContracts)
+  const { data: payslips = [] } = usePayslips(orgId, initialPayslips)
+  const { data: jobPositions = [] } = useJobPositions(orgId)
+  const { data: leaveTypes = [] } = useLeaveTypes(orgId)
+  const { data: payrollStructures = [] } = usePayrollStructures(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
   const createEmployee = useCreateEmployee(orgId, companyId)

@@ -55,7 +55,7 @@ import {
   useAddWidgetToDashboard,
   useUpdateWidgetLayout,
   useShareDashboard,
-} from "@/hooks/reports"
+} from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -105,7 +105,8 @@ function ReportsClientLoaded({
 }: ReportsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
-  const { companyId } = orgBigInts(organizationId)
+  /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
+  const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -127,11 +128,11 @@ function ReportsClientLoaded({
   const [shareDashboardOpen, setShareDashboardOpen] = useState(false)
   const [shareDashboardId, setShareDashboardId] = useState<string | null>(null)
 
-  const { data: reportsRaw = [] } = useFinancialReports(companyId, initialReports)
-  const { data: trialBalances = [] } = useTrialBalances(companyId, initialBalances)
-  const { data: reportTemplates = [] } = useReportTemplates(companyId, initialReportTemplates)
-  const { data: scheduledReports = [] } = useScheduledReports(companyId, initialScheduledReports)
-  const { data: analyticsMetrics = [] } = useAnalyticsMetrics(companyId, initialAnalyticsMetrics)
+  const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
+  const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
+  const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
+  const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
+  const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
 
   const reports = useMemo(
     () =>
@@ -142,27 +143,27 @@ function ReportsClientLoaded({
     [reportsRaw],
   )
 
-  const createTrialBalanceEntry = useCreateTrialBalanceEntry(companyId)
-  const createFinancialReportFlow = useCreateFinancialReportFlow(companyId)
-  const generateFinancialReport = useGenerateFinancialReport(companyId)
-  const exportFinancialReport = useExportFinancialReport(companyId)
-  const archiveFinancialReport = useArchiveFinancialReport(companyId)
-  const deleteFinancialReport = useDeleteFinancialReport(companyId)
-  const createReportTemplate = useCreateReportTemplate(companyId)
-  const createScheduledReport = useCreateScheduledReport(companyId)
-  const createAnalyticsMetric = useCreateAnalyticsMetric(companyId)
-  const updateReportTemplate = useUpdateReportTemplate(companyId)
-  const updateMetricValues = useUpdateMetricValues(companyId)
-  const recordReportRun = useRecordReportRun(companyId)
-  const csvImports = useReportsCsvImportMutations(companyId)
+  const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId)
+  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId)
+  const generateFinancialReport = useGenerateFinancialReport(orgId)
+  const exportFinancialReport = useExportFinancialReport(orgId)
+  const archiveFinancialReport = useArchiveFinancialReport(orgId)
+  const deleteFinancialReport = useDeleteFinancialReport(orgId)
+  const createReportTemplate = useCreateReportTemplate(orgId)
+  const createScheduledReport = useCreateScheduledReport(orgId)
+  const createAnalyticsMetric = useCreateAnalyticsMetric(orgId)
+  const updateReportTemplate = useUpdateReportTemplate(orgId)
+  const updateMetricValues = useUpdateMetricValues(orgId)
+  const recordReportRun = useRecordReportRun(orgId)
+  const csvImports = useReportsCsvImportMutations(orgId)
 
   // Dashboard hooks (6 missing reducers)
-  const updateFinancialReport = useUpdateFinancialReport(companyId)
-  const createDashboard = useCreateDashboard(companyId)
-  const createDashboardWidget = useCreateDashboardWidget(companyId)
-  const addWidgetToDashboard = useAddWidgetToDashboard(companyId)
-  const updateWidgetLayout = useUpdateWidgetLayout(companyId)
-  const shareDashboard = useShareDashboard(companyId)
+  const updateFinancialReport = useUpdateFinancialReport(orgId)
+  const createDashboard = useCreateDashboard(orgId)
+  const createDashboardWidget = useCreateDashboardWidget(orgId)
+  const addWidgetToDashboard = useAddWidgetToDashboard(orgId)
+  const updateWidgetLayout = useUpdateWidgetLayout(orgId)
+  const shareDashboard = useShareDashboard(orgId)
 
   useEffect(() => {
     if (csvKind) setCsvError(null)

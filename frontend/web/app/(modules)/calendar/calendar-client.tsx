@@ -2,8 +2,8 @@
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
 import { useTranslation } from "@lumiere/i18n"
-import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@/hooks/calendar"
-import type { CreateCalendarEventParams, UpdateCalendarEventParams } from "@/hooks/calendar"
+import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
+import type { CreateCalendarEventParams, UpdateCalendarEventParams } from "@lumiere/query-hooks/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, MissingOrganization } from "@lumiere/ui"
 import { useEffect, useMemo, useState } from "react"

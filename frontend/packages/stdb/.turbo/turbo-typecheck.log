@@ -1,0 +1,4 @@
+
+> @lumiere/stdb@0.0.1 typecheck /Users/kevintivert/codebox/lumiere-v-1/frontend/packages/stdb
+> tsc --noEmit
+

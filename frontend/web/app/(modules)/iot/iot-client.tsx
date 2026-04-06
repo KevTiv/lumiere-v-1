@@ -17,7 +17,7 @@ import type { EntityViewConfig, EntityAction, FormConfig } from "@lumiere/ui"
 import { iotModuleConfig } from "@/lib/module-dashboard-configs"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import type { QueryRows } from "@/lib/query-fetch"
-import { useStockLocations } from "@/hooks/inventory"
+import { useStockLocations } from "@lumiere/query-hooks/hooks/inventory"
 import {
   useIotActions,
   useIotDevices,
@@ -39,7 +39,7 @@ import {
   useMarkActionSent,
   useClaimHubWithToken,
   useTestIotDevice,
-} from "@/hooks/iot"
+} from "@lumiere/query-hooks/hooks/iot"
 
 interface IotClientProps {
   initialDevices?: QueryRows

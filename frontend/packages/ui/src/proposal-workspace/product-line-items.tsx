@@ -6,7 +6,8 @@ import { Trash2, GripVertical } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { productKindBadgeClass } from "@/lib/theme-colors"
-import type { ProposalLineItem } from "@lumiere/stdb"
+import type { ProposalLineItem } from "@lumiere/stdb/proposal-row-types"
+import { rowBigint, rowNumber, rowString } from "./row-field-utils"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Product = Record<string, any>
@@ -31,10 +32,10 @@ interface LineItemRowProps {
 
 function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
   const { t } = useTranslation()
-  const [qty, setQty] = useState(item.quantity ?? 1)
-  const [price, setPrice] = useState(item.priceUnit ?? 0)
-  const [discount, setDiscount] = useState(item.discount ?? 0)
-  const [notes, setNotes] = useState(item.notes ?? "")
+  const [qty, setQty] = useState(rowNumber(item.quantity, 1))
+  const [price, setPrice] = useState(rowNumber(item.priceUnit))
+  const [discount, setDiscount] = useState(rowNumber(item.discount))
+  const [notes, setNotes] = useState(rowString(item.notes))
   const [expanded, setExpanded] = useState(false)
 
   const subtotal = qty * price * (1 - discount / 100)
@@ -43,7 +44,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
     productKindBadgeClass[productType] ?? "bg-muted text-muted-foreground"
 
   const handleSave = () => {
-    onUpdate(item.id, qty, price, discount, notes || undefined)
+    onUpdate(rowBigint(item.id), qty, price, discount, notes || undefined)
   }
 
   return (
@@ -53,7 +54,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium truncate">{item.productName}</span>
+            <span className="text-xs font-medium truncate">{rowString(item.productName)}</span>
             {productType && (
               <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", typeBadgeClass)}>
                 {productType}
@@ -104,7 +105,7 @@ function LineItemRow({ item, product, onUpdate, onDelete }: LineItemRowProps) {
             {expanded ? t("proposalWorkspace.productLineItems.collapse") : t("proposalWorkspace.productLineItems.expand")}
           </button>
           <button
-            onClick={() => onDelete(item.id)}
+            onClick={() => onDelete(rowBigint(item.id))}
             className="p-0.5 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
           >
             <Trash2 className="h-3 w-3" />
@@ -155,7 +156,10 @@ export function ProductLineItems({ items, products, onUpdate, onDelete }: Produc
   if (items.length === 0) return null
 
   const total = items.reduce((sum, item) => {
-    const subtotal = (item.quantity ?? 1) * (item.priceUnit ?? 0) * (1 - (item.discount ?? 0) / 100)
+    const q = rowNumber(item.quantity, 1)
+    const pu = rowNumber(item.priceUnit)
+    const d = rowNumber(item.discount)
+    const subtotal = q * pu * (1 - d / 100)
     return sum + subtotal
   }, 0)
 
@@ -166,7 +170,7 @@ export function ProductLineItems({ items, products, onUpdate, onDelete }: Produc
         <span className="text-xs font-semibold text-foreground">{formatCurrency(total)}</span>
       </div>
       {items.map((item) => {
-        const product = products.find((p) => String(p.id) === String(item.productId))
+        const product = products.find((p) => String(p.id) === rowString(item.productId))
         return (
           <LineItemRow
             key={String(item.id)}

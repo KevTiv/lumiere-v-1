@@ -13,7 +13,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{config::Config, embeddings::EmbeddingClient, qdrant_client::VectorStore, stdb_client::StdbClient};
+use crate::{config::Config, embeddings::EmbeddingClient, qdrant_client::VectorStore, stdb_embed::LumiereStdbExt};
+use stdb_client::StdbClient;
 
 pub async fn run(
     config: Arc<Config>,
@@ -112,7 +113,7 @@ async fn process_job(
     embedder: &EmbeddingClient,
     vector_store: &VectorStore,
     _stdb: &StdbClient,
-    payload: &crate::stdb_client::EmbedJobPayload,
+    payload: &crate::stdb_embed::EmbedJobPayload,
 ) -> anyhow::Result<(u64, u32)> {
     if payload.text.trim().is_empty() {
         anyhow::bail!("Job text is empty — skipping");

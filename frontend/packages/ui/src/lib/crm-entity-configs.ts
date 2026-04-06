@@ -50,7 +50,7 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("crm.leads.filters.state"),
+        label: t("crm.leads.filters.state.label"),
         type: "select",
         options: [
           { value: "new", label: t("crm.leads.filters.state.options.New") },
@@ -135,7 +135,7 @@ export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("crm.activities.filters.state"),
+        label: t("crm.activities.filters.state.label"),
         type: "select",
         options: [
           { value: "planned", label: t("crm.activities.filters.state.options.planned") },

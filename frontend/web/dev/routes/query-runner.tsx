@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-fetch'
 import { createRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Route as rootRoute } from './__root'
@@ -31,7 +32,7 @@ function QueryRunnerPage() {
     try {
       const params = new URLSearchParams()
       if (orgId) params.set('organizationId', orgId)
-      const response = await fetch(`/api/query/${resource}${params.toString() ? `?${params}` : ''}`)
+      const response = await apiFetch(`/api/query/${resource}${params.toString() ? `?${params}` : ''}`)
       const json = await response.json()
       if (!response.ok) throw new Error(json.error ?? `HTTP ${response.status}`)
       setResult(json)

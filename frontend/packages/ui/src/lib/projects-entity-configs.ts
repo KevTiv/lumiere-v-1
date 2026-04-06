@@ -47,7 +47,7 @@ export const projectsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "lastUpdateStatus",
-        label: t("projects.projects.filters.lastUpdateStatus"),
+        label: t("projects.projects.filters.lastUpdateStatus.label"),
         type: "select",
         options: [
           { value: "InProgress", label: t("projects.projects.filters.lastUpdateStatus.options.InProgress") },
@@ -84,7 +84,7 @@ export const tasksTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "kanbanState",
-        label: t("projects.tasks.filters.kanbanState"),
+        label: t("projects.tasks.filters.kanbanState.label"),
         type: "select",
         options: [
           { value: "InProgress", label: t("projects.tasks.filters.kanbanState.options.InProgress") },

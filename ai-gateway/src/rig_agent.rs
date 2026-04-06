@@ -18,7 +18,8 @@ use qdrant_client::{
 };
 use uuid::Uuid;
 
-use crate::{config::Config, providers::Providers, stdb_client::StdbClient};
+use crate::{config::Config, providers::Providers};
+use stdb_client::StdbClient;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

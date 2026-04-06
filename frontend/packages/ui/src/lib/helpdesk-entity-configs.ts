@@ -43,7 +43,7 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("helpdesk.tickets.filters.state"),
+        label: t("helpdesk.tickets.filters.state.label"),
         type: "select",
         options: [
           { value: "New", label: t("helpdesk.tickets.filters.state.options.New") },
@@ -55,7 +55,7 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
       {
         key: "priority",
-        label: t("helpdesk.tickets.filters.priority"),
+        label: t("helpdesk.tickets.filters.priority.label"),
         type: "select",
         options: [
           { value: "low", label: t("helpdesk.tickets.filters.priority.options.low") },

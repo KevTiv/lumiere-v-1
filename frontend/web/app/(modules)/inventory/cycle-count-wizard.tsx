@@ -11,7 +11,7 @@ import {
   useRecordCycleCountLine,
   useValidateCycleCount,
   usePostCycleCountAdjustments,
-} from "@/hooks/inventory"
+} from "@lumiere/query-hooks/hooks/inventory"
 import type { QueryRows } from "@/lib/query-fetch"
 
 type ScalarId = bigint | number | string

@@ -21,7 +21,7 @@ import {
 
 export interface QuickActionsData {
   actions: QuickAction[]
-  columns?: 2 | 3 | 4
+  columns?: 2 | 3 | 4 | 6
 }
 
 export interface QuickAction {
@@ -56,7 +56,8 @@ export function QuickActionsWidget({ data }: { data: QuickActionsData }) {
       "grid gap-3",
       columns === 2 && "grid-cols-2",
       columns === 3 && "grid-cols-3",
-      columns === 4 && "grid-cols-2 sm:grid-cols-4"
+      columns === 4 && "grid-cols-2 sm:grid-cols-4",
+      columns === 6 && "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
     )}>
       {data.actions.map((action) => {
         const IconComponent = iconMap[action.icon] || Plus

@@ -53,7 +53,7 @@ export const expensesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("expenses.expenses.filters.state"),
+        label: t("expenses.expenses.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("expenses.expenses.filters.state.options.Draft") },
@@ -91,7 +91,7 @@ export const expenseSheetsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("expenses.expenseReports.filters.state"),
+        label: t("expenses.expenseReports.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("expenses.expenseReports.filters.state.options.Draft") },

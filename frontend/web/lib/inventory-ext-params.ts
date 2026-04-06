@@ -7,7 +7,9 @@ import type {
   CreateStockTraceabilityReportParams,
   CreateTraceabilityRecordParams,
 } from '@lumiere/stdb/generated/types'
-import { Timestamp } from 'spacetimedb'
+import type { Timestamp } from "spacetimedb"
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -32,9 +34,9 @@ function optionalBigIntU64(v: unknown): bigint | undefined {
 function timestampFromFormDate(v: unknown, fallback = new Date()): Timestamp {
   if (v != null && String(v).trim() !== '') {
     const d = new Date(String(v))
-    if (!Number.isNaN(d.getTime())) return Timestamp.fromDate(d)
+    if (!Number.isNaN(d.getTime())) return stbTimestampFromDate(d)
   }
-  return Timestamp.fromDate(fallback)
+  return stbTimestampFromDate(fallback)
 }
 
 /** Comma / whitespace separated unsigned integers → bigint array (invalid tokens skipped). */

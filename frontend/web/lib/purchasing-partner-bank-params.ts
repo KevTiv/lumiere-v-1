@@ -2,7 +2,7 @@
  * Partner bank forms → SpacetimeDB reducer params.
  */
 
-import type { CreatePartnerBankParams, UpdatePartnerBankParams } from '@lumiere/stdb'
+import type { CreatePartnerBankParams, UpdatePartnerBankParams } from '@lumiere/stdb/generated/types'
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 

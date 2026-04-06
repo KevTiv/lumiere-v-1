@@ -14,8 +14,8 @@
  * Org selection: prefers "Lumiere Demo Corp" (seed_dev_data), then "Lumiere Dev Org" (ensure_minimal_dev_org),
  * else first organization row (LIMIT 1; SpacetimeDB HTTP SQL does not support ORDER BY here).
  *
- * Env: NEXT_PUBLIC_STDB_HOST, NEXT_PUBLIC_STDB_MODULE, STDB_SERVER_TOKEN,
- *      STDB_CREDENTIAL_ENCRYPTION_KEY (same as Next .env.local).
+ * Env: STDB_HOST or NEXT_PUBLIC_STDB_HOST, STDB_MODULE or NEXT_PUBLIC_STDB_MODULE,
+ *      STDB_SERVER_TOKEN, STDB_CREDENTIAL_ENCRYPTION_KEY (same as Next + api-server).
  * Loads frontend/web/.env.local when present (does not override existing env).
  *
  * STDB_CREDENTIAL_ENCRYPTION_KEY: required when creating credentials (64 hex chars); must match
@@ -75,8 +75,11 @@ function loadEnvLocal() {
 }
 
 function getStdbHost() {
-  const raw = process.env['NEXT_PUBLIC_STDB_HOST'] ?? 'https://maincloud.spacetimedb.com'
-  return raw.replace(/^wss?:\/\//, 'https://')
+  const raw =
+    process.env['STDB_HOST'] ??
+    process.env['NEXT_PUBLIC_STDB_HOST'] ??
+    'https://maincloud.spacetimedb.com'
+  return raw.replace(/^wss?:\/\//, 'https://').replace(/\/$/, '')
 }
 
 const TOKEN_PLACEHOLDERS = new Set([
@@ -130,8 +133,8 @@ function resolveStdbToken(host) {
   if (!t) {
     throw new Error(
       'STDB_SERVER_TOKEN is missing or still a placeholder. Set it in frontend/web/.env.local to a real JWT, ' +
-        'or run `spacetime login` (maincloud) or `spacetime login --server-issued-login local` (local server) ' +
-        'so ~/.config/spacetime/cli.toml contains spacetimedb_token.',
+      'or run `spacetime login` (maincloud) or `spacetime login --server-issued-login local` (local server) ' +
+      'so ~/.config/spacetime/cli.toml contains spacetimedb_token.',
     )
   }
 
@@ -140,11 +143,11 @@ function resolveStdbToken(host) {
   if (local && iss && iss.includes('auth.spacetimedb.com')) {
     throw new Error(
       `STDB_SERVER_TOKEN is a maincloud login JWT, but NEXT_PUBLIC_STDB_HOST targets a local server (${host}). ` +
-        'SpacetimeDB tokens are not portable between clusters.\n' +
-        'Run:\n' +
-        '  spacetime login --server-issued-login local\n' +
-        'Then set STDB_SERVER_TOKEN to the spacetimedb_token in ~/.config/spacetime/cli.toml (or export it) and re-run. ' +
-        'If you use maincloud, set NEXT_PUBLIC_STDB_HOST to https://maincloud.spacetimedb.com instead.',
+      'SpacetimeDB tokens are not portable between clusters.\n' +
+      'Run:\n' +
+      '  spacetime login --server-issued-login local\n' +
+      'Then set STDB_SERVER_TOKEN to the spacetimedb_token in ~/.config/spacetime/cli.toml (or export it) and re-run. ' +
+      'If you use maincloud, set NEXT_PUBLIC_STDB_HOST to https://maincloud.spacetimedb.com instead.',
     )
   }
 
@@ -167,8 +170,8 @@ function getEncryptionKey() {
   if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
     throw new Error(
       'STDB_CREDENTIAL_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes), same as Next.js ' +
-        'frontend/web/lib/stdb-auth-server.ts. Add it to frontend/web/.env.local (or export it). ' +
-        'Generate one with: openssl rand -hex 32',
+      'frontend/web/lib/stdb-auth-server.ts. Add it to frontend/web/.env.local (or export it). ' +
+      'Generate one with: openssl rand -hex 32',
     )
   }
   const bytes = new Uint8Array(32)
@@ -387,7 +390,10 @@ async function main() {
   loadEnvLocal()
 
   const host = getStdbHost()
-  const moduleName = process.env['NEXT_PUBLIC_STDB_MODULE'] ?? 'lumiere-v1-j1uo0'
+  const moduleName =
+    process.env['STDB_MODULE'] ??
+    process.env['NEXT_PUBLIC_STDB_MODULE'] ??
+    'lumiere-v1-j1uo0'
   const adminToken = resolveStdbToken(host)
 
   await callStdbReducer(host, moduleName, adminToken, 'dev_promote_caller_superuser', [])

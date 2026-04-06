@@ -7,7 +7,7 @@ mod qdrant_client;
 mod rig_agent;
 mod routes;
 mod state;
-mod stdb_client;
+mod stdb_embed;
 mod context_worker;
 mod worker;
 

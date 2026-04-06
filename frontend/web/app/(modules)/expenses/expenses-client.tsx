@@ -37,11 +37,11 @@ import {
   useRefuseExpenseSheet,
   usePostExpenseSheet,
   useExpensesCsvImportMutations,
-} from "@/hooks/expenses"
-import type { CreateExpenseParams, CreateExpenseSheetParams } from "@/hooks/expenses"
+} from "@lumiere/query-hooks/hooks/expenses"
+import type { CreateExpenseParams, CreateExpenseSheetParams } from "@lumiere/query-hooks/hooks/expenses"
 import { hasValidOrganizationId, orgBigInts, withCompanyScope } from "@/lib/org-scoped"
-import { usePricelists } from "@/hooks/sales"
-import { useEmployees } from "@/hooks/hr"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,

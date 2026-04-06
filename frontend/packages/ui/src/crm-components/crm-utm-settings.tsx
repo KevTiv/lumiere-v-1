@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   createUtmCampaign,
   createUtmMedium,
   createUtmSource,
-  getStdbConnection,
   updateUtmCampaign,
   updateUtmMedium,
   updateUtmSource,
-  useStdbConnection,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/client-ui-bridge"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,41 +25,48 @@ interface UtmRow {
   isActive: boolean
 }
 
+const UTM_RESOURCE: Record<"utm_campaign" | "utm_medium" | "utm_source", string> = {
+  utm_campaign: "utm-campaigns",
+  utm_medium: "utm-media",
+  utm_source: "utm-sources",
+}
+
 function useOrgUtmTable<T extends UtmRow>(
   organizationId: number,
   table: "utm_campaign" | "utm_medium" | "utm_source",
+  refreshKey: number,
 ): T[] {
   const [rows, setRows] = useState<T[]>([])
-  const { connected } = useStdbConnection()
 
   useEffect(() => {
     if (!organizationId) {
       setRows([])
       return
     }
-    const conn = getStdbConnection()
-    if (!conn) {
-      setRows([])
-      return
-    }
 
-    const t = conn.db[table]
-    function load() {
-      const list = [...t.iter()].filter((r) => Number((r as { organizationId: bigint }).organizationId) === organizationId)
-      setRows(
-        list.map((r) => ({
-          id: (r as { id: bigint }).id,
-          name: String((r as { name: string }).name),
-          isActive: Boolean((r as { isActive: boolean }).isActive),
-        })) as T[],
-      )
-    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const resource = UTM_RESOURCE[table]
+        const list = await stdbBrowserQuery(resource)
+        if (cancelled) return
+        const filtered = list.filter(r => Number(r.organizationId) === organizationId)
+        setRows(
+          filtered.map(r => ({
+            id: BigInt(String(r.id ?? 0)),
+            name: String(r.name ?? ""),
+            isActive: Boolean(r.isActive),
+          })) as T[],
+        )
+      } catch {
+        if (!cancelled) setRows([])
+      }
+    })()
 
-    load()
-    t.onInsert(() => load())
-    t.onUpdate(() => load())
-    t.onDelete(() => load())
-  }, [organizationId, table, connected])
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, table, refreshKey])
 
   return rows
 }
@@ -70,6 +77,8 @@ interface UtmColumnProps {
   description: string
   namePlaceholder: string
   table: "utm_campaign" | "utm_medium" | "utm_source"
+  refreshKey: number
+  onRefresh: () => void
   onCreate: (name: string, isActive: boolean) => Promise<void>
   onToggleActive: (id: bigint, name: string, isActive: boolean) => Promise<void>
 }
@@ -80,11 +89,13 @@ function UtmColumn({
   description,
   namePlaceholder,
   table,
+  refreshKey,
+  onRefresh,
   onCreate,
   onToggleActive,
 }: UtmColumnProps) {
   const { t } = useTranslation()
-  const rows = useOrgUtmTable(organizationId, table)
+  const rows = useOrgUtmTable(organizationId, table, refreshKey)
   const [name, setName] = useState("")
   const [activeNew, setActiveNew] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -96,6 +107,7 @@ function UtmColumn({
       setBusy(true)
       await onCreate(n, activeNew)
       setName("")
+      onRefresh()
     } finally {
       setBusy(false)
     }
@@ -142,7 +154,12 @@ function UtmColumn({
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Switch
                     checked={r.isActive}
-                    onCheckedChange={(v) => void onToggleActive(r.id, r.name, v)}
+                    onCheckedChange={(v) => {
+                      void (async () => {
+                        await onToggleActive(r.id, r.name, v)
+                        onRefresh()
+                      })()
+                    }}
                     aria-label={t("crm.attribution.toggleActive")}
                   />
                 </div>
@@ -162,7 +179,8 @@ export interface CrmUtmSettingsProps {
 
 export function CrmUtmSettings({ organizationId, className }: CrmUtmSettingsProps) {
   const { t } = useTranslation()
-  const { connected } = useStdbConnection()
+  const { identity } = useErpSession()
+  const [utmRefresh, setUtmRefresh] = useState(0)
 
   const org = BigInt(organizationId)
 
@@ -209,7 +227,7 @@ export function CrmUtmSettings({ organizationId, className }: CrmUtmSettingsProp
     return <p className="text-sm text-muted-foreground">{t("crm.attribution.needOrg")}</p>
   }
 
-  if (!connected) {
+  if (!identity) {
     return <p className="text-sm text-muted-foreground">{t("crm.attribution.needConnection")}</p>
   }
 
@@ -226,6 +244,8 @@ export function CrmUtmSettings({ organizationId, className }: CrmUtmSettingsProp
           description={t("crm.attribution.campaignsHint")}
           namePlaceholder={t("crm.attribution.campaignPlaceholder")}
           table="utm_campaign"
+          refreshKey={utmRefresh}
+          onRefresh={() => setUtmRefresh(k => k + 1)}
           onCreate={mkCreateCampaign}
           onToggleActive={mkUpdateCampaign}
         />
@@ -235,6 +255,8 @@ export function CrmUtmSettings({ organizationId, className }: CrmUtmSettingsProp
           description={t("crm.attribution.mediaHint")}
           namePlaceholder={t("crm.attribution.mediumPlaceholder")}
           table="utm_medium"
+          refreshKey={utmRefresh}
+          onRefresh={() => setUtmRefresh(k => k + 1)}
           onCreate={mkCreateMedium}
           onToggleActive={mkUpdateMedium}
         />
@@ -244,6 +266,8 @@ export function CrmUtmSettings({ organizationId, className }: CrmUtmSettingsProp
           description={t("crm.attribution.sourcesHint")}
           namePlaceholder={t("crm.attribution.sourcePlaceholder")}
           table="utm_source"
+          refreshKey={utmRefresh}
+          onRefresh={() => setUtmRefresh(k => k + 1)}
           onCreate={mkCreateSource}
           onToggleActive={mkUpdateSource}
         />

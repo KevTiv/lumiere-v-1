@@ -6,8 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newProposalForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useProposals, useCreateProposal } from "@/hooks/proposals"
-import type { CreateProposalParams } from "@/hooks/proposals"
+import { useProposals, useCreateProposal } from "@lumiere/query-hooks/hooks/proposals"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface ProposalsClientProps {
@@ -129,9 +128,9 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         title,
         clientName: String(formData.clientName ?? "").trim(),
         value: Number(formData.value ?? 0),
-        deadline: formData.deadline ? new Date(formData.deadline as string) : undefined,
-        description: formData.description as string | undefined,
-      } as CreateProposalParams, {
+        deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
+        description: formData.description != null ? String(formData.description) : undefined,
+      }, {
         onSuccess: (_, variables) => {
           // Navigate to the new proposal — find it by title after creation
           const newId = `new-${Date.now()}`

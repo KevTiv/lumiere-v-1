@@ -79,7 +79,7 @@ function getMoveStatus(move: AccountMove): DisplayStatus {
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch / 1000n)
+  const ms = Number(ts.microsSinceUnixEpoch) / 1000
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 

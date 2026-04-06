@@ -1,0 +1,4 @@
+
+> @lumiere/api-client@0.0.0 typecheck /Users/kevintivert/codebox/lumiere-v-1/frontend/packages/api-client
+> tsc --noEmit
+

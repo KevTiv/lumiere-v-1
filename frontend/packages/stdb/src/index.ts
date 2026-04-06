@@ -1,117 +1,21 @@
+/**
+ * SpacetimeDB **WebSocket client** barrel (`DbConnection`, generated bindings, connection + context).
+ *
+ * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
+ * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
+ * - `@lumiere/stdb/server` — RSC / `stdbSql` / `serverQuery*`
+ * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted
+ * - `@lumiere/stdb/client-ui-bridge` — minimal mutation helpers for `@lumiere/ui`
+ *
+ * Optional WS subscriptions: `StdbConnectionProvider` + `createClientSubscriptions` from `./queries/erp-subscriptions`.
+ * Mobile / embedded clients that use `DbConnection` continue to import from this package.
+ */
 export * from './generated';
 export * from './connection';
 export * from './context';
 export * from './queries/auth';
 export * from './queries/erp-subscriptions';
-export * from './hooks/useStdbAuth';
-export * from './queries/accounting';
-export * from './hooks/useIotHubs';
-export * from './hooks/useIotDevices';
-export * from './hooks/useIotAlerts';
-export * from './hooks/useAccountAccounts';
-export * from './hooks/useAccountMoves';
-export * from './hooks/useAccountJournals';
-export * from './hooks/useAccountTaxes';
-export * from './hooks/useBudgets';
-export * from './hooks/useAnalyticAccounts';
-export * from './hooks/useBankStatements';
-export * from './hooks/useFixedAssets';
-export * from './mutations/accounting';
-export * from './queries/sales';
-export * from './hooks/useSaleOrders';
-export * from './hooks/useSaleOrderLines';
-export * from './hooks/usePricelists';
-export * from './hooks/usePickingBatches';
-export * from './mutations/sales';
-export * from './queries/crm';
-export * from './hooks/useLeads';
-export * from './hooks/useOpportunities';
-export * from './hooks/useContacts';
-export * from './hooks/useActivities';
-export * from './mutations/crm';
-export * from './queries/projects';
-export * from './hooks/useProjects';
-export * from './hooks/useTasks';
-export * from './hooks/useTimesheets';
-export * from './mutations/projects';
-export * from './queries/inventory';
-export * from './hooks/useProducts';
-export * from './hooks/useStockQuants';
-export * from './hooks/useStockPickings';
-export * from './hooks/useWarehouses';
-export * from './hooks/useInventoryAdjustments';
-export * from './hooks/useStockLocations';
-export * from './hooks/useProductionLots';
-export * from './hooks/useQualityChecks';
 export * from './warehouse-3d-types';
-export * from './hooks/useWarehouse3D';
-export * from './mutations/inventory';
-export * from './queries/purchasing';
-export * from './hooks/usePurchaseOrders';
-export * from './hooks/usePurchaseOrderLines';
-export * from './hooks/usePurchaseRequisitions';
-export * from './mutations/purchasing';
-export * from './queries/manufacturing';
-export * from './hooks/useMrpProductions';
-export * from './hooks/useMrpBoms';
-export * from './hooks/useMrpWorkorders';
-export * from './hooks/useMrpWorkcenters';
-export * from './mutations/manufacturing';
-export * from './queries/hr';
-export * from './hooks/useEmployees';
-export * from './hooks/useDepartments';
-export * from './hooks/useLeaveRequests';
-export * from './hooks/useContracts';
-export * from './hooks/usePayslips';
-export * from './hooks/useJobPositions';
-export * from './mutations/hr';
-export * from './queries/documents';
-export * from './hooks/useDocuments';
-export * from './hooks/useKnowledgeArticles';
-export * from './mutations/documents';
-export * from './queries/calendar';
-export * from './hooks/useCalendarEvents';
-export * from './mutations/calendar';
-export * from './queries/reports';
-export * from './hooks/useFinancialReports';
-export * from './hooks/useTrialBalances';
-export * from './queries/subscriptions';
-export * from './hooks/useSubscriptions';
-export * from './hooks/useSubscriptionPlans';
-export * from './hooks/useSubscriptionLines';
-export * from './queries/expenses';
-export * from './hooks/useExpenses';
-export * from './hooks/useExpenseSheets';
-export * from './mutations/expenses';
-export * from './queries/helpdesk';
-export * from './hooks/useHelpdeskTickets';
-export * from './hooks/useHelpdeskTeams';
-export * from './hooks/useHelpdeskStages';
-export * from './hooks/useHelpdeskSLAs';
-export * from './mutations/helpdesk';
-export * from './queries/workflows';
-export * from './hooks/useWorkflows';
-export * from './hooks/useWorkflowInstances';
-export * from './hooks/useWorkflowActivities';
-export * from './hooks/useWorkflowTransitions';
-export * from './mutations/workflows';
-export * from './queries/messages';
-export * from './hooks/useMailMessages';
-export * from './mutations/messages';
-export * from './queries/proposals';
-export * from './hooks/useProposals';
-export * from './hooks/useProposalSections';
-export * from './hooks/useProposalLineItems';
-export * from './hooks/useProposalPresence';
-export * from './hooks/useProposalComments';
-export * from './hooks/useProposalSourceDocs';
-export * from './hooks/useProposalVersions';
-export * from './mutations/proposals';
-export * from './queries/fleet';
-export * from './hooks/useFleetVehicles';
-export * from './hooks/usePosTerminals';
-export * from './hooks/useWarehouseGeo';
-export * from './mutations/form-config';
 
 /** Form config enums / structs live in `generated/types.ts`, not the SpacetimeDB `generated/index` barrel. */
 export { FieldType, FieldWidth, FieldOption, FieldValidation } from './generated/types';

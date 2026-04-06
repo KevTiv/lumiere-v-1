@@ -29,7 +29,7 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "isDeleted",
-        label: t("documents.documents.filters.isDeleted"),
+        label: t("documents.documents.filters.isDeleted.label"),
         type: "select",
         options: [
           { value: "false", label: t("documents.documents.filters.isDeleted.options.false") },
@@ -65,7 +65,7 @@ export const knowledgeArticlesTableConfig = (t: TFunction): EntityViewConfig => 
     filters: [
       {
         key: "isPublished",
-        label: t("documents.knowledgeBase.filters.isPublished"),
+        label: t("documents.knowledgeBase.filters.isPublished.label"),
         type: "select",
         options: [
           { value: "true", label: t("documents.knowledgeBase.filters.isPublished.options.true") },
@@ -98,7 +98,7 @@ export const documentProcessingJobsTableConfig = (t: TFunction): EntityViewConfi
     filters: [
       {
         key: "isApproved",
-        label: t("documents.processing.filters.isApproved"),
+        label: t("documents.processing.filters.isApproved.label"),
         type: "select",
         options: [
           { value: "false", label: t("documents.processing.filters.isApproved.options.no") },
@@ -146,7 +146,7 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
     filters: [
       {
         key: "dismissed",
-        label: t("documents.insights.filters.dismissed"),
+        label: t("documents.insights.filters.dismissed.label"),
         type: "select",
         options: [
           { value: "false", label: t("documents.insights.filters.dismissed.options.open") },
@@ -155,7 +155,7 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
       },
       {
         key: "isAcknowledged",
-        label: t("documents.insights.filters.isAcknowledged"),
+        label: t("documents.insights.filters.isAcknowledged.label"),
         type: "select",
         options: [
           { value: "false", label: t("documents.insights.filters.isAcknowledged.options.no") },

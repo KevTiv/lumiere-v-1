@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
 import Link from "next/link"
 import { Trans, useTranslation } from "@lumiere/i18n"
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      await fetch("/api/auth/forgot-password", {
+      await apiFetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

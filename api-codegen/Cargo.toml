@@ -1,0 +1,16 @@
+[package]
+name = "api-codegen"
+version.workspace = true
+edition.workspace = true
+description = "OpenAPI → TypeScript path helpers, TanStack hooks, and stdb reducer invalidation map"
+
+[[bin]]
+name = "api-codegen"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+api-server = { path = "../api-server" }
+reqwest.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

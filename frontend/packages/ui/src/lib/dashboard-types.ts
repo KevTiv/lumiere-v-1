@@ -185,7 +185,7 @@ export interface QuickActionsWidget extends BaseWidget {
       color?: "blue" | "green" | "orange" | "red" | "purple" | "teal"
       onClick?: () => void
     }>
-    columns?: 2 | 3 | 4
+    columns?: 2 | 3 | 4 | 6
   }
 }
 

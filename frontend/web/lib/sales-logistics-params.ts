@@ -8,8 +8,10 @@ import type {
   CreateLoyaltyProgramParams,
   CreatePaymentMethodParams,
   CreateShippingMethodParams,
-} from '@lumiere/stdb'
-import { Timestamp } from 'spacetimedb'
+} from '@lumiere/stdb/generated/types'
+import type { Timestamp } from "spacetimedb"
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -177,7 +179,7 @@ export function toCreateLoyaltyProgramParams(
   let dateTo: Timestamp | undefined
   if (dateToRaw != null && String(dateToRaw).trim() !== '') {
     const d = new Date(String(dateToRaw))
-    if (!Number.isNaN(d.getTime())) dateTo = Timestamp.fromDate(d)
+    if (!Number.isNaN(d.getTime())) dateTo = stbTimestampFromDate(d)
   }
 
   const vdRaw = formData.validityDuration

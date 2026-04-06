@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Building, Save, Loader2, Cloud, MessageCircle, ExternalLink, Upload, Trash2 } from "lucide-react"
-import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials } from "@/hooks/auth"
-import { useOrgMasterCsvImportMutations } from "@/hooks/org-master-csv-imports"
+import { apiFetch } from "@/lib/api-fetch"
+import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials } from "@lumiere/query-hooks/hooks/auth"
+import { useOrgMasterCsvImportMutations } from "@lumiere/query-hooks/hooks/org-master-csv-imports"
 import {
   useCompanies,
   useCreateCompany,
@@ -23,8 +24,8 @@ import {
   useUpdateCompanyAddress,
   useUpdateCompanyBusiness,
   useUpdateCompanyHierarchy,
-} from "@/hooks/organization-company"
-import { useStdbConnection } from "@lumiere/stdb"
+} from "@lumiere/query-hooks/hooks/organization-company"
+import { useErpSession } from "@lumiere/erp-session"
 import { csvImportForm, FormModal } from "@lumiere/ui"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { ModularForm } from "../forms/modular-form"
@@ -68,7 +69,7 @@ export function OrganizationSettings() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const { organizationId } = useStdbConnection()
+  const { organizationId } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
 
@@ -307,7 +308,7 @@ export function OrganizationSettings() {
     }
     setIsLoading(true)
     try {
-      const response = await fetch('/api/call/upsert_organization_settings', {
+      const response = await apiFetch('/api/call/upsert_organization_settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([organizationId.toString(), settings]),
@@ -343,7 +344,7 @@ export function OrganizationSettings() {
     }
     setIsLoading(true)
     try {
-      const response = await fetch('/api/call/update_organization', {
+      const response = await apiFetch('/api/call/update_organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([organizationId.toString(), {

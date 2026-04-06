@@ -116,7 +116,7 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
     return null
   }
 
-  // Recover identity from JWT when the cookie is missing (common before first saveStdbSession).
+  // Recover identity from JWT when stdb_identity cookie is missing (e.g. legacy clients).
   if (!identityHex) {
     const fromJwt = decodeIdentityHexFromStdbToken(token)
     if (fromJwt) identityHex = fromJwt

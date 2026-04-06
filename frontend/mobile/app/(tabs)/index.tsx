@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { Platform, StyleSheet } from 'react-native';
 
@@ -5,9 +6,17 @@ import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { getLumiereApiBaseUrl, mobileApi } from '@/lib/lumiere-api';
 import { Link } from 'expo-router';
 
 export default function HomeScreen() {
+  const apiBase = getLumiereApiBaseUrl();
+  const rolesQuery = useQuery({
+    queryKey: ['lumiere-api', 'roles', apiBase],
+    enabled: Boolean(apiBase),
+    queryFn: () => mobileApi.fetchQueryList('/api/query/roles', 'Could not load roles'),
+  });
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -20,6 +29,23 @@ export default function HomeScreen() {
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
+      </ThemedView>
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">API gateway (Phase 6)</ThemedText>
+        {!apiBase ? (
+          <ThemedText>
+            Set <ThemedText type="defaultSemiBold">EXPO_PUBLIC_LUMIERE_API_URL</ThemedText> to your Next.js
+            origin (e.g. http://192.168.1.2:3000) to probe <ThemedText type="defaultSemiBold">GET /api/query/roles</ThemedText> with the same Bearer token as SpacetimeDB.
+          </ThemedText>
+        ) : rolesQuery.isPending ? (
+          <ThemedText>Loading roles…</ThemedText>
+        ) : rolesQuery.isError ? (
+          <ThemedText>{rolesQuery.error instanceof Error ? rolesQuery.error.message : 'Request failed'}</ThemedText>
+        ) : (
+          <ThemedText>
+            Roles from API: <ThemedText type="defaultSemiBold">{rolesQuery.data?.length ?? 0}</ThemedText>
+          </ThemedText>
+        )}
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>

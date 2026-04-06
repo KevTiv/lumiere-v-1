@@ -23,8 +23,8 @@ import {
   useClearProposalPresence,
   useAddProposalComment,
   useResolveProposalComment,
-} from "@/hooks/proposals"
-import { useProducts } from "@/hooks/inventory"
+} from "@lumiere/query-hooks/hooks/proposals"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
 
 interface ProposalWorkspaceWrapperProps {

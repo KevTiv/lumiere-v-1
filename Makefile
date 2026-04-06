@@ -72,6 +72,10 @@ logs:
 seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
 
+# --- API ----------------------------------------------------------------------
+api-server-run:
+	source api-server/.env.local && cargo run -p api-server
+
 # ── Cloud ─────────────────────────────────────────────────────────────────────
 
 publish-cloud:

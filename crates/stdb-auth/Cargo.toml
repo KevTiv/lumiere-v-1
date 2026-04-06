@@ -1,0 +1,11 @@
+[package]
+name = "stdb-auth"
+version.workspace = true
+edition.workspace = true
+description = "Session field-access context and SQL column RBAC (port of field-policy.ts)"
+
+[dependencies]
+once_cell = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

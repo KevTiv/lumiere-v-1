@@ -1,0 +1,342 @@
+//! ERP WebSocket subscription SQL (port of `frontend/packages/stdb/src/queries/erp-subscriptions.ts`).
+//! Keep `assets/erp-org-sql.json` aligned with the `ERP_ORG_SQL` map in that file (regenerate via tooling if needed).
+
+use std::collections::HashMap;
+
+use once_cell::sync::Lazy;
+use serde::Deserialize;
+
+use crate::field_policy::{
+    resolve_http_sql_columns, select_org_scoped_sql, select_roles_active_sql,
+    select_user_role_assignments_for_identity_sql, sql_column_list_for_generated_type,
+    FieldAccessContext,
+};
+
+#[derive(Debug, Clone, Default)]
+pub struct SubscriptionQueryContext<'a> {
+    pub organization_id: Option<u64>,
+    pub company_ids: Option<&'a [u64]>,
+    pub identity_hex: Option<&'a str>,
+    pub role_names: Option<&'a [String]>,
+    pub field_access: Option<&'a FieldAccessContext>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ErpOrgRow {
+    map_key: String,
+    resource_key: String,
+    table: String,
+    extra_where: String,
+    order_by: String,
+}
+
+static ERP_ORG_ROWS: Lazy<Vec<ErpOrgRow>> = Lazy::new(|| {
+    serde_json::from_str(include_str!("../assets/erp-org-sql.json")).expect("erp-org-sql.json")
+});
+
+static ERP_ORG_INDEX: Lazy<HashMap<String, usize>> = Lazy::new(|| {
+    ERP_ORG_ROWS
+        .iter()
+        .enumerate()
+        .map(|(i, r)| (r.map_key.clone(), i))
+        .collect()
+});
+
+fn auth_select_all(table: &str, type_name: &str) -> Result<String, String> {
+    let cols = sql_column_list_for_generated_type(type_name)?.join(", ");
+    Ok(format!("SELECT {cols} FROM {table}"))
+}
+
+static AUTH_SINGLE: Lazy<HashMap<String, String>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(
+        "user-profile".into(),
+        auth_select_all("user_profile", "UserProfile").expect("UserProfile cols"),
+    );
+    m.insert(
+        "user-role-assignment".into(),
+        auth_select_all("user_role_assignment", "UserRoleAssignment").expect("UserRoleAssignment cols"),
+    );
+    m.insert(
+        "auth-role-table".into(),
+        auth_select_all("role", "Role").expect("Role cols"),
+    );
+    m.insert(
+        "user-organization".into(),
+        auth_select_all("user_organization", "UserOrganization").expect("UserOrganization cols"),
+    );
+    m.insert(
+        "casbin-rule".into(),
+        auth_select_all("casbin_rule", "CasbinRule").expect("CasbinRule cols"),
+    );
+    m
+});
+
+fn sql_quote_str(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "''"))
+}
+
+fn is_narrow_identity_hex(s: &str) -> bool {
+    let s = s.trim();
+    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Port of `authSubscriptions` from `queries/auth.ts` (uses `SELECT *`).
+pub fn auth_subscriptions(
+    identity_hex: Option<&str>,
+    role_names: Option<&[String]>,
+    organization_id: Option<u64>,
+) -> Vec<String> {
+    let id = identity_hex
+        .map(str::trim)
+        .filter(|s| is_narrow_identity_hex(s))
+        .map(|s| s.to_ascii_lowercase());
+
+    let roles: Vec<&str> = role_names
+        .map(|v| {
+            v.iter()
+                .map(|s| s.as_str())
+                .filter(|r| !r.is_empty() && r.len() < 256)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let user_profile_sql = if let Some(ref hex) = id {
+        format!("SELECT * FROM user_profile WHERE identity = 0x{hex}")
+    } else {
+        "SELECT * FROM user_profile".into()
+    };
+
+    let user_role_assignment_sql = if let Some(ref hex) = id {
+        format!(
+            "SELECT * FROM user_role_assignment WHERE user_identity = 0x{hex} AND is_active = true"
+        )
+    } else {
+        "SELECT * FROM user_role_assignment".into()
+    };
+
+    let org_id_num = organization_id.filter(|&n| n > 0);
+
+    let role_sql = if let Some(n) = org_id_num {
+        format!("SELECT * FROM role WHERE organization_id = {n}")
+    } else {
+        "SELECT * FROM role".into()
+    };
+
+    let user_organization_sql = if let Some(ref hex) = id {
+        format!(
+            "SELECT * FROM user_organization WHERE user_identity = 0x{hex} AND is_active = true"
+        )
+    } else {
+        "SELECT * FROM user_organization".into()
+    };
+
+    let mut casbin_subjects: Vec<String> = Vec::new();
+    if let Some(ref idv) = id {
+        casbin_subjects.push(idv.clone());
+        for r in roles {
+            casbin_subjects.push(r.to_string());
+        }
+    }
+
+    let casbin_sql = if !casbin_subjects.is_empty() {
+        let conds: Vec<String> = casbin_subjects
+            .iter()
+            .map(|s| format!("v0 = {}", sql_quote_str(s)))
+            .collect();
+        format!("SELECT * FROM casbin_rule WHERE ({})", conds.join(" OR "))
+    } else {
+        "SELECT * FROM casbin_rule".into()
+    };
+
+    vec![
+        user_profile_sql,
+        user_role_assignment_sql,
+        role_sql,
+        user_organization_sql,
+        casbin_sql,
+    ]
+}
+
+enum CompanyScoped {
+    NotApplicable,
+    MissingContext,
+    Queries(Vec<String>),
+}
+
+fn subscription_sql_for_company_scoped(
+    resource: &str,
+    ctx: &SubscriptionQueryContext<'_>,
+) -> Result<CompanyScoped, String> {
+    let fa = ctx.field_access;
+    let ids = ctx.company_ids.filter(|v| !v.is_empty());
+
+    match resource {
+        "fixed-assets" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let list = list_ids
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let c = resolve_http_sql_columns("fixed-assets", fa)?.join(", ");
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM account_asset WHERE company_id IN ({list})"
+            )]))
+        }
+        "intercompany-rules" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let list = list_ids
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let c = resolve_http_sql_columns("intercompany-rules", fa)?.join(", ");
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM intercompany_rule WHERE source_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY sequence ASC"
+            )]))
+        }
+        "intercompany-transactions" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let list = list_ids
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let c = resolve_http_sql_columns("intercompany-transactions", fa)?.join(", ");
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM intercompany_transaction WHERE origin_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY id DESC"
+            )]))
+        }
+        "depreciation-lines" => Ok(CompanyScoped::MissingContext),
+        _ => Ok(CompanyScoped::NotApplicable),
+    }
+}
+
+fn erp_org_line(
+    resource: &str,
+    org: u64,
+    fa: Option<&FieldAccessContext>,
+) -> Result<Option<String>, String> {
+    let Some(&idx) = ERP_ORG_INDEX.get(resource) else {
+        return Ok(None);
+    };
+    let ent = &ERP_ORG_ROWS[idx];
+    Ok(Some(select_org_scoped_sql(
+        &ent.resource_key,
+        &ent.table,
+        org,
+        fa,
+        &ent.extra_where,
+        &ent.order_by,
+    )?))
+}
+
+/// `Ok(None)` when the resource is unknown or required context is missing.
+pub fn subscription_queries_for_resource(
+    resource: &str,
+    ctx: &SubscriptionQueryContext<'_>,
+) -> Result<Option<Vec<String>>, String> {
+    let r = resource.trim();
+    if r.is_empty() {
+        return Ok(None);
+    }
+
+    if r == "auth" {
+        return Ok(Some(auth_subscriptions(
+            ctx.identity_hex,
+            ctx.role_names,
+            ctx.organization_id,
+        )));
+    }
+
+    if let Some(sql) = AUTH_SINGLE.get(r) {
+        return Ok(Some(vec![sql.clone()]));
+    }
+
+    if r == "roles" {
+        return Ok(Some(vec![select_roles_active_sql(ctx.field_access)?]));
+    }
+
+    if r == "form-configuration" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let fc = sql_column_list_for_generated_type("FormConfig")?.join(", ");
+        let ucf = sql_column_list_for_generated_type("UserCustomField")?.join(", ");
+        return Ok(Some(vec![
+            format!("SELECT {fc} FROM form_config WHERE organization_id = {org}"),
+            format!("SELECT {ucf} FROM user_custom_field WHERE organization_id = {org}"),
+        ]));
+    }
+
+    if r == "user-roles" {
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        return Ok(Some(vec![select_user_role_assignments_for_identity_sql(
+            id,
+            ctx.field_access,
+        )?]));
+    }
+
+    let Some(org) = ctx.organization_id else {
+        return Ok(None);
+    };
+
+    match subscription_sql_for_company_scoped(r, ctx)? {
+        CompanyScoped::NotApplicable => {}
+        CompanyScoped::MissingContext => return Ok(None),
+        CompanyScoped::Queries(q) => return Ok(Some(q)),
+    }
+
+    let Some(line) = erp_org_line(r, org, ctx.field_access)? else {
+        return Ok(None);
+    };
+    Ok(Some(vec![line]))
+}
+
+pub fn create_client_subscriptions<T: AsRef<str>>(
+    resources: &[T],
+    ctx: &SubscriptionQueryContext<'_>,
+) -> Result<Vec<String>, String> {
+    let identity_hex = ctx.identity_hex.filter(|s| *s != "unknown");
+    let scoped = SubscriptionQueryContext {
+        organization_id: ctx.organization_id,
+        company_ids: ctx.company_ids,
+        identity_hex,
+        role_names: ctx.role_names,
+        field_access: ctx.field_access,
+    };
+
+    let mut out = Vec::new();
+    for key in resources {
+        let key = key.as_ref();
+        if let Some(part) = subscription_queries_for_resource(key, &scoped)? {
+            out.extend(part);
+        }
+    }
+    Ok(out)
+}
+
+pub static SUBSCRIPTION_RESOURCE_KEYS_JSON: &str =
+    include_str!("../assets/subscription-resource-keys.json");
+
+pub static FULL_CLIENT_SUBSCRIPTION_RESOURCES_JSON: &str =
+    include_str!("../assets/full-client-subscription-resources.json");
+
+pub fn subscription_resource_keys_vec() -> Vec<String> {
+    serde_json::from_str(SUBSCRIPTION_RESOURCE_KEYS_JSON).expect("subscription-resource-keys.json")
+}
+
+pub fn full_client_subscription_resources_vec() -> Vec<String> {
+    serde_json::from_str(FULL_CLIENT_SUBSCRIPTION_RESOURCES_JSON)
+        .expect("full-client-subscription-resources.json")
+}

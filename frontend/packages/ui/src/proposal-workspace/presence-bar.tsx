@@ -2,7 +2,8 @@
 
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
-import type { ProposalPresence } from "@lumiere/stdb"
+import type { ProposalPresence } from "@lumiere/stdb/proposal-row-types"
+import { rowString } from "./row-field-utils"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Section = Record<string, any>
@@ -24,10 +25,11 @@ export function PresenceBar({ presenceRows, sections, currentUserId }: PresenceB
   const { t } = useTranslation()
   if (presenceRows.length === 0) return null
 
-  const getSectionTitle = (sectionId: bigint | null | undefined): string | null => {
-    if (!sectionId) return null
+  const getSectionTitle = (sectionId: unknown): string | null => {
+    if (sectionId == null || sectionId === "") return null
     const sec = sections.find((s) => String(s.id) === String(sectionId))
-    return sec?.title ?? null
+    const t = sec?.title
+    return t != null ? String(t) : null
   }
 
   return (
@@ -37,9 +39,10 @@ export function PresenceBar({ presenceRows, sections, currentUserId }: PresenceB
         const isSelf = userId === currentUserId
         const sectionTitle = getSectionTitle(p.sectionId)
         const initials = String(p.userName ?? "?").slice(0, 2).toUpperCase()
+        const displayName = rowString(p.userName)
         const tooltip = isSelf
           ? (sectionTitle ? t("proposalWorkspace.presenceBar.youWithSection", { section: sectionTitle }) : t("proposalWorkspace.presenceBar.you"))
-          : (sectionTitle ? t("proposalWorkspace.presenceBar.userWithSection", { name: p.userName, section: sectionTitle }) : String(p.userName ?? ""))
+          : (sectionTitle ? t("proposalWorkspace.presenceBar.userWithSection", { name: displayName, section: sectionTitle }) : displayName)
 
         return (
           <div

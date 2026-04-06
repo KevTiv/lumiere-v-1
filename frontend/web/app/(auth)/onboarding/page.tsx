@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
@@ -30,7 +31,7 @@ export default function OnboardingPage() {
     setError(null)
     setLoading(true)
     try {
-      const r = await fetch("/api/bootstrap/tenant", {
+      const r = await apiFetch("/api/bootstrap/tenant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

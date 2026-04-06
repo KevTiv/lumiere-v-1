@@ -2,8 +2,10 @@
  * Maps Projects module form payloads to SpacetimeDB reducer param types.
  */
 
-import type { CreateProjectParams, CreateTaskParams } from '@lumiere/stdb'
-import { Timestamp } from 'spacetimedb'
+import type { CreateProjectParams, CreateTaskParams } from '@lumiere/stdb/generated/types'
+import type { Timestamp } from "spacetimedb"
+
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -25,7 +27,7 @@ function optionalTimestampFromFormDate(v: unknown): Timestamp | undefined {
   if (v == null || String(v).trim() === '') return undefined
   const d = new Date(String(v))
   if (Number.isNaN(d.getTime())) return undefined
-  return Timestamp.fromDate(d)
+  return stbTimestampFromDate(d)
 }
 
 function parseU64FromForm(v: unknown): bigint | null {

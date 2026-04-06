@@ -14,7 +14,7 @@ export const proposalsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "status",
-        label: t("proposals.proposals.filters.status"),
+        label: t("proposals.proposals.filters.status.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("proposals.proposals.filters.status.options.Draft") },

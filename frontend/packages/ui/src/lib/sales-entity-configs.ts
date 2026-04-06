@@ -55,7 +55,7 @@ export const saleOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("sales.salesOrders.filters.state"),
+        label: t("sales.salesOrders.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("sales.salesOrders.filters.state.options.Draft") },
@@ -166,7 +166,7 @@ export const deliveriesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("sales.deliveries.filters.state"),
+        label: t("sales.deliveries.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("sales.deliveries.filters.state.options.Draft") },

@@ -79,8 +79,7 @@ async fn ingest_sale_orders(state: &AppState, org_filter: Option<u64>) -> anyhow
             );
             let amount = get_f64(row, "amount_total").unwrap_or(0.0);
             let state_name = get_string(row, "state").unwrap_or_else(|| "unknown".to_string());
-            let customer = row
-                .get("partner_id")
+            let customer = row_field(row, "partner_id")
                 .map(display_value)
                 .unwrap_or_else(|| "unknown customer".to_string());
 
@@ -112,16 +111,13 @@ async fn ingest_project_tasks(state: &AppState, org_filter: Option<u64>) -> anyh
             let entity_id = get_u64(row, "id")?.to_string();
             let ts = latest_timestamp_micros(row, &["write_date", "create_date", "date_assign"]);
             let name = get_string(row, "name").unwrap_or_else(|| "Untitled task".to_string());
-            let project = row
-                .get("project_id")
+            let project = row_field(row, "project_id")
                 .map(display_value)
                 .unwrap_or_else(|| "unknown project".to_string());
-            let stage = row
-                .get("stage_id")
+            let stage = row_field(row, "stage_id")
                 .map(display_value)
                 .unwrap_or_else(|| "no stage".to_string());
-            let assigned = row
-                .get("user_ids")
+            let assigned = row_field(row, "user_ids")
                 .map(display_user_list)
                 .unwrap_or_else(|| "unassigned".to_string());
 
@@ -152,12 +148,10 @@ async fn ingest_hr_leaves(state: &AppState, org_filter: Option<u64>) -> anyhow::
             let entity_id = get_u64(row, "id")?.to_string();
             let ts = latest_timestamp_micros(row, &["created_at", "date_from"]);
             let days = get_f64(row, "number_of_days").unwrap_or(0.0);
-            let leave_type = row
-                .get("leave_type_id")
+            let leave_type = row_field(row, "leave_type_id")
                 .map(display_value)
                 .unwrap_or_else(|| "leave".to_string());
-            let employee = row
-                .get("employee_id")
+            let employee = row_field(row, "employee_id")
                 .map(display_value)
                 .unwrap_or_else(|| "unknown employee".to_string());
             let state_name = get_string(row, "state").unwrap_or_else(|| "unknown".to_string());
@@ -195,8 +189,7 @@ async fn ingest_iot_telemetry(state: &AppState, org_filter: Option<u64>) -> anyh
                 get_string(row, "sensor_type").unwrap_or_else(|| "unknown".to_string());
             let unit = get_string(row, "unit").unwrap_or_default();
 
-            let value_text = row
-                .get("raw_value")
+            let value_text = row_field(row, "raw_value")
                 .and_then(|v| v.as_str())
                 .map(str::to_string)
                 .unwrap_or_else(|| {
@@ -263,8 +256,7 @@ async fn ingest_mrp_production(
                 row,
                 &["write_date", "create_date", "date_start", "date_planned_start"],
             );
-            let product = row
-                .get("product_id")
+            let product = row_field(row, "product_id")
                 .map(display_value)
                 .unwrap_or_else(|| "unknown product".to_string());
             let qty = get_f64(row, "product_qty").unwrap_or(0.0);
@@ -363,10 +355,31 @@ fn watermark_key(org_id: u64, table: &str) -> String {
     format!("{org_id}:{table}")
 }
 
+fn snake_to_camel_key(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut upper = false;
+    for c in s.chars() {
+        if c == '_' {
+            upper = true;
+        } else if upper {
+            out.push(c.to_ascii_uppercase());
+            upper = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn row_field<'a>(row: &'a serde_json::Value, snake_key: &str) -> Option<&'a serde_json::Value> {
+    let camel = snake_to_camel_key(snake_key);
+    row.get(snake_key).or_else(|| row.get(&camel))
+}
+
 fn latest_timestamp_micros(row: &serde_json::Value, fields: &[&str]) -> i64 {
     fields
         .iter()
-        .filter_map(|field| row.get(*field))
+        .filter_map(|field| row_field(row, field))
         .map(timestamp_to_micros)
         .max()
         .unwrap_or(0)
@@ -408,15 +421,15 @@ fn timestamp_to_micros(value: &serde_json::Value) -> i64 {
 }
 
 fn get_u64(row: &serde_json::Value, key: &str) -> Option<u64> {
-    row.get(key).and_then(value_to_u64)
+    row_field(row, key).and_then(value_to_u64)
 }
 
 fn get_f64(row: &serde_json::Value, key: &str) -> Option<f64> {
-    row.get(key).and_then(value_to_f64)
+    row_field(row, key).and_then(value_to_f64)
 }
 
 fn get_string(row: &serde_json::Value, key: &str) -> Option<String> {
-    row.get(key).map(display_value)
+    row_field(row, key).map(display_value)
 }
 
 fn value_to_u64(value: &serde_json::Value) -> Option<u64> {

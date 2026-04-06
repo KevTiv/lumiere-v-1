@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
-  getStdbConnection,
   postInternalNote,
   subscribeToRecord,
   unsubscribeFromRecord,
-  useStdbConnection,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/client-ui-bridge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -58,7 +58,7 @@ export function CrmRecordChatter({
   className,
 }: CrmRecordChatterProps) {
   const { t } = useTranslation()
-  const { connected, identity } = useStdbConnection()
+  const { identity } = useErpSession()
   const org = BigInt(organizationId)
 
   const [noteBody, setNoteBody] = useState("")
@@ -69,54 +69,67 @@ export function CrmRecordChatter({
   const [following, setFollowing] = useState(false)
 
   const reloadMessages = useCallback(() => {
-    const conn = getStdbConnection()
-    if (!conn || !organizationId || !resModel) {
+    if (!organizationId || !resModel) {
       setMessages([])
       return
     }
-    const list = [...conn.db.mail_message.iter()].filter((m) => {
-      const row = m as {
-        organizationId: bigint
-        model: string
-        resId: bigint
+    ;(async () => {
+      try {
+        const list = await stdbBrowserQuery("mail-messages")
+        const filtered = list.filter(m => {
+          const row = m as { organizationId: unknown; model: string; resId: unknown }
+          return (
+            Number(row.organizationId) === organizationId &&
+            row.model === resModel &&
+            BigInt(String(row.resId ?? 0)) === resId
+          )
+        })
+        const mapped = filtered
+          .map(m => {
+            const row = m as { id: unknown; body: string; messageType: unknown; date: unknown }
+            return {
+              id: BigInt(String(row.id ?? 0)),
+              body: row.body,
+              messageType: row.messageType,
+              date: row.date,
+            }
+          })
+          .sort((a, b) => Number(b.date ?? 0) - Number(a.date ?? 0))
+        setMessages(mapped)
+      } catch {
+        setMessages([])
       }
-      return (
-        Number(row.organizationId) === organizationId &&
-        row.model === resModel &&
-        row.resId === resId
-      )
-    })
-    const mapped = list
-      .map((m) => {
-        const row = m as { id: bigint; body: string; messageType: unknown; date: unknown }
-        return { id: row.id, body: row.body, messageType: row.messageType, date: row.date }
-      })
-      .sort((a, b) => Number(b.date ?? 0) - Number(a.date ?? 0))
-    setMessages(mapped)
+    })()
   }, [organizationId, resModel, resId])
 
   const reloadFollower = useCallback(() => {
-    const conn = getStdbConnection()
-    if (!conn || !identity || !organizationId || !resModel) {
+    if (!identity || !organizationId || !resModel) {
       setFollowing(false)
       return
     }
-    const me = identity.toLowerCase()
-    const found = [...conn.db.mail_follower.iter()].some((f) => {
-      const row = f as {
-        organizationId: bigint
-        resModel: string
-        resId: bigint
-        partnerId: unknown
+    ;(async () => {
+      try {
+        const list = await stdbBrowserQuery("mail-followers")
+        const me = identity.toLowerCase()
+        const found = list.some(f => {
+          const row = f as {
+            organizationId: unknown
+            resModel: string
+            resId: unknown
+            partnerId: unknown
+          }
+          return (
+            Number(row.organizationId) === organizationId &&
+            row.resModel === resModel &&
+            BigInt(String(row.resId ?? 0)) === resId &&
+            identityHex(row.partnerId) === me
+          )
+        })
+        setFollowing(found)
+      } catch {
+        setFollowing(false)
       }
-      return (
-        Number(row.organizationId) === organizationId &&
-        row.resModel === resModel &&
-        row.resId === resId &&
-        identityHex(row.partnerId) === me
-      )
-    })
-    setFollowing(found)
+    })()
   }, [organizationId, resModel, resId, identity])
 
   useEffect(() => {
@@ -126,11 +139,12 @@ export function CrmRecordChatter({
 
   const postNote = async () => {
     const body = noteBody.trim()
-    if (!body || !connected) return
+    if (!body || !identity) return
     try {
       setBusy(true)
       await postInternalNote(org, resModel, resId, body)
       setNoteBody("")
+      reloadMessages()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     } finally {
@@ -139,7 +153,7 @@ export function CrmRecordChatter({
   }
 
   const toggleFollow = async () => {
-    if (!connected || !identity) return
+    if (!identity) return
     try {
       setBusy(true)
       if (following) {
@@ -151,6 +165,7 @@ export function CrmRecordChatter({
       window.alert(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      reloadFollower()
     }
   }
 
@@ -163,7 +178,7 @@ export function CrmRecordChatter({
     return <p className="text-sm text-muted-foreground">{t("crm.chatter.needOrg")}</p>
   }
 
-  if (!connected) {
+  if (!identity) {
     return <p className="text-sm text-muted-foreground">{t("crm.chatter.needConnection")}</p>
   }
 

@@ -9,7 +9,7 @@ import {
   manufacturingWorkorderRowActionForm,
   manufacturingWorkcenterRowActionForm,
 } from "@lumiere/ui"
-import type { ManufacturingMutations } from "@/hooks/manufacturing"
+import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
 import type { QueryRows } from "@/lib/query-fetch"
 import { submitManufacturingRowAction } from "@/lib/manufacturing-row-action-submit"
 

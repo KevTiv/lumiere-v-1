@@ -3,8 +3,8 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
+import { useErpSession } from "@lumiere/erp-session"
 import {
-  useStdbConnection,
   seedOrganizationFormConfigs,
   addFormField,
   setFormRoleConfig,
@@ -13,7 +13,7 @@ import {
   initializeDefaultFormConfigs,
   type CreateFormFieldParams as StdbCreateFormFieldParams,
   type UpdateFormFieldParams,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/client-ui-bridge"
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
 import { formRegistry } from "../forms/config/registry"
@@ -307,7 +307,7 @@ const FIELD_TYPES_FOR_CUSTOM: FieldType[] = [
 function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigurationDetailProps) {
   const { t } = useTranslation()
   const { checkPermission } = useRBAC()
-  const { organizationId, connected } = useStdbConnection()
+  const { organizationId, connected } = useErpSession()
   const canEditForms = checkPermission("admin:roles", "update").allowed
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid")

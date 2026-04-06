@@ -44,10 +44,10 @@ import {
   useBillTimesheets,
   useEmployees,
   useProjectsCsvImportMutations,
-} from "@/hooks/projects"
+} from "@lumiere/query-hooks/hooks/projects"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { usePricelists } from "@/hooks/sales"
-import { useContacts, useUsers } from "@/hooks/crm"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
 import {
   pricelistRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
@@ -97,13 +97,13 @@ function ProjectsClientLoaded({
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
 
-  const { data: projects = [] } = useProjects(companyId, initialProjects)
-  const { data: tasks = [] } = useTasks(companyId, initialTasks)
-  const { data: timesheets = [] } = useTimesheets(companyId, initialTimesheets)
-  const { data: employees = [] } = useEmployees(companyId)
+  const { data: projects = [] } = useProjects(orgId, initialProjects)
+  const { data: tasks = [] } = useTasks(orgId, initialTasks)
+  const { data: timesheets = [] } = useTimesheets(orgId, initialTimesheets)
+  const { data: employees = [] } = useEmployees(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: contacts = [] } = useContacts(companyId, initialContacts)
-  const { data: users = [] } = useUsers(companyId)
+  const { data: contacts = [] } = useContacts(orgId, initialContacts)
+  const { data: users = [] } = useUsers(orgId)
 
   const createProject = useCreateProject(orgId, companyId)
   const createTask = useCreateTask(orgId, companyId)

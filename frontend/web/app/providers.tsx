@@ -1,7 +1,7 @@
 "use client"
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
@@ -9,9 +9,10 @@ import {
   type User,
   type Role,
 } from "@lumiere/ui"
-import { StdbConnectionProvider, FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb"
-import { useStdbQuery } from "@/hooks/stdb"
-import { saveStdbSession } from "@/app/actions/save-stdb-token"
+import { ErpSessionProvider } from "@lumiere/erp-session"
+import { LumiereApiProvider } from "@lumiere/api-client"
+import { useStdbQuery } from "@lumiere/query-hooks/hooks/stdb"
+import { webApi } from "@/lib/lumiere-web-http"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 const getRBACRoles = (rolesData: Record<string, unknown>[]) => {
@@ -87,39 +88,36 @@ export function Providers({
   serverIdentity,
   serverRoleNames,
   organizationId,
-  companyIds,
-  stdbModule,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
   organizationId?: number
+  /** @deprecated WebSocket stack removed (Phase 5); ignored */
   companyIds?: readonly number[]
-  /** Must match server `STDB_MODULE` / upstream database name */
+  /** @deprecated WebSocket stack removed (Phase 5); ignored */
   stdbModule?: string
 }) {
   const [queryClient] = useState(() => new QueryClient())
   return (
     <I18nProvider>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <StdbConnectionProvider
-            sameOriginStdbProxy
-            moduleName={stdbModule}
-            serverIdentity={serverIdentity}
-            serverRoleNames={serverRoleNames}
-            organizationId={organizationId}
-            companyIds={companyIds}
-            subscriptionResources={FULL_CLIENT_SUBSCRIPTION_RESOURCES}
-            onTokenPersisted={(token, identityHex) => {
-              void saveStdbSession(token, identityHex)
-            }}
-          >
-            <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
-              {children}
-            </RBACBridge>
-          </StdbConnectionProvider>
-        </QueryClientProvider>
+        <LumiereApiProvider client={webApi}>
+          <QueryClientProvider client={queryClient}>
+            <ErpSessionProvider
+              value={{
+                identity: serverIdentity ?? null,
+                connected: Boolean(serverIdentity),
+                organizationId: organizationId ?? undefined,
+              }}
+            >
+              <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
+                {children}
+              </RBACBridge>
+            </ErpSessionProvider>
+          </QueryClientProvider>
+
+        </LumiereApiProvider>
       </ThemeProvider>
     </I18nProvider>
   )

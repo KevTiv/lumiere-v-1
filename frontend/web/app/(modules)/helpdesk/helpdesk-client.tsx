@@ -30,8 +30,8 @@ import {
   useCloseTicket,
   useReopenTicket,
   useImportHelpdeskTicketCsv,
-} from "@/hooks/helpdesk"
-import type { CreateTicketParams } from "@/hooks/helpdesk"
+} from "@lumiere/query-hooks/hooks/helpdesk"
+import type { CreateTicketParams } from "@lumiere/query-hooks/hooks/helpdesk"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   helpdeskTeamRowsToSelectOptions,
@@ -39,7 +39,7 @@ import {
   helpdeskSlaRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import { helpdeskEnumTag, identityToHex, normalizeHelpdeskTicketRow } from "@/lib/helpdesk-display"
-import { useOrgUsers } from "@/hooks/inventory"
+import { useOrgUsers } from "@lumiere/query-hooks/hooks/inventory"
 import { HelpdeskTicketDialog } from "./helpdesk-ticket-dialog"
 
 interface HelpdeskClientProps {
@@ -196,7 +196,7 @@ function HelpdeskClientLoaded({
       priority: pr,
       agentIdentityHex: agentValue,
       stateTag: st,
-      stageOptions: stageFieldOptions.filter((o) => !o.disabled),
+      stageOptions: stageFieldOptions.filter((o) => !("disabled" in o && o.disabled)),
       priorityOptions,
       agentOptions: agentSelectOptions,
     })

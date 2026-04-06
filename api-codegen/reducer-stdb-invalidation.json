@@ -1,0 +1,51 @@
+{
+  "add_account_move_line": ["account-moves", "account-move-lines"],
+  "cancel_account_move": ["account-moves", "account-move-lines"],
+  "create_account_account": ["account-accounts"],
+  "create_account_asset": ["fixed-assets", "depreciation-lines"],
+  "create_account_bank_statement": [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets"
+  ],
+  "create_account_journal": ["account-journals"],
+  "create_account_move": ["account-moves", "account-move-lines"],
+  "create_account_tax": [
+    "account-taxes",
+    "tax-groups",
+    "tax-jurisdictions",
+    "tax-schedules",
+    "tax-deadlines"
+  ],
+  "create_budget_line": ["budgets", "budget-lines", "budget-posts"],
+  "delete_account_move_line": ["account-moves", "account-move-lines"],
+  "deprecate_account_account": ["account-accounts"],
+  "dispose_account_asset": ["fixed-assets", "depreciation-lines"],
+  "post_account_move": ["account-moves", "account-move-lines"],
+  "post_invoice": ["account-moves", "account-move-lines"],
+  "unreconcile_account_bank_statement_line": [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets"
+  ],
+  "update_account_account": ["account-accounts"],
+  "update_account_asset": ["fixed-assets", "depreciation-lines"],
+  "update_account_bank_statement": [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets"
+  ],
+  "update_account_journal": ["account-journals"],
+  "update_account_tax": [
+    "account-taxes",
+    "tax-groups",
+    "tax-jurisdictions",
+    "tax-schedules",
+    "tax-deadlines"
+  ],
+  "update_budget_line": ["budgets", "budget-lines", "budget-posts"],
+  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"]
+}

@@ -27,8 +27,8 @@ import {
   useCompleteDocumentProcessingJob,
   useApproveDocumentProcessingJob,
   useAcknowledgeInsight,
-} from "@/hooks/documents"
-import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@/hooks/documents"
+} from "@lumiere/query-hooks/hooks/documents"
+import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@lumiere/query-hooks/hooks/documents"
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import type { QueryRows } from "@/lib/query-fetch"

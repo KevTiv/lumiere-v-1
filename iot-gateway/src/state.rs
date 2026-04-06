@@ -5,89 +5,50 @@ use rumqttc::AsyncClient;
 use tokio::sync::{mpsc, Mutex};
 
 use crate::config::Config;
+use stdb_client::StdbClient;
 
 /// Shared application state passed to all Axum route handlers.
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
-    pub http: reqwest::Client,
+    pub stdb: StdbClient,
     /// MQTT client — wrapped in Mutex because AsyncClient is not Clone
     pub mqtt: Arc<Mutex<AsyncClient>>,
     /// Active hub WebSocket connections keyed by hub_id.
-    ///
-    /// When a hub establishes a persistent WebSocket connection via `GET /v1/ws`,
-    /// its sender channel is inserted here. The action dispatcher checks this map
-    /// first; if the hub is present the action is pushed over WS immediately rather
-    /// than waiting for the next MQTT poll cycle.
     pub hub_connections: Arc<DashMap<u64, mpsc::UnboundedSender<String>>>,
 }
 
 impl AppState {
     pub fn new(config: Config, mqtt: AsyncClient) -> Self {
+        let host = config.stdb_host.trim_end_matches('/').to_string();
+        let stdb = StdbClient::new(host, config.stdb_module.clone(), config.stdb_token.clone());
         AppState {
             config: Arc::new(config),
-            http: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(10))
-                .build()
-                .expect("Failed to build HTTP client"),
+            stdb,
             mqtt: Arc::new(Mutex::new(mqtt)),
             hub_connections: Arc::new(DashMap::new()),
         }
     }
 
-    /// Call a SpacetimeDB reducer via the REST API.
-    ///
-    /// SpacetimeDB exposes reducers at:
-    ///   POST /database/call/<module>/<reducer>
-    /// with the token in the Authorization header.
+    /// Call a SpacetimeDB reducer via HTTP (`/v1/database/.../call/...`).
     pub async fn call_reducer(&self, reducer: &str, args: serde_json::Value) -> anyhow::Result<()> {
-        let url = format!(
-            "{}/database/call/{}/{}",
-            self.config.stdb_host, self.config.stdb_module, reducer
-        );
-
-        let resp = self
-            .http
-            .post(&url)
-            .bearer_auth(&self.config.stdb_token)
-            .json(&args)
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Reducer '{}' failed: {}", reducer, body);
-        }
-
-        Ok(())
+        self.stdb
+            .call_reducer(reducer, args)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
-    /// Query a SpacetimeDB table via the REST API.
     pub async fn query_table(&self, table: &str) -> anyhow::Result<Vec<serde_json::Value>> {
-        self.query_sql(&format!("SELECT * FROM {}", table)).await
+        self.stdb
+            .query_table(table)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
-    /// Run an arbitrary SQL query against SpacetimeDB's REST API.
     pub async fn query_sql(&self, sql: &str) -> anyhow::Result<Vec<serde_json::Value>> {
-        let url = format!(
-            "{}/database/sql/{}",
-            self.config.stdb_host, self.config.stdb_module
-        );
-
-        let resp = self
-            .http
-            .post(&url)
-            .bearer_auth(&self.config.stdb_token)
-            .json(&serde_json::json!({ "query": sql }))
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("SQL query failed: {}", body);
-        }
-
-        let rows: Vec<serde_json::Value> = resp.json().await?;
-        Ok(rows)
+        self.stdb
+            .query_sql(sql)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 }

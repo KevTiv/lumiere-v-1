@@ -1,12 +1,14 @@
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   addFormField,
   createFormConfiguration,
-  getStdbConnection,
   setFormRoleConfig,
   type CreateFormFieldParams as StdbCreateFormFieldParams,
-  type FieldType as StdbFieldType,
-  type FieldWidth as StdbFieldWidth,
-} from "@lumiere/stdb"
+} from "@lumiere/stdb/client-ui-bridge"
+import type {
+  FieldType as StdbFieldType,
+  FieldWidth as StdbFieldWidth,
+} from "@lumiere/stdb/generated/types"
 import type {
   CreateFormFieldParams as RegistryFieldParams,
   FormRegistryEntry,
@@ -52,18 +54,16 @@ export async function pushRegistryFormToDatabase(
     isSystemDefault: def.isSystemDefault,
   })
 
-  const conn = getStdbConnection()
-  if (!conn) throw new Error("Not connected to SpacetimeDB")
-
-  const row = [...conn.db.form_config.iter()].find(
+  const rows = await stdbBrowserQuery("form-configs")
+  const row = rows.find(
     c =>
       Number(c.organizationId) === organizationId &&
       c.moduleId === def.moduleId &&
       c.formId === def.formId,
   )
-  if (!row) throw new Error("Form configuration not found after create")
+  if (!row?.id) throw new Error("Form configuration not found after create")
 
-  const configurationId = row.id
+  const configurationId = BigInt(String(row.id))
 
   for (const field of def.fields) {
     await addFormField(BigInt(organizationId), configurationId, registryFieldToStdbParams(field))

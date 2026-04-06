@@ -89,7 +89,7 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "employmentType",
-        label: t("hr.employees.filters.employmentType"),
+        label: t("hr.employees.filters.employmentType.label"),
         type: "select",
         options: [
           { value: "FullTime", label: t("hr.employees.filters.employmentType.options.FullTime") },
@@ -149,7 +149,7 @@ export const leaveRequestsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("hr.leaveRequests.filters.state"),
+        label: t("hr.leaveRequests.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("hr.leaveRequests.filters.state.options.Draft") },
@@ -186,7 +186,7 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("hr.contracts.filters.state"),
+        label: t("hr.contracts.filters.state.label"),
         type: "select",
         options: [
           { value: "New", label: t("hr.contracts.filters.state.options.New") },
@@ -222,7 +222,7 @@ export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("hr.payslips.filters.state"),
+        label: t("hr.payslips.filters.state.label"),
         type: "select",
         options: [
           { value: "Draft", label: t("hr.payslips.filters.state.options.Draft") },
@@ -260,7 +260,7 @@ export const jobPositionsTableConfig = (t: TFunction): EntityViewConfig => ({
     filters: [
       {
         key: "state",
-        label: t("hr.jobPositions.filters.state"),
+        label: t("hr.jobPositions.filters.state.label"),
         type: "select",
         options: [
           { value: "recruit", label: t("hr.jobPositions.filters.state.options.recruit") },

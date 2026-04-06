@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { SectionStatus } from "@/lib/proposal-workspace-types"
-import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb"
+import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb/proposal-row-types"
 import { ProductLineItems } from "./product-line-items"
 import { CommentThread } from "./comment-thread"
 

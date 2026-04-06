@@ -69,9 +69,9 @@ import {
   useCreatePartnerBank,
   useUpdatePartnerBank,
   useDeletePartnerBank,
-} from "@/hooks/purchasing"
-import { usePricelists } from "@/hooks/sales"
-import { useProducts, useUoms } from "@/hooks/inventory"
+} from "@lumiere/query-hooks/hooks/purchasing"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useProducts, useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   contactRowsToVendorSelectOptions,
@@ -179,13 +179,13 @@ function PurchasingClientLoaded({
     if (csvKind) setCsvError(null)
   }, [csvKind])
 
-  const { data: orders = [] } = usePurchaseOrders(companyId, initialOrders)
-  const { data: lines = [] } = usePurchaseOrderLines(companyId, initialLines)
-  const { data: requisitions = [] } = usePurchaseRequisitions(companyId, initialRequisitions)
-  const { data: allContacts = [] } = useContacts(companyId, initialContacts)
+  const { data: orders = [] } = usePurchaseOrders(orgId, initialOrders)
+  const { data: lines = [] } = usePurchaseOrderLines(orgId, initialLines)
+  const { data: requisitions = [] } = usePurchaseRequisitions(orgId, initialRequisitions)
+  const { data: allContacts = [] } = useContacts(orgId, initialContacts)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: products = [] } = useProducts(companyId, initialProducts)
-  const { data: uoms = [] } = useUoms(companyId, initialUoms)
+  const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: uoms = [] } = useUoms(orgId, initialUoms)
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
@@ -972,7 +972,7 @@ function PurchasingClientLoaded({
                       label: t("common.delete"),
                       requiresSelection: true,
                       variant: "destructive",
-                      onClick: (rows) => {
+                      onClick: (rows: Record<string, unknown>[]) => {
                         if (
                           typeof window !== "undefined" &&
                           !window.confirm(

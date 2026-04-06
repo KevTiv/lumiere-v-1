@@ -41,15 +41,15 @@ import {
   useDeactivateRevenueRecognitionRule,
   useImportSubscriptionPlanCsv,
   useImportSubscriptionCsv,
-} from "@/hooks/subscriptions"
+} from "@lumiere/query-hooks/hooks/subscriptions"
 import type {
   CreateSubscriptionFromSaleOrderParams,
   CreateSubscriptionPlanParams,
-} from "@/hooks/subscriptions"
+} from "@lumiere/query-hooks/hooks/subscriptions"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { useSaleOrders, usePricelists } from "@/hooks/sales"
-import { useProducts } from "@/hooks/inventory"
-import { useAccountJournals, useAccountAccounts } from "@/hooks/accounting"
+import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useAccountJournals, useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
 import {
   saleOrderRowsToSelectOptions,
   subscriptionPlanRowsToSelectOptions,
@@ -129,11 +129,11 @@ function SubscriptionsClientLoaded({
   const { data: deferredSchedules = [] } = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
   const { data: deferredLines = [] } = useDeferredRevenueLines(orgId, initialDeferredLines)
   const { data: recognitionRules = [] } = useRevenueRecognitionRules(orgId, initialRecognitionRules)
-  const { data: saleOrders = [] } = useSaleOrders(companyId, initialSaleOrders)
+  const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: journals = [] } = useAccountJournals(orgId, initialJournals)
-  const { data: accounts = [] } = useAccountAccounts(orgId, initialAccounts)
+  const { data: journals = [] } = useAccountJournals(orgId, { initialData: initialJournals })
+  const { data: accounts = [] } = useAccountAccounts(orgId, { initialData: initialAccounts })
 
   const createSubscription = useCreateSubscription(orgId, orgId)
   const createPlan = useCreateSubscriptionPlan(orgId, orgId)
