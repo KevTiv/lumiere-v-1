@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function useEmployees(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-employees', organizationId.toString()],
+    queryKey: ['hr-employees', organizationId],
     queryFn: () => fetchQueryList('/api/query/employees', 'Failed to fetch employees'),
     staleTime: 30_000,
     initialData,
@@ -31,7 +33,7 @@ export function useDepartments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-departments', organizationId.toString()],
+    queryKey: ['hr-departments', organizationId],
     queryFn: () => fetchQueryList('/api/query/departments', 'Failed to fetch departments'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function useLeaveRequests(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-leave-requests', organizationId.toString()],
+    queryKey: ['hr-leave-requests', organizationId],
     queryFn: () => fetchQueryList('/api/query/leave-requests', 'Failed to fetch leave requests'),
     staleTime: 30_000,
     initialData,
@@ -55,7 +57,7 @@ export function useContracts(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-contracts', organizationId.toString()],
+    queryKey: ['hr-contracts', organizationId],
     queryFn: () => fetchQueryList('/api/query/contracts', 'Failed to fetch contracts'),
     staleTime: 30_000,
     initialData,
@@ -67,7 +69,7 @@ export function usePayslips(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-payslips', organizationId.toString()],
+    queryKey: ['hr-payslips', organizationId],
     queryFn: () => fetchQueryList('/api/query/payslips', 'Failed to fetch payslips'),
     staleTime: 30_000,
     initialData,
@@ -79,7 +81,7 @@ export function useJobPositions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['job-positions', organizationId.toString()],
+    queryKey: ['job-positions', organizationId],
     queryFn: () => fetchQueryList('/api/query/job-positions', 'Failed to fetch job positions'),
     staleTime: 30_000,
     initialData,
@@ -91,7 +93,7 @@ export function useLeaveTypes(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-leave-types', organizationId.toString()],
+    queryKey: ['hr-leave-types', organizationId],
     queryFn: () => fetchQueryList('/api/query/leave-types', 'Failed to fetch leave types'),
     staleTime: 30_000,
     initialData,
@@ -103,7 +105,7 @@ export function usePayrollStructures(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-payroll-structures', organizationId.toString()],
+    queryKey: ['hr-payroll-structures', organizationId],
     queryFn: () => fetchQueryList('/api/query/payroll-structures', 'Failed to fetch payroll structures'),
     staleTime: 30_000,
     initialData,
@@ -115,7 +117,7 @@ export function useSalaryRules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-salary-rules', organizationId.toString()],
+    queryKey: ['hr-salary-rules', organizationId],
     queryFn: () => fetchQueryList('/api/query/salary-rules', 'Failed to fetch salary rules'),
     staleTime: 30_000,
     initialData,
@@ -131,12 +133,12 @@ export function useCreateDepartment(organizationId: bigint, companyId?: bigint) 
       const r = await apiFetch('/api/call/create_department', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create department')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
   })
 }
 
@@ -147,12 +149,12 @@ export function useCreateJobPosition(organizationId: bigint, companyId?: bigint)
       const r = await apiFetch('/api/call/create_job_position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create job position')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['job-positions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
   })
 }
 
@@ -163,12 +165,12 @@ export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
   })
 }
 
@@ -179,12 +181,12 @@ export function useCreateLeaveRequest(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/create_leave_request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create leave request')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] }),
   })
 }
 
@@ -195,12 +197,12 @@ export function useCreateContract(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -211,12 +213,12 @@ export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_payslip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
   })
 }
 
@@ -229,12 +231,12 @@ export function useUpdateDepartment(organizationId: bigint, companyId?: bigint) 
       const r = await apiFetch('/api/call/update_department', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), departmentId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, departmentId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to update department')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
   })
 }
 
@@ -245,12 +247,12 @@ export function useUpdateJobPosition(organizationId: bigint, companyId?: bigint)
       const r = await apiFetch('/api/call/update_job_position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), jobId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, jobId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to update job position')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['job-positions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
   })
 }
 
@@ -261,12 +263,12 @@ export function useUpdateEmployee(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/update_employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId?.toString(), employeeId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, companyId ?? null, employeeId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to update employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
   })
 }
 
@@ -277,12 +279,12 @@ export function useArchiveEmployee(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/archive_employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId?.toString(), employeeId, terminationDate]),
+        body: stringifyReducerCallBody([organizationId, companyId ?? null, employeeId, terminationDate]),
       })
       if (!r.ok) throw new Error('Failed to archive employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
   })
 }
 
@@ -295,12 +297,12 @@ export function useCreateLeaveType(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/create_leave_type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create leave type')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
   })
 }
 
@@ -311,12 +313,12 @@ export function useUpdateLeaveType(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/update_leave_type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leaveTypeId, params]),
+        body: stringifyReducerCallBody([organizationId, leaveTypeId, params]),
       })
       if (!r.ok) throw new Error('Failed to update leave type')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
   })
 }
 
@@ -327,12 +329,12 @@ export function useApproveLeave(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/approve_leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leaveId, managerId]),
+        body: stringifyReducerCallBody([organizationId, leaveId, managerId]),
       })
       if (!r.ok) throw new Error('Failed to approve leave')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
     },
   })
 }
@@ -344,12 +346,12 @@ export function useRefuseLeave(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/refuse_leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leaveId, managerId]),
+        body: stringifyReducerCallBody([organizationId, leaveId, managerId]),
       })
       if (!r.ok) throw new Error('Failed to refuse leave')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
     },
   })
 }
@@ -361,12 +363,12 @@ export function useResetLeaveToDraft(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/reset_leave_to_draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leaveId]),
+        body: stringifyReducerCallBody([organizationId, leaveId]),
       })
       if (!r.ok) throw new Error('Failed to reset leave to draft')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
     },
   })
 }
@@ -380,12 +382,12 @@ export function useUpdateContract(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/update_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contractId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, contractId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to update contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -396,12 +398,12 @@ export function useOpenContract(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/open_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contractId, companyId?.toString()]),
+        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null]),
       })
       if (!r.ok) throw new Error('Failed to open contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -412,12 +414,12 @@ export function useExpireContract(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/expire_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contractId, companyId?.toString(), endDate]),
+        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null, endDate]),
       })
       if (!r.ok) throw new Error('Failed to expire contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -428,12 +430,12 @@ export function useCancelContract(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/cancel_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contractId, companyId?.toString()]),
+        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null]),
       })
       if (!r.ok) throw new Error('Failed to cancel contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -446,12 +448,12 @@ export function useCreatePayrollStructure(organizationId: bigint, _companyId?: b
       const r = await apiFetch('/api/call/create_payroll_structure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create payroll structure')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId] }),
   })
 }
 
@@ -462,12 +464,12 @@ export function useCreateSalaryRule(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch('/api/call/create_salary_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create salary rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId] }),
   })
 }
 
@@ -478,12 +480,12 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/confirm_payslip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), payslipId, companyId?.toString(), { gross_wage: grossWage, net_wage: netWage }]),
+        body: stringifyReducerCallBody([organizationId, payslipId, companyId ?? null, { gross_wage: grossWage, net_wage: netWage }]),
       })
       if (!r.ok) throw new Error('Failed to confirm payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
   })
 }
 
@@ -494,12 +496,12 @@ export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/cancel_payslip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), payslipId, companyId?.toString()]),
+        body: stringifyReducerCallBody([organizationId, payslipId, companyId ?? null]),
       })
       if (!r.ok) throw new Error('Failed to cancel payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
   })
 }
 
@@ -521,12 +523,12 @@ function useImportHrResourceCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_resource_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-resources', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-resources', organizationId] }),
   })
 }
 
@@ -537,12 +539,12 @@ function useImportHrDepartmentCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_department_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-departments', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
   })
 }
 
@@ -553,12 +555,12 @@ function useImportHrJobPositionCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_job_position_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['job-positions', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
   })
 }
 
@@ -569,12 +571,12 @@ function useImportHrEmployeeCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_employee_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-employees', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
   })
 }
 
@@ -585,12 +587,12 @@ function useImportHrContractCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_contract_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
   })
 }
 
@@ -601,12 +603,12 @@ function useImportHrLeaveTypeCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_leave_type_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
   })
 }
 
@@ -617,12 +619,12 @@ function useImportHrLeaveCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_leave_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] }),
   })
 }
 
@@ -633,12 +635,12 @@ function useImportHrPayrollStructureCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_payroll_structure_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId] }),
   })
 }
 
@@ -649,12 +651,12 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_salary_rule_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId] }),
   })
 }
 
@@ -665,12 +667,12 @@ function useImportHrPayslipCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_hr_payslip_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
   })
 }
 

@@ -6,6 +6,8 @@
  * Wraps REST API calls with React Query for the Expenses module.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -17,7 +19,7 @@ export function useExpenses(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['expenses', organizationId.toString()],
+    queryKey: ['expenses', organizationId],
     queryFn: () => fetchQueryList('/api/query/expenses', 'Failed to fetch expenses'),
     staleTime: 30_000,
     initialData,
@@ -29,7 +31,7 @@ export function useExpenseSheets(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['expense-sheets', organizationId.toString()],
+    queryKey: ['expense-sheets', organizationId],
     queryFn: () => fetchQueryList('/api/query/expense-sheets', 'Failed to fetch expense sheets'),
     staleTime: 30_000,
     initialData,
@@ -45,12 +47,12 @@ export function useCreateExpense(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/create_expense', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create expense')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
   })
 }
 
@@ -61,12 +63,12 @@ export function useCreateExpenseSheet(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/create_expense_sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create expense sheet')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
   })
 }
 
@@ -83,12 +85,12 @@ export function useUpdateExpense(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/update_expense', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), expenseId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, expenseId, params]),
       })
       if (!r.ok) throw new Error('Failed to update expense')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
   })
 }
 
@@ -105,18 +107,18 @@ export function useSubmitExpense(organizationId: bigint) {
       const r = await apiFetch('/api/call/submit_expense', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          expenseId.toString(),
-          sheetId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          expenseId,
+          sheetId,
         ]),
       })
       if (!r.ok) throw new Error('Failed to submit expense')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
       ])
     },
   })
@@ -135,14 +137,14 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
       const r = await apiFetch('/api/call/submit_expense_sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), sheetId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, sheetId, params]),
       })
       if (!r.ok) throw new Error('Failed to submit expense sheet')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
       ])
     },
   })
@@ -155,14 +157,14 @@ export function useApproveExpenseSheet(organizationId: bigint) {
       const r = await apiFetch('/api/call/approve_expense_sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), sheetId.toString()]),
+        body: stringifyReducerCallBody([organizationId, sheetId]),
       })
       if (!r.ok) throw new Error('Failed to approve expense sheet')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
       ])
     },
   })
@@ -175,14 +177,14 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
       const r = await apiFetch('/api/call/refuse_expense_sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), sheetId.toString()]),
+        body: stringifyReducerCallBody([organizationId, sheetId]),
       })
       if (!r.ok) throw new Error('Failed to refuse expense sheet')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
       ])
     },
   })
@@ -206,9 +208,9 @@ export function usePostExpenseSheet(organizationId: bigint) {
       const r = await apiFetch('/api/call/post_expense_sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          sheetId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          sheetId,
           accountingDateValue,
         ]),
       })
@@ -216,8 +218,8 @@ export function usePostExpenseSheet(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
       ])
     },
   })
@@ -241,11 +243,11 @@ export function useImportExpenseCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_expense_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expenses', organizationId.toString()] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
   })
 }
 
@@ -256,12 +258,12 @@ export function useImportExpenseSheetCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_expense_sheet_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
   })
 }
 

@@ -1,4 +1,4 @@
-//! Port of `frontend/web/lib/api-session.ts` + `server-field-access.ts`.
+//! Port of `frontend/web/lib/api-session.ts` (JWT + `user_organization` + field-access context).
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::Value;

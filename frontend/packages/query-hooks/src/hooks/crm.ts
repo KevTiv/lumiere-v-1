@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -22,7 +24,7 @@ export function useLeads(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['leads', organizationId.toString()],
+    queryKey: ['leads', organizationId],
     queryFn: () => fetchQueryList('/api/query/leads', 'Failed to fetch leads'),
     staleTime: 30_000,
     initialData,
@@ -34,7 +36,7 @@ export function useOpportunities(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['opportunities', organizationId.toString()],
+    queryKey: ['opportunities', organizationId],
     queryFn: () => fetchQueryList('/api/query/opportunities', 'Failed to fetch opportunities'),
     staleTime: 30_000,
     initialData,
@@ -46,7 +48,7 @@ export function useOpportunityStages(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['opportunity-stages', organizationId.toString()],
+    queryKey: ['opportunity-stages', organizationId],
     queryFn: () =>
       fetchQueryList('/api/query/opportunity-stages', 'Failed to fetch opportunity stages'),
     staleTime: 60_000,
@@ -59,7 +61,7 @@ export function useContacts(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['contacts', organizationId.toString()],
+    queryKey: ['contacts', organizationId],
     queryFn: () => fetchQueryList('/api/query/contacts', 'Failed to fetch contacts'),
     staleTime: 30_000,
     initialData,
@@ -71,7 +73,7 @@ export function useActivities(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['activities', organizationId.toString()],
+    queryKey: ['activities', organizationId],
     queryFn: () => fetchQueryList('/api/query/activities', 'Failed to fetch activities'),
     staleTime: 30_000,
     initialData,
@@ -83,7 +85,7 @@ export function useUsers(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['users', organizationId.toString()],
+    queryKey: ['users', organizationId],
     queryFn: () => fetchQueryList('/api/query/users', 'Failed to fetch users'),
     staleTime: 60_000,
     initialData,
@@ -99,11 +101,11 @@ export function useCreateLead(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create lead')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId] }),
   })
 }
 
@@ -114,12 +116,12 @@ export function useCreateOpportunity(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_opportunity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create opportunity')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['opportunities', organizationId] }),
   })
 }
 
@@ -130,11 +132,11 @@ export function useCreateContact(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create contact')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -145,11 +147,11 @@ export function useCreateActivity(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create activity')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', organizationId] }),
   })
 }
 
@@ -160,11 +162,11 @@ export function useUpdateContact(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, contactId, params]),
       })
       if (!r.ok) throw new Error('Failed to update contact')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -175,11 +177,11 @@ export function useUpdateContactAddress(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_contact_address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, contactId, params]),
       })
       if (!r.ok) throw new Error('Failed to update contact address')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -190,11 +192,11 @@ export function useUpdateContactBusiness(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_contact_business', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, contactId, params]),
       })
       if (!r.ok) throw new Error('Failed to update contact business')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -205,11 +207,11 @@ export function useUpdateContactDetails(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_contact_details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, contactId, params]),
       })
       if (!r.ok) throw new Error('Failed to update contact details')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -220,11 +222,11 @@ export function useUpdateLeadDetails(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_lead_details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leadId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, leadId, params]),
       })
       if (!r.ok) throw new Error('Failed to update lead details')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId] }),
   })
 }
 
@@ -235,11 +237,11 @@ export function useUpdateLeadAddress(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_lead_address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leadId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, leadId, params]),
       })
       if (!r.ok) throw new Error('Failed to update lead address')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId] }),
   })
 }
 
@@ -250,11 +252,11 @@ export function useUpdateLeadRevenue(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_lead_revenue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leadId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, leadId, params]),
       })
       if (!r.ok) throw new Error('Failed to update lead revenue')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', organizationId] }),
   })
 }
 
@@ -265,11 +267,11 @@ export function useCreateContactTag(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_contact_tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create contact tag')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -280,11 +282,11 @@ export function useCreateContactSegment(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_contact_segment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create contact segment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -295,14 +297,14 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
       const r = await apiFetch('/api/call/convert_lead_to_customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), leadId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, leadId, params]),
       })
       if (!r.ok) throw new Error('Failed to convert lead')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] })
-      void qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] })
-      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['leads', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['contacts', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId] })
     },
   })
 }
@@ -314,13 +316,13 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/convert_opportunity_to_sale_order?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([opportunityId.toString(), params]),
+        body: stringifyReducerCallBody([opportunityId, params]),
       })
       if (!r.ok) throw new Error('Failed to convert opportunity to sale order')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] })
-      void qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
     },
   })
 }
@@ -332,11 +334,11 @@ export function useDeleteContact(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString()]),
+        body: stringifyReducerCallBody([organizationId, contactId]),
       })
       if (!r.ok) throw new Error('Failed to delete contact')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -347,11 +349,11 @@ export function useAssignTagToContact(organizationId: bigint) {
       const r = await apiFetch('/api/call/assign_tag_to_contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), contactId.toString(), tagId.toString(), metadata ?? null]),
+        body: stringifyReducerCallBody([organizationId, contactId, tagId, metadata ?? null]),
       })
       if (!r.ok) throw new Error('Failed to assign tag')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -362,11 +364,11 @@ export function useAddContactToSegment(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_contact_to_segment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), segmentId.toString(), contactId.toString()]),
+        body: stringifyReducerCallBody([organizationId, segmentId, contactId]),
       })
       if (!r.ok) throw new Error('Failed to add contact to segment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -377,11 +379,11 @@ export function useCompleteActivity(organizationId: bigint) {
       const r = await apiFetch('/api/call/complete_activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), activityId.toString()]),
+        body: stringifyReducerCallBody([organizationId, activityId]),
       })
       if (!r.ok) throw new Error('Failed to complete activity')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', organizationId] }),
   })
 }
 
@@ -403,12 +405,12 @@ export function useImportContactCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_contact_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['contacts', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['contacts', organizationId] }),
   })
 }
 
@@ -419,12 +421,12 @@ export function useImportLeadCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_lead_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['leads', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['leads', organizationId] }),
   })
 }
 
@@ -435,12 +437,12 @@ export function useImportOpportunityCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_opportunity_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['opportunities', organizationId] }),
   })
 }
 

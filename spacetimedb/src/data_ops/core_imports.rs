@@ -1,7 +1,7 @@
 /// Core CSV Imports — Country, Currency, CurrencyRate, UOMCategory, UOM, Company, Role
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{company, Company};
+use crate::core::organization::{company, new_external_id, Company};
 use crate::core::permissions::{role, Role};
 use crate::core::reference::{
     country, currency, currency_rate, uom, uom_cat, Country, Currency, CurrencyRate, UOMCategory,
@@ -332,6 +332,7 @@ pub fn import_company_csv(
 
         ctx.db.company().insert(Company {
             id: 0,
+            external_id: new_external_id(ctx),
             organization_id,
             name,
             code: if code.is_empty() {

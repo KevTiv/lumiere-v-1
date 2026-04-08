@@ -59,7 +59,8 @@ interface StdbConnectionProviderProps {
    */
   subscriptionResources: string[];
   /**
-   * Use `ws(s)://<current-host>/api/stdb` (Next.js custom server proxy). Overrides `host` when true.
+   * @deprecated Removed: web app uses Lumiere `/api/realtime/ws` + api-server instead of raw STDB proxy.
+   * When true, pointed at `ws(s)://<host>/api/stdb/` (no longer used by `frontend/web`).
    */
   sameOriginStdbProxy?: boolean;
 }

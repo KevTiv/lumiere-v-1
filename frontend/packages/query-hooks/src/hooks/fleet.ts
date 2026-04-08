@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function useFleetVehicles(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['fleet-vehicles', organizationId.toString()],
+    queryKey: ['fleet-vehicles', organizationId],
     queryFn: () => fetchQueryList('/api/query/fleet-vehicles', 'Failed to fetch fleet vehicles'),
     staleTime: 30_000,
     initialData,
@@ -29,7 +31,7 @@ export function useFleetVehicles(
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidateFleetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['fleet-vehicles', organizationId.toString()] })
+  return qc.invalidateQueries({ queryKey: ['fleet-vehicles', organizationId] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -41,7 +43,7 @@ export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint
       const r = await apiFetch('/api/call/create_fleet_vehicle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create fleet vehicle')
     },
@@ -64,9 +66,9 @@ export function useUpdateVehiclePosition(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_vehicle_position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          args.vehicleId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.vehicleId,
           args.latitude,
           args.longitude,
           args.speedKmh ?? null,

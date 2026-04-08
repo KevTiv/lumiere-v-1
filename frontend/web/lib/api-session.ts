@@ -9,11 +9,8 @@
  */
 
 import { cookies } from 'next/headers'
-import type { FieldAccessContext } from '@lumiere/stdb/server'
-import {
-  loadFieldAccessContext,
-  type StdbHttpOptions,
-} from '@lumiere/stdb/server'
+import type { FieldAccessContext, StdbHttpOptions } from '@lumiere/stdb/server'
+import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
 import { serverQueryUserOrganizationWithFallback } from '@/lib/stdb-org-resolve'
 import { callReducer } from '@/lib/stdb-reducer'
 import { decodeIdentityHexFromStdbToken } from '@/lib/stdb-token-identity'
@@ -28,6 +25,48 @@ function devSeedOrgId(): number | undefined {
   if (!raw) return undefined
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+/** Field-access context is built only on the Rust api-server (`load_field_access_context`); avoid duplicating STDB queries in Next. */
+async function fetchFieldAccessFromApiServer(input: {
+  token: string
+  identityHex: string
+  cookieHeader?: string
+}): Promise<FieldAccessContext | undefined> {
+  const base = resolveApiServerBaseUrl()
+  if (!base) return undefined
+
+  const headers = new Headers()
+  headers.set('Authorization', `Bearer ${input.token.trim()}`)
+  if (input.identityHex && input.identityHex !== 'unknown') {
+    headers.set('x-stdb-identity', input.identityHex)
+  }
+  if (input.cookieHeader) {
+    headers.set('Cookie', input.cookieHeader)
+  }
+
+  try {
+    const res = await fetch(`${base}/v1/session/field-access`, {
+      headers,
+      cache: 'no-store',
+    })
+    if (!res.ok) return undefined
+    const data = (await res.json()) as { fieldAccess?: FieldAccessContext | null }
+    return data.fieldAccess ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function browserCookieHeader(): Promise<string | undefined> {
+  try {
+    const store = await cookies()
+    const all = store.getAll()
+    if (all.length === 0) return undefined
+    return all.map((c) => `${c.name}=${c.value}`).join('; ')
+  } catch {
+    return undefined
+  }
 }
 
 export interface ApiSession {
@@ -68,7 +107,10 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
     const identityHex = 'dev-mock-identity'
     let fieldAccess: FieldAccessContext | undefined
     try {
-      fieldAccess = await loadFieldAccessContext(identityHex, organizationId, opts)
+      fieldAccess = await fetchFieldAccessFromApiServer({
+        token: mockToken,
+        identityHex,
+      })
     } catch {
       fieldAccess = undefined
     }
@@ -174,8 +216,13 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
   const resolvedIdentity = identityHex || 'unknown'
   let fieldAccess: FieldAccessContext | undefined
   if (organizationId !== undefined && resolvedIdentity !== 'unknown') {
+    const cookieHeader = req?.headers.get('cookie') ?? (await browserCookieHeader())
     try {
-      fieldAccess = await loadFieldAccessContext(resolvedIdentity, organizationId, opts)
+      fieldAccess = await fetchFieldAccessFromApiServer({
+        token,
+        identityHex: resolvedIdentity,
+        cookieHeader: cookieHeader ?? undefined,
+      })
     } catch {
       fieldAccess = undefined
     }

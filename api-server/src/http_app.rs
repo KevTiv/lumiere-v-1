@@ -11,6 +11,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+
+use crate::realtime;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::CookieManagerLayer;
@@ -196,13 +198,18 @@ pub async fn serve() -> anyhow::Result<()> {
         Method::OPTIONS,
         Method::HEAD,
     ];
-    const CORS_ALLOW_HEADERS: [HeaderName; 6] = [
+    const CORS_ALLOW_HEADERS: [HeaderName; 11] = [
         AUTHORIZATION,
         CONTENT_TYPE,
         ACCEPT,
         ACCEPT_LANGUAGE,
         HeaderName::from_static("x-stdb-identity"),
         COOKIE,
+        HeaderName::from_static("connection"),
+        HeaderName::from_static("upgrade"),
+        HeaderName::from_static("sec-websocket-key"),
+        HeaderName::from_static("sec-websocket-version"),
+        HeaderName::from_static("sec-websocket-protocol"),
     ];
 
     let cors = CorsLayer::new()
@@ -224,6 +231,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/openapi.json", get(get_openapi))
         .route("/query/:resource", get(get_query))
         .route("/call/:reducer", post(post_call))
+        .route("/realtime/ws", get(realtime::realtime_ws_upgrade))
+        .route("/realtime/info", get(realtime::realtime_info))
         // Auth + STDB routes before domain routers so `/stdb/*` catch-all does not shadow `/stdb/subscription-queries`.
         .merge(routes::domain_router());
 

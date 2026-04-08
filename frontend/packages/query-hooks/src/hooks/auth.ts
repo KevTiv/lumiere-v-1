@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -16,7 +18,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['audit-log', organizationId.toString()],
+    queryKey: ['audit-log', organizationId],
     queryFn: () => fetchQueryList('/api/query/audit-log', 'Failed to fetch audit log'),
     staleTime: 30_000,
     initialData,
@@ -25,7 +27,7 @@ export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
 
 export function useAuditRules(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['audit-rules', organizationId.toString()],
+    queryKey: ['audit-rules', organizationId],
     queryFn: () => fetchQueryList('/api/query/audit-rules', 'Failed to fetch audit rules'),
     staleTime: 30_000,
     initialData,
@@ -34,7 +36,7 @@ export function useAuditRules(organizationId: bigint, initialData?: QueryRows) {
 
 export function useUserSessions(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['user-sessions', organizationId.toString()],
+    queryKey: ['user-sessions', organizationId],
     queryFn: () => fetchQueryList('/api/query/user-sessions', 'Failed to fetch user sessions'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function useUserSessions(organizationId: bigint, initialData?: QueryRows)
 
 export function useUserInvites(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['user-invites', organizationId.toString()],
+    queryKey: ['user-invites', organizationId],
     queryFn: () => fetchQueryList('/api/query/user-invites', 'Failed to fetch user invites'),
     staleTime: 30_000,
     initialData,
@@ -54,7 +56,7 @@ function invalidateAuthModule(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
 ) {
-  const org = organizationId.toString()
+  const org = organizationId
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['audit-log', org] }),
     qc.invalidateQueries({ queryKey: ['audit-rules', org] }),
@@ -77,7 +79,7 @@ export function useCreateRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create role')
     },
@@ -98,7 +100,7 @@ export function useUpdateRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(roleId), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, roleId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update role')
     },
@@ -119,7 +121,7 @@ export function useAssignRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/assign_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), String(roleId)]),
+        body: stringifyReducerCallBody([organizationId, userId, roleId]),
       })
       if (!r.ok) throw new Error('Failed to assign role')
     },
@@ -140,7 +142,7 @@ export function useRevokeRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/revoke_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), String(roleId)]),
+        body: stringifyReducerCallBody([organizationId, userId, roleId]),
       })
       if (!r.ok) throw new Error('Failed to revoke role')
     },
@@ -166,7 +168,7 @@ export function useCreateAuditRule(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_audit_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create audit rule')
     },
@@ -187,7 +189,7 @@ export function useUpdateAuditRule(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_audit_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(ruleId), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, ruleId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update audit rule')
     },
@@ -213,10 +215,10 @@ export function useLogAuditEvent(organizationId: bigint) {
       const r = await apiFetch('/api/call/log_audit_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
           resourceType,
-          String(resourceId),
+          resourceId,
           action,
           details ? stdbParamsToJson(details) : null,
         ]),
@@ -243,7 +245,7 @@ export function useCreateUserInvite(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_user_invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create user invite')
     },
@@ -268,9 +270,9 @@ export function useUpdateUserPassword(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_user_password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(userId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          userId,
           newPassword,
           requireReset,
         ]),
@@ -297,7 +299,7 @@ export function useUpdateUserProfile(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_user_profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update user profile')
     },
@@ -321,7 +323,7 @@ export function useUpdateOrgMemberRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_org_member_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), newRole]),
+        body: stringifyReducerCallBody([organizationId, userId, newRole]),
       })
       if (!r.ok) throw new Error('Failed to update org member role')
     },
@@ -345,7 +347,7 @@ export function useUpdateUserOrganizationStatus(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_user_organization_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), status]),
+        body: stringifyReducerCallBody([organizationId, userId, status]),
       })
       if (!r.ok) throw new Error('Failed to update user organization status')
     },
@@ -362,7 +364,7 @@ export function useRemoveUserFromOrganization(organizationId: bigint) {
       const r = await apiFetch('/api/call/remove_user_from_organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId)]),
+        body: stringifyReducerCallBody([organizationId, userId]),
       })
       if (!r.ok) throw new Error('Failed to remove user from organization')
     },
@@ -386,7 +388,7 @@ export function useUpdateOrgMemberDetails(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_org_member_details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update org member details')
     },
@@ -410,7 +412,7 @@ export function useUpdateUserEmail(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_user_email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), newEmail]),
+        body: stringifyReducerCallBody([organizationId, userId, newEmail]),
       })
       if (!r.ok) throw new Error('Failed to update user email')
     },
@@ -436,9 +438,9 @@ export function useCreateUserSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_user_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(userId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          userId,
           sessionData ? stdbParamsToJson(sessionData) : null,
         ]),
       })
@@ -457,7 +459,7 @@ export function useEndUserSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/end_user_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(sessionId)]),
+        body: stringifyReducerCallBody([organizationId, sessionId]),
       })
       if (!r.ok) throw new Error('Failed to end user session')
     },
@@ -484,7 +486,7 @@ export function useRecordPrivacyConsent(organizationId: bigint) {
       const r = await apiFetch('/api/call/record_privacy_consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), consentType, consented]),
+        body: stringifyReducerCallBody([organizationId, userId, consentType, consented]),
       })
       if (!r.ok) throw new Error('Failed to record privacy consent')
     },
@@ -508,7 +510,7 @@ export function useUpdateGoogleDriveCredentials(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_google_drive_credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), stdbParamsToJson(credentials)]),
+        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(credentials)]),
       })
       if (!r.ok) throw new Error('Failed to update Google Drive credentials')
     },
@@ -532,7 +534,7 @@ export function useUpdateWhatsappCredentials(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_whatsapp_credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(userId), stdbParamsToJson(credentials)]),
+        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(credentials)]),
       })
       if (!r.ok) throw new Error('Failed to update WhatsApp credentials')
     },

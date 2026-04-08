@@ -9,7 +9,8 @@ LOCAL      := http://127.0.0.1:3000
         publish-cloud publish-cloud-clear \
         call-tests logs \
         call-tests-cloud logs-cloud \
-        seed-test-user
+        seed-test-user \
+        generate-stdb-rust-sdk
 
 help:
 	@echo "Usage: make <target>"
@@ -27,6 +28,7 @@ help:
 	@echo "  call-tests           Call run_all_core_tests on local"
 	@echo "  logs                 Tail logs from local"
 	@echo "  seed-test-user       Provision test@email.com + admin org (make publish first; uses frontend/web/.env.local)"
+	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -73,6 +75,10 @@ seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
 
 # --- API ----------------------------------------------------------------------
+generate-stdb-rust-sdk:
+	spacetime generate --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
+	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
+
 api-server-run:
 	source api-server/.env.local && cargo run -p api-server
 

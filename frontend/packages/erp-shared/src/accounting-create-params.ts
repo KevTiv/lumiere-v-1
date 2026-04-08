@@ -272,6 +272,67 @@ export function toCreateAccountTaxParams(
   }
 }
 
+const MAX_SAFE_U64_JSON = BigInt(Number.MAX_SAFE_INTEGER)
+
+function bigintToSafeJsonU64(b: bigint): number {
+  if (b < 0n) {
+    throw new Error(`u64 JSON: negative bigint ${b}`)
+  }
+  if (b > MAX_SAFE_U64_JSON) {
+    throw new Error(
+      `u64 JSON: bigint ${b} exceeds Number.MAX_SAFE_INTEGER; cannot send exact value in JSON`,
+    )
+  }
+  return Number(b)
+}
+
+/** SATS sum type with unit variants: `{"Sale":[]}` etc. (matches SpacetimeDB HTTP / Rust serde for these enums). */
+function stdbTaggedUnitEnumToSumJson(v: { tag: string }): Record<string, unknown> {
+  return { [v.tag]: [] }
+}
+
+function u64BigintArrayToHttpJson(ids: readonly bigint[]): number[] {
+  return ids.map(bigintToSafeJsonU64)
+}
+
+function optionalBigintU64ToHttpJson(b: bigint | undefined): number | null {
+  if (b === undefined) return null
+  return bigintToSafeJsonU64(b)
+}
+
+/**
+ * `POST .../call/create_account_tax` expects JSON keys matching the Rust struct (snake_case), not
+ * the generated TS client field names (camelCase). Use this instead of {@link stdbParamsToJson} for
+ * {@link CreateAccountTaxParams}.
+ */
+export function createAccountTaxParamsToStdbHttpJson(
+  params: CreateAccountTaxParams,
+): Record<string, unknown> {
+  const typeTaxUse = params.typeTaxUse as { tag: string }
+  const amountType = params.amountType as { tag: string }
+
+  return {
+    name: params.name,
+    description: params.description ?? null,
+    type_tax_use: stdbTaggedUnitEnumToSumJson(typeTaxUse),
+    amount_type: stdbTaggedUnitEnumToSumJson(amountType),
+    amount: params.amount,
+    active: params.active,
+    price_include: params.priceInclude,
+    include_base_amount: params.includeBaseAmount,
+    is_base_affected: params.isBaseAffected,
+    sequence: params.sequence,
+    tax_group_id: optionalBigintU64ToHttpJson(params.taxGroupId),
+    country_id: optionalBigintU64ToHttpJson(params.countryId),
+    country_code: params.countryCode ?? null,
+    tags: u64BigintArrayToHttpJson(params.tags),
+    has_negative_factor: params.hasNegativeFactor,
+    invoice_repartition_line_ids: u64BigintArrayToHttpJson(params.invoiceRepartitionLineIds),
+    refund_repartition_line_ids: u64BigintArrayToHttpJson(params.refundRepartitionLineIds),
+    metadata: params.metadata ?? null,
+  }
+}
+
 const BUDGET_STATE_DRAFT: CreateCrossoveredBudgetParams['state'] = { tag: 'Draft' }
 
 export function toCreateCrossoveredBudgetParams(
@@ -420,7 +481,6 @@ export function accountingParamsToJson(
   params:
     | CreateAccountAccountParams
     | CreateAccountMoveParams
-    | CreateAccountTaxParams
     | CreateCrossoveredBudgetParams
     | CreateFiscalYearParams
     | CreateAccountPeriodParams,

@@ -4,7 +4,7 @@
 //! `assets/stdb-generated-sql-columns.json` aligned with the frontend copies when adding query resources.
 
 use once_cell::sync::Lazy;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -15,7 +15,8 @@ pub struct ResourceEntry {
     pub mandatory: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FieldAccessContext {
     pub organization_id: u64,
     pub role_id: u64,
@@ -26,7 +27,7 @@ pub struct FieldAccessContext {
     pub casbin_rules: Vec<CasbinRuleLike>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CasbinRuleLike {
     #[serde(default)]
     pub ptype: String,
@@ -173,7 +174,7 @@ fn subject_matches(v0: Option<&str>, ctx: &FieldAccessContext) -> bool {
 }
 
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
-pub fn resolve_read_columns(
+pub(crate) fn resolve_read_columns(
     resource_key: &str,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Option<Vec<String>>, String> {
@@ -331,7 +332,7 @@ pub fn select_roles_active_sql(field_access: Option<&FieldAccessContext>) -> Res
 }
 
 /// SpacetimeDB HTTP SQL: `Identity` must be `0x` + 64 hex, not a quoted UUID/string.
-pub(crate) fn identity_sql_literal(hex64: &str) -> Result<String, String> {
+pub fn identity_sql_literal(hex64: &str) -> Result<String, String> {
     let s = hex64.trim();
     let s = s.strip_prefix("0x").unwrap_or(s);
     let s = s.strip_prefix("0X").unwrap_or(s);

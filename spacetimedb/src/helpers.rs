@@ -6,22 +6,24 @@
 ///
 /// To add a new helper: add the function here and `use crate::helpers::…`
 /// in the domain module that needs it.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
-use crate::core::permissions::{casbin_rule, role};
+use crate::core::permissions::{
+    casbin_rule, org_permission, role, PermissionAction, PermissionEffect, PermissionSubject,
+};
 use crate::core::reference::{document_sequence, DocumentSequence};
 use crate::core::users::{user_organization, user_profile};
 use crate::types::TaxAmountType;
 
-/// Returns `Ok(())` when the calling identity holds `resource:action`
-/// in `organization_id`, `Err(reason)` otherwise.
-///
 /// Resolution order:
 ///   1. Superuser → always allowed
 ///   2. Role.permissions string list (`"resource:action"` or `"resource:*"`)
-///   3. CasbinRule table (policy type `"p"`)
+///   3. OrgPermission rows for the org (explicit **Deny** wins over **Allow**)
+///   4. Legacy CasbinRule policy rows (`ptype == "p"`), org-scoped via index
+///
+/// Returns `Ok(())` when allowed, `Err(reason)` otherwise.
 pub fn check_permission(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -46,12 +48,9 @@ pub fn check_permission(
     let user_org = ctx
         .db
         .user_organization()
-        .iter()
-        .find(|uo| {
-            uo.user_identity == ctx.sender()
-                && uo.organization_id == organization_id
-                && uo.is_active
-        })
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|uo| uo.organization_id == organization_id && uo.is_active)
         .ok_or("Not a member of this organization")?;
 
     let role = ctx
@@ -72,7 +71,11 @@ pub fn check_permission(
         return Ok(());
     }
 
-    // Fine-grained Casbin override check (v0 = role id or role name, matches seed policies)
+    if let Some(r) = try_org_permission(ctx, organization_id, resource, action, role.id) {
+        return r;
+    }
+
+    // Legacy Casbin "p" rules (v0 = role id or role name; v1 = org id string)
     let role_str = role.id.to_string();
     let role_name = role.name.as_str();
     let org_str = organization_id.to_string();
@@ -84,10 +87,14 @@ pub fn check_permission(
         .any(|r| {
             let subject_ok =
                 r.v0.as_deref() == Some(role_str.as_str()) || r.v0.as_deref() == Some(role_name);
+            let res_ok =
+                r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
+            let act_ok =
+                r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
             subject_ok
-                && r.v1.as_deref() == Some(&org_str)
-                && r.v2.as_deref() == Some(resource)
-                && (r.v3.as_deref() == Some(action) || r.v3.as_deref() == Some("*"))
+                && r.v1.as_deref() == Some(org_str.as_str())
+                && res_ok
+                && act_ok
         });
 
     if has_casbin {
@@ -95,6 +102,72 @@ pub fn check_permission(
     }
 
     Err(format!("Permission denied: {} on {}", action, resource))
+}
+
+fn org_perm_subject_matches(subject: &PermissionSubject, sender: Identity, role_id: u64) -> bool {
+    match subject {
+        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::User(id) => *id == sender,
+    }
+}
+
+fn org_perm_resource_matches(rule_res: &str, resource: &str) -> bool {
+    rule_res == "*" || rule_res == resource
+}
+
+fn org_perm_action_matches(rule_action: &PermissionAction, action: &str) -> bool {
+    matches!(rule_action, PermissionAction::All)
+        || matches!(
+            (rule_action, action),
+            (PermissionAction::Read, "read")
+                | (PermissionAction::Write, "write")
+                | (PermissionAction::Create, "create")
+                | (PermissionAction::Delete, "delete")
+        )
+}
+
+/// `Some(Ok)` / `Some(Err)` when org-permission rows match; `None` if none apply.
+fn try_org_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    resource: &str,
+    action: &str,
+    role_id: u64,
+) -> Option<Result<(), String>> {
+    let mut saw_deny = false;
+    let mut saw_allow = false;
+
+    for p in ctx
+        .db
+        .org_permission()
+        .perm_by_org()
+        .filter(&organization_id)
+    {
+        if !org_perm_subject_matches(&p.subject, ctx.sender(), role_id) {
+            continue;
+        }
+        if !org_perm_resource_matches(&p.resource, resource) {
+            continue;
+        }
+        if !org_perm_action_matches(&p.action, action) {
+            continue;
+        }
+        match p.effect {
+            PermissionEffect::Deny => saw_deny = true,
+            PermissionEffect::Allow => saw_allow = true,
+        }
+    }
+
+    if saw_deny {
+        return Some(Err(format!(
+            "Permission denied: {} on {}",
+            action, resource
+        )));
+    }
+    if saw_allow {
+        return Some(Ok(()));
+    }
+    None
 }
 
 /// Params for `write_audit_log_v2`. All fields are named — no positional `None` ambiguity.

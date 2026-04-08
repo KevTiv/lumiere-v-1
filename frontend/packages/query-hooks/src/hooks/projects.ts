@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function useProjects(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['projects', organizationId.toString()],
+    queryKey: ['projects', organizationId],
     queryFn: () => fetchQueryList('/api/query/projects', 'Failed to fetch projects'),
     staleTime: 30_000,
     initialData,
@@ -31,7 +33,7 @@ export function useTasks(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['tasks', organizationId.toString()],
+    queryKey: ['tasks', organizationId],
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function useTimesheets(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['timesheets', organizationId.toString()],
+    queryKey: ['timesheets', organizationId],
     queryFn: () => fetchQueryList('/api/query/timesheets', 'Failed to fetch timesheets'),
     staleTime: 30_000,
     initialData,
@@ -59,11 +61,11 @@ export function useCreateProject(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create project')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
   })
 }
 
@@ -74,11 +76,11 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
   })
 }
 
@@ -89,11 +91,11 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/log_timesheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create timesheet')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
   })
 }
 
@@ -110,15 +112,15 @@ export function useUpdateProject(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/update_project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          projectId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          projectId,
           withCompanyScope(params, companyId),
         ]),
       })
       if (!r.ok) throw new Error('Failed to update project')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
   })
 }
 
@@ -135,15 +137,15 @@ export function useUpdateTask(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/update_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          taskId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          taskId,
           withCompanyScope(params, companyId),
         ]),
       })
       if (!r.ok) throw new Error('Failed to update task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
   })
 }
 
@@ -160,11 +162,11 @@ export function useUpdateTaskState(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_task_state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), taskId.toString(), state]),
+        body: stringifyReducerCallBody([organizationId, taskId, state]),
       })
       if (!r.ok) throw new Error('Failed to update task state')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
   })
 }
 
@@ -175,11 +177,11 @@ export function useStartTimesheetTimer(organizationId: bigint, companyId?: bigin
       const r = await apiFetch('/api/call/start_timesheet_timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to start timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
   })
 }
 
@@ -190,11 +192,11 @@ export function useStopTimesheetTimer(organizationId: bigint) {
       const r = await apiFetch('/api/call/stop_timesheet_timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), timesheetId.toString()]),
+        body: stringifyReducerCallBody([organizationId, timesheetId]),
       })
       if (!r.ok) throw new Error('Failed to stop timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
   })
 }
 
@@ -213,11 +215,11 @@ export function useSetProjectActive(organizationId: bigint) {
       const r = await apiFetch('/api/call/set_project_active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), projectId.toString(), active]),
+        body: stringifyReducerCallBody([organizationId, projectId, active]),
       })
       if (!r.ok) throw new Error('Failed to set project active state')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
   })
 }
 
@@ -228,11 +230,11 @@ export function useToggleProjectFavorite(organizationId: bigint) {
       const r = await apiFetch('/api/call/toggle_project_favorite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), projectId.toString()]),
+        body: stringifyReducerCallBody([organizationId, projectId]),
       })
       if (!r.ok) throw new Error('Failed to toggle project favorite')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
   })
 }
 
@@ -249,11 +251,11 @@ export function useSetTaskParent(organizationId: bigint) {
       const r = await apiFetch('/api/call/set_task_parent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), taskId.toString(), parentId?.toString() ?? null]),
+        body: stringifyReducerCallBody([organizationId, taskId, parentId ?? null]),
       })
       if (!r.ok) throw new Error('Failed to set task parent')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
   })
 }
 
@@ -270,11 +272,11 @@ export function useAssignTaskUsers(organizationId: bigint) {
       const r = await apiFetch('/api/call/assign_task_users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), taskId.toString(), userIds.map((id) => id.toString())]),
+        body: stringifyReducerCallBody([organizationId, taskId, userIds.map((id) => id)]),
       })
       if (!r.ok) throw new Error('Failed to assign task users')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
   })
 }
 
@@ -291,11 +293,11 @@ export function useValidateTimesheets(organizationId: bigint) {
       const r = await apiFetch('/api/call/validate_timesheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), timesheetIds.map((id) => id.toString()), validated]),
+        body: stringifyReducerCallBody([organizationId, timesheetIds.map((id) => id), validated]),
       })
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
   })
 }
 
@@ -312,13 +314,13 @@ export function useBillTimesheets(organizationId: bigint) {
       const r = await apiFetch('/api/call/bill_timesheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), timesheetIds.map((id) => id.toString()), partnerId?.toString() ?? null]),
+        body: stringifyReducerCallBody([organizationId, timesheetIds.map((id) => id), partnerId ?? null]),
       })
       if (!r.ok) throw new Error('Failed to bill timesheets')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['timesheets', organizationId] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
     },
   })
 }
@@ -341,12 +343,12 @@ export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
       const res = await apiFetch('/api/call/import_project_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['projects', companyId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['projects', companyId] }),
   })
 }
 
@@ -357,12 +359,12 @@ export function useImportTaskCsv(organizationId: bigint, companyId: bigint) {
       const res = await apiFetch('/api/call/import_task_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['tasks', companyId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['tasks', companyId] }),
   })
 }
 
@@ -373,12 +375,12 @@ export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint)
       const res = await apiFetch('/api/call/import_timesheet_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['timesheets', companyId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['timesheets', companyId] }),
   })
 }
 

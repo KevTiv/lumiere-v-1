@@ -6,6 +6,8 @@
  * Wraps REST API calls with React Query for the Workflows module.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -15,7 +17,7 @@ import type {
   CreateWorkflowParams,
 } from '@lumiere/stdb/generated/types'
 
-const wfKeys = (organizationId: bigint) => organizationId.toString()
+const wfKeys = (organizationId: bigint) => organizationId
 
 function invalidateAllWorkflowQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
   const o = wfKeys(organizationId)
@@ -86,7 +88,7 @@ export function useCreateWorkflow(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), null, params]),
+        body: stringifyReducerCallBody([organizationId, null, params]),
       })
       if (!r.ok) throw new Error('Failed to create workflow')
     },
@@ -104,9 +106,9 @@ export function useAddWorkflowActivity(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_workflow_activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.workflowId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.workflowId,
           params.params,
         ]),
       })
@@ -128,11 +130,11 @@ export function useAddWorkflowTransition(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_workflow_transition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.workflowId.toString(),
-          params.activityFrom.toString(),
-          params.activityTo.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.workflowId,
+          params.activityFrom,
+          params.activityTo,
           params.params,
         ]),
       })
@@ -149,7 +151,7 @@ export function useImportWorkflowCsv(organizationId: bigint) {
       const r = await apiFetch('/api/call/import_workflow_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!r.ok) throw new Error('Failed to import workflows')
     },
@@ -164,9 +166,9 @@ export function useSetWorkflowActive(organizationId: bigint) {
       const r = await apiFetch('/api/call/set_workflow_active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.workflowId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.workflowId,
           params.isActive,
         ]),
       })
@@ -189,10 +191,10 @@ export function useStartWorkflow(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.workflowId.toString(),
-          params.resId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.workflowId,
+          params.resId,
           params.resType,
         ]),
       })
@@ -214,9 +216,9 @@ export function useSignalWorkflow(organizationId: bigint) {
       const r = await apiFetch('/api/call/signal_workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.instanceId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.instanceId,
           params.signal,
         ]),
       })
@@ -235,7 +237,7 @@ export function useCancelWorkflowInstance(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_workflow_instance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), instanceId.toString()]),
+        body: stringifyReducerCallBody([organizationId, instanceId]),
       })
       if (!r.ok) throw new Error('Failed to cancel workflow instance')
     },
@@ -252,7 +254,7 @@ export function useSetWorkitemException(organizationId: bigint) {
       const r = await apiFetch('/api/call/set_workitem_exception', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workitemId.toString()]),
+        body: stringifyReducerCallBody([organizationId, workitemId]),
       })
       if (!r.ok) throw new Error('Failed to set workitem exception')
     },

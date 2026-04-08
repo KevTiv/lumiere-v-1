@@ -54,6 +54,7 @@ import {
   analyticParamsToJson,
   toCreateAccountAccountParams,
   toCreateAccountMoveFromInvoiceModal,
+  createAccountTaxParamsToStdbHttpJson,
   toCreateAccountTaxParams,
   toCreateCrossoveredBudgetParams,
   toCreateJournalEntryMoveParams,
@@ -1488,7 +1489,7 @@ function AccountingClientLoaded({
     (move: unknown) => {
       const row = move as Record<string, unknown>
       if (!row.id) return
-      const id = String(row.id)
+      const id = row.id as string | number | bigint
       const mt = moveTypeTag(row)
       if (isInvoiceLikeMoveType(mt)) {
         const resolved = resolveDefaultCogsInventoryAccountIds(
@@ -1496,9 +1497,9 @@ function AccountingClientLoaded({
         )
         const cogsId = resolved?.cogsAccountId ?? 0
         const invId = resolved?.inventoryAccountId ?? 0
-        postInvoice.mutate([String(organizationId), id, String(cogsId), String(invId)])
+        postInvoice.mutate([organizationId, id, cogsId, invId])
       } else {
-        postMove.mutate([String(organizationId), id])
+        postMove.mutate([organizationId, id])
       }
     },
     [postMove, postInvoice, organizationId, accounts],
@@ -1688,15 +1689,15 @@ function AccountingClientLoaded({
   ) => {
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData)
-      if (p) createAccount.mutate([String(organizationId), accountingParamsToJson(p)])
+      if (p) createAccount.mutate([organizationId, accountingParamsToJson(p)])
     } else if (action === "createMove") {
       const p = toCreateJournalEntryMoveParams(formData)
-      if (p) createMove.mutate([String(organizationId), accountingParamsToJson(p)])
+      if (p) createMove.mutate([organizationId, accountingParamsToJson(p)])
     } else if (action === "createTax") {
       await createTax.mutateAsync([
-        String(organizationId),
-        String(companyId),
-        accountingParamsToJson(toCreateAccountTaxParams(formData)),
+        organizationId,
+        companyId,
+        createAccountTaxParamsToStdbHttpJson(toCreateAccountTaxParams(formData)),
       ])
     } else if (action === "createBudget") {
       createBudget.mutate(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData)))
@@ -1826,7 +1827,7 @@ function AccountingClientLoaded({
                 onImportAccountsCsv={() => setCsvKind("account")}
                 onCreate={(data) => {
                   const p = toCreateAccountAccountParams(data as Record<string, unknown>)
-                  if (p) createAccount.mutate([String(organizationId), accountingParamsToJson(p)])
+                  if (p) createAccount.mutate([organizationId, accountingParamsToJson(p)])
                 }}
               />
             ),
@@ -1844,7 +1845,7 @@ function AccountingClientLoaded({
                 onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                 onPostMove={(move) => postDraft(move)}
                 onCancelMove={(move) =>
-                  cancelMove.mutate([String(organizationId), String(move.id)])
+                  cancelMove.mutate([organizationId, move.id as string | number | bigint])
                 }
                 onComputeInvoiceTotals={(move) =>
                   void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
@@ -2232,7 +2233,7 @@ function AccountingClientLoaded({
             jid,
             "Customer Invoice",
           )
-          createMove.mutate([String(organizationId), accountingParamsToJson(p)])
+          createMove.mutate([organizationId, accountingParamsToJson(p)])
         }}
       />
 
@@ -2265,7 +2266,7 @@ function AccountingClientLoaded({
             jid,
             "Vendor Bill",
           )
-          createMove.mutate([String(organizationId), accountingParamsToJson(p)])
+          createMove.mutate([organizationId, accountingParamsToJson(p)])
         }}
       />
 

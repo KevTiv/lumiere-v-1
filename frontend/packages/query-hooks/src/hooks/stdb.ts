@@ -13,14 +13,9 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch } from "../http"
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 
-/** Same as `@lumiere/api-client` / `callStdbReducer` — JSON.stringify cannot encode bigint. */
-function stringifyReducerArgs(args: unknown[]): string {
-  return JSON.stringify(args, (_key, value: unknown) =>
-    typeof value === "bigint" ? value.toString() : value,
-  )
-}
+import { apiFetch } from "../http"
 
 /** Invalidate `useStdbQuery` caches for the given resource names (same `organizationId` as the query). */
 export function invalidateStdbQueryResources(
@@ -48,7 +43,7 @@ export function useStdbCallMutation(
       const r = await apiFetch(`/api/call/${encodeURIComponent(reducerName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerArgs(args),
+        body: stringifyReducerCallBody(args),
       })
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -72,7 +67,7 @@ export function useStdbReducer(reducerName: string) {
       const r = await apiFetch(`/api/call/${encodeURIComponent(reducerName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerArgs(args),
+        body: stringifyReducerCallBody(args),
       })
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>

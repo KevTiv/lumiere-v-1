@@ -1,6 +1,6 @@
 "use client"
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
@@ -12,6 +12,8 @@ import {
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { useStdbQuery } from "@lumiere/query-hooks/hooks/stdb"
+import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
+import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
 import { webApi } from "@/lib/lumiere-web-http"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
@@ -81,6 +83,26 @@ function RBACBridge({
   )
 }
 
+/** api-server `/v1/realtime/ws` (proxied at `/api/realtime/ws`) → invalidate `useStdbQuery` rows. */
+function LumiereRealtimeBridge({
+  organizationId,
+  companyIds,
+}: {
+  organizationId?: number
+  companyIds?: readonly number[]
+}) {
+  const queryClient = useQueryClient()
+  const resources = useMemo(() => FULL_CLIENT_SUBSCRIPTION_RESOURCES, [])
+  useLumiereRealtime({
+    queryClient,
+    organizationId,
+    companyIds,
+    resources,
+    enabled: organizationId != null && organizationId > 0,
+  })
+  return null
+}
+
 // ─── Root providers ───────────────────────────────────────────────────────────
 
 export function Providers({
@@ -88,14 +110,16 @@ export function Providers({
   serverIdentity,
   serverRoleNames,
   organizationId,
+  companyIds,
+  stdbModule: _stdbModule,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
   organizationId?: number
-  /** @deprecated WebSocket stack removed (Phase 5); ignored */
+  /** Company row ids for realtime subscription context (fixed-assets, intercompany, …). */
   companyIds?: readonly number[]
-  /** @deprecated WebSocket stack removed (Phase 5); ignored */
+  /** @deprecated unused; module name is configured on api-server */
   stdbModule?: string
 }) {
   const [queryClient] = useState(() => new QueryClient())
@@ -104,6 +128,7 @@ export function Providers({
       <ThemeProvider>
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
+            <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />
             <ErpSessionProvider
               value={{
                 identity: serverIdentity ?? null,

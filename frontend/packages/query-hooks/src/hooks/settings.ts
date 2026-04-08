@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { apiFetch } from "../http"
 /**
  * Settings hooks — Organization and system configuration
@@ -19,13 +21,13 @@ export function useUpsertOrganizationSettings(organizationId: bigint) {
       const r = await apiFetch('/api/call/upsert_organization_settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), settings]),
+        body: stringifyReducerCallBody([organizationId, settings]),
       })
       if (!r.ok) throw new Error('Failed to save organization settings')
     },
     onSuccess: () => {
       // Invalidate any queries that might depend on organization settings
-      qc.invalidateQueries({ queryKey: ['organization-settings', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['organization-settings', organizationId] })
     },
   })
 }
@@ -37,12 +39,12 @@ export function useUpdateOrganization(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to update organization')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['organization', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['organization', organizationId] })
     },
   })
 }
@@ -54,7 +56,7 @@ export function useCreateOrganization() {
       const r = await apiFetch('/api/call/create_organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([params]),
+        body: stringifyReducerCallBody([params]),
       })
       if (!r.ok) throw new Error('Failed to create organization')
     },

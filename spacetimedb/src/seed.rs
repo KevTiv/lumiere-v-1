@@ -13,10 +13,12 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::audit::{audit_log, audit_rule, AuditLog, AuditRule};
 use crate::core::messaging::{mail_follower, mail_message, MailFollower, MailMessage};
 use crate::core::organization::{
-    company, organization, organization_settings, Company, Organization, OrganizationSettings,
+    company, new_external_id, organization, organization_settings, Company, Organization,
+    OrganizationSettings,
 };
 use crate::core::permissions::{
-    casbin_rule, role, user_role_assignment, CasbinRule, Role, UserRoleAssignment,
+    casbin_rule, org_permission, role, seed_insert_org_permission, user_role_assignment, CasbinRule,
+    PermissionAction, PermissionEffect, PermissionSubject, Role, UserRoleAssignment,
 };
 use crate::core::privacy::{
     data_classification, data_classification_rule, privacy_consent, DataClassification,
@@ -326,6 +328,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 1.3 Organization ──────────────────────────────────────────────────────
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        external_id: new_external_id(ctx),
         name: "Lumiere Demo Corp".to_string(),
         code: "DEMO".to_string(),
         description: Some("Demo organization for development".to_string()),
@@ -408,6 +411,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // NOTE: currency_id is u64 but Currency uses string PK — use 1 as placeholder
     let company = ctx.db.company().insert(Company {
         id: 0,
+        external_id: new_external_id(ctx),
         organization_id: org_id,
         name: "Lumiere Technologies Inc.".to_string(),
         code: "LTI".to_string(),
@@ -4452,6 +4456,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 5.13 Subsidiary company, intercompany, consolidation ───────────────────
     let company_sub = ctx.db.company().insert(Company {
         id: 0,
+        external_id: new_external_id(ctx),
         organization_id: org_id,
         name: "Lumiere EU Demo Ltd.".to_string(),
         code: "LTI-EU".to_string(),
@@ -9044,6 +9049,7 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
 
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        external_id: new_external_id(ctx),
         name: "Lumiere Dev Org".to_string(),
         code: "DEV".to_string(),
         description: Some("Minimal local dev org (auto-seeded for alpha)".to_string()),
@@ -9064,6 +9070,7 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
 
     let company = ctx.db.company().insert(Company {
         id: 0,
+        external_id: new_external_id(ctx),
         organization_id: org_id,
         name: "Dev Company".to_string(),
         code: "DEVCO".to_string(),
@@ -9221,25 +9228,25 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         });
     }
 
-    // Ensure casbin policy: p, owner, <org_id>, *, * (full access)
     let org_id_str = org_id.to_string();
-    let already_has_policy = ctx.db.casbin_rule().iter().any(|r| {
-        r.ptype == "p" && r.v0.as_deref() == Some("owner") && r.v1.as_deref() == Some(&org_id_str)
+
+    let already_has_org_perm = ctx.db.org_permission().iter().any(|p| {
+        p.organization_id == org_id
+            && matches!(&p.subject, PermissionSubject::Role(rid) if *rid == owner_role.id)
+            && p.resource == "*"
+            && p.action == PermissionAction::All
+            && p.effect == PermissionEffect::Allow
     });
 
-    if !already_has_policy {
-        ctx.db.casbin_rule().insert(CasbinRule {
-            id: 0,
-            ptype: "p".to_string(),
-            v0: Some("owner".to_string()), // role subject
-            v1: Some(org_id_str.clone()),  // domain (org)
-            v2: Some("*".to_string()),     // resource (wildcard)
-            v3: Some("*".to_string()),     // action (wildcard)
-            v4: Some("allow".to_string()), // effect
-            v5: None,
-            created_at: ctx.timestamp,
-            metadata: None,
-        });
+    if !already_has_org_perm {
+        seed_insert_org_permission(
+            ctx,
+            org_id,
+            PermissionSubject::Role(owner_role.id),
+            "*".to_string(),
+            PermissionAction::All,
+            PermissionEffect::Allow,
+        );
     }
 
     // Ensure casbin grouping: g, <caller_hex>, owner, <org_id> (user→role mapping)

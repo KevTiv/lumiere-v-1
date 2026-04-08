@@ -81,7 +81,7 @@ async fn subscription_queries(
         company_ids: None,
         identity_hex,
         role_names: None,
-        field_access: None,
+        field_access: session.field_access.as_ref(),
     };
 
     if resource == "all" {

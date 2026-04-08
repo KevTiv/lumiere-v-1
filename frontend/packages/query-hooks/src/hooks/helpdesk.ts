@@ -4,12 +4,14 @@
  * Helpdesk — React Query over `/api/query/*` and `/api/call/*`.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
 
 function helpdeskKeys(organizationId: bigint) {
-  const k = organizationId.toString()
+  const k = organizationId
   return {
     tickets: ['helpdesk-tickets', k] as const,
     teams: ['helpdesk-teams', k] as const,
@@ -73,7 +75,7 @@ export function useCreateTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create helpdesk ticket')
     },
@@ -92,7 +94,7 @@ export function useUpdateTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(ticketId), params]),
+        body: stringifyReducerCallBody([organizationId, Number(ticketId), params]),
       })
       if (!r.ok) throw new Error('Failed to update ticket')
     },
@@ -108,7 +110,7 @@ export function useAssignTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/assign_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(ticketId), agentIdentityHex]),
+        body: stringifyReducerCallBody([organizationId, Number(ticketId), agentIdentityHex]),
       })
       if (!r.ok) throw new Error('Failed to assign helpdesk ticket')
     },
@@ -123,7 +125,7 @@ export function useCloseTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/close_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(ticketId)]),
+        body: stringifyReducerCallBody([organizationId, Number(ticketId)]),
       })
       if (!r.ok) throw new Error('Failed to close helpdesk ticket')
     },
@@ -138,7 +140,7 @@ export function useReopenTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/reopen_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(ticketId)]),
+        body: stringifyReducerCallBody([organizationId, Number(ticketId)]),
       })
       if (!r.ok) throw new Error('Failed to reopen helpdesk ticket')
     },
@@ -155,7 +157,7 @@ export function useCreateHelpdeskTeam(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_helpdesk_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create team')
     },
@@ -170,7 +172,7 @@ export function useCreateHelpdeskStage(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_helpdesk_stage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create stage')
     },
@@ -185,7 +187,7 @@ export function useCreateHelpdeskSla(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_helpdesk_sla', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create SLA')
     },
@@ -202,7 +204,7 @@ export function useImportHelpdeskTicketCsv(organizationId: bigint) {
       const r = await apiFetch('/api/call/import_helpdesk_ticket_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!r.ok) throw new Error('Failed to import tickets CSV')
     },
@@ -217,7 +219,7 @@ export function useImportHelpdeskTeamCsv(organizationId: bigint) {
       const r = await apiFetch('/api/call/import_helpdesk_team_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!r.ok) throw new Error('Failed to import teams CSV')
     },
@@ -232,7 +234,7 @@ export function useImportHelpdeskStageCsv(organizationId: bigint) {
       const r = await apiFetch('/api/call/import_helpdesk_stage_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!r.ok) throw new Error('Failed to import stages CSV')
     },
@@ -247,7 +249,7 @@ export function useImportHelpdeskSlaCsv(organizationId: bigint) {
       const r = await apiFetch('/api/call/import_helpdesk_sla_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!r.ok) throw new Error('Failed to import SLAs CSV')
     },

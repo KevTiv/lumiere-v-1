@@ -6,6 +6,7 @@
  */
 import 'server-only'
 
+import { stringifyReducerCallBody } from '@lumiere/api-client'
 import bcrypt from 'bcryptjs'
 import { stdbSql } from '@lumiere/stdb/server'
 import { getDefaultStdbHttpConnect } from '@/lib/stdb-http-env'
@@ -112,7 +113,7 @@ export async function callStdbReducer(reducerName: string, args: unknown[]): Pro
       'Authorization': `Bearer ${STDB_ADMIN_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(args),
+    body: stringifyReducerCallBody(args),
   })
   if (!res.ok) {
     const body = await res.text()

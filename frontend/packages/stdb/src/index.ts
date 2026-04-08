@@ -7,7 +7,7 @@
  * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted
  * - `@lumiere/stdb/client-ui-bridge` — minimal mutation helpers for `@lumiere/ui`
  *
- * Optional WS subscriptions: `StdbConnectionProvider` + `createClientSubscriptions` from `./queries/erp-subscriptions`.
+ * Web: realtime invalidation uses `@lumiere/query-hooks/hooks/realtime` (`useLumiereRealtime`); optional native `StdbConnectionProvider` + `createClientSubscriptions` for non-web or legacy.
  * Mobile / embedded clients that use `DbConnection` continue to import from this package.
  */
 export * from './generated';

@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { apiFetch } from "../http"
 import { useMutation } from "@tanstack/react-query"
 
@@ -15,7 +17,7 @@ export function useImportCountryCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_country_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },
@@ -28,7 +30,7 @@ export function useImportCurrencyCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_currency_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },
@@ -41,7 +43,7 @@ export function useImportCurrencyRateCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_currency_rate_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },
@@ -54,7 +56,7 @@ export function useImportCompanyCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_company_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },
@@ -67,7 +69,7 @@ export function useImportRoleCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_role_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },
@@ -80,7 +82,7 @@ export function useImportAiAgentCsv(organizationId: number) {
       const res = await apiFetch("/api/call/import_ai_agent_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorOrgMaster(res))
     },

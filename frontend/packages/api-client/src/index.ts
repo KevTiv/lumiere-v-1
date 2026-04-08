@@ -5,7 +5,12 @@ export {
 } from "./create-client"
 export { parseQueryListResponse, type QueryRow, type QueryRows } from "./query-list"
 export { resolveApiUrl, resolveRequestUrl } from "./resolve-url"
-export { queryStdbList, callStdbReducer, type LumiereHttpFetch } from "./stdb-gateway"
+export {
+  queryStdbList,
+  callStdbReducer,
+  stringifyReducerCallBody,
+  type LumiereHttpFetch,
+} from "./stdb-gateway"
 export {
   LumiereApiProvider,
   getLumiereApiClient,

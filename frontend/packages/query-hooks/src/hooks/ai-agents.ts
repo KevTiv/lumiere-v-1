@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -43,7 +45,7 @@ export function useCreateAiAgent(organizationId: number) {
       const r = await apiFetch("/api/call/create_ai_agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), null, stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, null, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -58,9 +60,9 @@ export function useUpdateAiAgent(organizationId: number) {
       const r = await apiFetch("/api/call/update_ai_agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.agentId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.agentId,
           stdbParamsToJson(args.params as object),
         ]),
       })
@@ -77,7 +79,7 @@ export function useSetAiAgentActive(organizationId: number) {
       const r = await apiFetch("/api/call/set_ai_agent_active", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.agentId), args.isActive]),
+        body: stringifyReducerCallBody([organizationId, args.agentId, args.isActive]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -91,9 +93,9 @@ export function useCreateAiTeamMember(organizationId: number) {
       const r = await apiFetch("/api/call/create_ai_team_member", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          args.companyId != null ? String(args.companyId) : null,
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.companyId != null ? args.companyId : null,
           stdbParamsToJson(args.params as object),
         ]),
       })
@@ -108,9 +110,9 @@ export function useDismissAiInsight() {
       const r = await apiFetch("/api/call/dismiss_insight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          args.companyId != null ? String(args.companyId) : null,
-          String(args.insightId),
+        body: stringifyReducerCallBody([
+          args.companyId != null ? args.companyId : null,
+          args.insightId,
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -124,8 +126,8 @@ export function useCreateAiInsight() {
       const r = await apiFetch("/api/call/create_ai_insight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          args.companyId != null ? String(args.companyId) : null,
+        body: stringifyReducerCallBody([
+          args.companyId != null ? args.companyId : null,
           stdbParamsToJson(args.params as object),
         ]),
       })
@@ -141,9 +143,9 @@ export function useRecordAiSpend(organizationId: number) {
       const r = await apiFetch("/api/call/record_ai_spend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.agentId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.agentId,
           args.tokensUsed,
         ]),
       })

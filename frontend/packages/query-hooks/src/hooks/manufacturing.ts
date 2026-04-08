@@ -7,13 +7,15 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 
 function invalidateMrpBomsAndLines(qc: QueryClient, organizationId: bigint) {
-  const key = organizationId.toString()
+  const key = organizationId
   void qc.invalidateQueries({ queryKey: ['mrp-boms', key] })
   void qc.invalidateQueries({ queryKey: ['mrp-bom-lines', key] })
 }
@@ -25,7 +27,7 @@ export function useMrpProductions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-productions', organizationId.toString()],
+    queryKey: ['mrp-productions', organizationId],
     queryFn: () => fetchQueryList('/api/query/mrp-productions', 'Failed to fetch manufacturing orders'),
     staleTime: 30_000,
     initialData,
@@ -37,7 +39,7 @@ export function useMrpBoms(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-boms', organizationId.toString()],
+    queryKey: ['mrp-boms', organizationId],
     queryFn: () => fetchQueryList('/api/query/mrp-boms', 'Failed to fetch BOMs'),
     staleTime: 30_000,
     initialData,
@@ -49,7 +51,7 @@ export function useMrpBomLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-bom-lines', organizationId.toString()],
+    queryKey: ['mrp-bom-lines', organizationId],
     queryFn: () => fetchQueryList('/api/query/mrp-bom-lines', 'Failed to fetch BOM lines'),
     staleTime: 30_000,
     initialData,
@@ -61,7 +63,7 @@ export function useMrpWorkorders(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-workorders', organizationId.toString()],
+    queryKey: ['mrp-workorders', organizationId],
     queryFn: () => fetchQueryList('/api/query/mrp-workorders', 'Failed to fetch workorders'),
     staleTime: 30_000,
     initialData,
@@ -73,7 +75,7 @@ export function useMrpWorkcenters(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-workcenters', organizationId.toString()],
+    queryKey: ['mrp-workcenters', organizationId],
     queryFn: () => fetchQueryList('/api/query/mrp-workcenters', 'Failed to fetch workcenters'),
     staleTime: 30_000,
     initialData,
@@ -85,7 +87,7 @@ export function useMrpRoutingWorkcenters(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-routing-workcenters', organizationId.toString()],
+    queryKey: ['mrp-routing-workcenters', organizationId],
     queryFn: () =>
       fetchQueryList('/api/query/mrp-routing-workcenters', 'Failed to fetch routing operations'),
     staleTime: 30_000,
@@ -98,7 +100,7 @@ export function useQualityChecks(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['quality-checks', organizationId.toString()],
+    queryKey: ['quality-checks', organizationId],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
     initialData,
@@ -114,12 +116,12 @@ export function useCreateManufacturingOrder(organizationId: bigint, companyId?: 
       const r = await apiFetch('/api/call/create_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -130,7 +132,7 @@ export function useCreateBom(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create BOM')
     },
@@ -145,12 +147,12 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
       const r = await apiFetch('/api/call/create_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
@@ -161,12 +163,12 @@ export function useConfirmManufacturingOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/confirm_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+        body: stringifyReducerCallBody([organizationId, productionId]),
       })
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -177,12 +179,12 @@ export function useStartManufacturingOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+        body: stringifyReducerCallBody([organizationId, productionId]),
       })
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -193,12 +195,12 @@ export function useFinishManufacturingOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/finish_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+        body: stringifyReducerCallBody([organizationId, productionId]),
       })
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -209,12 +211,12 @@ export function useCancelManufacturingOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), productionId.toString()]),
+        body: stringifyReducerCallBody([organizationId, productionId]),
       })
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -225,12 +227,12 @@ export function useStartWorkorder(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_workorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workorderId.toString()]),
+        body: stringifyReducerCallBody([organizationId, workorderId]),
       })
       if (!r.ok) throw new Error('Failed to start workorder')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] }),
   })
 }
 
@@ -241,12 +243,12 @@ export function useFinishWorkorder(organizationId: bigint) {
       const r = await apiFetch('/api/call/finish_workorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workorderId.toString()]),
+        body: stringifyReducerCallBody([organizationId, workorderId]),
       })
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] }),
   })
 }
 
@@ -263,12 +265,12 @@ export function useBlockWorkcenter(organizationId: bigint) {
       const r = await apiFetch('/api/call/block_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workcenterId.toString(), reason]),
+        body: stringifyReducerCallBody([organizationId, workcenterId, reason]),
       })
       if (!r.ok) throw new Error('Failed to block workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
@@ -279,12 +281,12 @@ export function useUnblockWorkcenter(organizationId: bigint) {
       const r = await apiFetch('/api/call/unblock_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workcenterId.toString()]),
+        body: stringifyReducerCallBody([organizationId, workcenterId]),
       })
       if (!r.ok) throw new Error('Failed to unblock workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
@@ -306,12 +308,12 @@ export function useCheckMoAvailability(organizationId: bigint) {
       const r = await apiFetch('/api/call/check_mo_availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), moId.toString()]),
+        body: stringifyReducerCallBody([organizationId, moId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -322,12 +324,12 @@ export function useProduceManufacturingOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/produce_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), moId.toString(), qty]),
+        body: stringifyReducerCallBody([organizationId, moId, qty]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -338,12 +340,12 @@ export function useConsumeMoMaterials(organizationId: bigint) {
       const r = await apiFetch('/api/call/consume_mo_materials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), moId.toString()]),
+        body: stringifyReducerCallBody([organizationId, moId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -355,13 +357,13 @@ export function useCreateWorkorder(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_workorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId.toString()] })
-      void qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] })
     },
   })
 }
@@ -379,10 +381,10 @@ export function useUpdateBom(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/update_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
-          bomId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          bomId,
           params,
         ]),
       })
@@ -399,7 +401,7 @@ export function useDeleteBom(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/delete_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), bomId.toString()]),
+        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -414,7 +416,7 @@ export function useComputeBomCost(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/compute_bom_cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), bomId.toString()]),
+        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -429,7 +431,7 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/explode_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), bomId.toString()]),
+        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -439,13 +441,13 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
 
 export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId.toString()
+  const orgKey = organizationId
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const r = await apiFetch('/api/call/create_routing_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -470,12 +472,12 @@ export function useUpdateWorkcenter(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/update_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), workcenterId.toString(), scoped]),
+        body: stringifyReducerCallBody([organizationId, workcenterId, scoped]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
@@ -492,29 +494,29 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       const r = await apiFetch('/api/call/log_workcenter_productivity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
-          workcenterId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          workcenterId,
           params,
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
 export function useCompleteProductivityLog(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId.toString()
+  const orgKey = organizationId
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
       const r = await apiFetch('/api/call/complete_productivity_log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), logId.toString()]),
+        body: stringifyReducerCallBody([organizationId, companyId, logId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -529,12 +531,12 @@ export function useImportWorkcenterCsv(organizationId: bigint, companyId: bigint
       const r = await apiFetch('/api/call/import_workcenter_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
   })
 }
 
@@ -545,7 +547,7 @@ export function useImportBomCsv(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/import_bom_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -560,7 +562,7 @@ export function useImportBomLineCsv(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch('/api/call/import_bom_line_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -575,12 +577,12 @@ export function useImportManufacturingOrderCsv(organizationId: bigint, companyId
       const r = await apiFetch('/api/call/import_manufacturing_order_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
   })
 }
 
@@ -598,16 +600,16 @@ export function useLinkDeviceToWorkcenter(organizationId: bigint) {
       const r = await apiFetch('/api/call/link_device_to_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          deviceId.toString(),
-          workcenterId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          deviceId,
+          workcenterId,
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['iot-devices', organizationId.toString()] })
+      void qc.invalidateQueries({ queryKey: ['iot-devices', organizationId] })
     },
   })
 }

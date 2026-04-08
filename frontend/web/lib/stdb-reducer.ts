@@ -11,6 +11,7 @@
  *   Body: JSON array of arguments
  */
 
+import { stringifyReducerCallBody } from '@lumiere/api-client'
 import type { StdbHttpOptions } from '@lumiere/stdb/server'
 
 // Module-level cache for config resolution
@@ -83,7 +84,7 @@ export async function callReducer(
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(args),
+    body: stringifyReducerCallBody(args),
   })
 
   if (!res.ok) {

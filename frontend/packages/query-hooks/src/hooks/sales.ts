@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function useSaleOrders(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['sale-orders', organizationId.toString()],
+    queryKey: ['sale-orders', organizationId],
     queryFn: () => fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders'),
     staleTime: 30_000,
     initialData,
@@ -31,7 +33,7 @@ export function useSaleOrderLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['sale-order-lines', organizationId.toString()],
+    queryKey: ['sale-order-lines', organizationId],
     queryFn: () => fetchQueryList('/api/query/sale-order-lines', 'Failed to fetch sale order lines'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function usePricelists(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['pricelists', organizationId.toString()],
+    queryKey: ['pricelists', organizationId],
     queryFn: () => fetchQueryList('/api/query/pricelists', 'Failed to fetch pricelists'),
     staleTime: 30_000,
     initialData,
@@ -55,7 +57,7 @@ export function usePricelistItems(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['pricelist-items', organizationId.toString()],
+    queryKey: ['pricelist-items', organizationId],
     queryFn: () => fetchQueryList('/api/query/pricelist-items', 'Failed to fetch pricelist items'),
     staleTime: 30_000,
     initialData,
@@ -67,7 +69,7 @@ export function usePickingBatches(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['picking-batches', organizationId.toString()],
+    queryKey: ['picking-batches', organizationId],
     queryFn: () => fetchQueryList('/api/query/picking-batches', 'Failed to fetch picking batches'),
     staleTime: 30_000,
     initialData,
@@ -76,7 +78,7 @@ export function usePickingBatches(
 
 export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['delivery-carriers', companyId.toString()],
+    queryKey: ['delivery-carriers', companyId],
     queryFn: () => fetchQueryList('/api/query/delivery-carriers', 'Failed to fetch delivery carriers'),
     staleTime: 30_000,
     initialData,
@@ -85,7 +87,7 @@ export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) 
 
 export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['delivery-price-rules', companyId.toString()],
+    queryKey: ['delivery-price-rules', companyId],
     queryFn: () =>
       fetchQueryList('/api/query/delivery-price-rules', 'Failed to fetch delivery price rules'),
     staleTime: 30_000,
@@ -95,7 +97,7 @@ export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows
 
 export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['shipping-methods', companyId.toString()],
+    queryKey: ['shipping-methods', companyId],
     queryFn: () => fetchQueryList('/api/query/shipping-methods', 'Failed to fetch shipping methods'),
     staleTime: 30_000,
     initialData,
@@ -104,7 +106,7 @@ export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
 
 export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['pos-payment-methods', companyId.toString()],
+    queryKey: ['pos-payment-methods', companyId],
     queryFn: () =>
       fetchQueryList('/api/query/pos-payment-methods', 'Failed to fetch POS payment methods'),
     staleTime: 30_000,
@@ -114,7 +116,7 @@ export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows)
 
 export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['pos-loyalty-programs', organizationId.toString()],
+    queryKey: ['pos-loyalty-programs', organizationId],
     queryFn: () =>
       fetchQueryList('/api/query/pos-loyalty-programs', 'Failed to fetch loyalty programs'),
     staleTime: 30_000,
@@ -124,7 +126,7 @@ export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: Quer
 
 export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['pos-loyalty-cards', organizationId.toString()],
+    queryKey: ['pos-loyalty-cards', organizationId],
     queryFn: () => fetchQueryList('/api/query/pos-loyalty-cards', 'Failed to fetch loyalty cards'),
     staleTime: 30_000,
     initialData,
@@ -140,11 +142,11 @@ export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create sale order')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] }),
   })
 }
 
@@ -155,14 +157,14 @@ export function useConfirmSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/confirm_sales_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), orderId.toString()]),
+        body: stringifyReducerCallBody([organizationId, orderId]),
       })
       if (!r.ok) throw new Error('Failed to confirm sale order')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] })
+      qc.invalidateQueries({ queryKey: ['picking-batches', organizationId] })
     },
   })
 }
@@ -174,17 +176,17 @@ export function useCancelSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.orderId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.orderId,
           params.reason ?? null,
         ]),
       })
       if (!r.ok) throw new Error('Failed to cancel sale order')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] })
     },
   })
 }
@@ -196,13 +198,13 @@ export function useComputeSoTotals(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_so_totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), orderId.toString()]),
+        body: stringifyReducerCallBody([organizationId, orderId]),
       })
       if (!r.ok) throw new Error('Failed to recalculate order totals')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] })
     },
   })
 }
@@ -214,11 +216,11 @@ export function useCreatePricelist(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_pricelist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create pricelist')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pricelists', organizationId] }),
   })
 }
 
@@ -235,18 +237,18 @@ export function useUpdatePricelist(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_pricelist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.pricelistId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.pricelistId,
           params.name ?? null,
-          params.currencyId != null ? params.currencyId.toString() : null,
+          params.currencyId != null ? params.currencyId : null,
           params.discountPolicy ?? null,
           params.isActive ?? null,
         ]),
       })
       if (!r.ok) throw new Error('Failed to update pricelist')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pricelists', organizationId] }),
   })
 }
 
@@ -257,13 +259,13 @@ export function useCreatePricelistItem(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_pricelist_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create pricelist item')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId] })
     },
   })
 }
@@ -275,13 +277,13 @@ export function useDeletePricelist(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_pricelist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), pricelistId.toString()]),
+        body: stringifyReducerCallBody([organizationId, pricelistId]),
       })
       if (!r.ok) throw new Error('Failed to delete pricelist')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId] })
     },
   })
 }
@@ -293,13 +295,13 @@ export function useDeletePricelistItem(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_pricelist_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), itemId.toString()]),
+        body: stringifyReducerCallBody([organizationId, itemId]),
       })
       if (!r.ok) throw new Error('Failed to delete pricelist item')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pricelists', organizationId.toString()] })
-      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId.toString()] })
+      qc.invalidateQueries({ queryKey: ['pricelists', organizationId] })
+      qc.invalidateQueries({ queryKey: ['pricelist-items', organizationId] })
     },
   })
 }
@@ -311,11 +313,11 @@ export function useCreatePickingBatch(organizationId: bigint, companyId?: bigint
       const r = await apiFetch('/api/call/create_picking_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create picking batch')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId] }),
   })
 }
 
@@ -326,11 +328,11 @@ export function useStartPickingBatch(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_picking_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), batchId.toString()]),
+        body: stringifyReducerCallBody([organizationId, batchId]),
       })
       if (!r.ok) throw new Error('Failed to start picking batch')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId] }),
   })
 }
 
@@ -341,11 +343,11 @@ export function useCompletePickingBatch(organizationId: bigint) {
       const r = await apiFetch('/api/call/complete_picking_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), batchId.toString()]),
+        body: stringifyReducerCallBody([organizationId, batchId]),
       })
       if (!r.ok) throw new Error('Failed to complete picking batch')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId] }),
   })
 }
 
@@ -356,11 +358,11 @@ export function useCancelPickingBatch(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_picking_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), batchId.toString()]),
+        body: stringifyReducerCallBody([organizationId, batchId]),
       })
       if (!r.ok) throw new Error('Failed to cancel picking batch')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-batches', organizationId] }),
   })
 }
 
@@ -373,12 +375,12 @@ export function useUpdateSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(orderId), params]),
+        body: stringifyReducerCallBody([organizationId, Number(orderId), params]),
       })
       if (!r.ok) throw new Error('Failed to update sale order')
     },
     onSuccess: async () => {
-      const orgKey = organizationId.toString()
+      const orgKey = organizationId
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] }),
         qc.invalidateQueries({ queryKey: ['sale-order-lines', orgKey] }),
@@ -394,11 +396,11 @@ export function useLockSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/lock_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to lock sale order')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] }),
   })
 }
 
@@ -409,11 +411,11 @@ export function useUnlockSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/unlock_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to unlock sale order')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] }),
   })
 }
 
@@ -426,11 +428,11 @@ export function useCreateSaleOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_sale_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(orderId), params]),
+        body: stringifyReducerCallBody([organizationId, Number(orderId), params]),
       })
       if (!r.ok) throw new Error('Failed to create sale order line')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] }),
   })
 }
 
@@ -441,11 +443,11 @@ export function useUpdateSaleOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_sale_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(lineId), params]),
+        body: stringifyReducerCallBody([organizationId, Number(lineId), params]),
       })
       if (!r.ok) throw new Error('Failed to update sale order line')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] }),
   })
 }
 
@@ -456,11 +458,11 @@ export function useDeleteSaleOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_sale_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(lineId)]),
+        body: stringifyReducerCallBody([organizationId, Number(lineId)]),
       })
       if (!r.ok) throw new Error('Failed to delete sale order line')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId.toString()] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', organizationId] }),
   })
 }
 
@@ -473,12 +475,12 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_invoice_from_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), Number(orderId), invoiceDate ?? null, journalId ? Number(journalId) : null]),
+        body: stringifyReducerCallBody([organizationId, Number(orderId), invoiceDate ?? null, journalId ? Number(journalId) : null]),
       })
       if (!r.ok) throw new Error('Failed to create invoice from sale order')
     },
     onSuccess: () => {
-      const orgKey = organizationId.toString()
+      const orgKey = organizationId
       void qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] })
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
     },
@@ -503,12 +505,12 @@ export function useImportSaleOrderCsv(organizationId: bigint, companyId: bigint)
       const res = await apiFetch('/api/call/import_sale_order_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorSales(res))
     },
     onSuccess: () => {
-      const k = companyId.toString()
+      const k = companyId
       void qc.invalidateQueries({ queryKey: ['sale-orders', k] })
     },
   })
@@ -521,12 +523,12 @@ export function useImportSaleOrderLineCsv(organizationId: bigint, companyId: big
       const res = await apiFetch('/api/call/import_sale_order_line_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorSales(res))
     },
     onSuccess: () => {
-      const k = companyId.toString()
+      const k = companyId
       void qc.invalidateQueries({ queryKey: ['sale-order-lines', k] })
     },
   })
@@ -540,8 +542,8 @@ export function useSalesCsvImportMutations(organizationId: bigint, companyId: bi
 }
 
 function invalidateSalesLogistics(qc: ReturnType<typeof useQueryClient>, orgId: bigint, companyId: bigint) {
-  const o = orgId.toString()
-  const c = companyId.toString()
+  const o = orgId
+  const c = companyId
   void qc.invalidateQueries({ queryKey: ['delivery-carriers', c] })
   void qc.invalidateQueries({ queryKey: ['delivery-price-rules', c] })
   void qc.invalidateQueries({ queryKey: ['shipping-methods', c] })
@@ -557,9 +559,9 @@ export function useCreateDeliveryCarrier(organizationId: bigint, companyId: bigi
       const r = await apiFetch('/api/call/create_delivery_carrier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
           params,
         ]),
       })
@@ -576,9 +578,9 @@ export function useCreateDeliveryPriceRule(organizationId: bigint, companyId: bi
       const r = await apiFetch('/api/call/create_delivery_price_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
           params,
         ]),
       })
@@ -595,9 +597,9 @@ export function useCreateShippingMethod(organizationId: bigint, companyId: bigin
       const r = await apiFetch('/api/call/create_shipping_method', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
           params,
         ]),
       })
@@ -614,9 +616,9 @@ export function useCreatePaymentMethod(organizationId: bigint, companyId: bigint
       const r = await apiFetch('/api/call/create_payment_method', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          companyId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
           params,
         ]),
       })
@@ -633,7 +635,7 @@ export function useCreateLoyaltyProgram(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_loyalty_program', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create loyalty program')
     },
@@ -654,8 +656,8 @@ export function useCreateLoyaltyCard(organizationId: bigint, companyId: bigint) 
       const r = await apiFetch('/api/call/create_loyalty_card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
           partnerId === null || partnerId === '' ? null : Number(partnerId),
           Number(programId),
           code,

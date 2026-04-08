@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -10,7 +12,7 @@ async function parseCallError(r: Response): Promise<string> {
 }
 
 function stdbQueryKey(resource: string, organizationId: number) {
-  return ["stdb", resource, String(organizationId)] as const
+  return ["stdb", resource, organizationId] as const
 }
 
 export function useCompanies(organizationId: number, enabled: boolean) {
@@ -71,7 +73,7 @@ export function useCreateCompany(organizationId: number) {
       const r = await apiFetch("/api/call/create_company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -86,7 +88,7 @@ export function useUpdateCompany() {
       const r = await apiFetch("/api/call/update_company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.companyId), stdbParamsToJson(args.params as object)]),
+        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -104,7 +106,7 @@ export function useUpdateCompanyAddress() {
       const r = await apiFetch("/api/call/update_company_address", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.companyId), stdbParamsToJson(args.params as object)]),
+        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -122,7 +124,7 @@ export function useUpdateCompanyBusiness() {
       const r = await apiFetch("/api/call/update_company_business", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.companyId), stdbParamsToJson(args.params as object)]),
+        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -140,7 +142,7 @@ export function useUpdateCompanyHierarchy() {
       const r = await apiFetch("/api/call/update_company_hierarchy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.companyId), stdbParamsToJson(args.params as object)]),
+        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -158,7 +160,7 @@ export function useDeleteCompany() {
       const r = await apiFetch("/api/call/delete_company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.companyId)]),
+        body: stringifyReducerCallBody([args.companyId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -176,7 +178,7 @@ export function useCreateDataClassification(organizationId: number) {
       const r = await apiFetch("/api/call/create_data_classification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -191,7 +193,7 @@ export function useCreateDataClassificationRule(organizationId: number) {
       const r = await apiFetch("/api/call/create_data_classification_rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },

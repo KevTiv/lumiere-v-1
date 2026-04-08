@@ -7,6 +7,7 @@ mod crm;
 mod inventory;
 mod proposals;
 mod sales;
+mod session;
 mod settings;
 mod stdb;
 
@@ -19,6 +20,7 @@ use crate::state::AppState;
 pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
         .merge(auth::router())
+        .merge(session::router())
         .merge(stdb::router())
         .merge(crm::router())
         .merge(sales::router())

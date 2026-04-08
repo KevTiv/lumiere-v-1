@@ -3,6 +3,7 @@
 import { apiFetch } from "../http"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreatePaymentParams } from "@lumiere/stdb/generated/types"
 import { invalidateStdbQueryResources, useStdbCallMutation, useStdbQuery } from "./stdb"
@@ -232,14 +233,14 @@ async function parseCallError(r: Response): Promise<string> {
 }
 
 function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "budgets", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "budget-lines", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "budget-posts", k] })
 }
 
 function invalidateChartStructureQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "account-accounts", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "account-account-types", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "account-groups", k] })
@@ -379,7 +380,7 @@ export function useCreateCrossoveredBudget(organizationId: number) {
       const r = await apiFetch("/api/call/create_crossovered_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -394,7 +395,7 @@ export function useCreateAccountAccountType(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_account_type", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -409,9 +410,9 @@ export function useUpdateAccountAccountType(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_account_type", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.typeId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.typeId,
           stdbParamsToJson(args.params as object),
         ]),
       })
@@ -428,7 +429,7 @@ export function useCreateAccountGroup(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), stdbParamsToJson(params as object)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -443,9 +444,9 @@ export function useUpdateAccountGroup(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.groupId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.groupId,
           stdbParamsToJson(args.params as object),
         ]),
       })
@@ -495,7 +496,7 @@ export function useConfirmBudget(organizationId: number) {
       const r = await apiFetch("/api/call/confirm_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(budgetId)]),
+        body: stringifyReducerCallBody([organizationId, budgetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -510,7 +511,7 @@ export function useValidateBudget(organizationId: number) {
       const r = await apiFetch("/api/call/validate_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(budgetId)]),
+        body: stringifyReducerCallBody([organizationId, budgetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -525,7 +526,7 @@ export function useDoneBudget(organizationId: number) {
       const r = await apiFetch("/api/call/done_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(budgetId)]),
+        body: stringifyReducerCallBody([organizationId, budgetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -540,7 +541,7 @@ export function useCancelBudget(organizationId: number) {
       const r = await apiFetch("/api/call/cancel_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(budgetId)]),
+        body: stringifyReducerCallBody([organizationId, budgetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -555,7 +556,7 @@ export function useDeleteBudgetLine(organizationId: number) {
       const r = await apiFetch("/api/call/delete_budget_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(lineId)]),
+        body: stringifyReducerCallBody([organizationId, lineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -573,7 +574,7 @@ export function useUpdateBudgetLineActuals(organizationId: number) {
       const r = await apiFetch("/api/call/update_budget_line_actuals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -588,7 +589,7 @@ export function useCreateBudgetPost(organizationId: number) {
       const r = await apiFetch("/api/call/create_budget_post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -603,7 +604,7 @@ export function useUpdateBudgetPost(organizationId: number) {
       const r = await apiFetch("/api/call/update_budget_post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.postId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.postId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -702,14 +703,14 @@ export function useUpdateAccountJournal(organizationId: number) {
 // ── Analytic accounting (explicit /api/call — reducer coverage + correct [orgId, …] args) ──
 
 function invalidateAnalyticQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "analytic-accounts", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "analytic-lines", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "analytic-distribution-models", k] })
 }
 
 function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-statements", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-statement-lines", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-match-candidates", k] })
@@ -717,12 +718,12 @@ function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryClient>, o
 }
 
 function invalidateFiscalYearQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "fiscal-years", k] })
 }
 
 function invalidateAccountPeriodQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "account-periods", k] })
 }
 
@@ -734,7 +735,7 @@ export function useCreateFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/create_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -749,10 +750,10 @@ export function useUpdateFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/update_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.fiscalYearId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.fiscalYearId,
           args.params,
         ]),
       })
@@ -769,7 +770,7 @@ export function useDeleteFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/delete_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(fiscalYearId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -784,7 +785,7 @@ export function useOpenFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/open_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(fiscalYearId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -799,7 +800,7 @@ export function useCloseFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/close_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(fiscalYearId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -815,7 +816,7 @@ export function useCreateAccountPeriod(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/create_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -830,10 +831,10 @@ export function useUpdateAccountPeriod(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/update_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.periodId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.periodId,
           args.params,
         ]),
       })
@@ -850,7 +851,7 @@ export function useDeleteAccountPeriod(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/delete_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(periodId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -865,7 +866,7 @@ export function useOpenAccountPeriod(organizationId: number, companyId: bigint) 
       const r = await apiFetch("/api/call/open_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(periodId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -880,7 +881,7 @@ export function useCloseAccountPeriod(organizationId: number, companyId: bigint)
       const r = await apiFetch("/api/call/close_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(periodId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -895,7 +896,7 @@ export function useCreateAnalyticAccount(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -910,7 +911,7 @@ export function useUpdateAnalyticAccount(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.accountId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.accountId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -925,7 +926,7 @@ export function useSetAnalyticAccountActive(organizationId: number) {
       const r = await apiFetch("/api/call/set_analytic_account_active", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.accountId), args.active]),
+        body: stringifyReducerCallBody([organizationId, args.accountId, args.active]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -940,7 +941,7 @@ export function useCreateAnalyticLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -955,7 +956,7 @@ export function useUpdateAnalyticLine(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -970,7 +971,7 @@ export function useDeleteAnalyticLine(organizationId: number) {
       const r = await apiFetch("/api/call/delete_analytic_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(lineId)]),
+        body: stringifyReducerCallBody([organizationId, lineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -985,7 +986,7 @@ export function useCreateAnalyticDistributionModel(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_distribution_model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1000,7 +1001,7 @@ export function useUpdateAnalyticDistributionModel(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_distribution_model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.modelId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.modelId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1017,7 +1018,7 @@ export function usePostAccountBankStatement(organizationId: number) {
       const r = await apiFetch("/api/call/post_account_bank_statement?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(statementId)]),
+        body: stringifyReducerCallBody([statementId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1032,7 +1033,7 @@ export function useDeleteAccountBankStatement(organizationId: number) {
       const r = await apiFetch("/api/call/delete_account_bank_statement?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(statementId)]),
+        body: stringifyReducerCallBody([statementId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1047,7 +1048,7 @@ export function useCreateAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.statementId), args.params]),
+        body: stringifyReducerCallBody([args.statementId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1062,7 +1063,7 @@ export function useUpdateAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1077,7 +1078,7 @@ export function useDeleteAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/delete_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(lineId)]),
+        body: stringifyReducerCallBody([lineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1112,7 +1113,7 @@ export function useMatchBankLine(organizationId: number) {
       const r = await apiFetch("/api/call/match_bank_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.lineId), args.ruleId]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, args.ruleId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1127,7 +1128,7 @@ export function useApplyReconciliationRules(organizationId: number) {
       const r = await apiFetch("/api/call/apply_reconciliation_rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.lineId), args.ruleId]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, args.ruleId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1142,7 +1143,7 @@ export function useReconcileAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/reconcile_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1157,7 +1158,7 @@ export function useUnreconciledAccountBankStatementLine(organizationId: number) 
       const r = await apiFetch("/api/call/unreconciled_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1171,7 +1172,7 @@ function invalidateConsolidationQueries(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: number,
 ) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "consolidation-accounts", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "consolidation-journals", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "consolidation-elimination-entries", k] })
@@ -1205,7 +1206,7 @@ export function useCreateConsolidationAccount(organizationId: number) {
       const r = await apiFetch("/api/call/create_consolidation_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1220,7 +1221,7 @@ export function useUpdateConsolidationAccount(organizationId: number) {
       const r = await apiFetch("/api/call/update_consolidation_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.accountId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.accountId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1235,7 +1236,7 @@ export function useCreateConsolidationJournal(organizationId: number) {
       const r = await apiFetch("/api/call/create_consolidation_journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1250,7 +1251,7 @@ export function useCreateEliminationEntry(organizationId: number) {
       const r = await apiFetch("/api/call/create_elimination_entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1265,7 +1266,7 @@ export function useProcessConsolidation(organizationId: number) {
       const r = await apiFetch("/api/call/process_consolidation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(journalId)]),
+        body: stringifyReducerCallBody([organizationId, journalId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1280,7 +1281,7 @@ export function useValidateConsolidation(organizationId: number) {
       const r = await apiFetch("/api/call/validate_consolidation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(journalId)]),
+        body: stringifyReducerCallBody([organizationId, journalId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1295,7 +1296,7 @@ export function useCancelConsolidation(organizationId: number) {
       const r = await apiFetch("/api/call/cancel_consolidation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.journalId), args.reason]),
+        body: stringifyReducerCallBody([organizationId, args.journalId, args.reason]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1310,7 +1311,7 @@ export function useSetConsolidationCompanyRate(organizationId: number) {
       const r = await apiFetch("/api/call/set_consolidation_company_rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1325,10 +1326,10 @@ export function useMatchEliminationEntries(organizationId: number) {
       const r = await apiFetch("/api/call/match_elimination_entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.entryId),
-          String(args.matchedEntryId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.entryId,
+          args.matchedEntryId,
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1344,7 +1345,7 @@ export function useUnmatchEliminationEntry(organizationId: number) {
       const r = await apiFetch("/api/call/unmatch_elimination_entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(entryId)]),
+        body: stringifyReducerCallBody([organizationId, entryId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1359,7 +1360,7 @@ export function useCreateAccountReconciliationWidget(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_reconciliation_widget?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([params]),
+        body: stringifyReducerCallBody([params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1374,7 +1375,7 @@ export function useUpdateAccountReconciliationWidget(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_reconciliation_widget?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(args.widgetId), args.params]),
+        body: stringifyReducerCallBody([args.widgetId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1389,7 +1390,7 @@ export function useDeleteAccountReconciliationWidget(organizationId: number) {
       const r = await apiFetch("/api/call/delete_account_reconciliation_widget?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(widgetId)]),
+        body: stringifyReducerCallBody([widgetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1400,7 +1401,7 @@ export function useDeleteAccountReconciliationWidget(organizationId: number) {
 // ── Fixed Assets ──────────────────────────────────────────────────────────────
 
 function invalidateFixedAssetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "fixed-assets", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "depreciation-lines", k] })
 }
@@ -1420,7 +1421,7 @@ export function useDeleteAccountAsset(organizationId: number, companyId: bigint)
       const r = await apiFetch("/api/call/delete_account_asset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(assetId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1435,7 +1436,7 @@ export function useConfirmAccountAsset(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/confirm_account_asset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(assetId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1450,7 +1451,7 @@ export function useCloseAccountAsset(organizationId: number, companyId: bigint) 
       const r = await apiFetch("/api/call/close_account_asset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(assetId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1465,10 +1466,10 @@ export function useSetAccountAssetActive(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/set_asset_active", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.assetId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.assetId,
           args.active,
         ]),
       })
@@ -1485,7 +1486,7 @@ export function useCreateDepreciationLine(organizationId: number, companyId: big
       const r = await apiFetch("/api/call/create_depreciation_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1500,7 +1501,7 @@ export function useComputeDepreciationBoard(organizationId: number, companyId: b
       const r = await apiFetch("/api/call/compute_depreciation_board", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(assetId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1511,7 +1512,7 @@ export function useComputeDepreciationBoard(organizationId: number, companyId: b
 // ── Intercompany ──────────────────────────────────────────────────────────────
 
 function invalidateIntercompanyQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "intercompany-rules", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "intercompany-transactions", k] })
 }
@@ -1544,10 +1545,10 @@ export function useCreateIntercompanyRule(organizationId: number) {
       const r = await apiFetch("/api/call/create_intercompany_rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.sourceCompanyId),
-          String(args.destinationCompanyId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.sourceCompanyId,
+          args.destinationCompanyId,
           args.params,
         ]),
       })
@@ -1564,10 +1565,10 @@ export function useUpdateIntercompanyRule(organizationId: number, companyId: big
       const r = await apiFetch("/api/call/update_intercompany_rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.ruleId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.ruleId,
           args.params,
         ]),
       })
@@ -1584,7 +1585,7 @@ export function useDeleteIntercompanyRule(organizationId: number, companyId: big
       const r = await apiFetch("/api/call/delete_intercompany_rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, ruleId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1599,10 +1600,10 @@ export function useSetIntercompanyRuleActive(organizationId: number, companyId: 
       const r = await apiFetch("/api/call/set_intercompany_rule_active", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.ruleId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.ruleId,
           args.isActive,
         ]),
       })
@@ -1620,9 +1621,9 @@ export function useCreateIntercompanyTransaction(organizationId: number) {
       const r = await apiFetch("/api/call/create_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.originCompanyId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.originCompanyId,
           args.params,
         ]),
       })
@@ -1641,7 +1642,7 @@ export function useApproveIntercompanyTransaction(organizationId: number, compan
       const r = await apiFetch("/api/call/approve_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(transactionId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1656,10 +1657,10 @@ export function useProcessIntercompanyTransaction(organizationId: number, compan
       const r = await apiFetch("/api/call/process_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.transactionId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.transactionId,
           args.params,
         ]),
       })
@@ -1676,7 +1677,7 @@ export function useCompleteIntercompanyTransaction(organizationId: number, compa
       const r = await apiFetch("/api/call/complete_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(transactionId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1691,10 +1692,10 @@ export function useErrorIntercompanyTransaction(organizationId: number, companyI
       const r = await apiFetch("/api/call/error_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.transactionId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.transactionId,
           { errorMessage: args.errorMessage },
         ]),
       })
@@ -1711,10 +1712,10 @@ export function useCancelIntercompanyTransaction(organizationId: number, company
       const r = await apiFetch("/api/call/cancel_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.transactionId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.transactionId,
           { reason: args.reason },
         ]),
       })
@@ -1731,7 +1732,7 @@ export function useRetryIntercompanyTransaction(organizationId: number, companyI
       const r = await apiFetch("/api/call/retry_intercompany_transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), String(transactionId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1742,7 +1743,7 @@ export function useRetryIntercompanyTransaction(organizationId: number, companyI
 // ── Moves / Payments ──────────────────────────────────────────────────────────
 
 function invalidateMoveQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = String(organizationId)
+  const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "account-move-lines", k] })
 }
@@ -1755,7 +1756,7 @@ export function useComputeInvoiceTotals(organizationId: number, companyId: bigin
       const r = await apiFetch("/api/call/compute_invoice_totals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), Number(moveId)]),
+        body: stringifyReducerCallBody([organizationId, Number(moveId)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1770,7 +1771,7 @@ export function useUpdateAccountMoveLine(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/update_account_move_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.lineId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1785,10 +1786,10 @@ export function useReconcilePaymentWithInvoice(organizationId: number, companyId
       const r = await apiFetch("/api/call/reconcile_payment_with_invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.paymentMoveId),
-          String(args.invoiceMoveId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.paymentMoveId,
+          args.invoiceMoveId,
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1812,7 +1813,7 @@ export function useCreateAccountPayment(organizationId: number) {
       const r = await apiFetch("/api/call/create_payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), paymentParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, paymentParamsToJson(params)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1828,7 +1829,7 @@ export function usePostAccountPayment(organizationId: number) {
       const r = await apiFetch("/api/call/post_payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(paymentId)]),
+        body: stringifyReducerCallBody([organizationId, paymentId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1847,7 +1848,7 @@ export function useCancelAccountPayment(organizationId: number) {
       const r = await apiFetch("/api/call/cancel_payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(paymentId)]),
+        body: stringifyReducerCallBody([organizationId, paymentId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1867,10 +1868,10 @@ export function useRegisterPaymentOnInvoice(organizationId: number) {
       const r = await apiFetch("/api/call/register_payment_on_invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.paymentId),
-          args.invoiceIds.map((id) => String(id)),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.paymentId,
+          args.invoiceIds,
           args.isBill,
         ]),
       })
@@ -1888,7 +1889,7 @@ export function useCreatePaymentTerm(organizationId: number) {
       const r = await apiFetch("/api/call/create_payment_term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1909,9 +1910,9 @@ export function useUpdatePaymentTerm(organizationId: number) {
       const r = await apiFetch("/api/call/update_payment_term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.termId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.termId,
           args.name,
           args.note,
           args.isActive,
@@ -1931,7 +1932,7 @@ export function useDeletePaymentTerm(organizationId: number) {
       const r = await apiFetch("/api/call/delete_payment_term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(termId)]),
+        body: stringifyReducerCallBody([organizationId, termId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1947,7 +1948,7 @@ export function useCreatePaymentTermLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_payment_term_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1971,9 +1972,9 @@ export function useUpdatePaymentTermLine(organizationId: number) {
       const r = await apiFetch("/api/call/update_payment_term_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(args.lineId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.lineId,
           args.value,
           args.valueAmount,
           args.days,
@@ -1996,7 +1997,7 @@ export function useDeletePaymentTermLine(organizationId: number) {
       const r = await apiFetch("/api/call/delete_payment_term_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(lineId)]),
+        body: stringifyReducerCallBody([organizationId, lineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2013,7 +2014,7 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
       const r = await apiFetch("/api/call/create_currency_rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), companyId === null ? null : String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId === null ? null : companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2066,7 +2067,7 @@ export function useCreateAccountTaxGroup(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/create_account_tax_group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2081,10 +2082,10 @@ export function useUpdateAccountTaxGroup(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/update_account_tax_group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.groupId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.groupId,
           args.params,
         ]),
       })
@@ -2103,7 +2104,7 @@ export function useCreateTaxJurisdiction(organizationId: number) {
       const r = await apiFetch("/api/call/create_tax_jurisdiction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2120,7 +2121,7 @@ export function useUpdateTaxJurisdiction(organizationId: number) {
       const r = await apiFetch("/api/call/update_tax_jurisdiction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.jurisdictionId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.jurisdictionId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2139,7 +2140,7 @@ export function useCreateTaxSchedule(organizationId: number, companyId: bigint) 
       const r = await apiFetch("/api/call/create_tax_schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2154,10 +2155,10 @@ export function useUpdateTaxSchedule(organizationId: number, companyId: bigint) 
       const r = await apiFetch("/api/call/update_tax_schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([
-          String(organizationId),
-          String(companyId),
-          String(args.scheduleId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          args.scheduleId,
           args.params,
         ]),
       })
@@ -2176,7 +2177,7 @@ export function useCreateTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/create_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2193,7 +2194,7 @@ export function useUpdateTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/update_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(args.deadlineId), args.params]),
+        body: stringifyReducerCallBody([organizationId, args.deadlineId, args.params]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2210,7 +2211,7 @@ export function useDeleteTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/delete_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(deadlineId)]),
+        body: stringifyReducerCallBody([organizationId, deadlineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2227,7 +2228,7 @@ export function useCompleteTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/complete_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(deadlineId)]),
+        body: stringifyReducerCallBody([organizationId, deadlineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2244,7 +2245,7 @@ export function useWaiveTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/waive_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(deadlineId)]),
+        body: stringifyReducerCallBody([organizationId, deadlineId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2263,7 +2264,7 @@ export function useRefreshTaxDeadlineStatuses(organizationId: number) {
       const r = await apiFetch("/api/call/refresh_tax_deadline_statuses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId)]),
+        body: stringifyReducerCallBody([organizationId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2280,7 +2281,7 @@ export function useScheduleTaxDeadlineUpdates(organizationId: number) {
       const r = await apiFetch("/api/call/schedule_tax_deadline_updates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId)]),
+        body: stringifyReducerCallBody([organizationId]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2299,7 +2300,7 @@ export function useImportTaxRateCsv(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/import_tax_rate_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2316,7 +2317,7 @@ export function useImportBudgetCsv(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/import_budget_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2331,7 +2332,7 @@ export function useImportBudgetLineCsv(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/import_budget_line_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2346,7 +2347,7 @@ export function useImportAnalyticAccountCsv(organizationId: number, companyId: b
       const r = await apiFetch("/api/call/import_analytic_account_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2361,7 +2362,7 @@ export function useImportAccountCsv(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/import_account_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2376,7 +2377,7 @@ export function useImportAccountMoveCsv(organizationId: number, companyId: bigin
       const r = await apiFetch("/api/call/import_account_move_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2391,7 +2392,7 @@ export function useImportAccountMoveLineCsv(organizationId: number, companyId: b
       const r = await apiFetch("/api/call/import_account_move_line_csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([String(organizationId), String(companyId), csvData]),
+        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },

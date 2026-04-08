@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -23,7 +25,7 @@ export function useFinancialReports(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['financial-reports', organizationId.toString()],
+    queryKey: ['financial-reports', organizationId],
     queryFn: () => fetchQueryList('/api/query/financial-reports', 'Failed to fetch financial reports'),
     staleTime: 30_000,
     initialData,
@@ -35,7 +37,7 @@ export function useTrialBalances(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['trial-balances', organizationId.toString()],
+    queryKey: ['trial-balances', organizationId],
     queryFn: () => fetchQueryList('/api/query/trial-balances', 'Failed to fetch trial balances'),
     staleTime: 30_000,
     initialData,
@@ -47,7 +49,7 @@ export function useReportTemplates(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['report-templates', organizationId.toString()],
+    queryKey: ['report-templates', organizationId],
     queryFn: () => fetchQueryList('/api/query/report-templates', 'Failed to fetch report templates'),
     staleTime: 30_000,
     initialData,
@@ -59,7 +61,7 @@ export function useScheduledReports(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['scheduled-reports', organizationId.toString()],
+    queryKey: ['scheduled-reports', organizationId],
     queryFn: () => fetchQueryList('/api/query/scheduled-reports', 'Failed to fetch scheduled reports'),
     staleTime: 30_000,
     initialData,
@@ -71,7 +73,7 @@ export function useAnalyticsMetrics(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['analytics-metrics', organizationId.toString()],
+    queryKey: ['analytics-metrics', organizationId],
     queryFn: () => fetchQueryList('/api/query/analytics-metrics', 'Failed to fetch analytics metrics'),
     staleTime: 30_000,
     initialData,
@@ -82,7 +84,7 @@ function invalidateReportsModule(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
 ) {
-  const org = organizationId.toString()
+  const org = organizationId
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['financial-reports', org] }),
     qc.invalidateQueries({ queryKey: ['trial-balances', org] }),
@@ -119,7 +121,7 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([stdbParamsToJson(params)]),
+          body: stringifyReducerCallBody([stdbParamsToJson(params)]),
         },
       )
       if (!createRes.ok) throw new Error('Failed to create financial report')
@@ -142,7 +144,7 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([String(created.id)]),
+          body: stringifyReducerCallBody([Number(created.id)]),
         },
       )
       if (!genRes.ok) throw new Error('Failed to generate financial report')
@@ -160,7 +162,7 @@ export function useGenerateFinancialReport(organizationId: bigint) {
       const r = await apiFetch('/api/call/generate_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([String(reportId)]),
+        body: stringifyReducerCallBody([reportId]),
       })
       if (!r.ok) throw new Error('Failed to regenerate report')
     },
@@ -181,7 +183,7 @@ export function useExportFinancialReport(organizationId: bigint) {
       const r = await apiFetch('/api/call/export_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([String(reportId), { exportFormat }]),
+        body: stringifyReducerCallBody([reportId, { exportFormat }]),
       })
       if (!r.ok) throw new Error('Failed to export report')
     },
@@ -198,7 +200,7 @@ export function useArchiveFinancialReport(organizationId: bigint) {
       const r = await apiFetch('/api/call/archive_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([String(reportId)]),
+        body: stringifyReducerCallBody([reportId]),
       })
       if (!r.ok) throw new Error('Failed to archive report')
     },
@@ -215,7 +217,7 @@ export function useDeleteFinancialReport(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([String(reportId)]),
+        body: stringifyReducerCallBody([reportId]),
       })
       if (!r.ok) throw new Error('Failed to delete report')
     },
@@ -238,7 +240,7 @@ export function useCreateReportTemplate(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_report_template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, params]),
       })
       if (!r.ok) throw new Error('Failed to create report template')
     },
@@ -259,7 +261,7 @@ export function useUpdateReportTemplate(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_report_template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), String(templateId), params]),
+        body: stringifyReducerCallBody([organizationId, templateId, params]),
       })
       if (!r.ok) throw new Error('Failed to update report template')
     },
@@ -276,12 +278,12 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId =
-        formData.companyId != null ? String(formData.companyId) : null
+        formData.companyId != null ? Number(formData.companyId) : null
       const r = await apiFetch('/api/call/create_scheduled_report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
           companyId,
           stdbParamsToJson(params),
         ]),
@@ -301,12 +303,12 @@ export function useCreateAnalyticsMetric(organizationId: bigint) {
       const params = toCreateAnalyticsMetricParams(formData)
       if (!params) throw new Error('Invalid metric parameters')
       const companyId =
-        formData.companyId != null ? String(formData.companyId) : null
+        formData.companyId != null ? Number(formData.companyId) : null
       const r = await apiFetch('/api/call/create_analytics_metric', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
           companyId,
           stdbParamsToJson(params),
         ]),
@@ -333,9 +335,9 @@ export function useUpdateMetricValues(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_metric_values', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(metricId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          metricId,
           stdbParamsToJson(params),
         ]),
       })
@@ -362,9 +364,9 @@ export function useRecordReportRun(organizationId: bigint) {
       const r = await apiFetch('/api/call/record_report_run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          params.reportId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          params.reportId,
           nextRun,
         ]),
       })
@@ -401,7 +403,7 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_trial_balance_entry?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create trial balance entry')
     },
@@ -424,7 +426,7 @@ export function useUpdateFinancialReport(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([String(reportId), stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([reportId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update financial report')
     },
@@ -443,11 +445,11 @@ export function useCreateDashboard(organizationId: bigint) {
         description: formData.description ? String(formData.description) : null,
         isActive: Boolean(formData.isActive ?? true),
       }
-      const companyId = formData.companyId != null ? String(formData.companyId) : null
+      const companyId = formData.companyId != null ? Number(formData.companyId) : null
       const r = await apiFetch('/api/call/create_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create dashboard')
     },
@@ -467,11 +469,11 @@ export function useCreateDashboardWidget(organizationId: bigint) {
         dataSource: String(formData.dataSource ?? ''),
         config: formData.config ? JSON.stringify(formData.config) : null,
       }
-      const companyId = formData.companyId != null ? String(formData.companyId) : null
+      const companyId = formData.companyId != null ? Number(formData.companyId) : null
       const r = await apiFetch('/api/call/create_dashboard_widget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), companyId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to create dashboard widget')
     },
@@ -492,10 +494,10 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_widget_to_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(dashboardId),
-          String(widgetId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          dashboardId,
+          widgetId,
           layout ? stdbParamsToJson(layout) : null,
         ]),
       })
@@ -522,10 +524,10 @@ export function useUpdateWidgetLayout(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_widget_layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(dashboardId),
-          String(widgetId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          dashboardId,
+          widgetId,
           stdbParamsToJson(layout),
         ]),
       })
@@ -553,11 +555,11 @@ export function useShareDashboard(organizationId: bigint) {
       const r = await apiFetch('/api/call/share_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          String(dashboardId),
-          userId ? String(userId) : null,
-          teamId ? String(teamId) : null,
+        body: stringifyReducerCallBody([
+          organizationId,
+          dashboardId,
+          userId ?? null,
+          teamId ?? null,
           permissions,
         ]),
       })
@@ -585,12 +587,12 @@ function useImportReportTemplateCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_report_template_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['report-templates', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['report-templates', organizationId] }),
   })
 }
 
@@ -601,12 +603,12 @@ function useImportAnalyticsMetricCsv(organizationId: bigint) {
       const res = await apiFetch('/api/call/import_analytics_metric_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), csvData]),
+        body: stringifyReducerCallBody([organizationId, csvData]),
       })
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['analytics-metrics', organizationId.toString()] }),
+      void qc.invalidateQueries({ queryKey: ['analytics-metrics', organizationId] }),
   })
 }
 

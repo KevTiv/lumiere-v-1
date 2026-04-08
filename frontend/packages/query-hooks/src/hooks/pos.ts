@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function usePosTerminals(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['pos-terminals', organizationId.toString()],
+    queryKey: ['pos-terminals', organizationId],
     queryFn: () => fetchQueryList('/api/query/pos-terminals', 'Failed to fetch POS terminals'),
     staleTime: 30_000,
     initialData,
@@ -29,7 +31,7 @@ export function usePosTerminals(
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidatePosQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['pos-terminals', organizationId.toString()] })
+  return qc.invalidateQueries({ queryKey: ['pos-terminals', organizationId] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -41,7 +43,7 @@ export function useCreatePosTerminal(organizationId: bigint, companyId?: bigint)
       const r = await apiFetch('/api/call/create_pos_terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create POS terminal')
     },
@@ -63,14 +65,14 @@ export function useUpdatePosTerminal(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_pos_terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          args.terminalId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.terminalId,
           args.name ?? null,
           args.locationLabel ?? null,
           args.latitude ?? null,
           args.longitude ?? null,
-          args.currencyId != null ? args.currencyId.toString() : null,
+          args.currencyId != null ? args.currencyId : null,
         ]),
       })
       if (!r.ok) throw new Error('Failed to update POS terminal')
@@ -86,7 +88,7 @@ export function useCreatePosConfig(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/create_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create POS config')
     },
@@ -101,7 +103,7 @@ export function useActivatePosConfig(organizationId: bigint) {
       const r = await apiFetch('/api/call/activate_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), configId.toString()]),
+        body: stringifyReducerCallBody([organizationId, configId]),
       })
       if (!r.ok) throw new Error('Failed to activate POS config')
     },
@@ -116,7 +118,7 @@ export function useDeactivatePosConfig(organizationId: bigint) {
       const r = await apiFetch('/api/call/deactivate_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), configId.toString()]),
+        body: stringifyReducerCallBody([organizationId, configId]),
       })
       if (!r.ok) throw new Error('Failed to deactivate POS config')
     },
@@ -135,10 +137,10 @@ export function useOpenPosSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/open_pos_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          args.configId.toString(),
-          args.terminalId?.toString() ?? null,
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.configId,
+          args.terminalId ?? null,
           args.openingBalance ?? 0,
         ]),
       })
@@ -159,9 +161,9 @@ export function useClosePosSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/close_pos_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          organizationId.toString(),
-          args.sessionId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          args.sessionId,
           args.closingBalance,
           args.notes ?? null,
         ]),
@@ -179,7 +181,7 @@ export function useComputePosSessionTotals(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_pos_session_totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), sessionId.toString()]),
+        body: stringifyReducerCallBody([organizationId, sessionId]),
       })
       if (!r.ok) throw new Error('Failed to compute POS session totals')
     },
@@ -194,7 +196,7 @@ export function useCreatePosOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_pos_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create POS order')
     },

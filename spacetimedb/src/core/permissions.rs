@@ -1,12 +1,13 @@
 /// Casbin-Style Permission System
 ///
-/// Tables:  Role · CasbinRule · UserRoleAssignment
+/// Tables:  Role · CasbinRule (legacy) · OrgPermission · UserRoleAssignment
 /// Pattern: Roles carry a `permissions` string list (`"resource:action"`).
-///          CasbinRule provides fine-grained policy overrides (Casbin "p" / "g").
+///          OrgPermission provides typed fine-grained allow/deny rules.
+///          CasbinRule is retained temporarily for migration; prefer OrgPermission.
 ///          UserRoleAssignment links identities to roles within an organization.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -57,6 +58,36 @@ pub struct AssignRoleParams {
     pub metadata: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub enum PermissionSubject {
+    Role(u64),
+    User(Identity),
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum PermissionAction {
+    Read,
+    Write,
+    Create,
+    Delete,
+    All,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum PermissionEffect {
+    Allow,
+    Deny,
+}
+
+/// Params for `grant_permission`.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct GrantOrgPermissionParams {
+    pub subject: PermissionSubject,
+    pub resource: String,
+    pub action: PermissionAction,
+    pub effect: PermissionEffect,
+}
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
@@ -81,6 +112,7 @@ pub struct Role {
     pub metadata: Option<String>,
 }
 
+/// Legacy Casbin-shaped policy rows. Prefer [`OrgPermission`] for new grants.
 #[spacetimedb::table(
     accessor = casbin_rule,
     public,
@@ -100,6 +132,27 @@ pub struct CasbinRule {
     pub v5: Option<String>, // extra
     pub created_at: Timestamp,
     pub metadata: Option<String>,
+}
+
+#[spacetimedb::table(
+    accessor = org_permission,
+    public,
+    index(accessor = perm_by_org, btree(columns = [organization_id])),
+    index(accessor = perm_by_role, btree(columns = [role_id]))
+)]
+pub struct OrgPermission {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub subject: PermissionSubject,
+    /// Denormalized `Some(role_id)` when `subject` is [`PermissionSubject::Role`]; else `None`.
+    pub role_id: Option<u64>,
+    pub resource: String,
+    pub action: PermissionAction,
+    pub effect: PermissionEffect,
+    pub created_by: Identity,
+    pub created_at: Timestamp,
 }
 
 #[spacetimedb::table(
@@ -222,6 +275,102 @@ pub fn remove_casbin_rule(
 }
 
 #[spacetimedb::reducer]
+pub fn grant_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: GrantOrgPermissionParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "org_permission", "create")?;
+
+    if params.resource.is_empty() {
+        return Err("resource cannot be empty".to_string());
+    }
+
+    let role_id = match &params.subject {
+        PermissionSubject::Role(rid) => Some(*rid),
+        PermissionSubject::User(_) => None,
+    };
+
+    let row = ctx.db.org_permission().insert(OrgPermission {
+        id: 0,
+        organization_id,
+        subject: params.subject.clone(),
+        role_id,
+        resource: params.resource.clone(),
+        action: params.action.clone(),
+        effect: params.effect.clone(),
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+    });
+
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "org_permission",
+        record_id: row.id,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(
+            serde_json::json!({
+                "resource": params.resource,
+                "action": format!("{:?}", params.action),
+                "effect": format!("{:?}", params.effect),
+            })
+            .to_string(),
+        ),
+        changed_fields: vec![
+            "resource".to_string(),
+            "action".to_string(),
+            "effect".to_string(),
+        ],
+        metadata: None,
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn revoke_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    permission_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "org_permission", "delete")?;
+
+    let row = ctx
+        .db
+        .org_permission()
+        .id()
+        .find(&permission_id)
+        .ok_or("Permission not found")?;
+
+    if row.organization_id != organization_id {
+        return Err("Permission does not belong to this organization".to_string());
+    }
+
+    let old_values = serde_json::json!({
+        "resource": row.resource,
+        "action": format!("{:?}", row.action),
+        "effect": format!("{:?}", row.effect),
+    })
+    .to_string();
+
+    ctx.db.org_permission().id().delete(&permission_id);
+
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "org_permission",
+        record_id: permission_id,
+        action: "DELETE",
+        old_values: Some(old_values),
+        new_values: None,
+        changed_fields: vec![],
+        metadata: None,
+    });
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn assign_role(
     ctx: &ReducerContext,
     user_identity: Identity,
@@ -292,4 +441,30 @@ pub fn revoke_role(
         });
 
     Ok(())
+}
+
+/// Seed / bootstrap: insert a typed permission row without `check_permission`.
+pub(crate) fn seed_insert_org_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    subject: PermissionSubject,
+    resource: String,
+    action: PermissionAction,
+    effect: PermissionEffect,
+) {
+    let role_id = match &subject {
+        PermissionSubject::Role(rid) => Some(*rid),
+        PermissionSubject::User(_) => None,
+    };
+    ctx.db.org_permission().insert(OrgPermission {
+        id: 0,
+        organization_id,
+        subject,
+        role_id,
+        resource,
+        action,
+        effect,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+    });
 }

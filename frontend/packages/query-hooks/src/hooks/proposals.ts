@@ -6,6 +6,8 @@
  * Wraps REST API calls with React Query for the Proposals module.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -18,7 +20,7 @@ export function useProposals(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposals', organizationId.toString()],
+    queryKey: ['proposals', organizationId],
     queryFn: () => fetchQueryList('/api/query/proposals', 'Failed to fetch proposals'),
     staleTime: 30_000,
     initialData,
@@ -30,7 +32,7 @@ export function useProposalSections(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-sections', organizationId.toString()],
+    queryKey: ['proposal-sections', organizationId],
     queryFn: () => fetchQueryList('/api/query/proposal-sections', 'Failed to fetch proposal sections'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function useProposalLineItems(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-line-items', organizationId.toString(), proposalId?.toString()],
+    queryKey: ['proposal-line-items', organizationId, proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-line-items', 'Failed to fetch proposal line items'),
     staleTime: 30_000,
     initialData,
@@ -55,7 +57,7 @@ export function useProposalVersions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-versions', organizationId.toString()],
+    queryKey: ['proposal-versions', organizationId],
     queryFn: () => fetchQueryList('/api/query/proposal-versions', 'Failed to fetch proposal versions'),
     staleTime: 30_000,
     initialData,
@@ -67,7 +69,7 @@ export function useProposalSourceDocs(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-source-docs', organizationId.toString()],
+    queryKey: ['proposal-source-docs', organizationId],
     queryFn: () => fetchQueryList('/api/query/proposal-source-docs', 'Failed to fetch proposal source docs'),
     staleTime: 30_000,
     initialData,
@@ -80,7 +82,7 @@ export function useProposalPresence(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-presence', organizationId.toString(), proposalId?.toString()],
+    queryKey: ['proposal-presence', organizationId, proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-presence', 'Failed to fetch proposal presence'),
     staleTime: 30_000,
     initialData,
@@ -93,7 +95,7 @@ export function useProposalComments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-comments', organizationId.toString(), proposalId?.toString()],
+    queryKey: ['proposal-comments', organizationId, proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-comments', 'Failed to fetch proposal comments'),
     staleTime: 30_000,
     initialData,
@@ -117,7 +119,7 @@ export function useUpsertProposalSection() {
       const r = await apiFetch('/api/call/upsert_proposal_section', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.sectionId != null ? Number(params.sectionId) : 0,
           params.title,
@@ -151,7 +153,7 @@ export function useCreateProposal() {
       const r = await apiFetch('/api/call/create_proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.organizationId),
           params.title,
           params.clientName,
@@ -186,7 +188,7 @@ export function useUpdateProposal() {
       const r = await apiFetch('/api/call/update_proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.title,
           params.clientName,
@@ -211,7 +213,7 @@ export function useUpdateProposalStatus() {
       const r = await apiFetch('/api/call/update_proposal_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(params.proposalId), params.status]),
+        body: stringifyReducerCallBody([Number(params.proposalId), params.status]),
       })
       if (!r.ok) throw new Error('Failed to update proposal status')
     },
@@ -235,7 +237,7 @@ export function useAddProposalLineItem() {
       const r = await apiFetch('/api/call/add_proposal_line_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.sectionId != null ? Number(params.sectionId) : null,
           Number(params.productId),
@@ -265,7 +267,7 @@ export function useUpdateProposalLineItem() {
       const r = await apiFetch('/api/call/update_proposal_line_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.lineItemId),
           params.quantity,
           params.priceUnit,
@@ -286,7 +288,7 @@ export function useDeleteProposalLineItem() {
       const r = await apiFetch('/api/call/delete_proposal_line_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(lineItemId)]),
+        body: stringifyReducerCallBody([Number(lineItemId)]),
       })
       if (!r.ok) throw new Error('Failed to delete proposal line item')
     },
@@ -301,7 +303,7 @@ export function useDeleteProposalSection() {
       const r = await apiFetch('/api/call/delete_proposal_section', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(sectionId)]),
+        body: stringifyReducerCallBody([Number(sectionId)]),
       })
       if (!r.ok) throw new Error('Failed to delete proposal section')
     },
@@ -320,7 +322,7 @@ export function useSaveProposalVersion() {
       const r = await apiFetch('/api/call/save_proposal_version', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.message,
           params.sectionsJson,
@@ -345,7 +347,7 @@ export function useAddProposalSourceDoc() {
       const r = await apiFetch('/api/call/add_proposal_source_doc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.name,
           params.content,
@@ -366,7 +368,7 @@ export function useDeleteProposalSourceDoc() {
       const r = await apiFetch('/api/call/delete_proposal_source_doc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(docId)]),
+        body: stringifyReducerCallBody([Number(docId)]),
       })
       if (!r.ok) throw new Error('Failed to delete proposal source document')
     },
@@ -387,7 +389,7 @@ export function useUpdateProposalSourceDoc() {
       const r = await apiFetch('/api/call/update_proposal_source_doc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.docId),
           stdbParamsToJson({
             name: params.name ?? null,
@@ -416,7 +418,7 @@ export function useReorderProposalLineItems() {
       const r = await apiFetch('/api/call/reorder_proposal_line_items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.orderedIds.map((id) => Number(id)),
         ]),
@@ -438,7 +440,7 @@ export function useUpdateProposalPresence() {
       const r = await apiFetch('/api/call/update_proposal_presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           params.sectionId != null ? Number(params.sectionId) : null,
           params.userName,
@@ -457,7 +459,7 @@ export function useClearProposalPresence() {
       const r = await apiFetch('/api/call/clear_proposal_presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(proposalId)]),
+        body: stringifyReducerCallBody([Number(proposalId)]),
       })
       if (!r.ok) throw new Error('Failed to clear proposal presence')
     },
@@ -478,7 +480,7 @@ export function useAddProposalComment() {
       const r = await apiFetch('/api/call/add_proposal_comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
+        body: stringifyReducerCallBody([
           Number(params.proposalId),
           Number(params.sectionId),
           params.content,
@@ -499,7 +501,7 @@ export function useResolveProposalComment() {
       const r = await apiFetch('/api/call/resolve_proposal_comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([Number(commentId)]),
+        body: stringifyReducerCallBody([Number(commentId)]),
       })
       if (!r.ok) throw new Error('Failed to resolve proposal comment')
     },

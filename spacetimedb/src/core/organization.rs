@@ -3,9 +3,11 @@
 /// Tables:  Organization · OrganizationSettings · Company
 /// Pattern: every table row carries `organization_id` for tenant isolation.
 ///          Companies are sub-units within an Organization.
+use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
+use crate::core::users::user_profile;
 use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
 use crate::core::users::{user_organization, UserOrganization};
 use crate::forms::migrations::run_seed_organization_form_configs;
@@ -140,6 +142,16 @@ pub struct BootstrapNewTenantParams {
     pub settings: UpsertOrganizationSettingsParams,
 }
 
+/// Non-guessable id for HTTP clients (`u64` ids remain internal).
+pub(crate) fn new_external_id(ctx: &ReducerContext) -> String {
+    let mut out = String::with_capacity(24);
+    for _ in 0..12 {
+        let b: u8 = ctx.rng().gen();
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(accessor = organization, public)]
@@ -147,6 +159,8 @@ pub struct Organization {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Opaque token for APIs; never enumerate internal `id`.
+    pub external_id: String,
     pub name: String,
     pub code: String,
     pub description: Option<String>,
@@ -188,6 +202,8 @@ pub struct Company {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Opaque token for APIs; never enumerate internal `id`.
+    pub external_id: String,
     pub organization_id: u64,
     pub name: String,
     pub code: String,
@@ -225,6 +241,7 @@ fn insert_organization_with_owner(
 
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        external_id: new_external_id(ctx),
         name: params.name,
         code: params.code,
         description: params.description,
@@ -349,6 +366,7 @@ pub fn bootstrap_new_tenant(
 
     let company = ctx.db.company().insert(Company {
         id: 0,
+        external_id: new_external_id(ctx),
         organization_id: org.id,
         name: default_name.to_string(),
         code: default_code.to_string(),
@@ -507,6 +525,7 @@ pub fn create_company(
 
     ctx.db.company().insert(Company {
         id: 0,
+        external_id: new_external_id(ctx),
         organization_id,
         name: params.name,
         code: params.code,
@@ -713,4 +732,40 @@ pub(crate) fn company_id_from_scope(
         }
         None => default_company_id_for_organization(ctx, organization_id),
     }
+}
+
+/// One-time migration: set `external_id` on rows that predate the column (empty string).
+#[spacetimedb::reducer]
+pub fn backfill_external_ids(ctx: &ReducerContext) -> Result<(), String> {
+    let me = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("User not found")?;
+    if !me.is_superuser {
+        return Err("Only superusers may run backfill_external_ids".to_string());
+    }
+
+    let orgs: Vec<_> = ctx.db.organization().iter().collect();
+    for org in orgs {
+        if org.external_id.is_empty() {
+            ctx.db.organization().id().update(Organization {
+                external_id: new_external_id(ctx),
+                ..org
+            });
+        }
+    }
+
+    let companies: Vec<_> = ctx.db.company().iter().collect();
+    for c in companies {
+        if c.external_id.is_empty() {
+            ctx.db.company().id().update(Company {
+                external_id: new_external_id(ctx),
+                ..c
+            });
+        }
+    }
+
+    Ok(())
 }

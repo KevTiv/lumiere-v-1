@@ -6,6 +6,8 @@
  * Wraps REST API calls with React Query for the Calendar module.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -17,7 +19,7 @@ export function useCalendarEvents(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['calendar-events', organizationId.toString()],
+    queryKey: ['calendar-events', organizationId],
     queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch calendar events'),
     staleTime: 30_000,
     initialData,
@@ -33,12 +35,12 @@ export function useCreateCalendarEvent(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_calendar_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, params]),
       })
       if (!r.ok) throw new Error('Failed to create calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
   })
 }
 
@@ -53,12 +55,12 @@ export function useUpdateCalendarEvent(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_calendar_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), eventId.toString(), params]),
+        body: stringifyReducerCallBody([organizationId, eventId, params]),
       })
       if (!r.ok) throw new Error('Failed to update calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
   })
 }
 
@@ -69,12 +71,12 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_calendar_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), eventId.toString()]),
+        body: stringifyReducerCallBody([organizationId, eventId]),
       })
       if (!r.ok) throw new Error('Failed to delete calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
   })
 }
 

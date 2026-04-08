@@ -2,5 +2,7 @@
 # .windsurfrules
 .DS_Store
 target
+.env.*
+.env
 */**/node_modules
 node_modules

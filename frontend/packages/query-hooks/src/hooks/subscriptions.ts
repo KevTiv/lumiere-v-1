@@ -7,6 +7,8 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows } from "../http"
@@ -19,7 +21,7 @@ export function useSubscriptions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['subscriptions', organizationId.toString()],
+    queryKey: ['subscriptions', organizationId],
     queryFn: () => fetchQueryList('/api/query/subscriptions', 'Failed to fetch subscriptions'),
     staleTime: 30_000,
     initialData,
@@ -31,7 +33,7 @@ export function useSubscriptionPlans(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['subscription-plans', organizationId.toString()],
+    queryKey: ['subscription-plans', organizationId],
     queryFn: () => fetchQueryList('/api/query/subscription-plans', 'Failed to fetch subscription plans'),
     staleTime: 30_000,
     initialData,
@@ -43,7 +45,7 @@ export function useDeferredRevenueSchedules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['deferred-revenue-schedules', organizationId.toString()],
+    queryKey: ['deferred-revenue-schedules', organizationId],
     queryFn: () =>
       fetchQueryList(
         '/api/query/deferred-revenue-schedules',
@@ -59,7 +61,7 @@ export function useDeferredRevenueLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['deferred-revenue-lines', organizationId.toString()],
+    queryKey: ['deferred-revenue-lines', organizationId],
     queryFn: () =>
       fetchQueryList('/api/query/deferred-revenue-lines', 'Failed to fetch deferred revenue lines'),
     staleTime: 30_000,
@@ -72,7 +74,7 @@ export function useRevenueRecognitionRules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['revenue-recognition-rules', organizationId.toString()],
+    queryKey: ['revenue-recognition-rules', organizationId],
     queryFn: () =>
       fetchQueryList(
         '/api/query/revenue-recognition-rules',
@@ -92,12 +94,12 @@ export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bi
       const r = await apiFetch('/api/call/create_subscription_plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create subscription plan')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
   })
 }
 
@@ -108,14 +110,14 @@ export function useCreateSubscriptionFromSaleOrder(organizationId: bigint, compa
       const r = await apiFetch('/api/call/create_subscription_from_sale_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
       })
       if (!r.ok) throw new Error('Failed to create subscription from sale order')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
       ])
     },
   })
@@ -125,14 +127,6 @@ export function useCreateSubscription(organizationId: bigint, companyId?: bigint
   return useCreateSubscriptionFromSaleOrder(organizationId, companyId)
 }
 
-function orgStr(organizationId: bigint): string {
-  return organizationId.toString()
-}
-
-function companyStr(companyId: bigint | undefined, organizationId: bigint): string {
-  return (companyId ?? organizationId).toString()
-}
-
 export function useActivateSubscription(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { subscriptionId: bigint }>({
@@ -140,16 +134,16 @@ export function useActivateSubscription(organizationId: bigint, companyId?: bigi
       const r = await apiFetch('/api/call/activate_subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          subscriptionId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          subscriptionId,
         ]),
       })
       if (!r.ok) throw new Error('Failed to activate subscription')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
   })
 }
 
@@ -160,17 +154,17 @@ export function useCloseSubscription(organizationId: bigint, companyId?: bigint)
       const r = await apiFetch('/api/call/close_subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          subscriptionId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          subscriptionId,
           params,
         ]),
       })
       if (!r.ok) throw new Error('Failed to close subscription')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
   })
 }
 
@@ -181,17 +175,17 @@ export function useGenerateSubscriptionInvoice(organizationId: bigint, companyId
       const r = await apiFetch('/api/call/generate_subscription_invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          subscriptionId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          subscriptionId,
           params,
         ]),
       })
       if (!r.ok) throw new Error('Failed to generate subscription invoice')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
   })
 }
 
@@ -202,9 +196,9 @@ export function useCreateDeferredRevenueSchedule(organizationId: bigint, company
       const r = await apiFetch('/api/call/create_deferred_revenue_schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
           params,
         ]),
       })
@@ -212,8 +206,8 @@ export function useCreateDeferredRevenueSchedule(organizationId: bigint, company
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId] }),
       ])
     },
   })
@@ -226,10 +220,10 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
       const r = await apiFetch('/api/call/recognize_deferred_revenue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          lineId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          lineId,
           params,
         ]),
       })
@@ -237,8 +231,8 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId.toString()] }),
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId.toString()] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId] }),
       ])
     },
   })
@@ -251,16 +245,16 @@ export function useCreateRevenueRecognitionRule(organizationId: bigint, companyI
       const r = await apiFetch('/api/call/create_revenue_recognition_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
           params,
         ]),
       })
       if (!r.ok) throw new Error('Failed to create revenue recognition rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
   })
 }
 
@@ -271,16 +265,16 @@ export function useActivateRevenueRecognitionRule(organizationId: bigint, compan
       const r = await apiFetch('/api/call/activate_revenue_recognition_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          ruleId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          ruleId,
         ]),
       })
       if (!r.ok) throw new Error('Failed to activate rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
   })
 }
 
@@ -291,16 +285,16 @@ export function useDeactivateRevenueRecognitionRule(organizationId: bigint, comp
       const r = await apiFetch('/api/call/deactivate_revenue_recognition_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
-          ruleId.toString(),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
+          ruleId,
         ]),
       })
       if (!r.ok) throw new Error('Failed to deactivate rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
   })
 }
 
@@ -311,16 +305,16 @@ export function useImportSubscriptionPlanCsv(organizationId: bigint, companyId?:
       const r = await apiFetch('/api/call/import_subscription_plan_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
           csvData,
         ]),
       })
       if (!r.ok) throw new Error('Failed to import subscription plans from CSV')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
   })
 }
 
@@ -331,16 +325,16 @@ export function useImportSubscriptionCsv(organizationId: bigint, companyId?: big
       const r = await apiFetch('/api/call/import_subscription_csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          orgStr(organizationId),
-          companyStr(companyId, organizationId),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId ?? organizationId,
           csvData,
         ]),
       })
       if (!r.ok) throw new Error('Failed to import subscriptions from CSV')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId.toString()] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
   })
 }
 

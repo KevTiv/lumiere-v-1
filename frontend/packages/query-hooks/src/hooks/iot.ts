@@ -11,6 +11,8 @@
  * debugging or demos** only; production ingestion should not rely on browser POST volume.
  */
 
+
+import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { fetchQueryList, type QueryRows } from "../http"
@@ -30,7 +32,7 @@ async function postReducer(path: string, body: unknown[]): Promise<void> {
   const r = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: stringifyReducerCallBody(body),
   })
   if (!r.ok) throw new Error(await parseCallError(r))
 }
@@ -39,7 +41,7 @@ async function postReducer(path: string, body: unknown[]): Promise<void> {
 
 export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-devices', organizationId.toString()],
+    queryKey: ['iot-devices', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-devices', 'Failed to fetch IoT devices'),
     staleTime: 30_000,
     initialData,
@@ -48,7 +50,7 @@ export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-hubs', organizationId.toString()],
+    queryKey: ['iot-hubs', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-hubs', 'Failed to fetch IoT hubs'),
     staleTime: 30_000,
     initialData,
@@ -57,7 +59,7 @@ export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotPairingTokens(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-pairing-tokens', organizationId.toString()],
+    queryKey: ['iot-pairing-tokens', organizationId],
     queryFn: () =>
       fetchQueryList('/api/query/iot-pairing-tokens', 'Failed to fetch IoT pairing tokens'),
     staleTime: 15_000,
@@ -67,7 +69,7 @@ export function useIotPairingTokens(organizationId: bigint, initialData?: QueryR
 
 export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-alerts', organizationId.toString()],
+    queryKey: ['iot-alerts', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-alerts', 'Failed to fetch IoT alerts'),
     staleTime: 30_000,
     initialData,
@@ -76,7 +78,7 @@ export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-actions', organizationId.toString()],
+    queryKey: ['iot-actions', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-actions', 'Failed to fetch IoT actions'),
     staleTime: 30_000,
     initialData,
@@ -85,7 +87,7 @@ export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotTelemetry(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-telemetry', organizationId.toString()],
+    queryKey: ['iot-telemetry', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-telemetry', 'Failed to fetch IoT telemetry'),
     staleTime: 30_000,
     initialData,
@@ -94,7 +96,7 @@ export function useIotTelemetry(organizationId: bigint, initialData?: QueryRows)
 
 export function useIotThresholds(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-thresholds', organizationId.toString()],
+    queryKey: ['iot-thresholds', organizationId],
     queryFn: () => fetchQueryList('/api/query/iot-thresholds', 'Failed to fetch IoT thresholds'),
     staleTime: 30_000,
     initialData,
@@ -104,7 +106,7 @@ export function useIotThresholds(organizationId: bigint, initialData?: QueryRows
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidateIotQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  const org = organizationId.toString()
+  const org = organizationId
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['iot-devices', org] }),
     qc.invalidateQueries({ queryKey: ['iot-hubs', org] }),
@@ -169,7 +171,7 @@ export function useDeleteIotHub(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (hubId: ScalarId) => {
-      await postReducer('/api/call/delete_iot_hub', [organizationId.toString(), hubId.toString()])
+      await postReducer('/api/call/delete_iot_hub', [organizationId, hubId])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -184,7 +186,7 @@ export function useRegisterIotDevice(organizationId: bigint) {
   >({
     mutationFn: async ({ hubId, params }) => {
       await postReducer('/api/call/register_iot_device?withCompany=true', [
-        hubId.toString(),
+        hubId,
         params,
       ])
     },
@@ -196,7 +198,7 @@ export function useDeleteIotDevice(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
-      await postReducer('/api/call/delete_iot_device', [organizationId.toString(), deviceId.toString()])
+      await postReducer('/api/call/delete_iot_device', [organizationId, deviceId])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -207,9 +209,9 @@ export function useLinkDeviceToLocation(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; locationId: ScalarId }) => {
       await postReducer('/api/call/link_device_to_location', [
-        organizationId.toString(),
-        args.deviceId.toString(),
-        args.locationId.toString(),
+        organizationId,
+        args.deviceId,
+        args.locationId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -221,9 +223,9 @@ export function useLinkDeviceToPos(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; posConfigId: ScalarId }) => {
       await postReducer('/api/call/link_device_to_pos', [
-        organizationId.toString(),
-        args.deviceId.toString(),
-        args.posConfigId.toString(),
+        organizationId,
+        args.deviceId,
+        args.posConfigId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -234,7 +236,7 @@ export function useUnlinkDevice(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
-      await postReducer('/api/call/unlink_device', [organizationId.toString(), deviceId.toString()])
+      await postReducer('/api/call/unlink_device', [organizationId, deviceId])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -250,8 +252,8 @@ export function useUpdateHubHeartbeat(organizationId: bigint) {
       connectivityQuality?: string | null
     }) => {
       await postReducer('/api/call/update_hub_heartbeat', [
-        organizationId.toString(),
-        args.hubId.toString(),
+        organizationId,
+        args.hubId,
         args.ipAddress ?? null,
         args.firmwareVersion ?? null,
         args.connectivityQuality ?? null,
@@ -274,8 +276,8 @@ export function useSyncHubDevices(organizationId: bigint) {
       }>
     }) => {
       await postReducer('/api/call/sync_hub_devices', [
-        organizationId.toString(),
-        args.hubId.toString(),
+        organizationId,
+        args.hubId,
         args.detected,
       ])
     },
@@ -288,8 +290,8 @@ export function useUpdateDeviceStatus(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; status: string }) => {
       await postReducer('/api/call/update_device_status', [
-        organizationId.toString(),
-        args.deviceId.toString(),
+        organizationId,
+        args.deviceId,
         args.status,
       ])
     },
@@ -310,8 +312,8 @@ export function useRecordTelemetry(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; params: RecordTelemetryParamsSnake }) => {
       await postReducer('/api/call/record_telemetry', [
-        organizationId.toString(),
-        args.deviceId.toString(),
+        organizationId,
+        args.deviceId,
         args.params,
       ])
     },
@@ -324,8 +326,8 @@ export function useRecordTelemetryBatch(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; readings: RecordTelemetryParamsSnake[] }) => {
       await postReducer('/api/call/record_telemetry_batch', [
-        organizationId.toString(),
-        args.deviceId.toString(),
+        organizationId,
+        args.deviceId,
         args.readings,
       ])
     },
@@ -338,8 +340,8 @@ export function useMarkActionSent(organizationId: bigint) {
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
       await postReducer('/api/call/mark_action_sent', [
-        organizationId.toString(),
-        actionId.toString(),
+        organizationId,
+        actionId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -361,8 +363,8 @@ export function useCreateIotAction(organizationId: bigint) {
     mutationFn: async (body) => {
       const { deviceId, ...params } = body
       await postReducer('/api/call/create_iot_action', [
-        organizationId.toString(),
-        deviceId.toString(),
+        organizationId,
+        deviceId,
         params,
       ])
     },
@@ -375,8 +377,8 @@ export function useAcknowledgeIotAction(organizationId: bigint) {
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
       await postReducer('/api/call/acknowledge_iot_action', [
-        organizationId.toString(),
-        actionId.toString(),
+        organizationId,
+        actionId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -388,8 +390,8 @@ export function useFailIotAction(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { actionId: ScalarId; reason?: string | null }) => {
       await postReducer('/api/call/fail_iot_action', [
-        organizationId.toString(),
-        args.actionId.toString(),
+        organizationId,
+        args.actionId,
         args.reason ?? null,
       ])
     },
@@ -402,8 +404,8 @@ export function useRetryIotAction(organizationId: bigint) {
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
       await postReducer('/api/call/retry_iot_action', [
-        organizationId.toString(),
-        actionId.toString(),
+        organizationId,
+        actionId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -420,8 +422,8 @@ export function useCreateIotAlert(organizationId: bigint) {
       message: string
     }) => {
       await postReducer('/api/call/create_iot_alert', [
-        organizationId.toString(),
-        args.deviceId.toString(),
+        organizationId,
+        args.deviceId,
         args.alert_type,
         args.severity,
         args.message,
@@ -436,8 +438,8 @@ export function useResolveIotAlert(organizationId: bigint) {
   return useMutation({
     mutationFn: async (alertId: ScalarId) => {
       await postReducer('/api/call/resolve_iot_alert', [
-        organizationId.toString(),
-        alertId.toString(),
+        organizationId,
+        alertId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
@@ -455,8 +457,8 @@ export function useSetIotThreshold(organizationId: bigint) {
       severity: string
     }) => {
       await postReducer('/api/call/set_iot_threshold', [
-        organizationId.toString(),
-        args.deviceId.toString(),
+        organizationId,
+        args.deviceId,
         args.sensor_type,
         args.min_value,
         args.max_value,
@@ -472,8 +474,8 @@ export function useTestIotDevice(organizationId: bigint) {
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
       await postReducer('/api/call/test_iot_device', [
-        organizationId.toString(),
-        deviceId.toString(),
+        organizationId,
+        deviceId,
       ])
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),

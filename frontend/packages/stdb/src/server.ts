@@ -29,7 +29,6 @@ import {
 export type { StdbHttpOptions }
 export { stdbSql }
 export type { FieldAccessContext, QueryResourceKey } from './field-policy'
-export { loadFieldAccessContext } from './server-field-access'
 
 /** HTTP options plus optional field-level RBAC context (used by `/api/query`). */
 export type StdbServerQueryOptions = StdbHttpOptions & {
