@@ -1,0 +1,267 @@
+---
+description: "⛔ MANDATORY: Read this ENTIRE file before writing ANY reducer in this project. Defines the lumiere-v1 reducer architecture conventions."
+globs: spacetimedb/src/**/*.rs
+alwaysApply: true
+---
+
+# Lumiere ERP — Reducer Architecture Conventions
+
+## Core Rule
+
+Every reducer must separate **scope/auth parameters** (flat) from **user-driven entity data** (input struct).
+
+---
+
+## 1) Parameter Roles
+
+| Parameter | Type | Rule |
+|-----------|------|------|
+| `organization_id` | `u64` | Always flat — scopes the permission check |
+| `company_id` | `u64` | Always flat — scopes tenant isolation |
+| `<entity>_id` | `u64` | Always flat — identifies the target record for update/delete |
+| Single-toggle booleans | `bool` | Flat is acceptable for dedicated toggle reducers (e.g. `set_*_active`) |
+| All entity field values | `*Params` struct | Always in an input struct — never as individual flat params |
+
+---
+
+## 2) Input Struct Pattern
+
+### Naming
+
+```
+Create<EntityName>Params   — for create reducers
+Update<EntityName>Params   — for update reducers
+```
+
+### Derive
+
+```rust
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateFooParams { ... }
+```
+
+> ⚠️ `SpacetimeType` is required for structs passed as reducer parameters.
+> Do NOT use `#[table(...)]` on input structs — they are value types, not tables.
+
+### Placement
+
+Define all `*Params` structs in a clearly marked section **between the table definitions and the reducers** in the same file:
+
+```rust
+// ── Tables ───────────────────────────────────────────────────────────────────
+// ... table structs ...
+
+// ── Input Params ─────────────────────────────────────────────────────────────
+// ... params structs ...
+
+// ── Reducers ─────────────────────────────────────────────────────────────────
+// ... reducers ...
+```
+
+---
+
+## 3) No Hardcoded Values in Reducer Bodies
+
+**Every field in the inserted/updated row must come from one of three sources:**
+
+1. `ctx` — sender, timestamp (audit/ownership fields)
+2. `params.*` — user-provided data
+3. A value derived/computed from other params (not a literal)
+
+### ❌ WRONG — hardcoded defaults polluting the reducer body
+
+```rust
+ctx.db.foo().insert(Foo {
+    id: 0,
+    active: true,               // hardcoded
+    balance: 0.0,               // hardcoded
+    line_ids: Vec::new(),       // hardcoded
+    description: None,          // hardcoded
+    is_required: false,         // hardcoded
+    ...
+});
+```
+
+### ✅ CORRECT — all field values from params
+
+```rust
+ctx.db.foo().insert(Foo {
+    id: 0,                                      // auto_inc placeholder — only allowed literal
+    active: params.active,
+    balance: params.balance,
+    line_ids: params.line_ids,
+    description: params.description,
+    is_required: params.is_required,
+    is_root: params.parent_id.is_none(),        // derived — acceptable
+    create_uid: Some(ctx.sender()),             // from ctx — acceptable
+    create_date: Some(ctx.timestamp),           // from ctx — acceptable
+    ...
+});
+```
+
+### Allowed exceptions (only these)
+
+| Field | Value | Reason |
+|-------|-------|--------|
+| `id` | `0` | SpacetimeDB auto_inc placeholder — required |
+| `create_uid` / `write_uid` | `Some(ctx.sender())` | Identity comes from context |
+| `create_date` / `write_date` | `Some(ctx.timestamp)` | Timestamp comes from context |
+| `user_id` (ownership) | `Some(ctx.sender())` | Assigned from context, not user input |
+| Derived booleans | `params.x.is_none()`, `params.x > 0`, etc. | Computed from params — not literal |
+
+---
+
+## 4) Reducer Signatures
+
+### Create
+
+```rust
+#[spacetimedb::reducer]
+pub fn create_foo(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateFooParams,
+) -> Result<(), String> { ... }
+```
+
+### Update
+
+```rust
+#[spacetimedb::reducer]
+pub fn update_foo(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    foo_id: u64,
+    params: UpdateFooParams,
+) -> Result<(), String> { ... }
+```
+
+### Delete
+
+```rust
+#[spacetimedb::reducer]
+pub fn delete_foo(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    foo_id: u64,
+) -> Result<(), String> { ... }
+```
+
+### Dedicated toggle (no params struct needed)
+
+```rust
+#[spacetimedb::reducer]
+pub fn set_foo_active(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    foo_id: u64,
+    active: bool,
+) -> Result<(), String> { ... }
+```
+
+---
+
+## 5) Update Struct Field Coverage
+
+Update params structs use `Option<T>` for every field that may change. The reducer applies only the `Some` values:
+
+```rust
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateFooParams {
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub partner_id: Option<u64>,
+    // ...
+}
+```
+
+Fields that are system-managed and never directly updated by callers (e.g. `balance`, `line_ids`, `child_ids`) should be omitted from update params — they are mutated by dedicated domain logic inside the reducer (balance recalculation, relation management, etc.).
+
+---
+
+## 6) Create Struct Field Coverage
+
+Create params structs use **non-optional types** for required fields and `Option<T>` / `Vec<T>` for optional/relational fields. They must cover **all** table columns except:
+
+- `id` — auto_inc, omitted
+- `create_uid` / `write_uid` / `create_date` / `write_date` — from ctx, omitted
+- `user_id` (ownership field) — from ctx, omitted
+
+Everything else — including fields that will commonly be initialized to `false`, `0.0`, or empty `Vec` — belongs in the params struct so the caller is explicit.
+
+---
+
+## 7) Company Scope Guard
+
+Every create/update/delete reducer that touches a record owned by a company must verify ownership before mutating:
+
+```rust
+if record.company_id != company_id {
+    return Err("Record does not belong to this company".to_string());
+}
+```
+
+This check must come immediately after the `.find()` lookup, before any mutation.
+
+---
+
+## 8) Audit Log
+
+Every reducer must call `write_audit_log_v2` (struct-based) as its final action before `Ok(())`.
+
+### AuditLogParams fields
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `company_id` | `Option<u64>` | Tenant scope |
+| `table_name` | `&'static str` | Snake-case table name |
+| `record_id` | `u64` | ID of the mutated row |
+| `action` | `&'static str` | `"CREATE"` · `"UPDATE"` · `"DELETE"` · `"SET_ACTIVE"` |
+| `old_values` | `Option<String>` | JSON snapshot before mutation; `None` for creates |
+| `new_values` | `Option<String>` | JSON snapshot after mutation; `None` for deletes |
+| `changed_fields` | `Vec<String>` | List of field names that changed |
+| `metadata` | `Option<String>` | Arbitrary JSON; `None` if unused |
+
+Context-derived fields — **never pass these, the helper derives them automatically**:
+- `session_id` — lower 64 bits of `ctx.connection_id()` (128-bit session token)
+- `ip_address` — not exposed by SpacetimeDB 2.0.1 WASM sandbox; always `None`
+- `user_agent` — not exposed by SpacetimeDB 2.0.1 WASM sandbox; always `None`
+- `user_identity` — `ctx.sender()`
+- `timestamp` — `ctx.timestamp`
+
+### Usage
+
+```rust
+use crate::helpers::{write_audit_log_v2, AuditLogParams};
+
+write_audit_log_v2(ctx, organization_id, AuditLogParams {
+    company_id: Some(company_id),
+    table_name: "my_table",
+    record_id: row.id,
+    action: "CREATE",
+    old_values: None,
+    new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+    changed_fields: vec!["name".to_string()],
+    metadata: None,
+});
+```
+
+**Do NOT use `write_audit_log` (flat positional form) in new code** — it is deprecated.
+
+---
+
+## 9) Quick Checklist
+
+Before submitting any reducer:
+
+- [ ] Scope params (`organization_id`, `company_id`, `*_id`) are flat
+- [ ] All entity field values are in a `*Params` struct
+- [ ] Params struct derives `SpacetimeType, Clone, Debug`
+- [ ] No hardcoded literals in the insert/update call except `id: 0`
+- [ ] `create_uid`/`write_uid`/`create_date`/`write_date` come from `ctx`
+- [ ] Company ownership guard present on update/delete
+- [ ] `write_audit_log_v2` called before `Ok(())`
