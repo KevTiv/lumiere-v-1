@@ -9,6 +9,7 @@ export * from "./components/theme-provider";
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/form";
 export * from "./components/toast";
 export * from "./components/toaster";
+export { Toaster as SonnerToaster } from "./components/sonner";
 export * from "./components/use-mobile";
 export * from "./lib/utils";
 export * from "./lib/theme-colors";

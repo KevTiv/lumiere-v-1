@@ -107,6 +107,15 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
           options: emptySelect,
         },
         {
+          id: "departmentId",
+          name: "departmentId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.departmentId"),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.departmentPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
           id: "origin",
           name: "origin",
           type: "text",

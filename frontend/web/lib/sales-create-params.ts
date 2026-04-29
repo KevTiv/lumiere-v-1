@@ -2,7 +2,11 @@
  * Maps Sales module form payloads to SpacetimeDB reducer param types.
  */
 
-import type { CreatePricelistParams, CreateSaleOrderParams } from '@lumiere/stdb/generated/types'
+import type {
+  CreatePickingBatchParams,
+  CreatePricelistParams,
+  CreateSaleOrderParams,
+} from '@lumiere/stdb/generated/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -74,8 +78,15 @@ export function toCreateSaleOrderParams(
       : undefined
 
   const commitmentDate = optionalTimestampFromFormDate(formData.commitmentDate)
+  const clientOrderRef = optionalTrimmedString(formData.clientOrderRef)
+  const note = optionalTrimmedString(formData.note)
+  const validityRaw = formData.validityDate
+  const metadata =
+    validityRaw != null && String(validityRaw).trim() !== ''
+      ? JSON.stringify({ validityDate: validityRaw })
+      : undefined
 
-  return {
+  const params = {
     companyId,
     partnerId,
     partnerInvoiceId: partnerId,
@@ -83,40 +94,16 @@ export function toCreateSaleOrderParams(
     pricelistId,
     currencyId,
     warehouseId,
-    orderLines: [],
-    origin: undefined,
-    clientOrderRef: optionalTrimmedString(formData.clientOrderRef),
-    paymentTermId,
-    fiscalPositionId: undefined,
-    teamId: undefined,
-    opportunityId: undefined,
-    note: optionalTrimmedString(formData.note),
-    termsAndConditions: undefined,
-    validityDays: undefined,
-    shippingPolicy: undefined,
-    pickingPolicy: undefined,
-    campaignId: undefined,
-    mediumId: undefined,
-    sourceId: undefined,
-    commitmentDate,
-    expectedDate: undefined,
-    incoterm: undefined,
-    incotermLocation: undefined,
-    carrierId: undefined,
-    customerLead: undefined,
-    analyticAccountId: undefined,
-    userId: undefined,
-    isPrinted: undefined,
-    isLocked: undefined,
-    isDropship: undefined,
-    messageFollowerIds: undefined,
-    messagePartnerIds: undefined,
-    messageChannelIds: undefined,
-    activityIds: undefined,
-    metadata: formData.validityDate
-      ? JSON.stringify({ validityDate: formData.validityDate })
-      : undefined,
-  }
+    orderLines: [] as CreateSaleOrderParams['orderLines'],
+  } as CreateSaleOrderParams
+
+  if (clientOrderRef !== undefined) params.clientOrderRef = clientOrderRef
+  if (paymentTermId !== undefined) params.paymentTermId = paymentTermId
+  if (note !== undefined) params.note = note
+  if (commitmentDate !== undefined) params.commitmentDate = commitmentDate
+  if (metadata !== undefined) params.metadata = metadata
+
+  return params
 }
 
 export function toCreatePricelistParams(
@@ -140,10 +127,18 @@ export function salesParamsToJson(
   return stdbParamsToJson(params)
 }
 
-/** Comma- or whitespace-separated stock picking IDs → create_picking_batch params JSON. */
-export function toCreatePickingBatchParamsJson(
+/** Default when the form does not include an explicit wave batch toggle. */
+export const PICKING_BATCH_DEFAULT_IS_WAVE = false
+
+function isWaveFromForm(raw: unknown): boolean {
+  if (raw === true || raw === 1 || raw === '1' || raw === 'true') return true
+  return PICKING_BATCH_DEFAULT_IS_WAVE
+}
+
+/** Comma- or whitespace-separated stock picking IDs → `create_picking_batch` params. */
+export function toCreatePickingBatchParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> | null {
+): CreatePickingBatchParams | null {
   const name = String(formData.name ?? '').trim()
   if (!name) return null
   const raw = formData.pickingIds
@@ -155,9 +150,9 @@ export function toCreatePickingBatchParamsJson(
           .map((s) => s.trim())
           .filter(Boolean)
   const pickingIds = parts.map((p) => BigInt(p))
-  return stdbParamsToJson({
+  return {
     name,
     pickingIds,
-    isWave: false,
-  })
+    isWave: isWaveFromForm(formData.isWave),
+  } as CreatePickingBatchParams
 }

@@ -2,7 +2,11 @@
 
 /**
  * Browser WebSocket to api-server `/v1/realtime/ws` (JSON `change` / `subscribed` / `error`).
- * Same-origin default: `ws(s)://<host>/api/realtime/ws` (proxied by `frontend/web/server.js` to Axum).
+ *
+ * URL resolution:
+ * - `NEXT_PUBLIC_REALTIME_WS_URL` — full `ws://` / `wss://` URL (production-friendly).
+ * - Else `NEXT_PUBLIC_API_GATEWAY_URL` — same base as `apiUrl()` (e.g. `http://localhost:8082`).
+ * - Else on `localhost` / `127.0.0.1`: `ws://127.0.0.1:8082/v1/realtime/ws` (local api-server default).
  */
 
 import type { QueryClient } from "@tanstack/react-query"
@@ -10,16 +14,29 @@ import { useEffect, useRef } from "react"
 
 import { invalidateStdbQueryResources } from "./stdb"
 
+function httpBaseToRealtimeWsUrl(baseHttp: string): string {
+  const u = new URL(baseHttp.replace(/\/$/, ""))
+  const wsProto = u.protocol === "https:" ? "wss:" : "ws:"
+  return `${wsProto}//${u.host}/v1/realtime/ws`
+}
+
 function resolveRealtimeWsUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_REALTIME_WS_URL?.trim()
   if (explicit) {
     return explicit.replace(/\/$/, "")
   }
+  const gateway = process.env.NEXT_PUBLIC_API_GATEWAY_URL?.trim()
+  if (gateway) {
+    return httpBaseToRealtimeWsUrl(gateway)
+  }
   if (typeof window === "undefined") {
     return ""
   }
-  const proto = window.location.protocol === "https:" ? "wss" : "ws"
-  return `${proto}://${window.location.host}/api/realtime/ws`
+  const host = window.location.hostname
+  if (host === "localhost" || host === "127.0.0.1") {
+    return "ws://127.0.0.1:8082/v1/realtime/ws"
+  }
+  return ""
 }
 
 type ServerRealtimeMsg =

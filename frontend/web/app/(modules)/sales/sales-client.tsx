@@ -25,13 +25,11 @@ import type {
   ModuleConfig,
 } from '@lumiere/ui';
 import {
-  salesParamsToJson,
-  toCreatePickingBatchParamsJson,
+  toCreatePickingBatchParams,
   toCreatePricelistParams,
   toCreateSaleOrderParams,
 } from '@/lib/sales-create-params';
 import {
-  logisticsParamsToJson,
   toCreateDeliveryCarrierParams,
   toCreateDeliveryPriceRuleParams,
   toCreateLoyaltyProgramParams,
@@ -66,7 +64,8 @@ import {
   useUpdateSaleOrderLine,
   useDeleteSaleOrderLine,
   useCreateInvoiceFromSaleOrder,
-  useSalesCsvImportMutations,
+  useImportSaleOrderCsv,
+  useImportSaleOrderLineCsv,
   useDeliveryCarriers,
   useDeliveryPriceRules,
   useShippingMethods,
@@ -212,20 +211,21 @@ function SalesClientLoaded({
   const cancelPickingBatch = useCancelPickingBatch(orgId);
 
   // Additional sale order operations
-  const updateSaleOrder = useUpdateSaleOrder(orgId);
+  const updateSaleOrder = useUpdateSaleOrder(orgId, companyId);
   const lockSaleOrder = useLockSaleOrder(orgId);
   const unlockSaleOrder = useUnlockSaleOrder(orgId);
   const createSaleOrderLine = useCreateSaleOrderLine(orgId);
   const updateSaleOrderLine = useUpdateSaleOrderLine(orgId);
   const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
   const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
-  const csvImports = useSalesCsvImportMutations(orgId, companyId);
+  const importSaleOrderCsv = useImportSaleOrderCsv(orgId, companyId);
+  const importSaleOrderLineCsv = useImportSaleOrderLineCsv(orgId, companyId);
 
   const createDeliveryCarrier = useCreateDeliveryCarrier(orgId, companyId);
   const createDeliveryPriceRule = useCreateDeliveryPriceRule(orgId, companyId);
   const createShippingMethod = useCreateShippingMethod(orgId, companyId);
   const createPaymentMethod = useCreatePaymentMethod(orgId, companyId);
-  const createLoyaltyProgram = useCreateLoyaltyProgram(orgId);
+  const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, companyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, companyId);
 
   useEffect(() => {
@@ -761,42 +761,42 @@ function SalesClientLoaded({
     ],
   );
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
     if (action === 'createSaleOrder') {
       const p = toCreateSaleOrderParams(formData, pricelists, companyId);
-      if (p) createSaleOrder.mutate(salesParamsToJson(p));
+      if (p) await createSaleOrder.mutateAsync(p);
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData);
-      if (p) createPricelist.mutate(salesParamsToJson(p));
+      if (p) await createPricelist.mutateAsync(p);
     } else if (action === 'createPickingBatch') {
-      const p = toCreatePickingBatchParamsJson(formData);
-      if (p) createPickingBatch.mutate(p);
+      const p = toCreatePickingBatchParams(formData);
+      if (p) await createPickingBatch.mutateAsync(p);
     } else if (action === 'createDeliveryPriceRule') {
       const p = toCreateDeliveryPriceRuleParams(formData);
-      if (p) createDeliveryPriceRule.mutate(logisticsParamsToJson(p));
+      if (p) await createDeliveryPriceRule.mutateAsync(p);
     } else if (action === 'createDeliveryCarrier') {
       const p = toCreateDeliveryCarrierParams(formData);
-      if (p) createDeliveryCarrier.mutate(logisticsParamsToJson(p));
+      if (p) await createDeliveryCarrier.mutateAsync(p);
     } else if (action === 'createShippingMethod') {
       const p = toCreateShippingMethodParams(formData);
-      if (p) createShippingMethod.mutate(logisticsParamsToJson(p));
+      if (p) await createShippingMethod.mutateAsync(p);
     } else if (action === 'createPaymentMethod') {
       const p = toCreatePaymentMethodParams(formData);
-      if (p) createPaymentMethod.mutate(logisticsParamsToJson(p));
+      if (p) await createPaymentMethod.mutateAsync(p);
     } else if (action === 'createLoyaltyProgram') {
       const p = toCreateLoyaltyProgramParams(formData);
-      if (p) createLoyaltyProgram.mutate(logisticsParamsToJson(p));
+      if (p) await createLoyaltyProgram.mutateAsync(p);
     } else if (action === 'createLoyaltyCard') {
       const programIdNum = Number(formData.programId);
       const code = String(formData.code ?? '').trim();
       const points = Number(formData.points);
       if (!Number.isFinite(programIdNum) || programIdNum <= 0 || !code || !Number.isFinite(points)) return;
       const partnerRaw = formData.partnerId;
-      createLoyaltyCard.mutate({
+      await createLoyaltyCard.mutateAsync({
         partnerId:
           partnerRaw === '' || partnerRaw == null ? null : Number(partnerRaw),
         programId: programIdNum,
@@ -806,16 +806,51 @@ function SalesClientLoaded({
     }
   };
 
+  const isFormMutationPending =
+    createSaleOrder.isPending ||
+    createPricelist.isPending ||
+    createPickingBatch.isPending ||
+    confirmSaleOrder.isPending ||
+    cancelSaleOrder.isPending ||
+    computeSoTotals.isPending ||
+    updatePricelist.isPending ||
+    deletePricelist.isPending ||
+    deletePricelistItem.isPending ||
+    startPickingBatch.isPending ||
+    completePickingBatch.isPending ||
+    cancelPickingBatch.isPending ||
+    updateSaleOrder.isPending ||
+    lockSaleOrder.isPending ||
+    unlockSaleOrder.isPending ||
+    createSaleOrderLine.isPending ||
+    updateSaleOrderLine.isPending ||
+    deleteSaleOrderLine.isPending ||
+    createInvoiceFromSaleOrder.isPending ||
+    createDeliveryCarrier.isPending ||
+    createDeliveryPriceRule.isPending ||
+    createShippingMethod.isPending ||
+    createPaymentMethod.isPending ||
+    createLoyaltyProgram.isPending ||
+    createLoyaltyCard.isPending ||
+    importSaleOrderCsv.isPending ||
+    importSaleOrderLineCsv.isPending;
+
   return (
     <>
-      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} />
+      <ModuleView
+        config={config}
+        data={data}
+        onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
+      />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? saleOrderFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit('dashboard', quickActionForm.action, formData);
+            await handleFormSubmit('dashboard', quickActionForm.action, formData);
             setQuickActionForm(null);
           }
         }}
@@ -826,6 +861,7 @@ function SalesClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {
@@ -839,9 +875,9 @@ function SalesClientLoaded({
             try {
               const text = await file.text();
               if (csvKind === 'order') {
-                await csvImports.importSaleOrder.mutateAsync(text);
+                await importSaleOrderCsv.mutateAsync(text);
               } else {
-                await csvImports.importSaleOrderLine.mutateAsync(text);
+                await importSaleOrderLineCsv.mutateAsync(text);
               }
               setCsvKind(null);
             } catch (e) {

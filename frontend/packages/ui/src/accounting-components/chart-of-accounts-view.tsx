@@ -171,7 +171,7 @@ function AccountsTable({ accounts, t }: AccountsTableProps) {
 
 interface ChartOfAccountsViewProps {
   accounts: AccountAccount[]
-  onCreate?: (data: Record<string, unknown>) => void
+  onCreate?: (data: Record<string, unknown>) => void | Promise<void>
   onImportAccountsCsv?: () => void
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
@@ -186,6 +186,7 @@ export function ChartOfAccountsView({
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [newCode, setNewCode] = useState("")
   const [newName, setNewName] = useState("")
   const [newGroup, setNewGroup] = useState<DisplayGroup>("asset")
@@ -324,24 +325,36 @@ export function ChartOfAccountsView({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("common.cancel")}</Button>
             <Button
-              onClick={() => {
+              variant="outline"
+              disabled={isCreating}
+              onClick={() => setShowCreateModal(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={isCreating}
+              onClick={async () => {
                 const bal = Number(newOpening) || 0
-                onCreate?.({
-                  code: newCode.trim(),
-                  name: newName.trim(),
-                  internalGroup: newGroup,
-                  internalType: "other",
-                  reconcile: false,
-                  openingDebit: bal >= 0 ? bal : 0,
-                  openingCredit: bal < 0 ? -bal : 0,
-                })
-                setNewCode("")
-                setNewName("")
-                setNewGroup("asset")
-                setNewOpening("")
-                setShowCreateModal(false)
+                setIsCreating(true)
+                try {
+                  await onCreate?.({
+                    code: newCode.trim(),
+                    name: newName.trim(),
+                    internalGroup: newGroup,
+                    internalType: "other",
+                    reconcile: false,
+                    openingDebit: bal >= 0 ? bal : 0,
+                    openingCredit: bal < 0 ? -bal : 0,
+                  })
+                  setNewCode("")
+                  setNewName("")
+                  setNewGroup("asset")
+                  setNewOpening("")
+                  setShowCreateModal(false)
+                } finally {
+                  setIsCreating(false)
+                }
               }}
             >
               {t("accounting.forms.newAccount.submitLabel")}

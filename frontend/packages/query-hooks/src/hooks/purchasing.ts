@@ -15,19 +15,59 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 
 type ScalarId = bigint | number | string
 
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
+
+/** Shallow merge for reducer JSON: `overrides` entries with value `undefined` are skipped. */
+function mergeReducerParams(
+  base: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base }
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v !== undefined) out[k] = v
+  }
+  return out
+}
+
+const CREATE_PURCHASE_ORDER_DEFAULTS: Record<string, unknown> = {
+  invoiceIds: [],
+  pickingIds: [],
+  messageFollowerIds: [],
+  messageIds: [],
+  activityIds: [],
+}
+
+const CREATE_PURCHASE_REQUISITION_DEFAULTS: Record<string, unknown> = {
+  multipleProduct: false,
+  lineIds: [],
+  purchaseIds: [],
+  activityIds: [],
+  messageFollowerIds: [],
+  messageIds: [],
+}
+
+const ADD_PURCHASE_ORDER_LINE_DEFAULTS: Record<string, unknown> = {
+  discount: 0,
+  taxIds: [],
+}
+
 function invalidateLandedAndPo(qc: QueryClient, organizationId: bigint) {
-  const k = organizationId
+  const k = rqBigIntKey(organizationId)
   void qc.invalidateQueries({ queryKey: ['landed-costs', k] })
   void qc.invalidateQueries({ queryKey: ['purchase-orders', k] })
 }
 
 function invalidateSupplierIntakes(qc: QueryClient, organizationId: bigint) {
-  const k = organizationId
+  const k = rqBigIntKey(organizationId)
   void qc.invalidateQueries({ queryKey: ['supplier-intakes', k] })
   void qc.invalidateQueries({ queryKey: ['contacts', k] })
 }
@@ -48,7 +88,7 @@ async function postSubmitSupplierIntake(
   const r = await apiFetch('/api/call/submit_supplier_intake', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: stringifyReducerCallBody([organizationId, params]),
+    body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
   })
   if (!r.ok) throw new Error('Failed to submit supplier intake')
 }
@@ -60,7 +100,7 @@ export function usePurchaseOrders(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['purchase-orders', organizationId],
+    queryKey: ['purchase-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
     staleTime: 30_000,
     initialData,
@@ -72,7 +112,7 @@ export function usePurchaseOrderLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['purchase-order-lines', organizationId],
+    queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-order-lines', 'Failed to fetch purchase order lines'),
     staleTime: 30_000,
     initialData,
@@ -84,7 +124,7 @@ export function usePurchaseRequisitions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['purchase-requisitions', organizationId],
+    queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-requisitions', 'Failed to fetch purchase requisitions'),
     staleTime: 30_000,
     initialData,
@@ -93,7 +133,7 @@ export function usePurchaseRequisitions(
 
 export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['landed-costs', organizationId],
+    queryKey: ['landed-costs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-costs', 'Failed to fetch landed costs'),
     staleTime: 30_000,
     initialData,
@@ -102,7 +142,7 @@ export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) 
 
 export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['supplier-intakes', organizationId],
+    queryKey: ['supplier-intakes', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/supplier-intakes', 'Failed to fetch supplier intakes'),
     staleTime: 30_000,
     initialData,
@@ -111,7 +151,7 @@ export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRo
 
 export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['partner-banks', organizationId],
+    queryKey: ['partner-banks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/partner-banks', 'Failed to fetch partner bank accounts'),
     staleTime: 30_000,
     initialData,
@@ -120,35 +160,47 @@ export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows)
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreatePurchaseOrder(organizationId: bigint, companyId?: bigint) {
+export function useCreatePurchaseOrder(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const scopedCompanyId = options?.companyId
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_PURCHASE_ORDER_DEFAULTS, params)
+      const scoped = withCompanyScope(merged, scopedCompanyId)
       const r = await apiFetch('/api/call/create_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
       })
       if (!r.ok) throw new Error('Failed to create purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useCreatePurchaseRequisition(organizationId: bigint, companyId?: bigint) {
+export function useCreatePurchaseRequisition(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const scopedCompanyId = options?.companyId
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_PURCHASE_REQUISITION_DEFAULTS, params)
+      const scoped = withCompanyScope(merged, scopedCompanyId)
       const r = await apiFetch('/api/call/create_purchase_requisition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
       })
       if (!r.ok) throw new Error('Failed to create purchase requisition')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -160,12 +212,12 @@ export function useSendPurchaseOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/send_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to send purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -176,12 +228,12 @@ export function useConfirmPurchaseOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/confirm_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to confirm purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -192,12 +244,12 @@ export function useCancelPurchaseOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -214,14 +266,20 @@ export function useAddPurchaseOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_purchase_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(orderId),
+          stdbParamsToJson(
+            mergeReducerParams(ADD_PURCHASE_ORDER_LINE_DEFAULTS, params) as object,
+          ),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to add purchase order line')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -234,14 +292,14 @@ export function useRemovePurchaseOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/remove_purchase_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lineId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId)]),
       })
       if (!r.ok) throw new Error('Failed to remove purchase order line')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -260,14 +318,14 @@ export function useReceivePurchaseOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/receive_po_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lineId), qty]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId), qty]),
       })
       if (!r.ok) throw new Error('Failed to receive purchase order line')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -286,14 +344,14 @@ export function useInvoicePurchaseOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/invoice_po_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lineId), qty]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId), qty]),
       })
       if (!r.ok) throw new Error('Failed to invoice purchase order line')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -306,12 +364,12 @@ export function useSubmitPurchaseRequisition(organizationId: bigint) {
       const r = await apiFetch('/api/call/submit_purchase_requisition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(requisitionId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
       })
       if (!r.ok) throw new Error('Failed to submit purchase requisition')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -322,12 +380,12 @@ export function useApprovePurchaseRequisition(organizationId: bigint) {
       const r = await apiFetch('/api/call/approve_purchase_requisition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(requisitionId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
       })
       if (!r.ok) throw new Error('Failed to approve purchase requisition')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -338,12 +396,12 @@ export function useClosePurchaseRequisition(organizationId: bigint) {
       const r = await apiFetch('/api/call/close_purchase_requisition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(requisitionId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
       })
       if (!r.ok) throw new Error('Failed to close purchase requisition')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -354,12 +412,12 @@ export function useCancelPurchaseRequisition(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_purchase_requisition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(requisitionId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel purchase requisition')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -370,14 +428,14 @@ export function useComputePurchaseOrderTotals(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_purchase_order_totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to compute purchase order totals')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -390,14 +448,14 @@ export function useComputePurchaseOrderLineTotals(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_purchase_order_line_totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to compute purchase order line totals')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -425,12 +483,17 @@ export function useUpdatePurchaseOrder(organizationId: bigint, companyId?: bigin
       const r = await apiFetch('/api/call/update_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, cid, Number(orderId), payload]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          BigInt(cid),
+          toScalarU64(orderId),
+          stdbParamsToJson(payload as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -441,12 +504,12 @@ export function useLockPurchaseOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/lock_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to lock purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -457,12 +520,12 @@ export function useUnlockPurchaseOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/unlock_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error('Failed to unlock purchase order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -473,14 +536,18 @@ export function useUpdatePurchaseOrderLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_purchase_order_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lineId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(lineId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update purchase order line')
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -506,7 +573,11 @@ export function useCreateLandedCost(organizationId: bigint, companyId?: bigint) 
       const r = await apiFetch('/api/call/create_landed_cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, cid, payload]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          BigInt(cid),
+          stdbParamsToJson(payload as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create landed cost')
     },
@@ -521,7 +592,11 @@ export function useUpdateLandedCost(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_landed_cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(landedCostId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update landed cost')
     },
@@ -536,7 +611,7 @@ export function useDeleteLandedCost(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_landed_cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
       })
       if (!r.ok) throw new Error('Failed to delete landed cost')
     },
@@ -551,7 +626,11 @@ export function useAddLandedCostLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_landed_cost_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(landedCostId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to add landed cost line')
     },
@@ -566,7 +645,7 @@ export function useRemoveLandedCostLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/remove_landed_cost_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lineId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId)]),
       })
       if (!r.ok) throw new Error('Failed to remove landed cost line')
     },
@@ -581,7 +660,7 @@ export function useComputeLandedCosts(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_landed_costs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
       })
       if (!r.ok) throw new Error('Failed to compute landed costs')
     },
@@ -596,12 +675,12 @@ export function usePostLandedCosts(organizationId: bigint) {
       const r = await apiFetch('/api/call/post_landed_costs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
       })
       if (!r.ok) throw new Error('Failed to post landed costs')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       invalidateLandedAndPo(qc, organizationId)
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
     },
@@ -624,13 +703,13 @@ export function useApplyLandedCosts(organizationId: bigint, companyId?: bigint) 
       const r = await apiFetch('/api/call/apply_landed_costs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, cid, Number(landedCostId)]),
+        body: stringifyReducerCallBody([organizationId, BigInt(cid), toScalarU64(landedCostId)]),
       })
       if (!r.ok) throw new Error('Failed to apply landed costs')
     },
     onSuccess: () => {
       invalidateLandedAndPo(qc, organizationId)
-      void qc.invalidateQueries({ queryKey: ['stock-quants', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -642,7 +721,7 @@ export function useCancelLandedCost(organizationId: bigint) {
       const r = await apiFetch('/api/call/cancel_landed_cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(landedCostId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel landed cost')
     },
@@ -667,7 +746,11 @@ export function useUpdateSupplierIntake(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(intakeId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update supplier intake')
     },
@@ -682,7 +765,7 @@ export function useDeleteSupplierIntake(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId)]),
       })
       if (!r.ok) throw new Error('Failed to delete supplier intake')
     },
@@ -706,7 +789,11 @@ export function useReviewSupplierIntake(organizationId: bigint) {
       const r = await apiFetch('/api/call/review_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId), reviewerNotes ?? null]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(intakeId),
+          reviewerNotes ?? null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to review supplier intake')
     },
@@ -716,12 +803,16 @@ export function useReviewSupplierIntake(organizationId: bigint) {
 
 export function useApproveSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (intakeId) => {
+  return useMutation<void, Error, { intakeId: ScalarId; partnerId: ScalarId }>({
+    mutationFn: async ({ intakeId, partnerId }) => {
       const r = await apiFetch('/api/call/approve_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(intakeId),
+          toScalarU64(partnerId),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to approve supplier intake')
     },
@@ -736,7 +827,7 @@ export function useRejectSupplierIntake(organizationId: bigint) {
       const r = await apiFetch('/api/call/reject_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId), reason]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId), reason]),
       })
       if (!r.ok) throw new Error('Failed to reject supplier intake')
     },
@@ -751,7 +842,7 @@ export function useHoldSupplierIntake(organizationId: bigint) {
       const r = await apiFetch('/api/call/hold_supplier_intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(intakeId), reason]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId), reason]),
       })
       if (!r.ok) throw new Error('Failed to hold supplier intake')
     },
@@ -761,19 +852,34 @@ export function useHoldSupplierIntake(organizationId: bigint) {
 
 // ── Bill Creation ─────────────────────────────────────────────────────────────
 
+export type CreateBillFromPurchaseOrderInput = {
+  orderId: ScalarId
+  journalId: ScalarId
+  defaultExpenseAccountId: ScalarId
+  invoiceDate: Date | string | number
+}
+
 export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { orderId: ScalarId; billDate?: string; journalId?: ScalarId }>({
-    mutationFn: async ({ orderId, billDate, journalId }) => {
+  return useMutation<void, Error, CreateBillFromPurchaseOrderInput>({
+    mutationFn: async ({ orderId, journalId, defaultExpenseAccountId, invoiceDate }) => {
+      const when =
+        invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate)
       const r = await apiFetch('/api/call/create_bill_from_purchase_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId), billDate ?? null, journalId ? Number(journalId) : null]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(orderId),
+          toScalarU64(journalId),
+          toScalarU64(defaultExpenseAccountId),
+          stbTimestampFromDate(when),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create bill from purchase order')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['purchase-orders', orgKey] })
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
     },
@@ -794,7 +900,7 @@ export function useImportPurchaseOrderCsv(organizationId: bigint, companyId: big
       if (!res.ok) throw new Error(await parseCallErrorPo(res))
     },
     onSuccess: () => {
-      const k = companyId
+      const k = rqBigIntKey(companyId)
       void qc.invalidateQueries({ queryKey: ['purchase-orders', k] })
     },
   })
@@ -812,7 +918,7 @@ export function useImportPurchaseOrderLineCsv(organizationId: bigint, companyId:
       if (!res.ok) throw new Error(await parseCallErrorPo(res))
     },
     onSuccess: () => {
-      const k = companyId
+      const k = rqBigIntKey(companyId)
       void qc.invalidateQueries({ queryKey: ['purchase-order-lines', k] })
     },
   })
@@ -850,12 +956,12 @@ export function useUpdatePoReceiptStatus(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_po_receipt_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -867,29 +973,37 @@ export function useUpdatePoInvoiceStatus(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_po_invoice_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(orderId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
       })
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['purchase-orders', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] })
     },
   })
 }
 
-export function useCreatePartnerBank(organizationId: bigint) {
+export function useCreatePartnerBank(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const scopedCompanyId = options?.companyId
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(
+        scopedCompanyId != null ? { companyId: scopedCompanyId } : {},
+        params,
+      )
       const r = await apiFetch('/api/call/create_partner_bank', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['partner-banks', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -903,14 +1017,14 @@ export function useUpdatePartnerBank(organizationId: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(args.bankId),
-          args.params,
+          toScalarU64(args.bankId),
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['partner-banks', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -922,12 +1036,12 @@ export function useDeletePartnerBank(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_partner_bank', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(bankId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(bankId)]),
       })
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['partner-banks', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['partner-banks', rqBigIntKey(organizationId)] })
     },
   })
 }

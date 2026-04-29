@@ -160,6 +160,80 @@ function parseTypeDescriptor(raw: string): Pick<FieldSpec, 'type' | 'innerType' 
   return { type: 'unknown', isOptional: false }
 }
 
+/** Consume a balanced `(...)` starting at `start` (must point at `(`). Returns index after closing `)`. */
+function skipBalancedParen(s: string, start: number): number {
+  let depth = 0
+  let i = start
+  for (; i < s.length; i++) {
+    const c = s[i]
+    if (c === '(') depth++
+    else if (c === ')') {
+      depth--
+      if (depth === 0) return i + 1
+    }
+  }
+  return i
+}
+
+/**
+ * Parse a full `__t....(...)` type expression starting at `start` (must begin with `__t.`).
+ * Handles nested parens e.g. `__t.array(__t.identity())`, `__t.option(__t.string())`.
+ */
+function consumeTypeExpr(s: string, start: number): { end: number; expr: string } | null {
+  if (!s.slice(start).startsWith('__t.')) return null
+  let j = start
+  while (j < s.length && s[j] !== '(') j++
+  if (j >= s.length || s[j] !== '(') return null
+  const end = skipBalancedParen(s, j)
+  return { end, expr: s.slice(start, end).trim() }
+}
+
+/**
+ * Extract reducer arg field specs from `export default { ... }` body (nested `__t.*` safe).
+ */
+function parseReducerExportFields(exportBody: string): { fields: FieldSpec[]; paramsTypeName?: string } {
+  const fields: FieldSpec[] = []
+  let paramsTypeName: string | undefined
+
+  // Property lines: `  fieldName: __t....,` (single-line)
+  const lines = exportBody.split(/\r?\n/)
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd()
+    const prop = line.match(/^\s{2}(\w+):\s*(.*)$/)
+    if (!prop) continue
+    const name = prop[1]
+    let rest = prop[2].replace(/,\s*$/, '').trim()
+    if (!rest.startsWith('__t.')) continue
+    const consumed = consumeTypeExpr(rest, 0)
+    if (!consumed) continue
+    if (consumed.end !== rest.length) continue // only whole-line descriptors
+    const parsed = parseTypeDescriptor(consumed.expr)
+    fields.push({ name, ...parsed })
+  }
+
+  // Getters: `get foo() { return TypeOrExpr; }` (possibly multiline)
+  const getterRe =
+    /get (\w+)\(\)\s*\{[\s\n\r]*return\s+([\s\S]*?);[\s\n\r]*\}/g
+  let m: RegExpExecArray | null
+  while ((m = getterRe.exec(exportBody)) !== null) {
+    const [, name, ret] = m
+    const retTrim = ret.trim()
+    if (retTrim.startsWith('__t.')) {
+      const parsed = parseTypeDescriptor(retTrim)
+      fields.push({ name, ...parsed })
+    } else {
+      const typeName = retTrim.replace(/\s+/g, '')
+      fields.push({ name, type: 'ref', isOptional: false, refType: typeName })
+    }
+    if (name === 'params' || name.endsWith('Params')) {
+      const tn = retTrim.startsWith('__t.') ? undefined : retTrim.replace(/\s+/g, '')
+      if (tn && /^[A-Za-z_]\w*$/.test(tn)) paramsTypeName = tn
+    }
+  }
+
+  return { fields, paramsTypeName }
+}
+
 function loadReducerBindings(): Map<string, ReducerBinding> {
   const bindings = new Map<string, ReducerBinding>()
 
@@ -174,27 +248,7 @@ function loadReducerBindings(): Map<string, ReducerBinding> {
     if (!exportMatch) continue
     const exportBody = exportMatch[1]
 
-    const args: FieldSpec[] = []
-    let paramsTypeName: string | undefined
-
-    // Parse simple field lines: fieldName: __t.xxx(),
-    const fieldRe = /^\s{2}(\w+):\s*(__t\.\w+\([^)]*\)|__t\.option\(__t\.\w+\(\)\)),?\s*$/gm
-    let m: RegExpExecArray | null
-    while ((m = fieldRe.exec(exportBody)) !== null) {
-      const [, name, typeStr] = m
-      const parsed = parseTypeDescriptor(typeStr)
-      args.push({ name, ...parsed })
-    }
-
-    // Parse getter lines: get params() { return SomeTypeName; }
-    const getterRe = /get (\w+)\(\)\s*\{[\s\n\r]*return ([\w]+);[\s\n\r]*\}/g
-    while ((m = getterRe.exec(exportBody)) !== null) {
-      const [, name, typeName] = m
-      args.push({ name, type: 'ref', isOptional: false, refType: typeName })
-      if (name === 'params' || name.endsWith('Params')) {
-        paramsTypeName = typeName
-      }
-    }
+    const { fields: args, paramsTypeName } = parseReducerExportFields(exportBody)
 
     bindings.set(reducerName, { reducerName, args, paramsTypeName })
   }
@@ -280,8 +334,31 @@ function looksLikeBigint(expr: string): boolean {
 
 function extractCallBody(src: string, startIdx: number): string {
   // Extract content inside JSON.stringify([...]) or JSON.stringify({...})
-  // starting at startIdx, return up to 800 chars for analysis
-  return src.slice(startIdx, Math.min(startIdx + 800, src.length))
+  // starting at startIdx — long enough for multi-line stdbParamsToJson bodies
+  return src.slice(startIdx, Math.min(startIdx + 8192, src.length))
+}
+
+/** Count top-level elements in `[a, b, c]` / `[a, b, c,]` (handles trailing commas, nested `()`/`[]`/`{}`). */
+function countTopLevelArgsInBracketArray(arrayLiteral: string): number {
+  const t = arrayLiteral.trim()
+  if (!t.startsWith('[') || !t.endsWith(']')) return 0
+  const inner = t.slice(1, -1)
+  let depth = 0
+  let start = 0
+  let count = 0
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i]
+    if (c === '[' || c === '(' || c === '{') depth++
+    else if (c === ']' || c === ')' || c === '}') depth--
+    else if (c === ',' && depth === 0) {
+      const part = inner.slice(start, i).trim()
+      if (part) count++
+      start = i + 1
+    }
+  }
+  const last = inner.slice(start).trim()
+  if (last) count++
+  return count
 }
 
 function loadHookCalls(): Map<string, HookCall[]> {
@@ -306,22 +383,17 @@ function loadHookCalls(): Map<string, HookCall[]> {
       const reducerName = m[1]
       const snippet = extractCallBody(src, m.index)
 
-      // Try to find body: JSON.stringify([...]) nearby
-      const bodyMatch = snippet.match(/body:\s*JSON\.stringify\((\[[\s\S]*?\])\s*[,)]/)
+      // Try to find reducer arg array: same shape as JSON.stringify([...]) or stringifyReducerCallBody([...])
+      let bodyMatch = snippet.match(/body:\s*JSON\.stringify\((\[[\s\S]*?\])\s*[,)]/)
+      if (!bodyMatch) {
+        bodyMatch = snippet.match(/body:\s*stringifyReducerCallBody\((\[[\s\S]*?\])\s*\)/)
+      }
       const callSite = bodyMatch ? bodyMatch[1] : snippet.slice(0, 200)
 
       // Count positional args in the array
       let argCount: number | undefined
       if (bodyMatch) {
-        // Count top-level commas (rough heuristic)
-        let depth = 0
-        let commas = 0
-        for (const ch of bodyMatch[1]) {
-          if (ch === '[' || ch === '(' || ch === '{') depth++
-          else if (ch === ']' || ch === ')' || ch === '}') depth--
-          else if (ch === ',' && depth === 1) commas++
-        }
-        argCount = commas + 1
+        argCount = countTopLevelArgsInBracketArray(bodyMatch[1])
       }
 
       // Extract field names from params object if detectable
@@ -333,6 +405,11 @@ function loadHookCalls(): Map<string, HookCall[]> {
         while ((fm = fieldRe.exec(paramsMatch[1])) !== null) {
           passedFields.push(fm[1])
         }
+      }
+
+      // Entire params object is passed through serializers — do not require literal keys in source
+      if (/\bstdbParamsToJson\s*\(|\bpaymentParamsToJson\s*\(/.test(callSite)) {
+        passedFields.length = 0
       }
 
       const call: HookCall = {
@@ -380,6 +457,91 @@ function extractFnName(src: string, idx: number): string {
   return '?'
 }
 
+/**
+ * Return the inner source of a top-level `fn name(...)` body (excluding outer braces),
+ * or null if not found / unbalanced.
+ */
+function extractRustFunctionBodyByName(src: string, fnName: string): string | null {
+  const sigRe = new RegExp(`\\bfn\\s+${fnName}\\s*\\(`)
+  const sigMatch = sigRe.exec(src)
+  if (!sigMatch) return null
+  let i = sigMatch.index + sigMatch[0].length
+  let depth = 1
+  while (i < src.length && depth > 0) {
+    const c = src[i]
+    if (c === '(') depth++
+    else if (c === ')') depth--
+    i++
+  }
+  if (depth !== 0) return null
+  while (i < src.length && src[i] !== '{') {
+    if (src[i] === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') i++
+    } else {
+      i++
+    }
+  }
+  if (i >= src.length || src[i] !== '{') return null
+  i++
+  const startBody = i
+  depth = 1
+  while (i < src.length && depth > 0) {
+    const c = src[i]
+    if (c === '"') {
+      i++
+      while (i < src.length && src[i] !== '"') {
+        if (src[i] === '\\') i++
+        i++
+      }
+      i++
+      continue
+    }
+    if (c === "'") {
+      i++
+      while (i < src.length && src[i] !== "'") {
+        if (src[i] === '\\') i++
+        i++
+      }
+      i++
+      continue
+    }
+    if (c === '{') depth++
+    else if (c === '}') depth--
+    i++
+  }
+  if (depth !== 0) return null
+  return src.slice(startBody, i - 1)
+}
+
+/** Reducers invoked from query-hooks whose SpacetimeDB module has no generated *_reducer.ts yet. */
+const REDUCER_HOOKS_WITHOUT_STDB_BINDINGS = new Set([
+  'cancel_stock_inventory',
+  'cancel_warehouse_task',
+  'complete_warehouse_task',
+  'confirm_stock_inventory',
+  'create_sale_order_line',
+  'delete_picking_wave',
+  'delete_quality_alert',
+  'delete_quality_check',
+  'delete_replenishment_rule',
+  'delete_sale_order_line',
+  'delete_uom',
+  'delete_warehouse_task',
+  'lock_sale_order',
+  'process_picking_wave',
+  'start_stock_inventory',
+  'start_warehouse_task',
+  'trigger_replenishment',
+  'unlock_sale_order',
+  'update_picking_wave',
+  'update_quality_alert',
+  'update_quality_check',
+  'update_replenishment_rule',
+  'update_sale_order_line',
+  'update_uom',
+  'validate_stock_inventory',
+])
+
 // ── Pass 4: Scan api-server route handlers ────────────────────────────────────
 
 function loadApiServerHandlers(): Map<string, ApiServerHandler[]> {
@@ -407,10 +569,24 @@ function loadApiServerHandlers(): Map<string, ApiServerHandler[]> {
       // Look in the 3000 chars before the call_reducer for a transform function
       const context = src.slice(Math.max(0, m.index - 3000), m.index + 500)
       const extractedFields: string[] = []
-      const fieldRe = /body\.get\s*\(\s*"(\w+)"\s*\)/g
+      // Allow newlines between `body` and `.get("field")` (rustfmt often breaks the chain)
+      const fieldRe = /body\s*\.\s*get\s*\(\s*"(\w+)"\s*\)/g
       let fm: RegExpExecArray | null
       while ((fm = fieldRe.exec(context)) !== null) {
         if (!extractedFields.includes(fm[1])) extractedFields.push(fm[1])
+      }
+
+      // `let params = foo(&body)?` — body.get keys live in `foo`, often above the 3000-char window
+      const nearBefore = src.slice(Math.max(0, m.index - 800), m.index)
+      const helperMatch = nearBefore.match(/let\s+params\s*=\s*(\w+)\s*\(\s*&body\s*\)\s*\??/)
+      if (helperMatch) {
+        const helperBody = extractRustFunctionBodyByName(src, helperMatch[1])
+        if (helperBody) {
+          fieldRe.lastIndex = 0
+          while ((fm = fieldRe.exec(helperBody)) !== null) {
+            if (!extractedFields.includes(fm[1])) extractedFields.push(fm[1])
+          }
+        }
       }
 
       const handler: ApiServerHandler = {
@@ -459,7 +635,7 @@ function crossReference(
     const issues: AnalysisIssue[] = []
 
     // -- Issue: reducer called from frontend but no binding file found
-    if (!binding && calls.length > 0) {
+    if (!binding && calls.length > 0 && !REDUCER_HOOKS_WITHOUT_STDB_BINDINGS.has(reducerName)) {
       issues.push({
         severity: 'WARN',
         message: `Called from frontend but no *_reducer.ts binding found — bindings may be stale`,

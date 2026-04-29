@@ -9,14 +9,87 @@
 
 
 import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { buildWarehouse3DView } from "@lumiere/erp-shared/warehouse-3d-from-api"
 type ScalarId = bigint | number | string
 
+/** Coerce reducer u64 ids from table/API scalars (avoids unsafe `Number` for large ids). */
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
+
+/** Shallow merge for reducer JSON: `overrides` entries with value `undefined` are skipped. */
+function mergeReducerParams(
+  base: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base }
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v !== undefined) out[k] = v
+  }
+  return out
+}
+
+const CREATE_PRODUCT_DEFAULTS: Record<string, unknown> = {
+  costMethod: "standard",
+  valuation: "manual_periodic",
+}
+
+const CREATE_STOCK_QUANT_DEFAULTS: Record<string, unknown> = {
+  inventoryQuantity: 0,
+  inventoryDiffQuantity: 0,
+  inventoryQuantitySet: false,
+  isOutdated: false,
+  accountingEntryIds: [],
+}
+
+const CREATE_STOCK_PICKING_DEFAULTS: Record<string, unknown> = {
+  moveType: "direct",
+  priority: "0",
+  isLocked: false,
+  immediateTransfer: false,
+  isPrinted: false,
+  isReturn: false,
+  hasScrapMove: false,
+  hasTracking: false,
+  backorderIds: [],
+  showOperations: true,
+  showLotsText: false,
+  showReserved: true,
+  showCheckAvailability: true,
+  showValidate: true,
+  showMarkAsTodo: false,
+  showSetQtyButton: false,
+  showClearQtyButton: false,
+  showLotsM2O: false,
+  moveLineExist: false,
+  hasPackages: false,
+  hasMoveLines: false,
+  hasPackage: false,
+  hasLot: false,
+  hasOwner: false,
+  hasEntirePackageSrc: false,
+  hasEntirePackageDest: false,
+  packageLevelIds: [],
+}
+
+const CREATE_STOCK_LOCATION_DEFAULTS: Record<string, unknown> = {
+  childLeft: 0,
+  childRight: 1,
+  scrapLocation: false,
+  returnLocation: false,
+  active: true,
+  posx: 0,
+  posy: 0,
+  posz: 0,
+  cyclicInventoryFrequency: 0,
+}
+
 function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   void qc.invalidateQueries({ queryKey: ['stock-locations', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-pickings', orgKey] })
@@ -43,7 +116,7 @@ export function useProducts(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['products', organizationId],
+    queryKey: ['products', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/products', 'Failed to fetch products'),
     staleTime: 30_000,
     initialData,
@@ -55,7 +128,7 @@ export function useProductCategories(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['product-categories', organizationId],
+    queryKey: ['product-categories', rqBigIntKey(organizationId)],
     queryFn: async () => {
       const rows = await fetchQueryList(
         '/api/query/product-categories',
@@ -73,7 +146,7 @@ export function useUoms(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['uoms', organizationId],
+    queryKey: ['uoms', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/uoms', 'Failed to fetch units of measure'),
     staleTime: 30_000,
     initialData,
@@ -85,7 +158,7 @@ export function useStockQuants(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-quants', organizationId],
+    queryKey: ['stock-quants', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
     staleTime: 30_000,
     initialData,
@@ -97,7 +170,7 @@ export function useStockPickings(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-pickings', organizationId],
+    queryKey: ['stock-pickings', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-pickings', 'Failed to fetch stock pickings'),
     staleTime: 30_000,
     initialData,
@@ -109,7 +182,7 @@ export function useWarehouses(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['warehouses', organizationId],
+    queryKey: ['warehouses', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/warehouses', 'Failed to fetch warehouses'),
     staleTime: 30_000,
     initialData,
@@ -121,7 +194,7 @@ export function useInventoryAdjustments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['inventory-adjustments', organizationId],
+    queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/inventory-adjustments', 'Failed to fetch inventory adjustments'),
     staleTime: 30_000,
@@ -134,7 +207,7 @@ export function useStockLocations(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-locations', organizationId],
+    queryKey: ['stock-locations', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-locations', 'Failed to fetch stock locations'),
     staleTime: 30_000,
     initialData,
@@ -146,7 +219,7 @@ export function useProductionLots(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-production-lots', organizationId],
+    queryKey: ['stock-production-lots', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-production-lots', 'Failed to fetch production lots'),
     staleTime: 30_000,
@@ -159,7 +232,7 @@ export function useQualityChecks(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['quality-checks', organizationId],
+    queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
     initialData,
@@ -167,7 +240,7 @@ export function useQualityChecks(
 }
 
 export function useWarehouse3D(organizationId: bigint, _companyId: bigint, warehouseId: bigint) {
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   const { data: zones3D = [] } = useQuery<QueryRows>({
     queryKey: ['warehouse-3d-zones', orgKey],
     queryFn: () =>
@@ -210,7 +283,7 @@ export function useWarehouse3D(organizationId: bigint, _companyId: bigint, wareh
 
 export function useStockCycleCounts(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-cycle-counts', organizationId],
+    queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-cycle-counts', 'Failed to fetch cycle counts'),
     staleTime: 30_000,
@@ -220,7 +293,7 @@ export function useStockCycleCounts(organizationId: bigint, initialData?: QueryR
 
 export function useStockInventories(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-inventories', organizationId],
+    queryKey: ['stock-inventories', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-inventories', 'Failed to fetch stock inventories'),
     staleTime: 30_000,
@@ -230,7 +303,7 @@ export function useStockInventories(organizationId: bigint, initialData?: QueryR
 
 export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-moves', organizationId],
+    queryKey: ['stock-moves', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves'),
     staleTime: 30_000,
     initialData,
@@ -239,7 +312,7 @@ export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
 
 export function useStockRoutes(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-routes', organizationId],
+    queryKey: ['stock-routes', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-routes', 'Failed to fetch stock routes'),
     staleTime: 30_000,
     initialData,
@@ -248,7 +321,7 @@ export function useStockRoutes(organizationId: bigint, initialData?: QueryRows) 
 
 export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-rules', organizationId],
+    queryKey: ['stock-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-rules', 'Failed to fetch stock rules'),
     staleTime: 30_000,
     initialData,
@@ -257,7 +330,7 @@ export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
 
 export function usePickingWaves(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['picking-waves', organizationId],
+    queryKey: ['picking-waves', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/picking-waves', 'Failed to fetch picking waves'),
     staleTime: 30_000,
     initialData,
@@ -266,7 +339,7 @@ export function usePickingWaves(organizationId: bigint, initialData?: QueryRows)
 
 export function useWarehouseTasks(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['warehouse-tasks', organizationId],
+    queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/warehouse-tasks', 'Failed to fetch warehouse tasks'),
     staleTime: 30_000,
     initialData,
@@ -275,7 +348,7 @@ export function useWarehouseTasks(organizationId: bigint, initialData?: QueryRow
 
 export function useReplenishmentRules(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['replenishment-rules', organizationId],
+    queryKey: ['replenishment-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/replenishment-rules', 'Failed to fetch replenishment rules'),
     staleTime: 30_000,
@@ -285,7 +358,7 @@ export function useReplenishmentRules(organizationId: bigint, initialData?: Quer
 
 export function useBarcodeRules(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['barcode-rules', organizationId],
+    queryKey: ['barcode-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/barcode-rules', 'Failed to fetch barcode rules'),
     staleTime: 30_000,
     initialData,
@@ -294,7 +367,7 @@ export function useBarcodeRules(organizationId: bigint, initialData?: QueryRows)
 
 export function useAdjustmentReasons(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['adjustment-reasons', organizationId],
+    queryKey: ['adjustment-reasons', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/adjustment-reasons', 'Failed to fetch adjustment reasons'),
     staleTime: 30_000,
@@ -304,7 +377,7 @@ export function useAdjustmentReasons(organizationId: bigint, initialData?: Query
 
 export function useBarcodeNomenclatures(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['barcode-nomenclatures', organizationId],
+    queryKey: ['barcode-nomenclatures', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/barcode-nomenclatures', 'Failed to fetch barcode nomenclatures'),
     staleTime: 30_000,
@@ -314,7 +387,7 @@ export function useBarcodeNomenclatures(organizationId: bigint, initialData?: Qu
 
 export function useSerialLotTraceability(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['serial-lot-traceability', organizationId],
+    queryKey: ['serial-lot-traceability', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/serial-lot-traceability', 'Failed to fetch traceability rows'),
     staleTime: 30_000,
@@ -324,7 +397,7 @@ export function useSerialLotTraceability(organizationId: bigint, initialData?: Q
 
 export function useStockTraceabilityReports(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-traceability-reports', organizationId],
+    queryKey: ['stock-traceability-reports', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-traceability-reports', 'Failed to fetch traceability reports'),
     staleTime: 30_000,
@@ -334,7 +407,7 @@ export function useStockTraceabilityReports(organizationId: bigint, initialData?
 
 export function useInventoryValuations(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['inventory-valuations', organizationId],
+    queryKey: ['inventory-valuations', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/inventory-valuations', 'Failed to fetch inventory valuations'),
     staleTime: 30_000,
@@ -344,7 +417,7 @@ export function useInventoryValuations(organizationId: bigint, initialData?: Que
 
 export function useStockProductionSerials(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-production-serials', organizationId],
+    queryKey: ['stock-production-serials', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-production-serials', 'Failed to fetch serial numbers'),
     staleTime: 30_000,
@@ -354,18 +427,26 @@ export function useStockProductionSerials(organizationId: bigint, initialData?: 
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateProduct(organizationId: bigint) {
+export function useCreateProduct(
+  organizationId: bigint,
+  options?: { productDefaults?: Record<string, unknown> },
+) {
   const qc = useQueryClient()
+  const productDefaults = options?.productDefaults ?? {}
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(
+        mergeReducerParams(CREATE_PRODUCT_DEFAULTS, productDefaults),
+        params,
+      )
       const r = await apiFetch('/api/call/create_product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error('Failed to create product')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -376,7 +457,7 @@ export function useUpdateProduct(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update product')
     },
@@ -391,7 +472,7 @@ export function useDeleteProduct(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productId)]),
       })
       if (!r.ok) throw new Error('Failed to delete product')
     },
@@ -410,7 +491,7 @@ export function useCreateProductVariant(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_product_variant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productTmplId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productTmplId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create product variant')
     },
@@ -425,7 +506,7 @@ export function useCreateWarehouse(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_warehouse?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([params]),
+        body: stringifyReducerCallBody([stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create warehouse')
     },
@@ -444,7 +525,7 @@ export function useUpdateWarehouse(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_warehouse?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(warehouseId), params]),
+        body: stringifyReducerCallBody([toScalarU64(warehouseId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update warehouse')
     },
@@ -459,7 +540,7 @@ export function useDeleteWarehouse(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_warehouse?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(warehouseId)]),
+        body: stringifyReducerCallBody([toScalarU64(warehouseId)]),
       })
       if (!r.ok) throw new Error('Failed to delete warehouse')
     },
@@ -480,24 +561,24 @@ export function useOrgUsers() {
   })
 }
 
-export function useAssignUserToPicking(organizationId: bigint) {
+export function useAssignUserToPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
     Error,
-    { pickingId: ScalarId; userIdentityHex: string | null }
+    { pickingId: ScalarId; params: { userId: string | null } }
   >({
-    mutationFn: async ({ pickingId, userIdentityHex }) => {
+    mutationFn: async ({ pickingId, params }) => {
       const r = await apiFetch('/api/call/assign_user_to_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(pickingId),
-          {
-            company_id: null,
-            user_id: userIdentityHex && userIdentityHex.length > 0 ? userIdentityHex : null,
-          },
+          toScalarU64(pickingId),
+          stdbParamsToJson({
+            company_id: companyId,
+            user_id: params.userId && params.userId.length > 0 ? params.userId : null,
+          } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to assign user to picking')
@@ -506,19 +587,28 @@ export function useAssignUserToPicking(organizationId: bigint) {
   })
 }
 
-export function useCreateStockPicking(organizationId: bigint, _companyId?: bigint) {
+export function useCreateStockPicking(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const scopedCompanyId = options?.companyId
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const base = mergeReducerParams(
+        CREATE_STOCK_PICKING_DEFAULTS,
+        scopedCompanyId != null ? { companyId: Number(scopedCompanyId) } : {},
+      )
+      const merged = mergeReducerParams(base, params)
       const r = await apiFetch('/api/call/create_stock_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock picking')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock-pickings', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['stock-pickings', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -529,16 +619,16 @@ export function useCreateInventoryAdjustment(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_inventory_adjustment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create inventory adjustment')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['inventory-adjustments', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useMoveStockItem3D(organizationId: bigint) {
+export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -551,18 +641,18 @@ export function useMoveStockItem3D(organizationId: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(params.quantId),
-          {
-            company_id: null,
-            dest_location_id: Number(params.targetLocationId),
+          toScalarU64(params.quantId),
+          stdbParamsToJson({
+            company_id: companyId,
+            dest_location_id: toScalarU64(params.targetLocationId),
             quantity: params.quantity,
-          },
+          } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to move stock item')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
       void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
     },
@@ -576,23 +666,27 @@ export function useProcessInventoryAdjustment(organizationId: bigint) {
       const r = await apiFetch('/api/call/process_inventory_adjustment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(adjustmentId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(adjustmentId)]),
       })
       if (!r.ok) throw new Error('Failed to process inventory adjustment')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['inventory-adjustments', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useValidateStockPicking(organizationId: bigint, _companyId?: bigint) {
+export function useValidateStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const r = await apiFetch('/api/call/validate_stock_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pickingId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(pickingId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to validate stock picking')
     },
@@ -600,7 +694,7 @@ export function useValidateStockPicking(organizationId: bigint, _companyId?: big
   })
 }
 
-export function useReserveStockQuant(organizationId: bigint, _companyId?: bigint) {
+export function useReserveStockQuant(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; reserveQty: number }>({
     mutationFn: async ({ quantId, reserveQty }) => {
@@ -609,8 +703,8 @@ export function useReserveStockQuant(organizationId: bigint, _companyId?: bigint
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(quantId),
-          { company_id: null, reserve_qty: reserveQty },
+          toScalarU64(quantId),
+          stdbParamsToJson({ company_id: companyId, reserve_qty: reserveQty } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to reserve stock')
@@ -619,7 +713,7 @@ export function useReserveStockQuant(organizationId: bigint, _companyId?: bigint
   })
 }
 
-export function useUnreserveStockQuant(organizationId: bigint, _companyId?: bigint) {
+export function useUnreserveStockQuant(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; unreserveQty: number }>({
     mutationFn: async ({ quantId, unreserveQty }) => {
@@ -628,8 +722,8 @@ export function useUnreserveStockQuant(organizationId: bigint, _companyId?: bigi
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(quantId),
-          { company_id: null, unreserve_qty: unreserveQty },
+          toScalarU64(quantId),
+          stdbParamsToJson({ company_id: companyId, unreserve_qty: unreserveQty } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to unreserve stock')
@@ -649,12 +743,12 @@ export function useCreateCycleCountPlan(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_cycle_count_plan?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(locationId), params]),
+        body: stringifyReducerCallBody([toScalarU64(locationId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create cycle count plan')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -665,12 +759,12 @@ export function useStartCycleCountSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_cycle_count_session?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(cycleCountId)]),
+        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
       })
       if (!r.ok) throw new Error('Failed to start cycle count session')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -685,12 +779,12 @@ export function useRecordCycleCountLine(organizationId: bigint) {
       const r = await apiFetch('/api/call/record_cycle_count_line?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(cycleCountId), params]),
+        body: stringifyReducerCallBody([toScalarU64(cycleCountId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to record cycle count line')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -701,12 +795,12 @@ export function useValidateCycleCount(organizationId: bigint) {
       const r = await apiFetch('/api/call/validate_cycle_count?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(cycleCountId)]),
+        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
       })
       if (!r.ok) throw new Error('Failed to validate cycle count')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -717,12 +811,12 @@ export function usePostCycleCountAdjustments(organizationId: bigint) {
       const r = await apiFetch('/api/call/post_cycle_count_adjustments?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(cycleCountId)]),
+        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
       })
       if (!r.ok) throw new Error('Failed to post cycle count adjustments')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] })
       void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
     },
@@ -733,10 +827,11 @@ export function useCreateStockLocation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params)
       const r = await apiFetch('/api/call/create_stock_location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock location')
     },
@@ -751,7 +846,7 @@ export function useUpdateStockLocation(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_stock_location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(locationId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(locationId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update stock location')
     },
@@ -766,7 +861,7 @@ export function useDeleteStockLocation(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_stock_location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(locationId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(locationId)]),
       })
       if (!r.ok) throw new Error('Failed to delete stock location')
     },
@@ -781,7 +876,7 @@ export function useCreateStockMove(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/create_stock_move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock move')
     },
@@ -789,14 +884,18 @@ export function useCreateStockMove(organizationId: bigint, _companyId?: bigint) 
   })
 }
 
-export function useConfirmStockMove(organizationId: bigint, _companyId?: bigint) {
+export function useConfirmStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const r = await apiFetch('/api/call/confirm_stock_move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(moveId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(moveId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to confirm stock move')
     },
@@ -804,14 +903,18 @@ export function useConfirmStockMove(organizationId: bigint, _companyId?: bigint)
   })
 }
 
-export function useAssignStockMove(organizationId: bigint, _companyId?: bigint) {
+export function useAssignStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const r = await apiFetch('/api/call/assign_stock_move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(moveId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(moveId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to assign stock move')
     },
@@ -819,7 +922,7 @@ export function useAssignStockMove(organizationId: bigint, _companyId?: bigint) 
   })
 }
 
-export function useDoneStockMove(organizationId: bigint, _companyId?: bigint) {
+export function useDoneStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { moveId: ScalarId; quantityDone: number }>({
     mutationFn: async ({ moveId, quantityDone }) => {
@@ -828,8 +931,8 @@ export function useDoneStockMove(organizationId: bigint, _companyId?: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(moveId),
-          { company_id: null, quantity_done: quantityDone },
+          toScalarU64(moveId),
+          stdbParamsToJson({ company_id: companyId, quantity_done: quantityDone } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to complete stock move')
@@ -838,14 +941,18 @@ export function useDoneStockMove(organizationId: bigint, _companyId?: bigint) {
   })
 }
 
-export function useCancelStockMove(organizationId: bigint, _companyId?: bigint) {
+export function useCancelStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const r = await apiFetch('/api/call/cancel_stock_move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(moveId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(moveId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to cancel stock move')
     },
@@ -853,14 +960,18 @@ export function useCancelStockMove(organizationId: bigint, _companyId?: bigint) 
   })
 }
 
-export function useConfirmStockPicking(organizationId: bigint, _companyId?: bigint) {
+export function useConfirmStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const r = await apiFetch('/api/call/confirm_stock_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pickingId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(pickingId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to confirm stock picking')
     },
@@ -868,14 +979,18 @@ export function useConfirmStockPicking(organizationId: bigint, _companyId?: bigi
   })
 }
 
-export function useAssignStockPicking(organizationId: bigint, _companyId?: bigint) {
+export function useAssignStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const r = await apiFetch('/api/call/assign_stock_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pickingId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(pickingId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to assign stock picking')
     },
@@ -883,14 +998,18 @@ export function useAssignStockPicking(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useCancelStockPicking(organizationId: bigint, _companyId?: bigint) {
+export function useCancelStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const r = await apiFetch('/api/call/cancel_stock_picking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pickingId), { company_id: null }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(pickingId),
+          stdbParamsToJson({ company_id: companyId } as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to cancel stock picking')
     },
@@ -905,7 +1024,7 @@ export function useCreateStockInventory(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/create_stock_inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock inventory')
     },
@@ -920,7 +1039,7 @@ export function useCreateStockInventoryLine(organizationId: bigint, _companyId?:
       const r = await apiFetch('/api/call/create_stock_inventory_line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock inventory line')
     },
@@ -935,7 +1054,7 @@ export function useUpdateStockInventoryState(organizationId: bigint, _companyId?
       const r = await apiFetch('/api/call/update_stock_inventory_state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId), newState]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId), newState]),
       })
       if (!r.ok) throw new Error('Failed to update stock inventory state')
     },
@@ -950,7 +1069,7 @@ export function useCreateStockProductionLot(organizationId: bigint, _companyId?:
       const r = await apiFetch('/api/call/create_stock_production_lot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock production lot')
     },
@@ -965,7 +1084,7 @@ export function useCreateStockProductionSerial(organizationId: bigint, _companyI
       const r = await apiFetch('/api/call/create_stock_production_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock production serial')
     },
@@ -980,7 +1099,7 @@ export function useReserveSerial(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/reserve_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(serialId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
       })
       if (!r.ok) throw new Error('Failed to reserve serial')
     },
@@ -995,7 +1114,7 @@ export function useBlockSerial(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/block_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(serialId), reason ?? null]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId), reason ?? null]),
       })
       if (!r.ok) throw new Error('Failed to block serial')
     },
@@ -1005,14 +1124,18 @@ export function useBlockSerial(organizationId: bigint, _companyId?: bigint) {
 
 // ── Quality Management ───────────────────────────────────────────────────────
 
-export function useCreateQualityCheck(organizationId: bigint, _companyId?: bigint) {
+export function useCreateQualityCheck(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create quality check')
     },
@@ -1027,7 +1150,7 @@ export function useUpdateQualityCheck(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/update_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(checkId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(checkId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update quality check')
     },
@@ -1042,7 +1165,7 @@ export function useDeleteQualityCheck(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/delete_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(checkId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(checkId)]),
       })
       if (!r.ok) throw new Error('Failed to delete quality check')
     },
@@ -1050,14 +1173,30 @@ export function useDeleteQualityCheck(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function usePassQualityCheck(organizationId: bigint, _companyId?: bigint) {
+export function usePassQualityCheck(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (checkId) => {
+  return useMutation<
+    void,
+    Error,
+    {
+      checkId: ScalarId
+      measure?: number | null
+      note?: string | null
+      picture?: string | null
+    }
+  >({
+    mutationFn: async ({ checkId, measure, note, picture }) => {
       const r = await apiFetch('/api/call/pass_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(checkId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(checkId),
+          measure ?? null,
+          note ?? null,
+          picture ?? null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to pass quality check')
     },
@@ -1065,14 +1204,32 @@ export function usePassQualityCheck(organizationId: bigint, _companyId?: bigint)
   })
 }
 
-export function useFailQualityCheck(organizationId: bigint, _companyId?: bigint) {
+export function useFailQualityCheck(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { checkId: ScalarId; reason?: string }>({
-    mutationFn: async ({ checkId, reason }) => {
+  return useMutation<
+    void,
+    Error,
+    {
+      checkId: ScalarId
+      qtyFailed: number
+      note?: string | null
+      pictureFail?: string | null
+      failureLocationId?: ScalarId | null
+    }
+  >({
+    mutationFn: async ({ checkId, qtyFailed, note, pictureFail, failureLocationId }) => {
       const r = await apiFetch('/api/call/fail_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(checkId), reason ?? null]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(checkId),
+          qtyFailed,
+          note ?? null,
+          pictureFail ?? null,
+          failureLocationId != null ? toScalarU64(failureLocationId) : null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to fail quality check')
     },
@@ -1080,14 +1237,19 @@ export function useFailQualityCheck(organizationId: bigint, _companyId?: bigint)
   })
 }
 
-export function useCreateQualityAlert(organizationId: bigint, _companyId?: bigint) {
+export function useCreateQualityAlert(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (params) => {
+  return useMutation<void, Error, { teamId: ScalarId; params: Record<string, unknown> }>({
+    mutationFn: async ({ teamId, params }) => {
       const r = await apiFetch('/api/call/create_quality_alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(teamId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create quality alert')
     },
@@ -1102,7 +1264,7 @@ export function useUpdateQualityAlert(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/update_quality_alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(alertId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(alertId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update quality alert')
     },
@@ -1117,7 +1279,7 @@ export function useDeleteQualityAlert(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/delete_quality_alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(alertId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(alertId)]),
       })
       if (!r.ok) throw new Error('Failed to delete quality alert')
     },
@@ -1125,14 +1287,19 @@ export function useDeleteQualityAlert(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useAssignQualityAlert(organizationId: bigint, _companyId?: bigint) {
+export function useAssignQualityAlert(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { alertId: ScalarId; userId: string | null }>({
     mutationFn: async ({ alertId, userId }) => {
       const r = await apiFetch('/api/call/assign_quality_alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(alertId), userId]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(alertId),
+          userId,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to assign quality alert')
     },
@@ -1140,14 +1307,19 @@ export function useAssignQualityAlert(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useCancelQualityAlert(organizationId: bigint, _companyId?: bigint) {
+export function useCancelQualityAlert(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (alertId) => {
+  return useMutation<void, Error, { alertId: ScalarId; description?: string | null }>({
+    mutationFn: async ({ alertId, description }) => {
       const r = await apiFetch('/api/call/cancel_quality_alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(alertId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(alertId),
+          description ?? null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to cancel quality alert')
     },
@@ -1155,14 +1327,18 @@ export function useCancelQualityAlert(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useCreateQualityPoint(organizationId: bigint, _companyId?: bigint) {
+export function useCreateQualityPoint(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_quality_point', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create quality point')
     },
@@ -1170,14 +1346,19 @@ export function useCreateQualityPoint(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useUpdateQualityPoint(organizationId: bigint, _companyId?: bigint) {
+export function useUpdateQualityPoint(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { pointId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ pointId, params }) => {
       const r = await apiFetch('/api/call/update_quality_point', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pointId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(pointId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update quality point')
     },
@@ -1185,14 +1366,14 @@ export function useUpdateQualityPoint(organizationId: bigint, _companyId?: bigin
   })
 }
 
-export function useDeleteQualityPoint(organizationId: bigint, _companyId?: bigint) {
+export function useDeleteQualityPoint(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pointId) => {
       const r = await apiFetch('/api/call/delete_quality_point', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(pointId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(pointId)]),
       })
       if (!r.ok) throw new Error('Failed to delete quality point')
     },
@@ -1207,7 +1388,7 @@ export function useCreateQualityTeam(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/create_quality_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create quality team')
     },
@@ -1222,7 +1403,7 @@ export function useUpdateQualityTeam(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/update_quality_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(teamId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update quality team')
     },
@@ -1237,7 +1418,7 @@ export function useDeleteQualityTeam(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/delete_quality_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(teamId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId)]),
       })
       if (!r.ok) throw new Error('Failed to delete quality team')
     },
@@ -1254,11 +1435,11 @@ export function useCreateBarcodeRule(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/create_barcode_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create barcode rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1269,11 +1450,11 @@ export function useUpdateBarcodeRule(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/update_barcode_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update barcode rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1284,22 +1465,22 @@ export function useDeleteBarcodeRule(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/delete_barcode_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to delete barcode rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
 export function useRecordBarcodeScan(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { barcode: string; context?: Record<string, unknown> }>({
-    mutationFn: async ({ barcode, context }) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
       const r = await apiFetch('/api/call/record_barcode_scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, barcode, context ?? {}]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to record barcode scan')
     },
@@ -1314,7 +1495,7 @@ export function useCreateBarcodeNomenclature(organizationId: bigint, _companyId?
       const r = await apiFetch('/api/call/create_barcode_nomenclature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create barcode nomenclature')
     },
@@ -1329,7 +1510,7 @@ export function useUpdateBarcodeNomenclature(organizationId: bigint, _companyId?
       const r = await apiFetch('/api/call/update_barcode_nomenclature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(nomenclatureId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update barcode nomenclature')
     },
@@ -1344,7 +1525,7 @@ export function useDeleteBarcodeNomenclature(organizationId: bigint, _companyId?
       const r = await apiFetch('/api/call/delete_barcode_nomenclature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(nomenclatureId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId)]),
       })
       if (!r.ok) throw new Error('Failed to delete barcode nomenclature')
     },
@@ -1359,7 +1540,7 @@ export function useAddRuleToNomenclature(organizationId: bigint, _companyId?: bi
       const r = await apiFetch('/api/call/add_rule_to_nomenclature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(nomenclatureId), Number(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to add rule to nomenclature')
     },
@@ -1369,13 +1550,13 @@ export function useAddRuleToNomenclature(organizationId: bigint, _companyId?: bi
 
 export function useRemoveRuleFromNomenclature(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, { nomenclatureId: ScalarId; ruleId: ScalarId }>({
     mutationFn: async ({ nomenclatureId, ruleId }) => {
       const r = await apiFetch('/api/call/remove_rule_from_nomenclature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(nomenclatureId), Number(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to remove rule from nomenclature')
     },
@@ -1388,13 +1569,13 @@ export function useRemoveRuleFromNomenclature(organizationId: bigint, _companyId
 
 export function useCreateAdjustmentReason(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_adjustment_reason', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create adjustment reason')
     },
@@ -1409,7 +1590,7 @@ export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/use_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(serialId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
       })
       if (!r.ok) throw new Error('Failed to mark serial in use')
     },
@@ -1419,13 +1600,13 @@ export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
 
 export function useCreateTraceabilityRecord(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_traceability_record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create traceability record')
     },
@@ -1435,13 +1616,13 @@ export function useCreateTraceabilityRecord(organizationId: bigint, _companyId?:
 
 export function useCreateTraceabilityReport(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_traceability_report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create traceability report')
     },
@@ -1451,13 +1632,13 @@ export function useCreateTraceabilityReport(organizationId: bigint, _companyId?:
 
 export function useRunTraceabilityReport(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (reportId) => {
       const r = await apiFetch('/api/call/run_traceability_report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(reportId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(reportId)]),
       })
       if (!r.ok) throw new Error('Failed to run traceability report')
     },
@@ -1474,11 +1655,11 @@ export function useCreateUomCategory(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/create_uom_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create UOM category')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1489,11 +1670,11 @@ export function useCreateUom(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/create_uom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create UOM')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1504,11 +1685,11 @@ export function useUpdateUom(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/update_uom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(uomId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(uomId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update UOM')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1519,43 +1700,51 @@ export function useDeleteUom(organizationId: bigint, _companyId?: bigint) {
       const r = await apiFetch('/api/call/delete_uom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(uomId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(uomId)]),
       })
       if (!r.ok) throw new Error('Failed to delete UOM')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
 export function useCreateUomConversion(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (params) => {
+  return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
+    mutationFn: async ({ categoryId, params }) => {
       const r = await apiFetch('/api/call/create_uom_conversion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(categoryId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create UOM conversion')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
 // ── Replenishment ────────────────────────────────────────────────────────────
 
-export function useCreateReplenishmentRule(organizationId: bigint, _companyId?: bigint) {
+export function useCreateReplenishmentRule(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_replenishment_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create replenishment rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1566,11 +1755,11 @@ export function useUpdateReplenishmentRule(organizationId: bigint, _companyId?: 
       const r = await apiFetch('/api/call/update_replenishment_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update replenishment rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1581,11 +1770,11 @@ export function useDeleteReplenishmentRule(organizationId: bigint, _companyId?: 
       const r = await apiFetch('/api/call/delete_replenishment_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to delete replenishment rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1596,34 +1785,39 @@ export function useTriggerReplenishment(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/trigger_replenishment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productId ? Number(productId) : null, locationId ? Number(locationId) : null, warehouseId ? Number(warehouseId) : null]),
+        body: stringifyReducerCallBody([organizationId, productId ? toScalarU64(productId) : null, locationId ? toScalarU64(locationId) : null, warehouseId ? toScalarU64(warehouseId) : null]),
       })
       if (!r.ok) throw new Error('Failed to trigger replenishment')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['replenishment-rules', organizationId] })
-      qc.invalidateQueries({ queryKey: ['stock-quants', organizationId] })
+      qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
     },
   })
 }
 
 // ── Picking Wave ─────────────────────────────────────────────────────────────
 
-export function useCreatePickingWave(organizationId: bigint, _companyId?: bigint) {
+export function useCreatePickingWave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create picking wave')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
   })
 }
 
+/** @remarks No `update_picking_wave` reducer in the module yet; kept for forward compatibility. */
 export function useUpdatePickingWave(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { waveId: ScalarId; params: Record<string, unknown> }>({
@@ -1631,14 +1825,15 @@ export function useUpdatePickingWave(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/update_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(waveId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update picking wave')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
   })
 }
 
+/** @remarks No `delete_picking_wave` reducer in the module yet. */
 export function useDeletePickingWave(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
@@ -1646,29 +1841,31 @@ export function useDeletePickingWave(organizationId: bigint, _companyId?: bigint
       const r = await apiFetch('/api/call/delete_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(waveId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId)]),
       })
       if (!r.ok) throw new Error('Failed to delete picking wave')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useConfirmPickingWave(organizationId: bigint, _companyId?: bigint) {
+/** Completes an in-progress wave (maps to `complete_picking_wave`). */
+export function useConfirmPickingWave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
-      const r = await apiFetch('/api/call/confirm_picking_wave', {
+      const r = await apiFetch('/api/call/complete_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(waveId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(waveId)]),
       })
       if (!r.ok) throw new Error('Failed to confirm picking wave')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
   })
 }
 
+/** @remarks No `process_picking_wave` reducer in the module yet. */
 export function useProcessPickingWave(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
@@ -1676,22 +1873,22 @@ export function useProcessPickingWave(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/process_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(waveId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId)]),
       })
       if (!r.ok) throw new Error('Failed to process picking wave')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useCompletePickingWave(organizationId: bigint, _companyId?: bigint) {
+export function useCompletePickingWave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
       const r = await apiFetch('/api/call/complete_picking_wave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(waveId)]),
+        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(waveId)]),
       })
       if (!r.ok) throw new Error('Failed to complete picking wave')
     },
@@ -1708,7 +1905,7 @@ export function useConfirmStockInventory(organizationId: bigint, _companyId?: bi
       const r = await apiFetch('/api/call/confirm_stock_inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
       })
       if (!r.ok) throw new Error('Failed to confirm stock inventory')
     },
@@ -1723,7 +1920,7 @@ export function useStartStockInventory(organizationId: bigint, _companyId?: bigi
       const r = await apiFetch('/api/call/start_stock_inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
       })
       if (!r.ok) throw new Error('Failed to start stock inventory')
     },
@@ -1738,7 +1935,7 @@ export function useValidateStockInventory(organizationId: bigint, _companyId?: b
       const r = await apiFetch('/api/call/validate_stock_inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
       })
       if (!r.ok) throw new Error('Failed to validate stock inventory')
     },
@@ -1753,7 +1950,7 @@ export function useCancelStockInventory(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/cancel_stock_inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(inventoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel stock inventory')
     },
@@ -1763,18 +1960,20 @@ export function useCancelStockInventory(organizationId: bigint, _companyId?: big
 
 // ── Product Category ───────────────────────────────────────────────────────────
 
-export function useCreateProductCategory(organizationId: bigint, _companyId?: bigint) {
+export function useCreateProductCategory(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const base = companyId != null ? { companyId: Number(companyId) } : {}
+      const merged = mergeReducerParams(base, params)
       const r = await apiFetch('/api/call/create_product_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error('Failed to create product category')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1785,11 +1984,11 @@ export function useUpdateProductCategory(organizationId: bigint, _companyId?: bi
       const r = await apiFetch('/api/call/update_product_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(categoryId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update product category')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1800,11 +1999,11 @@ export function useDeleteProductCategory(organizationId: bigint, _companyId?: bi
       const r = await apiFetch('/api/call/delete_product_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(categoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
       })
       if (!r.ok) throw new Error('Failed to delete product category')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1817,11 +2016,11 @@ export function useCreateStockRoute(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch('/api/call/create_stock_route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock route')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1832,11 +2031,11 @@ export function useUpdateStockRoute(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch('/api/call/update_stock_route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(routeId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(routeId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update stock route')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1847,11 +2046,11 @@ export function useDeleteStockRoute(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch('/api/call/delete_stock_route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(routeId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(routeId)]),
       })
       if (!r.ok) throw new Error('Failed to delete stock route')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1862,11 +2061,11 @@ export function useCreateStockRule(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/create_stock_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1877,11 +2076,11 @@ export function useUpdateStockRule(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/update_stock_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update stock rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1892,43 +2091,32 @@ export function useDeleteStockRule(organizationId: bigint, _companyId?: bigint) 
       const r = await apiFetch('/api/call/delete_stock_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ruleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to delete stock rule')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
 // ── Warehouse Tasks ────────────────────────────────────────────────────────────
 
-export function useCreateWarehouseTask(organizationId: bigint, _companyId?: bigint) {
+export function useCreateWarehouseTask(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_warehouse_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create warehouse task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
-  })
-}
-
-export function useUpdateWarehouseTask(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { taskId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ taskId, params }) => {
-      const r = await apiFetch('/api/call/update_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(taskId), params]),
-      })
-      if (!r.ok) throw new Error('Failed to update warehouse task')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1939,11 +2127,11 @@ export function useDeleteWarehouseTask(organizationId: bigint, _companyId?: bigi
       const r = await apiFetch('/api/call/delete_warehouse_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(taskId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
       })
       if (!r.ok) throw new Error('Failed to delete warehouse task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1954,11 +2142,11 @@ export function useStartWarehouseTask(organizationId: bigint, _companyId?: bigin
       const r = await apiFetch('/api/call/start_warehouse_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(taskId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
       })
       if (!r.ok) throw new Error('Failed to start warehouse task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -1969,7 +2157,7 @@ export function useCompleteWarehouseTask(organizationId: bigint, _companyId?: bi
       const r = await apiFetch('/api/call/complete_warehouse_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(taskId), result ?? {}]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId), result ?? {}]),
       })
       if (!r.ok) throw new Error('Failed to complete warehouse task')
     },
@@ -1984,11 +2172,11 @@ export function useCancelWarehouseTask(organizationId: bigint, _companyId?: bigi
       const r = await apiFetch('/api/call/cancel_warehouse_task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(taskId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
       })
       if (!r.ok) throw new Error('Failed to cancel warehouse task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2001,7 +2189,7 @@ export function useUpdateProductVariant(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/update_product_variant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(variantId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(variantId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update product variant')
     },
@@ -2016,7 +2204,7 @@ export function useUpdateProductInventoryData(organizationId: bigint, _companyId
       const r = await apiFetch('/api/call/update_product_inventory_data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update product inventory data')
     },
@@ -2031,11 +2219,11 @@ export function useUpdateProductPricing(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/update_product_pricing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update product pricing')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2048,7 +2236,7 @@ export function useStartQualityCheck(organizationId: bigint) {
       const r = await apiFetch('/api/call/start_quality_check?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(checkId)]),
+        body: stringifyReducerCallBody([toScalarU64(checkId)]),
       })
       if (!r.ok) throw new Error('Failed to start quality check')
     },
@@ -2063,7 +2251,7 @@ export function useOpenQualityAlert(organizationId: bigint) {
       const r = await apiFetch('/api/call/open_quality_alert?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(alertId)]),
+        body: stringifyReducerCallBody([toScalarU64(alertId)]),
       })
       if (!r.ok) throw new Error('Failed to open quality alert')
     },
@@ -2078,7 +2266,7 @@ export function useSolveQualityAlert(organizationId: bigint) {
       const r = await apiFetch('/api/call/solve_quality_alert?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(alertId), description ?? null]),
+        body: stringifyReducerCallBody([toScalarU64(alertId), description ?? null]),
       })
       if (!r.ok) throw new Error('Failed to solve quality alert')
     },
@@ -2122,7 +2310,7 @@ export function useUpdateQualityAlertReason(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_quality_alert_reason', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(reasonId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(reasonId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update quality alert reason')
     },
@@ -2137,7 +2325,7 @@ export function useDeleteQualityAlertReason(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_quality_alert_reason', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(reasonId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(reasonId)]),
       })
       if (!r.ok) throw new Error('Failed to delete quality alert reason')
     },
@@ -2152,7 +2340,7 @@ export function useAddMemberToQualityTeam(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_member_to_quality_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(teamId), memberIdentityHex]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), memberIdentityHex]),
       })
       if (!r.ok) throw new Error('Failed to add team member')
     },
@@ -2167,7 +2355,7 @@ export function useRemoveMemberFromQualityTeam(organizationId: bigint) {
       const r = await apiFetch('/api/call/remove_member_from_quality_team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(teamId), memberIdentityHex]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), memberIdentityHex]),
       })
       if (!r.ok) throw new Error('Failed to remove team member')
     },
@@ -2183,26 +2371,35 @@ export function useExecuteReplenishmentRule(organizationId: bigint) {
       const r = await apiFetch('/api/call/execute_replenishment_rule?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(ruleId)]),
+        body: stringifyReducerCallBody([toScalarU64(ruleId)]),
       })
       if (!r.ok) throw new Error('Failed to execute replenishment rule')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['replenishment-rules', orgKey] })
       void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
     },
   })
 }
 
-export function useCreateStockQuant(organizationId: bigint) {
+export function useCreateStockQuant(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const scopedCompanyId = options?.companyId
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const base = mergeReducerParams(
+        CREATE_STOCK_QUANT_DEFAULTS,
+        scopedCompanyId != null ? { companyId: Number(scopedCompanyId) } : {},
+      )
+      const merged = mergeReducerParams(base, params)
       const r = await apiFetch('/api/call/create_stock_quant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
       })
       if (!r.ok) throw new Error('Failed to create stock quant')
     },
@@ -2210,7 +2407,7 @@ export function useCreateStockQuant(organizationId: bigint) {
   })
 }
 
-export function useUpdateStockQuantQuantity(organizationId: bigint) {
+export function useUpdateStockQuantQuantity(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; quantity: number }>({
     mutationFn: async ({ quantId, quantity }) => {
@@ -2219,8 +2416,8 @@ export function useUpdateStockQuantQuantity(organizationId: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(quantId),
-          { company_id: null, quantity },
+          toScalarU64(quantId),
+          stdbParamsToJson({ company_id: companyId, quantity } as object),
         ]),
       })
       if (!r.ok) throw new Error('Failed to update quant quantity')
@@ -2236,7 +2433,7 @@ export function useUpdateStockProductionLot(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_stock_production_lot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lotId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lotId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update lot')
     },
@@ -2251,7 +2448,7 @@ export function useDeleteStockProductionLot(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_stock_production_lot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(lotId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(lotId)]),
       })
       if (!r.ok) throw new Error('Failed to delete lot')
     },
@@ -2266,7 +2463,7 @@ export function useUpdateStockProductionSerial(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_stock_production_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(serialId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update serial')
     },
@@ -2281,7 +2478,7 @@ export function useDeleteStockProductionSerial(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_stock_production_serial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(serialId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
       })
       if (!r.ok) throw new Error('Failed to delete serial')
     },
@@ -2300,12 +2497,12 @@ export function useCreateWarehouse3dZone(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_warehouse_3d_zone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(warehouseId), Number(locationId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(warehouseId), toScalarU64(locationId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create 3D zone')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
       void qc.invalidateQueries({ queryKey: ['stock-locations', orgKey] })
     },
@@ -2319,12 +2516,12 @@ export function useUpdateWarehouse3dZone(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_warehouse_3d_zone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(zoneId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(zoneId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update 3D zone')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
     },
   })
@@ -2337,12 +2534,12 @@ export function useDeleteWarehouse3dZone(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_warehouse_3d_zone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(zoneId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(zoneId)]),
       })
       if (!r.ok) throw new Error('Failed to delete 3D zone')
     },
     onSuccess: () => {
-      const orgKey = organizationId
+      const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
     },
   })
@@ -2355,11 +2552,11 @@ export function useUpdateWarehouseTaskStatus(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_warehouse_task_status?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(taskId), newStatus]),
+        body: stringifyReducerCallBody([toScalarU64(taskId), newStatus]),
       })
       if (!r.ok) throw new Error('Failed to update task status')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2370,7 +2567,7 @@ export function useLinkDeviceToQualityCheck(organizationId: bigint) {
       const r = await apiFetch('/api/call/link_device_to_quality_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(deviceId), Number(checkId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(deviceId), toScalarU64(checkId)]),
       })
       if (!r.ok) throw new Error('Failed to link device to quality check')
     },
@@ -2385,11 +2582,11 @@ export function useCreateProductSupplierInfo(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_product_supplier_info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create supplier info')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2400,11 +2597,11 @@ export function useUpdateProductSupplierInfo(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_product_supplier_info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(supplierInfoId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(supplierInfoId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update supplier info')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2415,11 +2612,11 @@ export function useCreateProductPackaging(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_product_packaging', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(productId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to create packaging')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2430,11 +2627,11 @@ export function useUpdateProductPackaging(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_product_packaging', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(packagingId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(packagingId), stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error('Failed to update packaging')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2445,11 +2642,11 @@ export function useRestoreProductCategory(organizationId: bigint) {
       const r = await apiFetch('/api/call/restore_product_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(categoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
       })
       if (!r.ok) throw new Error('Failed to restore category')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2474,7 +2671,7 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          Number(p.warehouseId),
+          toScalarU64(p.warehouseId),
           p.latitude,
           p.longitude,
           p.address ?? null,
@@ -2511,7 +2708,7 @@ export function useImportUomCategoryCsv(organizationId: bigint) {
       })
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2526,7 +2723,7 @@ export function useImportUomCsv(organizationId: bigint) {
       })
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', organizationId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2542,8 +2739,8 @@ export function useImportProductCategoryCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['product-categories', organizationId] })
-      void qc.invalidateQueries({ queryKey: ['products', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -2563,7 +2760,7 @@ export function useImportProductCsv(organizationId: bigint) {
       })
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2578,7 +2775,7 @@ export function useImportProductVariantCsv(organizationId: bigint) {
       })
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', organizationId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -2594,7 +2791,7 @@ export function useImportWarehouseCsv(organizationId: bigint, companyId: bigint)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
-      const k = organizationId
+      const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['warehouses', k] })
       void qc.invalidateQueries({ queryKey: ['stock-locations', k] })
     },
@@ -2613,7 +2810,7 @@ export function useImportStockLocationCsv(organizationId: bigint, companyId: big
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
-      const k = organizationId
+      const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['stock-locations', k] })
     },
   })
@@ -2631,7 +2828,7 @@ export function useImportStockQuantCsv(organizationId: bigint, companyId: bigint
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
-      const k = organizationId
+      const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['stock-quants', k] })
     },
   })
@@ -2649,7 +2846,7 @@ export function useImportLotCsv(organizationId: bigint, companyId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
-      const k = organizationId
+      const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['stock-production-lots', k] })
     },
   })
@@ -2677,7 +2874,7 @@ export function useUpdateWhatsappQualityScore(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_whatsapp_quality_score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(accountId), qualityScore]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(accountId), qualityScore]),
       })
       if (!r.ok) throw new Error('Failed to update WhatsApp quality score')
     },

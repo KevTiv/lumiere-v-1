@@ -2,9 +2,7 @@
  * Partner bank forms → SpacetimeDB reducer params.
  */
 
-import type { CreatePartnerBankParams, UpdatePartnerBankParams } from '@lumiere/stdb/generated/types'
-
-import { stdbParamsToJson } from '@/lib/stdb-params-json'
+import type { CreatePartnerBankParams } from '@lumiere/stdb/generated/types'
 
 function numU64(v: unknown): bigint | null {
   if (v == null || v === '') return null
@@ -15,36 +13,21 @@ function numU64(v: unknown): bigint | null {
 
 export function toCreatePartnerBankParams(
   formData: Record<string, unknown>,
-  companyId?: bigint,
 ): CreatePartnerBankParams | null {
   const partnerId = numU64(formData.partnerId)
-  const accNumber = String(formData.accNumber ?? '').trim()
-  if (partnerId == null || !accNumber) return null
+  const accStr = String(formData.accNumber ?? '')
+  if (partnerId == null || accStr.trim() === '') return null
 
   return {
     partnerId,
-    accNumber,
+    accNumber: accStr.trim(),
     accHolderName:
       formData.accHolderName != null && String(formData.accHolderName).trim() !== ''
         ? String(formData.accHolderName)
         : undefined,
-    bankId: numU64(formData.bankId) ?? undefined,
     currencyId: numU64(formData.currencyId) ?? undefined,
-    companyId: companyId ?? undefined,
     allowOutPayment: Boolean(formData.allowOutPayment),
-    sequence: undefined,
-    journalId: numU64(formData.journalId) ?? undefined,
-    metadata: undefined,
   }
-}
-
-export function createPartnerBankParamsJson(
-  formData: Record<string, unknown>,
-  companyId?: bigint,
-): Record<string, unknown> | null {
-  const p = toCreatePartnerBankParams(formData, companyId)
-  if (!p) return null
-  return stdbParamsToJson(p)
 }
 
 export function toUpdatePartnerBankParams(
@@ -61,13 +44,14 @@ export function toUpdatePartnerBankParams(
   const accHolderName =
     holderRaw != null && String(holderRaw).trim() !== '' ? String(holderRaw) : undefined
 
-  const params: UpdatePartnerBankParams = {
-    accNumber,
-    accHolderName,
-    allowOutPayment:
-      formData.allowOutPayment === undefined ? undefined : Boolean(formData.allowOutPayment),
-    active: formData.active === undefined ? undefined : Boolean(formData.active),
+  return {
+    bankId,
+    params: {
+      accNumber,
+      accHolderName,
+      allowOutPayment:
+        formData.allowOutPayment === undefined ? undefined : Boolean(formData.allowOutPayment),
+      active: formData.active === undefined ? undefined : Boolean(formData.active),
+    } as Record<string, unknown>,
   }
-
-  return { bankId, params: stdbParamsToJson(params) }
 }

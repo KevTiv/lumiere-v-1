@@ -439,7 +439,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'codePrefixEnd',
   ]),
   'account-journals': orgEntry<AccountJournal>('account_journal', ['account-journals', 'account_journal'], [
-    'code', 'name', 'companyId',
+    'code',
+    'name',
+    'companyId',
+    'active',
+    'type',
+    'defaultAccountId',
   ]),
   'account-moves': orgEntry<AccountMove>('account_move', ['account-moves', 'account_move'], [
     'name',

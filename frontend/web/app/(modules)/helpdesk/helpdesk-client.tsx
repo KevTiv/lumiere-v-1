@@ -277,7 +277,7 @@ function HelpdeskClientLoaded({
     [tickets, teams, stages, slas],
   )
 
-  const handleFormSubmit = (tabId: string, action: string, formData: Record<string, unknown>) => {
+  const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
     if (action === "createTicket") {
       const teamRaw = formData.teamId
       const stageRaw = formData.stageId
@@ -297,14 +297,14 @@ function HelpdeskClientLoaded({
         slaId: slaRaw != null && slaRaw !== "" ? Number(slaRaw) : null,
         slaDeadline: null,
       }
-      createTicket.mutate(params)
+      await createTicket.mutateAsync(params)
       return
     }
 
     if (action === "createHelpdeskTeam") {
       const name = String(formData.name ?? "").trim()
       if (!name) return
-      createTeam.mutate({
+      await createTeam.mutateAsync({
         name,
         description: formData.description ? String(formData.description) : null,
         isActive: Boolean(formData.isActive ?? true),
@@ -316,7 +316,7 @@ function HelpdeskClientLoaded({
       const name = String(formData.name ?? "").trim()
       if (!name) return
       const teamRaw = formData.teamId
-      createStage.mutate({
+      await createStage.mutateAsync({
         name,
         teamId: teamRaw === "" || teamRaw == null ? null : Number(teamRaw),
         sequence: Number(formData.sequence) || 0,
@@ -333,7 +333,7 @@ function HelpdeskClientLoaded({
       const teamRaw = formData.teamId
       const stageRaw = formData.stageId
       if (teamRaw === "" || stageRaw === "") return
-      createSla.mutate({
+      await createSla.mutateAsync({
         name,
         teamId: Number(teamRaw),
         stageId: Number(stageRaw),
@@ -344,6 +344,17 @@ function HelpdeskClientLoaded({
       })
     }
   }
+
+  const isFormMutationPending =
+    createTicket.isPending ||
+    createTeam.isPending ||
+    createStage.isPending ||
+    createSla.isPending ||
+    updateTicket.isPending ||
+    assignTicket.isPending ||
+    closeTicket.isPending ||
+    reopenTicket.isPending ||
+    importTicketsCsv.isPending
 
   const onRowClick = (tabId: string, row: Record<string, unknown>) => {
     if (tabId !== "tickets") return
@@ -398,14 +409,16 @@ function HelpdeskClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         onRowClick={onRowClick}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? ticketFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -414,6 +427,7 @@ function HelpdeskClientLoaded({
         open={csvImportKind !== null}
         onOpenChange={(open) => !open && setCsvImportKind(null)}
         config={csvImportKind ? helpdeskCsvImportForm(t, csvImportKind) : helpdeskCsvImportForm(t, "ticket")}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           const csv = String(formData.csvData ?? "")
           if (!csv.trim() || !csvImportKind) return

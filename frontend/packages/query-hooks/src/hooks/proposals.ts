@@ -10,8 +10,12 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+function toScalarU64(v: bigint | number | string): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -20,7 +24,7 @@ export function useProposals(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposals', organizationId],
+    queryKey: ['proposals', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/proposals', 'Failed to fetch proposals'),
     staleTime: 30_000,
     initialData,
@@ -32,7 +36,7 @@ export function useProposalSections(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-sections', organizationId],
+    queryKey: ['proposal-sections', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/proposal-sections', 'Failed to fetch proposal sections'),
     staleTime: 30_000,
     initialData,
@@ -45,7 +49,7 @@ export function useProposalLineItems(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-line-items', organizationId, proposalId?.toString()],
+    queryKey: ['proposal-line-items', rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-line-items', 'Failed to fetch proposal line items'),
     staleTime: 30_000,
     initialData,
@@ -57,7 +61,7 @@ export function useProposalVersions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-versions', organizationId],
+    queryKey: ['proposal-versions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/proposal-versions', 'Failed to fetch proposal versions'),
     staleTime: 30_000,
     initialData,
@@ -69,7 +73,7 @@ export function useProposalSourceDocs(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-source-docs', organizationId],
+    queryKey: ['proposal-source-docs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/proposal-source-docs', 'Failed to fetch proposal source docs'),
     staleTime: 30_000,
     initialData,
@@ -82,7 +86,7 @@ export function useProposalPresence(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-presence', organizationId, proposalId?.toString()],
+    queryKey: ['proposal-presence', rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-presence', 'Failed to fetch proposal presence'),
     staleTime: 30_000,
     initialData,
@@ -95,7 +99,7 @@ export function useProposalComments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-comments', organizationId, proposalId?.toString()],
+    queryKey: ['proposal-comments', rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () => fetchQueryList('/api/query/proposal-comments', 'Failed to fetch proposal comments'),
     staleTime: 30_000,
     initialData,
@@ -238,9 +242,9 @@ export function useAddProposalLineItem() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
-          Number(params.proposalId),
-          params.sectionId != null ? Number(params.sectionId) : null,
-          Number(params.productId),
+          toScalarU64(params.proposalId),
+          params.sectionId != null ? toScalarU64(params.sectionId) : null,
+          toScalarU64(params.productId),
           params.productName,
           params.quantity,
           params.priceUnit,
@@ -481,10 +485,10 @@ export function useAddProposalComment() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
-          Number(params.proposalId),
-          Number(params.sectionId),
+          toScalarU64(params.proposalId),
+          toScalarU64(params.sectionId),
           params.content,
-          params.parentId != null ? Number(params.parentId) : null,
+          params.parentId != null ? toScalarU64(params.parentId) : null,
           params.authorName,
         ]),
       })

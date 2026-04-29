@@ -6,7 +6,6 @@ import { ModuleView, FormModal, newMailMessageForm, MissingOrganization } from "
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
 import { useMailMessages, usePostMessage } from "@lumiere/query-hooks/hooks/messages"
-import type { PostMessageParams } from "@lumiere/query-hooks/hooks/messages"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
@@ -94,7 +93,7 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
     [messages],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
@@ -106,15 +105,17 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
       if (resRaw === "" || resRaw == null) return
       const resNum = Number(resRaw)
       if (!Number.isFinite(resNum) || resNum <= 0) return
-      postMessage.mutate({
+      await postMessage.mutateAsync({
         model: formData.model ? String(formData.model) : "mail.message",
         resId: BigInt(Math.floor(resNum)),
         body,
-        parentId: optionalBigIntU64(formData.parentId),
+        parentId: optionalBigIntU64(formData.parentId) ?? null,
         attachmentIds: [],
       })
     }
   }
+
+  const isFormMutationPending = postMessage.isPending
 
   return (
     <>
@@ -122,14 +123,16 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newMailMessageForm(t)}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}

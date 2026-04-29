@@ -15,7 +15,7 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { fetchQueryList, type QueryRows } from "../http"
+import { fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 
 type ScalarId = bigint | number | string
 
@@ -41,7 +41,7 @@ async function postReducer(path: string, body: unknown[]): Promise<void> {
 
 export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-devices', organizationId],
+    queryKey: ['iot-devices', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-devices', 'Failed to fetch IoT devices'),
     staleTime: 30_000,
     initialData,
@@ -50,7 +50,7 @@ export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-hubs', organizationId],
+    queryKey: ['iot-hubs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-hubs', 'Failed to fetch IoT hubs'),
     staleTime: 30_000,
     initialData,
@@ -59,7 +59,7 @@ export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotPairingTokens(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-pairing-tokens', organizationId],
+    queryKey: ['iot-pairing-tokens', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/iot-pairing-tokens', 'Failed to fetch IoT pairing tokens'),
     staleTime: 15_000,
@@ -69,7 +69,7 @@ export function useIotPairingTokens(organizationId: bigint, initialData?: QueryR
 
 export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-alerts', organizationId],
+    queryKey: ['iot-alerts', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-alerts', 'Failed to fetch IoT alerts'),
     staleTime: 30_000,
     initialData,
@@ -78,7 +78,7 @@ export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-actions', organizationId],
+    queryKey: ['iot-actions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-actions', 'Failed to fetch IoT actions'),
     staleTime: 30_000,
     initialData,
@@ -87,7 +87,7 @@ export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotTelemetry(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-telemetry', organizationId],
+    queryKey: ['iot-telemetry', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-telemetry', 'Failed to fetch IoT telemetry'),
     staleTime: 30_000,
     initialData,
@@ -96,7 +96,7 @@ export function useIotTelemetry(organizationId: bigint, initialData?: QueryRows)
 
 export function useIotThresholds(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['iot-thresholds', organizationId],
+    queryKey: ['iot-thresholds', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/iot-thresholds', 'Failed to fetch IoT thresholds'),
     staleTime: 30_000,
     initialData,

@@ -829,7 +829,7 @@ function AccountingClientLoaded({
       setManualReconcileResidual(String(bankLineMatchFocus.amount ?? 0))
       setManualReconcileMoveIds("")
     }
-  }, [bankLineMatchFocus?.id])
+  }, [bankLineMatchFocus?.id, bankLineMatchFocus?.amount])
 
   const editBankStatementLineFormConfig = useMemo(() => {
     const empty = {
@@ -999,7 +999,7 @@ function AccountingClientLoaded({
         actions: [],
       },
     }
-  }, [t])
+  }, [])
 
   const fiscalYearsEntityConfig = useMemo((): EntityViewConfig => {
     const base = fiscalYearsTableConfig(t)
@@ -1335,9 +1335,9 @@ function AccountingClientLoaded({
   }, [t, deletePaymentTermLine])
 
   // Helper to get intercompany rule active state
-  const intercompanyRuleIsActive = (row: Record<string, unknown>): boolean => {
+  const intercompanyRuleIsActive = useCallback((row: Record<string, unknown>): boolean => {
     return row.isActive === true
-  }
+  }, []);
 
   const intercompanyRulesEntityConfig = useMemo((): EntityViewConfig => {
     const base = intercompanyRulesTableConfig(t)
@@ -1391,7 +1391,7 @@ function AccountingClientLoaded({
         ],
       },
     }
-  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule])
+  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule, intercompanyRuleIsActive])
 
   // Helper to get intercompany transaction state
   const intercompanyTransactionState = (row: Record<string, unknown>): string => {
@@ -1742,20 +1742,20 @@ function AccountingClientLoaded({
     if (csvKind) setCsvError(null)
   }, [csvKind])
 
-  const addCsvToolbar = (
-    ec: EntityViewConfig,
-    actions: Array<{ id: string; label: string; onClick: () => void }>,
-  ): EntityViewConfig => {
-    if (ec.view.mode !== "table") return ec
-    return {
-      ...ec,
-      view: {
-        ...ec.view,
-        rowSelectionToggleOnClick: false,
-        actions,
-      },
-    }
-  }
+  const addCsvToolbar = useCallback(
+    (ec: EntityViewConfig, actions: Array<{ id: string; label: string; onClick: () => void }>): EntityViewConfig => {
+      if (ec.view.mode !== "table") return ec
+      return {
+        ...ec,
+        view: {
+          ...ec.view,
+          rowSelectionToggleOnClick: false,
+          actions,
+        },
+      }
+    },
+    [],
+  )
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -1773,240 +1773,248 @@ function AccountingClientLoaded({
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
   const config = useMemo(
-    () => ({
-      ...moduleConfigBase,
-      tabs: moduleConfigBase.tabs.map((tab) => {
-        if (tab.id === "analytic-lines") {
-          return { ...tab, createForm: analyticLineFormConfig }
-        }
-        if (tab.id === "analytic-distribution") {
-          return { ...tab, createForm: analyticDistFormConfig }
-        }
-        if (tab.id === "dashboard") {
-          return { ...tab, sections: liveSections }
-        }
-        if (tab.id === "invoices") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <InvoiceListView
-                invoices={invoices as unknown as AccountMove[]}
-                onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
-                onCreateInvoice={() => setShowCreateInvoice(true)}
-                onRecalculateTotals={(inv) =>
-                  void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
-                }
-              />
-            ),
+    () => {
+      // Omit `tabs` from spread so static analysis (and runtime) only see the mapped tabs below.
+      const { tabs: _ignoreBaseTabs, ...moduleWithoutTabs } = moduleConfigBase
+      return {
+        ...moduleWithoutTabs,
+        tabs: moduleConfigBase.tabs.map((tab) => {
+          if (tab.id === "analytic-lines") {
+            return { ...tab, createForm: analyticLineFormConfig }
           }
-        }
-        if (tab.id === "bills") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <BillsListView
-                bills={bills as unknown as AccountMove[]}
-                onCreateBill={() => setShowCreateBill(true)}
-                onRecalculateTotals={(bill) =>
-                  void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
-                }
-              />
-            ),
+          if (tab.id === "analytic-distribution") {
+            return { ...tab, createForm: analyticDistFormConfig }
           }
-        }
-        if (tab.id === "accounts") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <ChartOfAccountsView
-                accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
-                chartStructureContent={chartStructurePanel}
-                onImportAccountsCsv={() => setCsvKind("account")}
-                onCreate={(data) => {
-                  const p = toCreateAccountAccountParams(data as Record<string, unknown>)
-                  if (p) createAccount.mutate([organizationId, accountingParamsToJson(p)])
-                }}
-              />
-            ),
+          if (tab.id === "dashboard") {
+            return { ...tab, sections: liveSections }
           }
-        }
-        if (tab.id === "journal-entries") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <GeneralLedgerView
-                moves={allMoves as unknown as AccountMove[]}
-                onImportMovesCsv={() => setCsvKind("accountMove")}
-                onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
-                onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
-                onPostMove={(move) => postDraft(move)}
-                onCancelMove={(move) =>
-                  cancelMove.mutate([organizationId, move.id as string | number | bigint])
-                }
-                onComputeInvoiceTotals={(move) =>
-                  void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
-                }
-                postMovePending={postMove.isPending || postInvoice.isPending}
-                cancelMovePending={cancelMove.isPending}
-                computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
-              />
-            ),
-          }
-        }
-        if (tab.id === "budgets") {
-          return {
-            ...tab,
-            entityConfig: addCsvToolbar(budgetsEntityConfig, [
-              {
-                id: "csv-budget",
-                label: t("accounting.csvImport.toolbarBudgets"),
-                onClick: () => setCsvKind("budget"),
-              },
-              {
-                id: "csv-budget-line",
-                label: t("accounting.csvImport.toolbarBudgetLines"),
-                onClick: () => setCsvKind("budgetLine"),
-              },
-            ]),
-          }
-        }
-        if (tab.id === "taxes" && tab.entityConfig) {
-          return {
-            ...tab,
-            entityConfig: addCsvToolbar(tab.entityConfig, [
-              {
-                id: "csv-tax",
-                label: t("accounting.csvImport.toolbarTaxRates"),
-                onClick: () => setCsvKind("tax"),
-              },
-              {
-                id: "tax-refresh-deadline-statuses",
-                label: t("accounting.taxes.refreshDeadlineStatuses"),
-                onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
-              },
-              {
-                id: "tax-schedule-deadline-updates",
-                label: t("accounting.taxes.scheduleDeadlineUpdates"),
-                onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
-              },
-            ]),
-          }
-        }
-        if (tab.id === "analytic" && tab.entityConfig) {
-          return {
-            ...tab,
-            entityConfig: addCsvToolbar(tab.entityConfig, [
-              {
-                id: "csv-analytic",
-                label: t("accounting.csvImport.toolbarAnalytic"),
-                onClick: () => setCsvKind("analytic"),
-              },
-            ]),
-          }
-        }
-        if (tab.id === "fiscal-years") {
-          return { ...tab, entityConfig: fiscalYearsEntityConfig }
-        }
-        if (tab.id === "account-periods") {
-          return {
-            ...tab,
-            entityConfig: accountPeriodsEntityConfig,
-            createForm: accountPeriodCreateFormConfig,
-          }
-        }
-        if (tab.id === "fixed-assets") {
-          return { ...tab, entityConfig: fixedAssetsEntityConfig }
-        }
-        if (tab.id === "payments") {
-          return {
-            ...tab,
-            createForm: accountPaymentFormConfig,
-            entityConfig: accountPaymentsEntityConfig,
-          }
-        }
-        if (tab.id === "payment-terms") {
-          return { ...tab, entityConfig: paymentTermsEntityConfig }
-        }
-        if (tab.id === "payment-term-lines") {
-          return {
-            ...tab,
-            createForm: paymentTermLineFormConfig,
-            entityConfig: paymentTermLinesEntityConfig,
-          }
-        }
-        if (tab.id === "intercompany-rules") {
-          return { ...tab, entityConfig: intercompanyRulesEntityConfig }
-        }
-        if (tab.id === "intercompany-transactions") {
-          return { ...tab, entityConfig: intercompanyTransactionsEntityConfig }
-        }
-        if (tab.id === "bank-statements") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <div className="space-y-3">
-                <EntityView
-                  config={bankStatementsEntityConfig}
-                  data={bankStatements as unknown as Record<string, unknown>[]}
-                  onRowClick={(row) => setBankStatementDetail(row)}
+          if (tab.id === "invoices") {
+            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+            return {
+              ...tabRest,
+              type: "custom" as const,
+              customContent: (
+                <InvoiceListView
+                  invoices={invoices as unknown as AccountMove[]}
+                  onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
+                  onCreateInvoice={() => setShowCreateInvoice(true)}
+                  onRecalculateTotals={(inv) =>
+                    void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
+                  }
                 />
-              </div>
-            ),
+              ),
+            }
           }
-        }
-        if (tab.id === "reconciliation-widgets") {
-          return {
-            ...tab,
-            createForm: reconciliationWidgetCreateFormConfig,
+          if (tab.id === "bills") {
+            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+            return {
+              ...tabRest,
+              type: "custom" as const,
+              customContent: (
+                <BillsListView
+                  bills={bills as unknown as AccountMove[]}
+                  onCreateBill={() => setShowCreateBill(true)}
+                  onRecalculateTotals={(bill) =>
+                    void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
+                  }
+                />
+              ),
+            }
           }
-        }
-        if (tab.id === "consolidation") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <ConsolidationWorkspace
-                consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
-                consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
-                eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
-                onCreateConsolidationAccount={(params) =>
-                  createConsolidationAccount.mutateAsync(params)
-                }
-                onUpdateConsolidationAccount={(accountId, params) =>
-                  updateConsolidationAccount.mutateAsync({ accountId, params })
-                }
-                onCreateConsolidationJournal={(params) =>
-                  createConsolidationJournal.mutateAsync(params)
-                }
-                onCreateEliminationEntry={(params) => createEliminationEntry.mutateAsync(params)}
-                onProcessConsolidation={(journalId) => processConsolidation.mutateAsync(journalId)}
-                onValidateConsolidation={(journalId) =>
-                  validateConsolidation.mutateAsync(journalId)
-                }
-                onCancelConsolidation={(journalId, reason) =>
-                  cancelConsolidation.mutateAsync({ journalId, reason })
-                }
-                onMatchEliminationEntries={(entryId, matchedEntryId) =>
-                  matchEliminationEntries.mutateAsync({ entryId, matchedEntryId })
-                }
-                onUnmatchEliminationEntry={(entryId) =>
-                  unmatchEliminationEntry.mutateAsync(entryId)
-                }
-                processConsolidationPending={processConsolidation.isPending}
-                validateConsolidationPending={validateConsolidation.isPending}
-                cancelConsolidationPending={cancelConsolidation.isPending}
-              />
-            ),
+          if (tab.id === "accounts") {
+            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+            return {
+              ...tabRest,
+              type: "custom" as const,
+              customContent: (
+                <ChartOfAccountsView
+                  accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
+                  chartStructureContent={chartStructurePanel}
+                  onImportAccountsCsv={() => setCsvKind("account")}
+                  onCreate={(data) => {
+                    const p = toCreateAccountAccountParams(data as Record<string, unknown>)
+                    if (p) createAccount.mutate([organizationId, accountingParamsToJson(p)])
+                  }}
+                />
+              ),
+            }
           }
-        }
-        return tab
-      }),
-    }) as ModuleConfig,
+          if (tab.id === "journal-entries") {
+            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+            return {
+              ...tabRest,
+              type: "custom" as const,
+              customContent: (
+                <GeneralLedgerView
+                  moves={allMoves as unknown as AccountMove[]}
+                  onImportMovesCsv={() => setCsvKind("accountMove")}
+                  onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
+                  onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
+                  onPostMove={(move) => postDraft(move)}
+                  onCancelMove={(move) =>
+                    cancelMove.mutate([organizationId, move.id as string | number | bigint])
+                  }
+                  onComputeInvoiceTotals={(move) =>
+                    void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
+                  }
+                  postMovePending={postMove.isPending || postInvoice.isPending}
+                  cancelMovePending={cancelMove.isPending}
+                  computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
+                />
+              ),
+            }
+          }
+          if (tab.id === "budgets") {
+            return {
+              ...tab,
+              entityConfig: addCsvToolbar(budgetsEntityConfig, [
+                {
+                  id: "csv-budget",
+                  label: t("accounting.csvImport.toolbarBudgets"),
+                  onClick: () => setCsvKind("budget"),
+                },
+                {
+                  id: "csv-budget-line",
+                  label: t("accounting.csvImport.toolbarBudgetLines"),
+                  onClick: () => setCsvKind("budgetLine"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "taxes" && tab.entityConfig) {
+            return {
+              ...tab,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-tax",
+                  label: t("accounting.csvImport.toolbarTaxRates"),
+                  onClick: () => setCsvKind("tax"),
+                },
+                {
+                  id: "tax-refresh-deadline-statuses",
+                  label: t("accounting.taxes.refreshDeadlineStatuses"),
+                  onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
+                },
+                {
+                  id: "tax-schedule-deadline-updates",
+                  label: t("accounting.taxes.scheduleDeadlineUpdates"),
+                  onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "analytic" && tab.entityConfig) {
+            return {
+              ...tab,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-analytic",
+                  label: t("accounting.csvImport.toolbarAnalytic"),
+                  onClick: () => setCsvKind("analytic"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "fiscal-years") {
+            return { ...tab, entityConfig: fiscalYearsEntityConfig }
+          }
+          if (tab.id === "account-periods") {
+            return {
+              ...tab,
+              entityConfig: accountPeriodsEntityConfig,
+              createForm: accountPeriodCreateFormConfig,
+            }
+          }
+          if (tab.id === "fixed-assets") {
+            return { ...tab, entityConfig: fixedAssetsEntityConfig }
+          }
+          if (tab.id === "payments") {
+            return {
+              ...tab,
+              createForm: accountPaymentFormConfig,
+              entityConfig: accountPaymentsEntityConfig,
+            }
+          }
+          if (tab.id === "payment-terms") {
+            return { ...tab, entityConfig: paymentTermsEntityConfig }
+          }
+          if (tab.id === "payment-term-lines") {
+            return {
+              ...tab,
+              createForm: paymentTermLineFormConfig,
+              entityConfig: paymentTermLinesEntityConfig,
+            }
+          }
+          if (tab.id === "intercompany-rules") {
+            return { ...tab, entityConfig: intercompanyRulesEntityConfig }
+          }
+          if (tab.id === "intercompany-transactions") {
+            return { ...tab, entityConfig: intercompanyTransactionsEntityConfig }
+          }
+          if (tab.id === "bank-statements") {
+            return {
+              ...tab,
+              type: "custom" as const,
+              customContent: (
+                <div className="space-y-3">
+                  <EntityView
+                    config={bankStatementsEntityConfig}
+                    data={bankStatements as unknown as Record<string, unknown>[]}
+                    onRowClick={(row) => setBankStatementDetail(row)}
+                  />
+                </div>
+              ),
+            }
+          }
+          if (tab.id === "reconciliation-widgets") {
+            return {
+              ...tab,
+              createForm: reconciliationWidgetCreateFormConfig,
+            }
+          }
+          if (tab.id === "consolidation") {
+            return {
+              ...tab,
+              type: "custom" as const,
+              customContent: (
+                <ConsolidationWorkspace
+                  consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
+                  consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
+                  eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
+                  onCreateConsolidationAccount={(params) =>
+                    createConsolidationAccount.mutateAsync(params)
+                  }
+                  onUpdateConsolidationAccount={(accountId, params) =>
+                    updateConsolidationAccount.mutateAsync({ accountId, params })
+                  }
+                  onCreateConsolidationJournal={(params) =>
+                    createConsolidationJournal.mutateAsync(params)
+                  }
+                  onCreateEliminationEntry={(params) => createEliminationEntry.mutateAsync(params)}
+                  onProcessConsolidation={(journalId) => processConsolidation.mutateAsync(journalId)}
+                  onValidateConsolidation={(journalId) =>
+                    validateConsolidation.mutateAsync(journalId)
+                  }
+                  onCancelConsolidation={(journalId, reason) =>
+                    cancelConsolidation.mutateAsync({ journalId, reason })
+                  }
+                  onMatchEliminationEntries={(entryId, matchedEntryId) =>
+                    matchEliminationEntries.mutateAsync({ entryId, matchedEntryId })
+                  }
+                  onUnmatchEliminationEntry={(entryId) =>
+                    unmatchEliminationEntry.mutateAsync(entryId)
+                  }
+                  processConsolidationPending={processConsolidation.isPending}
+                  validateConsolidationPending={validateConsolidation.isPending}
+                  cancelConsolidationPending={cancelConsolidation.isPending}
+                />
+              ),
+            }
+          }
+          return tab
+        }),
+      } as ModuleConfig
+    },
     [
       liveSections,
       chartStructurePanel,
@@ -2057,6 +2065,7 @@ function AccountingClientLoaded({
       cancelConsolidation.mutateAsync,
       matchEliminationEntries.mutateAsync,
       unmatchEliminationEntry.mutateAsync,
+      addCsvToolbar, computeInvoiceTotals.isPending
     ],
   )
 

@@ -291,7 +291,7 @@ function ExpensesClientLoaded({
     [expenses, sheets],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
@@ -302,7 +302,7 @@ function ExpensesClientLoaded({
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      createExpense.mutate(
+      await createExpense.mutateAsync(
         withCompanyScope(
           {
             employeeId: Number(empRaw),
@@ -327,7 +327,7 @@ function ExpensesClientLoaded({
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      createExpenseSheet.mutate(
+      await createExpenseSheet.mutateAsync(
         withCompanyScope(
           {
             employeeId: Number(empRaw),
@@ -343,6 +343,18 @@ function ExpensesClientLoaded({
       )
     }
   }
+
+  const isFormMutationPending =
+    createExpense.isPending ||
+    createExpenseSheet.isPending ||
+    updateExpense.isPending ||
+    submitExpense.isPending ||
+    submitExpenseSheet.isPending ||
+    approveExpenseSheet.isPending ||
+    refuseExpenseSheet.isPending ||
+    postExpenseSheet.isPending ||
+    csvImports.importExpense.isPending ||
+    csvImports.importExpenseSheet.isPending
 
   const addToReportFormForRow = useCallback(
     (row: Record<string, unknown>) => {
@@ -390,12 +402,12 @@ function ExpensesClientLoaded({
     return null
   }, [workflowForm, editExpenseFormConfig, addToReportFormForRow, submitReportFormBase, postReportFormBase, expenses])
 
-  const handleWorkflowSubmit = (formData: Record<string, unknown>) => {
+  const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowForm) return
     if (workflowForm.kind === "editExpense") {
       const id = rowId(workflowForm.row)
       if (!id) return
-      void updateExpense.mutateAsync({
+      await updateExpense.mutateAsync({
         expenseId: id,
         params: withCompanyScope(
           {
@@ -413,19 +425,19 @@ function ExpensesClientLoaded({
     } else if (workflowForm.kind === "addToReport") {
       const sheetRaw = formData.sheetId
       if (sheetRaw === "" || sheetRaw == null) return
-      void submitExpense.mutateAsync({
+      await submitExpense.mutateAsync({
         expenseId: rowId(workflowForm.row),
         sheetId: String(sheetRaw),
       })
     } else if (workflowForm.kind === "submitReport") {
-      void submitExpenseSheet.mutateAsync({
+      await submitExpenseSheet.mutateAsync({
         sheetId: rowId(workflowForm.row),
         params: { totalAmount: Number(formData.totalAmount ?? 0) },
       })
     } else if (workflowForm.kind === "postReport") {
       const d = formData.accountingDate
       if (d == null || d === "") return
-      void postExpenseSheet.mutateAsync({
+      await postExpenseSheet.mutateAsync({
         sheetId: rowId(workflowForm.row),
         accountingDate: new Date(String(d)),
       })
@@ -448,14 +460,16 @@ function ExpensesClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? expenseFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -467,6 +481,7 @@ function ExpensesClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {
@@ -644,7 +659,8 @@ function ExpensesClientLoaded({
           open
           onOpenChange={(open) => !open && setWorkflowForm(null)}
           config={workflowFormConfig}
-          onSubmit={handleWorkflowSubmit}
+          isPending={isFormMutationPending}
+          onSubmit={(fd) => handleWorkflowSubmit(fd)}
         />
       )}
     </>

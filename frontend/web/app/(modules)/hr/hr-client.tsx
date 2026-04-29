@@ -439,14 +439,14 @@ function HrClientLoaded({
     [employees, departments, leaves, contracts, payslips, jobPositions]
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>
   ) => {
     if (action === "createEmployee") {
       const deptRaw = formData.departmentId
-      createEmployee.mutate({
+      await createEmployee.mutateAsync({
         name: String(formData.name ?? ""),
         jobId: optionalBigIntU64(formData.jobId),
         departmentId:
@@ -477,7 +477,7 @@ function HrClientLoaded({
       const empRaw = formData.employeeId
       const ltRaw = formData.leaveTypeId
       if (empRaw === "" || empRaw == null || ltRaw === "" || ltRaw == null) return
-      createLeaveRequest.mutate({
+      await createLeaveRequest.mutateAsync({
         employeeId: Number(empRaw),
         leaveTypeId: Number(ltRaw),
         dateFrom: new Date(String(formData.dateFrom)),
@@ -493,7 +493,7 @@ function HrClientLoaded({
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      createContract.mutate({
+      await createContract.mutateAsync({
         employeeId: Number(empRaw),
         name: String(formData.name ?? ""),
         dateStart: new Date(String(formData.dateStart)),
@@ -505,7 +505,7 @@ function HrClientLoaded({
         notes: undefined,
       } as never)
     } else if (action === "createPayslip") {
-      createPayslip.mutate({
+      await createPayslip.mutateAsync({
         employeeId: Number(formData.employeeId),
         structId: Number(formData.structId),
         dateFrom: new Date(String(formData.dateFrom)),
@@ -516,7 +516,7 @@ function HrClientLoaded({
       } as never)
     } else if (action === "createJobPosition") {
       const deptRaw = formData.departmentId
-      createJobPosition.mutate({
+      await createJobPosition.mutateAsync({
         name: String(formData.name ?? ""),
         departmentId:
           deptRaw !== "" && deptRaw != null ? BigInt(Number(deptRaw)) : undefined,
@@ -529,7 +529,7 @@ function HrClientLoaded({
     } else if (action === "createDepartment") {
       const parentRaw = formData.parentId
       const managerRaw = formData.managerId
-      createDepartment.mutate({
+      await createDepartment.mutateAsync({
         name: String(formData.name ?? ""),
         parentId: parentRaw !== "" && parentRaw != null ? Number(parentRaw) : undefined,
         managerId: managerRaw !== "" && managerRaw != null ? Number(managerRaw) : undefined,
@@ -539,20 +539,31 @@ function HrClientLoaded({
     }
   }
 
+  const isFormMutationPending =
+    createEmployee.isPending ||
+    createLeaveRequest.isPending ||
+    createContract.isPending ||
+    createPayslip.isPending ||
+    createJobPosition.isPending ||
+    createDepartment.isPending ||
+    Object.values(csvImports).some((m) => m.isPending)
+
   return (
     <>
       <ModuleView
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? employeeFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -563,6 +574,7 @@ function HrClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {

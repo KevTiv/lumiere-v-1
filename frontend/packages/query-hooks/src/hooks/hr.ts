@@ -11,8 +11,15 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+type ScalarId = bigint | number | string
+
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +28,7 @@ export function useEmployees(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-employees', organizationId],
+    queryKey: ['hr-employees', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/employees', 'Failed to fetch employees'),
     staleTime: 30_000,
     initialData,
@@ -33,7 +40,7 @@ export function useDepartments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-departments', organizationId],
+    queryKey: ['hr-departments', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/departments', 'Failed to fetch departments'),
     staleTime: 30_000,
     initialData,
@@ -45,7 +52,7 @@ export function useLeaveRequests(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-leave-requests', organizationId],
+    queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/leave-requests', 'Failed to fetch leave requests'),
     staleTime: 30_000,
     initialData,
@@ -57,7 +64,7 @@ export function useContracts(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-contracts', organizationId],
+    queryKey: ['hr-contracts', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contracts', 'Failed to fetch contracts'),
     staleTime: 30_000,
     initialData,
@@ -69,7 +76,7 @@ export function usePayslips(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-payslips', organizationId],
+    queryKey: ['hr-payslips', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/payslips', 'Failed to fetch payslips'),
     staleTime: 30_000,
     initialData,
@@ -81,7 +88,7 @@ export function useJobPositions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['job-positions', organizationId],
+    queryKey: ['job-positions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/job-positions', 'Failed to fetch job positions'),
     staleTime: 30_000,
     initialData,
@@ -93,7 +100,7 @@ export function useLeaveTypes(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-leave-types', organizationId],
+    queryKey: ['hr-leave-types', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/leave-types', 'Failed to fetch leave types'),
     staleTime: 30_000,
     initialData,
@@ -105,7 +112,7 @@ export function usePayrollStructures(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-payroll-structures', organizationId],
+    queryKey: ['hr-payroll-structures', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/payroll-structures', 'Failed to fetch payroll structures'),
     staleTime: 30_000,
     initialData,
@@ -117,7 +124,7 @@ export function useSalaryRules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['hr-salary-rules', organizationId],
+    queryKey: ['hr-salary-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/salary-rules', 'Failed to fetch salary rules'),
     staleTime: 30_000,
     initialData,
@@ -138,7 +145,7 @@ export function useCreateDepartment(organizationId: bigint, companyId?: bigint) 
       if (!r.ok) throw new Error('Failed to create department')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-departments', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -154,7 +161,7 @@ export function useCreateJobPosition(organizationId: bigint, companyId?: bigint)
       if (!r.ok) throw new Error('Failed to create job position')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['job-positions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -170,23 +177,27 @@ export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to create employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useCreateLeaveRequest(organizationId: bigint, _companyId?: bigint) {
+export function useCreateLeaveRequest(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_leave_request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create leave request')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -202,7 +213,7 @@ export function useCreateContract(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to create contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -218,7 +229,7 @@ export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to create payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -236,7 +247,7 @@ export function useUpdateDepartment(organizationId: bigint, companyId?: bigint) 
       if (!r.ok) throw new Error('Failed to update department')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-departments', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -252,7 +263,7 @@ export function useUpdateJobPosition(organizationId: bigint, companyId?: bigint)
       if (!r.ok) throw new Error('Failed to update job position')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['job-positions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -268,7 +279,7 @@ export function useUpdateEmployee(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to update employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -284,91 +295,100 @@ export function useArchiveEmployee(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to archive employee')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-employees', rqBigIntKey(organizationId)] }),
   })
 }
 
 // ── Mutations: Leave Types & Workflow ───────────────────────────────────────
 
-export function useCreateLeaveType(organizationId: bigint, _companyId?: bigint) {
+export function useCreateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_leave_type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create leave type')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-types', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useUpdateLeaveType(organizationId: bigint, _companyId?: bigint) {
+export function useUpdateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { leaveTypeId: number; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { leaveTypeId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ leaveTypeId, params }) => {
       const r = await apiFetch('/api/call/update_leave_type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, leaveTypeId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          toScalarU64(leaveTypeId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update leave type')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-leave-types', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useApproveLeave(organizationId: bigint, _companyId?: bigint) {
+export function useApproveLeave(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { leaveId: number; managerId?: number }>({
-    mutationFn: async ({ leaveId, managerId }) => {
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (leaveId) => {
       const r = await apiFetch('/api/call/approve_leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, leaveId, managerId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
       })
       if (!r.ok) throw new Error('Failed to approve leave')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
     },
   })
 }
 
-export function useRefuseLeave(organizationId: bigint, _companyId?: bigint) {
+export function useRefuseLeave(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { leaveId: number; managerId?: number }>({
-    mutationFn: async ({ leaveId, managerId }) => {
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (leaveId) => {
       const r = await apiFetch('/api/call/refuse_leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, leaveId, managerId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
       })
       if (!r.ok) throw new Error('Failed to refuse leave')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
     },
   })
 }
 
-export function useResetLeaveToDraft(organizationId: bigint, _companyId?: bigint) {
+export function useResetLeaveToDraft(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, number>({
+  return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
       const r = await apiFetch('/api/call/reset_leave_to_draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, leaveId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
       })
       if (!r.ok) throw new Error('Failed to reset leave to draft')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] })
+      qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -387,55 +407,55 @@ export function useUpdateContract(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to update contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useOpenContract(organizationId: bigint, companyId?: bigint) {
+export function useOpenContract(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
       const r = await apiFetch('/api/call/open_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null]),
+        body: stringifyReducerCallBody([organizationId, contractId]),
       })
       if (!r.ok) throw new Error('Failed to open contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useExpireContract(organizationId: bigint, companyId?: bigint) {
+export function useExpireContract(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { contractId: number; endDate?: Date }>({
-    mutationFn: async ({ contractId, endDate }) => {
+  return useMutation<void, Error, { contractId: number }>({
+    mutationFn: async ({ contractId }) => {
       const r = await apiFetch('/api/call/expire_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null, endDate]),
+        body: stringifyReducerCallBody([organizationId, contractId]),
       })
       if (!r.ok) throw new Error('Failed to expire contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
-export function useCancelContract(organizationId: bigint, companyId?: bigint) {
+export function useCancelContract(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
       const r = await apiFetch('/api/call/cancel_contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId, companyId ?? null]),
+        body: stringifyReducerCallBody([organizationId, contractId]),
       })
       if (!r.ok) throw new Error('Failed to cancel contract')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -453,7 +473,7 @@ export function useCreatePayrollStructure(organizationId: bigint, _companyId?: b
       if (!r.ok) throw new Error('Failed to create payroll structure')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-payroll-structures', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -469,7 +489,7 @@ export function useCreateSalaryRule(organizationId: bigint, _companyId?: bigint)
       if (!r.ok) throw new Error('Failed to create salary rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-salary-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -480,12 +500,20 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch('/api/call/confirm_payslip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, payslipId, companyId ?? null, { gross_wage: grossWage, net_wage: netWage }]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(payslipId),
+          stdbParamsToJson({
+            companyId: companyId != null ? toScalarU64(companyId) : undefined,
+            grossWage: grossWage ?? 0,
+            netWage: netWage ?? 0,
+          }),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to confirm payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -501,7 +529,7 @@ export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to cancel payslip')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -528,7 +556,7 @@ function useImportHrResourceCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-resources', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-resources', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -544,7 +572,7 @@ function useImportHrDepartmentCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-departments', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-departments', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -560,7 +588,7 @@ function useImportHrJobPositionCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['job-positions', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['job-positions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -576,7 +604,7 @@ function useImportHrEmployeeCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-employees', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-employees', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -592,7 +620,7 @@ function useImportHrContractCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-contracts', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-contracts', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -608,7 +636,7 @@ function useImportHrLeaveTypeCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-leave-types', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-leave-types', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -624,7 +652,7 @@ function useImportHrLeaveCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-leave-requests', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -640,7 +668,7 @@ function useImportHrPayrollStructureCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-payroll-structures', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-payroll-structures', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -656,7 +684,7 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-salary-rules', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-salary-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -672,7 +700,7 @@ function useImportHrPayslipCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-payslips', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 

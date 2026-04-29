@@ -35,6 +35,8 @@ interface FormModalProps {
   submitError?: string | null
   /** Passed to {@link ModularForm} — e.g. a destructive action beside Cancel / Submit. */
   formLeadingActions?: React.ReactNode
+  /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
+  isPending?: boolean
 }
 
 export function FormModal({
@@ -46,6 +48,7 @@ export function FormModal({
   closeOnSubmit = true,
   submitError,
   formLeadingActions,
+  isPending,
 }: FormModalProps) {
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (onSubmit) {
@@ -113,6 +116,7 @@ export function FormModal({
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
+            isPending={isPending}
           />
         </div>
       </DialogContent>

@@ -11,8 +11,65 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+/** Shallow merge: `overrides` entries with value `undefined` are skipped. */
+function mergeReducerParams(
+  base: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base }
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v !== undefined) out[k] = v
+  }
+  return out
+}
+
+const CREATE_MRP_PRODUCTION_DEFAULTS: Record<string, unknown> = {
+  state: "Draft",
+  availability: "available",
+  reservationState: "confirmed",
+  componentsAvailability: "available",
+  componentsAvailabilityState: "available",
+  isPlanned: true,
+  isLocked: false,
+  isWorkorder: true,
+  delayAlert: false,
+  lotProducingCount: 0,
+  qtyProducing: 0,
+  qtyProduced: 0,
+  productUomQtyProducing: 0,
+}
+
+const CREATE_BOM_DEFAULTS: Record<string, unknown> = {
+  readyToProduce: "asap",
+  consumption: "flexible",
+  sequence: 1,
+  estimatedCost: 0,
+  lines: [],
+}
+
+const CREATE_WORKCENTER_DEFAULTS: Record<string, unknown> = {
+  active: true,
+  workingState: "normal",
+  capacityIds: [],
+  oee: 0,
+  performance: 0,
+  blockedTime: 0,
+  productiveTime: 0,
+  productivityIds: [],
+  orderIds: [],
+  workorderCount: 0,
+  workorderReadyCount: 0,
+  workorderProgressCount: 0,
+  workorderPendingCount: 0,
+  workorderLateCount: 0,
+  alternativeWorkcenterIds: [],
+  tagIds: [],
+  sequence: 1,
+}
 
 function invalidateMrpBomsAndLines(qc: QueryClient, organizationId: bigint) {
   const key = organizationId
@@ -27,7 +84,7 @@ export function useMrpProductions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-productions', organizationId],
+    queryKey: ['mrp-productions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-productions', 'Failed to fetch manufacturing orders'),
     staleTime: 30_000,
     initialData,
@@ -39,7 +96,7 @@ export function useMrpBoms(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-boms', organizationId],
+    queryKey: ['mrp-boms', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-boms', 'Failed to fetch BOMs'),
     staleTime: 30_000,
     initialData,
@@ -51,7 +108,7 @@ export function useMrpBomLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-bom-lines', organizationId],
+    queryKey: ['mrp-bom-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-bom-lines', 'Failed to fetch BOM lines'),
     staleTime: 30_000,
     initialData,
@@ -63,7 +120,7 @@ export function useMrpWorkorders(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-workorders', organizationId],
+    queryKey: ['mrp-workorders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-workorders', 'Failed to fetch workorders'),
     staleTime: 30_000,
     initialData,
@@ -75,7 +132,7 @@ export function useMrpWorkcenters(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-workcenters', organizationId],
+    queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-workcenters', 'Failed to fetch workcenters'),
     staleTime: 30_000,
     initialData,
@@ -87,7 +144,7 @@ export function useMrpRoutingWorkcenters(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['mrp-routing-workcenters', organizationId],
+    queryKey: ['mrp-routing-workcenters', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/mrp-routing-workcenters', 'Failed to fetch routing operations'),
     staleTime: 30_000,
@@ -100,7 +157,7 @@ export function useQualityChecks(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['quality-checks', organizationId],
+    queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
     initialData,
@@ -113,15 +170,17 @@ export function useCreateManufacturingOrder(organizationId: bigint, companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_MRP_PRODUCTION_DEFAULTS, params)
+      const scoped = withCompanyScope(merged, companyId)
       const r = await apiFetch('/api/call/create_manufacturing_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
       })
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -129,10 +188,12 @@ export function useCreateBom(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_BOM_DEFAULTS, params)
+      const scoped = withCompanyScope(merged, companyId)
       const r = await apiFetch('/api/call/create_bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
       })
       if (!r.ok) throw new Error('Failed to create BOM')
     },
@@ -144,15 +205,17 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const merged = mergeReducerParams(CREATE_WORKCENTER_DEFAULTS, params)
+      const scoped = withCompanyScope(merged, companyId)
       const r = await apiFetch('/api/call/create_workcenter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
       })
       if (!r.ok) throw new Error('Failed to create workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -168,7 +231,7 @@ export function useConfirmManufacturingOrder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -184,7 +247,7 @@ export function useStartManufacturingOrder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -200,7 +263,7 @@ export function useFinishManufacturingOrder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -216,7 +279,7 @@ export function useCancelManufacturingOrder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -232,7 +295,7 @@ export function useStartWorkorder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to start workorder')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -248,7 +311,7 @@ export function useFinishWorkorder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -270,7 +333,7 @@ export function useBlockWorkcenter(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to block workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -286,7 +349,7 @@ export function useUnblockWorkcenter(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to unblock workcenter')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -313,7 +376,7 @@ export function useCheckMoAvailability(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -329,7 +392,7 @@ export function useProduceManufacturingOrder(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -345,7 +408,7 @@ export function useConsumeMoMaterials(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -362,8 +425,8 @@ export function useCreateWorkorder(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['mrp-workorders', organizationId] })
-      void qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -441,7 +504,7 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
 
 export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const r = await apiFetch('/api/call/create_routing_workcenter', {
@@ -477,7 +540,7 @@ export function useUpdateWorkcenter(organizationId: bigint, companyId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -504,13 +567,13 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
 export function useCompleteProductivityLog(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  const orgKey = organizationId
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
       const r = await apiFetch('/api/call/complete_productivity_log', {
@@ -536,7 +599,7 @@ export function useImportWorkcenterCsv(organizationId: bigint, companyId: bigint
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -582,7 +645,7 @@ export function useImportManufacturingOrderCsv(organizationId: bigint, companyId
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -609,7 +672,7 @@ export function useLinkDeviceToWorkcenter(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['iot-devices', organizationId] })
+      void qc.invalidateQueries({ queryKey: ['iot-devices', rqBigIntKey(organizationId)] })
     },
   })
 }

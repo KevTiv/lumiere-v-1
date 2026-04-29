@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
+  SonnerToaster,
   ThemeProvider,
   type User,
   type Role,
@@ -83,7 +84,7 @@ function RBACBridge({
   )
 }
 
-/** api-server `/v1/realtime/ws` (proxied at `/api/realtime/ws`) → invalidate `useStdbQuery` rows. */
+/** api-server `/v1/realtime/ws` (browser connects directly) → invalidate `useStdbQuery` rows. */
 function LumiereRealtimeBridge({
   organizationId,
   companyIds,
@@ -126,6 +127,7 @@ export function Providers({
   return (
     <I18nProvider>
       <ThemeProvider>
+        <SonnerToaster />
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
             <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />

@@ -427,37 +427,56 @@ function ProjectsClientLoaded({
     [projects, tasks, timesheets, employees],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
     if (action === "createProject") {
       const p = toCreateProjectParams(formData, pricelists, companyId)
-      if (p) createProject.mutate(projectsParamsToJson(p))
+      if (p) await createProject.mutateAsync(projectsParamsToJson(p))
     } else if (action === "createTask") {
       const p = toCreateTaskParams(formData, companyId)
-      if (p) createTask.mutate(projectsParamsToJson(p))
+      if (p) await createTask.mutateAsync(projectsParamsToJson(p))
     } else if (action === "updateProject" && modal.type === 'edit') {
       const p = toUpdateProjectParams(formData)
-      if (p) updateProject.mutate({ projectId: modal.entityId, params: projectsParamsToJson(p) })
+      if (p) await updateProject.mutateAsync({ projectId: modal.entityId, params: projectsParamsToJson(p) })
     } else if (action === "updateTask" && modal.type === 'edit') {
       const p = toUpdateTaskParams(formData)
-      if (p) updateTask.mutate({ taskId: modal.entityId, params: projectsParamsToJson(p) })
+      if (p) await updateTask.mutateAsync({ taskId: modal.entityId, params: projectsParamsToJson(p) })
     } else if (action === "logTimesheet") {
       const p = toLogTimesheetParams(formData, companyId)
-      if (p) createTimesheet.mutate(projectsParamsToJson(p))
+      if (p) await createTimesheet.mutateAsync(projectsParamsToJson(p))
     } else if (action === "startTimer") {
       const p = toLogTimesheetParams(formData, companyId)
-      if (p) startTimer.mutate(projectsParamsToJson(p))
+      if (p) await startTimer.mutateAsync(projectsParamsToJson(p))
     }
   }
 
-  const handleModalSubmit = (formData: Record<string, unknown>) => {
+  const isFormMutationPending =
+    createProject.isPending ||
+    createTask.isPending ||
+    updateProject.isPending ||
+    updateTask.isPending ||
+    updateTaskState.isPending ||
+    createTimesheet.isPending ||
+    startTimer.isPending ||
+    stopTimer.isPending ||
+    setProjectActive.isPending ||
+    toggleFavorite.isPending ||
+    setTaskParent.isPending ||
+    assignTaskUsers.isPending ||
+    validateTimesheets.isPending ||
+    billTimesheets.isPending ||
+    csvImports.importProject.isPending ||
+    csvImports.importTask.isPending ||
+    csvImports.importTimesheet.isPending
+
+  const handleModalSubmit = async (formData: Record<string, unknown>) => {
     if (!modal.type || modal.type === null) return
 
     const tabId = modal.type === 'create' ? 'dashboard' : modal.type === 'edit' ? (modal.action === 'updateProject' ? 'projects' : 'tasks') : 'timesheets'
-    handleFormSubmit(tabId, modal.action, formData)
+    await handleFormSubmit(tabId, modal.action, formData)
     setModal({ type: null })
   }
 
@@ -468,12 +487,14 @@ function ProjectsClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={modal.type !== null}
         onOpenChange={(open) => !open && setModal({ type: null })}
         config={modal.type ? modal.form : projectFormConfig}
-        onSubmit={handleModalSubmit}
+        isPending={isFormMutationPending}
+        onSubmit={(fd) => handleModalSubmit(fd)}
       />
       {csvKind && csvFormConfig ? (
         <FormModal
@@ -481,6 +502,7 @@ function ProjectsClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {

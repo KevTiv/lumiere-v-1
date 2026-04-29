@@ -41,6 +41,7 @@ export function EntryDetailModal({
 }: EntryDetailModalProps) {
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSaving, setIsSaving] = useState(false)
 
   // Initialize values when entry changes
   useEffect(() => {
@@ -65,7 +66,7 @@ export function EntryDetailModal({
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Basic validation
     const newErrors: Record<string, string> = {}
     fields.forEach((field) => {
@@ -79,7 +80,12 @@ export function EntryDetailModal({
       return
     }
 
-    onSave?.({ ...entry, ...values })
+    setIsSaving(true)
+    try {
+      await Promise.resolve(onSave?.({ ...entry, ...values }))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleCancel = () => {
@@ -232,7 +238,7 @@ export function EntryDetailModal({
             {mode === "edit" ? "Cancel" : "Close"}
           </Button>
           {mode === "edit" && (
-            <Button onClick={handleSave}>
+            <Button onClick={() => void handleSave()} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
               Save Changes
             </Button>

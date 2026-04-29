@@ -11,8 +11,14 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+
+function toScalarU64(v: bigint | number | string): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +27,7 @@ export function useProjects(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['projects', organizationId],
+    queryKey: ['projects', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/projects', 'Failed to fetch projects'),
     staleTime: 30_000,
     initialData,
@@ -33,7 +39,7 @@ export function useTasks(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['tasks', organizationId],
+    queryKey: ['tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
     initialData,
@@ -45,7 +51,7 @@ export function useTimesheets(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['timesheets', organizationId],
+    queryKey: ['timesheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/timesheets', 'Failed to fetch timesheets'),
     staleTime: 30_000,
     initialData,
@@ -65,7 +71,7 @@ export function useCreateProject(organizationId: bigint, companyId?: bigint) {
       })
       if (!r.ok) throw new Error('Failed to create project')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -80,7 +86,7 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
       })
       if (!r.ok) throw new Error('Failed to create task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -95,7 +101,7 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
       })
       if (!r.ok) throw new Error('Failed to create timesheet')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -120,7 +126,7 @@ export function useUpdateProject(organizationId: bigint, companyId?: bigint) {
       })
       if (!r.ok) throw new Error('Failed to update project')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -145,7 +151,7 @@ export function useUpdateTask(organizationId: bigint, companyId?: bigint) {
       })
       if (!r.ok) throw new Error('Failed to update task')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -166,7 +172,7 @@ export function useUpdateTaskState(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to update task state')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -181,7 +187,7 @@ export function useStartTimesheetTimer(organizationId: bigint, companyId?: bigin
       })
       if (!r.ok) throw new Error('Failed to start timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -196,7 +202,7 @@ export function useStopTimesheetTimer(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to stop timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -219,7 +225,7 @@ export function useSetProjectActive(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to set project active state')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -234,7 +240,7 @@ export function useToggleProjectFavorite(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to toggle project favorite')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -255,7 +261,7 @@ export function useSetTaskParent(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to set task parent')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -276,51 +282,82 @@ export function useAssignTaskUsers(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to assign task users')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })
+}
+
+export type ValidateTimesheetsInput = {
+  companyId: bigint | number | string | null
+  timesheetIds: (string | number | bigint)[]
 }
 
 export function useValidateTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      timesheetIds,
-      validated,
-    }: {
-      timesheetIds: (string | number | bigint)[]
-      validated: boolean
-    }) => {
+  return useMutation<void, Error, ValidateTimesheetsInput>({
+    mutationFn: async ({ timesheetIds, companyId }) => {
       const r = await apiFetch('/api/call/validate_timesheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, timesheetIds.map((id) => id), validated]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          stdbParamsToJson({
+            companyId: companyId != null ? toScalarU64(companyId) : null,
+            timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+          }),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
   })
+}
+
+export type BillTimesheetsInput = {
+  companyId: bigint | number | string | null
+  timesheetIds: (string | number | bigint)[]
+  journalId: bigint | number | string
+  incomeAccountId: bigint | number | string
+  partnerId: bigint | number | string
+  /** Pass `null` to let the server default the invoice date. */
+  invoiceDate: Date | string | number | null
 }
 
 export function useBillTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
+  return useMutation<void, Error, BillTimesheetsInput>({
     mutationFn: async ({
       timesheetIds,
+      companyId,
+      journalId,
+      incomeAccountId,
       partnerId,
-    }: {
-      timesheetIds: (string | number | bigint)[]
-      partnerId?: string | number | bigint | null
+      invoiceDate,
     }) => {
       const r = await apiFetch('/api/call/bill_timesheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, timesheetIds.map((id) => id), partnerId ?? null]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          stdbParamsToJson({
+            companyId: companyId != null ? toScalarU64(companyId) : null,
+            timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+            journalId: toScalarU64(journalId),
+            incomeAccountId: toScalarU64(incomeAccountId),
+            partnerId: toScalarU64(partnerId),
+            invoiceDate:
+              invoiceDate != null
+                ? stbTimestampFromDate(
+                    invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate),
+                  )
+                : null,
+          }),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to bill timesheets')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets', organizationId] })
-      qc.invalidateQueries({ queryKey: ['sale-orders', organizationId] })
+      qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -348,7 +385,7 @@ export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['projects', companyId] }),
+      void qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(companyId)] }),
   })
 }
 
@@ -364,7 +401,7 @@ export function useImportTaskCsv(organizationId: bigint, companyId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['tasks', companyId] }),
+      void qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(companyId)] }),
   })
 }
 
@@ -380,7 +417,7 @@ export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['timesheets', companyId] }),
+      void qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(companyId)] }),
   })
 }
 

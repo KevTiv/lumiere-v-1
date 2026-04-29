@@ -9,6 +9,10 @@ import type { CreatePaymentParams } from "@lumiere/stdb/generated/types"
 import { invalidateStdbQueryResources, useStdbCallMutation, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
 
+function toScalarU64(v: bigint | number | string): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
+
 // ── Type Imports from @lumiere/stdb ─────────────────────────────────────────
 
 export type {
@@ -380,7 +384,7 @@ export function useCreateCrossoveredBudget(organizationId: number) {
       const r = await apiFetch("/api/call/create_crossovered_budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -574,7 +578,7 @@ export function useUpdateBudgetLineActuals(organizationId: number) {
       const r = await apiFetch("/api/call/update_budget_line_actuals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -589,7 +593,7 @@ export function useCreateBudgetPost(organizationId: number) {
       const r = await apiFetch("/api/call/create_budget_post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -604,7 +608,7 @@ export function useUpdateBudgetPost(organizationId: number) {
       const r = await apiFetch("/api/call/update_budget_post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.postId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.postId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -735,7 +739,7 @@ export function useCreateFiscalYear(organizationId: number, companyId: bigint) {
       const r = await apiFetch("/api/call/create_fiscal_year", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -754,7 +758,7 @@ export function useUpdateFiscalYear(organizationId: number, companyId: bigint) {
           organizationId,
           companyId,
           args.fiscalYearId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -816,7 +820,7 @@ export function useCreateAccountPeriod(organizationId: number, companyId: bigint
       const r = await apiFetch("/api/call/create_account_period", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -835,7 +839,7 @@ export function useUpdateAccountPeriod(organizationId: number, companyId: bigint
           organizationId,
           companyId,
           args.periodId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -896,7 +900,7 @@ export function useCreateAnalyticAccount(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -911,7 +915,7 @@ export function useUpdateAnalyticAccount(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.accountId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.accountId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -941,7 +945,7 @@ export function useCreateAnalyticLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -956,7 +960,7 @@ export function useUpdateAnalyticLine(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -986,7 +990,7 @@ export function useCreateAnalyticDistributionModel(organizationId: number) {
       const r = await apiFetch("/api/call/create_analytic_distribution_model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1001,7 +1005,7 @@ export function useUpdateAnalyticDistributionModel(organizationId: number) {
       const r = await apiFetch("/api/call/update_analytic_distribution_model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.modelId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.modelId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1048,7 +1052,7 @@ export function useCreateAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.statementId, args.params]),
+        body: stringifyReducerCallBody([args.statementId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1063,7 +1067,7 @@ export function useUpdateAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, args.params]),
+        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1143,7 +1147,7 @@ export function useReconcileAccountBankStatementLine(organizationId: number) {
       const r = await apiFetch("/api/call/reconcile_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, args.params]),
+        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1158,7 +1162,7 @@ export function useUnreconciledAccountBankStatementLine(organizationId: number) 
       const r = await apiFetch("/api/call/unreconciled_account_bank_statement_line?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, args.params]),
+        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1206,7 +1210,7 @@ export function useCreateConsolidationAccount(organizationId: number) {
       const r = await apiFetch("/api/call/create_consolidation_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1221,7 +1225,7 @@ export function useUpdateConsolidationAccount(organizationId: number) {
       const r = await apiFetch("/api/call/update_consolidation_account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.accountId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.accountId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1236,7 +1240,7 @@ export function useCreateConsolidationJournal(organizationId: number) {
       const r = await apiFetch("/api/call/create_consolidation_journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1251,7 +1255,7 @@ export function useCreateEliminationEntry(organizationId: number) {
       const r = await apiFetch("/api/call/create_elimination_entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1311,7 +1315,7 @@ export function useSetConsolidationCompanyRate(organizationId: number) {
       const r = await apiFetch("/api/call/set_consolidation_company_rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1360,7 +1364,7 @@ export function useCreateAccountReconciliationWidget(organizationId: number) {
       const r = await apiFetch("/api/call/create_account_reconciliation_widget?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([params]),
+        body: stringifyReducerCallBody([stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1375,7 +1379,7 @@ export function useUpdateAccountReconciliationWidget(organizationId: number) {
       const r = await apiFetch("/api/call/update_account_reconciliation_widget?withCompany=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.widgetId, args.params]),
+        body: stringifyReducerCallBody([args.widgetId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1486,7 +1490,7 @@ export function useCreateDepreciationLine(organizationId: number, companyId: big
       const r = await apiFetch("/api/call/create_depreciation_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1549,7 +1553,7 @@ export function useCreateIntercompanyRule(organizationId: number) {
           organizationId,
           args.sourceCompanyId,
           args.destinationCompanyId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1569,7 +1573,7 @@ export function useUpdateIntercompanyRule(organizationId: number, companyId: big
           organizationId,
           companyId,
           args.ruleId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1624,7 +1628,7 @@ export function useCreateIntercompanyTransaction(organizationId: number) {
         body: stringifyReducerCallBody([
           organizationId,
           args.originCompanyId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1661,7 +1665,7 @@ export function useProcessIntercompanyTransaction(organizationId: number, compan
           organizationId,
           companyId,
           args.transactionId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -1756,7 +1760,7 @@ export function useComputeInvoiceTotals(organizationId: number, companyId: bigin
       const r = await apiFetch("/api/call/compute_invoice_totals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, Number(moveId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(moveId)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1771,7 +1775,7 @@ export function useUpdateAccountMoveLine(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/update_account_move_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1889,7 +1893,7 @@ export function useCreatePaymentTerm(organizationId: number) {
       const r = await apiFetch("/api/call/create_payment_term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1948,7 +1952,7 @@ export function useCreatePaymentTermLine(organizationId: number) {
       const r = await apiFetch("/api/call/create_payment_term_line", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2014,7 +2018,11 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
       const r = await apiFetch("/api/call/create_currency_rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId === null ? null : companyId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId === null ? null : companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2067,7 +2075,7 @@ export function useCreateAccountTaxGroup(organizationId: number, companyId: bigi
       const r = await apiFetch("/api/call/create_account_tax_group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2086,7 +2094,7 @@ export function useUpdateAccountTaxGroup(organizationId: number, companyId: bigi
           organizationId,
           companyId,
           args.groupId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -2104,7 +2112,7 @@ export function useCreateTaxJurisdiction(organizationId: number) {
       const r = await apiFetch("/api/call/create_tax_jurisdiction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2121,7 +2129,7 @@ export function useUpdateTaxJurisdiction(organizationId: number) {
       const r = await apiFetch("/api/call/update_tax_jurisdiction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.jurisdictionId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.jurisdictionId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2140,7 +2148,7 @@ export function useCreateTaxSchedule(organizationId: number, companyId: bigint) 
       const r = await apiFetch("/api/call/create_tax_schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
+        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2159,7 +2167,7 @@ export function useUpdateTaxSchedule(organizationId: number, companyId: bigint) 
           organizationId,
           companyId,
           args.scheduleId,
-          args.params,
+          stdbParamsToJson(args.params as object),
         ]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -2177,7 +2185,7 @@ export function useCreateTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/create_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -2194,7 +2202,7 @@ export function useUpdateTaxDeadline(organizationId: number) {
       const r = await apiFetch("/api/call/update_tax_deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.deadlineId, args.params]),
+        body: stringifyReducerCallBody([organizationId, args.deadlineId, stdbParamsToJson(args.params as object)]),
       })
       if (!r.ok) throw new Error(await parseCallError(r))
     },

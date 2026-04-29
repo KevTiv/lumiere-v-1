@@ -143,18 +143,13 @@ fn identity_cell_to_hex(v: &Value) -> Option<String> {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct StdbCredential {
-    pub id: u64,
-    pub email: String,
     pub identity_hex: String,
     pub password_hash: Option<String>,
     pub stdb_token_enc: String,
 }
 
 fn parse_credential(row: &Value) -> Option<StdbCredential> {
-    let id = value_as_u64(row.get("id")?)?;
-    let email = value_as_str(row.get("email")?)?;
     let identity_hex = identity_cell_to_hex(row.get("identity")?)?;
     let password_hash = row
         .get("passwordHash")
@@ -171,8 +166,6 @@ fn parse_credential(row: &Value) -> Option<StdbCredential> {
         .or_else(|| row.get("stdb_token_enc"))
         .and_then(|v| value_as_str(v))?;
     Some(StdbCredential {
-        id,
-        email,
         identity_hex,
         password_hash,
         stdb_token_enc,
@@ -183,7 +176,7 @@ pub async fn find_credential_by_email(state: &AppState, email: &str) -> Result<O
     let client = admin_client(state)?;
     let safe = email.replace('\'', "''");
     let sql = format!(
-        "SELECT id, email, identity, password_hash, stdb_token_enc, email_verified, workos_user_id FROM user_credential WHERE email = '{safe}'"
+        "SELECT identity, password_hash, stdb_token_enc FROM user_credential WHERE email = '{safe}'"
     );
     let rows = client
         .query_sql(&sql)
@@ -199,7 +192,7 @@ pub async fn find_credential_by_identity(
     let client = admin_client(state)?;
     let hex = identity_hex.trim().trim_start_matches("0x").trim_start_matches("0X");
     let sql = format!(
-        "SELECT id, email, identity, password_hash, stdb_token_enc, email_verified, workos_user_id FROM user_credential WHERE identity = 0x{hex}"
+        "SELECT identity, password_hash, stdb_token_enc FROM user_credential WHERE identity = 0x{hex}"
     );
     let rows = client
         .query_sql(&sql)

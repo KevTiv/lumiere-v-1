@@ -10,7 +10,7 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ export function useExpenses(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['expenses', organizationId],
+    queryKey: ['expenses', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expenses', 'Failed to fetch expenses'),
     staleTime: 30_000,
     initialData,
@@ -31,7 +31,7 @@ export function useExpenseSheets(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['expense-sheets', organizationId],
+    queryKey: ['expense-sheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expense-sheets', 'Failed to fetch expense sheets'),
     staleTime: 30_000,
     initialData,
@@ -52,7 +52,7 @@ export function useCreateExpense(organizationId: bigint, _companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to create expense')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -68,7 +68,7 @@ export function useCreateExpenseSheet(organizationId: bigint, _companyId?: bigin
       if (!r.ok) throw new Error('Failed to create expense sheet')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -90,7 +90,7 @@ export function useUpdateExpense(organizationId: bigint, _companyId?: bigint) {
       if (!r.ok) throw new Error('Failed to update expense')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -117,8 +117,8 @@ export function useSubmitExpense(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -143,8 +143,8 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -163,8 +163,8 @@ export function useApproveExpenseSheet(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -183,8 +183,8 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -218,8 +218,8 @@ export function usePostExpenseSheet(organizationId: bigint) {
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -247,7 +247,7 @@ export function useImportExpenseCsv(organizationId: bigint) {
       })
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expenses', organizationId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -263,7 +263,7 @@ export function useImportExpenseSheetCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['expense-sheets', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
   })
 }
 

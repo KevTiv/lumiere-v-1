@@ -19,6 +19,8 @@ interface ModuleViewProps {
     action: string,
     data: Record<string, unknown>,
   ) => void | Promise<void>
+  /** Forwarded to tab create {@link FormModal} — e.g. parent mutation `isPending`. */
+  isPending?: boolean
   /** Called when a table row is clicked: tabId, row record */
   onRowClick?: (tabId: string, row: Record<string, unknown>) => void
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
@@ -33,6 +35,7 @@ export function ModuleView({
   onRowClick,
   activeTab: activeTabProp,
   onActiveTabChange,
+  isPending,
 }: ModuleViewProps) {
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
@@ -87,6 +90,7 @@ export function ModuleView({
                     open={openForm === tab.id}
                     onOpenChange={(open) => !open && setOpenForm(null)}
                     config={tab.createForm}
+                    isPending={isPending}
                     onSubmit={async (formData) => {
                       await onFormSubmit?.(
                         tab.id,

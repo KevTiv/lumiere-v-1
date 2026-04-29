@@ -57,6 +57,16 @@ import {
   useShareDashboard,
 } from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
+import {
+  toCreateAnalyticsMetricPayload,
+  toCreateDashboardPayload,
+  toCreateDashboardWidgetPayload,
+  toCreateFinancialReportPayload,
+  toCreateReportTemplatePayload,
+  toCreateScheduledReportPayload,
+  toCreateTrialBalanceEntryPayload,
+  toUpdateFinancialReportFormPayload,
+} from "@/lib/reports-module-form-payloads"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   Archive,
@@ -156,6 +166,8 @@ function ReportsClientLoaded({
   const updateMetricValues = useUpdateMetricValues(orgId)
   const recordReportRun = useRecordReportRun(orgId)
   const csvImports = useReportsCsvImportMutations(orgId)
+  const importReportTemplateCsv = csvImports.importReportTemplate
+  const importAnalyticsMetricCsv = csvImports.importAnalyticsMetric
 
   // Dashboard hooks (6 missing reducers)
   const updateFinancialReport = useUpdateFinancialReport(orgId)
@@ -497,7 +509,7 @@ function ReportsClientLoaded({
             ...w,
             data: {
               ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] || (() => {}) })),
+              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] || (() => { }) })),
             },
           }
         }
@@ -543,7 +555,7 @@ function ReportsClientLoaded({
       reportTemplatesEntityConfig,
       analyticsMetricsEntityConfig,
       scheduledReportsEntityConfig,
-      scheduledReportFormConfig,
+      scheduledReportFormConfig, t
     ],
   )
 
@@ -564,23 +576,45 @@ function ReportsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createReport" || action === "generateReport") {
-      await createFinancialReportFlow.mutateAsync(formData)
+      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(formData))
     } else if (action === "createReportTemplate") {
-      await createReportTemplate.mutateAsync(formData)
+      await createReportTemplate.mutateAsync(toCreateReportTemplatePayload(formData))
     } else if (action === "createScheduledReport") {
-      await createScheduledReport.mutateAsync(formData)
+      await createScheduledReport.mutateAsync(toCreateScheduledReportPayload(formData))
     } else if (action === "createAnalyticsMetric") {
-      await createAnalyticsMetric.mutateAsync(formData)
+      await createAnalyticsMetric.mutateAsync(toCreateAnalyticsMetricPayload(formData))
     } else if (action === "createTrialBalanceEntry") {
-      await createTrialBalanceEntry.mutateAsync(formData)
+      await createTrialBalanceEntry.mutateAsync(toCreateTrialBalanceEntryPayload(formData))
     } else if (action === "createDashboard") {
-      await createDashboard.mutateAsync(formData)
+      await createDashboard.mutateAsync(toCreateDashboardPayload(formData))
       setCreateDashboardOpen(false)
     } else if (action === "createDashboardWidget") {
-      await createDashboardWidget.mutateAsync(formData)
+      await createDashboardWidget.mutateAsync(toCreateDashboardWidgetPayload(formData))
       setCreateWidgetOpen(false)
     }
   }
+
+  const isFormMutationPending =
+    createTrialBalanceEntry.isPending ||
+    createFinancialReportFlow.isPending ||
+    generateFinancialReport.isPending ||
+    exportFinancialReport.isPending ||
+    archiveFinancialReport.isPending ||
+    deleteFinancialReport.isPending ||
+    createReportTemplate.isPending ||
+    createScheduledReport.isPending ||
+    createAnalyticsMetric.isPending ||
+    updateReportTemplate.isPending ||
+    updateMetricValues.isPending ||
+    recordReportRun.isPending ||
+    updateFinancialReport.isPending ||
+    createDashboard.isPending ||
+    createDashboardWidget.isPending ||
+    addWidgetToDashboard.isPending ||
+    updateWidgetLayout.isPending ||
+    shareDashboard.isPending ||
+    importReportTemplateCsv.isPending ||
+    importAnalyticsMetricCsv.isPending
 
   return (
     <>
@@ -588,6 +622,7 @@ function ReportsClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           if (tabId === "reports") {
             const id = row.id
@@ -599,9 +634,11 @@ function ReportsClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newFinancialReportForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
+            setQuickActionForm(null)
           }
         }}
       />
@@ -614,6 +651,7 @@ function ReportsClientLoaded({
           }
         }}
         config={updateReportTemplateForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (editTemplateId == null) return
           await updateReportTemplate.mutateAsync({
@@ -641,6 +679,7 @@ function ReportsClientLoaded({
           }
         }}
         config={updateMetricValuesForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (metricValuesId == null) return
           const cv = Number(formData.currentValue)
@@ -668,6 +707,7 @@ function ReportsClientLoaded({
           }
         }}
         config={recordScheduledRunForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (recordRunScheduledId == null) return
           const raw = formData.nextRun
@@ -688,6 +728,7 @@ function ReportsClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {
@@ -701,9 +742,9 @@ function ReportsClientLoaded({
             try {
               const text = await file.text()
               if (csvKind === "report_template") {
-                await csvImports.importReportTemplate.mutateAsync(text)
+                await importReportTemplateCsv.mutateAsync(text)
               } else {
-                await csvImports.importAnalyticsMetric.mutateAsync(text)
+                await importAnalyticsMetricCsv.mutateAsync(text)
               }
               setCsvKind(null)
             } catch (e) {
@@ -723,15 +764,12 @@ function ReportsClientLoaded({
           }
         }}
         config={updateFinancialReportForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (editReportId == null) return
           await updateFinancialReport.mutateAsync({
             reportId: editReportId,
-            params: {
-              name: formData.name ? String(formData.name) : undefined,
-              reportType: formData.reportType ? String(formData.reportType) : undefined,
-              state: formData.state ? String(formData.state) : undefined,
-            },
+            patch: toUpdateFinancialReportFormPayload(formData),
           })
           setEditReportOpen(false)
           setEditReportId(null)
@@ -743,6 +781,7 @@ function ReportsClientLoaded({
         open={createDashboardOpen}
         onOpenChange={(open) => !open && setCreateDashboardOpen(false)}
         config={newDashboardForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboard", formData)
         }}
@@ -753,6 +792,7 @@ function ReportsClientLoaded({
         open={createWidgetOpen}
         onOpenChange={(open) => !open && setCreateWidgetOpen(false)}
         config={newDashboardWidgetForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboardWidget", formData)
         }}
@@ -768,15 +808,20 @@ function ReportsClientLoaded({
           }
         }}
         config={addWidgetToDashboardForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (selectedDashboardId == null) return
+          const widgetId = String(formData.widgetId)
           await addWidgetToDashboard.mutateAsync({
             dashboardId: selectedDashboardId,
-            widgetId: String(formData.widgetId),
+            widgetId,
+          })
+          await updateWidgetLayout.mutateAsync({
+            widgetId,
             layout: {
               x: Number(formData.x ?? 0),
               y: Number(formData.y ?? 0),
-              width: String(formData.width ?? "1/2"),
+              width: formData.width ?? "4",
               height: Number(formData.height ?? 200),
             },
           })
@@ -795,13 +840,17 @@ function ReportsClientLoaded({
           }
         }}
         config={shareDashboardForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (shareDashboardId == null) return
+          const userIdRaw = formData.userId ? String(formData.userId).trim() : ""
+          const teamIdRaw = formData.teamId ? String(formData.teamId).trim() : ""
           await shareDashboard.mutateAsync({
             dashboardId: shareDashboardId,
-            userId: formData.userId ? String(formData.userId) : undefined,
-            teamId: formData.teamId ? String(formData.teamId) : undefined,
-            permissions: formData.permissions ? String(formData.permissions) : "read",
+            params: {
+              shareWith: userIdRaw !== "" ? [userIdRaw] : [],
+              shareWithGroups: teamIdRaw !== "" ? [teamIdRaw] : [],
+            },
           })
           setShareDashboardOpen(false)
           setShareDashboardId(null)

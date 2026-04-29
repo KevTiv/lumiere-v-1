@@ -365,7 +365,7 @@ function ManufacturingClientLoaded({
     [productions, boms, bomLines, workorders, workcenters, routingOperations, qualityChecks]
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>
@@ -398,7 +398,7 @@ function ManufacturingClientLoaded({
             ? Number(productRow.uomPoId)
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      m.createManufacturingOrder.mutate({
+      await m.createManufacturingOrder.mutateAsync({
         productId: Number(prodRaw),
         productQty: Number(formData.productQty ?? 1),
         productUomId: uomFromProduct,
@@ -410,33 +410,15 @@ function ManufacturingClientLoaded({
         locationDestId: Number(destRaw),
         warehouseId: Number(whRaw),
         pickingTypeId: Number(pickRaw),
-        consumption: formData.consumption ? String(formData.consumption) : undefined,
-        state: "Draft",
-        availability: "available",
-        reservationState: "confirmed",
-        componentsAvailability: "available",
-        componentsAvailabilityState: "available",
-        isPlanned: true,
-        isLocked: false,
-        isWorkorder: true,
-        delayAlert: false,
-        lotProducingCount: 0,
-        qtyProducing: 0,
-        qtyProduced: 0,
-        productUomQtyProducing: 0,
         bomId:
           formData.bomId != null && String(formData.bomId) !== ""
             ? Number(formData.bomId)
             : undefined,
         routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
-        procGroupId: undefined,
-        procurementGroupId: undefined,
         dateDeadline: formData.datePlannedFinished
           ? new Date(String(formData.datePlannedFinished))
           : undefined,
         origin: formData.origin ? String(formData.origin) : undefined,
-        responsibleUserId: undefined,
-        metadata: undefined,
       } as never)
     } else if (action === "createBom") {
       const tmplRaw = formData.productTmplId
@@ -450,61 +432,38 @@ function ManufacturingClientLoaded({
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
       const pid = Number(tmplRaw)
-      m.createBom.mutate({
+      await m.createBom.mutateAsync({
         type: String(formData.type ?? "Normal"),
         productId: pid,
         productTmplId: pid,
         productQty: Number(formData.productQty ?? 1),
         productUomId: uomFromProduct,
-        readyToProduce: "asap",
-        consumption: "flexible",
-        sequence: 1,
-        estimatedCost: Number(formData.estimatedCost ?? 0),
-        lines: [],
-        pickingTypeId: formData.pickingTypeId != null ? Number(formData.pickingTypeId) : undefined,
-        locationSrcId: formData.locationSrcId != null ? Number(formData.locationSrcId) : undefined,
-        locationDestId: formData.locationDestId != null ? Number(formData.locationDestId) : undefined,
-        warehouseId: formData.warehouseId != null ? Number(formData.warehouseId) : undefined,
         routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
-        metadata: undefined,
       } as never)
     } else if (action === "createWorkcenter") {
       const oeeTarget = Number(formData.oeeTarget ?? 85)
       const timeEfficiency = Number(formData.timeEfficiency ?? 100)
       const capacity = Number(formData.capacity ?? 1)
 
-      m.createWorkcenter.mutate({
+      await m.createWorkcenter.mutateAsync({
         name: String(formData.name ?? ""),
-        active: formData.active == null ? true : Boolean(formData.active),
         code: formData.code ? String(formData.code) : undefined,
-        workingState: "normal",
         oeeTarget,
         timeEfficiency,
         capacity,
-        capacityIds: [],
-        oee: 0,
-        performance: 0,
-        blockedTime: 0,
-        productiveTime: 0,
-        productivityIds: [],
-        orderIds: [],
-        workorderCount: 0,
-        workorderReadyCount: 0,
-        workorderProgressCount: 0,
-        workorderPendingCount: 0,
-        workorderLateCount: 0,
-        alternativeWorkcenterIds: [],
-        color: undefined,
-        resourceCalendarId: undefined,
-        tagIds: [],
-        defaultCapacityParentId: undefined,
         defaultTimeEfficiency: timeEfficiency,
         defaultOeeTarget: oeeTarget,
-        sequence: 1,
-        metadata: undefined,
       } as never)
     }
   }
+
+  const isFormMutationPending = Object.values(m).some(
+    (mutation) =>
+      mutation != null &&
+      typeof mutation === "object" &&
+      "isPending" in mutation &&
+      Boolean((mutation as { isPending: boolean }).isPending),
+  )
 
   return (
     <>
@@ -514,6 +473,7 @@ function ManufacturingClientLoaded({
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
+        isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           if (["orders", "boms", "workorders", "workcenters"].includes(tabId)) {
             setRowPick({ tabId, row })
@@ -538,6 +498,7 @@ function ManufacturingClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {
@@ -565,9 +526,10 @@ function ManufacturingClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? moFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}

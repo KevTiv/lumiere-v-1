@@ -11,12 +11,19 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { toCreateFinancialReportParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
 import { toCreateAnalyticsMetricParams } from "@lumiere/erp-shared/reports-analytics-params"
+import { toUpdateFinancialReportParams } from "@lumiere/erp-shared/reports-update-params"
+import {
+  companyIdFromDashboardForm,
+  companyIdFromDashboardWidgetForm,
+  toCreateDashboardParams,
+  toCreateDashboardWidgetParams,
+} from "@lumiere/erp-shared/reports-dashboard-params"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +32,7 @@ export function useFinancialReports(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['financial-reports', organizationId],
+    queryKey: ['financial-reports', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/financial-reports', 'Failed to fetch financial reports'),
     staleTime: 30_000,
     initialData,
@@ -37,7 +44,7 @@ export function useTrialBalances(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['trial-balances', organizationId],
+    queryKey: ['trial-balances', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/trial-balances', 'Failed to fetch trial balances'),
     staleTime: 30_000,
     initialData,
@@ -49,7 +56,7 @@ export function useReportTemplates(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['report-templates', organizationId],
+    queryKey: ['report-templates', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/report-templates', 'Failed to fetch report templates'),
     staleTime: 30_000,
     initialData,
@@ -61,7 +68,7 @@ export function useScheduledReports(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['scheduled-reports', organizationId],
+    queryKey: ['scheduled-reports', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/scheduled-reports', 'Failed to fetch scheduled reports'),
     staleTime: 30_000,
     initialData,
@@ -73,7 +80,7 @@ export function useAnalyticsMetrics(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['analytics-metrics', organizationId],
+    queryKey: ['analytics-metrics', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/analytics-metrics', 'Failed to fetch analytics metrics'),
     staleTime: 30_000,
     initialData,
@@ -229,14 +236,26 @@ export function useDeleteFinancialReport(organizationId: bigint) {
 
 // ── Mutations — templates, schedules, metrics ─────────────────────────────────
 
+function companyIdStringOrNull(formData: Record<string, unknown>): string | null {
+  if (formData.companyId == null) return null
+  const s = String(formData.companyId).trim()
+  return s !== "" ? s : null
+}
+
+function companyIdNumberOrNull(formData: Record<string, unknown>): number | null {
+  const s = companyIdStringOrNull(formData)
+  if (s == null) return null
+  const n = Number(s)
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null
+}
+
 export function useCreateReportTemplate(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
-      const companyId =
-        formData.companyId != null ? String(formData.companyId) : null
+      const companyId = companyIdStringOrNull(formData)
       const r = await apiFetch('/api/call/create_report_template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -277,8 +296,7 @@ export function useCreateScheduledReport(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
-      const companyId =
-        formData.companyId != null ? Number(formData.companyId) : null
+      const companyId = companyIdNumberOrNull(formData)
       const r = await apiFetch('/api/call/create_scheduled_report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -302,8 +320,7 @@ export function useCreateAnalyticsMetric(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateAnalyticsMetricParams(formData)
       if (!params) throw new Error('Invalid metric parameters')
-      const companyId =
-        formData.companyId != null ? Number(formData.companyId) : null
+      const companyId = companyIdNumberOrNull(formData)
       const r = await apiFetch('/api/call/create_analytics_metric', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -391,8 +408,6 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
         openingCredit: Number(formData.openingCredit ?? 0),
         periodDebit: Number(formData.periodDebit ?? 0),
         periodCredit: Number(formData.periodCredit ?? 0),
-        closingDebit: Number(formData.closingDebit ?? 0),
-        closingCredit: Number(formData.closingCredit ?? 0),
         currencyId: Number(formData.currencyId ?? 1),
         parentId: formData.parentId != null && String(formData.parentId).trim() !== ''
           ? Number(formData.parentId)
@@ -420,9 +435,10 @@ export function useUpdateFinancialReport(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { reportId: string | number | bigint; params: Record<string, unknown> }
+    { reportId: string | number | bigint; patch: Record<string, unknown> }
   >({
-    mutationFn: async ({ reportId, params }) => {
+    mutationFn: async ({ reportId, patch }) => {
+      const params = toUpdateFinancialReportParams(patch)
       const r = await apiFetch('/api/call/update_financial_report?withCompany=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -440,12 +456,9 @@ export function useCreateDashboard(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
-      const params = {
-        name: String(formData.name ?? ''),
-        description: formData.description ? String(formData.description) : null,
-        isActive: Boolean(formData.isActive ?? true),
-      }
-      const companyId = formData.companyId != null ? Number(formData.companyId) : null
+      const params = toCreateDashboardParams(formData)
+      if (!params.name.trim()) throw new Error('Dashboard name is required')
+      const companyId = companyIdFromDashboardForm(formData)
       const r = await apiFetch('/api/call/create_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -463,13 +476,10 @@ export function useCreateDashboardWidget(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
-      const params = {
-        name: String(formData.name ?? ''),
-        widgetType: String(formData.widgetType ?? 'kpi'),
-        dataSource: String(formData.dataSource ?? ''),
-        config: formData.config ? JSON.stringify(formData.config) : null,
-      }
-      const companyId = formData.companyId != null ? Number(formData.companyId) : null
+      const params = toCreateDashboardWidgetParams(formData)
+      if (!params.name.trim()) throw new Error('Widget name is required')
+      if (!params.model.trim()) throw new Error('Data source / model is required')
+      const companyId = companyIdFromDashboardWidgetForm(formData)
       const r = await apiFetch('/api/call/create_dashboard_widget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -490,16 +500,11 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
     Error,
     { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
   >({
-    mutationFn: async ({ dashboardId, widgetId, layout }) => {
+    mutationFn: async ({ dashboardId, widgetId }) => {
       const r = await apiFetch('/api/call/add_widget_to_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          dashboardId,
-          widgetId,
-          layout ? stdbParamsToJson(layout) : null,
-        ]),
+        body: stringifyReducerCallBody([organizationId, dashboardId, widgetId]),
       })
       if (!r.ok) throw new Error('Failed to add widget to dashboard')
     },
@@ -509,26 +514,43 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
   })
 }
 
+function toU32(n: number): number {
+  if (!Number.isFinite(n) || n < 0) return 0
+  return Math.min(0xffff_ffff, Math.floor(n))
+}
+
+function recordToWidgetLayoutParams(layout: Record<string, unknown>) {
+  const x = Number(layout.positionX ?? layout.x ?? 0)
+  const y = Number(layout.positionY ?? layout.y ?? 0)
+  let w = Number(layout.width ?? layout.w ?? 4)
+  if (!Number.isFinite(w) || w <= 0) w = 4
+  const h = Number(layout.height ?? layout.h ?? 200)
+  return {
+    positionX: toU32(x),
+    positionY: toU32(y),
+    width: Math.max(1, toU32(w)),
+    height: Math.max(1, toU32(h)),
+  }
+}
+
 export function useUpdateWidgetLayout(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
     Error,
     {
-      dashboardId: string | number | bigint
       widgetId: string | number | bigint
       layout: Record<string, unknown>
     }
   >({
-    mutationFn: async ({ dashboardId, widgetId, layout }) => {
+    mutationFn: async ({ widgetId, layout }) => {
       const r = await apiFetch('/api/call/update_widget_layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          dashboardId,
           widgetId,
-          stdbParamsToJson(layout),
+          stdbParamsToJson(recordToWidgetLayoutParams(layout)),
         ]),
       })
       if (!r.ok) throw new Error('Failed to update widget layout')
@@ -539,6 +561,12 @@ export function useUpdateWidgetLayout(organizationId: bigint) {
   })
 }
 
+export type ShareDashboardParamsInput = {
+  /** SpacetimeDB identity hex strings. */
+  shareWith: string[]
+  shareWithGroups: (bigint | number | string)[]
+}
+
 export function useShareDashboard(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
@@ -546,21 +574,22 @@ export function useShareDashboard(organizationId: bigint) {
     Error,
     {
       dashboardId: string | number | bigint
-      userId?: string | number | bigint
-      teamId?: string | number | bigint
-      permissions?: string
+      params: ShareDashboardParamsInput
     }
   >({
-    mutationFn: async ({ dashboardId, userId, teamId, permissions = 'read' }) => {
+    mutationFn: async ({ dashboardId, params }) => {
       const r = await apiFetch('/api/call/share_dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
           dashboardId,
-          userId ?? null,
-          teamId ?? null,
-          permissions,
+          stdbParamsToJson({
+            shareWith: params.shareWith,
+            shareWithGroups: params.shareWithGroups.map((id) =>
+              typeof id === "bigint" ? id : BigInt(String(id)),
+            ),
+          }),
         ]),
       })
       if (!r.ok) throw new Error('Failed to share dashboard')
@@ -592,7 +621,7 @@ function useImportReportTemplateCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['report-templates', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['report-templates', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -608,7 +637,7 @@ function useImportAnalyticsMetricCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['analytics-metrics', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['analytics-metrics', rqBigIntKey(organizationId)] }),
   })
 }
 

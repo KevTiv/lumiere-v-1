@@ -11,8 +11,14 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
-import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+type ScalarId = bigint | number | string
+
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +27,7 @@ export function usePosTerminals(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['pos-terminals', organizationId],
+    queryKey: ['pos-terminals', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pos-terminals', 'Failed to fetch POS terminals'),
     staleTime: 30_000,
     initialData,
@@ -31,19 +37,36 @@ export function usePosTerminals(
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidatePosQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['pos-terminals', organizationId] })
+  return qc.invalidateQueries({ queryKey: ['pos-terminals', rqBigIntKey(organizationId)] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreatePosTerminal(organizationId: bigint, companyId?: bigint) {
+export function useCreatePosTerminal(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const name = String(params.name ?? "").trim()
+      if (!name) throw new Error("Terminal name is required")
+      const loc = params.locationLabel
+      const locationLabel =
+        loc != null && String(loc).trim() !== "" ? String(loc).trim() : null
+      const latRaw = params.latitude
+      const lonRaw = params.longitude
+      const latitude =
+        latRaw != null && latRaw !== "" ? Number(latRaw) : null
+      const longitude =
+        lonRaw != null && lonRaw !== "" ? Number(lonRaw) : null
       const r = await apiFetch('/api/call/create_pos_terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          name,
+          locationLabel,
+          latitude != null && Number.isFinite(latitude) ? latitude : null,
+          longitude != null && Number.isFinite(longitude) ? longitude : null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create POS terminal')
     },
@@ -55,24 +78,19 @@ export function useUpdatePosTerminal(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: {
-      terminalId: bigint | number | string
-      name?: string
-      locationLabel?: string
-      latitude?: number
-      longitude?: number
-      currencyId?: bigint | number | string
+      terminalId: ScalarId
+      status: string
+      dailyRevenue: number
+      openOrders: number
     }) => {
       const r = await apiFetch('/api/call/update_pos_terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
-          organizationId,
-          args.terminalId,
-          args.name ?? null,
-          args.locationLabel ?? null,
-          args.latitude ?? null,
-          args.longitude ?? null,
-          args.currencyId != null ? args.currencyId : null,
+          toScalarU64(args.terminalId),
+          args.status,
+          args.dailyRevenue,
+          Math.max(0, Math.floor(args.openOrders)) >>> 0,
         ]),
       })
       if (!r.ok) throw new Error('Failed to update POS terminal')
@@ -81,14 +99,18 @@ export function useUpdatePosTerminal(organizationId: bigint) {
   })
 }
 
-export function useCreatePosConfig(organizationId: bigint, companyId?: bigint) {
+export function useCreatePosConfig(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create POS config')
     },
@@ -103,7 +125,7 @@ export function useActivatePosConfig(organizationId: bigint) {
       const r = await apiFetch('/api/call/activate_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, configId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(configId)]),
       })
       if (!r.ok) throw new Error('Failed to activate POS config')
     },
@@ -118,7 +140,7 @@ export function useDeactivatePosConfig(organizationId: bigint) {
       const r = await apiFetch('/api/call/deactivate_pos_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, configId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(configId)]),
       })
       if (!r.ok) throw new Error('Failed to deactivate POS config')
     },
@@ -131,7 +153,6 @@ export function useOpenPosSession(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: {
       configId: bigint | number | string
-      terminalId?: bigint | number | string
       openingBalance?: number
     }) => {
       const r = await apiFetch('/api/call/open_pos_session', {
@@ -139,8 +160,7 @@ export function useOpenPosSession(organizationId: bigint) {
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          args.configId,
-          args.terminalId ?? null,
+          toScalarU64(args.configId),
           args.openingBalance ?? 0,
         ]),
       })
@@ -156,16 +176,14 @@ export function useClosePosSession(organizationId: bigint) {
     mutationFn: async (args: {
       sessionId: bigint | number | string
       closingBalance: number
-      notes?: string
     }) => {
       const r = await apiFetch('/api/call/close_pos_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          args.sessionId,
+          toScalarU64(args.sessionId),
           args.closingBalance,
-          args.notes ?? null,
         ]),
       })
       if (!r.ok) throw new Error('Failed to close POS session')
@@ -181,7 +199,7 @@ export function useComputePosSessionTotals(organizationId: bigint) {
       const r = await apiFetch('/api/call/compute_pos_session_totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, sessionId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(sessionId)]),
       })
       if (!r.ok) throw new Error('Failed to compute POS session totals')
     },
@@ -196,7 +214,10 @@ export function useCreatePosOrder(organizationId: bigint) {
       const r = await apiFetch('/api/call/create_pos_order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create POS order')
     },

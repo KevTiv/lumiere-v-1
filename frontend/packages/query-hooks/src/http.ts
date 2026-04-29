@@ -23,3 +23,8 @@ export async function fetchQueryList(path: string, errorMessage: string): Promis
 export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows> {
   return getLumiereApiClientOrThrow().fetchQueryListAllowEmpty(path)
 }
+
+/** React Query hashes keys with JSON.stringify — BigInt is not JSON-serializable. */
+export function rqBigIntKey(id: bigint): string {
+  return id.toString()
+}

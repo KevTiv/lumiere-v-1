@@ -11,8 +11,7 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
-import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +20,7 @@ export function useFleetVehicles(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['fleet-vehicles', organizationId],
+    queryKey: ['fleet-vehicles', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/fleet-vehicles', 'Failed to fetch fleet vehicles'),
     staleTime: 30_000,
     initialData,
@@ -31,19 +30,32 @@ export function useFleetVehicles(
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidateFleetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['fleet-vehicles', organizationId] })
+  return qc.invalidateQueries({ queryKey: ['fleet-vehicles', rqBigIntKey(organizationId)] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint) {
+export type CreateFleetVehicleInput = {
+  name: string
+  vehicleType: string
+  licensePlate: string | null
+  driverName: string | null
+}
+
+export function useCreateFleetVehicle(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (params) => {
+  return useMutation<void, Error, CreateFleetVehicleInput>({
+    mutationFn: async ({ name, vehicleType, licensePlate, driverName }) => {
       const r = await apiFetch('/api/call/create_fleet_vehicle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          name.trim(),
+          vehicleType.trim(),
+          licensePlate != null && licensePlate.trim() !== '' ? licensePlate.trim() : null,
+          driverName != null && driverName.trim() !== '' ? driverName.trim() : null,
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create fleet vehicle')
     },
@@ -51,30 +63,29 @@ export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint
   })
 }
 
+export type UpdateVehiclePositionInput = {
+  vehicleId: bigint | number | string
+  latitude: number
+  longitude: number
+  speedKmh: number
+  heading: number
+  status: string
+}
+
 export function useUpdateVehiclePosition(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: {
-      vehicleId: bigint | number | string
-      latitude: number
-      longitude: number
-      speedKmh?: number
-      heading?: number
-      fuelLevel?: number
-      odometerKm?: number
-    }) => {
+  return useMutation<void, Error, UpdateVehiclePositionInput>({
+    mutationFn: async ({ vehicleId, latitude, longitude, speedKmh, heading, status }) => {
       const r = await apiFetch('/api/call/update_vehicle_position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
-          organizationId,
-          args.vehicleId,
-          args.latitude,
-          args.longitude,
-          args.speedKmh ?? null,
-          args.heading ?? null,
-          args.fuelLevel ?? null,
-          args.odometerKm ?? null,
+          vehicleId,
+          latitude,
+          longitude,
+          speedKmh,
+          heading,
+          status,
         ]),
       })
       if (!r.ok) throw new Error('Failed to update vehicle position')

@@ -3,7 +3,6 @@
  *
  * Must stay aligned with:
  * - `stdb-auth-server` credential SQL (same DB as org membership)
- * - `frontend/web/server.js` WebSocket proxy (`STDB_MODULE` / `STDB_HOST`)
  * - `@lumiere/stdb` `http.ts` (which defaults module to `lumiere-v1` if unset — avoid relying on that alone)
  */
 import 'server-only'

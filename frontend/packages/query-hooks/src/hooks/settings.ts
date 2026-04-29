@@ -2,7 +2,7 @@
 
 
 import { stringifyReducerCallBody } from "@lumiere/api-client"
-import { apiFetch } from "../http"
+import { apiFetch, rqBigIntKey } from "../http"
 /**
  * Settings hooks — Organization and system configuration
  *
@@ -27,7 +27,7 @@ export function useUpsertOrganizationSettings(organizationId: bigint) {
     },
     onSuccess: () => {
       // Invalidate any queries that might depend on organization settings
-      qc.invalidateQueries({ queryKey: ['organization-settings', organizationId] })
+      qc.invalidateQueries({ queryKey: ['organization-settings', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -44,7 +44,7 @@ export function useUpdateOrganization(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to update organization')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['organization', organizationId] })
+      qc.invalidateQueries({ queryKey: ['organization', rqBigIntKey(organizationId)] })
     },
   })
 }

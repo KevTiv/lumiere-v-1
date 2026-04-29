@@ -36,7 +36,7 @@ export function HelpdeskTicketDialog({
 }: HelpdeskTicketDialogProps) {
   const { t } = useTranslation()
   const canClose = stateTag !== "Closed" && stateTag !== "Cancelled"
-  const canReopen = closed
+  const canReopen = stateTag === "Closed" || stateTag === "Cancelled"
 
   const HeaderIcon = LifeBuoy
 

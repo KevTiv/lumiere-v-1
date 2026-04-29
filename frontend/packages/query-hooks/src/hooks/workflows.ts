@@ -10,14 +10,14 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
 import type {
   AddWorkflowActivityParams,
   AddWorkflowTransitionParams,
   CreateWorkflowParams,
 } from '@lumiere/stdb/generated/types'
 
-const wfKeys = (organizationId: bigint) => organizationId
+const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
 
 function invalidateAllWorkflowQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
   const o = wfKeys(organizationId)

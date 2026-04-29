@@ -16,7 +16,6 @@ import {
   newProductVariantForm,
   assignUserToPickingForm,
   newQualityCheckForm,
-  newQualityAlertForm,
   newQualityPointForm,
   newQualityTeamForm,
   newTraceabilityRecordForm,
@@ -133,7 +132,6 @@ import {
   useDeleteStockRule,
   // Warehouse tasks
   useCreateWarehouseTask,
-  useUpdateWarehouseTask,
   useDeleteWarehouseTask,
   useStartWarehouseTask,
   useCompleteWarehouseTask,
@@ -182,14 +180,6 @@ type InventoryCsvImportKind =
   | "stockQuant"
   | "lot"
 
-/** SpacetimeDB sum-type encoding for `ZoneDisplayType` (warehouse 3D zones). */
-function zoneDisplayTypeForReducer(tag: string): Record<string, unknown> {
-  const t = String(tag || "Rack")
-  if (t === "Floor") return { Floor: [] }
-  if (t === "Bin") return { Bin: [] }
-  return { Rack: [] }
-}
-
 import {
   pricelistRowsToSelectOptions,
   pickingTypeOptionsFromTransfers,
@@ -205,11 +195,14 @@ import {
 } from "lucide-react"
 import { buildCreateWarehouseParamsFromTemplate } from "@/lib/warehouse-create-params"
 import {
+  adjustmentCreateMetadataFromForm,
+  pickingWaveCreateParamsFromForm,
+  productCategoryCreateMetadataFromForm,
   toCreateAdjustmentReasonParamsFromForm,
-  toCreateTraceabilityRecordParamsFromForm,
   toCreateStockTraceabilityReportParamsFromForm,
+  toCreateTraceabilityRecordParamsFromForm,
+  warehouse3dZoneParamsFromForm,
 } from "@/lib/inventory-ext-params"
-import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { CycleCountWizard } from "./cycle-count-wizard"
 
@@ -422,7 +415,7 @@ function InventoryClientLoaded({
   )
 
   const createProduct = useCreateProduct(orgId)
-  const createStockPicking = useCreateStockPicking(orgId, companyId)
+  const createStockPicking = useCreateStockPicking(orgId, { companyId })
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId)
   const createStockLocation = useCreateStockLocation(orgId)
   const createWarehouse = useCreateWarehouse(orgId)
@@ -432,16 +425,16 @@ function InventoryClientLoaded({
   const deleteProduct = useDeleteProduct(orgId)
   const createProductVariant = useCreateProductVariant(orgId)
   const deleteStockLocation = useDeleteStockLocation(orgId)
-  const doneStockMove = useDoneStockMove(orgId)
-  const cancelStockMove = useCancelStockMove(orgId)
-  const assignUserToPicking = useAssignUserToPicking(orgId)
-  const confirmPicking = useConfirmStockPicking(orgId)
-  const assignPicking = useAssignStockPicking(orgId)
-  const validatePicking = useValidateStockPicking(orgId)
-  const cancelPicking = useCancelStockPicking(orgId)
+  const doneStockMove = useDoneStockMove(orgId, companyId)
+  const cancelStockMove = useCancelStockMove(orgId, companyId)
+  const assignUserToPicking = useAssignUserToPicking(orgId, companyId)
+  const confirmPicking = useConfirmStockPicking(orgId, companyId)
+  const assignPicking = useAssignStockPicking(orgId, companyId)
+  const validatePicking = useValidateStockPicking(orgId, companyId)
+  const cancelPicking = useCancelStockPicking(orgId, companyId)
   const processAdjustment = useProcessInventoryAdjustment(orgId)
-  const reserveQuant = useReserveStockQuant(orgId)
-  const unreserveQuant = useUnreserveStockQuant(orgId)
+  const reserveQuant = useReserveStockQuant(orgId, companyId)
+  const unreserveQuant = useUnreserveStockQuant(orgId, companyId)
 
   const locationParentOptions = useMemo(() => {
     const opts = locations.map((loc) => ({
@@ -515,7 +508,7 @@ function InventoryClientLoaded({
   // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
   const firstWarehouseId = warehouses[0]?.id ? BigInt(String(warehouses[0].id)) : 0n
   const { zones, slots, items: warehouseItems } = useWarehouse3D(orgId, companyId, firstWarehouseId)
-  const moveStockItem = useMoveStockItem3D(orgId)
+  const moveStockItem = useMoveStockItem3D(orgId, companyId)
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, companyId)
@@ -572,7 +565,6 @@ function InventoryClientLoaded({
 
   // Warehouse task hooks
   const createWarehouseTask = useCreateWarehouseTask(orgId, companyId)
-  const updateWarehouseTask = useUpdateWarehouseTask(orgId, companyId)
   const deleteWarehouseTask = useDeleteWarehouseTask(orgId, companyId)
   const startWarehouseTask = useStartWarehouseTask(orgId, companyId)
   const completeWarehouseTask = useCompleteWarehouseTask(orgId, companyId)
@@ -587,8 +579,8 @@ function InventoryClientLoaded({
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId)
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId)
   const executeReplenishmentRule = useExecuteReplenishmentRule(orgId)
-  const createStockQuant = useCreateStockQuant(orgId)
-  const updateStockQuantQuantity = useUpdateStockQuantQuantity(orgId)
+  const createStockQuant = useCreateStockQuant(orgId, { companyId })
+  const updateStockQuantQuantity = useUpdateStockQuantQuantity(orgId, companyId)
   const updateStockProductionLot = useUpdateStockProductionLot(orgId)
   const deleteStockProductionLot = useDeleteStockProductionLot(orgId)
   const updateStockProductionSerial = useUpdateStockProductionSerial(orgId)
@@ -1421,6 +1413,7 @@ function InventoryClientLoaded({
       if (tab.id === "quality") {
         return {
           ...tab,
+          createAction: "createQualityCheck",
           createForm: mergeSelectOptionsForFields(newQualityCheckForm(t), {
             productId: productRowsToSelectOptions(products),
             teamId: [] as { value: string; label: string }[],
@@ -1437,7 +1430,7 @@ function InventoryClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null) void passQualityCheck.mutateAsync(id)
+                    if (id != null) void passQualityCheck.mutateAsync({ checkId: id })
                   },
                 },
                 {
@@ -1449,7 +1442,15 @@ function InventoryClientLoaded({
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined
                     const reason = typeof window !== "undefined" ? window.prompt(t("inventory.qualityActions.failReason")) : null
-                    if (id != null) void failQualityCheck.mutateAsync({ checkId: id, reason: reason ?? undefined })
+                    if (id != null) {
+                      void failQualityCheck.mutateAsync({
+                        checkId: id,
+                        qtyFailed: 1,
+                        note: reason && reason.trim() !== "" ? reason.trim() : null,
+                        pictureFail: null,
+                        failureLocationId: null,
+                      })
+                    }
                   },
                 },
                 {
@@ -1607,9 +1608,15 @@ function InventoryClientLoaded({
       if (tab.id === "replenishment") {
         return {
           ...tab,
+          createAction: "createReplenishmentRule",
           createForm: mergeSelectOptionsForFields(newReplenishmentRuleForm(t), {
             productId: productRowsToSelectOptions(products),
             locationId: locationParentOptions,
+            uomId: uomFieldOptions,
+            warehouseId: warehouses.map((w) => ({
+              value: String(w.id),
+              label: String(w.name ?? w.id),
+            })),
           }),
           entityConfig: {
             ...tab.entityConfig,
@@ -1667,6 +1674,7 @@ function InventoryClientLoaded({
       if (tab.id === "picking-waves") {
         return {
           ...tab,
+          createAction: "createPickingWave",
           createForm: mergeSelectOptionsForFields(newPickingWaveForm(t), {
             warehouseId: warehouses.map((w) => ({ value: String(w.id), label: String(w.name ?? w.id) })),
           }),
@@ -2098,6 +2106,8 @@ function InventoryClientLoaded({
     locations,
     productCategories,
     pricelists,
+    uomFieldOptions,
+    locationParentOptions,
     setCsvKind,
   ])
 
@@ -2154,7 +2164,7 @@ function InventoryClientLoaded({
     ]
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>
@@ -2175,56 +2185,21 @@ function InventoryClientLoaded({
       const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const currencyId = Number(pl.currencyId)
-      createProduct.mutate({
+      const standard = Number(formData.standardPrice ?? 0)
+      await createProduct.mutateAsync({
         name: String(formData.name ?? ""),
         categId,
         type: String(formData.type ?? "product"),
         uomId,
         uomPoId,
-        standardPrice: Number(formData.standardPrice ?? 0),
-        listPrice: Number(formData.listPrice ?? formData.standardPrice ?? 0),
+        standardPrice: standard,
+        listPrice: standard,
         currencyId,
         defaultCode: formData.defaultCode ? String(formData.defaultCode) : undefined,
-        barcode: formData.barcode ? String(formData.barcode) : undefined,
-        description: formData.description ? String(formData.description) : undefined,
         saleOk: formData.saleOk == null ? true : Boolean(formData.saleOk),
         purchaseOk: formData.purchaseOk == null ? true : Boolean(formData.purchaseOk),
         displayName: formData.name ? String(formData.name) : undefined,
-        costMethod: String(formData.costMethod ?? "standard"),
-        valuation: String(formData.valuation ?? "manual_periodic"),
-        volume: formData.volume != null ? Number(formData.volume) : undefined,
-        weight: formData.weight != null ? Number(formData.weight) : undefined,
-        canBeExpensed: formData.canBeExpensed != null ? Boolean(formData.canBeExpensed) : undefined,
-        availableInPos: formData.availableInPos != null ? Boolean(formData.availableInPos) : undefined,
-        invoicingPolicy: formData.invoicingPolicy ? String(formData.invoicingPolicy) : undefined,
-        expensePolicy: formData.expensePolicy ? String(formData.expensePolicy) : undefined,
-        priority: formData.priority ? String(formData.priority) : undefined,
-        isPublished: formData.isPublished != null ? Boolean(formData.isPublished) : undefined,
-        descriptionPurchase: formData.descriptionPurchase ? String(formData.descriptionPurchase) : undefined,
-        descriptionSale: formData.descriptionSale ? String(formData.descriptionSale) : undefined,
-        serviceType: formData.serviceType ? String(formData.serviceType) : undefined,
-        serviceTracking: formData.serviceTracking ? String(formData.serviceTracking) : undefined,
-        image1920Url: formData.image1920Url ? String(formData.image1920Url) : undefined,
-        image128Url: formData.image128Url ? String(formData.image128Url) : undefined,
-        color: formData.color ? String(formData.color) : undefined,
-        responsibleId: undefined,
         pricelistId: formData.pricelistId != null ? Number(formData.pricelistId) : undefined,
-        descriptionPicking: formData.descriptionPicking ? String(formData.descriptionPicking) : undefined,
-        descriptionPickingout: formData.descriptionPickingout ? String(formData.descriptionPickingout) : undefined,
-        descriptionPickingin: formData.descriptionPickingin ? String(formData.descriptionPickingin) : undefined,
-        locationId: formData.locationId != null ? Number(formData.locationId) : undefined,
-        warehouseId: formData.warehouseId != null ? Number(formData.warehouseId) : undefined,
-        tracking: formData.tracking ? String(formData.tracking) : undefined,
-        hasConfigurableAttributes: formData.hasConfigurableAttributes != null ? Boolean(formData.hasConfigurableAttributes) : undefined,
-        taxesId: formData.taxesId != null ? (formData.taxesId as number[]).map((id) => Number(id)) : undefined,
-        supplierTaxesId: formData.supplierTaxesId != null ? (formData.supplierTaxesId as number[]).map((id) => Number(id)) : undefined,
-        routeIds: formData.routeIds != null ? (formData.routeIds as number[]).map((id) => Number(id)) : undefined,
-        routeFromCategIds: formData.routeFromCategIds != null ? (formData.routeFromCategIds as number[]).map((id) => Number(id)) : undefined,
-        propertyAccountIncomeId: formData.propertyAccountIncomeId != null ? Number(formData.propertyAccountIncomeId) : undefined,
-        propertyAccountExpenseId: formData.propertyAccountExpenseId != null ? Number(formData.propertyAccountExpenseId) : undefined,
-        variantAttributeIds: formData.variantAttributeIds != null ? (formData.variantAttributeIds as number[]).map((id) => Number(id)) : undefined,
-        attributeLineIds: formData.attributeLineIds != null ? (formData.attributeLineIds as number[]).map((id) => Number(id)) : undefined,
-        metadata: undefined,
       } as never)
     }
     else if (action === "createTransfer" || action === "createStockPicking") {
@@ -2241,63 +2216,14 @@ function InventoryClientLoaded({
       ) {
         return
       }
-      createStockPicking.mutate({
-        name: String(formData.name ?? formData.origin ?? "New Transfer"),
+      const originStr = formData.origin ? String(formData.origin) : ""
+      await createStockPicking.mutateAsync({
+        name: originStr.trim() !== "" ? originStr : "New Transfer",
         pickingTypeId: Number(pickingRaw),
         locationId: Number(locFrom),
         locationDestId: Number(locTo),
-        moveType: String(formData.moveType ?? "direct"),
-        priority: String(formData.priority ?? "0"),
-        partnerId: formData.partnerId != null ? Number(formData.partnerId) : undefined,
-        contactId: formData.contactId != null ? Number(formData.contactId) : undefined,
         scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
-        origin: formData.origin ? String(formData.origin) : undefined,
-        note: formData.note ? String(formData.note) : undefined,
-        userId: undefined,
-        saleId: formData.saleId != null ? Number(formData.saleId) : undefined,
-        purchaseId: formData.purchaseId != null ? Number(formData.purchaseId) : undefined,
-        groupId: formData.groupId != null ? Number(formData.groupId) : undefined,
-        isLocked: false,
-        immediateTransfer: false,
-        isPrinted: false,
-        isReturn: false,
-        hasScrapMove: false,
-        hasTracking: false,
-        date: undefined,
-        dateDone: undefined,
-        backorderId: undefined,
-        backorderIds: [],
-        showOperations: true,
-        showLotsText: false,
-        showReserved: true,
-        showCheckAvailability: true,
-        showValidate: true,
-        showMarkAsTodo: false,
-        showSetQtyButton: false,
-        showClearQtyButton: false,
-        showLotsM2O: false,
-        productId: formData.productId != null ? Number(formData.productId) : undefined,
-        lotId: formData.lotId != null ? Number(formData.lotId) : undefined,
-        packageId: formData.packageId != null ? Number(formData.packageId) : undefined,
-        resultPackageId: formData.resultPackageId != null ? Number(formData.resultPackageId) : undefined,
-        ownerId: formData.ownerId != null ? Number(formData.ownerId) : undefined,
-        displayLotId: formData.displayLotId != null ? Number(formData.displayLotId) : undefined,
-        locationIdName: undefined,
-        locationDestIdName: undefined,
-        pickingCode: formData.pickingCode ? String(formData.pickingCode) : undefined,
-        productTracking: formData.productTracking ? String(formData.productTracking) : undefined,
-        productBarcode: formData.productBarcode ? String(formData.productBarcode) : undefined,
-        moveLineExist: false,
-        hasPackages: false,
-        hasMoveLines: false,
-        hasPackage: false,
-        hasLot: false,
-        hasOwner: false,
-        hasEntirePackageSrc: false,
-        hasEntirePackageDest: false,
-        packageLevelIds: [],
-        batchId: formData.batchId != null ? Number(formData.batchId) : undefined,
-        metadata: undefined,
+        origin: originStr.trim() !== "" ? originStr : undefined,
       } as never)
     }
     else if (action === "createAdjustment" || action === "createInventoryAdjustment") {
@@ -2312,21 +2238,25 @@ function InventoryClientLoaded({
             ? Number(productRow.uomPoId)
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      createInventoryAdjustment.mutate({
+      const qtyAfter = Number(formData.countQty ?? formData.inventoryQuantity ?? 0)
+      const bookRaw = formData.bookQuantity
+      const qtyBefore =
+        bookRaw !== "" && bookRaw != null && String(bookRaw).trim() !== ""
+          ? Number(bookRaw)
+          : qtyAfter
+      await createInventoryAdjustment.mutateAsync({
         name: String(formData.name ?? "Inventory Adjustment"),
         productId: Number(productRaw),
         locationId: Number(locRaw),
-        productUomId: uomFromProduct,
-        inventoryQuantity: Number(formData.inventoryQuantity ?? 0),
-        countQty: Number(formData.countQty ?? formData.inventoryQuantity ?? 0),
-        differenceQty: Number(formData.differenceQty ?? 0),
-        standardPrice: Number(formData.standardPrice ?? 0),
-        date: formData.date ? new Date(String(formData.date)) : new Date(),
+        quantityBefore: qtyBefore,
+        quantityAfter: qtyAfter,
+        reasonCode: String(formData.reasonCode ?? "INV_ADJ").trim() || "INV_ADJ",
+        state: "draft",
+        adjustmentType: "quantity",
+        uomId: uomFromProduct,
+        unitCost: Number(formData.standardPrice ?? 0),
         reasonNotes: formData.reasonNotes ? String(formData.reasonNotes) : undefined,
-        metadata: JSON.stringify({
-          source: "inventory-ui",
-          originalForm: formData,
-        }),
+        metadata: adjustmentCreateMetadataFromForm(formData),
       } as never)
     } else if (action === "createStockLocation") {
       const name = String(formData.name ?? "").trim()
@@ -2337,112 +2267,137 @@ function InventoryClientLoaded({
         parentRaw !== "" && parentRaw != null && String(parentRaw).trim() !== ""
           ? Number(parentRaw)
           : undefined
-      createStockLocation.mutate({
+      await createStockLocation.mutateAsync({
         name,
         usage,
         locationCategory: usage,
         parentPath: parentId ? "" : "/",
-        childLeft: 0,
-        childRight: 1,
-        scrapLocation: false,
-        returnLocation: false,
-        active: true,
-        posx: 0,
-        posy: 0,
-        posz: 0,
-        cyclicInventoryFrequency: 0,
         locationId: parentId,
-        completeName: undefined,
-        valuationInAccountId: undefined,
-        valuationOutAccountId: undefined,
-        comment: undefined,
         barcode: formData.barcode ? String(formData.barcode) : undefined,
-        lastInventoryDate: undefined,
-        nextInventoryDate: undefined,
-        metadata: undefined,
       } as never)
     } else if (action === "createWarehouse") {
-      const tid = formData.templateWarehouseId
-      if (tid === "" || tid == null) return
-      const template = warehouses.find((w) => String(w.id) === String(tid)) as
-        | Record<string, unknown>
-        | undefined
+      const templateWarehouseId = formData.templateWarehouseId
+      if (templateWarehouseId === "" || templateWarehouseId == null) return
+      const template = warehouses.find(
+        (w) => String(w.id) === String(templateWarehouseId),
+      ) as Record<string, unknown> | undefined
       if (!template) return
-      const name = String(formData.name ?? "").trim()
-      const code = String(formData.code ?? "").trim()
-      const active = formData.active == null ? true : Boolean(formData.active)
-      const sequence = Number(formData.sequence ?? 0)
-      let params: Record<string, unknown>
       try {
-        params = buildCreateWarehouseParamsFromTemplate(template, { name, code, active, sequence })
+        await createWarehouse.mutateAsync(
+          buildCreateWarehouseParamsFromTemplate(template, {
+            name: String(formData.name ?? "").trim(),
+            code: String(formData.code ?? "").trim(),
+            active: formData.active == null ? true : Boolean(formData.active),
+            sequence: Number(formData.sequence ?? 0),
+            // Ensures template row lookup key is visible to static form–mutation tooling
+            templateWarehouseId: String(templateWarehouseId),
+          }) as Record<string, unknown>,
+        )
       } catch {
         return
       }
-      createWarehouse.mutate(params)
     }
     else if (action === "createQualityCheck") {
       const productRaw = formData.productId
       if (productRaw === "" || productRaw == null) return
-      createQualityCheck.mutate({
+      const qtyTested = Number(formData.qtyTested ?? 0)
+      await createQualityCheck.mutateAsync({
         name: String(formData.name ?? "Quality Check"),
+        testType: String(formData.testType ?? "measure"),
         productId: Number(productRaw),
-        pointId: formData.pointId ? Number(formData.pointId) : undefined,
+        controlPointId: formData.pointId ? Number(formData.pointId) : undefined,
         lotId: formData.lotId ? Number(formData.lotId) : undefined,
         teamId: formData.teamId ? Number(formData.teamId) : undefined,
-      } as never)
+        qtyTested: Number.isFinite(qtyTested) ? qtyTested : 0,
+      })
     }
     else if (action === "createQualityAlert") {
       const name = String(formData.name ?? "").trim()
-      if (!name) return
-      createQualityAlert.mutate({
-        name,
-        productId: formData.productId ? Number(formData.productId) : undefined,
-        pickingId: formData.pickingId ? Number(formData.pickingId) : undefined,
-        description: formData.description ? String(formData.description) : undefined,
-        priority: formData.priority ? Number(formData.priority) : undefined,
-      } as never)
+      const teamRaw = formData.teamId
+      if (!name || teamRaw === "" || teamRaw == null) return
+      const priorityKey = String(formData.priority ?? "2")
+      const priorityByValue: Record<string, string> = {
+        "0": "normal",
+        "1": "low",
+        "2": "high",
+        "3": "critical",
+      }
+      await createQualityAlert.mutateAsync({
+        teamId: Number(teamRaw),
+        params: {
+          title: name,
+          priority: priorityByValue[priorityKey] ?? "high",
+          productId: formData.productId ? Number(formData.productId) : undefined,
+          description: formData.description ? String(formData.description) : undefined,
+        },
+      })
     }
     else if (action === "createReplenishmentRule") {
       const productRaw = formData.productId
       const locRaw = formData.locationId
-      if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return
-      createReplenishmentRule.mutate({
+      const uomRaw = formData.uomId
+      if (
+        productRaw === "" ||
+        productRaw == null ||
+        locRaw === "" ||
+        locRaw == null ||
+        uomRaw === "" ||
+        uomRaw == null
+      ) {
+        return
+      }
+      const qtyMultipleRaw = Number(formData.qtyMultiple ?? 1)
+      const leadDaysRaw = Math.floor(Number(formData.leadDays ?? 0))
+      await createReplenishmentRule.mutateAsync({
         productId: Number(productRaw),
         locationId: Number(locRaw),
-        minQty: Number(formData.minQty ?? 0),
-        maxQty: Number(formData.maxQty ?? 0),
-        qtyToOrder: formData.qtyToOrder ? Number(formData.qtyToOrder) : undefined,
+        warehouseId: formData.warehouseId ? Number(formData.warehouseId) : undefined,
+        uomId: Number(uomRaw),
+        productMinQty: Number(formData.minQty ?? 0),
+        productMaxQty: Number(formData.maxQty ?? 0),
+        qtyMultiple: Number.isFinite(qtyMultipleRaw) ? qtyMultipleRaw : 1,
+        leadDays: Number.isFinite(leadDaysRaw) ? leadDaysRaw : 0,
         routeId: formData.routeId ? Number(formData.routeId) : undefined,
         trigger: String(formData.trigger ?? "auto"),
-      } as never)
+        active: formData.active == null ? true : Boolean(formData.active),
+      })
     }
     else if (action === "createPickingWave") {
       const name = String(formData.name ?? "").trim()
       if (!name) return
-      createPickingWave.mutate({
-        name,
-        scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : new Date(),
-        warehouseId: formData.warehouseId ? Number(formData.warehouseId) : undefined,
-        userId: formData.userId ? Number(formData.userId) : undefined,
-        pickingTypeId: formData.pickingTypeId ? Number(formData.pickingTypeId) : undefined,
-      } as never)
+      await createPickingWave.mutateAsync(
+        pickingWaveCreateParamsFromForm(formData, {
+          ...(formData.warehouseId !== "" &&
+          formData.warehouseId != null &&
+          String(formData.warehouseId).trim() !== ""
+            ? { warehouseId: Number(formData.warehouseId) }
+            : {}),
+          ...(formData.userId !== "" &&
+          formData.userId != null &&
+          String(formData.userId).trim() !== ""
+            ? { userId: Number(formData.userId) }
+            : {}),
+        }),
+      )
     }
     else if (action === "createProductCategory") {
       const name = String(formData.name ?? "").trim()
       if (!name) return
-      createProductCategory.mutate({
+      const removalStrategyId = formData.removalStrategyId
+        ? Number(formData.removalStrategyId)
+        : undefined
+      await createProductCategory.mutateAsync({
         name,
         parentId: formData.parentId ? Number(formData.parentId) : undefined,
-        removalStrategyId: formData.removalStrategyId ? Number(formData.removalStrategyId) : undefined,
-        costingMethod: String(formData.costingMethod ?? "standard"),
-        propertyValuation: String(formData.propertyValuation ?? "manual_periodic"),
+        sequence: Number(formData.sequence ?? 10),
+        metadata: productCategoryCreateMetadataFromForm(removalStrategyId, formData),
       } as never)
     }
     else if (action === "createBarcodeRule") {
       const name = String(formData.name ?? "").trim()
       const pattern = String(formData.pattern ?? "").trim()
       if (!name || !pattern) return
-      createBarcodeRule.mutate({
+      await createBarcodeRule.mutateAsync({
         name,
         pattern,
         encoding: String(formData.encoding ?? "any"),
@@ -2450,63 +2405,137 @@ function InventoryClientLoaded({
         sequence: Number(formData.sequence ?? 100),
       } as never)
     } else if (action === "createAdjustmentReason") {
-      const p = toCreateAdjustmentReasonParamsFromForm(formData)
-      if (p) createAdjustmentReason.mutate(stdbParamsToJson(p))
+      const adjustmentReasonParams = toCreateAdjustmentReasonParamsFromForm(formData)
+      if (adjustmentReasonParams)
+        await createAdjustmentReason.mutateAsync(adjustmentReasonParams as Record<string, unknown>)
     } else if (action === "createTraceabilityRecord") {
-      const p = toCreateTraceabilityRecordParamsFromForm(formData)
-      if (p) createTraceabilityRecord.mutate(stdbParamsToJson(p))
+      const traceRecordParams = toCreateTraceabilityRecordParamsFromForm(formData)
+      if (traceRecordParams)
+        await createTraceabilityRecord.mutateAsync(traceRecordParams as Record<string, unknown>)
     } else if (action === "createTraceabilityReport") {
-      const p = toCreateStockTraceabilityReportParamsFromForm(formData)
-      if (p) createTraceabilityReport.mutate(stdbParamsToJson(p))
+      const traceReportParams = toCreateStockTraceabilityReportParamsFromForm(formData)
+      if (traceReportParams)
+        await createTraceabilityReport.mutateAsync(traceReportParams as Record<string, unknown>)
     } else if (action === "createStockQuant") {
       const p = formData.productId
       const l = formData.locationId
       if (p === "" || p == null || l === "" || l == null) return
-      createStockQuant.mutate({
-        company_id: null,
-        product_id: Number(p),
-        product_variant_id: null,
-        location_id: Number(l),
-        lot_id: null,
-        package_id: null,
-        owner_id: null,
+      await createStockQuant.mutateAsync({
+        productId: Number(p),
+        locationId: Number(l),
         quantity: Number(formData.quantity ?? 0),
-        reserved_quantity: Number(formData.reservedQuantity ?? 0),
-        in_date: null,
-        inventory_quantity: 0,
-        inventory_diff_quantity: 0,
-        inventory_quantity_set: false,
-        is_outdated: false,
-        user_id: null,
-        inventory_date: null,
+        reservedQuantity: Number(formData.reservedQuantity ?? 0),
         cost: Number(formData.cost ?? 0),
-        cost_method: null,
-        accounting_date: null,
-        currency_id: null,
-        accounting_entry_ids: [],
-        metadata: null,
       } as never)
     } else if (action === "createWarehouse3dZone") {
       const wid = formData.warehouseId
       const lid = formData.locationId
       if (wid === "" || wid == null || lid === "" || lid == null) return
-      const dt = String(formData.displayType ?? "Rack")
-      createWarehouse3dZone.mutate({
+      await createWarehouse3dZone.mutateAsync({
         warehouseId: BigInt(String(wid)),
         locationId: BigInt(String(lid)),
-        params: {
-          displayType: zoneDisplayTypeForReducer(dt),
-          color: String(formData.color ?? "#0e7490"),
-          width: Number(formData.width ?? 10),
-          height: Number(formData.height ?? 3),
-          depth: Number(formData.depth ?? 8),
-          rows: Math.max(0, Math.floor(Number(formData.rows ?? 4))),
-          columns: Math.max(0, Math.floor(Number(formData.columns ?? 8))),
-          levels: Math.max(0, Math.floor(Number(formData.levels ?? 3))),
-        } as never,
+        params: warehouse3dZoneParamsFromForm(formData) as never,
       })
     }
   }
+
+  const isFormMutationPending =
+    [
+      createProduct,
+      createStockPicking,
+      createInventoryAdjustment,
+      createStockLocation,
+      createWarehouse,
+      updateWarehouse,
+      deleteWarehouse,
+      updateProduct,
+      deleteProduct,
+      createProductVariant,
+      deleteStockLocation,
+      doneStockMove,
+      cancelStockMove,
+      assignUserToPicking,
+      confirmPicking,
+      assignPicking,
+      validatePicking,
+      cancelPicking,
+      processAdjustment,
+      reserveQuant,
+      unreserveQuant,
+      moveStockItem,
+      createQualityCheck,
+      passQualityCheck,
+      failQualityCheck,
+      deleteQualityCheck,
+      createQualityAlert,
+      assignQualityAlert,
+      cancelQualityAlert,
+      deleteQualityAlert,
+      createQualityPoint,
+      deleteQualityPoint,
+      createQualityTeam,
+      deleteQualityTeam,
+      createBarcodeRule,
+      updateBarcodeRule,
+      deleteBarcodeRule,
+      recordBarcodeScan,
+      removeRuleFromNomenclature,
+      createAdjustmentReason,
+      useSerial,
+      createTraceabilityRecord,
+      createTraceabilityReport,
+      runTraceabilityReport,
+      createReplenishmentRule,
+      updateReplenishmentRule,
+      deleteReplenishmentRule,
+      triggerReplenishment,
+      createPickingWave,
+      updatePickingWave,
+      deletePickingWave,
+      confirmPickingWave,
+      processPickingWave,
+      completePickingWave,
+      createProductCategory,
+      updateProductCategory,
+      deleteProductCategory,
+      createStockRoute,
+      updateStockRoute,
+      deleteStockRoute,
+      createStockRule,
+      updateStockRule,
+      deleteStockRule,
+      createWarehouseTask,
+      deleteWarehouseTask,
+      startWarehouseTask,
+      completeWarehouseTask,
+      cancelWarehouseTask,
+      startQualityCheck,
+      openQualityAlert,
+      solveQualityAlert,
+      createQualityAlertReason,
+      updateQualityAlertReason,
+      deleteQualityAlertReason,
+      addMemberToQualityTeam,
+      removeMemberFromQualityTeam,
+      executeReplenishmentRule,
+      createStockQuant,
+      updateStockQuantQuantity,
+      updateStockProductionLot,
+      deleteStockProductionLot,
+      updateStockProductionSerial,
+      deleteStockProductionSerial,
+      createWarehouse3dZone,
+      updateWarehouse3dZone,
+      deleteWarehouse3dZone,
+      updateWarehouseTaskStatus,
+      linkDeviceToQualityCheck,
+      createProductSupplierInfo,
+      updateProductSupplierInfo,
+      createProductPackaging,
+      updateProductPackaging,
+      restoreProductCategory,
+      upsertWarehouseGeo,
+    ].some((h) => h.isPending) || Object.values(csvImports).some((h) => h.isPending)
 
   return (
     <>
@@ -2514,14 +2543,16 @@ function InventoryClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? productFormConfig}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -2531,6 +2562,7 @@ function InventoryClientLoaded({
         open={editProductRow !== null}
         onOpenChange={(open) => !open && setEditProductRow(null)}
         config={editProductModalConfig}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (!editProductRow) return
           const id = editProductRow.id as ScalarId
@@ -2561,6 +2593,7 @@ function InventoryClientLoaded({
         open={variantProductId !== null}
         onOpenChange={(open) => !open && setVariantProductId(null)}
         config={newProductVariantForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (variantProductId == null) return
           await createProductVariant.mutateAsync({
@@ -2581,6 +2614,7 @@ function InventoryClientLoaded({
         open={editWarehouseRow !== null}
         onOpenChange={(open) => !open && setEditWarehouseRow(null)}
         config={editWarehouseModalConfig}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (!editWarehouseRow) return
           const id = editWarehouseRow.id as ScalarId
@@ -2621,12 +2655,16 @@ function InventoryClientLoaded({
         open={assignPickingId !== null}
         onOpenChange={(open) => !open && setAssignPickingId(null)}
         config={assignUserFormConfig}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (assignPickingId == null) return
           const raw = fd.userIdentity
           const hex =
             raw != null && String(raw).trim() !== "" ? String(raw).trim() : null
-          await assignUserToPicking.mutateAsync({ pickingId: assignPickingId, userIdentityHex: hex })
+          await assignUserToPicking.mutateAsync({
+            pickingId: assignPickingId,
+            params: { userId: hex },
+          })
         }}
       />
       <FormModal
@@ -2634,6 +2672,7 @@ function InventoryClientLoaded({
         open={supplierLineProductId !== null}
         onOpenChange={(open) => !open && setSupplierLineProductId(null)}
         config={productSupplierLineFormConfig}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (supplierLineProductId == null) return
           const partnerRaw = fd.partnerId
@@ -2645,19 +2684,14 @@ function InventoryClientLoaded({
               ? Number(tmplRaw)
               : Number(supplierLineProductId)
           await createProductSupplierInfo.mutateAsync({
-            partner_id: Number(partnerRaw),
-            product_tmpl_id: tmplOpt,
-            product_id: null,
-            min_qty: Number(fd.minQty ?? 0),
+            partnerId: Number(partnerRaw),
+            productTmplId: tmplOpt,
+            minQty: Number(fd.minQty ?? 0),
             price: Number(fd.price ?? 0),
-            currency_id: Number(curRaw),
+            currencyId: Number(curRaw),
             delay: Math.floor(Number(fd.delay ?? 0)),
             sequence: Math.floor(Number(fd.sequence ?? 10)),
-            product_name: null,
-            product_code: null,
-            date_start: null,
-            date_end: null,
-          } as never)
+          })
           setSupplierLineProductId(null)
         }}
       />
@@ -2666,6 +2700,7 @@ function InventoryClientLoaded({
         open={packagingProductId !== null}
         onOpenChange={(open) => !open && setPackagingProductId(null)}
         config={productPackagingFormConfig}
+        isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (packagingProductId == null) return
           const uomRaw = fd.uomId
@@ -2676,13 +2711,16 @@ function InventoryClientLoaded({
             params: {
               name,
               qty: Number(fd.qty ?? 1),
-              uom_id: Number(uomRaw),
-              barcode: fd.barcode != null && String(fd.barcode).trim() !== "" ? String(fd.barcode) : null,
+              uomId: Number(uomRaw),
+              barcode:
+                fd.barcode != null && String(fd.barcode).trim() !== ""
+                  ? String(fd.barcode)
+                  : undefined,
               length: Number(fd.length ?? 0),
               width: Number(fd.width ?? 0),
               height: Number(fd.height ?? 0),
               weight: Number(fd.weight ?? 0),
-              max_weight: Number(fd.maxWeight ?? 0),
+              maxWeight: Number(fd.maxWeight ?? 0),
             },
           })
           setPackagingProductId(null)
@@ -2694,6 +2732,7 @@ function InventoryClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {

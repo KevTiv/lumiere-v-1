@@ -11,7 +11,7 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ export function useSubscriptions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['subscriptions', organizationId],
+    queryKey: ['subscriptions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/subscriptions', 'Failed to fetch subscriptions'),
     staleTime: 30_000,
     initialData,
@@ -33,7 +33,7 @@ export function useSubscriptionPlans(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['subscription-plans', organizationId],
+    queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/subscription-plans', 'Failed to fetch subscription plans'),
     staleTime: 30_000,
     initialData,
@@ -45,7 +45,7 @@ export function useDeferredRevenueSchedules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['deferred-revenue-schedules', organizationId],
+    queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
         '/api/query/deferred-revenue-schedules',
@@ -61,7 +61,7 @@ export function useDeferredRevenueLines(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['deferred-revenue-lines', organizationId],
+    queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/deferred-revenue-lines', 'Failed to fetch deferred revenue lines'),
     staleTime: 30_000,
@@ -74,7 +74,7 @@ export function useRevenueRecognitionRules(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['revenue-recognition-rules', organizationId],
+    queryKey: ['revenue-recognition-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
         '/api/query/revenue-recognition-rules',
@@ -99,7 +99,7 @@ export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bi
       if (!r.ok) throw new Error('Failed to create subscription plan')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscription-plans', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -116,8 +116,8 @@ export function useCreateSubscriptionFromSaleOrder(organizationId: bigint, compa
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['subscriptions', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['subscription-plans', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -143,7 +143,7 @@ export function useActivateSubscription(organizationId: bigint, companyId?: bigi
       if (!r.ok) throw new Error('Failed to activate subscription')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -164,7 +164,7 @@ export function useCloseSubscription(organizationId: bigint, companyId?: bigint)
       if (!r.ok) throw new Error('Failed to close subscription')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -185,7 +185,7 @@ export function useGenerateSubscriptionInvoice(organizationId: bigint, companyId
       if (!r.ok) throw new Error('Failed to generate subscription invoice')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -206,8 +206,8 @@ export function useCreateDeferredRevenueSchedule(organizationId: bigint, company
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -231,8 +231,8 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
     },
     onSuccess: async () => {
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', organizationId] }),
-        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', organizationId] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)] }),
       ])
     },
   })
@@ -254,7 +254,7 @@ export function useCreateRevenueRecognitionRule(organizationId: bigint, companyI
       if (!r.ok) throw new Error('Failed to create revenue recognition rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -274,7 +274,7 @@ export function useActivateRevenueRecognitionRule(organizationId: bigint, compan
       if (!r.ok) throw new Error('Failed to activate rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -294,7 +294,7 @@ export function useDeactivateRevenueRecognitionRule(organizationId: bigint, comp
       if (!r.ok) throw new Error('Failed to deactivate rule')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['revenue-recognition-rules', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -314,7 +314,7 @@ export function useImportSubscriptionPlanCsv(organizationId: bigint, companyId?:
       if (!r.ok) throw new Error('Failed to import subscription plans from CSV')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscription-plans', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscription-plans', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -334,7 +334,7 @@ export function useImportSubscriptionCsv(organizationId: bigint, companyId?: big
       if (!r.ok) throw new Error('Failed to import subscriptions from CSV')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['subscriptions', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['subscriptions', rqBigIntKey(organizationId)] }),
   })
 }
 

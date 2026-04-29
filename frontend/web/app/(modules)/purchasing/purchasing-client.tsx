@@ -72,6 +72,7 @@ import {
 } from "@lumiere/query-hooks/hooks/purchasing"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms } from "@lumiere/query-hooks/hooks/inventory"
+import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   contactRowsToVendorSelectOptions,
@@ -83,6 +84,7 @@ import {
   purchaseOrderLineRowsToReceiveOptions,
   purchaseOrderLineRowsToInvoiceOptions,
   partnerBankRowsToSelectOptions,
+  departmentRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   toAddPurchaseOrderLineParams,
@@ -91,7 +93,7 @@ import {
   toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
 import {
-  createPartnerBankParamsJson,
+  toCreatePartnerBankParams,
   toUpdatePartnerBankParams,
 } from "@/lib/purchasing-partner-bank-params"
 
@@ -128,7 +130,14 @@ interface PurchasingClientProps {
   initialProducts?: Record<string, unknown>[]
   initialUoms?: Record<string, unknown>[]
   initialPartnerBanks?: Record<string, unknown>[]
+  initialDepartments?: Record<string, unknown>[]
   organizationId?: number
+  /**
+   * Resolved on the server from `account_journal` (active Purchase journal for this org’s company + its `default_account_id`).
+   * Required for “create bill from PO” to run; omit when no suitable journal row exists.
+   */
+  purchaseBillJournalId?: string
+  purchaseBillExpenseAccountId?: string
 }
 
 type PurchasingClientLoadedProps = Omit<PurchasingClientProps, "organizationId"> & {
@@ -153,7 +162,10 @@ function PurchasingClientLoaded({
   initialProducts,
   initialUoms,
   initialPartnerBanks,
+  initialDepartments,
   organizationId,
+  purchaseBillJournalId,
+  purchaseBillExpenseAccountId,
 }: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
@@ -189,9 +201,10 @@ function PurchasingClientLoaded({
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
+  const { data: departments = [] } = useDepartments(orgId, initialDepartments)
 
-  const createPurchaseOrder = useCreatePurchaseOrder(orgId, companyId)
-  const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, companyId)
+  const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId })
+  const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId })
   const sendPurchaseOrder = useSendPurchaseOrder(orgId)
   const confirmPurchaseOrder = useConfirmPurchaseOrder(orgId)
   const cancelPurchaseOrder = useCancelPurchaseOrder(orgId)
@@ -228,7 +241,7 @@ function PurchasingClientLoaded({
 
   const updatePoReceiptStatus = useUpdatePoReceiptStatus(orgId)
   const updatePoInvoiceStatus = useUpdatePoInvoiceStatus(orgId)
-  const createPartnerBank = useCreatePartnerBank(orgId)
+  const createPartnerBank = useCreatePartnerBank(orgId, { companyId })
   const updatePartnerBank = useUpdatePartnerBank(orgId)
   const deletePartnerBank = useDeletePartnerBank(orgId)
 
@@ -263,6 +276,12 @@ function PurchasingClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noVendors"), disabled: true }]
   }, [allContacts, t])
+
+  const departmentFieldOptions = useMemo(() => {
+    const fromApi = departmentRowsToSelectOptions(departments as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noDepartments"), disabled: true }]
+  }, [departments, t])
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -310,8 +329,9 @@ function PurchasingClientLoaded({
     () =>
       mergeSelectOptionsForFields(newPurchaseRequisitionForm(t), {
         vendorId: vendorFieldOptions,
+        departmentId: departmentFieldOptions,
       }),
-    [t, vendorFieldOptions],
+    [t, vendorFieldOptions, departmentFieldOptions],
   )
 
   const addLineFormConfig = useMemo(
@@ -493,11 +513,17 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.createBillsFromSelected"),
             requiresSelection: true,
             onClick: (rows) => {
+              const j = purchaseBillJournalId?.trim()
+              const exp = purchaseBillExpenseAccountId?.trim()
+              if (!j || !exp) return
               for (const r of rows) {
                 const st = poState(r)
                 if (st === "Approved" || st === "Done") {
                   void createBillFromPurchaseOrder.mutateAsync({
                     orderId: r.id as string | number | bigint,
+                    journalId: j,
+                    defaultExpenseAccountId: exp,
+                    invoiceDate: new Date(),
                   })
                 }
               }
@@ -518,8 +544,8 @@ function PurchasingClientLoaded({
     lockPurchaseOrder,
     unlockPurchaseOrder,
     createBillFromPurchaseOrder,
-    setCsvKind,
-    t,
+    purchaseBillJournalId,
+    purchaseBillExpenseAccountId
   ])
 
   const linesEntityConfig = useMemo((): EntityViewConfig => {
@@ -597,9 +623,7 @@ function PurchasingClientLoaded({
     receiveLineFormConfig,
     invoiceLineFormConfig,
     removePurchaseOrderLine,
-    receivePurchaseOrderLine,
-    setCsvKind,
-    t,
+    receivePurchaseOrderLine
   ])
 
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {
@@ -769,9 +793,13 @@ function PurchasingClientLoaded({
           requiresSelection: true,
           onClick: (rows) => {
             for (const r of rows) {
-              if (supplierIntakeState(r) !== "Approved") {
-                void approveSupplierIntake.mutateAsync(r.id as string | number | bigint)
-              }
+              if (supplierIntakeState(r) === "Approved") continue
+              const partnerRaw = r.partnerId ?? r.partner_id
+              if (partnerRaw == null || partnerRaw === "" || Number(partnerRaw) <= 0) continue
+              void approveSupplierIntake.mutateAsync({
+                intakeId: r.id as string | number | bigint,
+                partnerId: partnerRaw as string | number | bigint,
+              })
             }
           },
         },
@@ -905,7 +933,7 @@ function PurchasingClientLoaded({
         return w
       }),
     }))
-  }, [orders, moduleConfig, t, purchaseOrderFormConfig, purchaseRequisitionFormConfig, receiveLineFormConfig])
+  }, [orders, moduleConfig, t, purchaseOrderFormConfig, purchaseRequisitionFormConfig, receiveLineFormConfig, setActiveTab])
 
   const config = useMemo(
     () =>
@@ -913,86 +941,86 @@ function PurchasingClientLoaded({
         ...moduleConfig,
         tabs: [
           ...moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") {
-            return { ...tab, sections: liveSections }
-          }
-          if (tab.id === "orders" && tab.type === "entity") {
-            return { ...tab, entityConfig: ordersEntityConfig, createForm: purchaseOrderFormConfig }
-          }
-          if (tab.id === "lines" && tab.type === "entity") {
-            return { ...tab, entityConfig: linesEntityConfig }
-          }
-          if (tab.id === "requisitions" && tab.type === "entity") {
-            return { ...tab, entityConfig: requisitionsEntityConfig, createForm: purchaseRequisitionFormConfig }
-          }
-          if (tab.id === "vendors" && tab.type === "entity" && tab.entityConfig) {
-            const base = tab.entityConfig
-            const view = base.view as EntityTableConfig
-            return {
-              ...tab,
-              entityConfig: {
-                ...base,
-                view: {
-                  ...view,
-                  rowSelectionToggleOnClick: false,
-                  actions: [
-                    {
-                      id: "csv-supplier-info",
-                      label: t("purchasing.csvImport.toolbarSupplierInfo"),
-                      onClick: () => setCsvKind("supplierInfo"),
-                    },
-                    ...(view.actions ?? []),
-                  ],
-                },
-              },
+            if (tab.id === "dashboard") {
+              return { ...tab, sections: liveSections }
             }
-          }
-          if (tab.id === "partner-banks" && tab.type === "entity" && tab.entityConfig) {
-            const base = tab.entityConfig
-            const view = base.view as EntityTableConfig
-            return {
-              ...tab,
-              createForm: partnerBankFormConfig,
-              entityConfig: {
-                ...base,
-                view: {
-                  ...view,
-                  actions: [
-                    {
-                      id: "pb-edit-form",
-                      label: t("purchasing.partnerBanks.editForm"),
-                      onClick: () =>
-                        setQuickActionForm({
-                          form: editPartnerBankFormConfig,
-                          action: "updatePartnerBank",
-                        }),
-                    },
-                    {
-                      id: "pb-delete",
-                      label: t("common.delete"),
-                      requiresSelection: true,
-                      variant: "destructive",
-                      onClick: (rows: Record<string, unknown>[]) => {
-                        if (
-                          typeof window !== "undefined" &&
-                          !window.confirm(
-                            t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
-                          )
-                        ) {
-                          return
-                        }
-                        for (const r of rows) {
-                          void deletePartnerBank.mutateAsync(r.id as string | number | bigint)
-                        }
+            if (tab.id === "orders" && tab.type === "entity") {
+              return { ...tab, entityConfig: ordersEntityConfig, createForm: purchaseOrderFormConfig }
+            }
+            if (tab.id === "lines" && tab.type === "entity") {
+              return { ...tab, entityConfig: linesEntityConfig }
+            }
+            if (tab.id === "requisitions" && tab.type === "entity") {
+              return { ...tab, entityConfig: requisitionsEntityConfig, createForm: purchaseRequisitionFormConfig }
+            }
+            if (tab.id === "vendors" && tab.type === "entity" && tab.entityConfig) {
+              const base = tab.entityConfig
+              const view = base.view as EntityTableConfig
+              return {
+                ...tab,
+                entityConfig: {
+                  ...base,
+                  view: {
+                    ...view,
+                    rowSelectionToggleOnClick: false,
+                    actions: [
+                      {
+                        id: "csv-supplier-info",
+                        label: t("purchasing.csvImport.toolbarSupplierInfo"),
+                        onClick: () => setCsvKind("supplierInfo"),
                       },
-                    },
-                    ...(view.actions ?? []),
-                  ],
+                      ...(view.actions ?? []),
+                    ],
+                  },
                 },
-              },
+              }
             }
-          }
-          return tab
+            if (tab.id === "partner-banks" && tab.type === "entity" && tab.entityConfig) {
+              const base = tab.entityConfig
+              const view = base.view as EntityTableConfig
+              return {
+                ...tab,
+                createForm: partnerBankFormConfig,
+                entityConfig: {
+                  ...base,
+                  view: {
+                    ...view,
+                    actions: [
+                      {
+                        id: "pb-edit-form",
+                        label: t("purchasing.partnerBanks.editForm"),
+                        onClick: () =>
+                          setQuickActionForm({
+                            form: editPartnerBankFormConfig,
+                            action: "updatePartnerBank",
+                          }),
+                      },
+                      {
+                        id: "pb-delete",
+                        label: t("common.delete"),
+                        requiresSelection: true,
+                        variant: "destructive",
+                        onClick: (rows: Record<string, unknown>[]) => {
+                          if (
+                            typeof window !== "undefined" &&
+                            !window.confirm(
+                              t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
+                            )
+                          ) {
+                            return
+                          }
+                          for (const r of rows) {
+                            void deletePartnerBank.mutateAsync(r.id as string | number | bigint)
+                          }
+                        },
+                      },
+                      ...(view.actions ?? []),
+                    ],
+                  },
+                },
+              }
+            }
+            return tab
           }),
           {
             id: "landed-costs",
@@ -1022,7 +1050,6 @@ function PurchasingClientLoaded({
       editPartnerBankFormConfig,
       deletePartnerBank,
       t,
-      setCsvKind,
     ],
   )
 
@@ -1039,7 +1066,7 @@ function PurchasingClientLoaded({
     [orders, lines, requisitions, vendors, landedCosts, supplierIntakes, partnerBanks],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
@@ -1053,7 +1080,7 @@ function PurchasingClientLoaded({
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const currencyId = Number(pl.currencyId)
 
-      createPurchaseOrder.mutate({
+      await createPurchaseOrder.mutateAsync({
         partnerId: Number(partnerRaw),
         currencyId,
         origin: formData.origin ? String(formData.origin) : undefined,
@@ -1064,21 +1091,10 @@ function PurchasingClientLoaded({
           formData.paymentTermId != null && formData.paymentTermId !== ""
             ? Number(formData.paymentTermId)
             : undefined,
-        fiscalPositionId: undefined,
-        incotermId: undefined,
-        incotermLocation: undefined,
-        userId: undefined,
-        invoiceIds: [],
-        pickingIds: [],
-        messageFollowerIds: [],
-        messageIds: [],
-        activityIds: [],
-        isQuantityCopy: undefined,
-        metadata: undefined,
-      } as never)
+      })
     } else if (action === "createPurchaseRequisition") {
       const vendorRaw = formData.vendorId
-      createPurchaseRequisition.mutate({
+      await createPurchaseRequisition.mutateAsync({
         description: formData.description ? String(formData.description) : undefined,
         orderingDate: formData.orderingDate
           ? new Date(String(formData.orderingDate))
@@ -1091,24 +1107,17 @@ function PurchasingClientLoaded({
           formData.departmentId != null && formData.departmentId !== ""
             ? Number(formData.departmentId)
             : undefined,
-        exclusive: undefined,
-        multipleProduct: false,
-        lineIds: [],
-        purchaseIds: [],
         vendorId:
           vendorRaw !== "" && vendorRaw != null ? Number(vendorRaw) : undefined,
-        activityIds: [],
-        messageFollowerIds: [],
-        messageIds: [],
         metadata: formData.origin
           ? JSON.stringify({ origin: String(formData.origin) })
           : undefined,
-      } as never)
+      })
     } else if (action === "addPurchaseOrderLine") {
       const params = toAddPurchaseOrderLineParams(formData)
       const orderId = formData.orderId
       if (params == null || orderId === "" || orderId == null) return
-      void addPurchaseOrderLine.mutateAsync({
+      await addPurchaseOrderLine.mutateAsync({
         orderId: orderId as string | number | bigint,
         params,
       })
@@ -1116,26 +1125,64 @@ function PurchasingClientLoaded({
       const lineId = formData.lineId
       const params = toUpdatePurchaseOrderLineParams(formData)
       if (params == null || lineId === "" || lineId == null) return
-      void updatePurchaseOrderLine.mutateAsync({
+      await updatePurchaseOrderLine.mutateAsync({
         lineId: lineId as string | number | bigint,
         params,
       })
     } else if (action === "receivePurchaseOrderLine") {
       const args = toReceivePoLineArgs(formData)
       if (args == null) return
-      void receivePurchaseOrderLine.mutateAsync(args)
+      await receivePurchaseOrderLine.mutateAsync(args)
     } else if (action === "invoicePurchaseOrderLine") {
       const args = toInvoicePoLineArgs(formData)
       if (args == null) return
-      void invoicePurchaseOrderLine.mutateAsync(args)
+      await invoicePurchaseOrderLine.mutateAsync(args)
     } else if (action === "createPartnerBank") {
-      const params = createPartnerBankParamsJson(formData, companyId)
-      if (params) createPartnerBank.mutate(params)
+      const bankParams = toCreatePartnerBankParams(formData)
+      if (bankParams) await createPartnerBank.mutateAsync(bankParams as Record<string, unknown>)
     } else if (action === "updatePartnerBank") {
       const u = toUpdatePartnerBankParams(formData)
-      if (u) void updatePartnerBank.mutateAsync({ bankId: u.bankId, params: u.params })
+      if (u) await updatePartnerBank.mutateAsync(u)
     }
   }
+
+  const isFormMutationPending =
+    createPurchaseOrder.isPending ||
+    createPurchaseRequisition.isPending ||
+    sendPurchaseOrder.isPending ||
+    confirmPurchaseOrder.isPending ||
+    cancelPurchaseOrder.isPending ||
+    addPurchaseOrderLine.isPending ||
+    removePurchaseOrderLine.isPending ||
+    receivePurchaseOrderLine.isPending ||
+    invoicePurchaseOrderLine.isPending ||
+    submitPurchaseRequisition.isPending ||
+    approvePurchaseRequisition.isPending ||
+    closePurchaseRequisition.isPending ||
+    cancelPurchaseRequisition.isPending ||
+    computePoTotals.isPending ||
+    computePoLineTotals.isPending ||
+    deleteLandedCost.isPending ||
+    computeLandedCosts.isPending ||
+    postLandedCosts.isPending ||
+    applyLandedCosts.isPending ||
+    cancelLandedCost.isPending ||
+    deleteSupplierIntake.isPending ||
+    approveSupplierIntake.isPending ||
+    rejectSupplierIntake.isPending ||
+    holdSupplierIntake.isPending ||
+    lockPurchaseOrder.isPending ||
+    unlockPurchaseOrder.isPending ||
+    createBillFromPurchaseOrder.isPending ||
+    updatePurchaseOrderLine.isPending ||
+    csvImports.importPurchaseOrder.isPending ||
+    csvImports.importPurchaseOrderLine.isPending ||
+    csvImports.importSupplierInfo.isPending ||
+    createPartnerBank.isPending ||
+    updatePartnerBank.isPending ||
+    deletePartnerBank.isPending ||
+    updatePoReceiptStatus.isPending ||
+    updatePoInvoiceStatus.isPending
 
   const defaultQuickForm = purchaseOrderFormConfig
 
@@ -1147,15 +1194,17 @@ function PurchasingClientLoaded({
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
+        isPending={isFormMutationPending}
       />
       <FormModal
         key={formModalKey}
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? defaultQuickForm}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -1166,6 +1215,7 @@ function PurchasingClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {

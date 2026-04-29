@@ -30,8 +30,6 @@ export function toAddPurchaseOrderLineParams(
     quantity,
     uomId: Number(uomId),
     priceUnit,
-    discount: 0,
-    taxIds: [] as number[],
   }
 }
 

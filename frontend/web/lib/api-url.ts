@@ -8,8 +8,9 @@
  * Next.js route handlers forward to Axum using `LUMIERE_API_SERVER_URL` (see
  * `lib/api-server-forward.ts`) — one gateway, cookies stay on the Next origin.
  *
- * Paths **not** listed here (e.g. `/api/auth/*`, `/api/stdb/*`, `/api/realtime/ws`, `/api/health`) always
- * stay on the Next.js origin.
+ * Paths **not** listed here (e.g. `/api/auth/*`, `/api/stdb/*`, `/api/health`) always
+ * stay on the Next.js origin. Realtime WebSockets go directly to api-server (see
+ * `NEXT_PUBLIC_REALTIME_WS_URL` / `NEXT_PUBLIC_API_GATEWAY_URL` in `hooks/realtime.ts`).
  */
 
 const GATEWAY_PREFIXES = [

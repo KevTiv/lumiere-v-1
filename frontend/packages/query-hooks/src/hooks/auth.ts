@@ -11,14 +11,20 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+type ScalarId = bigint | number | string
+
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['audit-log', organizationId],
+    queryKey: ['audit-log', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/audit-log', 'Failed to fetch audit log'),
     staleTime: 30_000,
     initialData,
@@ -27,7 +33,7 @@ export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
 
 export function useAuditRules(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['audit-rules', organizationId],
+    queryKey: ['audit-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/audit-rules', 'Failed to fetch audit rules'),
     staleTime: 30_000,
     initialData,
@@ -36,7 +42,7 @@ export function useAuditRules(organizationId: bigint, initialData?: QueryRows) {
 
 export function useUserSessions(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['user-sessions', organizationId],
+    queryKey: ['user-sessions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/user-sessions', 'Failed to fetch user sessions'),
     staleTime: 30_000,
     initialData,
@@ -45,7 +51,7 @@ export function useUserSessions(organizationId: bigint, initialData?: QueryRows)
 
 export function useUserInvites(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['user-invites', organizationId],
+    queryKey: ['user-invites', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/user-invites', 'Failed to fetch user invites'),
     staleTime: 30_000,
     initialData,
@@ -100,7 +106,7 @@ export function useUpdateRole(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, roleId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([toScalarU64(roleId), stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update role')
     },
@@ -110,18 +116,38 @@ export function useUpdateRole(organizationId: bigint) {
   })
 }
 
+export type AssignRoleParamsInput = {
+  expiresAtMicros: bigint | number | string | null
+  metadata: string | null
+}
+
 export function useAssignRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
     Error,
-    { userId: string | number | bigint; roleId: string | number | bigint }
+    {
+      userIdentity: string
+      roleId: string | number | bigint
+      params: AssignRoleParamsInput
+    }
   >({
-    mutationFn: async ({ userId, roleId }) => {
+    mutationFn: async ({ userIdentity, roleId, params }) => {
       const r = await apiFetch('/api/call/assign_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, roleId]),
+        body: stringifyReducerCallBody([
+          userIdentity.trim(),
+          toScalarU64(roleId),
+          organizationId,
+          stdbParamsToJson({
+            expiresAtMicros:
+              params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
+                ? toScalarU64(params.expiresAtMicros as ScalarId)
+                : null,
+            metadata: params.metadata,
+          }),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to assign role')
     },
@@ -133,16 +159,12 @@ export function useAssignRole(organizationId: bigint) {
 
 export function useRevokeRole(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { userId: string | number | bigint; roleId: string | number | bigint }
-  >({
-    mutationFn: async ({ userId, roleId }) => {
+  return useMutation<void, Error, { assignmentId: string | number | bigint }>({
+    mutationFn: async ({ assignmentId }) => {
       const r = await apiFetch('/api/call/revoke_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, roleId]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(assignmentId)]),
       })
       if (!r.ok) throw new Error('Failed to revoke role')
     },
@@ -189,7 +211,7 @@ export function useUpdateAuditRule(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_audit_rule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, ruleId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([toScalarU64(ruleId), stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update audit rule')
     },
@@ -199,28 +221,45 @@ export function useUpdateAuditRule(organizationId: bigint) {
   })
 }
 
+/** Mirrors `LogAuditEventParams` — callers supply every field (use `null` / `[]` where the reducer allows none). */
+export type LogAuditEventInput = {
+  companyId: bigint | number | string | null
+  tableName: string
+  recordId: ScalarId
+  action: string
+  oldValues: string | null
+  newValues: string | null
+  changedFields: string[]
+  sessionId: bigint | number | string | null
+  ipAddress: string | null
+  userAgent: string | null
+  metadata: string | null
+}
+
 export function useLogAuditEvent(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      resourceType: string
-      resourceId: string | number | bigint
-      action: string
-      details?: Record<string, unknown>
-    }
-  >({
-    mutationFn: async ({ resourceType, resourceId, action, details }) => {
+  return useMutation<void, Error, LogAuditEventInput>({
+    mutationFn: async (params) => {
       const r = await apiFetch('/api/call/log_audit_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          resourceType,
-          resourceId,
-          action,
-          details ? stdbParamsToJson(details) : null,
+          stdbParamsToJson({
+            companyId:
+              params.companyId != null ? toScalarU64(params.companyId as ScalarId) : null,
+            tableName: params.tableName,
+            recordId: toScalarU64(params.recordId),
+            action: params.action,
+            oldValues: params.oldValues,
+            newValues: params.newValues,
+            changedFields: params.changedFields,
+            sessionId:
+              params.sessionId != null ? toScalarU64(params.sessionId as ScalarId) : null,
+            ipAddress: params.ipAddress,
+            userAgent: params.userAgent,
+            metadata: params.metadata,
+          }),
         ]),
       })
       if (!r.ok) throw new Error('Failed to log audit event')
@@ -237,15 +276,24 @@ export function useCreateUserInvite(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
-      const params = {
-        email: String(formData.email ?? ''),
-        roleIds: formData.roleIds || [],
-        expiresInDays: Number(formData.expiresInDays ?? 7),
+      const email = String(formData.email ?? "").trim()
+      const roleIdRaw = formData.roleId ?? (formData.roleIds as unknown[])?.[0]
+      if (!email) throw new Error("Email is required")
+      if (roleIdRaw == null || String(roleIdRaw).trim() === "") {
+        throw new Error("roleId is required")
       }
-      const r = await apiFetch('/api/call/create_user_invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
+      const roleId = Number(String(roleIdRaw).trim())
+      if (!Number.isFinite(roleId) || roleId <= 0) {
+        throw new Error("roleId must be a positive number")
+      }
+      const r = await apiFetch("/api/auth/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          roleId,
+          organizationId: Number(organizationId),
+        }),
       })
       if (!r.ok) throw new Error('Failed to create user invite')
     },
@@ -255,27 +303,19 @@ export function useCreateUserInvite(organizationId: bigint) {
   })
 }
 
+/** Pass `targetIdentity` as hex (with or without 0x) and a bcrypt `newPasswordHash` (server-side admin flow). */
 export function useUpdateUserPassword(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
     Error,
-    {
-      userId: string | number | bigint
-      newPassword: string
-      requireReset?: boolean
-    }
+    { targetIdentity: string; newPasswordHash: string }
   >({
-    mutationFn: async ({ userId, newPassword, requireReset = false }) => {
+    mutationFn: async ({ targetIdentity, newPasswordHash }) => {
       const r = await apiFetch('/api/call/update_user_password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          userId,
-          newPassword,
-          requireReset,
-        ]),
+        body: stringifyReducerCallBody([targetIdentity.trim(), newPasswordHash]),
       })
       if (!r.ok) throw new Error('Failed to update user password')
     },
@@ -287,19 +327,12 @@ export function useUpdateUserPassword(organizationId: bigint) {
 
 export function useUpdateUserProfile(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      userId: string | number | bigint
-      params: Record<string, unknown>
-    }
-  >({
-    mutationFn: async ({ userId, params }) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
       const r = await apiFetch('/api/call/update_user_profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update user profile')
     },
@@ -315,15 +348,15 @@ export function useUpdateOrgMemberRole(organizationId: bigint) {
     void,
     Error,
     {
-      userId: string | number | bigint
-      newRole: string
+      userOrgId: string | number | bigint
+      roleName: string
     }
   >({
-    mutationFn: async ({ userId, newRole }) => {
+    mutationFn: async ({ userOrgId, roleName }) => {
       const r = await apiFetch('/api/call/update_org_member_role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, newRole]),
+        body: stringifyReducerCallBody([toScalarU64(userOrgId), roleName]),
       })
       if (!r.ok) throw new Error('Failed to update org member role')
     },
@@ -380,15 +413,15 @@ export function useUpdateOrgMemberDetails(organizationId: bigint) {
     void,
     Error,
     {
-      userId: string | number | bigint
+      userOrgId: string | number | bigint
       params: Record<string, unknown>
     }
   >({
-    mutationFn: async ({ userId, params }) => {
+    mutationFn: async ({ userOrgId, params }) => {
       const r = await apiFetch('/api/call/update_org_member_details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(params)]),
+        body: stringifyReducerCallBody([toScalarU64(userOrgId), stdbParamsToJson(params)]),
       })
       if (!r.ok) throw new Error('Failed to update org member details')
     },
@@ -404,15 +437,15 @@ export function useUpdateUserEmail(organizationId: bigint) {
     void,
     Error,
     {
-      userId: string | number | bigint
-      newEmail: string
+      email: string
+      emailVerified: boolean
     }
   >({
-    mutationFn: async ({ userId, newEmail }) => {
+    mutationFn: async ({ email, emailVerified }) => {
       const r = await apiFetch('/api/call/update_user_email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, newEmail]),
+        body: stringifyReducerCallBody([email.trim(), emailVerified]),
       })
       if (!r.ok) throw new Error('Failed to update user email')
     },
@@ -426,22 +459,14 @@ export function useUpdateUserEmail(organizationId: bigint) {
 
 export function useCreateUserSession(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      userId: string | number | bigint
-      sessionData?: Record<string, unknown>
-    }
-  >({
-    mutationFn: async ({ userId, sessionData }) => {
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (sessionParams) => {
       const r = await apiFetch('/api/call/create_user_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: stringifyReducerCallBody([
           organizationId,
-          userId,
-          sessionData ? stdbParamsToJson(sessionData) : null,
+          stdbParamsToJson(sessionParams),
         ]),
       })
       if (!r.ok) throw new Error('Failed to create user session')
@@ -459,7 +484,7 @@ export function useEndUserSession(organizationId: bigint) {
       const r = await apiFetch('/api/call/end_user_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, sessionId]),
+        body: stringifyReducerCallBody([toScalarU64(sessionId)]),
       })
       if (!r.ok) throw new Error('Failed to end user session')
     },
@@ -471,22 +496,33 @@ export function useEndUserSession(organizationId: bigint) {
 
 // ── Mutations — Privacy & Credentials ────────────────────────────────────────
 
+export type RecordPrivacyConsentInput = {
+  contactId: ScalarId
+  consentType: string
+  granted: boolean
+  ipAddress: string | null
+  userAgent: string | null
+  metadata: string | null
+}
+
 export function useRecordPrivacyConsent(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      userId: string | number | bigint
-      consentType: string
-      consented: boolean
-    }
-  >({
-    mutationFn: async ({ userId, consentType, consented }) => {
+  return useMutation<void, Error, RecordPrivacyConsentInput>({
+    mutationFn: async (params) => {
       const r = await apiFetch('/api/call/record_privacy_consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, consentType, consented]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          stdbParamsToJson({
+            contactId: toScalarU64(params.contactId),
+            consentType: params.consentType,
+            granted: params.granted,
+            ipAddress: params.ipAddress,
+            userAgent: params.userAgent,
+            metadata: params.metadata,
+          }),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to record privacy consent')
     },

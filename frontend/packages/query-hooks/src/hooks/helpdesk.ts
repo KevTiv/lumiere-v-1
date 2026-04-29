@@ -8,10 +8,14 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+
+function toScalarU64(v: bigint | number | string): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 function helpdeskKeys(organizationId: bigint) {
-  const k = organizationId
+  const k = rqBigIntKey(organizationId)
   return {
     tickets: ['helpdesk-tickets', k] as const,
     teams: ['helpdesk-teams', k] as const,
@@ -94,7 +98,7 @@ export function useUpdateTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ticketId), params]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId), params]),
       })
       if (!r.ok) throw new Error('Failed to update ticket')
     },
@@ -110,7 +114,7 @@ export function useAssignTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/assign_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ticketId), agentIdentityHex]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId), agentIdentityHex]),
       })
       if (!r.ok) throw new Error('Failed to assign helpdesk ticket')
     },
@@ -125,7 +129,7 @@ export function useCloseTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/close_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ticketId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId)]),
       })
       if (!r.ok) throw new Error('Failed to close helpdesk ticket')
     },
@@ -140,7 +144,7 @@ export function useReopenTicket(organizationId: bigint) {
       const r = await apiFetch('/api/call/reopen_ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(ticketId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId)]),
       })
       if (!r.ok) throw new Error('Failed to reopen helpdesk ticket')
     },

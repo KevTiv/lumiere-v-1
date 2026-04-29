@@ -17,6 +17,8 @@
     "./reports-template-params": "./src/reports-template-params.ts",
     "./reports-scheduled-params": "./src/reports-scheduled-params.ts",
     "./reports-analytics-params": "./src/reports-analytics-params.ts",
+    "./reports-update-params": "./src/reports-update-params.ts",
+    "./reports-dashboard-params": "./src/reports-dashboard-params.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts"
   },
   "scripts": {

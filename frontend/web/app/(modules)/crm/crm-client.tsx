@@ -2,7 +2,6 @@
 
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
 import {
-  crmParamsToJson,
   toConvertLeadParams,
   toConvertOpportunityParams,
   toCreateActivityParams,
@@ -137,7 +136,7 @@ function CrmClientLoaded({
   organizationId,
 }: CrmClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId } = orgBigInts(organizationId)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
@@ -199,8 +198,8 @@ function CrmClientLoaded({
   )
 
   const createLead = useCreateLead(orgId)
-  const createOpportunity = useCreateOpportunity(orgId)
-  const createContact = useCreateContact(orgId)
+  const createOpportunity = useCreateOpportunity(orgId, { companyId })
+  const createContact = useCreateContact(orgId, { companyId })
   const createActivity = useCreateActivity(orgId)
   const convertLead = useConvertLeadToCustomer(orgId)
   const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)
@@ -404,7 +403,13 @@ function CrmClientLoaded({
 
     const coreTabs = base.tabs.map((tab) => {
       if (tab.id === "leads") return { ...tab, entityConfig: leadsEntity }
-      if (tab.id === "opportunities") return { ...tab, entityConfig: oppEntity }
+      if (tab.id === "opportunities") {
+        return {
+          ...tab,
+          entityConfig: oppEntity,
+          createForm: newOpportunityForm(t, opportunityStageOptions),
+        }
+      }
       if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
       if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
       return tab
@@ -431,6 +436,7 @@ function CrmClientLoaded({
     openAddSegmentModal,
     deleteContact,
     completeActivity,
+    opportunityStageOptions,
   ])
 
   // Live KPI overrides
@@ -537,25 +543,38 @@ function CrmClientLoaded({
     [leads, opportunities, contacts, activities],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
     if (action === "createLead") {
       const p = toCreateLeadParams(formData)
-      if (p) createLead.mutate(crmParamsToJson(p))
+      if (p) await createLead.mutateAsync(p)
     } else if (action === "createOpportunity") {
       const p = toCreateOpportunityParams(formData)
-      if (p) createOpportunity.mutate(crmParamsToJson(p))
+      if (p) await createOpportunity.mutateAsync(p)
     } else if (action === "createContact") {
       const p = toCreateContactParams(formData)
-      if (p) createContact.mutate(crmParamsToJson(p))
+      if (p) await createContact.mutateAsync(p)
     } else if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
-      if (p) createActivity.mutate(crmParamsToJson(p))
+      if (p) await createActivity.mutateAsync(p)
     }
   }
+
+  const isFormMutationPending =
+    createLead.isPending ||
+    createOpportunity.isPending ||
+    createContact.isPending ||
+    createActivity.isPending ||
+    convertLead.isPending ||
+    convertOppToOrder.isPending ||
+    assignTag.isPending ||
+    addToSegment.isPending ||
+    csvImports.importContact.isPending ||
+    csvImports.importLead.isPending ||
+    csvImports.importOpportunity.isPending
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowModal) return
@@ -563,13 +582,13 @@ function CrmClientLoaded({
       if (workflowModal.kind === "convertLead") {
         const p = toConvertLeadParams(formData)
         if (!p) throw new Error(t("crm.forms.convertLead.validation.stageRequired"))
-        await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: crmParamsToJson(p) })
+        await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: p as Record<string, unknown> })
       } else if (workflowModal.kind === "convertOpp") {
         const p = toConvertOpportunityParams(formData)
         if (!p) throw new Error(t("crm.forms.convertToSaleOrder.validation.pricelistWarehouse"))
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
-          params: crmParamsToJson(p),
+          params: p as Record<string, unknown>,
         })
       } else if (workflowModal.kind === "assignTag") {
         const tagId = formData.tagId
@@ -614,6 +633,7 @@ function CrmClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           const resModel = crmTabToResModel(tabId)
           if (!resModel) return
@@ -641,9 +661,10 @@ function CrmClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newLeadForm(t)}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -653,8 +674,9 @@ function CrmClientLoaded({
         open={workflowModal !== null}
         onOpenChange={(open) => !open && setWorkflowModal(null)}
         config={workflowModal?.form ?? newLeadForm(t)}
+        isPending={isFormMutationPending}
         onSubmit={(formData) => {
-          handleWorkflowSubmit(formData)
+          return handleWorkflowSubmit(formData)
         }}
       />
       {csvKind && csvFormConfig ? (
@@ -663,6 +685,7 @@ function CrmClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {

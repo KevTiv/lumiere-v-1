@@ -11,7 +11,14 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+type ScalarId = bigint | number | string
+
+function toScalarU64(v: ScalarId): bigint {
+  return typeof v === "bigint" ? v : BigInt(String(v))
+}
 
 async function parseCallErrorDocuments(r: Response): Promise<string> {
   try {
@@ -29,7 +36,7 @@ export function useDocuments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['documents', organizationId],
+    queryKey: ['documents', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/documents', 'Failed to fetch documents'),
     staleTime: 30_000,
     initialData,
@@ -41,7 +48,7 @@ export function useKnowledgeArticles(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['knowledge-articles', organizationId],
+    queryKey: ['knowledge-articles', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/knowledge-articles', 'Failed to fetch knowledge articles'),
     staleTime: 30_000,
     initialData,
@@ -53,7 +60,7 @@ export function useAiDocumentProcessingJobs(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['ai-document-processing-jobs', organizationId],
+    queryKey: ['ai-document-processing-jobs', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
         '/api/query/ai-document-processing-jobs',
@@ -67,7 +74,7 @@ export function useAiDocumentProcessingJobs(
 /** Same rows as Settings → AI; shared query key keeps cache in sync across the app. */
 export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
-    queryKey: ['ai-insights', organizationId],
+    queryKey: ['ai-insights', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/ai-insights', 'Failed to fetch AI insights'),
     staleTime: 30_000,
     initialData,
@@ -76,18 +83,22 @@ export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryR
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateDocument(organizationId: bigint) {
+export function useCreateDocument(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const r = await apiFetch('/api/call/create_document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          companyId,
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to create document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -104,11 +115,15 @@ export function useUpdateDocument(organizationId: bigint) {
       const r = await apiFetch('/api/call/update_document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(documentId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to update document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -119,11 +134,11 @@ export function useDeleteDocument(organizationId: bigint) {
       const r = await apiFetch('/api/call/delete_document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
       })
       if (!r.ok) throw new Error('Failed to delete document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -134,11 +149,11 @@ export function useLockDocument(organizationId: bigint) {
       const r = await apiFetch('/api/call/lock_document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
       })
       if (!r.ok) throw new Error('Failed to lock document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -149,11 +164,11 @@ export function useUnlockDocument(organizationId: bigint) {
       const r = await apiFetch('/api/call/unlock_document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
       })
       if (!r.ok) throw new Error('Failed to unlock document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -170,11 +185,15 @@ export function useAddDocumentVersion(organizationId: bigint) {
       const r = await apiFetch('/api/call/add_document_version', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId), params]),
+        body: stringifyReducerCallBody([
+          organizationId,
+          toScalarU64(documentId),
+          stdbParamsToJson(params as object),
+        ]),
       })
       if (!r.ok) throw new Error('Failed to add document version')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -185,11 +204,11 @@ export function useRecordDocumentView(organizationId: bigint) {
       const r = await apiFetch('/api/call/record_document_view', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(documentId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
       })
       if (!r.ok) throw new Error('Failed to record document view')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -207,7 +226,7 @@ export function useCreateDocumentFolder(organizationId: bigint) {
       })
       if (!r.ok) throw new Error('Failed to create document folder')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', organizationId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -227,7 +246,7 @@ export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bi
       if (!r.ok) throw new Error('Failed to create knowledge article')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -248,12 +267,12 @@ export function useUpdateKnowledgeArticle(organizationId: bigint, companyId?: bi
       const r = await apiFetch('/api/call/update_knowledge_article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId), payload]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), payload]),
       })
       if (!r.ok) throw new Error('Failed to update knowledge article')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -264,12 +283,12 @@ export function useDeleteKnowledgeArticle(organizationId: bigint, _companyId?: b
       const r = await apiFetch('/api/call/delete_knowledge_article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
       })
       if (!r.ok) throw new Error('Failed to delete knowledge article')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -280,12 +299,12 @@ export function useLockKnowledgeArticle(organizationId: bigint, _companyId?: big
       const r = await apiFetch('/api/call/lock_knowledge_article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
       })
       if (!r.ok) throw new Error('Failed to lock knowledge article')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -296,12 +315,12 @@ export function useUnlockKnowledgeArticle(organizationId: bigint, _companyId?: b
       const r = await apiFetch('/api/call/unlock_knowledge_article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
       })
       if (!r.ok) throw new Error('Failed to unlock knowledge article')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -322,12 +341,12 @@ export function useSetArticlePublished(organizationId: bigint, companyId?: bigin
       const r = await apiFetch('/api/call/set_article_published', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId), payload]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), payload]),
       })
       if (!r.ok) throw new Error('Failed to update article publication state')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -344,12 +363,12 @@ export function useAddArticleMember(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch('/api/call/add_article_member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId), member]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), member]),
       })
       if (!r.ok) throw new Error('Failed to add article member')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -366,12 +385,12 @@ export function useRemoveArticleMember(organizationId: bigint, _companyId?: bigi
       const r = await apiFetch('/api/call/remove_article_member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(articleId), member]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), member]),
       })
       if (!r.ok) throw new Error('Failed to remove article member')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -391,7 +410,7 @@ export function useCreateKnowledgeCategory(organizationId: bigint, companyId?: b
       if (!r.ok) throw new Error('Failed to create knowledge category')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -412,12 +431,12 @@ export function useUpdateKnowledgeCategory(organizationId: bigint, companyId?: b
       const r = await apiFetch('/api/call/update_knowledge_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(categoryId), payload]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId), payload]),
       })
       if (!r.ok) throw new Error('Failed to update knowledge category')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -428,12 +447,12 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
       const r = await apiFetch('/api/call/delete_knowledge_category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, Number(categoryId)]),
+        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
       })
       if (!r.ok) throw new Error('Failed to delete knowledge category')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -449,7 +468,7 @@ function useImportKnowledgeCategoryCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -465,7 +484,7 @@ function useImportKnowledgeArticleCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -495,38 +514,42 @@ export function useCreateDocumentProcessingJob(organizationId: bigint, companyId
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
+      const documentType = String(params.documentType ?? "").trim()
+      const jobType = String(params.jobType ?? "").trim()
+      if (!documentType) throw new Error("documentType is required")
+      if (!jobType) throw new Error("jobType is required")
+
       const aiRaw = params.aiAgentId
-      let aiAgentId: number | null = null
-      if (aiRaw != null && String(aiRaw).trim() !== '') {
-        const n = Number(String(aiRaw).trim())
-        if (!Number.isFinite(n) || n <= 0) throw new Error('AI agent id must be a positive number')
+      let aiAgentId: bigint | null = null
+      if (aiRaw != null && String(aiRaw).trim() !== "") {
+        const n = BigInt(String(aiRaw).trim())
+        if (n <= 0n) throw new Error("AI agent id must be a positive integer")
         aiAgentId = n
       }
-      const body = [
-        Number(companyId),
-        {
-          documentType: String(params.documentType ?? '').trim(),
-          jobType: String(params.jobType ?? '').trim(),
-          aiAgentId,
-          inputData:
-            typeof params.inputData === 'string' && params.inputData.trim() !== ''
-              ? params.inputData.trim()
-              : null,
-          metadata:
-            typeof params.metadata === 'string' && params.metadata.trim() !== ''
-              ? params.metadata.trim()
-              : null,
-        },
-      ]
       const r = await apiFetch('/api/call/create_document_processing_job', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody(body),
+        body: stringifyReducerCallBody([
+          companyId,
+          stdbParamsToJson({
+            document_type: documentType,
+            job_type: jobType,
+            ai_agent_id: aiAgentId,
+            input_data:
+              typeof params.inputData === "string" && params.inputData.trim() !== ""
+                ? params.inputData.trim()
+                : null,
+            metadata:
+              typeof params.metadata === "string" && params.metadata.trim() !== ""
+                ? params.metadata.trim()
+                : null,
+          } as object),
+        ]),
       })
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -567,7 +590,7 @@ export function useCompleteDocumentProcessingJob(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -584,7 +607,7 @@ export function useApproveDocumentProcessingJob(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['ai-document-processing-jobs', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -607,7 +630,7 @@ export function useAcknowledgeInsight(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['ai-insights', organizationId] }),
+      void qc.invalidateQueries({ queryKey: ['ai-insights', rqBigIntKey(organizationId)] }),
   })
 }
 

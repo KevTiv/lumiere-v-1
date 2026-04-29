@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Separator } from "../components/separator"
 import { Check, Loader2 } from "lucide-react"
 import * as Icons from "lucide-react"
+import { toast } from "sonner"
 
 interface ModularFormProps {
   config: FormConfig
@@ -21,6 +22,8 @@ interface ModularFormProps {
   leadingActions?: React.ReactNode
   /** Called after any field change with the full values object (e.g. sync a parent select). */
   onValuesChange?: (values: Record<string, unknown>) => void
+  /** External mutation in-flight (e.g. React Query) — disables actions and shows loading on submit. */
+  isPending?: boolean
 }
 
 export function ModularForm({
@@ -30,6 +33,7 @@ export function ModularForm({
   className,
   leadingActions,
   onValuesChange,
+  isPending,
 }: ModularFormProps) {
   const { t } = useTranslation()
   // Initialize form state with default values
@@ -64,6 +68,7 @@ export function ModularForm({
   const [values, setValues] = useState<Record<string, unknown>>(getInitialValues)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const busy = isSubmitting || !!isPending
 
   const handleChange = (name: string, value: unknown) => {
     setValues((prev) => {
@@ -143,16 +148,31 @@ export function ModularForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validateForm()) return
+    if (busy) {
+      toast.warning(t("common.formSubmit.busy"))
+      return
+    }
+
+    if (!validateForm()) {
+      toast.warning(t("common.formSubmit.validationFailed"))
+      return
+    }
 
     setIsSubmitting(true)
     try {
       const submitHandler = onSubmit || config.onSubmit
       if (submitHandler) {
         await submitHandler(values)
+      } else {
+        toast.warning(t("common.formSubmit.noHandler"))
       }
     } catch (error) {
       console.error("Form submission error:", error)
+      const message =
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : t("common.formSubmit.failed")
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -232,7 +252,7 @@ export function ModularForm({
                 variant="ghost"
                 size="sm"
                 onClick={handleReset}
-                disabled={isSubmitting}
+                disabled={busy}
               >
                 {t("common.reset")}
               </Button>
@@ -243,13 +263,13 @@ export function ModularForm({
                 variant="outline"
                 size="sm"
                 onClick={handleCancel}
-                disabled={isSubmitting}
+                disabled={busy}
               >
                 {config.cancelLabel || t("common.cancel")}
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={isSubmitting}>
-              {isSubmitting
+            <Button type="submit" size="sm" disabled={busy}>
+              {busy
                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 : <Check className="mr-2 h-4 w-4" />
               }

@@ -53,8 +53,11 @@ export function buildCreateWarehouseParamsFromTemplate(
     code: string
     active: boolean
     sequence: number
+    /** Form field `templateWarehouseId` — not sent on the wire; ties UI to the chosen template row */
+    templateWarehouseId?: string | number
   },
 ): Record<string, unknown> {
+  void opts.templateWarehouseId
   const name = opts.name.trim()
   const code = opts.code.trim()
   if (!name || !code) {

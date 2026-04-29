@@ -100,7 +100,7 @@ function DocumentsClientLoaded({
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
-  const createDocument = useCreateDocument(orgId)
+  const createDocument = useCreateDocument(orgId, companyId)
   const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, companyId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, companyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
@@ -310,7 +310,7 @@ function DocumentsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createDocument" || action === "uploadDocument") {
-      createDocument.mutate({
+      await createDocument.mutateAsync({
         name: formData.name as string,
         fileName: formData.fileName as string,
         mimetype: formData.mimetype as string | undefined,
@@ -323,7 +323,7 @@ function DocumentsClientLoaded({
         metadata: undefined,
       } as unknown as CreateDocumentParams)
     } else if (action === "createArticle") {
-      createKnowledgeArticle.mutate({
+      await createKnowledgeArticle.mutateAsync({
         name: formData.name as string,
         description: formData.description as string | undefined,
         body: formData.body as string | undefined,
@@ -345,6 +345,16 @@ function DocumentsClientLoaded({
     }
   }
 
+  const isFormMutationPending =
+    createDocument.isPending ||
+    createKnowledgeArticle.isPending ||
+    createProcessingJob.isPending ||
+    completeProcessingJob.isPending ||
+    approveProcessingJob.isPending ||
+    acknowledgeInsight.isPending ||
+    csvImports.importKnowledgeCategory.isPending ||
+    csvImports.importKnowledgeArticle.isPending
+
   return (
     <>
       {processingToolbarError ? (
@@ -356,14 +366,16 @@ function DocumentsClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
       />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newDocumentForm(t)}
-        onSubmit={(formData) => {
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -374,6 +386,7 @@ function DocumentsClientLoaded({
           open
           onOpenChange={(o) => !o && setCsvKind(null)}
           config={csvFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={csvError}
           onSubmit={async (data) => {
@@ -408,6 +421,7 @@ function DocumentsClientLoaded({
             }
           }}
           config={completeFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={completeSubmitError}
           onSubmit={async (formData) => {
@@ -466,6 +480,7 @@ function DocumentsClientLoaded({
             }
           }}
           config={acknowledgeFormConfig}
+          isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={ackSubmitError}
           onSubmit={async (formData) => {

@@ -66,6 +66,12 @@
       "invalidFormat": "Invalid format",
       "invalidEmail": "Invalid email address"
     },
+    "formSubmit": {
+      "busy": "Please wait — another request is still in progress.",
+      "validationFailed": "Fix the highlighted fields, then try again.",
+      "noHandler": "This form is not wired to save — contact support.",
+      "failed": "Submit failed"
+    },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
       "submit": "Import",
@@ -1515,6 +1521,8 @@
           "taxType": "Tax Type",
           "computation": "Computation",
           "priceInclude": "Included in price",
+          "description": "Description",
+          "descriptionPlaceholder": "Optional notes for this tax…",
           "options": {
             "sale": "Sales",
             "purchase": "Purchase",
@@ -3406,7 +3414,16 @@
           "productPlaceholder": "Select product…",
           "locationId": "Location",
           "locationPlaceholder": "Select location…",
-          "inventoryQuantity": "Counted quantity"
+          "bookQuantity": "Book quantity (before)",
+          "bookQuantityPlaceholder": "Leave empty to match counted qty",
+          "inventoryQuantity": "Counted quantity",
+          "countQty": "Re-count (optional)",
+          "countQtyPlaceholder": "Overrides counted quantity if set",
+          "standardPrice": "Unit cost",
+          "reasonCode": "Reason code",
+          "reasonCodePlaceholder": "e.g. INV_ADJ",
+          "reasonNotes": "Notes",
+          "reasonNotesPlaceholder": "Optional explanation"
         }
       },
       "newStockLocation": {
@@ -3466,7 +3483,6 @@
         },
         "fields": {
           "name": "Name",
-          "defaultCode": "Internal reference",
           "standardPrice": "Cost",
           "listPrice": "Sales price",
           "description": "Description",
@@ -3516,7 +3532,14 @@
           "lotId": "Lot/Serial",
           "lotPlaceholder": "Select lot",
           "teamId": "Quality team",
-          "teamPlaceholder": "Select team"
+          "teamPlaceholder": "Select team",
+          "testType": "Test type",
+          "qtyTested": "Quantity to test",
+          "testTypes": {
+            "measure": "Measure",
+            "picture": "Picture",
+            "instructions": "Instructions"
+          }
         }
       },
       "newQualityAlert": {
@@ -3528,6 +3551,8 @@
         "fields": {
           "name": "Alert title",
           "namePlaceholder": "Describe the quality issue",
+          "teamId": "Quality team",
+          "teamPlaceholder": "Select team",
           "productId": "Product",
           "productPlaceholder": "Select affected product",
           "pickingId": "Transfer",
@@ -3676,9 +3701,12 @@
           "productPlaceholder": "Select product",
           "locationId": "Location",
           "locationPlaceholder": "Stock location",
+          "uomId": "Unit of measure",
+          "uomPlaceholder": "Select UOM",
           "minQty": "Minimum quantity",
           "maxQty": "Maximum quantity",
-          "qtyToOrder": "Quantity to order",
+          "warehouseId": "Warehouse",
+          "warehousePlaceholder": "Select warehouse (optional)",
           "routeId": "Route",
           "routePlaceholder": "Select route",
           "trigger": "Trigger mode",
@@ -3686,7 +3714,10 @@
             "auto": "Automatic",
             "manual": "Manual",
             "scheduled": "Scheduled"
-          }
+          },
+          "qtyMultiple": "Quantity multiple",
+          "leadDays": "Lead time (days)",
+          "active": "Active"
         }
       },
       "newPickingWave": {
@@ -3731,7 +3762,8 @@
           "valuations": {
             "manualPeriodic": "Manual (periodic)",
             "realTime": "Real-time"
-          }
+          },
+          "sequence": "Sequence"
         }
       },
       "newStockQuant": {
@@ -4074,6 +4106,8 @@
         "fields": {
           "vendorId": "Vendor",
           "vendorPlaceholder": "Select a vendor…",
+          "departmentId": "Department",
+          "departmentPlaceholder": "Select a department…",
           "origin": "Source Document",
           "originPlaceholder": "e.g. MO/00123",
           "description": "Description",
@@ -4417,7 +4451,9 @@
           "namePlaceholder": "e.g. Morning picks",
           "pickingIds": "Stock picking IDs",
           "pickingIdsPlaceholder": "101, 102, 103",
-          "pickingIdsHint": "Comma-separated IDs from Inventory → deliveries / pickings. Leave empty to create an empty batch."
+          "pickingIdsHint": "Comma-separated IDs from Inventory → deliveries / pickings. Leave empty to create an empty batch.",
+          "isWave": "Wave picking batch",
+          "isWaveHint": "When enabled, the batch is created as a wave (multi-step picking) instead of a simple batch."
         }
       },
       "newDeliveryPriceRule": {
@@ -7541,7 +7577,9 @@
           "namePlaceholder": "e.g. Executive Overview",
           "description": "Description",
           "descriptionPlaceholder": "Brief description of this dashboard",
-          "isActive": "Active"
+          "isActive": "Set as default dashboard",
+          "companyId": "Company ID (optional)",
+          "companyIdPlaceholder": "Leave blank for organization-wide"
         }
       },
       "dashboardWidget": {
@@ -7563,7 +7601,9 @@
             "barChart": "Bar Chart"
           },
           "dataSource": "Data Source",
-          "dataSourcePlaceholder": "e.g. account.move or analytics query"
+          "dataSourcePlaceholder": "e.g. account.move or analytics query",
+          "companyId": "Company ID (optional)",
+          "companyIdPlaceholder": "Leave blank for organization-wide"
         },
         "types": {
           "kpi": "KPI Card",
@@ -7609,25 +7649,18 @@
         },
         "fields": {
           "userId": "User (optional)",
-          "teamId": "Team (optional)",
-          "permissions": "Permissions"
-        },
-        "permissions": {
-          "read": "View only",
-          "write": "View and edit",
-          "admin": "Full control"
+          "teamId": "Team (optional)"
         }
       },
       "updateFinancialReport": {
         "title": "Update Financial Report",
-        "description": "Edit report details and settings",
+        "description": "Edit draft report settings (dates, display, and metadata). Only draft reports can be updated.",
         "sections": {
           "update": "Report Details"
         },
         "fields": {
           "name": "Report Name",
-          "reportType": "Report Type",
-          "state": "Status"
+          "metadata": "Metadata (optional)"
         }
       }
     }

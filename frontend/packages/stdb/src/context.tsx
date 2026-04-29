@@ -59,7 +59,7 @@ interface StdbConnectionProviderProps {
    */
   subscriptionResources: string[];
   /**
-   * @deprecated Removed: web app uses Lumiere `/api/realtime/ws` + api-server instead of raw STDB proxy.
+   * @deprecated Removed: web app uses Lumiere api-server `/v1/realtime/ws` instead of raw STDB proxy.
    * When true, pointed at `ws(s)://<host>/api/stdb/` (no longer used by `frontend/web`).
    */
   sameOriginStdbProxy?: boolean;

@@ -10,7 +10,7 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ export function useCalendarEvents(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['calendar-events', organizationId],
+    queryKey: ['calendar-events', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch calendar events'),
     staleTime: 30_000,
     initialData,
@@ -40,7 +40,7 @@ export function useCreateCalendarEvent(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -60,7 +60,7 @@ export function useUpdateCalendarEvent(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to update calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -76,7 +76,7 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to delete calendar event')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['calendar-events', organizationId] }),
+      qc.invalidateQueries({ queryKey: ['calendar-events', rqBigIntKey(organizationId)] }),
   })
 }
 

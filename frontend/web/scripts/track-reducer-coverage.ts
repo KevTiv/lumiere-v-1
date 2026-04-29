@@ -272,8 +272,8 @@ function extractRustReducers(): Set<string> {
   for (const file of files) {
     const content = readFileSync(file, 'utf-8')
     for (const pattern of REDUCER_PATTERNS) {
-      let match
-      while ((match = pattern.exec(content)) !== null) {
+      const match = pattern.exec(content)
+      while (match !== null) {
         reducers.add(match[1])
       }
     }
@@ -327,49 +327,56 @@ function extractWebReducers(): {
       const content = readFileSync(file, 'utf-8')
 
       // apiCallLiteral pattern
-      let match
-      while ((match = WEB_DETECTION_PATTERNS.apiCallLiteral.exec(content)) !== null) {
+      let match: RegExpExecArray | null
+      match = WEB_DETECTION_PATTERNS.apiCallLiteral.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.apiCallLiteral.add(match[1])
       }
       WEB_DETECTION_PATTERNS.apiCallLiteral.lastIndex = 0
 
       // useStdbReducer pattern
-      while ((match = WEB_DETECTION_PATTERNS.useStdbReducer.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.useStdbReducer.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.useStdbReducer.add(match[1])
       }
       WEB_DETECTION_PATTERNS.useStdbReducer.lastIndex = 0
 
       // useStdbReducerWithInvalidation pattern
-      while ((match = WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.useStdbReducerWithInvalidation.add(match[1])
       }
       WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.lastIndex = 0
 
       // useStdbCallMutation pattern
-      while ((match = WEB_DETECTION_PATTERNS.useStdbCallMutation.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.useStdbCallMutation.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.useStdbCallMutation.add(match[1])
       }
       WEB_DETECTION_PATTERNS.useStdbCallMutation.lastIndex = 0
 
       // callReducer pattern
-      while ((match = WEB_DETECTION_PATTERNS.callReducerLiteral.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.callReducerLiteral.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.callReducerLiteral.add(match[1])
       }
       WEB_DETECTION_PATTERNS.callReducerLiteral.lastIndex = 0
 
       // callReducersBatch pattern
-      while ((match = WEB_DETECTION_PATTERNS.callReducersBatch.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.callReducersBatch.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.callReducersBatch.add(match[1])
       }
       WEB_DETECTION_PATTERNS.callReducersBatch.lastIndex = 0
 
-      while ((match = WEB_DETECTION_PATTERNS.stdbBrowserCall.exec(content)) !== null) {
+      match = WEB_DETECTION_PATTERNS.stdbBrowserCall.exec(content)
+      while (match !== null) {
         allReducers.add(match[1])
         sources.stdbBrowserCall.add(match[1])
       }
@@ -405,8 +412,8 @@ function mergeWorkspacePackageReducerCalls(webResult: ReturnType<typeof extractW
     for (const file of files) {
       try {
         const content = readFileSync(file, 'utf-8')
-        let match
-        while ((match = pattern.exec(content)) !== null) {
+        const match = pattern.exec(content)
+        while (match !== null) {
           webResult.reducers.add(camelReducerMethodToSnake(match[1]))
         }
         pattern.lastIndex = 0
