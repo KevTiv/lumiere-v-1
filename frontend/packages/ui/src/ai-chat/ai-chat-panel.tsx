@@ -38,7 +38,7 @@ import {
   PanelRight,
   PanelRightClose,
 } from "lucide-react"
-import type { ChatMessage, AtCommand, AIChatConfig } from "@/lib/ai-chat-types"
+import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
@@ -63,6 +63,10 @@ interface AIChatPanelProps {
     activeView?: string
     selectedData?: unknown
   }
+  /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
+  onSendMessage?: (
+    userText: string,
+  ) => Promise<{ content: string; sources?: ChatMessageSourceRef[] }>
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -88,7 +92,7 @@ const MIN_HEIGHT = 300
 const DEFAULT_WIDTH = 400
 const DEFAULT_HEIGHT = 500
 
-export function AIChatPanel({ open, onClose, docked = false, onDockToggle, config, context }: AIChatPanelProps) {
+export function AIChatPanel({ open, onClose, docked = false, onDockToggle, config, context, onSendMessage }: AIChatPanelProps) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
@@ -327,22 +331,57 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
     setInput("")
     setIsLoading(true)
 
-    // Simulate AI response (replace with actual AI SDK call)
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: generateMockResponse(userMessage.content, context),
-        timestamp: new Date(),
-        metadata: {
-          model: "gpt-4",
-          tokens: Math.floor(Math.random() * 500) + 100,
-          duration: Math.floor(Math.random() * 2000) + 500,
-        },
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now()
+
+    try {
+      let assistantMessage: ChatMessage
+
+      if (onSendMessage) {
+        const reply = await onSendMessage(userMessage.content)
+        const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: reply.content,
+          timestamp: new Date(),
+          sources: reply.sources && reply.sources.length > 0 ? reply.sources : undefined,
+          metadata: {
+            duration: Math.round(t1 - t0),
+          },
+        }
+      } else {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 600)
+        })
+        const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: generateMockResponse(userMessage.content, context),
+          timestamp: new Date(),
+          metadata: {
+            model: "mock",
+            tokens: Math.floor(Math.random() * 500) + 100,
+            duration: Math.round(t1 - t0),
+          },
+        }
       }
+
       setMessages((prev) => [...prev, assistantMessage])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: msg,
+          timestamp: new Date(),
+        },
+      ])
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
   }
 
   const handleCopy = async (text: string, id: string) => {
@@ -509,6 +548,29 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                       )}>
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       </div>
+                      {message.role === "assistant" && message.sources != null && message.sources.length > 0 && (
+                        <div className="mt-1 max-w-[95%] rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] text-muted-foreground">
+                          <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
+                          <ul className="space-y-0.5 list-disc list-inside">
+                            {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
+                              const scope = src.content_type ?? src.entity_type ?? "ref"
+                              const idLabel =
+                                src.content_id != null
+                                  ? String(src.content_id)
+                                  : src.entity_id != null && String(src.entity_id) !== ""
+                                    ? String(src.entity_id)
+                                    : null
+                              return (
+                              <li key={`${message.id}-src-${i}`} className="break-all">
+                                {scope}
+                                {idLabel != null ? ` #${idLabel}` : ""}
+                                {src.score != null ? ` · ${src.score.toFixed(2)}` : ""}
+                                {src.excerpt ? ` — ${src.excerpt}` : ""}
+                              </li>
+                            )})}
+                          </ul>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 px-1">
                         <span className="text-[9px] text-muted-foreground">
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -525,11 +587,11 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                             )}
                           </button>
                         )}
-                        {message.metadata && (
+                        {message.metadata?.tokens != null ? (
                           <span className="text-[9px] text-muted-foreground">
                             {message.metadata.tokens}t
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>

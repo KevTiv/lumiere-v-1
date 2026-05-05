@@ -101,7 +101,6 @@ export function FormFieldRenderer({
       case "select":
         return (
           <Select
-            modal={false}
             value={radixSelectControlledValue(value as string | undefined, field.options)}
             onValueChange={(v) => onChange(storedValueFromRadixSelect(v))}
             disabled={field.disabled}

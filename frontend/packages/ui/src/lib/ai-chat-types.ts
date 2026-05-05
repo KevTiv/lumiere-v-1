@@ -1,11 +1,23 @@
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
+export interface ChatMessageSourceRef {
+  /** RAG / embedding content type or activity entity type */
+  content_type?: string
+  entity_type?: string
+  content_id?: number
+  entity_id?: string
+  score?: number
+  excerpt?: string
+}
+
 export interface ChatMessage {
   id: string
   role: "user" | "assistant" | "system"
   content: string
   timestamp: Date
   actions?: ChatAction[]
+  /** Retrieved memory / RAG citations (assistant messages) */
+  sources?: ChatMessageSourceRef[]
   metadata?: {
     model?: string
     tokens?: number

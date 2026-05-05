@@ -22,6 +22,11 @@ import {
   useSetAiAgentActive,
   useUpdateAiAgent,
 } from "@lumiere/query-hooks/hooks/ai-agents"
+import {
+  useAiGatewayHealth,
+  useAiMemoryIngest,
+  useAiMemorySearch,
+} from "@lumiere/query-hooks/hooks/ai-memory"
 import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
 import { apiFetch } from "@/lib/api-fetch"
 import {
@@ -39,7 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Bot, Loader2, Plus, RefreshCw, Sparkles, Trash2, Coins } from "lucide-react"
+import { Bot, Database, Loader2, Plus, RefreshCw, Sparkles, Trash2, Coins } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -169,6 +174,12 @@ export function AiSettings() {
   const dismissInsightMutation = useDismissAiInsight()
   const createInsightMutation = useCreateAiInsight()
   const recordSpendMutation = useRecordAiSpend(orgId)
+
+  const memoryIngestMutation = useAiMemoryIngest()
+  const memorySearchMutation = useAiMemorySearch()
+  const gatewayHealthMutation = useAiGatewayHealth()
+  const [memoryTestQuery, setMemoryTestQuery] = useState("")
+  const [memorySearchPreview, setMemorySearchPreview] = useState<string | null>(null)
 
   const agents = agentsQuery.data ?? []
 
@@ -402,7 +413,10 @@ export function AiSettings() {
     createTeamMemberMutation.isPending ||
     dismissInsightMutation.isPending ||
     createInsightMutation.isPending ||
-    recordSpendMutation.isPending
+    recordSpendMutation.isPending ||
+    memoryIngestMutation.isPending ||
+    memorySearchMutation.isPending ||
+    gatewayHealthMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -431,6 +445,147 @@ export function AiSettings() {
       <p className="text-sm text-muted-foreground border-l-2 border-muted pl-3">
         {t("settings.ai.spendNote")}
       </p>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Database className="h-5 w-5 shrink-0" />
+                {t("settings.ai.memoryTitle")}
+              </CardTitle>
+              <CardDescription>{t("settings.ai.memoryDescription")}</CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={mutating || !orgReady}
+              className="gap-1 shrink-0"
+              onClick={() => {
+                setMemorySearchPreview(null)
+                void gatewayHealthMutation.mutate(undefined, {
+                  onSuccess: (data) => {
+                    const ok = data.configured === true && data.upstreamOk === true
+                    toast({
+                      title: ok ? t("settings.ai.memoryGatewayOk") : t("settings.ai.memoryGatewayDown"),
+                      description:
+                        typeof data.message === "string"
+                          ? data.message
+                          : data.detail ?? JSON.stringify(data.gateway ?? data),
+                      variant: ok ? "default" : "destructive",
+                    })
+                  },
+                  onError: (e) => {
+                    toast({
+                      title: t("settings.ai.memoryGatewayDown"),
+                      description: e instanceof Error ? e.message : String(e),
+                      variant: "destructive",
+                    })
+                  },
+                })
+              }}
+            >
+              {gatewayHealthMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {t("settings.ai.memoryHealthCheck")}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">{t("settings.ai.memoryOpsNote")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={mutating || !orgReady}
+              onClick={() => {
+                setMemorySearchPreview(null)
+                void memoryIngestMutation.mutate(undefined, {
+                  onSuccess: (data) => {
+                    toast({
+                      title: t("settings.ai.memoryIngestDone"),
+                      description: t("settings.ai.memoryIngestCount", {
+                        count: data.ingested ?? 0,
+                      }),
+                    })
+                  },
+                  onError: (e) =>
+                    toast({
+                      title: t("settings.ai.mutationError"),
+                      description: e instanceof Error ? e.message : "",
+                      variant: "destructive",
+                    }),
+                })
+              }}
+            >
+              {memoryIngestMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Database className="h-4 w-4 mr-1" />
+              )}
+              {t("settings.ai.memoryIngest")}
+            </Button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="memory-test-query" className="text-xs">
+                {t("settings.ai.memoryTestQuery")}
+              </Label>
+              <Input
+                id="memory-test-query"
+                value={memoryTestQuery}
+                onChange={(e) => setMemoryTestQuery(e.target.value)}
+                placeholder={t("settings.ai.memoryTestPlaceholder")}
+                disabled={mutating || !orgReady}
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={
+                mutating || !orgReady || memorySearchMutation.isPending || memoryTestQuery.trim() === ""
+              }
+              onClick={() =>
+                void memorySearchMutation.mutateAsync({ query: memoryTestQuery.trim(), top_k: 8 }).then(
+                  (data) => {
+                    const hits = data.hits ?? []
+                    const top = hits
+                      .slice(0, 3)
+                      .map((h) => `${h.entity_type}:${h.entity_id}`)
+                      .join(" · ")
+                    setMemorySearchPreview(top || t("settings.ai.memoryNoHits"))
+                    toast({
+                      title: t("settings.ai.memorySearchDone"),
+                      description: `${t("settings.ai.memoryHitsLabel")}: ${String(hits.length)}`,
+                    })
+                  },
+                  (e: unknown) =>
+                    toast({
+                      title: t("settings.ai.mutationError"),
+                      description: e instanceof Error ? e.message : "",
+                      variant: "destructive",
+                    }),
+                )
+              }
+            >
+              {memorySearchMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-1" />
+              )}
+              {t("settings.ai.memorySearchRun")}
+            </Button>
+          </div>
+          {memorySearchPreview != null ? (
+            <p className="text-xs text-muted-foreground">{memorySearchPreview}</p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">

@@ -25,8 +25,19 @@ export function toCreatePartnerBankParams(
       formData.accHolderName != null && String(formData.accHolderName).trim() !== ''
         ? String(formData.accHolderName)
         : undefined,
+    bankId: numU64(formData.bankId) ?? undefined,
     currencyId: numU64(formData.currencyId) ?? undefined,
+    companyId: numU64(formData.companyId) ?? undefined,
     allowOutPayment: Boolean(formData.allowOutPayment),
+    sequence:
+      formData.sequence == null || formData.sequence === ''
+        ? undefined
+        : Math.trunc(Number(formData.sequence)),
+    journalId: numU64(formData.journalId) ?? undefined,
+    metadata:
+      formData.metadata != null && String(formData.metadata).trim() !== ''
+        ? String(formData.metadata)
+        : undefined,
   }
 }
 

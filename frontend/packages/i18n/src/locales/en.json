@@ -6632,6 +6632,7 @@
     },
     "commands": "Commands",
     "thinking": "Thinking...",
+    "sources": "Sources",
     "placeholder": "Ask anything... @ for commands",
     "hints": {
       "cmds": "cmds",
@@ -6855,7 +6856,22 @@
       "expertiseAreas": "Expertise areas",
       "csvHint": "Comma-separated",
       "tokensInvalid": "Enter a positive token count.",
-      "spendRecorded": "Spend recorded"
+      "spendRecorded": "Spend recorded",
+      "memoryTitle": "AI memory (retrieval)",
+      "memoryDescription": "Org-scoped activity vectors in Qdrant + RAG. Requires Next.js env LUMIERE_AI_GATEWAY_URL and the ai-gateway service.",
+      "memoryHealthCheck": "Check gateway",
+      "memoryGatewayOk": "AI gateway reachable",
+      "memoryGatewayDown": "AI gateway not reachable",
+      "memoryOpsNote": "Ingest pushes recent ERP rows into the memory index. Semantic search previews top matches for debugging.",
+      "memoryIngest": "Ingest org activity",
+      "memoryIngestDone": "Ingest triggered",
+      "memoryIngestCount": "Upsert attempts: {{count}}",
+      "memoryTestQuery": "Test semantic query",
+      "memoryTestPlaceholder": "e.g. recent sales orders...",
+      "memorySearchRun": "Search memory",
+      "memorySearchDone": "Search completed",
+      "memoryHitsLabel": "Hits",
+      "memoryNoHits": "No matches returned"
     },
     "auditLog": {
       "searchPlaceholder": "Search logs...",

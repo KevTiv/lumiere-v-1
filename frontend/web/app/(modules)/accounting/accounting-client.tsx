@@ -318,10 +318,10 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
 
 /** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
 function journalIdFromInvoiceModalSave(
-  params: Partial<{ journalId?: bigint }>,
+  params: unknown,
   journals: Record<string, unknown>[],
 ): bigint | null {
-  const j = params.journalId
+  const j = (params as { journalId?: unknown }).journalId
   if (j != null) {
     return typeof j === "bigint" ? j : BigInt(String(j))
   }

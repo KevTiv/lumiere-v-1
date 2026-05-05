@@ -171,7 +171,7 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
               {hasJournals ? (
                 <div className="space-y-2">
                   <Label>{t("accounting.forms.newInvoice.fields.journal")}</Label>
-                  <Select modal={false} value={resolvedJournalId} onValueChange={setJournalId}>
+                  <Select value={resolvedJournalId} onValueChange={setJournalId}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t("accounting.forms.newInvoice.fields.journalPlaceholder")} />
                     </SelectTrigger>

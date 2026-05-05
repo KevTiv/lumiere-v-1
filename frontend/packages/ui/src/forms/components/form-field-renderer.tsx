@@ -109,7 +109,6 @@ export function FormFieldRenderer({
       case "Select":
         return (
           <Select
-            modal={false}
             value={radixSelectControlledValue(value as string | undefined, field.options)}
             onValueChange={(v) => onChange(storedValueFromRadixSelect(v))}
             disabled={disabled}
@@ -628,7 +627,7 @@ function UserSelectField({
   ]
 
   return (
-    <Select modal={false} value={value} onValueChange={onChange} disabled={disabled}>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger>
         <SelectValue placeholder="Select user..." />
       </SelectTrigger>
