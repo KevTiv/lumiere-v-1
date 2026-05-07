@@ -12,6 +12,7 @@ import { Label } from "@lumiere/ui/components/label"
 import {
   redirectToWorkOsSignIn,
 } from "@/app/actions/workos-auth"
+import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
 const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
@@ -38,11 +39,15 @@ export default function SignInPage() {
       })
       const data = await res.json()
       if (!res.ok) {
+        phCapture("user_sign_in_failed", { error: data.error ?? "unknown" })
         setError(data.error ?? t("auth.errors.signInFailed"))
         return
       }
+      phIdentify(email)
+      phCapture("user_signed_in", { method: "email" })
       router.push(data.redirectTo ?? callbackUrl)
-    } catch {
+    } catch (err) {
+      phCaptureException(err)
       setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)

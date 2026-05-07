@@ -11,6 +11,7 @@ import { useErpSession } from "@lumiere/erp-session"
 import type { ChatMessageSourceRef } from "@lumiere/ui"
 import { useAiMemoryRag } from "@lumiere/query-hooks/hooks/ai-memory"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { performSignOut } from "@/lib/auth-sign-out"
 
 function numId(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v
@@ -82,6 +83,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
         onOpenJournal={() => setIsJournalOpen(true)}
         onOpenNotebook={() => setIsNotebookOpen(true)}
         onOpenAIChat={() => setIsAIChatOpen(true)}
+        onSignOut={() => void performSignOut()}
       />
       <main className="flex-1 overflow-auto scroll-smooth">
         <div className="p-6 lg:p-8">{children}</div>

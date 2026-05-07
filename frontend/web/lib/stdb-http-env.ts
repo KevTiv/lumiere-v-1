@@ -2,27 +2,16 @@
  * SpacetimeDB HTTP host + database name for Next.js server code.
  *
  * Must stay aligned with:
- * - `stdb-auth-server` credential SQL (same DB as org membership)
- * - `@lumiere/stdb` `http.ts` (which defaults module to `lumiere-v1` if unset — avoid relying on that alone)
+ * - `stdb-config` (Rust api-server / gateways)
+ * - `@lumiere/stdb` `http.ts` (browser + SSR SQL)
+ * - `lib/stdb-connect-env.ts` (shared resolution)
  */
 import 'server-only'
 
+import { resolveStdbConnectFromEnv } from '@/lib/stdb-connect-env'
+
 export function getDefaultStdbHttpConnect(): { host: string; module: string } {
-  const rawHost =
-    process.env['STDB_HOST'] ??
-    process.env['NEXT_PUBLIC_STDB_HOST'] ??
-    'wss://maincloud.spacetimedb.com'
-  const host = rawHost
-    .replace(/^wss:\/\//, 'https://')
-    .replace(/^ws:\/\//, 'http://')
-    .replace(/\/$/, '')
-
-  const module =
-    process.env['STDB_MODULE'] ??
-    process.env['NEXT_PUBLIC_STDB_MODULE'] ??
-    'lumiere-v1-j1uo0'
-
-  return { host, module }
+  return resolveStdbConnectFromEnv()
 }
 
 /** Normalize identity for SQL `user_identity = '…'` / credential columns (64 hex, lowercase). */

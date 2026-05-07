@@ -5,6 +5,7 @@ members = [
     "ai-gateway",
     "iot-gateway",
     "api-codegen",
+    "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",
     "crates/stdb-types",
@@ -38,6 +39,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dashmap = "6"
 
+stdb-config = { path = "crates/stdb-config" }
 stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
 stdb-types = { path = "crates/stdb-types" }

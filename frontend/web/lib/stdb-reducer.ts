@@ -14,20 +14,19 @@
 import { stringifyReducerCallBody } from '@lumiere/api-client'
 import type { StdbHttpOptions } from '@lumiere/stdb/server'
 
+import { normalizeStdbHttpHost, resolveStdbConnectFromEnv } from '@/lib/stdb-connect-env'
+
 // Module-level cache for config resolution
 let cachedHost: string | undefined
 let cachedModule: string | undefined
 
 function resolveHost(override?: string): string {
   if (override) {
-    return override.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://')
+    return normalizeStdbHttpHost(override)
   }
   if (!cachedHost) {
-    const raw =
-      process.env['STDB_HOST'] ??
-      process.env['NEXT_PUBLIC_STDB_HOST'] ??
-      'https://maincloud.spacetimedb.com'
-    cachedHost = raw.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://')
+    const { host } = resolveStdbConnectFromEnv()
+    cachedHost = host
   }
   return cachedHost
 }
@@ -35,10 +34,7 @@ function resolveHost(override?: string): string {
 function resolveModule(override?: string): string {
   if (override) return override
   if (!cachedModule) {
-    cachedModule =
-      process.env['STDB_MODULE'] ??
-      process.env['NEXT_PUBLIC_STDB_MODULE'] ??
-      'lumiere-v1-j1uo0'
+    cachedModule = resolveStdbConnectFromEnv().module
   }
   return cachedModule
 }

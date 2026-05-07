@@ -3,7 +3,8 @@
  *
  * - Server-only env: `LUMIERE_API_SERVER_URL` (e.g. `http://127.0.0.1:8082`). Empty / `false` / `off` disables forwarding.
  * - In development, defaults to `http://127.0.0.1:8082` when unset so local Axum + Next work together.
- * - Production: set `LUMIERE_API_SERVER_URL` to your internal gateway URL (no trailing slash).
+ * - Production (`NODE_ENV=production`): unset does **not** fall back to localhost — return null so callers must set
+ *   `LUMIERE_API_SERVER_URL` to your internal api-server base URL (no trailing slash).
  * - Debug: `LUMIERE_DEBUG_API_FORWARD=1` logs each proxied method + upstream URL on the Next.js server.
  *
  * Path map: same-origin `/api/...` → `{base}/v1/...` (e.g. `/api/auth/signin`, `/api/stdb/v1/identity`, `/api/query/foo`).

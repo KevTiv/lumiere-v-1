@@ -15,6 +15,8 @@ import {
   DEFAULT_FISCAL_YEAR_END_DAY,
 } from "@/lib/onboarding-config"
 import { POST_AUTH_PATHS } from "@/lib/post-auth-destination"
+import { performSignOut } from "@/lib/auth-sign-out"
+import { phCapture, phCaptureException } from "@/lib/posthog-browser"
 
 export default function OnboardingPage() {
   const { t } = useTranslation()
@@ -68,9 +70,11 @@ export default function OnboardingPage() {
         const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? t("auth.onboarding.errors.failedToCreate"))
       }
+      phCapture("onboarding_completed", { organization_name: name, organization_code: code, timezone, currency })
       router.push(POST_AUTH_PATHS.overview)
       router.refresh()
     } catch (err) {
+      phCaptureException(err)
       setError(err instanceof Error ? err.message : t("auth.onboarding.errors.failedToCreate"))
     } finally {
       setLoading(false)
@@ -152,6 +156,16 @@ export default function OnboardingPage() {
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? t("auth.onboarding.submitting") : t("auth.onboarding.submit")}
           </Button>
+
+          <p className="text-center text-sm text-muted-foreground">
+            <button
+              type="button"
+              className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+              onClick={() => void performSignOut()}
+            >
+              {t("nav.signOut")}
+            </button>
+          </p>
         </form>
       </CardContent>
     </Card>

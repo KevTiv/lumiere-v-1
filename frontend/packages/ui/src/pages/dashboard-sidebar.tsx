@@ -37,6 +37,7 @@ import {
   MessageSquare,
   ClipboardList,
   Map as MapIcon,
+  LogOut,
 } from "lucide-react"
 import type { Resource } from "@/lib/rbac-types"
 
@@ -57,9 +58,17 @@ interface DashboardSidebarProps {
   onOpenJournal?: () => void
   onOpenNotebook?: () => void
   onOpenAIChat?: () => void
+  /** When set, shows a sidebar control that calls this handler (typically clears session + redirects). */
+  onSignOut?: () => void | Promise<void>
 }
 
-export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook, onOpenAIChat }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  forceCollapsed,
+  onOpenJournal,
+  onOpenNotebook,
+  onOpenAIChat,
+  onSignOut,
+}: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const { checkPermission, currentUser, roles } = useRBAC()
   const pathname = usePathname()
@@ -278,7 +287,7 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
         )}
       </div>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
         <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
             {currentUser?.name.split(" ").map(n => n[0]).join("") || "?"}
@@ -292,6 +301,25 @@ export function DashboardSidebar({ forceCollapsed, onOpenJournal, onOpenNotebook
             </div>
           )}
         </div>
+        {onSignOut ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent",
+              !isCollapsed && "justify-start gap-2",
+              isCollapsed && "px-0 justify-center",
+            )}
+            title={isCollapsed ? t("nav.signOut") : undefined}
+            onClick={() => {
+              void onSignOut()
+            }}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!isCollapsed ? <span className="truncate">{t("nav.signOut")}</span> : null}
+          </Button>
+        ) : null}
       </div>
     </aside>
   )

@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
 import { redirectToWorkOsSignUp } from "@/app/actions/workos-auth"
+import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
 const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
@@ -38,11 +39,15 @@ export default function SignUpPage() {
       })
       const data = await res.json()
       if (!res.ok) {
+        phCapture("user_sign_up_failed", { error: data.error ?? "unknown" })
         setError(data.error ?? t("auth.errors.signUpFailed"))
         return
       }
+      phIdentify(email)
+      phCapture("user_signed_up", { method: "email" })
       router.push(data.redirectTo ?? "/onboarding")
-    } catch {
+    } catch (err) {
+      phCaptureException(err)
       setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)

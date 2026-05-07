@@ -1,5 +1,6 @@
 "use client"
 
+import { phCapture } from "@/lib/posthog-browser"
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   toConvertLeadParams,
@@ -550,7 +551,10 @@ function CrmClientLoaded({
   ) => {
     if (action === "createLead") {
       const p = toCreateLeadParams(formData)
-      if (p) await createLead.mutateAsync(p)
+      if (p) {
+        await createLead.mutateAsync(p)
+        phCapture("lead_created", { organization_id: organizationId })
+      }
     } else if (action === "createOpportunity") {
       const p = toCreateOpportunityParams(formData)
       if (p) await createOpportunity.mutateAsync(p)
@@ -590,6 +594,7 @@ function CrmClientLoaded({
           opportunityId: workflowModal.opportunityId,
           params: p as Record<string, unknown>,
         })
+        phCapture("opportunity_converted_to_order", { organization_id: organizationId })
       } else if (workflowModal.kind === "assignTag") {
         const tagId = formData.tagId
         if (tagId == null || String(tagId).trim() === "") {

@@ -12,6 +12,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { LifeBuoy } from "lucide-react"
+import { phCapture } from "@/lib/posthog-browser"
 
 interface HelpdeskTicketDialogProps {
   open: boolean
@@ -81,7 +82,10 @@ export function HelpdeskTicketDialog({
                 type="button"
                 variant="secondary"
                 disabled={isBusy}
-                onClick={() => void onCloseTicket()}
+                onClick={() => {
+                  phCapture('helpdesk_ticket_closed')
+                  void onCloseTicket()
+                }}
               >
                 {t("helpdesk.forms.ticketDetail.closeTicket")}
               </Button>

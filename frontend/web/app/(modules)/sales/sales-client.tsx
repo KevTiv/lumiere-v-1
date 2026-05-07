@@ -1,5 +1,6 @@
 'use client';
 
+import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
@@ -321,6 +322,7 @@ function SalesClientLoaded({
                 const st = saleOrderState(r);
                 if (st === 'Draft' || st === 'Sent') {
                   confirmSaleOrder.mutate(r.id as string | number | bigint);
+                  phCapture('sale_order_confirmed', { organization_id: organizationId });
                 }
               }
             },
@@ -337,6 +339,7 @@ function SalesClientLoaded({
                   cancelSaleOrder.mutate({
                     orderId: r.id as string | number | bigint,
                   });
+                  phCapture('sale_order_cancelled', { organization_id: organizationId });
                 }
               }
             },
@@ -768,7 +771,10 @@ function SalesClientLoaded({
   ) => {
     if (action === 'createSaleOrder') {
       const p = toCreateSaleOrderParams(formData, pricelists, companyId);
-      if (p) await createSaleOrder.mutateAsync(p);
+      if (p) {
+        await createSaleOrder.mutateAsync(p);
+        phCapture('sale_order_created', { organization_id: organizationId });
+      }
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData);
       if (p) await createPricelist.mutateAsync(p);

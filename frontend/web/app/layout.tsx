@@ -12,6 +12,8 @@ import './globals.css'
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
+import { getDefaultStdbHttpConnect } from '@/lib/stdb-http-env'
+
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
@@ -47,7 +49,7 @@ export default async function RootLayout({
   const identityHex = session?.identityHex
   const organizationId = session?.organizationId
   const opts = session?.opts ?? {}
-  const stdbModule = process.env.STDB_MODULE ?? process.env.NEXT_PUBLIC_STDB_MODULE ?? 'lumiere-v1-j1uo0'
+  const stdbModule = getDefaultStdbHttpConnect().module
 
   let serverRoleNames: string[] = []
   if (identityHex) {

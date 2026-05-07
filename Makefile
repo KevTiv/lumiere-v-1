@@ -1,9 +1,15 @@
-DB         := lumiere-v1-j1uo0
-DB_CLOUD   := lumiere-v1-j1uo0
-MODULE     := ./spacetimedb
-LOCAL      := http://127.0.0.1:3000
+# SpacetimeDB: published database name(s). Override: `make publish STDB_MODULE=my-db`
+STDB_MODULE        ?= lumiere-v1-j1uo0
+STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
+# Local SpacetimeDB HTTP base (default local server)
+STDB_HOST          ?= http://127.0.0.1:3000
 
-.PHONY: help setup check build \
+DB         := $(STDB_MODULE)
+DB_CLOUD   := $(STDB_CLOUD_MODULE)
+MODULE     := ./spacetimedb
+LOCAL      := $(STDB_HOST)
+
+.PHONY: help setup check check-env check-env-prod build \
         start stop \
         publish publish-clear test \
         publish-cloud publish-cloud-clear \
@@ -17,6 +23,8 @@ help:
 	@echo ""
 	@echo "  setup                Install wasm32 target and wasm-opt (one-time)"
 	@echo "  check                Run cargo check (fast type-check, no linking)"
+	@echo "  check-env            Print STDB_MODULE / STDB_CLOUD_MODULE / STDB_HOST (Makefile defaults)"
+	@echo "  check-env-prod       Print production env checklist (human-readable)"
 	@echo "  build                Compile to WASM (release)"
 	@echo ""
 	@echo "  --- Local (default) ---"
@@ -39,6 +47,23 @@ help:
 setup:
 	rustup target add wasm32-unknown-unknown --toolchain stable
 	brew install binaryen || true
+
+check-env:
+	@echo "STDB_MODULE=$(STDB_MODULE)"
+	@echo "STDB_CLOUD_MODULE=$(STDB_CLOUD_MODULE)"
+	@echo "STDB_HOST=$(STDB_HOST)"
+	@echo "DB (local publish target)=$(DB)"
+	@echo "DB_CLOUD=$(DB_CLOUD)"
+
+check-env-prod:
+	@echo "Production checklist (set in your host / orchestrator):"
+	@echo "  api-server (NODE_ENV=production or LUMIERE_ENV=production):"
+	@echo "    STDB_MODULE or NEXT_PUBLIC_STDB_MODULE"
+	@echo "    STDB_SERVER_TOKEN"
+	@echo "    AI_GATEWAY_URL (must not be localhost)"
+	@echo "  Next.js forward: LUMIERE_API_SERVER_URL"
+	@echo "  Client: NEXT_PUBLIC_STDB_HOST, NEXT_PUBLIC_STDB_MODULE"
+	@echo "  Realtime: NEXT_PUBLIC_API_GATEWAY_URL or NEXT_PUBLIC_REALTIME_WS_URL"
 
 check:
 	cd $(MODULE) && cargo check --tests
