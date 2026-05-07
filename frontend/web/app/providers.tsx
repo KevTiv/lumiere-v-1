@@ -1,7 +1,7 @@
 "use client"
 
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
@@ -16,6 +16,7 @@ import { useStdbQuery } from "@lumiere/query-hooks/hooks/stdb"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
 import { webApi } from "@/lib/lumiere-web-http"
+import { PostHogPageView } from "@/lib/posthog-pageview"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 const getRBACRoles = (rolesData: Record<string, unknown>[]) => {
@@ -128,6 +129,9 @@ export function Providers({
     <I18nProvider>
       <ThemeProvider>
         <SonnerToaster />
+        <Suspense fallback={null}>
+          <PostHogPageView />
+        </Suspense>
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
             <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />
