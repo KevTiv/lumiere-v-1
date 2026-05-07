@@ -74,6 +74,7 @@ export function FormModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        data-testid={`form-modal-${config.id}`}
         className={cn(
           maxW,
           "max-h-[85vh] flex flex-col bg-card p-0 gap-0",
@@ -92,7 +93,7 @@ export function FormModal({
               </div>
             )}
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold leading-tight">
+              <DialogTitle className="text-base font-semibold leading-tight" data-testid="form-modal-title">
                 {config.title}
               </DialogTitle>
               {config.description && (

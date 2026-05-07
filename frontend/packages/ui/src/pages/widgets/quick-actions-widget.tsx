@@ -67,8 +67,10 @@ export function QuickActionsWidget({ data }: { data: QuickActionsData }) {
 
         return (
           <button
+            type="button"
             key={action.id}
             onClick={action.onClick}
+            data-testid={`quick-action-${action.id}`}
             className={cn(
               "group flex flex-col items-center gap-3 p-4 rounded-2xl",
               "border border-border/30 hover:border-border/60",

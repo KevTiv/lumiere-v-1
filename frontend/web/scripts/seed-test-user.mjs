@@ -14,8 +14,9 @@
  * Org selection: prefers "Lumiere Demo Corp" (seed_dev_data), then "Lumiere Dev Org" (ensure_minimal_dev_org),
  * else first organization row (LIMIT 1; SpacetimeDB HTTP SQL does not support ORDER BY here).
  *
- * Env: STDB_HOST or NEXT_PUBLIC_STDB_HOST, STDB_MODULE or NEXT_PUBLIC_STDB_MODULE,
- *      STDB_SERVER_TOKEN, STDB_CREDENTIAL_ENCRYPTION_KEY (same as Next + api-server).
+ * Env: STDB_MODULE or NEXT_PUBLIC_STDB_MODULE (required — must match `spacetime publish <name>`),
+ *      STDB_HOST or NEXT_PUBLIC_STDB_HOST, STDB_SERVER_TOKEN, STDB_CREDENTIAL_ENCRYPTION_KEY
+ *      (same as Next + api-server).
  * Loads frontend/web/.env.local when present (does not override existing env).
  *
  * STDB_CREDENTIAL_ENCRYPTION_KEY: required when creating credentials (64 hex chars); must match
@@ -386,14 +387,27 @@ async function resolveTargetOrg(host, moduleName, adminToken) {
   return Number(row.id)
 }
 
+function getRequiredModuleName() {
+  const m =
+    process.env['STDB_MODULE']?.trim() || process.env['NEXT_PUBLIC_STDB_MODULE']?.trim()
+  if (!m) {
+    console.error(
+      '[seed-test-user] Missing STDB_MODULE or NEXT_PUBLIC_STDB_MODULE.\n' +
+        'Set to your published SpacetimeDB database name (same as `make publish` / `spacetime publish <name>`).\n' +
+        'Example in frontend/web/.env.local:\n' +
+        '  STDB_MODULE=lumiere-v1-j1uo0\n' +
+        '  NEXT_PUBLIC_STDB_MODULE=lumiere-v1-j1uo0',
+    )
+    process.exit(1)
+  }
+  return m
+}
+
 async function main() {
   loadEnvLocal()
 
   const host = getStdbHost()
-  const moduleName =
-    process.env['STDB_MODULE'] ??
-    process.env['NEXT_PUBLIC_STDB_MODULE'] ??
-    'lumiere-v1-j1uo0'
+  const moduleName = getRequiredModuleName()
   const adminToken = resolveStdbToken(host)
 
   await callStdbReducer(host, moduleName, adminToken, 'dev_promote_caller_superuser', [])

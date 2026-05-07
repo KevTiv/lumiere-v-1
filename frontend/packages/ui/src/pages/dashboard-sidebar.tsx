@@ -148,6 +148,7 @@ export function DashboardSidebar({
 
   return (
     <aside
+      data-testid="dashboard-sidebar"
       className={cn(
         "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
@@ -186,6 +187,7 @@ export function DashboardSidebar({
                     <Link
                       key={item.href}
                       href={item.href}
+                      data-testid={`sidebar-link-${item.href.replace(/^\//, "")}`}
                       title={isCollapsed ? item.label : undefined}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
@@ -206,6 +208,7 @@ export function DashboardSidebar({
                 return (
                   <div
                     key={item.href}
+                    data-testid={`sidebar-link-${item.href.replace(/^\//, "")}-locked`}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
@@ -288,7 +291,7 @@ export function DashboardSidebar({
       </div>
 
       <div className="p-4 border-t border-sidebar-border space-y-3">
-        <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
+        <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")} data-testid="sidebar-user">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
             {currentUser?.name.split(" ").map(n => n[0]).join("") || "?"}
           </div>
@@ -315,6 +318,7 @@ export function DashboardSidebar({
             onClick={() => {
               void onSignOut()
             }}
+            data-testid="sidebar-sign-out"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             {!isCollapsed ? <span className="truncate">{t("nav.signOut")}</span> : null}

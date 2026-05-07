@@ -25,6 +25,8 @@ export function phCaptureException(error: unknown) {
 }
 
 export function phReset() {
-  if (!enabled) return
-  posthog.reset()
+  if (enabled) posthog.reset()
+  if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+    window.dispatchEvent(new Event("lumiere:posthog-reset"))
+  }
 }

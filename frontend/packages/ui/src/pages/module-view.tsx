@@ -47,13 +47,18 @@ export function ModuleView({
   const [openForm, setOpenForm] = useState<string | null>(null)
 
   return (
-    <div className="flex flex-col min-h-full gap-2">
+    <div className="flex flex-col min-h-full gap-2" data-testid={`module-view-${config.id}`}>
       <DashboardHeader title={config.title} description={config.description} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
         <TabsList variant="default" className="w-full flex flex-wrap justify-start max-w-fit gap-2">
           {config.tabs.map((tab, i) => (
-            <TabsTrigger tabIndex={i} key={tab.id} value={tab.id}>
+            <TabsTrigger
+              tabIndex={i}
+              key={tab.id}
+              value={tab.id}
+              data-testid={`module-tab-${config.id}-${tab.id}`}
+            >
               {tab.label}
             </TabsTrigger>
           ))}
@@ -71,7 +76,11 @@ export function ModuleView({
               <div className="space-y-3">
                 {tab.createForm && (
                   <div className="flex justify-end">
-                    <Button size="lg" onClick={() => setOpenForm(tab.id)}>
+                    <Button
+                      size="lg"
+                      onClick={() => setOpenForm(tab.id)}
+                      data-testid={`module-create-${config.id}-${tab.id}`}
+                    >
                       {tab.createLabel ?? "New"}
                     </Button>
                   </div>
