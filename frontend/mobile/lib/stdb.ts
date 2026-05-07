@@ -2,7 +2,7 @@ import { DbConnection } from "@lumiere/stdb";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const HOST = process.env.EXPO_PUBLIC_STDB_HOST ?? "wss://maincloud.spacetimedb.com";
-const MODULE = process.env.EXPO_PUBLIC_STDB_MODULE ?? "lumiere-v1";
+const MODULE = process.env.EXPO_PUBLIC_STDB_MODULE ?? "lumiere-v1-j1uo0";
 const TOKEN_KEY = "lumiere_stdb_token";
 
 let _conn: DbConnection | null = null;

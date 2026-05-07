@@ -115,6 +115,7 @@
     "notebook": "Notebook",
     "aiAssistant": "AI Assistant",
     "noRole": "No Role",
+    "signOut": "Sign out",
     "erpSystem": "ERP System",
     "groups": {
       "analytics": "Analytics",

@@ -97,7 +97,7 @@ export function StdbConnectionProvider({
     const mod =
       moduleName ||
       process.env.NEXT_PUBLIC_STDB_MODULE ||
-      "lumiere-v1";
+      "lumiere-v1-j1uo0";
 
     // Load persisted token for seamless reconnection (SSR-safe)
     const savedToken =

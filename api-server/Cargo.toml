@@ -28,6 +28,7 @@ rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+stdb-config.workspace = true
 stdb-auth.workspace = true
 stdb-client.workspace = true
 thiserror.workspace = true

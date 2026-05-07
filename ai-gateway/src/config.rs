@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use stdb_config::{env_stdb_host_or_next_public, normalize_stdb_http_host};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -83,8 +84,10 @@ impl Config {
                 .unwrap_or_else(|_| "1024".to_string())
                 .parse()
                 .context("EMBEDDING_DIM must be a valid number")?,
-            stdb_host: std::env::var("STDB_HOST")
-                .unwrap_or_else(|_| "http://localhost:3000".to_string()),
+            stdb_host: normalize_stdb_http_host(
+                &env_stdb_host_or_next_public()
+                    .unwrap_or_else(|| "http://127.0.0.1:3000".to_string()),
+            ),
             stdb_module: std::env::var("STDB_MODULE")
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
             stdb_token: std::env::var("STDB_TOKEN")

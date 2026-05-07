@@ -72,13 +72,16 @@ function resolveHost(override?: string): string {
   return raw.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://')
 }
 
+/** Default published DB name when env is unset (align with Makefile / web `DEFAULT_STDB_MODULE_DEV`). */
+const DEFAULT_STDB_MODULE = 'lumiere-v1-j1uo0'
+
 function resolveModule(override?: string): string {
   return (
     override ??
     (typeof process !== 'undefined'
       ? process.env['STDB_MODULE'] ?? process.env['NEXT_PUBLIC_STDB_MODULE'] ?? process.env['VITE_STDB_MODULE']
       : undefined) ??
-    'lumiere-v1'
+    DEFAULT_STDB_MODULE
   )
 }
 

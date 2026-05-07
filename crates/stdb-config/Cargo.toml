@@ -1,0 +1,7 @@
+[package]
+name = "stdb-config"
+version.workspace = true
+edition.workspace = true
+description = "Shared SpacetimeDB env parsing and HTTP host normalization for Lumiere Rust services"
+
+[dependencies]

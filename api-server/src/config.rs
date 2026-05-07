@@ -1,4 +1,8 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use stdb_config::{
+    env_stdb_host_or_next_public, env_stdb_module_or_next_public, normalize_stdb_http_host,
+    runtime_is_production, DEFAULT_STDB_MODULE_DEV,
+};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -29,19 +33,28 @@ impl Config {
             .and_then(|s| s.parse().ok())
             .unwrap_or(8082);
 
-        let stdb_host = std::env::var("STDB_HOST")
-            .or_else(|_| std::env::var("NEXT_PUBLIC_STDB_HOST"))
-            .unwrap_or_else(|_| "https://maincloud.spacetimedb.com".into())
-            .replace("wss://", "https://")
-            .replace("ws://", "http://")
-            .trim_end_matches('/')
-            .to_string();
+        let prod = runtime_is_production();
 
-        let stdb_module = std::env::var("STDB_MODULE")
-            .or_else(|_| std::env::var("NEXT_PUBLIC_STDB_MODULE"))
-            .unwrap_or_else(|_| "lumiere-v1-j1uo0".into());
+        let stdb_host_raw = env_stdb_host_or_next_public().unwrap_or_else(|| {
+            "https://maincloud.spacetimedb.com".to_string()
+        });
+        let stdb_host = normalize_stdb_http_host(&stdb_host_raw);
+
+        let stdb_module = if prod {
+            env_stdb_module_or_next_public().context(
+                "STDB_MODULE or NEXT_PUBLIC_STDB_MODULE must be set in production (publish name / database name)",
+            )?
+        } else {
+            env_stdb_module_or_next_public()
+                .unwrap_or_else(|| DEFAULT_STDB_MODULE_DEV.to_string())
+        };
 
         let stdb_server_token = std::env::var("STDB_SERVER_TOKEN").ok().filter(|s| !s.is_empty());
+        if prod && stdb_server_token.is_none() {
+            anyhow::bail!(
+                "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
+            );
+        }
 
         // CORS_ORIGINS: comma-separated http(s)://host:port; required for credentialed cross-origin
         // browser calls (wildcard * is invalid with credentials: include).
@@ -59,10 +72,23 @@ impl Config {
             .ok()
             .and_then(|s| s.parse().ok());
 
-        let ai_gateway_url = std::env::var("AI_GATEWAY_URL")
-            .unwrap_or_else(|_| "http://localhost:3001".into())
-            .trim_end_matches('/')
-            .to_string();
+        let ai_gateway_url = if prod {
+            std::env::var("AI_GATEWAY_URL")
+                .context("AI_GATEWAY_URL must be set in production (internal AI gateway base URL, no trailing slash)")?
+        } else {
+            std::env::var("AI_GATEWAY_URL").unwrap_or_else(|_| "http://localhost:3001".to_string())
+        }
+        .trim_end_matches('/')
+        .to_string();
+
+        if prod {
+            let lower = ai_gateway_url.to_lowercase();
+            if lower.contains("localhost") || lower.contains("127.0.0.1") {
+                anyhow::bail!(
+                    "AI_GATEWAY_URL must not point at localhost in production (got {ai_gateway_url})"
+                );
+            }
+        }
 
         let workos_client_id = std::env::var("WORKOS_CLIENT_ID")
             .ok()
