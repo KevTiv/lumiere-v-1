@@ -7,10 +7,11 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import { workflowsBffPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AddWorkflowActivityParams,
   AddWorkflowTransitionParams,
@@ -85,11 +86,12 @@ export function useCreateWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateWorkflowParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, null, params]),
-      })
+      const { urlPath, init } = workflowsBffPost("create_workflow", [
+        organizationId,
+        null,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create workflow')
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
@@ -103,15 +105,12 @@ export function useAddWorkflowActivity(organizationId: bigint) {
       workflowId: bigint | number | string
       params: AddWorkflowActivityParams
     }) => {
-      const r = await apiFetch('/api/call/add_workflow_activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          params.workflowId,
-          params.params,
-        ]),
-      })
+      const { urlPath, init } = workflowsBffPost("add_workflow_activity", [
+        organizationId,
+        params.workflowId,
+        stdbParamsToJson(params.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add workflow activity')
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
@@ -127,17 +126,14 @@ export function useAddWorkflowTransition(organizationId: bigint) {
       activityTo: bigint | number | string
       params: AddWorkflowTransitionParams
     }) => {
-      const r = await apiFetch('/api/call/add_workflow_transition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          params.workflowId,
-          params.activityFrom,
-          params.activityTo,
-          params.params,
-        ]),
-      })
+      const { urlPath, init } = workflowsBffPost("add_workflow_transition", [
+        organizationId,
+        params.workflowId,
+        params.activityFrom,
+        params.activityTo,
+        stdbParamsToJson(params.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add workflow transition')
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
@@ -148,11 +144,11 @@ export function useImportWorkflowCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch('/api/call/import_workflow_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = workflowsBffPost("import_workflow_csv", [
+        organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import workflows')
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
@@ -163,15 +159,12 @@ export function useSetWorkflowActive(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: { workflowId: bigint | number | string; isActive: boolean }) => {
-      const r = await apiFetch('/api/call/set_workflow_active', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          params.workflowId,
-          params.isActive,
-        ]),
-      })
+      const { urlPath, init } = workflowsBffPost("set_workflow_active", [
+        organizationId,
+        params.workflowId,
+        params.isActive,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update workflow active state')
     },
     onSuccess: async () => {
@@ -188,16 +181,13 @@ export function useStartWorkflow(organizationId: bigint) {
       resId: bigint | number | string
       resType: string
     }) => {
-      const r = await apiFetch('/api/call/start_workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          params.workflowId,
-          params.resId,
-          params.resType,
-        ]),
-      })
+      const { urlPath, init } = workflowsBffPost("start_workflow", [
+        organizationId,
+        params.workflowId,
+        params.resId,
+        params.resType,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start workflow')
     },
     onSuccess: async () => {
@@ -213,15 +203,12 @@ export function useSignalWorkflow(organizationId: bigint) {
       instanceId: bigint | number | string
       signal: string
     }) => {
-      const r = await apiFetch('/api/call/signal_workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          params.instanceId,
-          params.signal,
-        ]),
-      })
+      const { urlPath, init } = workflowsBffPost("signal_workflow", [
+        organizationId,
+        params.instanceId,
+        params.signal,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to signal workflow')
     },
     onSuccess: async () => {
@@ -234,11 +221,11 @@ export function useCancelWorkflowInstance(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (instanceId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/cancel_workflow_instance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, instanceId]),
-      })
+      const { urlPath, init } = workflowsBffPost("cancel_workflow_instance", [
+        organizationId,
+        instanceId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel workflow instance')
     },
     onSuccess: async () => {
@@ -251,11 +238,11 @@ export function useSetWorkitemException(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workitemId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/set_workitem_exception', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workitemId]),
-      })
+      const { urlPath, init } = workflowsBffPost("set_workitem_exception", [
+        organizationId,
+        workitemId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to set workitem exception')
     },
     onSuccess: async () => {

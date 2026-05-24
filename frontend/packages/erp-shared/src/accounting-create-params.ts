@@ -32,7 +32,7 @@ import type {
 } from '@lumiere/stdb/generated/types'
 import type { Timestamp } from "spacetimedb"
 
-import { userTypeIdFromInternalGroup } from "./accounting-defaults"
+import { userTypeIdFromAccountTypes, userTypeIdFromInternalGroup } from "./accounting-defaults"
 import {
   optionalBigIntU64,
   parseDelimitedU64Ids,
@@ -113,12 +113,21 @@ function toInternalGroup(
 
 export function toCreateAccountAccountParams(
   formData: Record<string, unknown>,
+  opts?: { accountTypes?: ReadonlyArray<Record<string, unknown>> },
 ): CreateAccountAccountParams | null {
   const rawUt = formData.userTypeId
   let userTypeId: bigint | null =
-    rawUt != null && rawUt !== ''
-      ? requiredBigIntU64(rawUt)
-      : (userTypeIdFromInternalGroup(String(formData.internalGroup ?? '')) ?? null)
+    rawUt != null && rawUt !== "" ? requiredBigIntU64(rawUt) : null
+
+  if (userTypeId == null && opts?.accountTypes?.length) {
+    userTypeId =
+      userTypeIdFromAccountTypes(opts.accountTypes, String(formData.internalGroup ?? "")) ?? null
+  }
+
+  if (userTypeId == null) {
+    userTypeId = userTypeIdFromInternalGroup(String(formData.internalGroup ?? "")) ?? null
+  }
+
   if (userTypeId == null) return null
 
   return {
@@ -329,6 +338,60 @@ export function createAccountTaxParamsToStdbHttpJson(
     has_negative_factor: params.hasNegativeFactor,
     invoice_repartition_line_ids: u64BigintArrayToHttpJson(params.invoiceRepartitionLineIds),
     refund_repartition_line_ids: u64BigintArrayToHttpJson(params.refundRepartitionLineIds),
+    metadata: params.metadata ?? null,
+  }
+}
+
+/** SpacetimeDB HTTP JSON for `Option<T>` (SATS `some` / `none`). */
+function stdbOptionSome<T>(value: T): { some: T; none?: never } {
+  return { some: value }
+}
+
+function stdbOptionNone(): { none: []; some?: never } {
+  return { none: [] }
+}
+
+/** SATS unit-variant sum JSON for SpacetimeDB HTTP (keys are lowercase, e.g. `{"sale":[]}`). */
+function stdbTaggedUnitEnumToHttpSumJson(v: { tag: string }): Record<string, unknown> {
+  const t = v.tag
+  const key = t.charAt(0).toLowerCase() + t.slice(1)
+  return { [key]: [] }
+}
+
+function optionTaggedEnumToHttpJson(
+  v: { tag: string } | undefined,
+): { some: Record<string, unknown> } | { none: [] } {
+  if (v === undefined) return stdbOptionNone()
+  return stdbOptionSome(stdbTaggedUnitEnumToHttpSumJson(v))
+}
+
+/**
+ * `POST .../call/create_account_account` expects JSON keys matching the Rust struct (snake_case) and
+ * SATS sum JSON for enums (`{"Other":[]}`), not generated TS field names (`userTypeId`, `{tag:…}`, …).
+ */
+export function createAccountAccountParamsToStdbHttpJson(
+  params: CreateAccountAccountParams,
+): Record<string, unknown> {
+  const internalType = params.internalType as { tag: string } | undefined
+  const internalGroup = params.internalGroup as { tag: string } | undefined
+
+  return {
+    company_id: optionalBigintU64ToHttpJson(params.companyId),
+    code: params.code,
+    name: params.name,
+    user_type_id: bigintToSafeJsonU64(params.userTypeId),
+    currency_id: optionalBigintU64ToHttpJson(params.currencyId),
+    internal_type: optionTaggedEnumToHttpJson(internalType),
+    internal_group: optionTaggedEnumToHttpJson(internalGroup),
+    group_id: optionalBigintU64ToHttpJson(params.groupId),
+    reconcile: params.reconcile,
+    tax_ids: u64BigintArrayToHttpJson(params.taxIds),
+    note: params.note ?? null,
+    opening_debit: params.openingDebit,
+    opening_credit: params.openingCredit,
+    allowed_journal_ids: u64BigintArrayToHttpJson(params.allowedJournalIds),
+    non_trade: params.nonTrade,
+    is_off_balance: params.isOffBalance,
     metadata: params.metadata ?? null,
   }
 }

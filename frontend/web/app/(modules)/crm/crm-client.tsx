@@ -12,6 +12,7 @@ import {
 } from "@/lib/crm-create-params"
 import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useActivities,
   useAddContactToSegment,
@@ -107,8 +108,8 @@ function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string
     return s || `Opportunity #${id}`
   }
   if (tabId === "contacts") {
-    const s = String(row.name ?? "").trim()
-    return s || `Contact #${id}`
+    const label = contactPrimaryLabel(row).trim()
+    return label || `Contact #${id}`
   }
   return id ? `Record #${id}` : "Record"
 }
@@ -122,6 +123,12 @@ function partnerId(row: Record<string, unknown>): unknown {
 }
 
 type CrmCsvImportKind = "contact" | "lead" | "opportunity"
+
+const closedWorkflowFormConfig: FormConfig = {
+  id: "closed-crm-workflow",
+  title: "",
+  sections: [],
+}
 
 export function CrmClient(props: CrmClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -298,7 +305,9 @@ function CrmClientLoaded({
 
     const leadsCfg = leadsTableConfig(t)
     const oppCfg = opportunitiesTableConfig(t)
-    const contactCfg = contactsTableConfig(t)
+    const contactCfg = contactsTableConfig(t, {
+      formatContactDisplayName: contactPrimaryLabel,
+    })
     const actCfg = activitiesTableConfig(t)
 
     const leadsEntity: EntityViewConfig = {
@@ -509,13 +518,17 @@ function CrmClientLoaded({
           return { ...w, data: { metrics } }
         }
         if (w.id === "crm-recent-contacts") {
-          const recentRows = contacts.slice(0, 4).map((c) => ({
-            name: String(c.name ?? ""),
-            company: c.companyId ? `ID ${String(c.companyId).slice(-4)}` : "—",
-            stage: "—",
-            value: "—",
-            lastContact: "—",
-          }))
+          const recentRows = contacts.slice(0, 4).map((c) => {
+            const row = c as Record<string, unknown>
+            const primary = contactPrimaryLabel(row).trim()
+            return {
+              name: primary || String(c.name ?? ""),
+              company: c.companyId ? `ID ${String(c.companyId).slice(-4)}` : "—",
+              stage: "—",
+              value: "—",
+              lastContact: "—",
+            }
+          })
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: recentRows } }
         }
         return w
@@ -586,13 +599,13 @@ function CrmClientLoaded({
       if (workflowModal.kind === "convertLead") {
         const p = toConvertLeadParams(formData)
         if (!p) throw new Error(t("crm.forms.convertLead.validation.stageRequired"))
-        await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: p as Record<string, unknown> })
+        await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
       } else if (workflowModal.kind === "convertOpp") {
         const p = toConvertOpportunityParams(formData)
         if (!p) throw new Error(t("crm.forms.convertToSaleOrder.validation.pricelistWarehouse"))
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
-          params: p as Record<string, unknown>,
+          params: p,
         })
         phCapture("opportunity_converted_to_order", { organization_id: organizationId })
       } else if (workflowModal.kind === "assignTag") {
@@ -678,7 +691,7 @@ function CrmClientLoaded({
         key={workflowModalKey}
         open={workflowModal !== null}
         onOpenChange={(open) => !open && setWorkflowModal(null)}
-        config={workflowModal?.form ?? newLeadForm(t)}
+        config={workflowModal?.form ?? closedWorkflowFormConfig}
         isPending={isFormMutationPending}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)

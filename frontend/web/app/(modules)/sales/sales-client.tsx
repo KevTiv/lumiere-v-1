@@ -30,6 +30,7 @@ import {
   toCreatePricelistParams,
   toCreateSaleOrderParams,
 } from '@/lib/sales-create-params';
+import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
 import {
   toCreateDeliveryCarrierParams,
   toCreateDeliveryPriceRuleParams,
@@ -301,7 +302,9 @@ function SalesClientLoaded({
   );
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
-    const base = saleOrdersTableConfig(t);
+    const base = saleOrdersTableConfig(t, {
+      formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+    });
     const view = base.view as EntityTableConfig;
     return {
       ...base,

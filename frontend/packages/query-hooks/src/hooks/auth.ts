@@ -8,7 +8,7 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { authBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -82,11 +82,11 @@ export function useCreateRole(organizationId: bigint) {
         description: formData.description ? String(formData.description) : null,
         permissions: formData.permissions || [],
       }
-      const r = await apiFetch('/api/call/create_role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("create_role", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create role')
     },
     onSuccess: async () => {
@@ -103,11 +103,11 @@ export function useUpdateRole(organizationId: bigint) {
     { roleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ roleId, params }) => {
-      const r = await apiFetch('/api/call/update_role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(roleId), stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("update_role", [
+        toScalarU64(roleId),
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update role')
     },
     onSuccess: async () => {
@@ -133,22 +133,19 @@ export function useAssignRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userIdentity, roleId, params }) => {
-      const r = await apiFetch('/api/call/assign_role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          userIdentity.trim(),
-          toScalarU64(roleId),
-          organizationId,
-          stdbParamsToJson({
-            expiresAtMicros:
-              params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
-                ? toScalarU64(params.expiresAtMicros as ScalarId)
-                : null,
-            metadata: params.metadata,
-          }),
-        ]),
-      })
+      const { urlPath, init } = authBffPost("assign_role", [
+        userIdentity.trim(),
+        toScalarU64(roleId),
+        organizationId,
+        stdbParamsToJson({
+          expiresAtMicros:
+            params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
+              ? toScalarU64(params.expiresAtMicros as ScalarId)
+              : null,
+          metadata: params.metadata,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign role')
     },
     onSuccess: async () => {
@@ -161,11 +158,11 @@ export function useRevokeRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { assignmentId: string | number | bigint }>({
     mutationFn: async ({ assignmentId }) => {
-      const r = await apiFetch('/api/call/revoke_role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(assignmentId)]),
-      })
+      const { urlPath, init } = authBffPost("revoke_role", [
+        organizationId,
+        toScalarU64(assignmentId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to revoke role')
     },
     onSuccess: async () => {
@@ -187,11 +184,11 @@ export function useCreateAuditRule(organizationId: bigint) {
         isActive: Boolean(formData.isActive ?? true),
         severity: String(formData.severity ?? 'info'),
       }
-      const r = await apiFetch('/api/call/create_audit_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("create_audit_rule", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create audit rule')
     },
     onSuccess: async () => {
@@ -208,11 +205,11 @@ export function useUpdateAuditRule(organizationId: bigint) {
     { ruleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ ruleId, params }) => {
-      const r = await apiFetch('/api/call/update_audit_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(ruleId), stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("update_audit_rule", [
+        toScalarU64(ruleId),
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update audit rule')
     },
     onSuccess: async () => {
@@ -240,28 +237,25 @@ export function useLogAuditEvent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LogAuditEventInput>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/log_audit_event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          stdbParamsToJson({
-            companyId:
-              params.companyId != null ? toScalarU64(params.companyId as ScalarId) : null,
-            tableName: params.tableName,
-            recordId: toScalarU64(params.recordId),
-            action: params.action,
-            oldValues: params.oldValues,
-            newValues: params.newValues,
-            changedFields: params.changedFields,
-            sessionId:
-              params.sessionId != null ? toScalarU64(params.sessionId as ScalarId) : null,
-            ipAddress: params.ipAddress,
-            userAgent: params.userAgent,
-            metadata: params.metadata,
-          }),
-        ]),
-      })
+      const { urlPath, init } = authBffPost("log_audit_event", [
+        organizationId,
+        stdbParamsToJson({
+          companyId:
+            params.companyId != null ? toScalarU64(params.companyId as ScalarId) : null,
+          tableName: params.tableName,
+          recordId: toScalarU64(params.recordId),
+          action: params.action,
+          oldValues: params.oldValues,
+          newValues: params.newValues,
+          changedFields: params.changedFields,
+          sessionId:
+            params.sessionId != null ? toScalarU64(params.sessionId as ScalarId) : null,
+          ipAddress: params.ipAddress,
+          userAgent: params.userAgent,
+          metadata: params.metadata,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to log audit event')
     },
     onSuccess: async () => {
@@ -312,11 +306,11 @@ export function useUpdateUserPassword(organizationId: bigint) {
     { targetIdentity: string; newPasswordHash: string }
   >({
     mutationFn: async ({ targetIdentity, newPasswordHash }) => {
-      const r = await apiFetch('/api/call/update_user_password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([targetIdentity.trim(), newPasswordHash]),
-      })
+      const { urlPath, init } = authBffPost("update_user_password", [
+        targetIdentity.trim(),
+        newPasswordHash,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user password')
     },
     onSuccess: async () => {
@@ -329,11 +323,8 @@ export function useUpdateUserProfile(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/update_user_profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("update_user_profile", [stdbParamsToJson(params)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user profile')
     },
     onSuccess: async () => {
@@ -353,11 +344,11 @@ export function useUpdateOrgMemberRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userOrgId, roleName }) => {
-      const r = await apiFetch('/api/call/update_org_member_role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(userOrgId), roleName]),
-      })
+      const { urlPath, init } = authBffPost("update_org_member_role", [
+        toScalarU64(userOrgId),
+        roleName,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update org member role')
     },
     onSuccess: async () => {
@@ -377,11 +368,12 @@ export function useUpdateUserOrganizationStatus(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userId, status }) => {
-      const r = await apiFetch('/api/call/update_user_organization_status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, status]),
-      })
+      const { urlPath, init } = authBffPost("update_user_organization_status", [
+        organizationId,
+        userId,
+        status,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user organization status')
     },
     onSuccess: async () => {
@@ -394,11 +386,11 @@ export function useRemoveUserFromOrganization(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (userId) => {
-      const r = await apiFetch('/api/call/remove_user_from_organization', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId]),
-      })
+      const { urlPath, init } = authBffPost("remove_user_from_organization", [
+        organizationId,
+        userId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove user from organization')
     },
     onSuccess: async () => {
@@ -418,11 +410,11 @@ export function useUpdateOrgMemberDetails(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userOrgId, params }) => {
-      const r = await apiFetch('/api/call/update_org_member_details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(userOrgId), stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = authBffPost("update_org_member_details", [
+        toScalarU64(userOrgId),
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update org member details')
     },
     onSuccess: async () => {
@@ -442,11 +434,8 @@ export function useUpdateUserEmail(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ email, emailVerified }) => {
-      const r = await apiFetch('/api/call/update_user_email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([email.trim(), emailVerified]),
-      })
+      const { urlPath, init } = authBffPost("update_user_email", [email.trim(), emailVerified])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user email')
     },
     onSuccess: async () => {
@@ -461,14 +450,11 @@ export function useCreateUserSession(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (sessionParams) => {
-      const r = await apiFetch('/api/call/create_user_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          stdbParamsToJson(sessionParams),
-        ]),
-      })
+      const { urlPath, init } = authBffPost("create_user_session", [
+        organizationId,
+        stdbParamsToJson(sessionParams),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create user session')
     },
     onSuccess: async () => {
@@ -481,11 +467,8 @@ export function useEndUserSession(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (sessionId) => {
-      const r = await apiFetch('/api/call/end_user_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(sessionId)]),
-      })
+      const { urlPath, init } = authBffPost("end_user_session", [toScalarU64(sessionId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to end user session')
     },
     onSuccess: async () => {
@@ -509,21 +492,18 @@ export function useRecordPrivacyConsent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, RecordPrivacyConsentInput>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/record_privacy_consent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          stdbParamsToJson({
-            contactId: toScalarU64(params.contactId),
-            consentType: params.consentType,
-            granted: params.granted,
-            ipAddress: params.ipAddress,
-            userAgent: params.userAgent,
-            metadata: params.metadata,
-          }),
-        ]),
-      })
+      const { urlPath, init } = authBffPost("record_privacy_consent", [
+        organizationId,
+        stdbParamsToJson({
+          contactId: toScalarU64(params.contactId),
+          consentType: params.consentType,
+          granted: params.granted,
+          ipAddress: params.ipAddress,
+          userAgent: params.userAgent,
+          metadata: params.metadata,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record privacy consent')
     },
     onSuccess: async () => {
@@ -543,11 +523,12 @@ export function useUpdateGoogleDriveCredentials(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userId, credentials }) => {
-      const r = await apiFetch('/api/call/update_google_drive_credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(credentials)]),
-      })
+      const { urlPath, init } = authBffPost("update_google_drive_credentials", [
+        organizationId,
+        userId,
+        stdbParamsToJson(credentials),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update Google Drive credentials')
     },
     onSuccess: async () => {
@@ -567,11 +548,12 @@ export function useUpdateWhatsappCredentials(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userId, credentials }) => {
-      const r = await apiFetch('/api/call/update_whatsapp_credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, userId, stdbParamsToJson(credentials)]),
-      })
+      const { urlPath, init } = authBffPost("update_whatsapp_credentials", [
+        organizationId,
+        userId,
+        stdbParamsToJson(credentials),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update WhatsApp credentials')
     },
     onSuccess: async () => {

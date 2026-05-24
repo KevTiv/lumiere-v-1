@@ -1,0 +1,63 @@
+import type {
+  CreateHelpdeskSlaParams,
+  CreateHelpdeskStageParams,
+  CreateHelpdeskTeamParams,
+  CreateTicketParams,
+} from "@lumiere/stdb/types"
+
+const defaultTicketPriority: CreateTicketParams["priority"] = { tag: "Normal" }
+
+/** Merge partial Helpdesk create payloads with hook defaults before `stdbParamsToJson`. */
+export function finalizeCreateTicketParams(
+  partial: Partial<CreateTicketParams>,
+): CreateTicketParams {
+  return {
+    teamId: partial.teamId ?? 0n,
+    stageId: partial.stageId ?? 0n,
+    name: partial.name ?? "",
+    description: partial.description,
+    priority: partial.priority ?? defaultTicketPriority,
+    partnerId: partial.partnerId,
+    partnerName: partial.partnerName,
+    partnerEmail: partial.partnerEmail,
+    slaId: partial.slaId,
+    slaDeadline: partial.slaDeadline,
+  }
+}
+
+export function finalizeCreateHelpdeskTeamParams(
+  partial: Partial<CreateHelpdeskTeamParams>,
+): CreateHelpdeskTeamParams {
+  return {
+    name: partial.name ?? "",
+    description: partial.description,
+    isActive: partial.isActive ?? true,
+  }
+}
+
+export function finalizeCreateHelpdeskStageParams(
+  partial: Partial<CreateHelpdeskStageParams>,
+): CreateHelpdeskStageParams {
+  return {
+    name: partial.name ?? "",
+    teamId: partial.teamId,
+    sequence: partial.sequence ?? 0,
+    isClosed: partial.isClosed ?? false,
+    description: partial.description,
+    template: partial.template,
+  }
+}
+
+export function finalizeCreateHelpdeskSlaParams(
+  partial: Partial<CreateHelpdeskSlaParams>,
+): CreateHelpdeskSlaParams {
+  return {
+    name: partial.name ?? "",
+    teamId: partial.teamId ?? 0n,
+    stageId: partial.stageId ?? 0n,
+    priority: partial.priority ?? defaultTicketPriority,
+    timeDays: partial.timeDays ?? 0,
+    timeHours: partial.timeHours ?? 0,
+    isActive: partial.isActive ?? true,
+  }
+}

@@ -109,6 +109,8 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
         model: formData.model ? String(formData.model) : "mail.message",
         resId: BigInt(Math.floor(resNum)),
         body,
+        messageType: formData.messageType ? String(formData.messageType) : "comment",
+        subtype: formData.subtype ? String(formData.subtype) : null,
         parentId: optionalBigIntU64(formData.parentId) ?? null,
         attachmentIds: [],
       })

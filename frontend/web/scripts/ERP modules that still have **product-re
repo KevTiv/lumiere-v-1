@@ -1,0 +1,19 @@
+ERP modules that still have **product-relevant** gaps (per `byModule.missing`)
+
+| Area | What’s still missing (high level) |
+|------|-----------------------------------|
+| **Sales** | `create_delivery_carrier`, `create_delivery_price_rule`, `create_shipping_method`, `create_payment_method`, `create_loyalty_program`, `create_loyalty_card` |
+| **Purchasing** | `update_po_receipt_status`, `update_po_invoice_status`, `create_partner_bank`, `update_partner_bank`, `delete_partner_bank` |
+| **Inventory** | `process_pending_scans` (barcode batch processing) |
+| **Accounting** | `compute_invoice_totals`, `update_tax_deadlines` (script still flags them in `accounting.missing` even though product coverage is marked 100% — worth reconciling triage vs UI) |
+| **IoT** | Hub pairing / sync / device links / telemetry: e.g. `generate_hub_pairing_token`, `claim_hub_with_token`, `link_device_to_location`, `link_device_to_pos`, `unlink_device`, `update_hub_heartbeat`, `sync_hub_devices`, `update_device_status`, `record_telemetry`, `record_telemetry_batch`, `mark_action_sent` |
+| **Settings / multi-company** | Company CRUD + addresses/hierarchy, data classification, `create_country`, `create_currency` |
+| **AI** | Entire bucket in UI terms: agents, insights, embeddings, spend, etc. |
+| **Auth / admin** | Credential storage, invites/password reset flows, Casbin rule mutations, `add_org_member` / `add_user_to_organization`, dev superuser helper |
+| **Internal / platform** | Job queue: `enqueue_job`, `claim_queue_job`, `complete_queue_job`, `register_queue_worker`, `worker_heartbeat` |
+| **Imports** | Several **non–module-scoped** CSV imports: `import_company_csv`, `import_country_csv`, `import_currency_csv`, `import_currency_rate_csv`, `import_role_csv`, `import_ai_agent_csv` |
+| **Forms** | `migrate_all_organizations` (ops / migration, not normal product UI) |
+| **Bootstrap** | `seed_dev_data` |
+| **Uncategorized (cross-cutting)** | `post_invoice`, Google Drive + WhatsApp integration reducers, `set_ai_agent_active`, etc. (good candidates to **re-home** in `EXPLICIT_REDUCER_MODULE` + real screens) |
+
+### Modules that are **clean** on this report (no `missing` array)

@@ -1,7 +1,7 @@
 "use client"
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { organizationCompanyBffPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -70,11 +70,11 @@ export function useCreateCompany(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("create_company", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateOrgCompanyQueries(qc, organizationId),
@@ -85,11 +85,11 @@ export function useUpdateCompany() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("update_company", [
+        args.companyId,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
     },
@@ -103,11 +103,11 @@ export function useUpdateCompanyAddress() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_company_address", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("update_company_address", [
+        args.companyId,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
     },
@@ -121,11 +121,11 @@ export function useUpdateCompanyBusiness() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_company_business", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("update_company_business", [
+        args.companyId,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
     },
@@ -139,11 +139,11 @@ export function useUpdateCompanyHierarchy() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_company_hierarchy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.companyId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("update_company_hierarchy", [
+        args.companyId,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
     },
@@ -157,11 +157,8 @@ export function useDeleteCompany() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number }) => {
-      const r = await apiFetch("/api/call/delete_company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.companyId]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("delete_company", [args.companyId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
     },
@@ -175,11 +172,11 @@ export function useCreateDataClassification(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_data_classification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("create_data_classification", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidatePrivacyQueries(qc, organizationId),
@@ -190,11 +187,11 @@ export function useCreateDataClassificationRule(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_data_classification_rule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = organizationCompanyBffPost("create_data_classification_rule", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidatePrivacyQueries(qc, organizationId),

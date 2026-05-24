@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
@@ -55,39 +56,96 @@ const locationTypeBadges = (t: TFunction) => ({
 })
 
 // ── Products ──────────────────────────────────────────────────────────────────
-export const productsTableConfig = (t: TFunction): EntityViewConfig => ({
-  id: "products-table",
-  title: t("inventory.products.title"),
-  description: t("inventory.products.description"),
-  view: {
-    mode: "table",
-    rowKey: "id",
-    searchable: true,
-    searchPlaceholder: t("inventory.products.searchPlaceholder"),
-    searchKeys: ["name", "defaultCode", "barcode"],
-    filters: [
-      {
-        key: "type",
-        label: t("inventory.products.filters.type.label"),
-        type: "select",
-        options: [
-          { value: "product", label: t("inventory.products.filters.type.options.product") },
-          { value: "consu", label: t("inventory.products.filters.type.options.consu") },
-          { value: "service", label: t("inventory.products.filters.type.options.service") },
-        ],
-      },
-    ],
-    columns: [
-      { key: "defaultCode", label: t("inventory.products.columns.defaultCode"), width: "min-w-24" },
-      { key: "name", label: t("inventory.products.columns.name"), width: "min-w-48" },
-      { key: "type", label: t("inventory.products.columns.type"), type: "badge", ...productTypeBadges(t) },
-      { key: "standardPrice", label: t("inventory.products.columns.standardPrice"), type: "currency", align: "right" },
-      { key: "saleOk", label: t("inventory.products.columns.saleOk"), type: "boolean" },
-      { key: "purchaseOk", label: t("inventory.products.columns.purchaseOk"), type: "boolean" },
-    ],
-    emptyMessage: t("inventory.products.emptyMessage"),
-  },
-})
+
+export type ProductsTableConfigOptions = {
+  /** Combined default code + name for dense lists (optional). */
+  formatProductDisplayName?: (row: Record<string, unknown>) => string
+}
+
+export const productsTableConfig = (
+  t: TFunction,
+  options?: ProductsTableConfigOptions,
+): EntityViewConfig => {
+  const formatName = options?.formatProductDisplayName
+
+  const nameColumn = {
+    key: "name",
+    label: t("inventory.products.columns.name"),
+    width: "min-w-48",
+    ...(formatName
+      ? {
+          render: (_value: unknown, row: Record<string, unknown>) => {
+            const formatted = formatName(row).trim()
+            const fallback = String(row.name ?? "").trim()
+            const shown = formatted || fallback
+            if (!shown)
+              return createElement(
+                "span",
+                { className: "text-muted-foreground" },
+                "—",
+              )
+            return shown
+          },
+        }
+      : {}),
+  }
+
+  return {
+    id: "products-table",
+    title: t("inventory.products.title"),
+    description: t("inventory.products.description"),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("inventory.products.searchPlaceholder"),
+      searchKeys: ["name", "defaultCode", "default_code", "barcode"],
+      filters: [
+        {
+          key: "type",
+          label: t("inventory.products.filters.type.label"),
+          type: "select",
+          options: [
+            { value: "product", label: t("inventory.products.filters.type.options.product") },
+            { value: "consu", label: t("inventory.products.filters.type.options.consu") },
+            { value: "service", label: t("inventory.products.filters.type.options.service") },
+          ],
+        },
+      ],
+      columns: [
+        {
+          key: "defaultCode",
+          label: t("inventory.products.columns.defaultCode"),
+          width: "min-w-24",
+        },
+        nameColumn,
+        {
+          key: "type",
+          label: t("inventory.products.columns.type"),
+          type: "badge",
+          ...productTypeBadges(t),
+        },
+        {
+          key: "standardPrice",
+          label: t("inventory.products.columns.standardPrice"),
+          type: "currency",
+          align: "right",
+        },
+        {
+          key: "saleOk",
+          label: t("inventory.products.columns.saleOk"),
+          type: "boolean",
+        },
+        {
+          key: "purchaseOk",
+          label: t("inventory.products.columns.purchaseOk"),
+          type: "boolean",
+        },
+      ],
+      emptyMessage: t("inventory.products.emptyMessage"),
+    },
+  }
+}
 
 // ── Stock (on-hand) ───────────────────────────────────────────────────────────
 export const stockQuantsTableConfig = (t: TFunction): EntityViewConfig => ({

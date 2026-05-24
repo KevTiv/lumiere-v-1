@@ -51,6 +51,7 @@ export function FormFieldRenderer({
           <Input
             id={field.id}
             name={field.name}
+            data-testid={`form-field-${field.name}`}
             type={field.type}
             placeholder={field.placeholder}
             value={(value as string) || ""}
@@ -66,6 +67,7 @@ export function FormFieldRenderer({
           <Input
             id={field.id}
             name={field.name}
+            data-testid={`form-field-${field.name}`}
             type="number"
             placeholder={field.placeholder}
             value={(value as number) ?? ""}
@@ -84,6 +86,7 @@ export function FormFieldRenderer({
           <Textarea
             id={field.id}
             name={field.name}
+            data-testid={`form-field-${field.name}`}
             placeholder={field.placeholder}
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
@@ -106,6 +109,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",
                 inputBase,
@@ -133,6 +137,7 @@ export function FormFieldRenderer({
           <div className="flex items-center gap-3 pt-2">
             <Checkbox
               id={field.id}
+              data-testid={`form-field-${field.name}`}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -161,6 +166,7 @@ export function FormFieldRenderer({
             )}
             <Switch
               id={field.id}
+              data-testid={`form-field-${field.name}`}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -183,6 +189,7 @@ export function FormFieldRenderer({
                   key={option.value}
                   type="button"
                   role="radio"
+                  data-testid={`form-field-${field.name}-${option.value}`}
                   aria-checked={selected}
                   disabled={field.disabled || option.disabled}
                   onClick={() => onChange(option.value)}
@@ -209,6 +216,7 @@ export function FormFieldRenderer({
           <Input
             id={field.id}
             name={field.name}
+            data-testid={`form-field-${field.name}`}
             type={field.type === "datetime" ? "datetime-local" : field.type}
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
@@ -223,6 +231,7 @@ export function FormFieldRenderer({
           <Input
             id={field.id}
             name={field.name}
+            data-testid={`form-field-${field.name}`}
             type="file"
             accept={field.accept}
             multiple={field.multiple}
@@ -239,7 +248,7 @@ export function FormFieldRenderer({
 
       case "hidden":
         return (
-          <input type="hidden" name={field.name} value={(value as string) || ""} />
+          <input data-testid={`form-field-${field.name}`} type="hidden" name={field.name} value={(value as string) || ""} />
         )
 
       case "custom": {

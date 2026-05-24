@@ -12,10 +12,11 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { iotBffPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 type ScalarId = bigint | number | string
 
@@ -26,15 +27,6 @@ async function parseCallError(r: Response): Promise<string> {
   } catch {
     return r.statusText
   }
-}
-
-async function postReducer(path: string, body: unknown[]): Promise<void> {
-  const r = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: stringifyReducerCallBody(body),
-  })
-  if (!r.ok) throw new Error(await parseCallError(r))
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -106,15 +98,15 @@ export function useIotThresholds(organizationId: bigint, initialData?: QueryRows
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidateIotQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  const org = organizationId
+  const k = rqBigIntKey(organizationId)
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ['iot-devices', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-hubs', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-pairing-tokens', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-alerts', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-actions', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-telemetry', org] }),
-    qc.invalidateQueries({ queryKey: ['iot-thresholds', org] }),
+    qc.invalidateQueries({ queryKey: ['iot-devices', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-hubs', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-pairing-tokens', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-alerts', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-actions', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-telemetry', k] }),
+    qc.invalidateQueries({ queryKey: ['iot-thresholds', k] }),
   ])
 }
 
@@ -125,7 +117,9 @@ export function useGenerateHubPairingToken(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      await postReducer('/api/call/generate_hub_pairing_token?withCompany=true', [])
+      const { urlPath, init } = iotBffPost("generate_hub_pairing_token", [])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -145,13 +139,15 @@ export function useClaimHubWithToken(organizationId: bigint) {
       ipAddress?: string | null
       firmwareVersion?: string | null
     }) => {
-      await postReducer('/api/call/claim_hub_with_token', [
+      const { urlPath, init } = iotBffPost("claim_hub_with_token", [
         args.token,
         args.serial,
         args.name,
         args.ipAddress ?? null,
         args.firmwareVersion ?? null,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -161,7 +157,11 @@ export function useRegisterIotHub(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      await postReducer('/api/call/register_iot_hub?withCompany=true', [params])
+      const { urlPath, init } = iotBffPost("register_iot_hub", [
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -171,7 +171,9 @@ export function useDeleteIotHub(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (hubId: ScalarId) => {
-      await postReducer('/api/call/delete_iot_hub', [organizationId, hubId])
+      const { urlPath, init } = iotBffPost("delete_iot_hub", [organizationId, hubId])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -185,10 +187,12 @@ export function useRegisterIotDevice(organizationId: bigint) {
     { hubId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ hubId, params }) => {
-      await postReducer('/api/call/register_iot_device?withCompany=true', [
+      const { urlPath, init } = iotBffPost("register_iot_device", [
         hubId,
-        params,
+        stdbParamsToJson(params as object),
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -198,7 +202,9 @@ export function useDeleteIotDevice(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
-      await postReducer('/api/call/delete_iot_device', [organizationId, deviceId])
+      const { urlPath, init } = iotBffPost("delete_iot_device", [organizationId, deviceId])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -208,11 +214,13 @@ export function useLinkDeviceToLocation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; locationId: ScalarId }) => {
-      await postReducer('/api/call/link_device_to_location', [
+      const { urlPath, init } = iotBffPost("link_device_to_location", [
         organizationId,
         args.deviceId,
         args.locationId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -222,11 +230,13 @@ export function useLinkDeviceToPos(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; posConfigId: ScalarId }) => {
-      await postReducer('/api/call/link_device_to_pos', [
+      const { urlPath, init } = iotBffPost("link_device_to_pos", [
         organizationId,
         args.deviceId,
         args.posConfigId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -236,7 +246,9 @@ export function useUnlinkDevice(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
-      await postReducer('/api/call/unlink_device', [organizationId, deviceId])
+      const { urlPath, init } = iotBffPost("unlink_device", [organizationId, deviceId])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -251,13 +263,15 @@ export function useUpdateHubHeartbeat(organizationId: bigint) {
       firmwareVersion?: string | null
       connectivityQuality?: string | null
     }) => {
-      await postReducer('/api/call/update_hub_heartbeat', [
+      const { urlPath, init } = iotBffPost("update_hub_heartbeat", [
         organizationId,
         args.hubId,
         args.ipAddress ?? null,
         args.firmwareVersion ?? null,
         args.connectivityQuality ?? null,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -275,11 +289,13 @@ export function useSyncHubDevices(organizationId: bigint) {
         capabilities: string[]
       }>
     }) => {
-      await postReducer('/api/call/sync_hub_devices', [
+      const { urlPath, init } = iotBffPost("sync_hub_devices", [
         organizationId,
         args.hubId,
-        args.detected,
+        stdbParamsToJson(args.detected as unknown as object),
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -289,11 +305,13 @@ export function useUpdateDeviceStatus(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; status: string }) => {
-      await postReducer('/api/call/update_device_status', [
+      const { urlPath, init } = iotBffPost("update_device_status", [
         organizationId,
         args.deviceId,
         args.status,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -311,11 +329,13 @@ export function useRecordTelemetry(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; params: RecordTelemetryParamsSnake }) => {
-      await postReducer('/api/call/record_telemetry', [
+      const { urlPath, init } = iotBffPost("record_telemetry", [
         organizationId,
         args.deviceId,
-        args.params,
+        stdbParamsToJson(args.params as object),
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -325,11 +345,13 @@ export function useRecordTelemetryBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deviceId: ScalarId; readings: RecordTelemetryParamsSnake[] }) => {
-      await postReducer('/api/call/record_telemetry_batch', [
+      const { urlPath, init } = iotBffPost("record_telemetry_batch", [
         organizationId,
         args.deviceId,
-        args.readings,
+        stdbParamsToJson(args.readings as unknown as object),
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -339,10 +361,12 @@ export function useMarkActionSent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
-      await postReducer('/api/call/mark_action_sent', [
+      const { urlPath, init } = iotBffPost("mark_action_sent", [
         organizationId,
         actionId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -362,11 +386,13 @@ export function useCreateIotAction(organizationId: bigint) {
   >({
     mutationFn: async (body) => {
       const { deviceId, ...params } = body
-      await postReducer('/api/call/create_iot_action', [
+      const { urlPath, init } = iotBffPost("create_iot_action", [
         organizationId,
         deviceId,
-        params,
+        stdbParamsToJson(params as object),
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -376,10 +402,12 @@ export function useAcknowledgeIotAction(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
-      await postReducer('/api/call/acknowledge_iot_action', [
+      const { urlPath, init } = iotBffPost("acknowledge_iot_action", [
         organizationId,
         actionId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -389,11 +417,13 @@ export function useFailIotAction(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { actionId: ScalarId; reason?: string | null }) => {
-      await postReducer('/api/call/fail_iot_action', [
+      const { urlPath, init } = iotBffPost("fail_iot_action", [
         organizationId,
         args.actionId,
         args.reason ?? null,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -403,10 +433,12 @@ export function useRetryIotAction(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
-      await postReducer('/api/call/retry_iot_action', [
+      const { urlPath, init } = iotBffPost("retry_iot_action", [
         organizationId,
         actionId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -421,13 +453,15 @@ export function useCreateIotAlert(organizationId: bigint) {
       severity: string
       message: string
     }) => {
-      await postReducer('/api/call/create_iot_alert', [
+      const { urlPath, init } = iotBffPost("create_iot_alert", [
         organizationId,
         args.deviceId,
         args.alert_type,
         args.severity,
         args.message,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -437,10 +471,12 @@ export function useResolveIotAlert(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (alertId: ScalarId) => {
-      await postReducer('/api/call/resolve_iot_alert', [
+      const { urlPath, init } = iotBffPost("resolve_iot_alert", [
         organizationId,
         alertId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -456,7 +492,7 @@ export function useSetIotThreshold(organizationId: bigint) {
       max_value: number | null
       severity: string
     }) => {
-      await postReducer('/api/call/set_iot_threshold', [
+      const { urlPath, init } = iotBffPost("set_iot_threshold", [
         organizationId,
         args.deviceId,
         args.sensor_type,
@@ -464,6 +500,8 @@ export function useSetIotThreshold(organizationId: bigint) {
         args.max_value,
         args.severity,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })
@@ -473,10 +511,12 @@ export function useTestIotDevice(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deviceId: ScalarId) => {
-      await postReducer('/api/call/test_iot_device', [
+      const { urlPath, init } = iotBffPost("test_iot_device", [
         organizationId,
         deviceId,
       ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   })

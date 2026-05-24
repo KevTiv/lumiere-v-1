@@ -62,20 +62,16 @@ export function toUpdatePurchaseOrderLineParams(
   if (!Number.isFinite(quantity) || quantity <= 0) return null
   if (!Number.isFinite(priceUnit) || priceUnit < 0) return null
 
-  const out: Record<string, unknown> = {
+  const productId = formData.productId
+  const uomId = formData.uomId
+  const productIdValue = productId !== "" && productId != null ? Number(productId) : undefined
+  const uomIdValue = uomId !== "" && uomId != null ? Number(uomId) : undefined
+
+  return {
     quantity,
     priceUnit,
     taxIds: [] as number[],
+    productId: productIdValue,
+    uomId: uomIdValue,
   }
-
-  const productId = formData.productId
-  if (productId !== "" && productId != null) {
-    out.productId = Number(productId)
-  }
-  const uomId = formData.uomId
-  if (uomId !== "" && uomId != null) {
-    out.uomId = Number(uomId)
-  }
-
-  return out
 }

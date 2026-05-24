@@ -8,10 +8,10 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { posBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 type ScalarId = bigint | number | string
@@ -57,17 +57,14 @@ export function useCreatePosTerminal(organizationId: bigint) {
         latRaw != null && latRaw !== "" ? Number(latRaw) : null
       const longitude =
         lonRaw != null && lonRaw !== "" ? Number(lonRaw) : null
-      const r = await apiFetch('/api/call/create_pos_terminal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          name,
-          locationLabel,
-          latitude != null && Number.isFinite(latitude) ? latitude : null,
-          longitude != null && Number.isFinite(longitude) ? longitude : null,
-        ]),
-      })
+      const { urlPath, init } = posBffPost("create_pos_terminal", [
+        organizationId,
+        name,
+        locationLabel,
+        latitude != null && Number.isFinite(latitude) ? latitude : null,
+        longitude != null && Number.isFinite(longitude) ? longitude : null,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create POS terminal')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -83,16 +80,13 @@ export function useUpdatePosTerminal(organizationId: bigint) {
       dailyRevenue: number
       openOrders: number
     }) => {
-      const r = await apiFetch('/api/call/update_pos_terminal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          toScalarU64(args.terminalId),
-          args.status,
-          args.dailyRevenue,
-          Math.max(0, Math.floor(args.openOrders)) >>> 0,
-        ]),
-      })
+      const { urlPath, init } = posBffPost("update_pos_terminal", [
+        toScalarU64(args.terminalId),
+        args.status,
+        args.dailyRevenue,
+        Math.max(0, Math.floor(args.openOrders)) >>> 0,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update POS terminal')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -103,15 +97,12 @@ export function useCreatePosConfig(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_pos_config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = posBffPost("create_pos_config", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create POS config')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -122,11 +113,11 @@ export function useActivatePosConfig(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (configId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/activate_pos_config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(configId)]),
-      })
+      const { urlPath, init } = posBffPost("activate_pos_config", [
+        organizationId,
+        toScalarU64(configId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to activate POS config')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -137,11 +128,11 @@ export function useDeactivatePosConfig(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (configId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/deactivate_pos_config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(configId)]),
-      })
+      const { urlPath, init } = posBffPost("deactivate_pos_config", [
+        organizationId,
+        toScalarU64(configId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to deactivate POS config')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -155,15 +146,12 @@ export function useOpenPosSession(organizationId: bigint) {
       configId: bigint | number | string
       openingBalance?: number
     }) => {
-      const r = await apiFetch('/api/call/open_pos_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(args.configId),
-          args.openingBalance ?? 0,
-        ]),
-      })
+      const { urlPath, init } = posBffPost("open_pos_session", [
+        organizationId,
+        toScalarU64(args.configId),
+        args.openingBalance ?? 0,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to open POS session')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -177,15 +165,12 @@ export function useClosePosSession(organizationId: bigint) {
       sessionId: bigint | number | string
       closingBalance: number
     }) => {
-      const r = await apiFetch('/api/call/close_pos_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(args.sessionId),
-          args.closingBalance,
-        ]),
-      })
+      const { urlPath, init } = posBffPost("close_pos_session", [
+        organizationId,
+        toScalarU64(args.sessionId),
+        args.closingBalance,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to close POS session')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -196,11 +181,11 @@ export function useComputePosSessionTotals(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sessionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/compute_pos_session_totals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(sessionId)]),
-      })
+      const { urlPath, init } = posBffPost("compute_pos_session_totals", [
+        organizationId,
+        toScalarU64(sessionId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to compute POS session totals')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),
@@ -211,14 +196,11 @@ export function useCreatePosOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_pos_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = posBffPost("create_pos_order", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create POS order')
     },
     onSuccess: () => invalidatePosQueries(qc, organizationId),

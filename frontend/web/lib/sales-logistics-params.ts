@@ -38,6 +38,21 @@ function parseU64List(raw: unknown): bigint[] {
     .map((x) => BigInt(x))
 }
 
+function parseStringList(raw: unknown): string[] {
+  if (raw == null || raw === '') return []
+  return String(raw)
+    .split(/[\s,]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+}
+
+function optionalTimestampFromFormDate(v: unknown): Timestamp | undefined {
+  if (v == null || String(v).trim() === '') return undefined
+  const d = new Date(String(v))
+  if (Number.isNaN(d.getTime())) return undefined
+  return stbTimestampFromDate(d)
+}
+
 function paymentMethodTypeFromForm(raw: unknown): CreatePaymentMethodParams['paymentMethodType'] {
   const t = String(raw ?? 'Cash')
   if (t === 'Bank') return { tag: 'Bank' }
@@ -64,10 +79,7 @@ export function toCreateDeliveryCarrierParams(
     invoicePolicy: String(formData.invoicePolicy ?? 'estimated'),
     countryIds: parseU64List(formData.countryIds),
     stateIds: parseU64List(formData.stateIds),
-    zipPrefixIds: String(formData.zipPrefixIds ?? '')
-      .split(/[\s,]+/)
-      .map((x) => x.trim())
-      .filter(Boolean),
+    zipPrefixIds: parseStringList(formData.zipPrefixIds),
     margin: numF64(formData.margin, 0),
     freeOver: Boolean(formData.freeOver),
     amount: numF64(formData.amount, 0),
@@ -81,10 +93,7 @@ export function toCreateDeliveryCarrierParams(
     shippingInsuranceIsPercentage: Boolean(formData.shippingInsuranceIsPercentage),
     useDetailedDeliveryDescription: Boolean(formData.useDetailedDeliveryDescription),
     currencyId,
-    metadata:
-      formData.metadata != null && String(formData.metadata).trim() !== ''
-        ? String(formData.metadata)
-        : undefined,
+    metadata: undefined,
   }
 }
 
@@ -102,10 +111,7 @@ export function toCreateDeliveryPriceRuleParams(
     listBasePrice: numF64(formData.listBasePrice, 0),
     listPrice: numF64(formData.listPrice, 0),
     standardPrice: numF64(formData.standardPrice, 0),
-    metadata:
-      formData.metadata != null && String(formData.metadata).trim() !== ''
-        ? String(formData.metadata)
-        : undefined,
+    metadata: undefined,
   }
 }
 
@@ -128,10 +134,7 @@ export function toCreateShippingMethodParams(
     margin: numF64(formData.margin, 0),
     freeOver: Boolean(formData.freeOver),
     amount: numF64(formData.amount, 0),
-    metadata:
-      formData.metadata != null && String(formData.metadata).trim() !== ''
-        ? String(formData.metadata)
-        : undefined,
+    metadata: undefined,
   }
 }
 
@@ -160,10 +163,7 @@ export function toCreatePaymentMethodParams(
         : undefined,
     splitTransactions: Boolean(formData.splitTransactions),
     openCashbox: Boolean(formData.openCashbox),
-    image:
-      formData.image != null && String(formData.image).trim() !== ''
-        ? String(formData.image)
-        : undefined,
+    image: undefined,
     sequence: sequence >>> 0,
   }
 }
@@ -174,13 +174,6 @@ export function toCreateLoyaltyProgramParams(
   const name = String(formData.name ?? '').trim()
   const currencyId = numU64(formData.currencyId)
   if (!name || currencyId == null) return null
-
-  const dateToRaw = formData.dateTo
-  let dateTo: Timestamp | undefined
-  if (dateToRaw != null && String(dateToRaw).trim() !== '') {
-    const d = new Date(String(dateToRaw))
-    if (!Number.isNaN(d.getTime())) dateTo = stbTimestampFromDate(d)
-  }
 
   const vdRaw = formData.validityDuration
   const validityDuration =
@@ -202,7 +195,7 @@ export function toCreateLoyaltyProgramParams(
     triggerProductIds: parseU64List(formData.triggerProductIds),
     validityDuration: validityDuration !== undefined ? (validityDuration >>> 0) : undefined,
     validityDurationType,
-    dateTo,
+    dateTo: optionalTimestampFromFormDate(formData.dateTo),
     limitUsage,
   }
 }

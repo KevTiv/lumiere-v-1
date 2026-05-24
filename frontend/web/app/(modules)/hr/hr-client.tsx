@@ -35,9 +35,16 @@ import {
   useCreateDepartment,
   useHrCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/hr"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import {
+  toCreateContractParams,
+  toCreateDepartmentParams,
+  toCreateEmployeeParams,
+  toCreateJobPositionParams,
+  toCreateLeaveRequestParams,
+  toCreatePayslipParams,
+} from "@/lib/hr-create-params"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -445,97 +452,34 @@ function HrClientLoaded({
     formData: Record<string, unknown>
   ) => {
     if (action === "createEmployee") {
-      const deptRaw = formData.departmentId
-      await createEmployee.mutateAsync({
-        name: String(formData.name ?? ""),
-        jobId: optionalBigIntU64(formData.jobId),
-        departmentId:
-          deptRaw !== "" && deptRaw != null ? Number(deptRaw) : undefined,
-        employmentType: String(formData.employmentType ?? "FullTime"),
-        workEmail: formData.workEmail ? String(formData.workEmail) : undefined,
-        employeeNumber: undefined,
-        jobTitle: formData.jobTitle ? String(formData.jobTitle) : undefined,
-        parentId: optionalBigIntU64(formData.parentId),
-        coachId: undefined,
-        workPhone: formData.workPhone ? String(formData.workPhone) : undefined,
-        mobilePhone: undefined,
-        workLocation: formData.workLocation ? String(formData.workLocation) : undefined,
-        dateHired: formData.dateHired ? new Date(String(formData.dateHired)) : undefined,
-        gender: undefined,
-        birthday: undefined,
-        marital: undefined,
-        emergencyContact: undefined,
-        emergencyPhone: undefined,
-        barcode: undefined,
-        pin: undefined,
-        imageUrl: undefined,
-        color: undefined,
-        isActive: true,
-        metadata: undefined,
-      } as never)
+      await createEmployee.mutateAsync(toCreateEmployeeParams(formData))
     } else if (action === "createLeaveRequest") {
       const empRaw = formData.employeeId
       const ltRaw = formData.leaveTypeId
       if (empRaw === "" || empRaw == null || ltRaw === "" || ltRaw == null) return
-      await createLeaveRequest.mutateAsync({
-        employeeId: Number(empRaw),
-        leaveTypeId: Number(ltRaw),
-        dateFrom: new Date(String(formData.dateFrom)),
-        dateTo: new Date(String(formData.dateTo)),
-        numberOfDays: Number(formData.numberOfDays ?? 0),
-        notes: formData.notes ? String(formData.notes) : undefined,
-        name: undefined,
-        managerId: undefined,
-      } as never)
+      const params = toCreateLeaveRequestParams(formData)
+      if (params === null) return
+      await createLeaveRequest.mutateAsync(params)
     } else if (action === "createContract") {
       const plRaw = formData.pricelistId
       const empRaw = formData.employeeId
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      await createContract.mutateAsync({
-        employeeId: Number(empRaw),
-        name: String(formData.name ?? ""),
-        dateStart: new Date(String(formData.dateStart)),
-        wage: Number(formData.wage ?? 0),
-        currencyId: Number(pl.currencyId),
-        jobId: undefined,
-        departmentId: undefined,
-        dateEnd: formData.dateEnd ? new Date(String(formData.dateEnd)) : undefined,
-        notes: undefined,
-      } as never)
+      const params = toCreateContractParams(formData, {
+        currencyId: pl.currencyId,
+        pricelistId: plRaw,
+      })
+      if (params === null) return
+      await createContract.mutateAsync(params)
     } else if (action === "createPayslip") {
-      await createPayslip.mutateAsync({
-        employeeId: Number(formData.employeeId),
-        structId: Number(formData.structId),
-        dateFrom: new Date(String(formData.dateFrom)),
-        dateTo: new Date(String(formData.dateTo)),
-        basicWage: Number(formData.basicWage ?? 0),
-        contractId: formData.contractId != null ? Number(formData.contractId) : undefined,
-        notes: undefined,
-      } as never)
+      const params = toCreatePayslipParams(formData)
+      if (params === null) return
+      await createPayslip.mutateAsync(params)
     } else if (action === "createJobPosition") {
-      const deptRaw = formData.departmentId
-      await createJobPosition.mutateAsync({
-        name: String(formData.name ?? ""),
-        departmentId:
-          deptRaw !== "" && deptRaw != null ? BigInt(Number(deptRaw)) : undefined,
-        expectedEmployees: Number(formData.expectedEmployees ?? 1),
-        description: formData.description as string | undefined,
-        requirements: formData.requirements as string | undefined,
-        state: String(formData.state ?? "recruit"),
-        isActive: formData.isActive == null ? true : Boolean(formData.isActive),
-      } as never)
+      await createJobPosition.mutateAsync(toCreateJobPositionParams(formData))
     } else if (action === "createDepartment") {
-      const parentRaw = formData.parentId
-      const managerRaw = formData.managerId
-      await createDepartment.mutateAsync({
-        name: String(formData.name ?? ""),
-        parentId: parentRaw !== "" && parentRaw != null ? Number(parentRaw) : undefined,
-        managerId: managerRaw !== "" && managerRaw != null ? Number(managerRaw) : undefined,
-        note: formData.note ? String(formData.note) : undefined,
-        isActive: true,
-      } as never)
+      await createDepartment.mutateAsync(toCreateDepartmentParams(formData))
     }
   }
 

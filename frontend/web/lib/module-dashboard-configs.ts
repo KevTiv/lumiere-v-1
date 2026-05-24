@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { chartAccountPrimaryLabel, contactPrimaryLabel, inventoryProductPrimaryLabel, proposalPrimaryLabel, saleOrderPrimaryLabel } from "@lumiere/stdb/read-models"
 import type { DashboardConfig, ModuleConfig } from "@lumiere/ui"
 import {
   proposalsTableConfig,
@@ -6,7 +7,7 @@ import {
   newProposalForm,
 } from "@lumiere/ui"
 import {
-  accountsTableConfig,
+  buildAccountsTableConfig,
   journalEntriesTableConfig,
   taxesTableConfig,
   budgetsTableConfig,
@@ -292,7 +293,9 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "accounts",
       label: "Chart of Accounts",
       type: "entity",
-      entityConfig: accountsTableConfig,
+      entityConfig: buildAccountsTableConfig({
+        formatAccountDisplayName: chartAccountPrimaryLabel,
+      }),
       createForm: newAccountForm(t),
       createLabel: "New Account",
       createAction: "createAccount",
@@ -564,7 +567,9 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "orders",
       label: "Orders",
       type: "entity",
-      entityConfig: saleOrdersTableConfig(t),
+      entityConfig: saleOrdersTableConfig(t, {
+        formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      }),
       createForm: newSaleOrderForm(t),
       createLabel: "New Order",
       createAction: "createSaleOrder",
@@ -786,7 +791,9 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "contacts",
       label: "Contacts",
       type: "entity",
-      entityConfig: contactsTableConfig(t),
+      entityConfig: contactsTableConfig(t, {
+        formatContactDisplayName: contactPrimaryLabel,
+      }),
       createForm: newContactForm(t),
       createLabel: "New Contact",
       createAction: "createContact",
@@ -920,7 +927,9 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "products",
       label: "Products",
       type: "entity",
-      entityConfig: productsTableConfig(t),
+      entityConfig: productsTableConfig(t, {
+        formatProductDisplayName: inventoryProductPrimaryLabel,
+      }),
       createForm: newProductForm(t),
       createLabel: "New Product",
       createAction: "createProduct",
@@ -2619,7 +2628,9 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "proposals",
       label: "Proposals",
       type: "entity",
-      entityConfig: proposalsTableConfig(t),
+      entityConfig: proposalsTableConfig(t, {
+        formatProposalDisplayName: proposalPrimaryLabel,
+      }),
       createForm: newProposalForm(t),
       createLabel: "New Proposal",
       createAction: "createProposal",

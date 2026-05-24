@@ -1083,16 +1083,6 @@ export const newPickingWaveForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
-          id: "warehouseId",
-          name: "warehouseId",
-          type: "select",
-          label: t("inventory.forms.newPickingWave.fields.warehouseId"),
-          placeholder: t("inventory.forms.newPickingWave.fields.warehousePlaceholder"),
-          required: true,
-          width: "1/2",
-          options: emptySelect,
-        },
-        {
           id: "userId",
           name: "userId",
           type: "select",

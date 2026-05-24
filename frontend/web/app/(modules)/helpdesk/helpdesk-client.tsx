@@ -31,8 +31,14 @@ import {
   useReopenTicket,
   useImportHelpdeskTicketCsv,
 } from "@lumiere/query-hooks/hooks/helpdesk"
-import type { CreateTicketParams } from "@lumiere/query-hooks/hooks/helpdesk"
+import type { UpdateTicketParams } from "@lumiere/query-hooks/hooks/helpdesk"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  toCreateHelpdeskSlaParams,
+  toCreateHelpdeskStageParams,
+  toCreateHelpdeskTeamParams,
+  toCreateTicketParams,
+} from "@/lib/helpdesk-create-params"
 import {
   helpdeskTeamRowsToSelectOptions,
   helpdeskStageRowsToSelectOptionsWithTeams,
@@ -52,6 +58,25 @@ interface HelpdeskClientProps {
 
 type HelpdeskClientLoadedProps = Omit<HelpdeskClientProps, "organizationId"> & {
   organizationId: number
+}
+
+type MutableUpdateTicketParams = {
+  -readonly [K in keyof UpdateTicketParams]?: UpdateTicketParams[K]
+}
+
+function helpdeskPriorityValue(priority: unknown): string {
+  if (typeof priority === "string") return priority.toLowerCase()
+  if (priority && typeof priority === "object" && "tag" in priority) {
+    return String((priority as { tag?: unknown }).tag ?? "normal").toLowerCase()
+  }
+  return String(priority ?? "normal").toLowerCase()
+}
+
+function toUpdateTicketPriority(priority: string): UpdateTicketParams["priority"] {
+  if (priority === "low") return { tag: "Low" }
+  if (priority === "high") return { tag: "High" }
+  if (priority === "urgent") return { tag: "Urgent" }
+  return { tag: "Normal" }
 }
 
 export function HelpdeskClient(props: HelpdeskClientProps) {
@@ -176,10 +201,7 @@ function HelpdeskClientLoaded({
     if (!selectedTicket) return null
     const id = String(selectedTicket.id ?? "")
     const st = helpdeskEnumTag(selectedTicket.state)
-    const pr =
-      typeof selectedTicket.priority === "string"
-        ? selectedTicket.priority
-        : String(selectedTicket.priority ?? "normal").toLowerCase()
+    const pr = helpdeskPriorityValue(selectedTicket.priority)
     const stageId = String(selectedTicket.stageId ?? "")
     const uid = selectedTicket.userId
     const agentValue =
@@ -279,69 +301,30 @@ function HelpdeskClientLoaded({
 
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
     if (action === "createTicket") {
-      const teamRaw = formData.teamId
-      const stageRaw = formData.stageId
-      if (teamRaw === "" || teamRaw == null || stageRaw === "" || stageRaw == null) return
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      const slaRaw = formData.slaId
-      const params: Record<string, unknown> = {
-        teamId: Number(teamRaw),
-        stageId: Number(stageRaw),
-        name,
-        description: formData.description ? String(formData.description) : null,
-        priority: (formData.priority as CreateTicketParams["priority"]) ?? "normal",
-        partnerId: null,
-        partnerName: formData.partnerName ? String(formData.partnerName) : null,
-        partnerEmail: formData.partnerEmail ? String(formData.partnerEmail) : null,
-        slaId: slaRaw != null && slaRaw !== "" ? Number(slaRaw) : null,
-        slaDeadline: null,
-      }
+      const params = toCreateTicketParams(formData)
+      if (!params) return
       await createTicket.mutateAsync(params)
       return
     }
 
     if (action === "createHelpdeskTeam") {
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      await createTeam.mutateAsync({
-        name,
-        description: formData.description ? String(formData.description) : null,
-        isActive: Boolean(formData.isActive ?? true),
-      })
+      const params = toCreateHelpdeskTeamParams(formData)
+      if (!params) return
+      await createTeam.mutateAsync(params)
       return
     }
 
     if (action === "createHelpdeskStage") {
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      const teamRaw = formData.teamId
-      await createStage.mutateAsync({
-        name,
-        teamId: teamRaw === "" || teamRaw == null ? null : Number(teamRaw),
-        sequence: Number(formData.sequence) || 0,
-        isClosed: Boolean(formData.isClosed),
-        description: formData.description ? String(formData.description) : null,
-        template: formData.template ? String(formData.template) : null,
-      })
+      const params = toCreateHelpdeskStageParams(formData)
+      if (!params) return
+      await createStage.mutateAsync(params)
       return
     }
 
     if (action === "createHelpdeskSla") {
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      const teamRaw = formData.teamId
-      const stageRaw = formData.stageId
-      if (teamRaw === "" || stageRaw === "") return
-      await createSla.mutateAsync({
-        name,
-        teamId: Number(teamRaw),
-        stageId: Number(stageRaw),
-        priority: formData.priority ?? "normal",
-        timeDays: Number(formData.timeDays) || 0,
-        timeHours: Number(formData.timeHours) || 0,
-        isActive: Boolean(formData.isActive ?? true),
-      })
+      const params = toCreateHelpdeskSlaParams(formData)
+      if (!params) return
+      await createSla.mutateAsync(params)
     }
   }
 
@@ -368,7 +351,7 @@ function HelpdeskClientLoaded({
     const origName = String(selectedTicket.name ?? "")
     const origDesc = selectedTicket.description != null ? String(selectedTicket.description) : ""
     const origStage = String(selectedTicket.stageId ?? "")
-    const origPr = String(selectedTicket.priority ?? "normal").toLowerCase()
+    const origPr = helpdeskPriorityValue(selectedTicket.priority)
     const origAgent = identityToHex(selectedTicket.userId)
     const name = String(formData.name ?? "").trim()
     const desc = formData.description != null ? String(formData.description) : ""
@@ -379,11 +362,11 @@ function HelpdeskClientLoaded({
 
     setTicketBusy(true)
     try {
-      const params: Record<string, unknown> = {}
+      const params: MutableUpdateTicketParams = {}
       if (name !== origName) params.name = name
-      if (desc !== origDesc) params.description = desc === "" ? null : desc
-      if (stageId !== origStage) params.stageId = Number(stageId)
-      if (pr !== origPr) params.priority = pr
+      if (desc !== origDesc) params.description = (desc === "" ? null : desc) as UpdateTicketParams["description"]
+      if (stageId !== origStage && stageId !== "") params.stageId = BigInt(stageId)
+      if (pr !== origPr) params.priority = toUpdateTicketPriority(pr)
       if (Object.keys(params).length > 0) {
         await updateTicket.mutateAsync({ ticketId, params })
       }

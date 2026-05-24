@@ -86,7 +86,7 @@ export function toCreateSaleOrderParams(
       ? JSON.stringify({ validityDate: validityRaw })
       : undefined
 
-  const params = {
+  return {
     companyId,
     partnerId,
     partnerInvoiceId: partnerId,
@@ -94,16 +94,13 @@ export function toCreateSaleOrderParams(
     pricelistId,
     currencyId,
     warehouseId,
+    clientOrderRef,
+    paymentTermId,
+    note,
+    commitmentDate,
+    metadata,
     orderLines: [] as CreateSaleOrderParams['orderLines'],
   } as CreateSaleOrderParams
-
-  if (clientOrderRef !== undefined) params.clientOrderRef = clientOrderRef
-  if (paymentTermId !== undefined) params.paymentTermId = paymentTermId
-  if (note !== undefined) params.note = note
-  if (commitmentDate !== undefined) params.commitmentDate = commitmentDate
-  if (metadata !== undefined) params.metadata = metadata
-
-  return params
 }
 
 export function toCreatePricelistParams(
@@ -135,24 +132,23 @@ function isWaveFromForm(raw: unknown): boolean {
   return PICKING_BATCH_DEFAULT_IS_WAVE
 }
 
-/** Comma- or whitespace-separated stock picking IDs → `create_picking_batch` params. */
+/** Comma- or whitespace-separated stock picking IDs -> `create_picking_batch` params. */
 export function toCreatePickingBatchParams(
   formData: Record<string, unknown>,
 ): CreatePickingBatchParams | null {
   const name = String(formData.name ?? '').trim()
   if (!name) return null
   const raw = formData.pickingIds
-  const parts =
-    raw == null || String(raw).trim() === ''
-      ? []
-      : String(raw)
-          .split(/[,\s]+/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-  const pickingIds = parts.map((p) => BigInt(p))
   return {
     name,
-    pickingIds,
+    pickingIds:
+      raw == null || String(raw).trim() === ''
+        ? []
+        : String(raw)
+            .split(/[,\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((p) => BigInt(p)),
     isWave: isWaveFromForm(formData.isWave),
   } as CreatePickingBatchParams
 }

@@ -50,8 +50,8 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      react: './node_modules/react',
-      'react-dom': './node_modules/react-dom',
+      react: path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     }
     return config
   },

@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Building, Save, Loader2, Cloud, MessageCircle, ExternalLink, Upload, Trash2 } from "lucide-react"
-import { apiFetch } from "@/lib/api-fetch"
 import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials } from "@lumiere/query-hooks/hooks/auth"
 import { useOrgMasterCsvImportMutations } from "@lumiere/query-hooks/hooks/org-master-csv-imports"
 import {
@@ -25,6 +24,7 @@ import {
   useUpdateCompanyBusiness,
   useUpdateCompanyHierarchy,
 } from "@lumiere/query-hooks/hooks/organization-company"
+import { useUpdateOrganization, useUpsertOrganizationSettings } from "@lumiere/query-hooks/hooks/settings"
 import { useErpSession } from "@lumiere/erp-session"
 import { csvImportForm, FormModal } from "@lumiere/ui"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
@@ -90,6 +90,8 @@ export function OrganizationSettings() {
   const deleteCompany = useDeleteCompany()
   const createDataClassification = useCreateDataClassification(orgId)
   const createDataClassificationRule = useCreateDataClassificationRule(orgId)
+  const upsertOrganizationSettings = useUpsertOrganizationSettings(orgBigInt)
+  const updateOrganization = useUpdateOrganization(orgBigInt)
 
   const [selectedCompanyId, setSelectedCompanyId] = useState("")
   const [privacyDcFormKey, setPrivacyDcFormKey] = useState(0)
@@ -308,15 +310,7 @@ export function OrganizationSettings() {
     }
     setIsLoading(true)
     try {
-      const response = await apiFetch('/api/call/upsert_organization_settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), settings]),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save organization settings')
-      }
+      await upsertOrganizationSettings.mutateAsync(settings)
 
       toast({
         title: t("settings.organization.saveSuccess"),
@@ -344,18 +338,10 @@ export function OrganizationSettings() {
     }
     setIsLoading(true)
     try {
-      const response = await apiFetch('/api/call/update_organization', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([organizationId.toString(), {
-          name: settings.name,
-          description: settings.description,
-        }]),
+      await updateOrganization.mutateAsync({
+        name: settings.name,
+        description: settings.description,
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update organization')
-      }
 
       toast({
         title: t("settings.organization.updateSuccess"),

@@ -7,10 +7,12 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { calendarBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type { CreateCalendarEventParams } from '@lumiere/stdb/generated/types'
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -30,13 +32,13 @@ export function useCalendarEvents(
 
 export function useCreateCalendarEvent(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateCalendarEventParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_calendar_event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const { urlPath, init } = calendarBffPost("create_calendar_event", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create calendar event')
     },
     onSuccess: () =>
@@ -52,11 +54,12 @@ export function useUpdateCalendarEvent(organizationId: bigint) {
     { eventId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ eventId, params }) => {
-      const r = await apiFetch('/api/call/update_calendar_event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, eventId, params]),
-      })
+      const { urlPath, init } = calendarBffPost("update_calendar_event", [
+        organizationId,
+        eventId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update calendar event')
     },
     onSuccess: () =>
@@ -68,11 +71,8 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (eventId) => {
-      const r = await apiFetch('/api/call/delete_calendar_event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, eventId]),
-      })
+      const { urlPath, init } = calendarBffPost("delete_calendar_event", [organizationId, eventId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete calendar event')
     },
     onSuccess: () =>
@@ -83,7 +83,7 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
 // ── Types (re-exported so client components import from one place) ────────────
 export type { CreateCalendarEventParams } from '@lumiere/stdb/generated/types'
 
-// Local type until SpacetimeDB bindings are regenerated
+// Local type until callers finish moving to generated camelCase timestamp params.
 export interface UpdateCalendarEventParams {
   name?: string
   start?: number | bigint

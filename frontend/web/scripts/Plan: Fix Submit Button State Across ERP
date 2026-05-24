@@ -1,0 +1,110 @@
+Plan: Fix Submit Button State Across ERP Form Dialogs
+
+## Context
+
+An audit of all ERP module dialogs revealed that submit buttons do not correctly reflect mutation in-flight state. The main issues:
+
+1. **`canReopen` is always falsy** in `helpdesk-ticket-dialog.tsx` — the variable `closed` is never declared, so the "Reopen Ticket" button never renders regardless of ticket state.
+2. **`ModularForm`/`FormModal` have no `isPending` prop** — the submit button only uses internal `isSubmitting` state, which resets immediately because module clients call `.mutate()` (fire-and-forget, non-awaitable). The button shows no loading state while the actual HTTP request is in-flight.
+3. **`ModuleView`'s embedded `FormModal`** (used for tab-level create forms) has the same gap — no way to thread mutation pending state from the parent.
+4. **`chart-of-accounts-view.tsx` and `entry-detail-modal.tsx`** have action buttons with no `disabled` or pending guard — double-submit risk.
+
+## Recommended Approach
+
+### Step 1 — Fix `canReopen` bug (1 line)
+
+File: `frontend/web/app/(modules)/helpdesk/helpdesk-ticket-dialog.tsx:39`
+
+```ts
+// Before:
+const canReopen = closed  // `closed` is undefined → always falsy
+
+// After:
+const canReopen = stateTag === "Closed" || stateTag === "Cancelled"
+```
+
+### Step 2 — Add `isPending` prop to `ModularForm` and `FormModal`
+
+File: `frontend/packages/ui/src/forms/modular-form.tsx`
+
+- Add `isPending?: boolean` to `ModularFormProps`
+- Change submit button: `disabled={isSubmitting || !!isPending}`
+- Pass `isPending` to cancel/reset buttons as well: `disabled={isSubmitting || !!isPending}`
+
+File: `frontend/packages/ui/src/forms/form-modal.tsx`
+
+- Add `isPending?: boolean` to `FormModalProps`
+- Forward `isPending` to `<ModularForm isPending={isPending} />`
+
+### Step 3 — Add `isPending` prop to `ModuleView`
+
+File: `frontend/packages/ui/src/pages/module-view.tsx`
+
+- Add `isPending?: boolean` to `ModuleViewProps`
+- Forward `isPending` to the internal `<FormModal isPending={isPending} />`
+
+### Step 4 — Update module clients to pass `isPending`
+
+For each module client below, add a computed `isQuickActionPending` from all create/update mutation hooks and pass it to the relevant `FormModal` and `ModuleView` components.
+
+**Files to update:**
+- `frontend/web/app/(modules)/crm/crm-client.tsx`
+- `frontend/web/app/(modules)/sales/sales-client.tsx`
+- `frontend/web/app/(modules)/purchasing/purchasing-client.tsx`
+- `frontend/web/app/(modules)/inventory/inventory-client.tsx`
+- `frontend/web/app/(modules)/hr/hr-client.tsx`
+- `frontend/web/app/(modules)/projects/projects-client.tsx`
+- `frontend/web/app/(modules)/helpdesk/helpdesk-client.tsx`
+- `frontend/web/app/(modules)/messages/messages-client.tsx`
+- `frontend/web/app/(modules)/documents/documents-client.tsx`
+- `frontend/web/app/(modules)/reports/reports-client.tsx`
+- `frontend/web/app/(modules)/manufacturing/manufacturing-client.tsx`
+- `frontend/web/app/(modules)/expenses/expenses-client.tsx`
+
+Pattern per module client:
+```ts
+// Gather isPending from all create/update mutations relevant to quick actions
+const isAnyMutationPending =
+  createFoo.isPending ||
+  updateFoo.isPending ||
+  createBar.isPending ||
+  // ... etc
+
+// Pass to FormModal(s) and ModuleView
+<FormModal isPending={isAnyMutationPending} ... />
+<ModuleView isPending={isAnyMutationPending} ... />
+```
+
+For `HelpdeskTicketDialog`, the `isBusy` prop already works correctly — no change needed beyond Step 1.
+
+### Step 5 — Fix missing disabled guards in shared components
+
+**`frontend/packages/ui/src/accounting-components/chart-of-accounts-view.tsx`**
+- The create account button calls `onCreate?.({...})` and immediately calls `setShowCreateModal(false)` with no pending guard.
+- If the component receives an async `onCreate` prop, we need local `isCreating` state (useState + try/finally) or an `isPending` prop.
+- Add `isCreating` local state, set to `true` during `onCreate`, reset in `finally`.
+
+**`frontend/packages/ui/src/entry-table/entry-detail-modal.tsx`**
+- The "Save Changes" button calls `handleSave` with no disabled guard.
+- Add `isSaving` local state, set to `true` during `handleSave`, reset in `finally`.
+- Button: `disabled={isSaving}`
+
+## Critical Files
+
+| File | Change |
+|------|--------|
+| `frontend/web/app/(modules)/helpdesk/helpdesk-ticket-dialog.tsx` | Fix `canReopen` (1 line) |
+| `frontend/packages/ui/src/forms/modular-form.tsx` | Add `isPending` prop |
+| `frontend/packages/ui/src/forms/form-modal.tsx` | Add `isPending` prop, forward to ModularForm |
+| `frontend/packages/ui/src/pages/module-view.tsx` | Add `isPending` prop, forward to FormModal |
+| `frontend/packages/ui/src/accounting-components/chart-of-accounts-view.tsx` | Add `isCreating` local state guard |
+| `frontend/packages/ui/src/entry-table/entry-detail-modal.tsx` | Add `isSaving` local state guard |
+| Each of the 12 module clients listed above | Add computed `isPending`, pass to FormModal/ModuleView |
+
+## Verification
+
+1. **Helpdesk reopen button**: Open a ticket in "Closed" or "Cancelled" state → "Reopen Ticket" button should now be visible.
+2. **Submit button loading state**: Open any create/edit dialog → fill fields → click Submit → button should show spinner and remain disabled until the mutation HTTP call completes.
+3. **No double-submit**: Rapidly clicking Submit on a slow connection should only fire one mutation.
+4. **CSV import unaffected**: CSV import dialogs (which correctly use `mutateAsync` + `closeOnSubmit={false}`) should continue to work as before.
+5. **TypeScript compile**: Run `pnpm tsc --noEmit` in `frontend/` — no new type errors.

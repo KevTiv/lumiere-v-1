@@ -195,10 +195,15 @@ import {
 } from "lucide-react"
 import { buildCreateWarehouseParamsFromTemplate } from "@/lib/warehouse-create-params"
 import {
-  adjustmentCreateMetadataFromForm,
   pickingWaveCreateParamsFromForm,
-  productCategoryCreateMetadataFromForm,
+  toCreateBarcodeRuleParamsFromForm,
   toCreateAdjustmentReasonParamsFromForm,
+  toCreateInventoryAdjustmentParamsFromForm,
+  toCreateProductCategoryParamsFromForm,
+  toCreateProductParamsFromForm,
+  toCreateStockLocationParamsFromForm,
+  toCreateStockPickingParamsFromForm,
+  toCreateStockQuantParamsFromForm,
   toCreateStockTraceabilityReportParamsFromForm,
   toCreateTraceabilityRecordParamsFromForm,
   warehouse3dZoneParamsFromForm,
@@ -1676,7 +1681,7 @@ function InventoryClientLoaded({
           ...tab,
           createAction: "createPickingWave",
           createForm: mergeSelectOptionsForFields(newPickingWaveForm(t), {
-            warehouseId: warehouses.map((w) => ({ value: String(w.id), label: String(w.name ?? w.id) })),
+            userId: assignUserFieldOptions,
           }),
           entityConfig: {
             ...tab.entityConfig,
@@ -2170,66 +2175,21 @@ function InventoryClientLoaded({
     formData: Record<string, unknown>
   ) => {
     if (action === "createProduct") {
-      const categRaw = formData.categId
-      const uomRaw = formData.uomId
-      if (categRaw === "" || categRaw == null || uomRaw === "" || uomRaw == null) return
-      const categId = Number(categRaw)
-      const uomId = Number(uomRaw)
-      const uomPoRaw = formData.uomPoId
-      const uomPoId =
-        uomPoRaw !== "" && uomPoRaw != null && String(uomPoRaw).trim() !== ""
-          ? Number(uomPoRaw)
-          : uomId
       const pricelistRaw = formData.pricelistId
       if (pricelistRaw === "" || pricelistRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const currencyId = Number(pl.currencyId)
-      const standard = Number(formData.standardPrice ?? 0)
-      await createProduct.mutateAsync({
-        name: String(formData.name ?? ""),
-        categId,
-        type: String(formData.type ?? "product"),
-        uomId,
-        uomPoId,
-        standardPrice: standard,
-        listPrice: standard,
-        currencyId,
-        defaultCode: formData.defaultCode ? String(formData.defaultCode) : undefined,
-        saleOk: formData.saleOk == null ? true : Boolean(formData.saleOk),
-        purchaseOk: formData.purchaseOk == null ? true : Boolean(formData.purchaseOk),
-        displayName: formData.name ? String(formData.name) : undefined,
-        pricelistId: formData.pricelistId != null ? Number(formData.pricelistId) : undefined,
-      } as never)
+      const productParams = toCreateProductParamsFromForm(formData, currencyId)
+      if (productParams) await createProduct.mutateAsync(productParams)
     }
     else if (action === "createTransfer" || action === "createStockPicking") {
-      const pickingRaw = formData.pickingTypeId
-      const locFrom = formData.locationId
-      const locTo = formData.locationDestId
-      if (
-        pickingRaw === "" ||
-        pickingRaw == null ||
-        locFrom === "" ||
-        locFrom == null ||
-        locTo === "" ||
-        locTo == null
-      ) {
-        return
-      }
-      const originStr = formData.origin ? String(formData.origin) : ""
-      await createStockPicking.mutateAsync({
-        name: originStr.trim() !== "" ? originStr : "New Transfer",
-        pickingTypeId: Number(pickingRaw),
-        locationId: Number(locFrom),
-        locationDestId: Number(locTo),
-        scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
-        origin: originStr.trim() !== "" ? originStr : undefined,
-      } as never)
+      const stockPickingParams = toCreateStockPickingParamsFromForm(formData)
+      if (stockPickingParams) await createStockPicking.mutateAsync(stockPickingParams)
     }
     else if (action === "createAdjustment" || action === "createInventoryAdjustment") {
       const productRaw = formData.productId
-      const locRaw = formData.locationId
-      if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return
+      if (productRaw === "" || productRaw == null) return
       const productRow = products.find((p) => String(p.id) === String(productRaw))
       const uomFromProduct =
         productRow?.uomId != null
@@ -2238,43 +2198,11 @@ function InventoryClientLoaded({
             ? Number(productRow.uomPoId)
             : undefined
       if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      const qtyAfter = Number(formData.countQty ?? formData.inventoryQuantity ?? 0)
-      const bookRaw = formData.bookQuantity
-      const qtyBefore =
-        bookRaw !== "" && bookRaw != null && String(bookRaw).trim() !== ""
-          ? Number(bookRaw)
-          : qtyAfter
-      await createInventoryAdjustment.mutateAsync({
-        name: String(formData.name ?? "Inventory Adjustment"),
-        productId: Number(productRaw),
-        locationId: Number(locRaw),
-        quantityBefore: qtyBefore,
-        quantityAfter: qtyAfter,
-        reasonCode: String(formData.reasonCode ?? "INV_ADJ").trim() || "INV_ADJ",
-        state: "draft",
-        adjustmentType: "quantity",
-        uomId: uomFromProduct,
-        unitCost: Number(formData.standardPrice ?? 0),
-        reasonNotes: formData.reasonNotes ? String(formData.reasonNotes) : undefined,
-        metadata: adjustmentCreateMetadataFromForm(formData),
-      } as never)
+      const adjustmentParams = toCreateInventoryAdjustmentParamsFromForm(formData, uomFromProduct)
+      if (adjustmentParams) await createInventoryAdjustment.mutateAsync(adjustmentParams)
     } else if (action === "createStockLocation") {
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      const usage = String(formData.usage ?? "internal")
-      const parentRaw = formData.parentLocationId
-      const parentId =
-        parentRaw !== "" && parentRaw != null && String(parentRaw).trim() !== ""
-          ? Number(parentRaw)
-          : undefined
-      await createStockLocation.mutateAsync({
-        name,
-        usage,
-        locationCategory: usage,
-        parentPath: parentId ? "" : "/",
-        locationId: parentId,
-        barcode: formData.barcode ? String(formData.barcode) : undefined,
-      } as never)
+      const stockLocationParams = toCreateStockLocationParamsFromForm(formData)
+      if (stockLocationParams) await createStockLocation.mutateAsync(stockLocationParams)
     } else if (action === "createWarehouse") {
       const templateWarehouseId = formData.templateWarehouseId
       if (templateWarehouseId === "" || templateWarehouseId == null) return
@@ -2365,45 +2293,15 @@ function InventoryClientLoaded({
     else if (action === "createPickingWave") {
       const name = String(formData.name ?? "").trim()
       if (!name) return
-      await createPickingWave.mutateAsync(
-        pickingWaveCreateParamsFromForm(formData, {
-          ...(formData.warehouseId !== "" &&
-          formData.warehouseId != null &&
-          String(formData.warehouseId).trim() !== ""
-            ? { warehouseId: Number(formData.warehouseId) }
-            : {}),
-          ...(formData.userId !== "" &&
-          formData.userId != null &&
-          String(formData.userId).trim() !== ""
-            ? { userId: Number(formData.userId) }
-            : {}),
-        }),
-      )
+      await createPickingWave.mutateAsync(pickingWaveCreateParamsFromForm(formData))
     }
     else if (action === "createProductCategory") {
-      const name = String(formData.name ?? "").trim()
-      if (!name) return
-      const removalStrategyId = formData.removalStrategyId
-        ? Number(formData.removalStrategyId)
-        : undefined
-      await createProductCategory.mutateAsync({
-        name,
-        parentId: formData.parentId ? Number(formData.parentId) : undefined,
-        sequence: Number(formData.sequence ?? 10),
-        metadata: productCategoryCreateMetadataFromForm(removalStrategyId, formData),
-      } as never)
+      const productCategoryParams = toCreateProductCategoryParamsFromForm(formData)
+      if (productCategoryParams) await createProductCategory.mutateAsync(productCategoryParams)
     }
     else if (action === "createBarcodeRule") {
-      const name = String(formData.name ?? "").trim()
-      const pattern = String(formData.pattern ?? "").trim()
-      if (!name || !pattern) return
-      await createBarcodeRule.mutateAsync({
-        name,
-        pattern,
-        encoding: String(formData.encoding ?? "any"),
-        type: String(formData.type ?? "product"),
-        sequence: Number(formData.sequence ?? 100),
-      } as never)
+      const barcodeRuleParams = toCreateBarcodeRuleParamsFromForm(formData)
+      if (barcodeRuleParams) await createBarcodeRule.mutateAsync(barcodeRuleParams)
     } else if (action === "createAdjustmentReason") {
       const adjustmentReasonParams = toCreateAdjustmentReasonParamsFromForm(formData)
       if (adjustmentReasonParams)
@@ -2417,16 +2315,8 @@ function InventoryClientLoaded({
       if (traceReportParams)
         await createTraceabilityReport.mutateAsync(traceReportParams as Record<string, unknown>)
     } else if (action === "createStockQuant") {
-      const p = formData.productId
-      const l = formData.locationId
-      if (p === "" || p == null || l === "" || l == null) return
-      await createStockQuant.mutateAsync({
-        productId: Number(p),
-        locationId: Number(l),
-        quantity: Number(formData.quantity ?? 0),
-        reservedQuantity: Number(formData.reservedQuantity ?? 0),
-        cost: Number(formData.cost ?? 0),
-      } as never)
+      const stockQuantParams = toCreateStockQuantParamsFromForm(formData)
+      if (stockQuantParams) await createStockQuant.mutateAsync(stockQuantParams)
     } else if (action === "createWarehouse3dZone") {
       const wid = formData.warehouseId
       const lid = formData.locationId
@@ -2434,7 +2324,7 @@ function InventoryClientLoaded({
       await createWarehouse3dZone.mutateAsync({
         warehouseId: BigInt(String(wid)),
         locationId: BigInt(String(lid)),
-        params: warehouse3dZoneParamsFromForm(formData) as never,
+        params: warehouse3dZoneParamsFromForm(formData),
       })
     }
   }

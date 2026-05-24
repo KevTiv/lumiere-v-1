@@ -1,0 +1,33 @@
+
+
+## 1. Official plan doc: `frontend/ACCOUNTING_UI_PLAN.md`
+
+That file is an older **TanStack Router + sidebar** blueprint. A lot of it is already covered by the **module dashboard** (`accounting-client` + `EntityView` + hooks), but anything in the plan that assumed **separate routes** or **screens not built yet** is still aspirational unless you’ve added it elsewhere. The doc doesn’t maintain a checkbox list against reducers; it’s mainly architecture + screen ideas.
+
+## 2. Reducer coverage (authoritative gap list): `frontend/web/reducer-coverage-report.json`
+
+Under `byModule.accounting`, **`missing`** is the list of accounting reducers the web app **does not** call yet (64 items at last report). Grouped by theme, that’s roughly:
+
+| Area | Still missing from web (per report) |
+|------|--------------------------------------|
+| **Budgets** | `update_budget_line_actuals`, `confirm_budget`, `validate_budget`, `done_budget`, `cancel_budget`, `create_budget_post`, `update_budget_post`, `delete_budget_line` |
+| **Chart / structure** | `create_account_account_type`, `update_account_account_type`, `create_account_group`, `update_account_group` |
+| **Consolidation** | `create_consolidation_account`, `update_consolidation_account`, `create_consolidation_journal`, `create_elimination_entry`, `process_consolidation`, `validate_consolidation`, `cancel_consolidation`, `set_consolidation_company_rate`, `match_elimination_entries`, `unmatch_elimination_entry` |
+| **Trial balance** | `create_trial_balance_entry` |
+| **Fiscal years** | `create_fiscal_year`, `update_fiscal_year`, `delete_fiscal_year`, `open_fiscal_year`, `close_fiscal_year` |
+| **Periods** | `create_account_period`, `update_account_period`, `delete_account_period`, `close_account_period` |
+| **Fixed assets (beyond create/update/dispose)** | `delete_account_asset`, `confirm_account_asset`, `close_account_asset`, `create_depreciation_line`, `compute_depreciation_board` |
+| **Intercompany** | Full set: rules CRUD, transactions, approve/process/complete/error/cancel/retry, `set_intercompany_rule_active` |
+| **Moves / payments** | `update_account_move_line`, `reconcile_payment_with_invoice` |
+| **Tax (extended)** | Tax groups, jurisdictions, schedules, deadline CRUD + `update_tax_deadlines`, `refresh_tax_deadline_statuses`, `schedule_tax_deadline_updates`, `import_tax_rate_csv` |
+| **Imports** | `import_budget_csv`, `import_budget_line_csv`, `import_analytic_account_csv` |
+
+**Note:** The script puts **`match_bank_line`** and **`unreconciled_account_bank_statement_line`** under **`uncategorized`**, not `accounting`, even though they’re bank reconciliation. They’re wired in the client now; re-running the script updates counts, but the **module tagging** for those reducers may still look “uncategorized” until the scanner maps them to accounting.
+
+## 3. `REDUCER_REFACTOR_PLAN.md`
+
+That plan is **backend-focused** (hardcoded fields / `Option` patterns across the whole codebase). It is **not** an “accounting reducer checklist.” Accounting only shows up where related tables/reducers are discussed (e.g. product / move lines). What’s “left” there is whatever items in that long doc you still want to **refactor in Rust**, not “wire in the UI.”
+
+---
+
+**Bottom line:** For **reducer–accounting** work, the remaining **web-facing** bucket is essentially the **`byModule.accounting.missing`** list above (plus **uncategorized** reducers that are really accounting—payments, invoices, `open_account_period`, `deprecate_account_account`, etc.—if you want full parity). Next logical product slices are usually **budget lifecycle**, **fiscal years + periods**, **fixed-asset closing/depreciation**, then **consolidation / intercompany / advanced tax**, depending on roadmap.

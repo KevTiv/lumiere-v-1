@@ -2,7 +2,14 @@
  * Maps CRM quick-action form payloads to reducer param bodies (hooks merge defaults + JSON).
  */
 
-import type { ConvertLeadParams, ConvertOpportunityParams } from "@lumiere/stdb/generated/types"
+import type {
+  ConvertLeadParams,
+  ConvertOpportunityParams,
+  CreateActivityParams,
+  CreateContactParams,
+  CreateLeadParams,
+  CreateOpportunityParams,
+} from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -42,11 +49,17 @@ function parseU64Field(v: unknown): bigint | null {
   return null
 }
 
+function optionalDateDeadlineFromForm(v: unknown): Timestamp | undefined {
+  if (v == null || String(v).trim() === "") return undefined
+  const d = new Date(String(v))
+  return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
+}
+
 /**
  * Lead form uses contact-centric field names; `name` is the lead title required by `create_lead`.
  * Defaults (priority, state, tagIds) are applied in `useCreateLead`.
  */
-export function toCreateLeadParams(formData: Record<string, unknown>): Record<string, unknown> | null {
+export function toCreateLeadParams(formData: Record<string, unknown>): Partial<CreateLeadParams> | null {
   const contactName = optionalTrimmedString(formData.contactName)
   if (!contactName) return null
 
@@ -65,7 +78,7 @@ export function toCreateLeadParams(formData: Record<string, unknown>): Record<st
 }
 
 /** Defaults (isWon, isLost, tagIds, companyId) merged in `useCreateOpportunity`. */
-export function toCreateOpportunityParams(formData: Record<string, unknown>): Record<string, unknown> | null {
+export function toCreateOpportunityParams(formData: Record<string, unknown>): Partial<CreateOpportunityParams> | null {
   const name = optionalTrimmedString(formData.name)
   if (!name) return null
 
@@ -74,28 +87,22 @@ export function toCreateOpportunityParams(formData: Record<string, unknown>): Re
 
   const priority = optionalTrimmedString(formData.priority) ?? "Medium"
 
-  let dateDeadline: Timestamp | undefined
   const rawDeadline = formData.dateDeadline
-  if (rawDeadline != null && String(rawDeadline).trim() !== "") {
-    const d = new Date(String(rawDeadline))
-    if (!Number.isNaN(d.getTime())) {
-      dateDeadline = stbTimestampFromDate(d)
-    }
-  }
+  const dateDeadline = optionalDateDeadlineFromForm(rawDeadline)
 
-  const out: Record<string, unknown> = {
+  const out: Partial<CreateOpportunityParams> = {
     name,
     expectedRevenue: parseF64(formData.expectedRevenue, 0),
     probability: parseF64(formData.probability, 0),
     stageId,
     priority,
+    dateDeadline,
   }
-  if (dateDeadline !== undefined) out.dateDeadline = dateDeadline
   return out
 }
 
 /** Defaults (flags, ranks) merged in `useCreateContact`. */
-export function toCreateContactParams(formData: Record<string, unknown>): Record<string, unknown> | null {
+export function toCreateContactParams(formData: Record<string, unknown>): Partial<CreateContactParams> | null {
   const name = optionalTrimmedString(formData.name)
   if (!name) return null
 
@@ -113,7 +120,7 @@ export function toCreateContactParams(formData: Record<string, unknown>): Record
 }
 
 /** Defaults (activityType, priority, state, flags) merged in `useCreateActivity`. */
-export function toCreateActivityParams(formData: Record<string, unknown>): Record<string, unknown> | null {
+export function toCreateActivityParams(formData: Record<string, unknown>): Partial<CreateActivityParams> | null {
   const summary = optionalTrimmedString(formData.summary)
   if (!summary) return null
 
@@ -127,11 +134,10 @@ export function toCreateActivityParams(formData: Record<string, unknown>): Recor
   if (Number.isNaN(d.getTime())) return null
 
   const userRaw = formData.userId
-  let userIdNum: number | null = null
-  if (userRaw != null && String(userRaw).trim() !== "") {
-    const n = Number(userRaw)
-    if (Number.isFinite(n) && n > 0) userIdNum = n
-  }
+  const userIdNum =
+    userRaw != null && String(userRaw).trim() !== "" && Number.isFinite(Number(userRaw)) && Number(userRaw) > 0
+      ? Number(userRaw)
+      : null
 
   return {
     summary,

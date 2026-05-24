@@ -363,36 +363,31 @@ function IotClientLoaded({
     [pairingTokens, hubs, devices, actions, telemetry],
   )
 
-  const runRegisterIotHub = async (formData: Record<string, unknown>) => {
-    await registerHub.mutateAsync({
-      name: String(formData.name ?? ""),
-      serial: String(formData.serial ?? ""),
-      ip_address: formData.ip_address ? String(formData.ip_address) : null,
-      firmware_version: formData.firmware_version ? String(formData.firmware_version) : null,
-      metadata: null,
-    })
-    setBanner({ kind: "ok", text: t("iot.hubs.hubRegistered") })
-  }
-
-  const runRegisterIotDevice = async (formData: Record<string, unknown>) => {
-    const hubId = Number(formData.hub_id)
-    if (!Number.isFinite(hubId) || hubId <= 0) throw new Error(t("iot.forms.errors.invalidHubId"))
-    await registerDevice.mutateAsync({
-      hubId,
-      params: {
-        name: String(formData.name ?? ""),
-        device_type: String(formData.device_type ?? ""),
-        identifier: String(formData.identifier ?? ""),
-        capabilities: [],
-        metadata: null,
-      },
-    })
-    setBanner({ kind: "ok", text: t("iot.devices.registered") })
-  }
-
   const handleFormSubmit = async (_tabId: string, action: string, formData: Record<string, unknown>) => {
-    if (action === "registerIotHub") await runRegisterIotHub(formData)
-    else if (action === "registerIotDevice") await runRegisterIotDevice(formData)
+    if (action === "registerIotHub") {
+      await registerHub.mutateAsync({
+        name: String(formData.name ?? ""),
+        serial: String(formData.serial ?? ""),
+        ip_address: formData.ip_address ? String(formData.ip_address) : null,
+        firmware_version: formData.firmware_version ? String(formData.firmware_version) : null,
+        metadata: null,
+      })
+      setBanner({ kind: "ok", text: t("iot.hubs.hubRegistered") })
+    } else if (action === "registerIotDevice") {
+      const hubId = Number(formData.hub_id)
+      if (!Number.isFinite(hubId) || hubId <= 0) throw new Error(t("iot.forms.errors.invalidHubId"))
+      await registerDevice.mutateAsync({
+        hubId,
+        params: {
+          name: String(formData.name ?? ""),
+          device_type: String(formData.device_type ?? ""),
+          identifier: String(formData.identifier ?? ""),
+          capabilities: [],
+          metadata: null,
+        },
+      })
+      setBanner({ kind: "ok", text: t("iot.devices.registered") })
+    }
   }
 
   const handleDeviceRowSubmit = async (formData: Record<string, unknown>) => {
@@ -476,11 +471,11 @@ function IotClientLoaded({
         }}
         config={dashForm?.form ?? newIotHubForm(t)}
         submitError={dashFormError}
-        onSubmit={async (fd) => {
+        onSubmit={async (formData) => {
           setDashFormError(null)
           if (!dashForm) return
           try {
-            await handleFormSubmit("dashboard", dashForm.action, fd)
+            await handleFormSubmit("dashboard", dashForm.action, formData)
             setDashForm(null)
           } catch (e) {
             setDashFormError(e instanceof Error ? e.message : String(e))

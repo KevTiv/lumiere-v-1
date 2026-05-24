@@ -70,7 +70,8 @@
       "busy": "Please wait — another request is still in progress.",
       "validationFailed": "Fix the highlighted fields, then try again.",
       "noHandler": "This form is not wired to save — contact support.",
-      "failed": "Submit failed"
+      "failed": "Submit failed",
+      "saved": "Saved successfully."
     },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",

@@ -7,7 +7,7 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { proposalsBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -120,10 +120,7 @@ export function useUpsertProposalSection() {
       sequence?: number
       aiSuggestion?: string | null
     }) => {
-      const r = await apiFetch('/api/call/upsert_proposal_section', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("upsert_proposal_section", [
           Number(params.proposalId),
           params.sectionId != null ? Number(params.sectionId) : 0,
           params.title,
@@ -131,8 +128,8 @@ export function useUpsertProposalSection() {
           params.status,
           params.sequence ?? 0,
           params.aiSuggestion ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to upsert proposal section')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposal-sections'] }),
@@ -145,6 +142,7 @@ export function useCreateProposal() {
     organizationId: bigint | number | string
     title: string
     clientName: string
+    type?: string
     value: number
     deadline?: Date | string | null
     description?: string | null
@@ -154,10 +152,7 @@ export function useCreateProposal() {
       const deadline = params.deadline instanceof Date
         ? params.deadline.toISOString()
         : params.deadline ?? null
-      const r = await apiFetch('/api/call/create_proposal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("create_proposal", [
           Number(params.organizationId),
           params.title,
           params.clientName,
@@ -165,8 +160,8 @@ export function useCreateProposal() {
           deadline,
           params.description ?? null,
           params.documentFolderId != null ? Number(params.documentFolderId) : null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create proposal')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -189,18 +184,15 @@ export function useUpdateProposal() {
           ? params.deadline.toISOString()
           : params.deadline ?? null
 
-      const r = await apiFetch('/api/call/update_proposal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("update_proposal", [
           Number(params.proposalId),
           params.title,
           params.clientName,
           params.value,
           deadline,
           params.description ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -214,11 +206,8 @@ export function useUpdateProposalStatus() {
       proposalId: bigint | number | string
       status: string
     }) => {
-      const r = await apiFetch('/api/call/update_proposal_status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(params.proposalId), params.status]),
-      })
+      const { urlPath, init } = proposalsBffPost("update_proposal_status", [Number(params.proposalId), params.status])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal status')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -238,10 +227,7 @@ export function useAddProposalLineItem() {
       discount: number
       notes?: string | null
     }) => {
-      const r = await apiFetch('/api/call/add_proposal_line_item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("add_proposal_line_item", [
           toScalarU64(params.proposalId),
           params.sectionId != null ? toScalarU64(params.sectionId) : null,
           toScalarU64(params.productId),
@@ -250,8 +236,8 @@ export function useAddProposalLineItem() {
           params.priceUnit,
           params.discount,
           params.notes ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal line item')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -268,17 +254,14 @@ export function useUpdateProposalLineItem() {
       discount: number
       notes?: string | null
     }) => {
-      const r = await apiFetch('/api/call/update_proposal_line_item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("update_proposal_line_item", [
           Number(params.lineItemId),
           params.quantity,
           params.priceUnit,
           params.discount,
           params.notes ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal line item')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -289,11 +272,8 @@ export function useDeleteProposalLineItem() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineItemId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_proposal_line_item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(lineItemId)]),
-      })
+      const { urlPath, init } = proposalsBffPost("delete_proposal_line_item", [Number(lineItemId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal line item')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -304,11 +284,8 @@ export function useDeleteProposalSection() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sectionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_proposal_section', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(sectionId)]),
-      })
+      const { urlPath, init } = proposalsBffPost("delete_proposal_section", [Number(sectionId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal section')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -323,15 +300,12 @@ export function useSaveProposalVersion() {
       message: string
       sectionsJson: string
     }) => {
-      const r = await apiFetch('/api/call/save_proposal_version', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("save_proposal_version", [
           Number(params.proposalId),
           params.message,
           params.sectionsJson,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to save proposal version')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -348,17 +322,14 @@ export function useAddProposalSourceDoc() {
       docType: string
       wordCount: number
     }) => {
-      const r = await apiFetch('/api/call/add_proposal_source_doc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("add_proposal_source_doc", [
           Number(params.proposalId),
           params.name,
           params.content,
           params.docType,
           params.wordCount,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal source document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -369,11 +340,8 @@ export function useDeleteProposalSourceDoc() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (docId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_proposal_source_doc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(docId)]),
-      })
+      const { urlPath, init } = proposalsBffPost("delete_proposal_source_doc", [Number(docId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal source document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -390,10 +358,7 @@ export function useUpdateProposalSourceDoc() {
       docType?: string
       wordCount?: number
     }) => {
-      const r = await apiFetch('/api/call/update_proposal_source_doc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("update_proposal_source_doc", [
           Number(params.docId),
           stdbParamsToJson({
             name: params.name ?? null,
@@ -401,8 +366,8 @@ export function useUpdateProposalSourceDoc() {
             docType: params.docType ?? null,
             wordCount: params.wordCount ?? null,
           }),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal source document')
     },
     onSuccess: () => {
@@ -419,14 +384,11 @@ export function useReorderProposalLineItems() {
       proposalId: bigint | number | string
       orderedIds: Array<bigint | number | string>
     }) => {
-      const r = await apiFetch('/api/call/reorder_proposal_line_items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("reorder_proposal_line_items", [
           Number(params.proposalId),
           params.orderedIds.map((id) => Number(id)),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reorder proposal line items')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -441,15 +403,12 @@ export function useUpdateProposalPresence() {
       sectionId?: bigint | number | string | null
       userName: string
     }) => {
-      const r = await apiFetch('/api/call/update_proposal_presence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("update_proposal_presence", [
           Number(params.proposalId),
           params.sectionId != null ? Number(params.sectionId) : null,
           params.userName,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal presence')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -460,11 +419,8 @@ export function useClearProposalPresence() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (proposalId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/clear_proposal_presence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(proposalId)]),
-      })
+      const { urlPath, init } = proposalsBffPost("clear_proposal_presence", [Number(proposalId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to clear proposal presence')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -481,17 +437,14 @@ export function useAddProposalComment() {
       parentId?: bigint | number | string | null
       authorName: string
     }) => {
-      const r = await apiFetch('/api/call/add_proposal_comment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = proposalsBffPost("add_proposal_comment", [
           toScalarU64(params.proposalId),
           toScalarU64(params.sectionId),
           params.content,
           params.parentId != null ? toScalarU64(params.parentId) : null,
           params.authorName,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal comment')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
@@ -502,11 +455,8 @@ export function useResolveProposalComment() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (commentId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/resolve_proposal_comment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([Number(commentId)]),
-      })
+      const { urlPath, init } = proposalsBffPost("resolve_proposal_comment", [Number(commentId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to resolve proposal comment')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),

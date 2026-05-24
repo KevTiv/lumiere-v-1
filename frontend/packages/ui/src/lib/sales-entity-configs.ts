@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
@@ -42,43 +43,118 @@ const discountPolicyBadges = (t: TFunction) => ({
 }) as const
 
 // ── Sale Orders ───────────────────────────────────────────────────────────────
-export const saleOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
-  id: "sale-orders-table",
-  title: t("sales.salesOrders.title"),
-  description: t("sales.salesOrders.description"),
-  view: {
-    mode: "table",
-    rowKey: "id",
-    searchable: true,
-    searchPlaceholder: t("sales.salesOrders.searchPlaceholder"),
-    searchKeys: ["reference", "clientOrderRef"],
-    filters: [
-      {
-        key: "state",
-        label: t("sales.salesOrders.filters.state.label"),
-        type: "select",
-        options: [
-          { value: "Draft", label: t("sales.salesOrders.filters.state.options.Draft") },
-          { value: "Sent", label: t("sales.salesOrders.filters.state.options.Sent") },
-          { value: "Sale", label: t("sales.salesOrders.filters.state.options.Sale") },
-          { value: "Done", label: t("sales.salesOrders.filters.state.options.Done") },
-          { value: "Cancel", label: t("sales.salesOrders.filters.state.options.Cancel") },
-        ],
-      },
-    ],
-    columns: [
-      { key: "reference", label: t("sales.salesOrders.columns.reference"), width: "min-w-28" },
-      { key: "clientOrderRef", label: t("sales.salesOrders.columns.clientOrderRef"), width: "min-w-28" },
-      { key: "state", label: t("sales.salesOrders.columns.state"), type: "badge", ...saleStateBadges(t) },
-      { key: "amountTotal", label: t("sales.salesOrders.columns.amountTotal"), type: "currency", align: "right" },
-      { key: "amountResidual", label: t("sales.salesOrders.columns.amountResidual"), type: "currency", align: "right" },
-      { key: "invoiceStatus", label: t("sales.salesOrders.columns.invoiceStatus"), type: "badge", ...invoiceStatusBadges(t) },
-      { key: "dateOrder", label: t("sales.salesOrders.columns.dateOrder"), type: "date" },
-      { key: "deliveryCount", label: t("sales.salesOrders.columns.deliveryCount"), type: "number", align: "right" },
-    ],
-    emptyMessage: t("sales.salesOrders.emptyMessage"),
-  },
-})
+
+export type SaleOrdersTableConfigOptions = {
+  /** Primary label for the reference column (e.g. partner / client ref fallbacks). */
+  formatSaleOrderDisplayName?: (row: Record<string, unknown>) => string
+}
+
+export const saleOrdersTableConfig = (
+  t: TFunction,
+  options?: SaleOrdersTableConfigOptions,
+): EntityViewConfig => {
+  const formatName = options?.formatSaleOrderDisplayName
+
+  const referenceColumn = {
+    key: "reference",
+    label: t("sales.salesOrders.columns.reference"),
+    width: "min-w-28",
+    ...(formatName
+      ? {
+          render: (_value: unknown, row: Record<string, unknown>) => {
+            const formatted = formatName(row).trim()
+            const fallback = String(row.reference ?? "").trim()
+            const shown = formatted || fallback
+            if (!shown)
+              return createElement(
+                "span",
+                { className: "text-muted-foreground" },
+                "—",
+              )
+            return shown
+          },
+        }
+      : {}),
+  }
+
+  return {
+    id: "sale-orders-table",
+    title: t("sales.salesOrders.title"),
+    description: t("sales.salesOrders.description"),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("sales.salesOrders.searchPlaceholder"),
+      searchKeys: [
+        "reference",
+        "clientOrderRef",
+        "client_order_ref",
+        "name",
+        "partnerName",
+        "partner_name",
+      ],
+      filters: [
+        {
+          key: "state",
+          label: t("sales.salesOrders.filters.state.label"),
+          type: "select",
+          options: [
+            { value: "Draft", label: t("sales.salesOrders.filters.state.options.Draft") },
+            { value: "Sent", label: t("sales.salesOrders.filters.state.options.Sent") },
+            { value: "Sale", label: t("sales.salesOrders.filters.state.options.Sale") },
+            { value: "Done", label: t("sales.salesOrders.filters.state.options.Done") },
+            { value: "Cancel", label: t("sales.salesOrders.filters.state.options.Cancel") },
+          ],
+        },
+      ],
+      columns: [
+        referenceColumn,
+        {
+          key: "clientOrderRef",
+          label: t("sales.salesOrders.columns.clientOrderRef"),
+          width: "min-w-28",
+        },
+        {
+          key: "state",
+          label: t("sales.salesOrders.columns.state"),
+          type: "badge",
+          ...saleStateBadges(t),
+        },
+        {
+          key: "amountTotal",
+          label: t("sales.salesOrders.columns.amountTotal"),
+          type: "currency",
+          align: "right",
+        },
+        {
+          key: "amountResidual",
+          label: t("sales.salesOrders.columns.amountResidual"),
+          type: "currency",
+          align: "right",
+        },
+        {
+          key: "invoiceStatus",
+          label: t("sales.salesOrders.columns.invoiceStatus"),
+          type: "badge",
+          ...invoiceStatusBadges(t),
+        },
+        {
+          key: "dateOrder",
+          label: t("sales.salesOrders.columns.dateOrder"),
+          type: "date",
+        },
+        {
+          key: "deliveryCount",
+          label: t("sales.salesOrders.columns.deliveryCount"),
+          type: "number",
+          align: "right",
+        },
+      ],
+      emptyMessage: t("sales.salesOrders.emptyMessage"),
+    },
+  }
+}
 
 // ── Sale Order Lines ──────────────────────────────────────────────────────────
 export const saleOrderLinesTableConfig = (t: TFunction): EntityViewConfig => ({

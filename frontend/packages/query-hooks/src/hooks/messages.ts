@@ -7,7 +7,7 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { messagesBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -20,6 +20,8 @@ export type PostMessageInput = {
   model: string
   resId: bigint | number | string
   body: string
+  messageType?: string
+  subtype?: string | null
   parentId: bigint | number | string | null
   attachmentIds: (bigint | number | string)[]
 }
@@ -44,18 +46,15 @@ export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, PostMessageInput>({
     mutationFn: async ({ model, resId, body, parentId, attachmentIds }) => {
-      const r = await apiFetch('/api/call/post_message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          model,
-          toScalarU64(resId),
-          body,
-          parentId != null ? toScalarU64(parentId) : null,
-          attachmentIds.map((id) => toScalarU64(id)),
-        ]),
-      })
+      const { urlPath, init } = messagesBffPost("post_message", [
+        organizationId,
+        model,
+        toScalarU64(resId),
+        body,
+        parentId != null ? toScalarU64(parentId) : null,
+        attachmentIds.map((id) => toScalarU64(id)),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post message')
     },
     onSuccess: () =>

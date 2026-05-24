@@ -1,7 +1,7 @@
 "use client"
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { aiAgentsBffPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -42,11 +42,12 @@ export function useCreateAiAgent(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_ai_agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, null, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("create_ai_agent", [
+        organizationId,
+        null,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAiAgents(qc, organizationId),
@@ -57,15 +58,12 @@ export function useUpdateAiAgent(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { agentId: number; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_ai_agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
-          organizationId,
-          args.agentId,
-          stdbParamsToJson(args.params as object),
-        ]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("update_ai_agent", [
+        organizationId,
+        args.agentId,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAiAgents(qc, organizationId),
@@ -76,11 +74,12 @@ export function useSetAiAgentActive(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { agentId: number; isActive: boolean }) => {
-      const r = await apiFetch("/api/call/set_ai_agent_active", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.agentId, args.isActive]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("set_ai_agent_active", [
+        organizationId,
+        args.agentId,
+        args.isActive,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAiAgents(qc, organizationId),
@@ -90,15 +89,12 @@ export function useSetAiAgentActive(organizationId: number) {
 export function useCreateAiTeamMember(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/create_ai_team_member", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
-          organizationId,
-          args.companyId != null ? args.companyId : null,
-          stdbParamsToJson(args.params as object),
-        ]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("create_ai_team_member", [
+        organizationId,
+        args.companyId != null ? args.companyId : null,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
   })
@@ -107,14 +103,11 @@ export function useCreateAiTeamMember(organizationId: number) {
 export function useDismissAiInsight() {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; insightId: number }) => {
-      const r = await apiFetch("/api/call/dismiss_insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
-          args.companyId != null ? args.companyId : null,
-          args.insightId,
-        ]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("dismiss_insight", [
+        args.companyId != null ? args.companyId : null,
+        args.insightId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
   })
@@ -123,14 +116,11 @@ export function useDismissAiInsight() {
 export function useCreateAiInsight() {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/create_ai_insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
-          args.companyId != null ? args.companyId : null,
-          stdbParamsToJson(args.params as object),
-        ]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("create_ai_insight", [
+        args.companyId != null ? args.companyId : null,
+        stdbParamsToJson(args.params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
   })
@@ -140,15 +130,12 @@ export function useRecordAiSpend(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { agentId: number; tokensUsed: number }) => {
-      const r = await apiFetch("/api/call/record_ai_spend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
-          organizationId,
-          args.agentId,
-          args.tokensUsed,
-        ]),
-      })
+      const { urlPath, init } = aiAgentsBffPost("record_ai_spend", [
+        organizationId,
+        args.agentId,
+        args.tokensUsed,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAiAgents(qc, organizationId),

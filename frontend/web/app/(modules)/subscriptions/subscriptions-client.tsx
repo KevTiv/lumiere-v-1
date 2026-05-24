@@ -493,23 +493,23 @@ function SubscriptionsClientLoaded({
         name: String(formData.name ?? ""),
         code: String(formData.code ?? formData.name ?? ""),
         description: formData.description ? String(formData.description) : undefined,
-        currencyId,
+        currencyId: plRaw == null ? currencyId : currencyId,
         journalId: Number(jRaw),
         productId: Number(prodRaw),
         billingPeriod: String(formData.billingPeriod ?? "monthly"),
         billingPeriodUnit: Number(formData.billingPeriodUnit ?? 1),
-        recurringInvoiceDay: Number(formData.recurringInvoiceDay ?? 1),
+        recurringInvoiceDay: 1,
         trialPeriod: Boolean(formData.trialPeriod),
         trialDuration: Number(formData.trialDuration ?? 0),
-        trialUnit: String(formData.trialUnit ?? "day"),
-        autoCloseLimit: Number(formData.autoCloseLimit ?? 0),
-        paymentMode: String(formData.paymentMode ?? "manual"),
+        trialUnit: "day",
+        autoCloseLimit: 0,
+        paymentMode: "manual",
         templateId: undefined,
         invoiceMailTemplateId: undefined,
         websiteUrl: undefined,
         isPublished: true,
         isDefault: Boolean(formData.isDefault),
-        color: Number(formData.color ?? 0),
+        color: 0,
         image1920Url: undefined,
         active: true,
         recurringRuleCount: Number(formData.billingPeriodUnit ?? 1),
@@ -566,7 +566,9 @@ function SubscriptionsClientLoaded({
         config={closeForm}
         onSubmit={(formData) => {
           if (closeTargetId == null) return
-          const params = buildCloseSubscriptionParams(formData)
+          const closeReasonId = formData.closeReasonId
+          const notes = formData.notes
+          const params = buildCloseSubscriptionParams({ closeReasonId, notes })
           void closeSubscription.mutate({
             subscriptionId: BigInt(closeTargetId),
             params: params as unknown as Record<string, unknown>,
@@ -580,7 +582,8 @@ function SubscriptionsClientLoaded({
         config={generateForm}
         onSubmit={(formData) => {
           if (generateTargetId == null) return
-          const params = buildGenerateSubscriptionInvoiceParams(formData)
+          const invoiceDate = formData.invoiceDate
+          const params = buildGenerateSubscriptionInvoiceParams({ invoiceDate })
           void generateInvoice.mutate({
             subscriptionId: BigInt(generateTargetId),
             params: params as unknown as Record<string, unknown>,
@@ -594,7 +597,9 @@ function SubscriptionsClientLoaded({
         config={recognizeForm}
         onSubmit={(formData) => {
           if (recognizeLineId == null) return
-          const params = buildRecognizeDeferredRevenueParams(formData)
+          const moveId = formData.moveId
+          const moveLineId = formData.moveLineId
+          const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
           void recognizeDeferred.mutate({
             lineId: BigInt(recognizeLineId),
             params: params as unknown as Record<string, unknown>,

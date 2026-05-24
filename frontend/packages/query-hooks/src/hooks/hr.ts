@@ -8,12 +8,35 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { hrBffPost } from "@lumiere/stdb/commands"
+import type {
+  CreateContractParams,
+  CreateDepartmentParams,
+  CreateEmployeeParams,
+  CreateJobPositionParams,
+  CreateLeaveRequestParams,
+  CreateLeaveTypeParams,
+  CreatePayrollStructureParams,
+  CreatePayslipParams,
+  CreateSalaryRuleParams,
+  UpdateContractParams,
+  UpdateDepartmentParams,
+  UpdateEmployeeParams,
+  UpdateJobPositionParams,
+  UpdateLeaveTypeParams,
+} from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  finalizeCreateContractParams,
+  finalizeCreateDepartmentParams,
+  finalizeCreateEmployeeParams,
+  finalizeCreateJobPositionParams,
+  finalizeCreateLeaveRequestParams,
+  finalizeCreatePayslipParams,
+} from "./hr-params-merge"
 
 type ScalarId = bigint | number | string
 
@@ -135,13 +158,18 @@ export function useSalaryRules(
 
 export function useCreateDepartment(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateDepartmentParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_department', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+      const finalized = finalizeCreateDepartmentParams({
+        ...params,
+        companyId: params.companyId ?? companyId,
       })
+      const { urlPath, init } = hrBffPost("create_department", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create department')
     },
     onSuccess: () =>
@@ -151,13 +179,18 @@ export function useCreateDepartment(organizationId: bigint, companyId?: bigint) 
 
 export function useCreateJobPosition(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateJobPositionParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_job_position', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+      const finalized = finalizeCreateJobPositionParams({
+        ...params,
+        companyId: params.companyId ?? companyId,
       })
+      const { urlPath, init } = hrBffPost("create_job_position", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create job position')
     },
     onSuccess: () =>
@@ -167,13 +200,18 @@ export function useCreateJobPosition(organizationId: bigint, companyId?: bigint)
 
 export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateEmployeeParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_employee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+      const finalized = finalizeCreateEmployeeParams({
+        ...params,
+        companyId: params.companyId ?? companyId,
       })
+      const { urlPath, init } = hrBffPost("create_employee", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create employee')
     },
     onSuccess: () =>
@@ -183,17 +221,16 @@ export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
 
 export function useCreateLeaveRequest(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateLeaveRequestParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_leave_request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const finalized = finalizeCreateLeaveRequestParams(params)
+      const { urlPath, init } = hrBffPost("create_leave_request", [
           organizationId,
           companyId,
-          stdbParamsToJson(params as object),
-        ]),
-      })
+          stdbParamsToJson(finalized),
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create leave request')
     },
     onSuccess: () =>
@@ -203,13 +240,18 @@ export function useCreateLeaveRequest(organizationId: bigint, companyId: bigint)
 
 export function useCreateContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateContractParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+      const finalized = finalizeCreateContractParams({
+        ...params,
+        companyId: params.companyId ?? companyId,
       })
+      const { urlPath, init } = hrBffPost("create_contract", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contract')
     },
     onSuccess: () =>
@@ -219,13 +261,18 @@ export function useCreateContract(organizationId: bigint, companyId?: bigint) {
 
 export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreatePayslipParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_payslip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
+      const finalized = finalizeCreatePayslipParams({
+        ...params,
+        companyId: params.companyId ?? companyId,
       })
+      const { urlPath, init } = hrBffPost("create_payslip", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payslip')
     },
     onSuccess: () =>
@@ -237,13 +284,16 @@ export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
 
 export function useUpdateDepartment(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { departmentId: number; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { departmentId: number; params: Partial<UpdateDepartmentParams> }>({
     mutationFn: async ({ departmentId, params }) => {
-      const r = await apiFetch('/api/call/update_department', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, departmentId, withCompanyScope(params, companyId)]),
-      })
+      const patch = { ...params, companyId: params.companyId ?? companyId }
+      const { urlPath, init } = hrBffPost("update_department", [
+        organizationId,
+        departmentId,
+        stdbParamsToJson(patch),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update department')
     },
     onSuccess: () =>
@@ -253,13 +303,16 @@ export function useUpdateDepartment(organizationId: bigint, companyId?: bigint) 
 
 export function useUpdateJobPosition(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { jobId: number; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { jobId: number; params: Partial<UpdateJobPositionParams> }>({
     mutationFn: async ({ jobId, params }) => {
-      const r = await apiFetch('/api/call/update_job_position', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, jobId, withCompanyScope(params, companyId)]),
-      })
+      const patch = { ...params, companyId: params.companyId ?? companyId }
+      const { urlPath, init } = hrBffPost("update_job_position", [
+        organizationId,
+        jobId,
+        stdbParamsToJson(patch),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update job position')
     },
     onSuccess: () =>
@@ -269,13 +322,16 @@ export function useUpdateJobPosition(organizationId: bigint, companyId?: bigint)
 
 export function useUpdateEmployee(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { employeeId: number; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { employeeId: number; params: Partial<UpdateEmployeeParams> }>({
     mutationFn: async ({ employeeId, params }) => {
-      const r = await apiFetch('/api/call/update_employee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId ?? null, employeeId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = hrBffPost("update_employee", [
+        organizationId,
+        companyId ?? null,
+        employeeId,
+        stdbParamsToJson(params),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update employee')
     },
     onSuccess: () =>
@@ -287,11 +343,9 @@ export function useArchiveEmployee(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; terminationDate?: Date }>({
     mutationFn: async ({ employeeId, terminationDate }) => {
-      const r = await apiFetch('/api/call/archive_employee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId ?? null, employeeId, terminationDate]),
-      })
+      const { urlPath, init } = hrBffPost("archive_employee", [organizationId, companyId ?? null, employeeId, terminationDate])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to archive employee')
     },
     onSuccess: () =>
@@ -303,17 +357,15 @@ export function useArchiveEmployee(organizationId: bigint, companyId?: bigint) {
 
 export function useCreateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateLeaveTypeParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_leave_type', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = hrBffPost("create_leave_type", [
           organizationId,
           companyId,
-          stdbParamsToJson(params as object),
-        ]),
-      })
+          stdbParamsToJson(params),
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create leave type')
     },
     onSuccess: () =>
@@ -323,18 +375,16 @@ export function useCreateLeaveType(organizationId: bigint, companyId: bigint) {
 
 export function useUpdateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { leaveTypeId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { leaveTypeId: ScalarId; params: Partial<UpdateLeaveTypeParams> }>({
     mutationFn: async ({ leaveTypeId, params }) => {
-      const r = await apiFetch('/api/call/update_leave_type', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = hrBffPost("update_leave_type", [
           organizationId,
           companyId,
           toScalarU64(leaveTypeId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+          stdbParamsToJson(params),
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update leave type')
     },
     onSuccess: () =>
@@ -346,11 +396,9 @@ export function useApproveLeave(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const r = await apiFetch('/api/call/approve_leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
-      })
+      const { urlPath, init } = hrBffPost("approve_leave", [organizationId, toScalarU64(leaveId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to approve leave')
     },
     onSuccess: () => {
@@ -363,11 +411,9 @@ export function useRefuseLeave(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const r = await apiFetch('/api/call/refuse_leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
-      })
+      const { urlPath, init } = hrBffPost("refuse_leave", [organizationId, toScalarU64(leaveId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to refuse leave')
     },
     onSuccess: () => {
@@ -380,11 +426,9 @@ export function useResetLeaveToDraft(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const r = await apiFetch('/api/call/reset_leave_to_draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(leaveId)]),
-      })
+      const { urlPath, init } = hrBffPost("reset_leave_to_draft", [organizationId, toScalarU64(leaveId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reset leave to draft')
     },
     onSuccess: () => {
@@ -397,13 +441,16 @@ export function useResetLeaveToDraft(organizationId: bigint) {
 
 export function useUpdateContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { contractId: number; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { contractId: number; params: Partial<UpdateContractParams> }>({
     mutationFn: async ({ contractId, params }) => {
-      const r = await apiFetch('/api/call/update_contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId, withCompanyScope(params, companyId)]),
-      })
+      const patch = { ...params, companyId: params.companyId ?? companyId }
+      const { urlPath, init } = hrBffPost("update_contract", [
+        organizationId,
+        contractId,
+        stdbParamsToJson(patch),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contract')
     },
     onSuccess: () =>
@@ -415,11 +462,9 @@ export function useOpenContract(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
-      const r = await apiFetch('/api/call/open_contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId]),
-      })
+      const { urlPath, init } = hrBffPost("open_contract", [organizationId, contractId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to open contract')
     },
     onSuccess: () =>
@@ -431,11 +476,9 @@ export function useExpireContract(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contractId: number }>({
     mutationFn: async ({ contractId }) => {
-      const r = await apiFetch('/api/call/expire_contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId]),
-      })
+      const { urlPath, init } = hrBffPost("expire_contract", [organizationId, contractId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to expire contract')
     },
     onSuccess: () =>
@@ -447,11 +490,9 @@ export function useCancelContract(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
-      const r = await apiFetch('/api/call/cancel_contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, contractId]),
-      })
+      const { urlPath, init } = hrBffPost("cancel_contract", [organizationId, contractId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel contract')
     },
     onSuccess: () =>
@@ -463,13 +504,14 @@ export function useCancelContract(organizationId: bigint) {
 
 export function useCreatePayrollStructure(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePayrollStructureParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_payroll_structure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const { urlPath, init } = hrBffPost("create_payroll_structure", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payroll structure')
     },
     onSuccess: () =>
@@ -479,13 +521,14 @@ export function useCreatePayrollStructure(organizationId: bigint, _companyId?: b
 
 export function useCreateSalaryRule(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateSalaryRuleParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_salary_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const { urlPath, init } = hrBffPost("create_salary_rule", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create salary rule')
     },
     onSuccess: () =>
@@ -497,10 +540,7 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { payslipId: number; grossWage?: number; netWage?: number }>({
     mutationFn: async ({ payslipId, grossWage, netWage }) => {
-      const r = await apiFetch('/api/call/confirm_payslip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = hrBffPost("confirm_payslip", [
           organizationId,
           toScalarU64(payslipId),
           stdbParamsToJson({
@@ -508,8 +548,9 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
             grossWage: grossWage ?? 0,
             netWage: netWage ?? 0,
           }),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm payslip')
     },
     onSuccess: () =>
@@ -521,11 +562,9 @@ export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (payslipId) => {
-      const r = await apiFetch('/api/call/cancel_payslip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, payslipId, companyId ?? null]),
-      })
+      const { urlPath, init } = hrBffPost("cancel_payslip", [organizationId, payslipId, companyId ?? null])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel payslip')
     },
     onSuccess: () =>
@@ -548,11 +587,9 @@ function useImportHrResourceCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_resource_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_resource_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -564,11 +601,9 @@ function useImportHrDepartmentCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_department_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_department_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -580,11 +615,9 @@ function useImportHrJobPositionCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_job_position_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_job_position_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -596,11 +629,9 @@ function useImportHrEmployeeCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_employee_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_employee_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -612,11 +643,9 @@ function useImportHrContractCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_contract_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_contract_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -628,11 +657,9 @@ function useImportHrLeaveTypeCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_leave_type_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_leave_type_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -644,11 +671,9 @@ function useImportHrLeaveCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_leave_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_leave_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -660,11 +685,9 @@ function useImportHrPayrollStructureCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_payroll_structure_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_payroll_structure_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -676,11 +699,9 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_salary_rule_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_salary_rule_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -692,11 +713,9 @@ function useImportHrPayslipCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_hr_payslip_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = hrBffPost("import_hr_payslip_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
     },
     onSuccess: () =>
@@ -723,4 +742,11 @@ export function useHrCsvImportMutations(organizationId: bigint) {
 export type HrCsvImportMutations = ReturnType<typeof useHrCsvImportMutations>
 
 // ── Types (re-exported so client components import from one place) ────────────
-export type { CreateJobPositionParams } from '@lumiere/stdb/generated/types'
+export type {
+  CreateContractParams,
+  CreateDepartmentParams,
+  CreateEmployeeParams,
+  CreateJobPositionParams,
+  CreateLeaveRequestParams,
+  CreatePayslipParams,
+} from '@lumiere/stdb/types'

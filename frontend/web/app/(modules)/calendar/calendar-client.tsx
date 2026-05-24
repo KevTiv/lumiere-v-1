@@ -19,6 +19,10 @@ type CalendarClientLoadedProps = Omit<CalendarClientProps, "organizationId"> & {
   organizationId: number
 }
 
+function calendarTimestampMicros(_raw: unknown, date: Date): bigint {
+  return BigInt(date.getTime() * 1000)
+}
+
 export function CalendarClient(props: CalendarClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -200,20 +204,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       const start = new Date(String(formData.start ?? ""))
       const stop = new Date(String(formData.stop ?? ""))
       if (Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return
-      const updateParams: UpdateCalendarEventParams = {}
-      // Only include changed fields
-      if (title) updateParams.name = title
-      updateParams.start = BigInt(start.getTime() * 1000)
-      updateParams.stop = BigInt(stop.getTime() * 1000)
-      updateParams.allday = Boolean(formData.allday)
-      updateParams.privacy = (formData.privacy as string) ?? "public"
-      updateParams.show_as = "busy"
-      updateParams.state = "confirmed"
-      if (formData.location) updateParams.location = String(formData.location)
-      if (formData.description) updateParams.description = String(formData.description)
       updateCalendarEvent.mutate({
         eventId: quickActionForm.eventId,
-        params: updateParams as Record<string, unknown>,
+        params: ({
+          name: title,
+          start: calendarTimestampMicros(formData.start, start),
+          stop: calendarTimestampMicros(formData.stop, stop),
+          allday: Boolean(formData.allday),
+          privacy: (formData.privacy as string) ?? "public",
+          show_as: "busy",
+          state: "confirmed",
+          location: formData.location ? String(formData.location) : undefined,
+          description: formData.description ? String(formData.description) : undefined,
+        } satisfies UpdateCalendarEventParams) as Record<string, unknown>,
       })
     }
   }

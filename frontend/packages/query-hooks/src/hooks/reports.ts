@@ -8,10 +8,10 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { reportsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { toCreateFinancialReportParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
@@ -91,13 +91,13 @@ function invalidateReportsModule(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
 ) {
-  const org = organizationId
+  const k = rqBigIntKey(organizationId)
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ['financial-reports', org] }),
-    qc.invalidateQueries({ queryKey: ['trial-balances', org] }),
-    qc.invalidateQueries({ queryKey: ['report-templates', org] }),
-    qc.invalidateQueries({ queryKey: ['scheduled-reports', org] }),
-    qc.invalidateQueries({ queryKey: ['analytics-metrics', org] }),
+    qc.invalidateQueries({ queryKey: ['financial-reports', k] }),
+    qc.invalidateQueries({ queryKey: ['trial-balances', k] }),
+    qc.invalidateQueries({ queryKey: ['report-templates', k] }),
+    qc.invalidateQueries({ queryKey: ['scheduled-reports', k] }),
+    qc.invalidateQueries({ queryKey: ['analytics-metrics', k] }),
   ])
 }
 
@@ -124,13 +124,8 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         0,
       )
 
-      const createRes = await apiFetch('/api/call/create_financial_report?withCompany=true',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: stringifyReducerCallBody([stdbParamsToJson(params)]),
-        },
-      )
+      const createCall = reportsBffPost("create_financial_report", [stdbParamsToJson(params)])
+      const createRes = await apiFetch(createCall.urlPath, createCall.init)
       if (!createRes.ok) throw new Error('Failed to create financial report')
 
       const listAfter = await fetchQueryList(
@@ -147,13 +142,8 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         )
       }
 
-      const genRes = await apiFetch('/api/call/generate_financial_report?withCompany=true',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: stringifyReducerCallBody([Number(created.id)]),
-        },
-      )
+      const genCall = reportsBffPost("generate_financial_report", [Number(created.id)])
+      const genRes = await apiFetch(genCall.urlPath, genCall.init)
       if (!genRes.ok) throw new Error('Failed to generate financial report')
     },
     onSuccess: async () => {
@@ -166,11 +156,9 @@ export function useGenerateFinancialReport(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const r = await apiFetch('/api/call/generate_financial_report?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([reportId]),
-      })
+      const { urlPath, init } = reportsBffPost("generate_financial_report", [reportId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to regenerate report')
     },
     onSuccess: async () => {
@@ -187,11 +175,12 @@ export function useExportFinancialReport(organizationId: bigint) {
     { reportId: string | number | bigint; exportFormat: 'pdf' | 'xlsx' | 'csv' }
   >({
     mutationFn: async ({ reportId, exportFormat }) => {
-      const r = await apiFetch('/api/call/export_financial_report?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([reportId, { exportFormat }]),
-      })
+      const { urlPath, init } = reportsBffPost("export_financial_report", [
+        reportId,
+        stdbParamsToJson({ exportFormat }),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to export report')
     },
     onSuccess: async () => {
@@ -204,11 +193,9 @@ export function useArchiveFinancialReport(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const r = await apiFetch('/api/call/archive_financial_report?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([reportId]),
-      })
+      const { urlPath, init } = reportsBffPost("archive_financial_report", [reportId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to archive report')
     },
     onSuccess: async () => {
@@ -221,11 +208,9 @@ export function useDeleteFinancialReport(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const r = await apiFetch('/api/call/delete_financial_report?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([reportId]),
-      })
+      const { urlPath, init } = reportsBffPost("delete_financial_report", [reportId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete report')
     },
     onSuccess: async () => {
@@ -256,11 +241,13 @@ export function useCreateReportTemplate(organizationId: bigint) {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
       const companyId = companyIdStringOrNull(formData)
-      const r = await apiFetch('/api/call/create_report_template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
-      })
+      const { urlPath, init } = reportsBffPost("create_report_template", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create report template')
     },
     onSuccess: async () => {
@@ -277,11 +264,13 @@ export function useUpdateReportTemplate(organizationId: bigint) {
     { templateId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ templateId, params }) => {
-      const r = await apiFetch('/api/call/update_report_template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, templateId, params]),
-      })
+      const { urlPath, init } = reportsBffPost("update_report_template", [
+        organizationId,
+        templateId,
+        stdbParamsToJson(params as object),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update report template')
     },
     onSuccess: async () => {
@@ -297,15 +286,13 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const r = await apiFetch('/api/call/create_scheduled_report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = reportsBffPost("create_scheduled_report", [
           organizationId,
           companyId,
           stdbParamsToJson(params),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create scheduled report')
     },
     onSuccess: async () => {
@@ -321,15 +308,13 @@ export function useCreateAnalyticsMetric(organizationId: bigint) {
       const params = toCreateAnalyticsMetricParams(formData)
       if (!params) throw new Error('Invalid metric parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const r = await apiFetch('/api/call/create_analytics_metric', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = reportsBffPost("create_analytics_metric", [
           organizationId,
           companyId,
           stdbParamsToJson(params),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create analytics metric')
     },
     onSuccess: async () => {
@@ -349,15 +334,13 @@ export function useUpdateMetricValues(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ metricId, params }) => {
-      const r = await apiFetch('/api/call/update_metric_values', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = reportsBffPost("update_metric_values", [
           organizationId,
           metricId,
           stdbParamsToJson(params),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update metric values')
     },
     onSuccess: async () => {
@@ -378,15 +361,14 @@ export function useRecordReportRun(organizationId: bigint) {
           ? params.nextRun.toISOString()
           : String(params.nextRun)
 
-      const r = await apiFetch('/api/call/record_report_run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = reportsBffPost("record_report_run", [
           organizationId,
           params.reportId,
           nextRun,
-        ]),
-      })
+        ])
+
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record report run')
     },
     onSuccess: async () => {
@@ -415,11 +397,9 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
         level: Number(formData.level ?? 1),
         isLeaf: Boolean(formData.isLeaf),
       }
-      const r = await apiFetch('/api/call/create_trial_balance_entry?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = reportsBffPost("create_trial_balance_entry", [stdbParamsToJson(params)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create trial balance entry')
     },
     onSuccess: async () => {
@@ -439,11 +419,9 @@ export function useUpdateFinancialReport(organizationId: bigint) {
   >({
     mutationFn: async ({ reportId, patch }) => {
       const params = toUpdateFinancialReportParams(patch)
-      const r = await apiFetch('/api/call/update_financial_report?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([reportId, stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = reportsBffPost("update_financial_report", [reportId, stdbParamsToJson(params)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update financial report')
     },
     onSuccess: async () => {
@@ -459,11 +437,9 @@ export function useCreateDashboard(organizationId: bigint) {
       const params = toCreateDashboardParams(formData)
       if (!params.name.trim()) throw new Error('Dashboard name is required')
       const companyId = companyIdFromDashboardForm(formData)
-      const r = await apiFetch('/api/call/create_dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = reportsBffPost("create_dashboard", [organizationId, companyId, stdbParamsToJson(params)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard')
     },
     onSuccess: async () => {
@@ -480,11 +456,9 @@ export function useCreateDashboardWidget(organizationId: bigint) {
       if (!params.name.trim()) throw new Error('Widget name is required')
       if (!params.model.trim()) throw new Error('Data source / model is required')
       const companyId = companyIdFromDashboardWidgetForm(formData)
-      const r = await apiFetch('/api/call/create_dashboard_widget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params)]),
-      })
+      const { urlPath, init } = reportsBffPost("create_dashboard_widget", [organizationId, companyId, stdbParamsToJson(params)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard widget')
     },
     onSuccess: async () => {
@@ -501,11 +475,9 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
     { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
   >({
     mutationFn: async ({ dashboardId, widgetId }) => {
-      const r = await apiFetch('/api/call/add_widget_to_dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, dashboardId, widgetId]),
-      })
+      const { urlPath, init } = reportsBffPost("add_widget_to_dashboard", [organizationId, dashboardId, widgetId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add widget to dashboard')
     },
     onSuccess: async () => {
@@ -544,15 +516,13 @@ export function useUpdateWidgetLayout(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ widgetId, layout }) => {
-      const r = await apiFetch('/api/call/update_widget_layout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = reportsBffPost("update_widget_layout", [
           organizationId,
           widgetId,
           stdbParamsToJson(recordToWidgetLayoutParams(layout)),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update widget layout')
     },
     onSuccess: async () => {
@@ -578,20 +548,17 @@ export function useShareDashboard(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ dashboardId, params }) => {
-      const r = await apiFetch('/api/call/share_dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          dashboardId,
-          stdbParamsToJson({
-            shareWith: params.shareWith,
-            shareWithGroups: params.shareWithGroups.map((id) =>
-              typeof id === "bigint" ? id : BigInt(String(id)),
-            ),
-          }),
-        ]),
-      })
+      const { urlPath, init } = reportsBffPost("share_dashboard", [
+        organizationId,
+        dashboardId,
+        stdbParamsToJson({
+          shareWith: params.shareWith,
+          shareWithGroups: params.shareWithGroups.map((id) =>
+            typeof id === "bigint" ? id : BigInt(String(id)),
+          ),
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to share dashboard')
     },
     onSuccess: async () => {
@@ -613,11 +580,9 @@ function useImportReportTemplateCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_report_template_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = reportsBffPost("import_report_template_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>
@@ -629,11 +594,9 @@ function useImportAnalyticsMetricCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_analytics_metric_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = reportsBffPost("import_analytics_metric_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
     },
     onSuccess: () =>

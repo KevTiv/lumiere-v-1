@@ -38,10 +38,13 @@ import {
   usePostExpenseSheet,
   useExpensesCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/expenses"
-import type { CreateExpenseParams, CreateExpenseSheetParams } from "@lumiere/query-hooks/hooks/expenses"
-import { hasValidOrganizationId, orgBigInts, withCompanyScope } from "@/lib/org-scoped"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
+import {
+  toCreateExpenseParams,
+  toCreateExpenseSheetParams,
+} from "@/lib/expenses-create-params"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -127,8 +130,8 @@ function ExpensesClientLoaded({
     [sheetsRaw],
   )
 
-  const createExpense = useCreateExpense(orgId, orgId)
-  const createExpenseSheet = useCreateExpenseSheet(orgId, orgId)
+  const createExpense = useCreateExpense(orgId, companyId)
+  const createExpenseSheet = useCreateExpenseSheet(orgId, companyId)
   const updateExpense = useUpdateExpense(orgId, companyId)
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId)
@@ -302,45 +305,24 @@ function ExpensesClientLoaded({
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      await createExpense.mutateAsync(
-        withCompanyScope(
-          {
-            employeeId: Number(empRaw),
-            name: formData.name as string,
-            date: new Date(formData.date as string) as unknown as CreateExpenseParams["date"],
-            unitAmount: Number(formData.totalAmount ?? 0),
-            quantity: Number(formData.quantity ?? 1),
-            currencyId: Number(pl.currencyId),
-            description: formData.description as string | undefined,
-            productId: undefined,
-            taxIds: [],
-            accountId: undefined,
-            analyticAccountId: undefined,
-            attachmentIds: [],
-          } as unknown as Record<string, unknown>,
-          companyId,
-        ) as unknown as CreateExpenseParams,
-      )
+      const params = toCreateExpenseParams(formData, {
+        currencyId: pl.currencyId,
+        pricelistId: plRaw,
+      })
+      if (params === null) return
+      await createExpense.mutateAsync(params)
     } else if (action === "createExpenseSheet" || action === "createSheet") {
       const plRaw = formData.pricelistId
       const empRaw = formData.employeeId
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      await createExpenseSheet.mutateAsync(
-        withCompanyScope(
-          {
-            employeeId: Number(empRaw),
-            name: formData.name as string,
-            currencyId: Number(pl.currencyId),
-            notes: formData.notes as string | undefined,
-            accountingDate: formData.accountingDate
-              ? (new Date(formData.accountingDate as string) as unknown as CreateExpenseSheetParams["accountingDate"])
-              : undefined,
-          } as unknown as Record<string, unknown>,
-          companyId,
-        ) as unknown as CreateExpenseSheetParams,
-      )
+      const params = toCreateExpenseSheetParams(formData, {
+        currencyId: pl.currencyId,
+        pricelistId: plRaw,
+      })
+      if (params === null) return
+      await createExpenseSheet.mutateAsync(params)
     }
   }
 
@@ -409,18 +391,15 @@ function ExpensesClientLoaded({
       if (!id) return
       await updateExpense.mutateAsync({
         expenseId: id,
-        params: withCompanyScope(
-          {
-            name: String(formData.name ?? ""),
-            unitAmount: Number(formData.unitAmount ?? 0),
-            quantity: Number(formData.quantity ?? 1),
-            description:
-              formData.description != null && String(formData.description).trim() !== ""
-                ? String(formData.description)
-                : undefined,
-          },
-          companyId,
-        ),
+        params: {
+          name: String(formData.name ?? ""),
+          unitAmount: Number(formData.unitAmount ?? 0),
+          quantity: Number(formData.quantity ?? 1),
+          description:
+            formData.description != null && String(formData.description).trim() !== ""
+              ? String(formData.description)
+              : undefined,
+        },
       })
     } else if (workflowForm.kind === "addToReport") {
       const sheetRaw = formData.sheetId

@@ -472,14 +472,6 @@ function ProjectsClientLoaded({
     csvImports.importTask.isPending ||
     csvImports.importTimesheet.isPending
 
-  const handleModalSubmit = async (formData: Record<string, unknown>) => {
-    if (!modal.type || modal.type === null) return
-
-    const tabId = modal.type === 'create' ? 'dashboard' : modal.type === 'edit' ? (modal.action === 'updateProject' ? 'projects' : 'tasks') : 'timesheets'
-    await handleFormSubmit(tabId, modal.action, formData)
-    setModal({ type: null })
-  }
-
   return (
     <>
       <ModuleView
@@ -494,7 +486,19 @@ function ProjectsClientLoaded({
         onOpenChange={(open) => !open && setModal({ type: null })}
         config={modal.type ? modal.form : projectFormConfig}
         isPending={isFormMutationPending}
-        onSubmit={(fd) => handleModalSubmit(fd)}
+        onSubmit={async (formData) => {
+          if (!modal.type) return
+          const tabId =
+            modal.type === 'create'
+              ? 'dashboard'
+              : modal.type === 'edit'
+                ? modal.action === 'updateProject'
+                  ? 'projects'
+                  : 'tasks'
+                : 'timesheets'
+          await handleFormSubmit(tabId, modal.action, formData)
+          setModal({ type: null })
+        }}
       />
       {csvKind && csvFormConfig ? (
         <FormModal

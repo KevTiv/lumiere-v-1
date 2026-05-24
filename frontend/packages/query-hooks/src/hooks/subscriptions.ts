@@ -8,11 +8,16 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { subscriptionsBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type {
+  CreateDeferredRevenueScheduleParams,
+  CreateRevenueRecognitionRuleParams,
+} from '@lumiere/stdb/generated/types'
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -91,11 +96,11 @@ export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_subscription_plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("create_subscription_plan", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create subscription plan')
     },
     onSuccess: () =>
@@ -107,11 +112,11 @@ export function useCreateSubscriptionFromSaleOrder(organizationId: bigint, compa
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_subscription_from_sale_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("create_subscription_from_sale_order", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create subscription from sale order')
     },
     onSuccess: async () => {
@@ -131,15 +136,12 @@ export function useActivateSubscription(organizationId: bigint, companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, { subscriptionId: bigint }>({
     mutationFn: async ({ subscriptionId }) => {
-      const r = await apiFetch('/api/call/activate_subscription', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          subscriptionId,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("activate_subscription", [
+        organizationId,
+        companyId ?? organizationId,
+        subscriptionId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to activate subscription')
     },
     onSuccess: () =>
@@ -151,16 +153,13 @@ export function useCloseSubscription(organizationId: bigint, companyId?: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { subscriptionId: bigint; params: Record<string, unknown> }>({
     mutationFn: async ({ subscriptionId, params }) => {
-      const r = await apiFetch('/api/call/close_subscription', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          subscriptionId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("close_subscription", [
+        organizationId,
+        companyId ?? organizationId,
+        subscriptionId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to close subscription')
     },
     onSuccess: () =>
@@ -172,16 +171,13 @@ export function useGenerateSubscriptionInvoice(organizationId: bigint, companyId
   const qc = useQueryClient()
   return useMutation<void, Error, { subscriptionId: bigint; params: Record<string, unknown> }>({
     mutationFn: async ({ subscriptionId, params }) => {
-      const r = await apiFetch('/api/call/generate_subscription_invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          subscriptionId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("generate_subscription_invoice", [
+        organizationId,
+        companyId ?? organizationId,
+        subscriptionId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to generate subscription invoice')
     },
     onSuccess: () =>
@@ -191,17 +187,14 @@ export function useGenerateSubscriptionInvoice(organizationId: bigint, companyId
 
 export function useCreateDeferredRevenueSchedule(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateDeferredRevenueScheduleParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_deferred_revenue_schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("create_deferred_revenue_schedule", [
+        organizationId,
+        companyId ?? organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create deferred revenue schedule')
     },
     onSuccess: async () => {
@@ -217,16 +210,13 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, { lineId: bigint; params: Record<string, unknown> }>({
     mutationFn: async ({ lineId, params }) => {
-      const r = await apiFetch('/api/call/recognize_deferred_revenue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          lineId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("recognize_deferred_revenue", [
+        organizationId,
+        companyId ?? organizationId,
+        lineId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to recognize deferred revenue')
     },
     onSuccess: async () => {
@@ -240,17 +230,14 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
 
 export function useCreateRevenueRecognitionRule(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateRevenueRecognitionRuleParams>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_revenue_recognition_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("create_revenue_recognition_rule", [
+        organizationId,
+        companyId ?? organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create revenue recognition rule')
     },
     onSuccess: () =>
@@ -262,15 +249,12 @@ export function useActivateRevenueRecognitionRule(organizationId: bigint, compan
   const qc = useQueryClient()
   return useMutation<void, Error, { ruleId: bigint }>({
     mutationFn: async ({ ruleId }) => {
-      const r = await apiFetch('/api/call/activate_revenue_recognition_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          ruleId,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("activate_revenue_recognition_rule", [
+        organizationId,
+        companyId ?? organizationId,
+        ruleId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to activate rule')
     },
     onSuccess: () =>
@@ -282,15 +266,12 @@ export function useDeactivateRevenueRecognitionRule(organizationId: bigint, comp
   const qc = useQueryClient()
   return useMutation<void, Error, { ruleId: bigint }>({
     mutationFn: async ({ ruleId }) => {
-      const r = await apiFetch('/api/call/deactivate_revenue_recognition_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          ruleId,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("deactivate_revenue_recognition_rule", [
+        organizationId,
+        companyId ?? organizationId,
+        ruleId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to deactivate rule')
     },
     onSuccess: () =>
@@ -302,15 +283,12 @@ export function useImportSubscriptionPlanCsv(organizationId: bigint, companyId?:
   const qc = useQueryClient()
   return useMutation<void, Error, { csvData: string }>({
     mutationFn: async ({ csvData }) => {
-      const r = await apiFetch('/api/call/import_subscription_plan_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          csvData,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("import_subscription_plan_csv", [
+        organizationId,
+        companyId ?? organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import subscription plans from CSV')
     },
     onSuccess: () =>
@@ -322,15 +300,12 @@ export function useImportSubscriptionCsv(organizationId: bigint, companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, { csvData: string }>({
     mutationFn: async ({ csvData }) => {
-      const r = await apiFetch('/api/call/import_subscription_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId ?? organizationId,
-          csvData,
-        ]),
-      })
+      const { urlPath, init } = subscriptionsBffPost("import_subscription_csv", [
+        organizationId,
+        companyId ?? organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import subscriptions from CSV')
     },
     onSuccess: () =>

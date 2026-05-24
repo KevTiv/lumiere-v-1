@@ -8,7 +8,7 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { inventoryBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -439,11 +439,8 @@ export function useCreateProduct(
         mergeReducerParams(CREATE_PRODUCT_DEFAULTS, productDefaults),
         params,
       )
-      const r = await apiFetch('/api/call/create_product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_product", [organizationId, stdbParamsToJson(merged as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -454,11 +451,8 @@ export function useUpdateProduct(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ productId, params }) => {
-      const r = await apiFetch('/api/call/update_product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -469,11 +463,8 @@ export function useDeleteProduct(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (productId) => {
-      const r = await apiFetch('/api/call/delete_product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_product", [organizationId, toScalarU64(productId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete product')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -488,11 +479,8 @@ export function useCreateProductVariant(organizationId: bigint) {
     { productTmplId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ productTmplId, params }) => {
-      const r = await apiFetch('/api/call/create_product_variant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productTmplId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_product_variant", [organizationId, toScalarU64(productTmplId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product variant')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -503,11 +491,8 @@ export function useCreateWarehouse(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_warehouse?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_warehouse", [stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create warehouse')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -522,11 +507,8 @@ export function useUpdateWarehouse(organizationId: bigint) {
     { warehouseId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ warehouseId, params }) => {
-      const r = await apiFetch('/api/call/update_warehouse?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(warehouseId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_warehouse", [toScalarU64(warehouseId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update warehouse')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -537,11 +519,8 @@ export function useDeleteWarehouse(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (warehouseId) => {
-      const r = await apiFetch('/api/call/delete_warehouse?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(warehouseId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_warehouse", [toScalarU64(warehouseId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete warehouse')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -569,18 +548,15 @@ export function useAssignUserToPicking(organizationId: bigint, companyId: bigint
     { pickingId: ScalarId; params: { userId: string | null } }
   >({
     mutationFn: async ({ pickingId, params }) => {
-      const r = await apiFetch('/api/call/assign_user_to_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("assign_user_to_picking", [
           organizationId,
           toScalarU64(pickingId),
           stdbParamsToJson({
             company_id: companyId,
             user_id: params.userId && params.userId.length > 0 ? params.userId : null,
           } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign user to picking')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -600,11 +576,8 @@ export function useCreateStockPicking(
         scopedCompanyId != null ? { companyId: Number(scopedCompanyId) } : {},
       )
       const merged = mergeReducerParams(base, params)
-      const r = await apiFetch('/api/call/create_stock_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_picking", [organizationId, stdbParamsToJson(merged as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock picking')
     },
     onSuccess: () =>
@@ -616,11 +589,8 @@ export function useCreateInventoryAdjustment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_inventory_adjustment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_inventory_adjustment", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create inventory adjustment')
     },
     onSuccess: () =>
@@ -636,10 +606,7 @@ export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
     { quantId: bigint; targetLocationId: bigint; quantity: number }
   >({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/move_stock_quant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("move_stock_quant", [
           organizationId,
           toScalarU64(params.quantId),
           stdbParamsToJson({
@@ -647,8 +614,8 @@ export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
             dest_location_id: toScalarU64(params.targetLocationId),
             quantity: params.quantity,
           } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to move stock item')
     },
     onSuccess: () => {
@@ -663,11 +630,8 @@ export function useProcessInventoryAdjustment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (adjustmentId) => {
-      const r = await apiFetch('/api/call/process_inventory_adjustment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(adjustmentId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("process_inventory_adjustment", [organizationId, toScalarU64(adjustmentId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to process inventory adjustment')
     },
     onSuccess: () =>
@@ -679,15 +643,12 @@ export function useValidateStockPicking(organizationId: bigint, companyId: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
-      const r = await apiFetch('/api/call/validate_stock_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("validate_stock_picking", [
           organizationId,
           toScalarU64(pickingId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate stock picking')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -698,15 +659,12 @@ export function useReserveStockQuant(organizationId: bigint, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; reserveQty: number }>({
     mutationFn: async ({ quantId, reserveQty }) => {
-      const r = await apiFetch('/api/call/reserve_stock_quant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("reserve_stock_quant", [
           organizationId,
           toScalarU64(quantId),
           stdbParamsToJson({ company_id: companyId, reserve_qty: reserveQty } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reserve stock')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -717,15 +675,12 @@ export function useUnreserveStockQuant(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; unreserveQty: number }>({
     mutationFn: async ({ quantId, unreserveQty }) => {
-      const r = await apiFetch('/api/call/unreserve_stock_quant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("unreserve_stock_quant", [
           organizationId,
           toScalarU64(quantId),
           stdbParamsToJson({ company_id: companyId, unreserve_qty: unreserveQty } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unreserve stock')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -740,11 +695,8 @@ export function useCreateCycleCountPlan(organizationId: bigint) {
     { locationId: number; params: Record<string, unknown> }
   >({
     mutationFn: async ({ locationId, params }) => {
-      const r = await apiFetch('/api/call/create_cycle_count_plan?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(locationId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_cycle_count_plan", [toScalarU64(locationId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create cycle count plan')
     },
     onSuccess: () =>
@@ -756,11 +708,8 @@ export function useStartCycleCountSession(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (cycleCountId) => {
-      const r = await apiFetch('/api/call/start_cycle_count_session?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("start_cycle_count_session", [toScalarU64(cycleCountId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start cycle count session')
     },
     onSuccess: () =>
@@ -776,11 +725,8 @@ export function useRecordCycleCountLine(organizationId: bigint) {
     { cycleCountId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ cycleCountId, params }) => {
-      const r = await apiFetch('/api/call/record_cycle_count_line?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(cycleCountId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("record_cycle_count_line", [toScalarU64(cycleCountId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record cycle count line')
     },
     onSuccess: () =>
@@ -792,11 +738,8 @@ export function useValidateCycleCount(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (cycleCountId) => {
-      const r = await apiFetch('/api/call/validate_cycle_count?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("validate_cycle_count", [toScalarU64(cycleCountId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate cycle count')
     },
     onSuccess: () =>
@@ -808,11 +751,8 @@ export function usePostCycleCountAdjustments(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (cycleCountId) => {
-      const r = await apiFetch('/api/call/post_cycle_count_adjustments?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(cycleCountId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("post_cycle_count_adjustments", [toScalarU64(cycleCountId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post cycle count adjustments')
     },
     onSuccess: () => {
@@ -828,11 +768,8 @@ export function useCreateStockLocation(organizationId: bigint) {
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params)
-      const r = await apiFetch('/api/call/create_stock_location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_location", [organizationId, stdbParamsToJson(merged as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock location')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -843,11 +780,8 @@ export function useUpdateStockLocation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { locationId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ locationId, params }) => {
-      const r = await apiFetch('/api/call/update_stock_location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(locationId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_location", [organizationId, toScalarU64(locationId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update stock location')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -858,11 +792,8 @@ export function useDeleteStockLocation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (locationId) => {
-      const r = await apiFetch('/api/call/delete_stock_location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(locationId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_stock_location", [organizationId, toScalarU64(locationId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete stock location')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -873,11 +804,8 @@ export function useCreateStockMove(organizationId: bigint, _companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_move", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock move')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -888,15 +816,12 @@ export function useConfirmStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
-      const r = await apiFetch('/api/call/confirm_stock_move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("confirm_stock_move", [
           organizationId,
           toScalarU64(moveId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock move')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -907,15 +832,12 @@ export function useAssignStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
-      const r = await apiFetch('/api/call/assign_stock_move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("assign_stock_move", [
           organizationId,
           toScalarU64(moveId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock move')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -926,15 +848,12 @@ export function useDoneStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { moveId: ScalarId; quantityDone: number }>({
     mutationFn: async ({ moveId, quantityDone }) => {
-      const r = await apiFetch('/api/call/done_stock_move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("done_stock_move", [
           organizationId,
           toScalarU64(moveId),
           stdbParamsToJson({ company_id: companyId, quantity_done: quantityDone } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete stock move')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -945,15 +864,12 @@ export function useCancelStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
-      const r = await apiFetch('/api/call/cancel_stock_move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("cancel_stock_move", [
           organizationId,
           toScalarU64(moveId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock move')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -964,15 +880,12 @@ export function useConfirmStockPicking(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
-      const r = await apiFetch('/api/call/confirm_stock_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("confirm_stock_picking", [
           organizationId,
           toScalarU64(pickingId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock picking')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -983,15 +896,12 @@ export function useAssignStockPicking(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
-      const r = await apiFetch('/api/call/assign_stock_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("assign_stock_picking", [
           organizationId,
           toScalarU64(pickingId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock picking')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1002,15 +912,12 @@ export function useCancelStockPicking(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
-      const r = await apiFetch('/api/call/cancel_stock_picking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("cancel_stock_picking", [
           organizationId,
           toScalarU64(pickingId),
           stdbParamsToJson({ company_id: companyId } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock picking')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1021,11 +928,8 @@ export function useCreateStockInventory(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_inventory", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1036,11 +940,8 @@ export function useCreateStockInventoryLine(organizationId: bigint, _companyId?:
   const qc = useQueryClient()
   return useMutation<void, Error, { inventoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ inventoryId, params }) => {
-      const r = await apiFetch('/api/call/create_stock_inventory_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_inventory_line", [organizationId, toScalarU64(inventoryId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock inventory line')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1051,11 +952,8 @@ export function useUpdateStockInventoryState(organizationId: bigint, _companyId?
   const qc = useQueryClient()
   return useMutation<void, Error, { inventoryId: ScalarId; newState: string }>({
     mutationFn: async ({ inventoryId, newState }) => {
-      const r = await apiFetch('/api/call/update_stock_inventory_state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId), newState]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_inventory_state", [organizationId, toScalarU64(inventoryId), newState])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update stock inventory state')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1066,11 +964,8 @@ export function useCreateStockProductionLot(organizationId: bigint, _companyId?:
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_production_lot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_production_lot", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock production lot')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1081,11 +976,8 @@ export function useCreateStockProductionSerial(organizationId: bigint, _companyI
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_production_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_production_serial", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock production serial')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1096,11 +988,8 @@ export function useReserveSerial(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (serialId) => {
-      const r = await apiFetch('/api/call/reserve_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("reserve_serial", [organizationId, toScalarU64(serialId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reserve serial')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1111,11 +1000,8 @@ export function useBlockSerial(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { serialId: ScalarId; reason?: string | null }>({
     mutationFn: async ({ serialId, reason }) => {
-      const r = await apiFetch('/api/call/block_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId), reason ?? null]),
-      })
+      const { urlPath, init } = inventoryBffPost("block_serial", [organizationId, toScalarU64(serialId), reason ?? null])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to block serial')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1128,15 +1014,12 @@ export function useCreateQualityCheck(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_quality_check", [
           organizationId,
           companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1147,11 +1030,8 @@ export function useUpdateQualityCheck(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, { checkId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ checkId, params }) => {
-      const r = await apiFetch('/api/call/update_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(checkId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_quality_check", [organizationId, toScalarU64(checkId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1162,11 +1042,8 @@ export function useDeleteQualityCheck(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (checkId) => {
-      const r = await apiFetch('/api/call/delete_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(checkId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_quality_check", [organizationId, toScalarU64(checkId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1186,18 +1063,15 @@ export function usePassQualityCheck(organizationId: bigint, companyId: bigint) {
     }
   >({
     mutationFn: async ({ checkId, measure, note, picture }) => {
-      const r = await apiFetch('/api/call/pass_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("pass_quality_check", [
           organizationId,
           companyId,
           toScalarU64(checkId),
           measure ?? null,
           note ?? null,
           picture ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to pass quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1218,10 +1092,7 @@ export function useFailQualityCheck(organizationId: bigint, companyId: bigint) {
     }
   >({
     mutationFn: async ({ checkId, qtyFailed, note, pictureFail, failureLocationId }) => {
-      const r = await apiFetch('/api/call/fail_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("fail_quality_check", [
           organizationId,
           companyId,
           toScalarU64(checkId),
@@ -1229,8 +1100,8 @@ export function useFailQualityCheck(organizationId: bigint, companyId: bigint) {
           note ?? null,
           pictureFail ?? null,
           failureLocationId != null ? toScalarU64(failureLocationId) : null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to fail quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1241,16 +1112,13 @@ export function useCreateQualityAlert(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { teamId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ teamId, params }) => {
-      const r = await apiFetch('/api/call/create_quality_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_quality_alert", [
           organizationId,
           companyId,
           toScalarU64(teamId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1261,11 +1129,8 @@ export function useUpdateQualityAlert(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, { alertId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ alertId, params }) => {
-      const r = await apiFetch('/api/call/update_quality_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(alertId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_quality_alert", [organizationId, toScalarU64(alertId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1276,11 +1141,8 @@ export function useDeleteQualityAlert(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (alertId) => {
-      const r = await apiFetch('/api/call/delete_quality_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(alertId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_quality_alert", [organizationId, toScalarU64(alertId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1291,16 +1153,13 @@ export function useAssignQualityAlert(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { alertId: ScalarId; userId: string | null }>({
     mutationFn: async ({ alertId, userId }) => {
-      const r = await apiFetch('/api/call/assign_quality_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("assign_quality_alert", [
           organizationId,
           companyId,
           toScalarU64(alertId),
           userId,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1311,16 +1170,13 @@ export function useCancelQualityAlert(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { alertId: ScalarId; description?: string | null }>({
     mutationFn: async ({ alertId, description }) => {
-      const r = await apiFetch('/api/call/cancel_quality_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("cancel_quality_alert", [
           organizationId,
           companyId,
           toScalarU64(alertId),
           description ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1331,15 +1187,12 @@ export function useCreateQualityPoint(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_quality_point', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_quality_point", [
           organizationId,
           companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality point')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1350,16 +1203,13 @@ export function useUpdateQualityPoint(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { pointId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ pointId, params }) => {
-      const r = await apiFetch('/api/call/update_quality_point', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("update_quality_point", [
           organizationId,
           companyId,
           toScalarU64(pointId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality point')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1370,11 +1220,8 @@ export function useDeleteQualityPoint(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pointId) => {
-      const r = await apiFetch('/api/call/delete_quality_point', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(pointId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_quality_point", [organizationId, companyId, toScalarU64(pointId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete quality point')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1385,11 +1232,8 @@ export function useCreateQualityTeam(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_quality_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_quality_team", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality team')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1400,11 +1244,8 @@ export function useUpdateQualityTeam(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, { teamId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ teamId, params }) => {
-      const r = await apiFetch('/api/call/update_quality_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_quality_team", [organizationId, toScalarU64(teamId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality team')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1415,11 +1256,8 @@ export function useDeleteQualityTeam(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (teamId) => {
-      const r = await apiFetch('/api/call/delete_quality_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_quality_team", [organizationId, toScalarU64(teamId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete quality team')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1432,11 +1270,8 @@ export function useCreateBarcodeRule(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_barcode_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_barcode_rule", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create barcode rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
@@ -1447,11 +1282,8 @@ export function useUpdateBarcodeRule(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, { ruleId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ ruleId, params }) => {
-      const r = await apiFetch('/api/call/update_barcode_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_barcode_rule", [organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update barcode rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
@@ -1462,11 +1294,8 @@ export function useDeleteBarcodeRule(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (ruleId) => {
-      const r = await apiFetch('/api/call/delete_barcode_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_barcode_rule", [organizationId, toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete barcode rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['barcode-rules', rqBigIntKey(organizationId)] }),
@@ -1477,11 +1306,8 @@ export function useRecordBarcodeScan(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/record_barcode_scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("record_barcode_scan", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record barcode scan')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1492,11 +1318,8 @@ export function useCreateBarcodeNomenclature(organizationId: bigint, _companyId?
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_barcode_nomenclature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_barcode_nomenclature", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create barcode nomenclature')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1507,11 +1330,8 @@ export function useUpdateBarcodeNomenclature(organizationId: bigint, _companyId?
   const qc = useQueryClient()
   return useMutation<void, Error, { nomenclatureId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ nomenclatureId, params }) => {
-      const r = await apiFetch('/api/call/update_barcode_nomenclature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_barcode_nomenclature", [organizationId, toScalarU64(nomenclatureId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update barcode nomenclature')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1522,11 +1342,8 @@ export function useDeleteBarcodeNomenclature(organizationId: bigint, _companyId?
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (nomenclatureId) => {
-      const r = await apiFetch('/api/call/delete_barcode_nomenclature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_barcode_nomenclature", [organizationId, toScalarU64(nomenclatureId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete barcode nomenclature')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1537,11 +1354,8 @@ export function useAddRuleToNomenclature(organizationId: bigint, _companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, { nomenclatureId: ScalarId; ruleId: ScalarId }>({
     mutationFn: async ({ nomenclatureId, ruleId }) => {
-      const r = await apiFetch('/api/call/add_rule_to_nomenclature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("add_rule_to_nomenclature", [organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add rule to nomenclature')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1553,11 +1367,8 @@ export function useRemoveRuleFromNomenclature(organizationId: bigint, _companyId
   const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, { nomenclatureId: ScalarId; ruleId: ScalarId }>({
     mutationFn: async ({ nomenclatureId, ruleId }) => {
-      const r = await apiFetch('/api/call/remove_rule_from_nomenclature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("remove_rule_from_nomenclature", [organizationId, toScalarU64(nomenclatureId), toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove rule from nomenclature')
     },
     onSuccess: () => {
@@ -1572,11 +1383,8 @@ export function useCreateAdjustmentReason(organizationId: bigint, _companyId?: b
   const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_adjustment_reason', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_adjustment_reason", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create adjustment reason')
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['adjustment-reasons', orgKey] }),
@@ -1587,11 +1395,8 @@ export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (serialId) => {
-      const r = await apiFetch('/api/call/use_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("use_serial", [organizationId, toScalarU64(serialId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to mark serial in use')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1603,11 +1408,8 @@ export function useCreateTraceabilityRecord(organizationId: bigint, _companyId?:
   const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_traceability_record', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_traceability_record", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create traceability record')
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['serial-lot-traceability', orgKey] }),
@@ -1619,11 +1421,8 @@ export function useCreateTraceabilityReport(organizationId: bigint, _companyId?:
   const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_traceability_report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_traceability_report", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create traceability report')
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] }),
@@ -1635,11 +1434,8 @@ export function useRunTraceabilityReport(organizationId: bigint, _companyId?: bi
   const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (reportId) => {
-      const r = await apiFetch('/api/call/run_traceability_report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(reportId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("run_traceability_report", [organizationId, toScalarU64(reportId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to run traceability report')
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] }),
@@ -1652,11 +1448,8 @@ export function useCreateUomCategory(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_uom_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_uom_category", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM category')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -1667,11 +1460,8 @@ export function useCreateUom(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_uom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_uom", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -1682,11 +1472,8 @@ export function useUpdateUom(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { uomId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ uomId, params }) => {
-      const r = await apiFetch('/api/call/update_uom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(uomId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_uom", [organizationId, toScalarU64(uomId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update UOM')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -1697,11 +1484,8 @@ export function useDeleteUom(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (uomId) => {
-      const r = await apiFetch('/api/call/delete_uom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(uomId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_uom", [organizationId, toScalarU64(uomId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete UOM')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -1712,15 +1496,12 @@ export function useCreateUomConversion(organizationId: bigint, _companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ categoryId, params }) => {
-      const r = await apiFetch('/api/call/create_uom_conversion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_uom_conversion", [
           organizationId,
           toScalarU64(categoryId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM conversion')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -1733,15 +1514,12 @@ export function useCreateReplenishmentRule(organizationId: bigint, companyId: bi
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_replenishment_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_replenishment_rule", [
           organizationId,
           companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create replenishment rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
@@ -1752,11 +1530,8 @@ export function useUpdateReplenishmentRule(organizationId: bigint, _companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, { ruleId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ ruleId, params }) => {
-      const r = await apiFetch('/api/call/update_replenishment_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_replenishment_rule", [organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update replenishment rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
@@ -1767,11 +1542,8 @@ export function useDeleteReplenishmentRule(organizationId: bigint, _companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (ruleId) => {
-      const r = await apiFetch('/api/call/delete_replenishment_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_replenishment_rule", [organizationId, toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete replenishment rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
@@ -1782,11 +1554,8 @@ export function useTriggerReplenishment(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, { productId?: ScalarId; locationId?: ScalarId; warehouseId?: ScalarId }>({
     mutationFn: async ({ productId, locationId, warehouseId }) => {
-      const r = await apiFetch('/api/call/trigger_replenishment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productId ? toScalarU64(productId) : null, locationId ? toScalarU64(locationId) : null, warehouseId ? toScalarU64(warehouseId) : null]),
-      })
+      const { urlPath, init } = inventoryBffPost("trigger_replenishment", [organizationId, productId ? toScalarU64(productId) : null, locationId ? toScalarU64(locationId) : null, warehouseId ? toScalarU64(warehouseId) : null])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to trigger replenishment')
     },
     onSuccess: () => {
@@ -1802,15 +1571,12 @@ export function useCreatePickingWave(organizationId: bigint, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_picking_wave", [
           organizationId,
           companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create picking wave')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
@@ -1822,11 +1588,8 @@ export function useUpdatePickingWave(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, { waveId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ waveId, params }) => {
-      const r = await apiFetch('/api/call/update_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_picking_wave", [organizationId, toScalarU64(waveId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update picking wave')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
@@ -1838,11 +1601,8 @@ export function useDeletePickingWave(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
-      const r = await apiFetch('/api/call/delete_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_picking_wave", [organizationId, toScalarU64(waveId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete picking wave')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
@@ -1854,11 +1614,8 @@ export function useConfirmPickingWave(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
-      const r = await apiFetch('/api/call/complete_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(waveId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("complete_picking_wave", [organizationId, companyId, toScalarU64(waveId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm picking wave')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
@@ -1870,11 +1627,8 @@ export function useProcessPickingWave(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
-      const r = await apiFetch('/api/call/process_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(waveId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("process_picking_wave", [organizationId, toScalarU64(waveId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to process picking wave')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
@@ -1885,11 +1639,8 @@ export function useCompletePickingWave(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (waveId) => {
-      const r = await apiFetch('/api/call/complete_picking_wave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, toScalarU64(waveId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("complete_picking_wave", [organizationId, companyId, toScalarU64(waveId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete picking wave')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1902,11 +1653,8 @@ export function useConfirmStockInventory(organizationId: bigint, _companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (inventoryId) => {
-      const r = await apiFetch('/api/call/confirm_stock_inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("confirm_stock_inventory", [organizationId, toScalarU64(inventoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1917,11 +1665,8 @@ export function useStartStockInventory(organizationId: bigint, _companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (inventoryId) => {
-      const r = await apiFetch('/api/call/start_stock_inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("start_stock_inventory", [organizationId, toScalarU64(inventoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1932,11 +1677,8 @@ export function useValidateStockInventory(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (inventoryId) => {
-      const r = await apiFetch('/api/call/validate_stock_inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("validate_stock_inventory", [organizationId, toScalarU64(inventoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1947,11 +1689,8 @@ export function useCancelStockInventory(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (inventoryId) => {
-      const r = await apiFetch('/api/call/cancel_stock_inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(inventoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("cancel_stock_inventory", [organizationId, toScalarU64(inventoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -1966,11 +1705,8 @@ export function useCreateProductCategory(organizationId: bigint, companyId?: big
     mutationFn: async (params) => {
       const base = companyId != null ? { companyId: Number(companyId) } : {}
       const merged = mergeReducerParams(base, params)
-      const r = await apiFetch('/api/call/create_product_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_product_category", [organizationId, stdbParamsToJson(merged as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product category')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
@@ -1981,11 +1717,8 @@ export function useUpdateProductCategory(organizationId: bigint, _companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ categoryId, params }) => {
-      const r = await apiFetch('/api/call/update_product_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_category", [organizationId, toScalarU64(categoryId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product category')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
@@ -1996,11 +1729,8 @@ export function useDeleteProductCategory(organizationId: bigint, _companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (categoryId) => {
-      const r = await apiFetch('/api/call/delete_product_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_product_category", [organizationId, toScalarU64(categoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete product category')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
@@ -2013,11 +1743,8 @@ export function useCreateStockRoute(organizationId: bigint, _companyId?: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_route", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock route')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
@@ -2028,11 +1755,8 @@ export function useUpdateStockRoute(organizationId: bigint, _companyId?: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, { routeId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ routeId, params }) => {
-      const r = await apiFetch('/api/call/update_stock_route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(routeId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_route", [organizationId, toScalarU64(routeId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update stock route')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
@@ -2043,11 +1767,8 @@ export function useDeleteStockRoute(organizationId: bigint, _companyId?: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (routeId) => {
-      const r = await apiFetch('/api/call/delete_stock_route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(routeId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_stock_route", [organizationId, toScalarU64(routeId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete stock route')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-routes', rqBigIntKey(organizationId)] }),
@@ -2058,11 +1779,8 @@ export function useCreateStockRule(organizationId: bigint, _companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_stock_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_rule", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
@@ -2073,11 +1791,8 @@ export function useUpdateStockRule(organizationId: bigint, _companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, { ruleId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ ruleId, params }) => {
-      const r = await apiFetch('/api/call/update_stock_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_rule", [organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update stock rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
@@ -2088,11 +1803,8 @@ export function useDeleteStockRule(organizationId: bigint, _companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (ruleId) => {
-      const r = await apiFetch('/api/call/delete_stock_rule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_stock_rule", [organizationId, toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete stock rule')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-rules', rqBigIntKey(organizationId)] }),
@@ -2105,15 +1817,12 @@ export function useCreateWarehouseTask(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_warehouse_task", [
           organizationId,
           companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create warehouse task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
@@ -2124,11 +1833,8 @@ export function useDeleteWarehouseTask(organizationId: bigint, _companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (taskId) => {
-      const r = await apiFetch('/api/call/delete_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_warehouse_task", [organizationId, toScalarU64(taskId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete warehouse task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
@@ -2139,11 +1845,8 @@ export function useStartWarehouseTask(organizationId: bigint, _companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (taskId) => {
-      const r = await apiFetch('/api/call/start_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("start_warehouse_task", [organizationId, toScalarU64(taskId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start warehouse task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
@@ -2154,11 +1857,8 @@ export function useCompleteWarehouseTask(organizationId: bigint, _companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, { taskId: ScalarId; result?: Record<string, unknown> }>({
     mutationFn: async ({ taskId, result }) => {
-      const r = await apiFetch('/api/call/complete_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId), result ?? {}]),
-      })
+      const { urlPath, init } = inventoryBffPost("complete_warehouse_task", [organizationId, toScalarU64(taskId), result ?? {}])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete warehouse task')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2169,11 +1869,8 @@ export function useCancelWarehouseTask(organizationId: bigint, _companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (taskId) => {
-      const r = await apiFetch('/api/call/cancel_warehouse_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(taskId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("cancel_warehouse_task", [organizationId, toScalarU64(taskId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel warehouse task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
@@ -2186,11 +1883,8 @@ export function useUpdateProductVariant(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, { variantId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ variantId, params }) => {
-      const r = await apiFetch('/api/call/update_product_variant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(variantId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_variant", [organizationId, toScalarU64(variantId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product variant')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2201,11 +1895,8 @@ export function useUpdateProductInventoryData(organizationId: bigint, _companyId
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ productId, params }) => {
-      const r = await apiFetch('/api/call/update_product_inventory_data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_inventory_data", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product inventory data')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2216,11 +1907,8 @@ export function useUpdateProductPricing(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ productId, params }) => {
-      const r = await apiFetch('/api/call/update_product_pricing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_pricing", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product pricing')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2233,11 +1921,8 @@ export function useStartQualityCheck(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (checkId) => {
-      const r = await apiFetch('/api/call/start_quality_check?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(checkId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("start_quality_check", [toScalarU64(checkId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2248,11 +1933,8 @@ export function useOpenQualityAlert(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (alertId) => {
-      const r = await apiFetch('/api/call/open_quality_alert?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(alertId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("open_quality_alert", [toScalarU64(alertId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to open quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2263,11 +1945,8 @@ export function useSolveQualityAlert(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { alertId: ScalarId; description?: string | null }>({
     mutationFn: async ({ alertId, description }) => {
-      const r = await apiFetch('/api/call/solve_quality_alert?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(alertId), description ?? null]),
-      })
+      const { urlPath, init } = inventoryBffPost("solve_quality_alert", [toScalarU64(alertId), description ?? null])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to solve quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2278,18 +1957,15 @@ export function useCreateQualityAlertReason(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { name: string; description?: string | null; metadata?: string | null }>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_quality_alert_reason', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("create_quality_alert_reason", [
           organizationId,
           {
             name: params.name,
             description: params.description ?? null,
             metadata: params.metadata ?? null,
           },
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality alert reason')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2307,11 +1983,8 @@ export function useUpdateQualityAlertReason(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ reasonId, params }) => {
-      const r = await apiFetch('/api/call/update_quality_alert_reason', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(reasonId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_quality_alert_reason", [organizationId, toScalarU64(reasonId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality alert reason')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2322,11 +1995,8 @@ export function useDeleteQualityAlertReason(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (reasonId) => {
-      const r = await apiFetch('/api/call/delete_quality_alert_reason', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(reasonId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_quality_alert_reason", [organizationId, toScalarU64(reasonId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete quality alert reason')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2337,11 +2007,8 @@ export function useAddMemberToQualityTeam(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { teamId: ScalarId; memberIdentityHex: string }>({
     mutationFn: async ({ teamId, memberIdentityHex }) => {
-      const r = await apiFetch('/api/call/add_member_to_quality_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), memberIdentityHex]),
-      })
+      const { urlPath, init } = inventoryBffPost("add_member_to_quality_team", [organizationId, toScalarU64(teamId), memberIdentityHex])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add team member')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2352,11 +2019,8 @@ export function useRemoveMemberFromQualityTeam(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { teamId: ScalarId; memberIdentityHex: string }>({
     mutationFn: async ({ teamId, memberIdentityHex }) => {
-      const r = await apiFetch('/api/call/remove_member_from_quality_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(teamId), memberIdentityHex]),
-      })
+      const { urlPath, init } = inventoryBffPost("remove_member_from_quality_team", [organizationId, toScalarU64(teamId), memberIdentityHex])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove team member')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2368,11 +2032,8 @@ export function useExecuteReplenishmentRule(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (ruleId) => {
-      const r = await apiFetch('/api/call/execute_replenishment_rule?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(ruleId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("execute_replenishment_rule", [toScalarU64(ruleId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to execute replenishment rule')
     },
     onSuccess: () => {
@@ -2396,11 +2057,8 @@ export function useCreateStockQuant(
         scopedCompanyId != null ? { companyId: Number(scopedCompanyId) } : {},
       )
       const merged = mergeReducerParams(base, params)
-      const r = await apiFetch('/api/call/create_stock_quant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_stock_quant", [organizationId, stdbParamsToJson(merged as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock quant')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2411,15 +2069,12 @@ export function useUpdateStockQuantQuantity(organizationId: bigint, companyId: b
   const qc = useQueryClient()
   return useMutation<void, Error, { quantId: ScalarId; quantity: number }>({
     mutationFn: async ({ quantId, quantity }) => {
-      const r = await apiFetch('/api/call/update_stock_quant_quantity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("update_stock_quant_quantity", [
           organizationId,
           toScalarU64(quantId),
           stdbParamsToJson({ company_id: companyId, quantity } as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quant quantity')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2430,11 +2085,8 @@ export function useUpdateStockProductionLot(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { lotId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ lotId, params }) => {
-      const r = await apiFetch('/api/call/update_stock_production_lot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lotId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_production_lot", [organizationId, toScalarU64(lotId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lot')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2445,11 +2097,8 @@ export function useDeleteStockProductionLot(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (lotId) => {
-      const r = await apiFetch('/api/call/delete_stock_production_lot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lotId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_stock_production_lot", [organizationId, toScalarU64(lotId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete lot')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2460,11 +2109,8 @@ export function useUpdateStockProductionSerial(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { serialId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ serialId, params }) => {
-      const r = await apiFetch('/api/call/update_stock_production_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_stock_production_serial", [organizationId, toScalarU64(serialId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update serial')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2475,11 +2121,8 @@ export function useDeleteStockProductionSerial(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (serialId) => {
-      const r = await apiFetch('/api/call/delete_stock_production_serial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(serialId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_stock_production_serial", [organizationId, toScalarU64(serialId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete serial')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2494,11 +2137,8 @@ export function useCreateWarehouse3dZone(organizationId: bigint) {
     { warehouseId: ScalarId; locationId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ warehouseId, locationId, params }) => {
-      const r = await apiFetch('/api/call/create_warehouse_3d_zone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(warehouseId), toScalarU64(locationId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_warehouse_3d_zone", [organizationId, toScalarU64(warehouseId), toScalarU64(locationId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create 3D zone')
     },
     onSuccess: () => {
@@ -2513,11 +2153,8 @@ export function useUpdateWarehouse3dZone(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { zoneId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ zoneId, params }) => {
-      const r = await apiFetch('/api/call/update_warehouse_3d_zone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(zoneId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_warehouse_3d_zone", [organizationId, toScalarU64(zoneId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update 3D zone')
     },
     onSuccess: () => {
@@ -2531,11 +2168,8 @@ export function useDeleteWarehouse3dZone(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (zoneId) => {
-      const r = await apiFetch('/api/call/delete_warehouse_3d_zone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(zoneId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("delete_warehouse_3d_zone", [organizationId, toScalarU64(zoneId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete 3D zone')
     },
     onSuccess: () => {
@@ -2549,11 +2183,8 @@ export function useUpdateWarehouseTaskStatus(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { taskId: ScalarId; newStatus: string }>({
     mutationFn: async ({ taskId, newStatus }) => {
-      const r = await apiFetch('/api/call/update_warehouse_task_status?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([toScalarU64(taskId), newStatus]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_warehouse_task_status", [toScalarU64(taskId), newStatus])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task status')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
@@ -2564,11 +2195,8 @@ export function useLinkDeviceToQualityCheck(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { deviceId: ScalarId; checkId: ScalarId }>({
     mutationFn: async ({ deviceId, checkId }) => {
-      const r = await apiFetch('/api/call/link_device_to_quality_check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(deviceId), toScalarU64(checkId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("link_device_to_quality_check", [organizationId, toScalarU64(deviceId), toScalarU64(checkId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to link device to quality check')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2579,11 +2207,8 @@ export function useCreateProductSupplierInfo(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_product_supplier_info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_product_supplier_info", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create supplier info')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2594,11 +2219,8 @@ export function useUpdateProductSupplierInfo(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { supplierInfoId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ supplierInfoId, params }) => {
-      const r = await apiFetch('/api/call/update_product_supplier_info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(supplierInfoId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_supplier_info", [organizationId, toScalarU64(supplierInfoId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update supplier info')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2609,11 +2231,8 @@ export function useCreateProductPackaging(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ productId, params }) => {
-      const r = await apiFetch('/api/call/create_product_packaging', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(productId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("create_product_packaging", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create packaging')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2624,11 +2243,8 @@ export function useUpdateProductPackaging(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { packagingId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ packagingId, params }) => {
-      const r = await apiFetch('/api/call/update_product_packaging', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(packagingId), stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_product_packaging", [organizationId, toScalarU64(packagingId), stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update packaging')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2639,11 +2255,8 @@ export function useRestoreProductCategory(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (categoryId) => {
-      const r = await apiFetch('/api/call/restore_product_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
-      })
+      const { urlPath, init } = inventoryBffPost("restore_product_category", [organizationId, toScalarU64(categoryId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to restore category')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
@@ -2666,10 +2279,7 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
     }
   >({
     mutationFn: async (p) => {
-      const r = await apiFetch('/api/call/upsert_warehouse_geo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("upsert_warehouse_geo", [
           organizationId,
           toScalarU64(p.warehouseId),
           p.latitude,
@@ -2678,8 +2288,8 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
           p.city ?? null,
           p.countryCode ?? null,
           p.managerName ?? null,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to save warehouse geo')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
@@ -2701,11 +2311,8 @@ export function useImportUomCategoryCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_uom_category_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_uom_category_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -2716,11 +2323,8 @@ export function useImportUomCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_uom_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_uom_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
@@ -2731,11 +2335,8 @@ export function useImportProductCategoryCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_product_category_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_product_category_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
@@ -2749,15 +2350,12 @@ export function useImportProductCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { csvData: string; currencyId: number }) => {
-      const res = await apiFetch('/api/call/import_product_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = inventoryBffPost("import_product_csv", [
           organizationId,
           args.currencyId,
           args.csvData,
-        ]),
-      })
+        ])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2768,11 +2366,8 @@ export function useImportProductVariantCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_product_variant_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_product_variant_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['products', rqBigIntKey(organizationId)] }),
@@ -2783,11 +2378,8 @@ export function useImportWarehouseCsv(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_warehouse_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_warehouse_csv", [organizationId, companyId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
@@ -2802,11 +2394,8 @@ export function useImportStockLocationCsv(organizationId: bigint, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_stock_location_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_stock_location_csv", [organizationId, companyId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
@@ -2820,11 +2409,8 @@ export function useImportStockQuantCsv(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_stock_quant_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_stock_quant_csv", [organizationId, companyId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
@@ -2838,11 +2424,8 @@ export function useImportLotCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_lot_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = inventoryBffPost("import_lot_csv", [organizationId, companyId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },
     onSuccess: () => {
@@ -2871,11 +2454,8 @@ export function useUpdateWhatsappQualityScore(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { accountId: ScalarId; qualityScore: string }>({
     mutationFn: async ({ accountId, qualityScore }) => {
-      const r = await apiFetch('/api/call/update_whatsapp_quality_score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(accountId), qualityScore]),
-      })
+      const { urlPath, init } = inventoryBffPost("update_whatsapp_quality_score", [organizationId, toScalarU64(accountId), qualityScore])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update WhatsApp quality score')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),

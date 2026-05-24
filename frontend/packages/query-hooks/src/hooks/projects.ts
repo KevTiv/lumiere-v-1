@@ -8,10 +8,10 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { projectsBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
@@ -64,11 +64,12 @@ export function useCreateProject(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = projectsBffPost("create_project", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
@@ -79,11 +80,12 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = projectsBffPost("create_task", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
@@ -94,11 +96,12 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/log_timesheet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = projectsBffPost("log_timesheet", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create timesheet')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
@@ -115,15 +118,13 @@ export function useUpdateProject(organizationId: bigint, companyId?: bigint) {
       projectId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/update_project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = projectsBffPost("update_project", [
           organizationId,
           projectId,
-          withCompanyScope(params, companyId),
-        ]),
-      })
+          stdbParamsToJson(withCompanyScope(params, companyId)),
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update project')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
@@ -140,15 +141,13 @@ export function useUpdateTask(organizationId: bigint, companyId?: bigint) {
       taskId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/update_task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = projectsBffPost("update_task", [
           organizationId,
           taskId,
-          withCompanyScope(params, companyId),
-        ]),
-      })
+          stdbParamsToJson(withCompanyScope(params, companyId)),
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
@@ -165,11 +164,9 @@ export function useUpdateTaskState(organizationId: bigint) {
       taskId: string | number | bigint
       state: unknown
     }) => {
-      const r = await apiFetch('/api/call/update_task_state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, taskId, state]),
-      })
+      const { urlPath, init } = projectsBffPost("update_task_state", [organizationId, taskId, state])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task state')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
@@ -180,11 +177,12 @@ export function useStartTimesheetTimer(organizationId: bigint, companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/start_timesheet_timer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, withCompanyScope(params, companyId)]),
-      })
+      const { urlPath, init } = projectsBffPost("start_timesheet_timer", [
+        organizationId,
+        stdbParamsToJson(withCompanyScope(params, companyId)),
+      ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start timesheet timer')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
@@ -195,11 +193,9 @@ export function useStopTimesheetTimer(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (timesheetId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/stop_timesheet_timer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, timesheetId]),
-      })
+      const { urlPath, init } = projectsBffPost("stop_timesheet_timer", [organizationId, timesheetId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to stop timesheet timer')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
@@ -218,11 +214,9 @@ export function useSetProjectActive(organizationId: bigint) {
       projectId: string | number | bigint
       active: boolean
     }) => {
-      const r = await apiFetch('/api/call/set_project_active', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, projectId, active]),
-      })
+      const { urlPath, init } = projectsBffPost("set_project_active", [organizationId, projectId, active])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to set project active state')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
@@ -233,11 +227,9 @@ export function useToggleProjectFavorite(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (projectId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/toggle_project_favorite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, projectId]),
-      })
+      const { urlPath, init } = projectsBffPost("toggle_project_favorite", [organizationId, projectId])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to toggle project favorite')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', rqBigIntKey(organizationId)] }),
@@ -254,11 +246,9 @@ export function useSetTaskParent(organizationId: bigint) {
       taskId: string | number | bigint
       parentId: string | number | bigint | null
     }) => {
-      const r = await apiFetch('/api/call/set_task_parent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, taskId, parentId ?? null]),
-      })
+      const { urlPath, init } = projectsBffPost("set_task_parent", [organizationId, taskId, parentId ?? null])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to set task parent')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
@@ -275,11 +265,9 @@ export function useAssignTaskUsers(organizationId: bigint) {
       taskId: string | number | bigint
       userIds: (string | number | bigint)[]
     }) => {
-      const r = await apiFetch('/api/call/assign_task_users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, taskId, userIds.map((id) => id)]),
-      })
+      const { urlPath, init } = projectsBffPost("assign_task_users", [organizationId, taskId, userIds.map((id) => id)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign task users')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
@@ -295,17 +283,14 @@ export function useValidateTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ValidateTimesheetsInput>({
     mutationFn: async ({ timesheetIds, companyId }) => {
-      const r = await apiFetch('/api/call/validate_timesheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          stdbParamsToJson({
-            companyId: companyId != null ? toScalarU64(companyId) : null,
-            timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
-          }),
-        ]),
-      })
+      const { urlPath, init } = projectsBffPost("validate_timesheets", [
+        organizationId,
+        stdbParamsToJson({
+          companyId: companyId != null ? toScalarU64(companyId) : null,
+          timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
@@ -333,10 +318,7 @@ export function useBillTimesheets(organizationId: bigint) {
       partnerId,
       invoiceDate,
     }) => {
-      const r = await apiFetch('/api/call/bill_timesheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = projectsBffPost("bill_timesheets", [
           organizationId,
           stdbParamsToJson({
             companyId: companyId != null ? toScalarU64(companyId) : null,
@@ -351,8 +333,9 @@ export function useBillTimesheets(organizationId: bigint) {
                   )
                 : null,
           }),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to bill timesheets')
     },
     onSuccess: () => {
@@ -377,11 +360,9 @@ export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_project_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = projectsBffPost("import_project_csv", [organizationId, companyId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
@@ -393,11 +374,9 @@ export function useImportTaskCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_task_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = projectsBffPost("import_task_csv", [organizationId, companyId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>
@@ -409,11 +388,9 @@ export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_timesheet_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = projectsBffPost("import_timesheet_csv", [organizationId, companyId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
     onSuccess: () =>

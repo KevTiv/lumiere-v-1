@@ -49,6 +49,7 @@ import {
 } from "../lib/theme-colors"
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
+import { toast } from "sonner"
 
 type DisplayGroup = AccountTypeGroup
 
@@ -285,17 +286,20 @@ export function ChartOfAccountsView({
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("accounting.forms.newAccount.fields.code")}</Label>
+                <Label htmlFor="coa-create-code">{t("accounting.forms.newAccount.fields.code")}</Label>
                 <Input
+                  id="coa-create-code"
                   value={newCode}
                   onChange={(e) => setNewCode(e.target.value)}
                   placeholder={t("accounting.forms.newAccount.fields.codePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("accounting.forms.newAccount.fields.internalGroup")}</Label>
+                <Label htmlFor="coa-create-group">{t("accounting.forms.newAccount.fields.internalGroup")}</Label>
                 <Select value={newGroup} onValueChange={(v) => setNewGroup(v as DisplayGroup)}>
-                  <SelectTrigger><SelectValue placeholder={t("accounting.forms.newAccount.fields.accountTypePlaceholder")} /></SelectTrigger>
+                  <SelectTrigger id="coa-create-group">
+                    <SelectValue placeholder={t("accounting.forms.newAccount.fields.accountTypePlaceholder")} />
+                  </SelectTrigger>
                   <SelectContent>
                     {(["asset", "liability", "equity", "income", "expense"] as DisplayGroup[]).map((g) => (
                       <SelectItem key={g} value={g}>
@@ -307,16 +311,18 @@ export function ChartOfAccountsView({
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t("accounting.forms.newAccount.fields.name")}</Label>
+              <Label htmlFor="coa-create-name">{t("accounting.forms.newAccount.fields.name")}</Label>
               <Input
+                id="coa-create-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder={t("accounting.forms.newAccount.fields.namePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t("accounting.forms.newAccount.fields.openingBalance")}</Label>
+              <Label htmlFor="coa-create-opening">{t("accounting.forms.newAccount.fields.openingBalance")}</Label>
               <Input
+                id="coa-create-opening"
                 type="number"
                 value={newOpening}
                 onChange={(e) => setNewOpening(e.target.value)}
@@ -352,6 +358,13 @@ export function ChartOfAccountsView({
                   setNewGroup("asset")
                   setNewOpening("")
                   setShowCreateModal(false)
+                  toast.success(t("common.formSubmit.saved"))
+                } catch (e) {
+                  const message =
+                    e instanceof Error && e.message.trim() !== ""
+                      ? e.message
+                      : t("common.formSubmit.failed")
+                  toast.error(message)
                 } finally {
                   setIsCreating(false)
                 }

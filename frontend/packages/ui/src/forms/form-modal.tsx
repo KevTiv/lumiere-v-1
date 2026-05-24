@@ -2,6 +2,8 @@
 
 
 import React from "react"
+import { useTranslation } from "@lumiere/i18n"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,13 @@ interface FormModalProps {
    * Use when you handle errors inside `onSubmit` and need to keep the dialog open.
    */
   closeOnSubmit?: boolean
+  /**
+   * After `onSubmit` resolves without throwing, show Sonner success.
+   * Defaults: `true` when `closeOnSubmit` is true; `false` when `closeOnSubmit` is false (avoid duplicate toasts for flows that close manually).
+   */
+  showSubmitSuccessToast?: boolean
+  /** Message for Sonner success; defaults to translated `common.formSubmit.saved`. */
+  submitSuccessMessage?: string
   /** Shown above the form body (e.g. API / validation errors while the dialog stays open). */
   submitError?: string | null
   /** Passed to {@link ModularForm} — e.g. a destructive action beside Cancel / Submit. */
@@ -46,16 +55,25 @@ export function FormModal({
   onSubmit,
   className,
   closeOnSubmit = true,
+  showSubmitSuccessToast,
+  submitSuccessMessage,
   submitError,
   formLeadingActions,
   isPending,
 }: FormModalProps) {
+  const { t } = useTranslation()
+
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (onSubmit) {
       await onSubmit(data)
     }
     if (closeOnSubmit) {
       onOpenChange(false)
+    }
+    const shouldToastSuccess =
+      showSubmitSuccessToast !== undefined ? showSubmitSuccessToast : closeOnSubmit
+    if (shouldToastSuccess) {
+      toast.success(submitSuccessMessage ?? t("common.formSubmit.saved"))
     }
   }
 

@@ -115,7 +115,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     [proposals],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
@@ -123,20 +123,20 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     if (action === "createProposal") {
       const title = String(formData.title ?? "").trim()
       if (!title) return
-      createProposal.mutate({
+      await createProposal.mutateAsync({
         organizationId: orgId,
         title,
         clientName: String(formData.clientName ?? "").trim(),
+        type: String(formData.type ?? ""),
         value: Number(formData.value ?? 0),
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
         description: formData.description != null ? String(formData.description) : undefined,
-      }, {
-        onSuccess: (_, variables) => {
-          // Navigate to the new proposal — find it by title after creation
-          const newId = `new-${Date.now()}`
-          router.push(`/proposals/${newId}?title=${encodeURIComponent(String(variables.title ?? "New Proposal"))}&orgId=${organizationId}`)
-        },
       })
+      // API returns only `{ ok: true }`; workspace route uses synthetic id until list refetches.
+      const newId = `new-${Date.now()}`
+      router.push(
+        `/proposals/${newId}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
+      )
     }
   }
 
@@ -157,11 +157,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newProposalForm(t)}
-        onSubmit={(formData) => {
-          if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
-            setQuickActionForm(null)
-          }
+        onSubmit={async (formData) => {
+          if (quickActionForm) await handleFormSubmit("dashboard", quickActionForm.action, formData)
         }}
       />
     </>

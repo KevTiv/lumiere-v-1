@@ -324,6 +324,7 @@ export function WorkflowsRowDialog({
           onSubmit={async (data) => {
             setSubmitError(null)
             try {
+              const workflowId = id || String(data.workflowId ?? "").trim()
               const seq = Number(data.sequence)
               const params: AddWorkflowActivityParams = {
                 name: String(data.name ?? "").trim(),
@@ -345,7 +346,7 @@ export function WorkflowsRowDialog({
                 metadata: undefined,
               }
               await mutations.addWorkflowActivity.mutateAsync({
-                workflowId: id,
+                workflowId,
                 params,
               })
               setPanel("main")
@@ -371,6 +372,7 @@ export function WorkflowsRowDialog({
           onSubmit={async (data) => {
             setSubmitError(null)
             try {
+              const workflowId = id || String(data.workflowId ?? "").trim()
               const seq = Number(data.sequence)
               const sig = String(data.signal ?? "").trim()
               const params: AddWorkflowTransitionParams = {
@@ -383,7 +385,7 @@ export function WorkflowsRowDialog({
                 metadata: undefined,
               }
               await mutations.addWorkflowTransition.mutateAsync({
-                workflowId: id,
+                workflowId,
                 activityFrom: String(data.activityFrom ?? ""),
                 activityTo: String(data.activityTo ?? ""),
                 params,

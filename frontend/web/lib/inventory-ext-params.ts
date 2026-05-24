@@ -11,6 +11,78 @@ import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
+export type InventoryCreateProductPayload = Record<string, unknown> & {
+  name: string
+  categId: number
+  type: string
+  uomId: number
+  uomPoId: number
+  standardPrice: number
+  listPrice: number
+  currencyId: number
+  defaultCode: string | undefined
+  saleOk: boolean
+  purchaseOk: boolean
+  displayName: string | undefined
+  pricelistId: number | undefined
+}
+
+export type InventoryCreateStockPickingPayload = Record<string, unknown> & {
+  name: string
+  pickingTypeId: number
+  locationId: number
+  locationDestId: number
+  scheduledDate: Date | undefined
+  origin: string | undefined
+}
+
+export type InventoryCreateAdjustmentPayload = Record<string, unknown> & {
+  name: string
+  productId: number
+  locationId: number
+  quantityBefore: number
+  quantityAfter: number
+  reasonCode: string
+  state: string
+  adjustmentType: string
+  uomId: number
+  unitCost: number
+  reasonNotes: string | undefined
+  metadata: string
+}
+
+export type InventoryCreateStockLocationPayload = Record<string, unknown> & {
+  name: string
+  usage: string
+  locationCategory: string
+  parentPath: string
+  locationId: number | undefined
+  barcode: string | undefined
+}
+
+export type InventoryCreateProductCategoryPayload = Record<string, unknown> & {
+  name: string
+  parentId: number | undefined
+  sequence: number
+  metadata: string
+}
+
+export type InventoryCreateBarcodeRulePayload = Record<string, unknown> & {
+  name: string
+  pattern: string
+  encoding: string
+  type: string
+  sequence: number
+}
+
+export type InventoryCreateStockQuantPayload = Record<string, unknown> & {
+  productId: number
+  locationId: number
+  quantity: number
+  reservedQuantity: number
+  cost: number
+}
+
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
   const s = String(v).trim()
@@ -55,6 +127,161 @@ export function parseBigIntIdList(raw: unknown): bigint[] {
     }
   }
   return out
+}
+
+export function toCreateProductParamsFromForm(
+  formData: Record<string, unknown>,
+  currencyId: number,
+): InventoryCreateProductPayload | null {
+  const categRaw = formData.categId
+  const uomRaw = formData.uomId
+  if (categRaw === "" || categRaw == null || uomRaw === "" || uomRaw == null) return null
+  const categId = Number(categRaw)
+  const uomId = Number(uomRaw)
+  const uomPoRaw = formData.uomPoId
+  const uomPoId =
+    uomPoRaw !== "" && uomPoRaw != null && String(uomPoRaw).trim() !== ""
+      ? Number(uomPoRaw)
+      : uomId
+  const standard = Number(formData.standardPrice ?? 0)
+  return {
+    name: String(formData.name ?? ""),
+    categId,
+    type: String(formData.type ?? "product"),
+    uomId,
+    uomPoId,
+    standardPrice: standard,
+    listPrice: standard,
+    currencyId,
+    defaultCode: formData.defaultCode ? String(formData.defaultCode) : undefined,
+    saleOk: formData.saleOk == null ? true : Boolean(formData.saleOk),
+    purchaseOk: formData.purchaseOk == null ? true : Boolean(formData.purchaseOk),
+    displayName: formData.name ? String(formData.name) : undefined,
+    pricelistId: formData.pricelistId != null ? Number(formData.pricelistId) : undefined,
+  }
+}
+
+export function toCreateStockPickingParamsFromForm(
+  formData: Record<string, unknown>,
+): InventoryCreateStockPickingPayload | null {
+  const pickingRaw = formData.pickingTypeId
+  const locFrom = formData.locationId
+  const locTo = formData.locationDestId
+  if (
+    pickingRaw === "" ||
+    pickingRaw == null ||
+    locFrom === "" ||
+    locFrom == null ||
+    locTo === "" ||
+    locTo == null
+  ) {
+    return null
+  }
+  const originStr = formData.origin ? String(formData.origin) : ""
+  return {
+    name: originStr.trim() !== "" ? originStr : "New Transfer",
+    pickingTypeId: Number(pickingRaw),
+    locationId: Number(locFrom),
+    locationDestId: Number(locTo),
+    scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
+    origin: originStr.trim() !== "" ? originStr : undefined,
+  }
+}
+
+export function toCreateInventoryAdjustmentParamsFromForm(
+  formData: Record<string, unknown>,
+  uomId: number,
+): InventoryCreateAdjustmentPayload | null {
+  const productRaw = formData.productId
+  const locRaw = formData.locationId
+  if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return null
+  const qtyAfter = Number(formData.countQty ?? formData.inventoryQuantity ?? 0)
+  const bookRaw = formData.bookQuantity
+  const qtyBefore =
+    bookRaw !== "" && bookRaw != null && String(bookRaw).trim() !== ""
+      ? Number(bookRaw)
+      : qtyAfter
+  return {
+    name: String(formData.name ?? "Inventory Adjustment"),
+    productId: Number(productRaw),
+    locationId: Number(locRaw),
+    quantityBefore: qtyBefore,
+    quantityAfter: qtyAfter,
+    reasonCode: String(formData.reasonCode ?? "INV_ADJ").trim() || "INV_ADJ",
+    state: "draft",
+    adjustmentType: "quantity",
+    uomId,
+    unitCost: Number(formData.standardPrice ?? 0),
+    reasonNotes: formData.reasonNotes ? String(formData.reasonNotes) : undefined,
+    metadata: adjustmentCreateMetadataFromForm(formData),
+  }
+}
+
+export function toCreateStockLocationParamsFromForm(
+  formData: Record<string, unknown>,
+): InventoryCreateStockLocationPayload | null {
+  const name = String(formData.name ?? "").trim()
+  if (!name) return null
+  const usage = String(formData.usage ?? "internal")
+  const parentRaw = formData.parentLocationId
+  const parentId =
+    parentRaw !== "" && parentRaw != null && String(parentRaw).trim() !== ""
+      ? Number(parentRaw)
+      : undefined
+  return {
+    name,
+    usage,
+    locationCategory: usage,
+    parentPath: parentId ? "" : "/",
+    locationId: parentId,
+    barcode: formData.barcode ? String(formData.barcode) : undefined,
+  }
+}
+
+export function toCreateProductCategoryParamsFromForm(
+  formData: Record<string, unknown>,
+): InventoryCreateProductCategoryPayload | null {
+  const name = String(formData.name ?? "").trim()
+  if (!name) return null
+  const removalStrategyId = formData.removalStrategyId
+    ? Number(formData.removalStrategyId)
+    : undefined
+  return {
+    name,
+    parentId: formData.parentId ? Number(formData.parentId) : undefined,
+    sequence: Number(formData.sequence ?? 10),
+    metadata: productCategoryCreateMetadataFromForm(removalStrategyId, formData),
+  }
+}
+
+export function toCreateBarcodeRuleParamsFromForm(
+  formData: Record<string, unknown>,
+): InventoryCreateBarcodeRulePayload | null {
+  const name = String(formData.name ?? "").trim()
+  const pattern = String(formData.pattern ?? "").trim()
+  if (!name || !pattern) return null
+  return {
+    name,
+    pattern,
+    encoding: String(formData.encoding ?? "any"),
+    type: String(formData.type ?? "product"),
+    sequence: Number(formData.sequence ?? 100),
+  }
+}
+
+export function toCreateStockQuantParamsFromForm(
+  formData: Record<string, unknown>,
+): InventoryCreateStockQuantPayload | null {
+  const p = formData.productId
+  const l = formData.locationId
+  if (p === "" || p == null || l === "" || l == null) return null
+  return {
+    productId: Number(p),
+    locationId: Number(l),
+    quantity: Number(formData.quantity ?? 0),
+    reservedQuantity: Number(formData.reservedQuantity ?? 0),
+    cost: Number(formData.cost ?? 0),
+  }
 }
 
 export function toCreateAdjustmentReasonParamsFromForm(
@@ -145,11 +372,12 @@ export function warehouse3dZoneParamsFromForm(formData: Record<string, unknown>)
 /** Payload for `create_picking_wave` aligned with `CreatePickingWaveParams`. */
 export function pickingWaveCreateParamsFromForm(
   formData: Record<string, unknown>,
-  /** Optional extras (e.g. warehouse / user ids) merged into `metadata` JSON. */
+  /** Optional extras merged into `metadata` JSON. */
   warehouseUserMeta?: Record<string, unknown>,
 ): Record<string, unknown> {
   const name = String(formData.name ?? "").trim()
   const scheduledRaw = formData.scheduledDate
+  const userId = formData.userId
   const dateStart: Timestamp =
     scheduledRaw != null && String(scheduledRaw).trim() !== ""
       ? stbTimestampFromDate(new Date(String(scheduledRaw)))
@@ -162,10 +390,14 @@ export function pickingWaveCreateParamsFromForm(
     isWave: true,
     pickingIds: [] as number[],
     moveLineIds: [] as number[],
+    userId: userId != null && String(userId).trim() !== "" ? String(userId) : undefined,
     dateStart,
   }
-  if (warehouseUserMeta && Object.keys(warehouseUserMeta).length > 0) {
-    out.metadata = JSON.stringify(warehouseUserMeta)
+  const metadata = {
+    ...(warehouseUserMeta ?? {}),
+  }
+  if (Object.keys(metadata).length > 0) {
+    out.metadata = JSON.stringify(metadata)
   }
   return out
 }

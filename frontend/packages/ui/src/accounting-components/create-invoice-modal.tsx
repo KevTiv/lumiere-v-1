@@ -149,7 +149,10 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
 
     return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { handleReset(); onClose() } }}>
-      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent
+        data-testid="create-invoice-modal"
+        className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
         <div className="shrink-0 space-y-2 px-4 pt-4">
         <DialogHeader>
           <DialogTitle>{t("accounting.forms.newInvoice.createTitle")}</DialogTitle>
@@ -162,6 +165,7 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
             <div className="space-y-2">
               <Label>{t("accounting.forms.newInvoice.fields.partner")}</Label>
               <Input
+                data-testid="create-invoice-partner"
                 placeholder={t("accounting.forms.newInvoice.fields.partnerPlaceholder")}
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
@@ -225,13 +229,25 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
                   {lineItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
-                        <Input value={item.description} onChange={(e) => updateLine(item.id, "description", e.target.value)} placeholder={t("accounting.forms.newInvoice.columns.description")} />
+                        <Input
+                          data-testid={item.id === lineItems[0]?.id ? "create-invoice-line-description" : undefined}
+                          value={item.description}
+                          onChange={(e) => updateLine(item.id, "description", e.target.value)}
+                          placeholder={t("accounting.forms.newInvoice.columns.description")}
+                        />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min={1} value={item.quantity} onChange={(e) => updateLine(item.id, "quantity", parseInt(e.target.value) || 1)} />
                       </TableCell>
                       <TableCell>
-                        <Input type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateLine(item.id, "unitPrice", parseFloat(e.target.value) || 0)} />
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          data-testid={item.id === lineItems[0]?.id ? "create-invoice-line-unit-price" : undefined}
+                          value={item.unitPrice}
+                          onChange={(e) => updateLine(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                        />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min={0} max={100} step={0.25} value={item.taxRate} onChange={(e) => updateLine(item.id, "taxRate", parseFloat(e.target.value) || 0)} />
@@ -285,8 +301,17 @@ export function CreateInvoiceModal({ open, onClose, onSave, journalOptions }: Cr
 
         <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="secondary" onClick={() => handleSave(true)} disabled={!canSave}>{t("accounting.forms.newInvoice.saveDraft")}</Button>
-          <Button onClick={() => handleSave(false)} disabled={!canSave}>{t("accounting.forms.newInvoice.createAndSend")}</Button>
+          <Button
+            data-testid="create-invoice-save-draft"
+            variant="secondary"
+            onClick={() => handleSave(true)}
+            disabled={!canSave}
+          >
+            {t("accounting.forms.newInvoice.saveDraft")}
+          </Button>
+          <Button data-testid="create-invoice-submit" onClick={() => handleSave(false)} disabled={!canSave}>
+            {t("accounting.forms.newInvoice.createAndSend")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

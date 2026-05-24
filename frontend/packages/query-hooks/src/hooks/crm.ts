@@ -8,12 +8,38 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import { crmBffPost } from "@lumiere/stdb/commands"
+import type {
+  ConvertLeadParams,
+  ConvertOpportunityParams,
+  CreateActivityParams,
+  CreateContactSegmentParams,
+  CreateContactTagParams,
+  CreateContactParams,
+  CreateLeadParams,
+  CreateOpportunityParams,
+  UpdateContactAddressParams,
+  UpdateContactBusinessParams,
+  UpdateContactDetailsParams,
+  UpdateContactParams,
+  UpdateLeadAddressParams,
+  UpdateLeadDetailsParams,
+  UpdateLeadRevenueParams,
+} from "@lumiere/stdb/types"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+import {
+  finalizeCreateActivityParams,
+  finalizeCreateContactParams,
+  finalizeCreateContactSegmentParams,
+  finalizeCreateContactTagParams,
+  finalizeCreateLeadParams,
+  finalizeCreateOpportunityParams,
+} from "./crm-params-merge"
 
 type ScalarId = string | number | bigint
 
@@ -21,50 +47,8 @@ function toScalarU64(v: ScalarId): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
 }
 
-/** Shallow merge: `overrides` entries with value `undefined` are skipped. */
-function mergeReducerParams(
-  base: Record<string, unknown>,
-  overrides: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base }
-  for (const [k, v] of Object.entries(overrides)) {
-    if (v !== undefined) out[k] = v
-  }
-  return out
-}
-
-const CREATE_LEAD_DEFAULTS: Record<string, unknown> = {
-  priority: "Medium",
-  state: "new",
-  tagIds: [],
-}
-
-const CREATE_OPPORTUNITY_DEFAULTS: Record<string, unknown> = {
-  isWon: false,
-  isLost: false,
-  tagIds: [],
-}
-
-const CREATE_CONTACT_DEFAULTS: Record<string, unknown> = {
-  isVendor: false,
-  isEmployee: false,
-  isProspect: true,
-  isPartner: false,
-  customerRank: 0,
-  supplierRank: 0,
-}
-
-const CREATE_ACTIVITY_DEFAULTS: Record<string, unknown> = {
-  activityType: "todo",
-  priority: "normal",
-  state: "planned",
-  auto: false,
-  isSystem: false,
-  isDone: false,
-}
-
-type ContactUpdate = { contactId: ScalarId; params: Record<string, unknown> }
-type LeadUpdate = { leadId: ScalarId; params: Record<string, unknown> }
+type ContactPatch<P> = { contactId: ScalarId; params: Partial<P> }
+type LeadPatch<P> = { leadId: ScalarId; params: Partial<P> }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -145,14 +129,14 @@ export function useUsers(
 
 export function useCreateLead(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateLeadParams>>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_LEAD_DEFAULTS, params)
-      const r = await apiFetch('/api/call/create_lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const merged = finalizeCreateLeadParams(params)
+      const { urlPath, init } = crmBffPost("create_lead", [
+        organizationId,
+        stdbParamsToJson(merged),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create lead')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
@@ -165,15 +149,18 @@ export function useCreateOpportunity(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateOpportunityParams>>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_OPPORTUNITY_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, scopedCompanyId)
-      const r = await apiFetch('/api/call/create_opportunity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const finalized = finalizeCreateOpportunityParams(params)
+      const scoped = withCompanyScope(
+        finalized as unknown as Record<string, unknown>,
+        scopedCompanyId,
+      )
+      const { urlPath, init } = crmBffPost("create_opportunity", [
+        organizationId,
+        stdbParamsToJson(scoped as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create opportunity')
     },
     onSuccess: () =>
@@ -187,15 +174,18 @@ export function useCreateContact(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateContactParams>>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_CONTACT_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, scopedCompanyId)
-      const r = await apiFetch('/api/call/create_contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const finalized = finalizeCreateContactParams(params)
+      const scoped = withCompanyScope(
+        finalized as unknown as Record<string, unknown>,
+        scopedCompanyId,
+      )
+      const { urlPath, init } = crmBffPost("create_contact", [
+        organizationId,
+        stdbParamsToJson(scoped as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -204,14 +194,14 @@ export function useCreateContact(
 
 export function useCreateActivity(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateActivityParams>>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_ACTIVITY_DEFAULTS, params)
-      const r = await apiFetch('/api/call/create_activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const merged = finalizeCreateActivityParams(params)
+      const { urlPath, init } = crmBffPost("create_activity", [
+        organizationId,
+        stdbParamsToJson(merged),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create activity')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', rqBigIntKey(organizationId)] }),
@@ -220,17 +210,14 @@ export function useCreateActivity(organizationId: bigint) {
 
 export function useUpdateContact(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ContactUpdate>({
+  return useMutation<void, Error, ContactPatch<UpdateContactParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const r = await apiFetch('/api/call/update_contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(contactId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_contact", [
+        organizationId,
+        toScalarU64(contactId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -239,17 +226,14 @@ export function useUpdateContact(organizationId: bigint) {
 
 export function useUpdateContactAddress(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ContactUpdate>({
+  return useMutation<void, Error, ContactPatch<UpdateContactAddressParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const r = await apiFetch('/api/call/update_contact_address', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(contactId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_contact_address", [
+        organizationId,
+        toScalarU64(contactId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact address')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -258,17 +242,14 @@ export function useUpdateContactAddress(organizationId: bigint) {
 
 export function useUpdateContactBusiness(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ContactUpdate>({
+  return useMutation<void, Error, ContactPatch<UpdateContactBusinessParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const r = await apiFetch('/api/call/update_contact_business', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(contactId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_contact_business", [
+        organizationId,
+        toScalarU64(contactId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact business')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -277,17 +258,14 @@ export function useUpdateContactBusiness(organizationId: bigint) {
 
 export function useUpdateContactDetails(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ContactUpdate>({
+  return useMutation<void, Error, ContactPatch<UpdateContactDetailsParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const r = await apiFetch('/api/call/update_contact_details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(contactId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_contact_details", [
+        organizationId,
+        toScalarU64(contactId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -296,17 +274,14 @@ export function useUpdateContactDetails(organizationId: bigint) {
 
 export function useUpdateLeadDetails(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, LeadUpdate>({
+  return useMutation<void, Error, LeadPatch<UpdateLeadDetailsParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const r = await apiFetch('/api/call/update_lead_details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(leadId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_lead_details", [
+        organizationId,
+        toScalarU64(leadId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead details')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
@@ -315,17 +290,14 @@ export function useUpdateLeadDetails(organizationId: bigint) {
 
 export function useUpdateLeadAddress(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, LeadUpdate>({
+  return useMutation<void, Error, LeadPatch<UpdateLeadAddressParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const r = await apiFetch('/api/call/update_lead_address', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(leadId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_lead_address", [
+        organizationId,
+        toScalarU64(leadId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead address')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
@@ -334,17 +306,14 @@ export function useUpdateLeadAddress(organizationId: bigint) {
 
 export function useUpdateLeadRevenue(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, LeadUpdate>({
+  return useMutation<void, Error, LeadPatch<UpdateLeadRevenueParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const r = await apiFetch('/api/call/update_lead_revenue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(leadId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("update_lead_revenue", [
+        organizationId,
+        toScalarU64(leadId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead revenue')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
@@ -353,13 +322,14 @@ export function useUpdateLeadRevenue(organizationId: bigint) {
 
 export function useCreateContactTag(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateContactTagParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_contact_tag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const merged = finalizeCreateContactTagParams(params)
+      const { urlPath, init } = crmBffPost("create_contact_tag", [
+        organizationId,
+        stdbParamsToJson(merged),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact tag')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -368,13 +338,14 @@ export function useCreateContactTag(organizationId: bigint) {
 
 export function useCreateContactSegment(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateContactSegmentParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_contact_segment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const merged = finalizeCreateContactSegmentParams(params)
+      const { urlPath, init } = crmBffPost("create_contact_segment", [
+        organizationId,
+        stdbParamsToJson(merged),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact segment')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -383,17 +354,14 @@ export function useCreateContactSegment(organizationId: bigint) {
 
 export function useConvertLeadToCustomer(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { leadId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { leadId: ScalarId; params: ConvertLeadParams }>({
     mutationFn: async ({ leadId, params }) => {
-      const r = await apiFetch('/api/call/convert_lead_to_customer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(leadId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("convert_lead_to_customer", [
+        organizationId,
+        toScalarU64(leadId),
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert lead')
     },
     onSuccess: () => {
@@ -406,16 +374,13 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
 
 export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { opportunityId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { opportunityId: ScalarId; params: ConvertOpportunityParams }>({
     mutationFn: async ({ opportunityId, params }) => {
-      const r = await apiFetch('/api/call/convert_opportunity_to_sale_order?withCompany=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          toScalarU64(opportunityId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("convert_opportunity_to_sale_order", [
+        toScalarU64(opportunityId),
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert opportunity to sale order')
     },
     onSuccess: () => {
@@ -429,11 +394,11 @@ export function useDeleteContact(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (contactId) => {
-      const r = await apiFetch('/api/call/delete_contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(contactId)]),
-      })
+      const { urlPath, init } = crmBffPost("delete_contact", [
+        organizationId,
+        toScalarU64(contactId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete contact')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -444,16 +409,13 @@ export function useAssignTagToContact(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contactId: ScalarId; tagId: ScalarId; metadata?: string | null }>({
     mutationFn: async ({ contactId, tagId, metadata }) => {
-      const r = await apiFetch('/api/call/assign_tag_to_contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(contactId),
-          toScalarU64(tagId),
-          metadata ?? null,
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("assign_tag_to_contact", [
+        organizationId,
+        toScalarU64(contactId),
+        toScalarU64(tagId),
+        metadata ?? null,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign tag')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -464,15 +426,12 @@ export function useAddContactToSegment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { segmentId: ScalarId; contactId: ScalarId }>({
     mutationFn: async ({ segmentId, contactId }) => {
-      const r = await apiFetch('/api/call/add_contact_to_segment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(segmentId),
-          toScalarU64(contactId),
-        ]),
-      })
+      const { urlPath, init } = crmBffPost("add_contact_to_segment", [
+        organizationId,
+        toScalarU64(segmentId),
+        toScalarU64(contactId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add contact to segment')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
@@ -483,11 +442,11 @@ export function useCompleteActivity(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (activityId) => {
-      const r = await apiFetch('/api/call/complete_activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(activityId)]),
-      })
+      const { urlPath, init } = crmBffPost("complete_activity", [
+        organizationId,
+        toScalarU64(activityId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete activity')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', rqBigIntKey(organizationId)] }),
@@ -509,11 +468,8 @@ export function useImportContactCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_contact_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = crmBffPost("import_contact_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
@@ -525,11 +481,8 @@ export function useImportLeadCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_lead_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = crmBffPost("import_lead_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
@@ -541,11 +494,8 @@ export function useImportOpportunityCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_opportunity_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = crmBffPost("import_opportunity_csv", [organizationId, csvData])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
@@ -563,10 +513,19 @@ export function useCrmCsvImportMutations(organizationId: bigint) {
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
-  CreateLeadParams,
-  CreateOpportunityParams,
-  CreateContactParams,
-  CreateActivityParams,
   ConvertLeadParams,
   ConvertOpportunityParams,
-} from '@lumiere/stdb/generated/types'
+  CreateActivityParams,
+  CreateContactParams,
+  CreateContactSegmentParams,
+  CreateContactTagParams,
+  CreateLeadParams,
+  CreateOpportunityParams,
+  UpdateContactAddressParams,
+  UpdateContactBusinessParams,
+  UpdateContactDetailsParams,
+  UpdateContactParams,
+  UpdateLeadAddressParams,
+  UpdateLeadDetailsParams,
+  UpdateLeadRevenueParams,
+} from '@lumiere/stdb/types'

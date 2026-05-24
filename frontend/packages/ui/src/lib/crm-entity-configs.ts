@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
@@ -98,28 +99,92 @@ export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
 })
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
-export const contactsTableConfig = (t: TFunction): EntityViewConfig => ({
-  id: "contacts-table",
-  title: t("crm.contacts.title"),
-  description: t("crm.contacts.description"),
-  view: {
-    mode: "table",
-    rowKey: "id",
-    searchable: true,
-    searchPlaceholder: t("crm.contacts.searchPlaceholder"),
-    searchKeys: ["name", "email"],
-    columns: [
-      { key: "name", label: t("crm.contacts.columns.name"), width: "min-w-40" },
-      { key: "companyName", label: t("crm.contacts.columns.companyName"), width: "min-w-36" },
-      { key: "email", label: t("crm.contacts.columns.email"), width: "min-w-44" },
-      { key: "phone", label: t("crm.contacts.columns.phone"), width: "min-w-28" },
-      { key: "isCompany", label: t("crm.contacts.columns.isCompany"), type: "boolean" },
-      { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
-      { key: "countryId", label: t("crm.contacts.columns.countryId"), width: "min-w-20" },
-    ],
-    emptyMessage: t("crm.contacts.emptyMessage"),
-  },
-})
+export type ContactsTableConfigOptions = {
+  /** Preferred display for the name column (e.g. partner > company > contact). */
+  formatContactDisplayName?: (row: Record<string, unknown>) => string
+}
+
+export const contactsTableConfig = (
+  t: TFunction,
+  options?: ContactsTableConfigOptions,
+): EntityViewConfig => {
+  const formatName = options?.formatContactDisplayName
+
+  const nameColumn = {
+    key: "name",
+    label: t("crm.contacts.columns.name"),
+    width: "min-w-40",
+    ...(formatName
+      ? {
+          render: (_value: unknown, row: Record<string, unknown>) => {
+            const formatted = formatName(row).trim()
+            const fallback = String(row.name ?? "").trim()
+            const shown = formatted || fallback
+            if (!shown)
+              return createElement(
+                "span",
+                { className: "text-muted-foreground" },
+                "—",
+              )
+            return shown
+          },
+        }
+      : {}),
+  }
+
+  return {
+    id: "contacts-table",
+    title: t("crm.contacts.title"),
+    description: t("crm.contacts.description"),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("crm.contacts.searchPlaceholder"),
+      searchKeys: [
+        "name",
+        "partnerName",
+        "partner_name",
+        "companyName",
+        "company_name",
+        "contactName",
+        "contact_name",
+        "email",
+        "phone",
+      ],
+      columns: [
+        nameColumn,
+        {
+          key: "companyName",
+          label: t("crm.contacts.columns.companyName"),
+          width: "min-w-36",
+        },
+        {
+          key: "email",
+          label: t("crm.contacts.columns.email"),
+          width: "min-w-44",
+        },
+        {
+          key: "phone",
+          label: t("crm.contacts.columns.phone"),
+          width: "min-w-28",
+        },
+        {
+          key: "isCompany",
+          label: t("crm.contacts.columns.isCompany"),
+          type: "boolean",
+        },
+        { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
+        {
+          key: "countryId",
+          label: t("crm.contacts.columns.countryId"),
+          width: "min-w-20",
+        },
+      ],
+      emptyMessage: t("crm.contacts.emptyMessage"),
+    },
+  }
+}
 
 // ── Activities ────────────────────────────────────────────────────────────────
 export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({

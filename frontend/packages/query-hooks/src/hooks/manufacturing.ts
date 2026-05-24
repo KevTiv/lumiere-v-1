@@ -8,7 +8,7 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { manufacturingBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -172,11 +172,8 @@ export function useCreateManufacturingOrder(organizationId: bigint, companyId?: 
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_MRP_PRODUCTION_DEFAULTS, params)
       const scoped = withCompanyScope(merged, companyId)
-      const r = await apiFetch('/api/call/create_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const { urlPath, init } = manufacturingBffPost('create_manufacturing_order', [organizationId, stdbParamsToJson(scoped as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
     onSuccess: () =>
@@ -190,11 +187,8 @@ export function useCreateBom(organizationId: bigint, companyId?: bigint) {
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_BOM_DEFAULTS, params)
       const scoped = withCompanyScope(merged, companyId)
-      const r = await apiFetch('/api/call/create_bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const { urlPath, init } = manufacturingBffPost('create_bom', [organizationId, stdbParamsToJson(scoped as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create BOM')
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -207,11 +201,8 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_WORKCENTER_DEFAULTS, params)
       const scoped = withCompanyScope(merged, companyId)
-      const r = await apiFetch('/api/call/create_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const { urlPath, init } = manufacturingBffPost('create_workcenter', [organizationId, stdbParamsToJson(scoped as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create workcenter')
     },
     onSuccess: () =>
@@ -223,11 +214,8 @@ export function useConfirmManufacturingOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/confirm_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productionId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('confirm_manufacturing_order', [organizationId, productionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
     onSuccess: () =>
@@ -239,11 +227,8 @@ export function useStartManufacturingOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/start_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productionId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('start_manufacturing_order', [organizationId, productionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
     onSuccess: () =>
@@ -255,11 +240,8 @@ export function useFinishManufacturingOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/finish_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productionId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('finish_manufacturing_order', [organizationId, productionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
     onSuccess: () =>
@@ -271,11 +253,8 @@ export function useCancelManufacturingOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/cancel_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, productionId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('cancel_manufacturing_order', [organizationId, productionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
     onSuccess: () =>
@@ -287,11 +266,8 @@ export function useStartWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/start_workorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workorderId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('start_workorder', [organizationId, workorderId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start workorder')
     },
     onSuccess: () =>
@@ -303,11 +279,8 @@ export function useFinishWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/finish_workorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workorderId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('finish_workorder', [organizationId, workorderId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
     onSuccess: () =>
@@ -325,11 +298,8 @@ export function useBlockWorkcenter(organizationId: bigint) {
       workcenterId: string | number | bigint
       reason: string
     }) => {
-      const r = await apiFetch('/api/call/block_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workcenterId, reason]),
-      })
+      const { urlPath, init } = manufacturingBffPost('block_workcenter', [organizationId, workcenterId, reason])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to block workcenter')
     },
     onSuccess: () =>
@@ -341,11 +311,8 @@ export function useUnblockWorkcenter(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workcenterId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/unblock_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workcenterId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('unblock_workcenter', [organizationId, workcenterId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unblock workcenter')
     },
     onSuccess: () =>
@@ -368,11 +335,8 @@ export function useCheckMoAvailability(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/check_mo_availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, moId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('check_mo_availability', [organizationId, moId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -384,11 +348,8 @@ export function useProduceManufacturingOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
-      const r = await apiFetch('/api/call/produce_manufacturing_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, moId, qty]),
-      })
+      const { urlPath, init } = manufacturingBffPost('produce_manufacturing_order', [organizationId, moId, qty])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -400,11 +361,8 @@ export function useConsumeMoMaterials(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/consume_mo_materials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, moId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('consume_mo_materials', [organizationId, moId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -417,11 +375,8 @@ export function useCreateWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch('/api/call/create_workorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const { urlPath, init } = manufacturingBffPost('create_workorder', [organizationId, params])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -441,16 +396,13 @@ export function useUpdateBom(organizationId: bigint, companyId: bigint) {
       bomId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/update_bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId,
-          bomId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = manufacturingBffPost('update_bom', [
+        organizationId,
+        companyId,
+        bomId,
+        params,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -461,11 +413,8 @@ export function useDeleteBom(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/delete_bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('delete_bom', [organizationId, companyId, bomId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -476,11 +425,8 @@ export function useComputeBomCost(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/compute_bom_cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('compute_bom_cost', [organizationId, companyId, bomId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -491,11 +437,8 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/explode_bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, bomId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('explode_bom', [organizationId, companyId, bomId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -507,11 +450,8 @@ export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bi
   const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch('/api/call/create_routing_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, params]),
-      })
+      const { urlPath, init } = manufacturingBffPost('create_routing_workcenter', [organizationId, companyId, params])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -532,11 +472,8 @@ export function useUpdateWorkcenter(organizationId: bigint, companyId: bigint) {
       params: Record<string, unknown>
     }) => {
       const scoped = withCompanyScope(params, companyId)
-      const r = await apiFetch('/api/call/update_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, workcenterId, scoped]),
-      })
+      const { urlPath, init } = manufacturingBffPost('update_workcenter', [organizationId, workcenterId, scoped])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -554,16 +491,13 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       workcenterId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/log_workcenter_productivity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId,
-          workcenterId,
-          params,
-        ]),
-      })
+      const { urlPath, init } = manufacturingBffPost('log_workcenter_productivity', [
+        organizationId,
+        companyId,
+        workcenterId,
+        params,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -576,11 +510,8 @@ export function useCompleteProductivityLog(organizationId: bigint, companyId: bi
   const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
-      const r = await apiFetch('/api/call/complete_productivity_log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, logId]),
-      })
+      const { urlPath, init } = manufacturingBffPost('complete_productivity_log', [organizationId, companyId, logId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['mrp-workcenters', orgKey] }),
@@ -591,11 +522,8 @@ export function useImportWorkcenterCsv(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch('/api/call/import_workcenter_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = manufacturingBffPost('import_workcenter_csv', [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -607,11 +535,8 @@ export function useImportBomCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch('/api/call/import_bom_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = manufacturingBffPost('import_bom_csv', [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -622,11 +547,8 @@ export function useImportBomLineCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch('/api/call/import_bom_line_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = manufacturingBffPost('import_bom_line_csv', [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMrpBomsAndLines(qc, organizationId),
@@ -637,11 +559,8 @@ export function useImportManufacturingOrderCsv(organizationId: bigint, companyId
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch('/api/call/import_manufacturing_order_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = manufacturingBffPost('import_manufacturing_order_csv', [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () =>
@@ -660,15 +579,12 @@ export function useLinkDeviceToWorkcenter(organizationId: bigint) {
       deviceId: string | number | bigint
       workcenterId: string | number | bigint
     }) => {
-      const r = await apiFetch('/api/call/link_device_to_workcenter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          deviceId,
-          workcenterId,
-        ]),
-      })
+      const { urlPath, init } = manufacturingBffPost('link_device_to_workcenter', [
+        organizationId,
+        deviceId,
+        workcenterId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {

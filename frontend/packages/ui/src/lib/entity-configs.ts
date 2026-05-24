@@ -1,3 +1,4 @@
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 // ─── State badge maps (shared across configs) ────────────────────────────────
@@ -19,54 +20,95 @@ const activeBadges = {
 
 // ─── Chart of Accounts ───────────────────────────────────────────────────────
 
-export const accountsTableConfig: EntityViewConfig = {
-  id: "accounts-table",
-  title: "Chart of Accounts",
-  description: "All general ledger accounts",
-  view: {
-    mode: "table",
-    rowKey: "id",
-    searchable: true,
-    searchPlaceholder: "Search by code or name…",
-    searchKeys: ["code", "name"],
-    filters: [
-      {
-        key: "active",
-        label: "Status",
-        type: "select",
-        options: [
-          { value: "true", label: "Active" },
-          { value: "false", label: "Inactive" },
-        ],
-      },
-      {
-        key: "internalGroup",
-        label: "Group",
-        type: "select",
-        options: [
-          { value: "asset", label: "Asset" },
-          { value: "liability", label: "Liability" },
-          { value: "equity", label: "Equity" },
-          { value: "income", label: "Income" },
-          { value: "expense", label: "Expense" },
-        ],
-      },
-    ],
-    columns: [
-      { key: "code", label: "Code", width: "min-w-20" },
-      { key: "name", label: "Name", width: "min-w-48" },
-      { key: "internalGroup", label: "Group", type: "text" },
-      { key: "openingBalance", label: "Balance", type: "currency", align: "right" },
-      {
-        key: "active",
-        label: "Status",
-        type: "badge",
-        ...activeBadges,
-      },
-    ],
-    emptyMessage: "No accounts found.",
-  },
+export type AccountsTableConfigOptions = {
+  /** Combined code + name for dense lists (optional). */
+  formatAccountDisplayName?: (row: Record<string, unknown>) => string
 }
+
+export function buildAccountsTableConfig(
+  options?: AccountsTableConfigOptions,
+): EntityViewConfig {
+  const formatName = options?.formatAccountDisplayName
+
+  const nameColumn = {
+    key: "name",
+    label: "Name",
+    width: "min-w-48",
+    ...(formatName
+      ? {
+          render: (_value: unknown, row: Record<string, unknown>) => {
+            const formatted = formatName(row).trim()
+            const fallback = String(row.name ?? "").trim()
+            const shown = formatted || fallback
+            if (!shown)
+              return createElement(
+                "span",
+                { className: "text-muted-foreground" },
+                "—",
+              )
+            return shown
+          },
+        }
+      : {}),
+  }
+
+  return {
+    id: "accounts-table",
+    title: "Chart of Accounts",
+    description: "All general ledger accounts",
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: "Search by code or name…",
+      searchKeys: ["code", "name", "internalGroup"],
+      filters: [
+        {
+          key: "active",
+          label: "Status",
+          type: "select",
+          options: [
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" },
+          ],
+        },
+        {
+          key: "internalGroup",
+          label: "Group",
+          type: "select",
+          options: [
+            { value: "asset", label: "Asset" },
+            { value: "liability", label: "Liability" },
+            { value: "equity", label: "Equity" },
+            { value: "income", label: "Income" },
+            { value: "expense", label: "Expense" },
+          ],
+        },
+      ],
+      columns: [
+        { key: "code", label: "Code", width: "min-w-20" },
+        nameColumn,
+        { key: "internalGroup", label: "Group", type: "text" },
+        {
+          key: "openingBalance",
+          label: "Balance",
+          type: "currency",
+          align: "right",
+        },
+        {
+          key: "active",
+          label: "Status",
+          type: "badge",
+          ...activeBadges,
+        },
+      ],
+      emptyMessage: "No accounts found.",
+    },
+  }
+}
+
+/** Default chart-of-accounts entity config (no custom display formatter). */
+export const accountsTableConfig = buildAccountsTableConfig()
 
 export const accountDetailConfig: EntityViewConfig = {
   id: "account-detail",

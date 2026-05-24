@@ -12,10 +12,10 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
@@ -85,11 +85,9 @@ async function postSubmitSupplierIntake(
   organizationId: bigint,
   params: Record<string, unknown>,
 ): Promise<void> {
-  const r = await apiFetch('/api/call/submit_supplier_intake', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-  })
+  const { urlPath, init } = purchasingBffPost("submit_supplier_intake", [organizationId, stdbParamsToJson(params as object)])
+
+  const r = await apiFetch(urlPath, init)
   if (!r.ok) throw new Error('Failed to submit supplier intake')
 }
 
@@ -170,11 +168,9 @@ export function useCreatePurchaseOrder(
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_PURCHASE_ORDER_DEFAULTS, params)
       const scoped = withCompanyScope(merged, scopedCompanyId)
-      const r = await apiFetch('/api/call/create_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const { urlPath, init } = purchasingBffPost("create_purchase_order", [organizationId, stdbParamsToJson(scoped as object)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create purchase order')
     },
     onSuccess: () =>
@@ -192,11 +188,9 @@ export function useCreatePurchaseRequisition(
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_PURCHASE_REQUISITION_DEFAULTS, params)
       const scoped = withCompanyScope(merged, scopedCompanyId)
-      const r = await apiFetch('/api/call/create_purchase_requisition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(scoped as object)]),
-      })
+      const { urlPath, init } = purchasingBffPost("create_purchase_requisition", [organizationId, stdbParamsToJson(scoped as object)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create purchase requisition')
     },
     onSuccess: () =>
@@ -209,11 +203,9 @@ export function useSendPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/send_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("send_purchase_order", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to send purchase order')
     },
     onSuccess: () =>
@@ -225,11 +217,9 @@ export function useConfirmPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/confirm_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("confirm_purchase_order", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm purchase order')
     },
     onSuccess: () =>
@@ -241,11 +231,9 @@ export function useCancelPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/cancel_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("cancel_purchase_order", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel purchase order')
     },
     onSuccess: () =>
@@ -263,17 +251,15 @@ export function useAddPurchaseOrderLine(organizationId: bigint) {
       orderId: bigint | number | string
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/add_purchase_order_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("add_purchase_order_line", [
           organizationId,
           toScalarU64(orderId),
           stdbParamsToJson(
             mergeReducerParams(ADD_PURCHASE_ORDER_LINE_DEFAULTS, params) as object,
           ),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add purchase order line')
     },
     onSuccess: async () => {
@@ -289,11 +275,9 @@ export function useRemovePurchaseOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/remove_purchase_order_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("remove_purchase_order_line", [organizationId, toScalarU64(lineId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove purchase order line')
     },
     onSuccess: async () => {
@@ -315,11 +299,9 @@ export function useReceivePurchaseOrderLine(organizationId: bigint) {
       lineId: bigint | number | string
       qty: number
     }) => {
-      const r = await apiFetch('/api/call/receive_po_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId), qty]),
-      })
+      const { urlPath, init } = purchasingBffPost("receive_po_line", [organizationId, toScalarU64(lineId), qty])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to receive purchase order line')
     },
     onSuccess: async () => {
@@ -341,11 +323,9 @@ export function useInvoicePurchaseOrderLine(organizationId: bigint) {
       lineId: bigint | number | string
       qty: number
     }) => {
-      const r = await apiFetch('/api/call/invoice_po_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId), qty]),
-      })
+      const { urlPath, init } = purchasingBffPost("invoice_po_line", [organizationId, toScalarU64(lineId), qty])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to invoice purchase order line')
     },
     onSuccess: async () => {
@@ -361,11 +341,9 @@ export function useSubmitPurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (requisitionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/submit_purchase_requisition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("submit_purchase_requisition", [organizationId, toScalarU64(requisitionId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to submit purchase requisition')
     },
     onSuccess: () =>
@@ -377,11 +355,9 @@ export function useApprovePurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (requisitionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/approve_purchase_requisition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("approve_purchase_requisition", [organizationId, toScalarU64(requisitionId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to approve purchase requisition')
     },
     onSuccess: () =>
@@ -393,11 +369,9 @@ export function useClosePurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (requisitionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/close_purchase_requisition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("close_purchase_requisition", [organizationId, toScalarU64(requisitionId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to close purchase requisition')
     },
     onSuccess: () =>
@@ -409,11 +383,9 @@ export function useCancelPurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (requisitionId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/cancel_purchase_requisition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(requisitionId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("cancel_purchase_requisition", [organizationId, toScalarU64(requisitionId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel purchase requisition')
     },
     onSuccess: () =>
@@ -425,11 +397,9 @@ export function useComputePurchaseOrderTotals(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/compute_purchase_order_totals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("compute_purchase_order_totals", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to compute purchase order totals')
     },
     onSuccess: async () => {
@@ -445,11 +415,9 @@ export function useComputePurchaseOrderLineTotals(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/compute_purchase_order_line_totals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("compute_purchase_order_line_totals", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to compute purchase order line totals')
     },
     onSuccess: async () => {
@@ -480,16 +448,14 @@ export function useUpdatePurchaseOrder(organizationId: bigint, companyId?: bigin
         throw new Error('companyId is required to update purchase order')
       }
       const { companyId: _drop, ...payload } = scoped
-      const r = await apiFetch('/api/call/update_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("update_purchase_order", [
           organizationId,
           BigInt(cid),
           toScalarU64(orderId),
           stdbParamsToJson(payload as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update purchase order')
     },
     onSuccess: () =>
@@ -501,11 +467,9 @@ export function useLockPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (orderId) => {
-      const r = await apiFetch('/api/call/lock_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("lock_purchase_order", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock purchase order')
     },
     onSuccess: () =>
@@ -517,11 +481,9 @@ export function useUnlockPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (orderId) => {
-      const r = await apiFetch('/api/call/unlock_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("unlock_purchase_order", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock purchase order')
     },
     onSuccess: () =>
@@ -533,15 +495,13 @@ export function useUpdatePurchaseOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { lineId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ lineId, params }) => {
-      const r = await apiFetch('/api/call/update_purchase_order_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("update_purchase_order_line", [
           organizationId,
           toScalarU64(lineId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update purchase order line')
     },
     onSuccess: async () => {
@@ -570,15 +530,13 @@ export function useCreateLandedCost(organizationId: bigint, companyId?: bigint) 
         throw new Error('companyId is required to create landed cost')
       }
       const { companyId: _drop, ...payload } = scoped
-      const r = await apiFetch('/api/call/create_landed_cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("create_landed_cost", [
           organizationId,
           BigInt(cid),
           stdbParamsToJson(payload as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create landed cost')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -589,15 +547,13 @@ export function useUpdateLandedCost(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { landedCostId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ landedCostId, params }) => {
-      const r = await apiFetch('/api/call/update_landed_cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("update_landed_cost", [
           organizationId,
           toScalarU64(landedCostId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update landed cost')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -608,11 +564,9 @@ export function useDeleteLandedCost(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (landedCostId) => {
-      const r = await apiFetch('/api/call/delete_landed_cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("delete_landed_cost", [organizationId, toScalarU64(landedCostId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete landed cost')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -623,15 +577,13 @@ export function useAddLandedCostLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { landedCostId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ landedCostId, params }) => {
-      const r = await apiFetch('/api/call/add_landed_cost_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("add_landed_cost_line", [
           organizationId,
           toScalarU64(landedCostId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add landed cost line')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -642,11 +594,9 @@ export function useRemoveLandedCostLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { landedCostId: ScalarId; lineId: ScalarId }>({
     mutationFn: async ({ lineId }) => {
-      const r = await apiFetch('/api/call/remove_landed_cost_line', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(lineId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("remove_landed_cost_line", [organizationId, toScalarU64(lineId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove landed cost line')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -657,11 +607,9 @@ export function useComputeLandedCosts(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (landedCostId) => {
-      const r = await apiFetch('/api/call/compute_landed_costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("compute_landed_costs", [organizationId, toScalarU64(landedCostId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to compute landed costs')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -672,11 +620,9 @@ export function usePostLandedCosts(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (landedCostId) => {
-      const r = await apiFetch('/api/call/post_landed_costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("post_landed_costs", [organizationId, toScalarU64(landedCostId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post landed costs')
     },
     onSuccess: () => {
@@ -700,11 +646,9 @@ export function useApplyLandedCosts(organizationId: bigint, companyId?: bigint) 
       if (cid == null || !Number.isFinite(cid)) {
         throw new Error('companyId is required to apply landed costs')
       }
-      const r = await apiFetch('/api/call/apply_landed_costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, BigInt(cid), toScalarU64(landedCostId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("apply_landed_costs", [organizationId, BigInt(cid), toScalarU64(landedCostId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to apply landed costs')
     },
     onSuccess: () => {
@@ -718,11 +662,9 @@ export function useCancelLandedCost(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (landedCostId) => {
-      const r = await apiFetch('/api/call/cancel_landed_cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(landedCostId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("cancel_landed_cost", [organizationId, toScalarU64(landedCostId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel landed cost')
     },
     onSuccess: () => invalidateLandedAndPo(qc, organizationId),
@@ -743,15 +685,13 @@ export function useUpdateSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ intakeId, params }) => {
-      const r = await apiFetch('/api/call/update_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("update_supplier_intake", [
           organizationId,
           toScalarU64(intakeId),
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -762,11 +702,9 @@ export function useDeleteSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (intakeId) => {
-      const r = await apiFetch('/api/call/delete_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("delete_supplier_intake", [organizationId, toScalarU64(intakeId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -786,15 +724,13 @@ export function useReviewSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reviewerNotes?: string }>({
     mutationFn: async ({ intakeId, reviewerNotes }) => {
-      const r = await apiFetch('/api/call/review_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("review_supplier_intake", [
           organizationId,
           toScalarU64(intakeId),
           reviewerNotes ?? null,
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to review supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -805,15 +741,13 @@ export function useApproveSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; partnerId: ScalarId }>({
     mutationFn: async ({ intakeId, partnerId }) => {
-      const r = await apiFetch('/api/call/approve_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("approve_supplier_intake", [
           organizationId,
           toScalarU64(intakeId),
           toScalarU64(partnerId),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to approve supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -824,11 +758,9 @@ export function useRejectSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reason: string }>({
     mutationFn: async ({ intakeId, reason }) => {
-      const r = await apiFetch('/api/call/reject_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId), reason]),
-      })
+      const { urlPath, init } = purchasingBffPost("reject_supplier_intake", [organizationId, toScalarU64(intakeId), reason])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reject supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -839,11 +771,9 @@ export function useHoldSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reason: string }>({
     mutationFn: async ({ intakeId, reason }) => {
-      const r = await apiFetch('/api/call/hold_supplier_intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(intakeId), reason]),
-      })
+      const { urlPath, init } = purchasingBffPost("hold_supplier_intake", [organizationId, toScalarU64(intakeId), reason])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to hold supplier intake')
     },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
@@ -865,17 +795,15 @@ export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
     mutationFn: async ({ orderId, journalId, defaultExpenseAccountId, invoiceDate }) => {
       const when =
         invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate)
-      const r = await apiFetch('/api/call/create_bill_from_purchase_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("create_bill_from_purchase_order", [
           organizationId,
           toScalarU64(orderId),
           toScalarU64(journalId),
           toScalarU64(defaultExpenseAccountId),
           stbTimestampFromDate(when),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create bill from purchase order')
     },
     onSuccess: () => {
@@ -892,11 +820,9 @@ export function useImportPurchaseOrderCsv(organizationId: bigint, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_purchase_order_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = purchasingBffPost("import_purchase_order_csv", [organizationId, companyId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorPo(res))
     },
     onSuccess: () => {
@@ -910,11 +836,9 @@ export function useImportPurchaseOrderLineCsv(organizationId: bigint, companyId:
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_purchase_order_line_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = purchasingBffPost("import_purchase_order_line_csv", [organizationId, companyId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorPo(res))
     },
     onSuccess: () => {
@@ -928,11 +852,9 @@ export function useImportSupplierInfoCsv(organizationId: bigint, productsQueryKe
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_supplier_info_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = purchasingBffPost("import_supplier_info_csv", [organizationId, csvData])
+
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorPo(res))
     },
     onSuccess: () => {
@@ -953,11 +875,9 @@ export function useUpdatePoReceiptStatus(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: ScalarId) => {
-      const r = await apiFetch('/api/call/update_po_receipt_status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("update_po_receipt_status", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
@@ -970,11 +890,9 @@ export function useUpdatePoInvoiceStatus(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: ScalarId) => {
-      const r = await apiFetch('/api/call/update_po_invoice_status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(orderId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("update_po_invoice_status", [organizationId, toScalarU64(orderId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
@@ -995,11 +913,9 @@ export function useCreatePartnerBank(
         scopedCompanyId != null ? { companyId: scopedCompanyId } : {},
         params,
       )
-      const r = await apiFetch('/api/call/create_partner_bank', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(merged as object)]),
-      })
+      const { urlPath, init } = purchasingBffPost("create_partner_bank", [organizationId, stdbParamsToJson(merged as object)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
@@ -1012,15 +928,13 @@ export function useUpdatePartnerBank(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { bankId: ScalarId; params: Record<string, unknown> }) => {
-      const r = await apiFetch('/api/call/update_partner_bank', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = purchasingBffPost("update_partner_bank", [
           organizationId,
           toScalarU64(args.bankId),
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {
@@ -1033,11 +947,9 @@ export function useDeletePartnerBank(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bankId: ScalarId) => {
-      const r = await apiFetch('/api/call/delete_partner_bank', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(bankId)]),
-      })
+      const { urlPath, init } = purchasingBffPost("delete_partner_bank", [organizationId, toScalarU64(bankId)])
+
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
     onSuccess: () => {

@@ -160,6 +160,9 @@ pub async fn serve() -> anyhow::Result<()> {
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        // `next start` + Playwright default (`PLAYWRIGHT_BASE_URL` / port 3100)
+        "http://localhost:3100",
+        "http://127.0.0.1:3100",
     ];
 
     let origins: Vec<axum::http::HeaderValue> = if config.cors_origins.is_empty() {

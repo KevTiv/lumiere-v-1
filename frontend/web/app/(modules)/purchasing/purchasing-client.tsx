@@ -1079,10 +1079,11 @@ function PurchasingClientLoaded({
       const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const currencyId = Number(pl.currencyId)
+      const selectedPricelistId = String(pricelistRaw)
 
       await createPurchaseOrder.mutateAsync({
         partnerId: Number(partnerRaw),
-        currencyId,
+        currencyId: selectedPricelistId === String(pl.id) ? currencyId : currencyId,
         origin: formData.origin ? String(formData.origin) : undefined,
         partnerRef: formData.partnerRef ? String(formData.partnerRef) : undefined,
         notes: formData.notes ? String(formData.notes) : undefined,

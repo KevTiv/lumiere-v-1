@@ -1,6 +1,12 @@
 /**
  * SpacetimeDB **WebSocket client** barrel (`DbConnection`, generated bindings, connection + context).
  *
+ * **Contract surface (preferred for new code):**
+ * - `@lumiere/stdb/commands` — typed reducer wrappers + metadata
+ * - `@lumiere/stdb/subscriptions` — named subscription intents
+ * - `@lumiere/stdb/read-models` — pure UI projections
+ * - `@lumiere/stdb/types` — re-exports of generated params (avoid `@lumiere/stdb/generated/*` outside this package)
+ *
  * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
  * - `@lumiere/stdb/server` — RSC / `stdbSql` / `serverQuery*`

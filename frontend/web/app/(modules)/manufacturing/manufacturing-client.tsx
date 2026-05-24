@@ -419,7 +419,7 @@ function ManufacturingClientLoaded({
           ? new Date(String(formData.datePlannedFinished))
           : undefined,
         origin: formData.origin ? String(formData.origin) : undefined,
-      } as never)
+      })
     } else if (action === "createBom") {
       const tmplRaw = formData.productTmplId
       if (tmplRaw === "" || tmplRaw == null) return
@@ -439,7 +439,7 @@ function ManufacturingClientLoaded({
         productQty: Number(formData.productQty ?? 1),
         productUomId: uomFromProduct,
         routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
-      } as never)
+      })
     } else if (action === "createWorkcenter") {
       const oeeTarget = Number(formData.oeeTarget ?? 85)
       const timeEfficiency = Number(formData.timeEfficiency ?? 100)
@@ -453,7 +453,7 @@ function ManufacturingClientLoaded({
         capacity,
         defaultTimeEfficiency: timeEfficiency,
         defaultOeeTarget: oeeTarget,
-      } as never)
+      })
     }
   }
 

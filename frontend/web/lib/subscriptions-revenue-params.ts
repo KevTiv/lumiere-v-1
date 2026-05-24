@@ -37,9 +37,7 @@ export function buildCreateDeferredRevenueScheduleParams(
 ): CreateDeferredRevenueScheduleParams {
   const total = Number(formData.totalAmount ?? 0)
   const recognized = Number(formData.recognizedAmount ?? 0)
-  const deferred = Number.isFinite(Number(formData.deferredAmount))
-    ? Number(formData.deferredAmount)
-    : Math.max(0, total - recognized)
+  const deferred = Math.max(0, total - recognized)
 
   return stdbParamsToJson({
     description: String(formData.description ?? ''),
@@ -55,21 +53,12 @@ export function buildCreateDeferredRevenueScheduleParams(
     recognitionMethod: String(formData.recognitionMethod ?? 'straight_line'),
     recognitionPeriod: String(formData.recognitionPeriod ?? 'month'),
     state: String(formData.state ?? 'draft'),
-    originMoveId:
-      formData.originMoveId != null && String(formData.originMoveId).trim() !== ''
-        ? BigInt(String(formData.originMoveId))
-        : undefined,
-    originMoveLineId:
-      formData.originMoveLineId != null && String(formData.originMoveLineId).trim() !== ''
-        ? BigInt(String(formData.originMoveLineId))
-        : undefined,
+    originMoveId: undefined,
+    originMoveLineId: undefined,
     lineIds: [],
     journalEntryIds: [],
     notes: String(formData.notes ?? ''),
-    metadata:
-      formData.metadata != null && String(formData.metadata).trim() !== ''
-        ? String(formData.metadata)
-        : undefined,
+    metadata: undefined,
   }) as unknown as CreateDeferredRevenueScheduleParams
 }
 
@@ -91,10 +80,7 @@ export function buildCreateRevenueRecognitionRuleParams(
     priority: Number(formData.priority ?? 10),
     notes: String(formData.notes ?? ''),
     isActive: formData.isActive === true || formData.isActive === 'true',
-    metadata:
-      formData.metadata != null && String(formData.metadata).trim() !== ''
-        ? String(formData.metadata)
-        : undefined,
+    metadata: undefined,
   }) as unknown as CreateRevenueRecognitionRuleParams
 }
 

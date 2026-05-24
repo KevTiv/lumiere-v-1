@@ -10,12 +10,42 @@
  * requiring individual domain-specific hook files.
  */
 
-import type { QueryClient } from '@tanstack/react-query'
+import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { stdbBffPost } from "@lumiere/stdb/commands"
 
 import { apiFetch } from "../http"
+
+export function stdbQueryKey(resource: string, organizationId: bigint | number) {
+  return ['stdb', resource, organizationId.toString()] as const
+}
+
+/**
+ * Query keys affected by an api-server realtime resource.
+ *
+ * Most BFF-backed hooks use resource-specific keys (`[resource, org]`), while
+ * generic STDB queries use `["stdb", resource, org]`. Keep both forms here so
+ * realtime invalidation can move toward domain keys without touching every hook.
+ */
+export function realtimeQueryKeysForResource(
+  resource: string,
+  organizationId: bigint | number,
+): QueryKey[] {
+  const orgString = organizationId.toString()
+  const keys: QueryKey[] = [
+    stdbQueryKey(resource, organizationId),
+    [resource, orgString],
+  ]
+
+  if (typeof organizationId === 'number') {
+    keys.push(['stdb', resource, organizationId])
+  }
+
+  // TODO(BFF Form Cleanup): add explicit aliases for bundle resources like
+  // "auth" and "form-configuration" once their concrete query keys are settled.
+  return keys
+}
 
 /** Invalidate `useStdbQuery` caches for the given resource names (same `organizationId` as the query). */
 export function invalidateStdbQueryResources(
@@ -23,9 +53,10 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
-  const k = organizationId.toString()
   for (const resource of resources) {
-    void qc.invalidateQueries({ queryKey: ['stdb', resource, k] })
+    for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
+      void qc.invalidateQueries({ queryKey })
+    }
   }
 }
 
@@ -40,11 +71,8 @@ export function useStdbCallMutation(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: unknown[]) => {
-      const r = await apiFetch(`/api/call/${encodeURIComponent(reducerName)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody(args),
-      })
+      const { urlPath, init } = stdbBffPost(reducerName, args)
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
@@ -64,11 +92,8 @@ export function useStdbCallMutation(
 export function useStdbReducer(reducerName: string) {
   return useMutation({
     mutationFn: async (args: unknown[]) => {
-      const r = await apiFetch(`/api/call/${encodeURIComponent(reducerName)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody(args),
-      })
+      const { urlPath, init } = stdbBffPost(reducerName, args)
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
@@ -100,7 +125,7 @@ export function useStdbQuery(
   },
 ) {
   return useQuery({
-    queryKey: ['stdb', resource, organizationId.toString()],
+    queryKey: stdbQueryKey(resource, organizationId),
     queryFn: async () => {
       const r = await apiFetch(`/api/query/${resource}`)
       if (!r.ok) {

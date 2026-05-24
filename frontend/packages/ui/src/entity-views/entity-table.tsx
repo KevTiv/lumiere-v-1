@@ -134,7 +134,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
     (hasActions && (config.actions?.some((a) => a.requiresSelection === true) ?? false))
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-4", className)} data-testid="entity-table">
       {/* Toolbar */}
       {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
         <div className="flex flex-wrap items-center gap-3">
@@ -190,6 +190,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                   size="sm"
                   disabled={action.requiresSelection && selectedRows.length === 0}
                   onClick={() => action.onClick(selectedRows)}
+                  data-testid={`entity-action-${action.id}`}
                 >
                   {Icon && <Icon className="h-4 w-4 mr-2" />}
                   {action.label}
@@ -236,6 +237,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                 return (
                   <TableRow
                     key={key}
+                    data-testid={`entity-row-${key}`}
                     onClick={() => {
                       if (selectionToggleOnRowClick) toggleRow(key)
                       onRowClick?.(row)

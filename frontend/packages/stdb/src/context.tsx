@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
+import { callEnsureDevAdmin } from "./commands/core";
 import { setStdbConnection } from "./connection";
 import { DbConnection } from "./generated";
 import { createClientSubscriptions } from "./queries/erp-subscriptions";
@@ -84,6 +85,9 @@ export function StdbConnectionProvider({
   });
 
   useEffect(() => {
+    /** Set during effect cleanup so `onDisconnect` does not clear React state for intentional teardown. */
+    let releasedForCleanup = false;
+
     let uri = host;
     if (sameOriginStdbProxy && typeof window !== "undefined") {
       // Trailing slash so SDK resolves `v1/...` under `/api/stdb/` (not under `/api/`).
@@ -114,6 +118,15 @@ export function StdbConnectionProvider({
         .withDatabaseName(mod)
         .withToken(savedToken)
         .onConnect((c, ident, refreshedToken) => {
+          if (releasedForCleanup) {
+            try {
+              c.disconnect();
+            } catch {
+              // ignore
+            }
+            return;
+          }
+
           // Persist token so the identity survives page refreshes
           if (typeof window !== "undefined" && refreshedToken) {
             localStorage.setItem("stdb_token", refreshedToken);
@@ -132,7 +145,7 @@ export function StdbConnectionProvider({
             process.env.NEXT_PUBLIC_DEV_ADMIN_AUTO_ORG === "true"
           ) {
             try {
-              c.reducers.ensureDevAdmin({});
+              callEnsureDevAdmin(c, {});
             } catch (e) {
               console.warn("[stdb] ensure_dev_admin failed", e);
             }
@@ -158,7 +171,9 @@ export function StdbConnectionProvider({
           console.error("[stdb] connection error", err);
         })
         .onDisconnect((_ctx, err) => {
+          if (releasedForCleanup) return;
           if (err) console.warn("[stdb] disconnected with error", err);
+          setStdbConnection(null);
           setState({ identity: null, connected: false });
         })
         .build();
@@ -167,6 +182,8 @@ export function StdbConnectionProvider({
     }
 
     return () => {
+      releasedForCleanup = true;
+      setStdbConnection(null);
       try {
         conn?.disconnect();
       } catch {

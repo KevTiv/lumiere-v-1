@@ -8,10 +8,10 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { documentsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 type ScalarId = bigint | number | string
@@ -87,15 +87,12 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = documentsBffPost("create_document", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -112,15 +109,12 @@ export function useUpdateDocument(organizationId: bigint) {
       documentId: bigint | number | string
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/update_document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(documentId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = documentsBffPost("update_document", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -131,11 +125,11 @@ export function useDeleteDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
-      })
+      const { urlPath, init } = documentsBffPost("delete_document", [
+        organizationId,
+        toScalarU64(documentId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -146,11 +140,11 @@ export function useLockDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/lock_document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
-      })
+      const { urlPath, init } = documentsBffPost("lock_document", [
+        organizationId,
+        toScalarU64(documentId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -161,11 +155,11 @@ export function useUnlockDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/unlock_document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
-      })
+      const { urlPath, init } = documentsBffPost("unlock_document", [
+        organizationId,
+        toScalarU64(documentId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock document')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -182,15 +176,12 @@ export function useAddDocumentVersion(organizationId: bigint) {
       documentId: bigint | number | string
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch('/api/call/add_document_version', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          organizationId,
-          toScalarU64(documentId),
-          stdbParamsToJson(params as object),
-        ]),
-      })
+      const { urlPath, init } = documentsBffPost("add_document_version", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add document version')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -201,11 +192,11 @@ export function useRecordDocumentView(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/record_document_view', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(documentId)]),
-      })
+      const { urlPath, init } = documentsBffPost("record_document_view", [
+        organizationId,
+        toScalarU64(documentId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record document view')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -219,11 +210,12 @@ export function useCreateDocumentFolder(organizationId: bigint) {
       const companyId = params.companyId != null ? String(params.companyId) : null
       const payload = companyId === null ? params : { ...params, companyId: undefined }
 
-      const r = await apiFetch('/api/call/create_document_folder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, companyId, payload]),
-      })
+      const { urlPath, init } = documentsBffPost("create_document_folder", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document folder')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
@@ -238,11 +230,11 @@ export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bi
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const r = await apiFetch('/api/call/create_knowledge_article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, payload]),
-      })
+      const { urlPath, init } = documentsBffPost("create_knowledge_article", [
+        organizationId,
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge article')
     },
     onSuccess: () =>
@@ -264,11 +256,12 @@ export function useUpdateKnowledgeArticle(organizationId: bigint, companyId?: bi
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const r = await apiFetch('/api/call/update_knowledge_article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), payload]),
-      })
+      const { urlPath, init } = documentsBffPost("update_knowledge_article", [
+        organizationId,
+        toScalarU64(articleId),
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge article')
     },
     onSuccess: () =>
@@ -280,11 +273,11 @@ export function useDeleteKnowledgeArticle(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_knowledge_article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
-      })
+      const { urlPath, init } = documentsBffPost("delete_knowledge_article", [
+        organizationId,
+        toScalarU64(articleId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge article')
     },
     onSuccess: () =>
@@ -296,11 +289,11 @@ export function useLockKnowledgeArticle(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/lock_knowledge_article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
-      })
+      const { urlPath, init } = documentsBffPost("lock_knowledge_article", [
+        organizationId,
+        toScalarU64(articleId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock knowledge article')
     },
     onSuccess: () =>
@@ -312,11 +305,11 @@ export function useUnlockKnowledgeArticle(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/unlock_knowledge_article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId)]),
-      })
+      const { urlPath, init } = documentsBffPost("unlock_knowledge_article", [
+        organizationId,
+        toScalarU64(articleId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock knowledge article')
     },
     onSuccess: () =>
@@ -338,11 +331,12 @@ export function useSetArticlePublished(organizationId: bigint, companyId?: bigin
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const r = await apiFetch('/api/call/set_article_published', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), payload]),
-      })
+      const { urlPath, init } = documentsBffPost("set_article_published", [
+        organizationId,
+        toScalarU64(articleId),
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update article publication state')
     },
     onSuccess: () =>
@@ -360,11 +354,12 @@ export function useAddArticleMember(organizationId: bigint, _companyId?: bigint)
       articleId: bigint | number | string
       member: string
     }) => {
-      const r = await apiFetch('/api/call/add_article_member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), member]),
-      })
+      const { urlPath, init } = documentsBffPost("add_article_member", [
+        organizationId,
+        toScalarU64(articleId),
+        member,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add article member')
     },
     onSuccess: () =>
@@ -382,11 +377,12 @@ export function useRemoveArticleMember(organizationId: bigint, _companyId?: bigi
       articleId: bigint | number | string
       member: string
     }) => {
-      const r = await apiFetch('/api/call/remove_article_member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(articleId), member]),
-      })
+      const { urlPath, init } = documentsBffPost("remove_article_member", [
+        organizationId,
+        toScalarU64(articleId),
+        member,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove article member')
     },
     onSuccess: () =>
@@ -402,11 +398,11 @@ export function useCreateKnowledgeCategory(organizationId: bigint, companyId?: b
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const r = await apiFetch('/api/call/create_knowledge_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, payload]),
-      })
+      const { urlPath, init } = documentsBffPost("create_knowledge_category", [
+        organizationId,
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge category')
     },
     onSuccess: () =>
@@ -428,11 +424,12 @@ export function useUpdateKnowledgeCategory(organizationId: bigint, companyId?: b
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const r = await apiFetch('/api/call/update_knowledge_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId), payload]),
-      })
+      const { urlPath, init } = documentsBffPost("update_knowledge_category", [
+        organizationId,
+        toScalarU64(categoryId),
+        stdbParamsToJson(payload as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge category')
     },
     onSuccess: () =>
@@ -444,11 +441,11 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (categoryId: bigint | number | string) => {
-      const r = await apiFetch('/api/call/delete_knowledge_category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(categoryId)]),
-      })
+      const { urlPath, init } = documentsBffPost("delete_knowledge_category", [
+        organizationId,
+        toScalarU64(categoryId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge category')
     },
     onSuccess: () =>
@@ -460,11 +457,11 @@ function useImportKnowledgeCategoryCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_knowledge_category_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = documentsBffPost("import_knowledge_category_csv", [
+        organizationId,
+        csvData,
+      ])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
     onSuccess: () =>
@@ -476,11 +473,11 @@ function useImportKnowledgeArticleCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const res = await apiFetch('/api/call/import_knowledge_article_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = documentsBffPost("import_knowledge_article_csv", [
+        organizationId,
+        csvData,
+      ])
+      const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
     onSuccess: () =>
@@ -526,26 +523,23 @@ export function useCreateDocumentProcessingJob(organizationId: bigint, companyId
         if (n <= 0n) throw new Error("AI agent id must be a positive integer")
         aiAgentId = n
       }
-      const r = await apiFetch('/api/call/create_document_processing_job', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([
-          companyId,
-          stdbParamsToJson({
-            document_type: documentType,
-            job_type: jobType,
-            ai_agent_id: aiAgentId,
-            input_data:
-              typeof params.inputData === "string" && params.inputData.trim() !== ""
-                ? params.inputData.trim()
-                : null,
-            metadata:
-              typeof params.metadata === "string" && params.metadata.trim() !== ""
-                ? params.metadata.trim()
-                : null,
-          } as object),
-        ]),
-      })
+      const { urlPath, init } = documentsBffPost("create_document_processing_job", [
+        companyId,
+        stdbParamsToJson({
+          document_type: documentType,
+          job_type: jobType,
+          ai_agent_id: aiAgentId,
+          input_data:
+            typeof params.inputData === "string" && params.inputData.trim() !== ""
+              ? params.inputData.trim()
+              : null,
+          metadata:
+            typeof params.metadata === "string" && params.metadata.trim() !== ""
+              ? params.metadata.trim()
+              : null,
+        } as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
@@ -582,11 +576,12 @@ export function useCompleteDocumentProcessingJob(organizationId: bigint) {
         cost,
         errorMessage,
       }
-      const r = await apiFetch('/api/call/complete_document_processing_job', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([companyIdArg(row), jobId, params]),
-      })
+      const { urlPath, init } = documentsBffPost("complete_document_processing_job", [
+        companyIdArg(row),
+        jobId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
@@ -599,11 +594,11 @@ export function useApproveDocumentProcessingJob(organizationId: bigint) {
   return useMutation({
     mutationFn: async (row: Record<string, unknown>) => {
       const jobId = rowId(row)
-      const r = await apiFetch('/api/call/approve_document_processing_job', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([companyIdArg(row), jobId]),
-      })
+      const { urlPath, init } = documentsBffPost("approve_document_processing_job", [
+        companyIdArg(row),
+        jobId,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
@@ -622,11 +617,12 @@ export function useAcknowledgeInsight(organizationId: bigint) {
       actionTaken: string | null
     }) => {
       const insightId = rowId(row)
-      const r = await apiFetch('/api/call/acknowledge_insight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([companyIdArg(row), insightId, actionTaken]),
-      })
+      const { urlPath, init } = documentsBffPost("acknowledge_insight", [
+        companyIdArg(row),
+        insightId,
+        actionTaken,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>

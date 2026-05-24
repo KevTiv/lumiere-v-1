@@ -5,10 +5,25 @@
  */
 
 
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { helpdeskBffPost } from "@lumiere/stdb/commands"
+import type {
+  CreateHelpdeskSlaParams,
+  CreateHelpdeskStageParams,
+  CreateHelpdeskTeamParams,
+  CreateTicketParams,
+  UpdateTicketParams,
+} from "@lumiere/stdb/types"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
+import {
+  finalizeCreateHelpdeskSlaParams,
+  finalizeCreateHelpdeskStageParams,
+  finalizeCreateHelpdeskTeamParams,
+  finalizeCreateTicketParams,
+} from "./helpdesk-params-merge"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -74,13 +89,14 @@ export function useHelpdeskSlas(organizationId: bigint, initialData?: QueryRows)
 
 export function useCreateTicket(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateTicketParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const finalized = finalizeCreateTicketParams(params)
+      const { urlPath, init } = helpdeskBffPost("create_ticket", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create helpdesk ticket')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -92,14 +108,15 @@ export function useUpdateTicket(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { ticketId: number | bigint | string; params: Record<string, unknown> }
+    { ticketId: number | bigint | string; params: Partial<UpdateTicketParams> }
   >({
     mutationFn: async ({ ticketId, params }) => {
-      const r = await apiFetch('/api/call/update_ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId), params]),
-      })
+      const { urlPath, init } = helpdeskBffPost("update_ticket", [
+        organizationId,
+        toScalarU64(ticketId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update ticket')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -111,11 +128,12 @@ export function useAssignTicket(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { ticketId: bigint | number | string; agentIdentityHex: string }>({
     mutationFn: async ({ ticketId, agentIdentityHex }) => {
-      const r = await apiFetch('/api/call/assign_ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId), agentIdentityHex]),
-      })
+      const { urlPath, init } = helpdeskBffPost("assign_ticket", [
+        organizationId,
+        toScalarU64(ticketId),
+        agentIdentityHex,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign helpdesk ticket')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -126,11 +144,11 @@ export function useCloseTicket(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { ticketId: bigint | number | string }>({
     mutationFn: async ({ ticketId }) => {
-      const r = await apiFetch('/api/call/close_ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId)]),
-      })
+      const { urlPath, init } = helpdeskBffPost("close_ticket", [
+        organizationId,
+        toScalarU64(ticketId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to close helpdesk ticket')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -141,11 +159,11 @@ export function useReopenTicket(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { ticketId: bigint | number | string }>({
     mutationFn: async ({ ticketId }) => {
-      const r = await apiFetch('/api/call/reopen_ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(ticketId)]),
-      })
+      const { urlPath, init } = helpdeskBffPost("reopen_ticket", [
+        organizationId,
+        toScalarU64(ticketId),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reopen helpdesk ticket')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -156,13 +174,14 @@ export function useReopenTicket(organizationId: bigint) {
 
 export function useCreateHelpdeskTeam(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateHelpdeskTeamParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_helpdesk_team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const finalized = finalizeCreateHelpdeskTeamParams(params)
+      const { urlPath, init } = helpdeskBffPost("create_helpdesk_team", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create team')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -171,13 +190,14 @@ export function useCreateHelpdeskTeam(organizationId: bigint) {
 
 export function useCreateHelpdeskStage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateHelpdeskStageParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_helpdesk_stage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const finalized = finalizeCreateHelpdeskStageParams(params)
+      const { urlPath, init } = helpdeskBffPost("create_helpdesk_stage", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stage')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -186,13 +206,14 @@ export function useCreateHelpdeskStage(organizationId: bigint) {
 
 export function useCreateHelpdeskSla(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, Partial<CreateHelpdeskSlaParams>>({
     mutationFn: async (params) => {
-      const r = await apiFetch('/api/call/create_helpdesk_sla', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, params]),
-      })
+      const finalized = finalizeCreateHelpdeskSlaParams(params)
+      const { urlPath, init } = helpdeskBffPost("create_helpdesk_sla", [
+        organizationId,
+        stdbParamsToJson(finalized),
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create SLA')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -205,11 +226,11 @@ export function useImportHelpdeskTicketCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: async (csvData) => {
-      const r = await apiFetch('/api/call/import_helpdesk_ticket_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = helpdeskBffPost("import_helpdesk_ticket_csv", [
+        organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import tickets CSV')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -220,11 +241,11 @@ export function useImportHelpdeskTeamCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: async (csvData) => {
-      const r = await apiFetch('/api/call/import_helpdesk_team_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = helpdeskBffPost("import_helpdesk_team_csv", [
+        organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import teams CSV')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -235,11 +256,11 @@ export function useImportHelpdeskStageCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: async (csvData) => {
-      const r = await apiFetch('/api/call/import_helpdesk_stage_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = helpdeskBffPost("import_helpdesk_stage_csv", [
+        organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import stages CSV')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
@@ -250,15 +271,21 @@ export function useImportHelpdeskSlaCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: async (csvData) => {
-      const r = await apiFetch('/api/call/import_helpdesk_sla_csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCallBody([organizationId, csvData]),
-      })
+      const { urlPath, init } = helpdeskBffPost("import_helpdesk_sla_csv", [
+        organizationId,
+        csvData,
+      ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to import SLAs CSV')
     },
     onSuccess: () => invalidateAll(qc, organizationId),
   })
 }
 
-export type { CreateTicketParams } from '@lumiere/stdb/generated/types'
+export type {
+  CreateHelpdeskSlaParams,
+  CreateHelpdeskStageParams,
+  CreateHelpdeskTeamParams,
+  CreateTicketParams,
+  UpdateTicketParams,
+} from '@lumiere/stdb/types'

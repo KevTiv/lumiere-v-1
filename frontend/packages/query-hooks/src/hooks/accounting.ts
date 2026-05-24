@@ -3,10 +3,10 @@
 import { apiFetch } from "../http"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
-import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreatePaymentParams } from "@lumiere/stdb/generated/types"
-import { invalidateStdbQueryResources, useStdbCallMutation, useStdbQuery } from "./stdb"
+import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
+import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -236,6 +236,25 @@ async function parseCallError(r: Response): Promise<string> {
   return (json.error as string | undefined) ?? `Request failed (${r.status})`
 }
 
+function useAccountingCallMutation(
+  reducer: AccountingBffReducerKey,
+  organizationId: bigint | number,
+  invalidateResources: readonly string[],
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: unknown[]) => {
+      const { urlPath, init } = accountingBffPost(reducer, args)
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
+        throw new Error((json.error as string | undefined) ?? `Reducer ${reducer} failed`)
+      }
+    },
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, invalidateResources),
+  })
+}
+
 function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
   const k = organizationId
   void qc.invalidateQueries({ queryKey: ["stdb", "budgets", k] })
@@ -261,7 +280,7 @@ function invalidateTaxQueries(qc: ReturnType<typeof useQueryClient>, organizatio
  * Create a new account in the chart of accounts.
  */
 export function useCreateAccountAccount(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_account",
     organizationId,
     stdbInvalidationFor("create_account_account"),
@@ -272,7 +291,7 @@ export function useCreateAccountAccount(organizationId: number) {
  * Update an existing account.
  */
 export function useUpdateAccountAccount(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_account_account",
     organizationId,
     stdbInvalidationFor("update_account_account"),
@@ -283,7 +302,7 @@ export function useUpdateAccountAccount(organizationId: number) {
  * Deprecate (soft-delete) an account.
  */
 export function useDeprecateAccountAccount(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "deprecate_account_account",
     organizationId,
     stdbInvalidationFor("deprecate_account_account"),
@@ -294,7 +313,7 @@ export function useDeprecateAccountAccount(organizationId: number) {
  * Create a new account move (journal entry).
  */
 export function useCreateAccountMove(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_move",
     organizationId,
     stdbInvalidationFor("create_account_move"),
@@ -305,7 +324,7 @@ export function useCreateAccountMove(organizationId: number) {
  * Post an account move (confirm it).
  */
 export function usePostAccountMove(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "post_account_move",
     organizationId,
     stdbInvalidationFor("post_account_move"),
@@ -316,14 +335,14 @@ export function usePostAccountMove(organizationId: number) {
  * Post a customer/vendor invoice or refund (totals + optional COGS lines).
  */
 export function usePostInvoice(organizationId: number) {
-  return useStdbCallMutation("post_invoice", organizationId, stdbInvalidationFor("post_invoice"))
+  return useAccountingCallMutation("post_invoice", organizationId, stdbInvalidationFor("post_invoice"))
 }
 
 /**
  * Cancel an account move.
  */
 export function useCancelAccountMove(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "cancel_account_move",
     organizationId,
     stdbInvalidationFor("cancel_account_move"),
@@ -334,7 +353,7 @@ export function useCancelAccountMove(organizationId: number) {
  * Add a line to an account move.
  */
 export function useAddAccountMoveLine(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "add_account_move_line",
     organizationId,
     stdbInvalidationFor("add_account_move_line"),
@@ -345,7 +364,7 @@ export function useAddAccountMoveLine(organizationId: number) {
  * Delete an account move line.
  */
 export function useDeleteAccountMoveLine(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "delete_account_move_line",
     organizationId,
     stdbInvalidationFor("delete_account_move_line"),
@@ -356,7 +375,7 @@ export function useDeleteAccountMoveLine(organizationId: number) {
  * Create a new tax.
  */
 export function useCreateAccountTax(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_tax",
     organizationId,
     stdbInvalidationFor("create_account_tax"),
@@ -367,7 +386,7 @@ export function useCreateAccountTax(organizationId: number) {
  * Update an existing tax.
  */
 export function useUpdateAccountTax(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_account_tax",
     organizationId,
     stdbInvalidationFor("update_account_tax"),
@@ -381,11 +400,8 @@ export function useCreateCrossoveredBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_crossovered_budget", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_crossovered_budget", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -396,11 +412,8 @@ export function useCreateAccountAccountType(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_account_account_type", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_account_type", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
@@ -411,15 +424,12 @@ export function useUpdateAccountAccountType(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { typeId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_account_type", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_account_account_type", [
           organizationId,
           args.typeId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
@@ -430,11 +440,8 @@ export function useCreateAccountGroup(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_account_group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_group", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
@@ -445,15 +452,12 @@ export function useUpdateAccountGroup(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { groupId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_account_group", [
           organizationId,
           args.groupId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
@@ -464,7 +468,7 @@ export function useUpdateAccountGroup(organizationId: number) {
  * Update an existing budget.
  */
 export function useUpdateCrossoveredBudget(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_crossovered_budget",
     organizationId,
     stdbInvalidationFor("update_crossovered_budget"),
@@ -475,7 +479,7 @@ export function useUpdateCrossoveredBudget(organizationId: number) {
  * Create a new budget line.
  */
 export function useCreateBudgetLine(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_budget_line",
     organizationId,
     stdbInvalidationFor("create_budget_line"),
@@ -486,7 +490,7 @@ export function useCreateBudgetLine(organizationId: number) {
  * Update an existing budget line.
  */
 export function useUpdateBudgetLine(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_budget_line",
     organizationId,
     stdbInvalidationFor("update_budget_line"),
@@ -497,11 +501,8 @@ export function useConfirmBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (budgetId: bigint) => {
-      const r = await apiFetch("/api/call/confirm_budget", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, budgetId]),
-      })
+      const { urlPath, init } = accountingBffPost("confirm_budget", [organizationId, budgetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -512,11 +513,8 @@ export function useValidateBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (budgetId: bigint) => {
-      const r = await apiFetch("/api/call/validate_budget", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, budgetId]),
-      })
+      const { urlPath, init } = accountingBffPost("validate_budget", [organizationId, budgetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -527,11 +525,8 @@ export function useDoneBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (budgetId: bigint) => {
-      const r = await apiFetch("/api/call/done_budget", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, budgetId]),
-      })
+      const { urlPath, init } = accountingBffPost("done_budget", [organizationId, budgetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -542,11 +537,8 @@ export function useCancelBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (budgetId: bigint) => {
-      const r = await apiFetch("/api/call/cancel_budget", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, budgetId]),
-      })
+      const { urlPath, init } = accountingBffPost("cancel_budget", [organizationId, budgetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -557,11 +549,8 @@ export function useDeleteBudgetLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineId: bigint) => {
-      const r = await apiFetch("/api/call/delete_budget_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, lineId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_budget_line", [organizationId, lineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -575,11 +564,8 @@ export function useUpdateBudgetLineActuals(organizationId: number) {
       lineId: bigint
       params: { practicalAmount: number; theoreticalAmount: number }
     }) => {
-      const r = await apiFetch("/api/call/update_budget_line_actuals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_budget_line_actuals", [organizationId, args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -590,11 +576,8 @@ export function useCreateBudgetPost(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_budget_post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_budget_post", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -605,11 +588,8 @@ export function useUpdateBudgetPost(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { postId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_budget_post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.postId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_budget_post", [organizationId, args.postId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -620,7 +600,7 @@ export function useUpdateBudgetPost(organizationId: number) {
  * Create a new bank statement.
  */
 export function useCreateAccountBankStatement(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_bank_statement",
     organizationId,
     stdbInvalidationFor("create_account_bank_statement"),
@@ -631,7 +611,7 @@ export function useCreateAccountBankStatement(organizationId: number) {
  * Update an existing bank statement.
  */
 export function useUpdateAccountBankStatement(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_account_bank_statement",
     organizationId,
     stdbInvalidationFor("update_account_bank_statement"),
@@ -642,7 +622,7 @@ export function useUpdateAccountBankStatement(organizationId: number) {
  * Unreconcile a bank statement line.
  */
 export function useUnreconcileAccountBankStatementLine(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "unreconcile_account_bank_statement_line",
     organizationId,
     stdbInvalidationFor("unreconcile_account_bank_statement_line"),
@@ -653,7 +633,7 @@ export function useUnreconcileAccountBankStatementLine(organizationId: number) {
  * Create a new fixed asset.
  */
 export function useCreateAccountAsset(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_asset",
     organizationId,
     stdbInvalidationFor("create_account_asset"),
@@ -664,7 +644,7 @@ export function useCreateAccountAsset(organizationId: number) {
  * Update an existing fixed asset.
  */
 export function useUpdateAccountAsset(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_account_asset",
     organizationId,
     stdbInvalidationFor("update_account_asset"),
@@ -675,7 +655,7 @@ export function useUpdateAccountAsset(organizationId: number) {
  * Dispose of a fixed asset.
  */
 export function useDisposeAccountAsset(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "dispose_account_asset",
     organizationId,
     stdbInvalidationFor("dispose_account_asset"),
@@ -686,7 +666,7 @@ export function useDisposeAccountAsset(organizationId: number) {
  * Create a new account journal.
  */
 export function useCreateAccountJournal(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "create_account_journal",
     organizationId,
     stdbInvalidationFor("create_account_journal"),
@@ -697,7 +677,7 @@ export function useCreateAccountJournal(organizationId: number) {
  * Update an existing account journal.
  */
 export function useUpdateAccountJournal(organizationId: number) {
-  return useStdbCallMutation(
+  return useAccountingCallMutation(
     "update_account_journal",
     organizationId,
     stdbInvalidationFor("update_account_journal"),
@@ -736,11 +716,8 @@ export function useCreateFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_fiscal_year", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_fiscal_year", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFiscalYearQueries(qc, organizationId),
@@ -751,16 +728,13 @@ export function useUpdateFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { fiscalYearId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_fiscal_year", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_fiscal_year", [
           organizationId,
           companyId,
           args.fiscalYearId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFiscalYearQueries(qc, organizationId),
@@ -771,11 +745,8 @@ export function useDeleteFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (fiscalYearId: bigint) => {
-      const r = await apiFetch("/api/call/delete_fiscal_year", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_fiscal_year", [organizationId, companyId, fiscalYearId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFiscalYearQueries(qc, organizationId),
@@ -786,11 +757,8 @@ export function useOpenFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (fiscalYearId: bigint) => {
-      const r = await apiFetch("/api/call/open_fiscal_year", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
-      })
+      const { urlPath, init } = accountingBffPost("open_fiscal_year", [organizationId, companyId, fiscalYearId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFiscalYearQueries(qc, organizationId),
@@ -801,11 +769,8 @@ export function useCloseFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (fiscalYearId: bigint) => {
-      const r = await apiFetch("/api/call/close_fiscal_year", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, fiscalYearId]),
-      })
+      const { urlPath, init } = accountingBffPost("close_fiscal_year", [organizationId, companyId, fiscalYearId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFiscalYearQueries(qc, organizationId),
@@ -817,11 +782,8 @@ export function useCreateAccountPeriod(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_account_period", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_period", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
@@ -832,16 +794,13 @@ export function useUpdateAccountPeriod(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { periodId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_period", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_account_period", [
           organizationId,
           companyId,
           args.periodId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
@@ -852,11 +811,8 @@ export function useDeleteAccountPeriod(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (periodId: bigint) => {
-      const r = await apiFetch("/api/call/delete_account_period", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_account_period", [organizationId, companyId, periodId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
@@ -867,11 +823,8 @@ export function useOpenAccountPeriod(organizationId: number, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (periodId: bigint) => {
-      const r = await apiFetch("/api/call/open_account_period", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
-      })
+      const { urlPath, init } = accountingBffPost("open_account_period", [organizationId, companyId, periodId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
@@ -882,11 +835,8 @@ export function useCloseAccountPeriod(organizationId: number, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (periodId: bigint) => {
-      const r = await apiFetch("/api/call/close_account_period", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, periodId]),
-      })
+      const { urlPath, init } = accountingBffPost("close_account_period", [organizationId, companyId, periodId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
@@ -897,11 +847,8 @@ export function useCreateAnalyticAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_analytic_account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_analytic_account", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -912,11 +859,8 @@ export function useUpdateAnalyticAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { accountId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_analytic_account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.accountId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_analytic_account", [organizationId, args.accountId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -927,11 +871,8 @@ export function useSetAnalyticAccountActive(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { accountId: bigint; active: boolean }) => {
-      const r = await apiFetch("/api/call/set_analytic_account_active", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.accountId, args.active]),
-      })
+      const { urlPath, init } = accountingBffPost("set_analytic_account_active", [organizationId, args.accountId, args.active])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -942,11 +883,8 @@ export function useCreateAnalyticLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_analytic_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_analytic_line", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -957,11 +895,8 @@ export function useUpdateAnalyticLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_analytic_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_analytic_line", [organizationId, args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -972,11 +907,8 @@ export function useDeleteAnalyticLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineId: bigint) => {
-      const r = await apiFetch("/api/call/delete_analytic_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, lineId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_analytic_line", [organizationId, lineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -987,11 +919,8 @@ export function useCreateAnalyticDistributionModel(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_analytic_distribution_model", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_analytic_distribution_model", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -1002,11 +931,8 @@ export function useUpdateAnalyticDistributionModel(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { modelId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_analytic_distribution_model", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.modelId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_analytic_distribution_model", [organizationId, args.modelId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -1019,11 +945,8 @@ export function usePostAccountBankStatement(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (statementId: bigint) => {
-      const r = await apiFetch("/api/call/post_account_bank_statement?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([statementId]),
-      })
+      const { urlPath, init } = accountingBffPost("post_account_bank_statement", [statementId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1034,11 +957,8 @@ export function useDeleteAccountBankStatement(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (statementId: bigint) => {
-      const r = await apiFetch("/api/call/delete_account_bank_statement?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([statementId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_account_bank_statement", [statementId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1049,11 +969,8 @@ export function useCreateAccountBankStatementLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { statementId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/create_account_bank_statement_line?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.statementId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_bank_statement_line", [args.statementId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1064,11 +981,8 @@ export function useUpdateAccountBankStatementLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_bank_statement_line?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_account_bank_statement_line", [args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1079,11 +993,8 @@ export function useDeleteAccountBankStatementLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineId: bigint) => {
-      const r = await apiFetch("/api/call/delete_account_bank_statement_line?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([lineId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_account_bank_statement_line", [lineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1114,11 +1025,8 @@ export function useMatchBankLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; ruleId: number | null }) => {
-      const r = await apiFetch("/api/call/match_bank_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, args.ruleId]),
-      })
+      const { urlPath, init } = accountingBffPost("match_bank_line", [organizationId, args.lineId, args.ruleId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1129,11 +1037,8 @@ export function useApplyReconciliationRules(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; ruleId: number | null }) => {
-      const r = await apiFetch("/api/call/apply_reconciliation_rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, args.ruleId]),
-      })
+      const { urlPath, init } = accountingBffPost("apply_reconciliation_rules", [organizationId, args.lineId, args.ruleId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1144,11 +1049,8 @@ export function useReconcileAccountBankStatementLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/reconcile_account_bank_statement_line?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("reconcile_account_bank_statement_line", [args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1159,11 +1061,8 @@ export function useUnreconciledAccountBankStatementLine(organizationId: number) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/unreconciled_account_bank_statement_line?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("unreconciled_account_bank_statement_line", [args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1207,11 +1106,8 @@ export function useCreateConsolidationAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_consolidation_account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_consolidation_account", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1222,11 +1118,8 @@ export function useUpdateConsolidationAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { accountId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_consolidation_account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.accountId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_consolidation_account", [organizationId, args.accountId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1237,11 +1130,8 @@ export function useCreateConsolidationJournal(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_consolidation_journal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_consolidation_journal", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1252,11 +1142,8 @@ export function useCreateEliminationEntry(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_elimination_entry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_elimination_entry", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1267,11 +1154,8 @@ export function useProcessConsolidation(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (journalId: bigint) => {
-      const r = await apiFetch("/api/call/process_consolidation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, journalId]),
-      })
+      const { urlPath, init } = accountingBffPost("process_consolidation", [organizationId, journalId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1282,11 +1166,8 @@ export function useValidateConsolidation(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (journalId: bigint) => {
-      const r = await apiFetch("/api/call/validate_consolidation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, journalId]),
-      })
+      const { urlPath, init } = accountingBffPost("validate_consolidation", [organizationId, journalId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1297,11 +1178,8 @@ export function useCancelConsolidation(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { journalId: bigint; reason: string }) => {
-      const r = await apiFetch("/api/call/cancel_consolidation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.journalId, args.reason]),
-      })
+      const { urlPath, init } = accountingBffPost("cancel_consolidation", [organizationId, args.journalId, args.reason])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1312,11 +1190,8 @@ export function useSetConsolidationCompanyRate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/set_consolidation_company_rate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("set_consolidation_company_rate", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1327,15 +1202,12 @@ export function useMatchEliminationEntries(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { entryId: bigint; matchedEntryId: bigint }) => {
-      const r = await apiFetch("/api/call/match_elimination_entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("match_elimination_entries", [
           organizationId,
           args.entryId,
           args.matchedEntryId,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1346,11 +1218,8 @@ export function useUnmatchEliminationEntry(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (entryId: bigint) => {
-      const r = await apiFetch("/api/call/unmatch_elimination_entry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, entryId]),
-      })
+      const { urlPath, init } = accountingBffPost("unmatch_elimination_entry", [organizationId, entryId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateConsolidationQueries(qc, organizationId),
@@ -1361,11 +1230,8 @@ export function useCreateAccountReconciliationWidget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_account_reconciliation_widget?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_reconciliation_widget", [stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1376,11 +1242,8 @@ export function useUpdateAccountReconciliationWidget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { widgetId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_reconciliation_widget?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([args.widgetId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_account_reconciliation_widget", [args.widgetId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1391,11 +1254,8 @@ export function useDeleteAccountReconciliationWidget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (widgetId: bigint) => {
-      const r = await apiFetch("/api/call/delete_account_reconciliation_widget?withCompany=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([widgetId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_account_reconciliation_widget", [widgetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -1422,11 +1282,8 @@ export function useDeleteAccountAsset(organizationId: number, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (assetId: bigint) => {
-      const r = await apiFetch("/api/call/delete_account_asset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_account_asset", [organizationId, companyId, assetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1437,11 +1294,8 @@ export function useConfirmAccountAsset(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (assetId: bigint) => {
-      const r = await apiFetch("/api/call/confirm_account_asset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
-      })
+      const { urlPath, init } = accountingBffPost("confirm_account_asset", [organizationId, companyId, assetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1452,11 +1306,8 @@ export function useCloseAccountAsset(organizationId: number, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (assetId: bigint) => {
-      const r = await apiFetch("/api/call/close_account_asset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
-      })
+      const { urlPath, init } = accountingBffPost("close_account_asset", [organizationId, companyId, assetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1467,16 +1318,13 @@ export function useSetAccountAssetActive(organizationId: number, companyId: bigi
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { assetId: bigint; active: boolean }) => {
-      const r = await apiFetch("/api/call/set_asset_active", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("set_asset_active", [
           organizationId,
           companyId,
           args.assetId,
           args.active,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1487,11 +1335,8 @@ export function useCreateDepreciationLine(organizationId: number, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_depreciation_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_depreciation_line", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1502,11 +1347,8 @@ export function useComputeDepreciationBoard(organizationId: number, companyId: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (assetId: bigint) => {
-      const r = await apiFetch("/api/call/compute_depreciation_board", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, assetId]),
-      })
+      const { urlPath, init } = accountingBffPost("compute_depreciation_board", [organizationId, companyId, assetId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
@@ -1546,16 +1388,13 @@ export function useCreateIntercompanyRule(organizationId: number) {
       destinationCompanyId: bigint
       params: Record<string, unknown>
     }) => {
-      const r = await apiFetch("/api/call/create_intercompany_rule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("create_intercompany_rule", [
           organizationId,
           args.sourceCompanyId,
           args.destinationCompanyId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1566,16 +1405,13 @@ export function useUpdateIntercompanyRule(organizationId: number, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { ruleId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_intercompany_rule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_intercompany_rule", [
           organizationId,
           companyId,
           args.ruleId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1586,11 +1422,8 @@ export function useDeleteIntercompanyRule(organizationId: number, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (ruleId: bigint) => {
-      const r = await apiFetch("/api/call/delete_intercompany_rule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, ruleId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_intercompany_rule", [organizationId, companyId, ruleId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1601,16 +1434,13 @@ export function useSetIntercompanyRuleActive(organizationId: number, companyId: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { ruleId: bigint; isActive: boolean }) => {
-      const r = await apiFetch("/api/call/set_intercompany_rule_active", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("set_intercompany_rule_active", [
           organizationId,
           companyId,
           args.ruleId,
           args.isActive,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1622,15 +1452,12 @@ export function useCreateIntercompanyTransaction(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { originCompanyId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/create_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("create_intercompany_transaction", [
           organizationId,
           args.originCompanyId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -1643,11 +1470,8 @@ export function useApproveIntercompanyTransaction(organizationId: number, compan
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (transactionId: bigint) => {
-      const r = await apiFetch("/api/call/approve_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
-      })
+      const { urlPath, init } = accountingBffPost("approve_intercompany_transaction", [organizationId, companyId, transactionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1658,16 +1482,13 @@ export function useProcessIntercompanyTransaction(organizationId: number, compan
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/process_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("process_intercompany_transaction", [
           organizationId,
           companyId,
           args.transactionId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1678,11 +1499,8 @@ export function useCompleteIntercompanyTransaction(organizationId: number, compa
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (transactionId: bigint) => {
-      const r = await apiFetch("/api/call/complete_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
-      })
+      const { urlPath, init } = accountingBffPost("complete_intercompany_transaction", [organizationId, companyId, transactionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1693,16 +1511,13 @@ export function useErrorIntercompanyTransaction(organizationId: number, companyI
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; errorMessage: string }) => {
-      const r = await apiFetch("/api/call/error_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("error_intercompany_transaction", [
           organizationId,
           companyId,
           args.transactionId,
           { errorMessage: args.errorMessage },
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1713,16 +1528,13 @@ export function useCancelIntercompanyTransaction(organizationId: number, company
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; reason: string }) => {
-      const r = await apiFetch("/api/call/cancel_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("cancel_intercompany_transaction", [
           organizationId,
           companyId,
           args.transactionId,
           { reason: args.reason },
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1733,11 +1545,8 @@ export function useRetryIntercompanyTransaction(organizationId: number, companyI
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (transactionId: bigint) => {
-      const r = await apiFetch("/api/call/retry_intercompany_transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, transactionId]),
-      })
+      const { urlPath, init } = accountingBffPost("retry_intercompany_transaction", [organizationId, companyId, transactionId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateIntercompanyQueries(qc, organizationId),
@@ -1757,11 +1566,8 @@ export function useComputeInvoiceTotals(organizationId: number, companyId: bigin
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moveId: bigint | number | string) => {
-      const r = await apiFetch("/api/call/compute_invoice_totals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, toScalarU64(moveId)]),
-      })
+      const { urlPath, init } = accountingBffPost("compute_invoice_totals", [organizationId, toScalarU64(moveId)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, organizationId),
@@ -1772,11 +1578,8 @@ export function useUpdateAccountMoveLine(organizationId: number, companyId: bigi
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_move_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.lineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_account_move_line", [organizationId, args.lineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, organizationId),
@@ -1787,15 +1590,12 @@ export function useReconcilePaymentWithInvoice(organizationId: number, companyId
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { paymentMoveId: bigint; invoiceMoveId: bigint }) => {
-      const r = await apiFetch("/api/call/reconcile_payment_with_invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("reconcile_payment_with_invoice", [
           organizationId,
           args.paymentMoveId,
           args.invoiceMoveId,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, organizationId),
@@ -1814,11 +1614,8 @@ export function useCreateAccountPayment(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: CreatePaymentParams) => {
-      const r = await apiFetch("/api/call/create_payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, paymentParamsToJson(params)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_payment", [organizationId, paymentParamsToJson(params)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1830,11 +1627,8 @@ export function usePostAccountPayment(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (paymentId: bigint) => {
-      const r = await apiFetch("/api/call/post_payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, paymentId]),
-      })
+      const { urlPath, init } = accountingBffPost("post_payment", [organizationId, paymentId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -1849,11 +1643,8 @@ export function useCancelAccountPayment(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (paymentId: bigint) => {
-      const r = await apiFetch("/api/call/cancel_payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, paymentId]),
-      })
+      const { urlPath, init } = accountingBffPost("cancel_payment", [organizationId, paymentId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -1869,16 +1660,13 @@ export function useRegisterPaymentOnInvoice(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (args: { paymentId: bigint; invoiceIds: bigint[]; isBill: boolean }) => {
-      const r = await apiFetch("/api/call/register_payment_on_invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("register_payment_on_invoice", [
           organizationId,
           args.paymentId,
           args.invoiceIds,
           args.isBill,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1890,11 +1678,8 @@ export function useCreatePaymentTerm(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_payment_term", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_payment_term", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1911,17 +1696,14 @@ export function useUpdatePaymentTerm(organizationId: number) {
       note: string | null
       isActive: boolean | null
     }) => {
-      const r = await apiFetch("/api/call/update_payment_term", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_payment_term", [
           organizationId,
           args.termId,
           args.name,
           args.note,
           args.isActive,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1933,11 +1715,8 @@ export function useDeletePaymentTerm(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (termId: bigint) => {
-      const r = await apiFetch("/api/call/delete_payment_term", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, termId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_payment_term", [organizationId, termId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1949,11 +1728,8 @@ export function useCreatePaymentTermLine(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_payment_term_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_payment_term_line", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1973,10 +1749,7 @@ export function useUpdatePaymentTermLine(organizationId: number) {
       daysAfterEndOfMonth: boolean | null
       sequence: number | null
     }) => {
-      const r = await apiFetch("/api/call/update_payment_term_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_payment_term_line", [
           organizationId,
           args.lineId,
           args.value,
@@ -1985,8 +1758,8 @@ export function useUpdatePaymentTermLine(organizationId: number) {
           args.months,
           args.daysAfterEndOfMonth,
           args.sequence,
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -1998,11 +1771,8 @@ export function useDeletePaymentTermLine(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (lineId: bigint) => {
-      const r = await apiFetch("/api/call/delete_payment_term_line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, lineId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_payment_term_line", [organizationId, lineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAccountPaymentQueries(qc, k),
@@ -2015,15 +1785,12 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_currency_rate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("create_currency_rate", [
           organizationId,
           companyId === null ? null : companyId,
           stdbParamsToJson(params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2072,11 +1839,8 @@ export function useCreateAccountTaxGroup(organizationId: number, companyId: bigi
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_account_tax_group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_account_tax_group", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateTaxQueries(qc, organizationId),
@@ -2087,16 +1851,13 @@ export function useUpdateAccountTaxGroup(organizationId: number, companyId: bigi
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { groupId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_account_tax_group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_account_tax_group", [
           organizationId,
           companyId,
           args.groupId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateTaxQueries(qc, organizationId),
@@ -2109,11 +1870,8 @@ export function useCreateTaxJurisdiction(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_tax_jurisdiction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_tax_jurisdiction", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2126,11 +1884,8 @@ export function useUpdateTaxJurisdiction(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { jurisdictionId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_tax_jurisdiction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.jurisdictionId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_tax_jurisdiction", [organizationId, args.jurisdictionId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2145,11 +1900,8 @@ export function useCreateTaxSchedule(organizationId: number, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_tax_schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_tax_schedule", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateTaxQueries(qc, organizationId),
@@ -2160,16 +1912,13 @@ export function useUpdateTaxSchedule(organizationId: number, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { scheduleId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_tax_schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([
+      const { urlPath, init } = accountingBffPost("update_tax_schedule", [
           organizationId,
           companyId,
           args.scheduleId,
           stdbParamsToJson(args.params as object),
-        ]),
-      })
+        ])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateTaxQueries(qc, organizationId),
@@ -2182,11 +1931,8 @@ export function useCreateTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const r = await apiFetch("/api/call/create_tax_deadline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, stdbParamsToJson(params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("create_tax_deadline", [organizationId, stdbParamsToJson(params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2199,11 +1945,8 @@ export function useUpdateTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { deadlineId: bigint; params: Record<string, unknown> }) => {
-      const r = await apiFetch("/api/call/update_tax_deadline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, args.deadlineId, stdbParamsToJson(args.params as object)]),
-      })
+      const { urlPath, init } = accountingBffPost("update_tax_deadline", [organizationId, args.deadlineId, stdbParamsToJson(args.params as object)])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2216,11 +1959,8 @@ export function useDeleteTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const r = await apiFetch("/api/call/delete_tax_deadline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, deadlineId]),
-      })
+      const { urlPath, init } = accountingBffPost("delete_tax_deadline", [organizationId, deadlineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2233,11 +1973,8 @@ export function useCompleteTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const r = await apiFetch("/api/call/complete_tax_deadline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, deadlineId]),
-      })
+      const { urlPath, init } = accountingBffPost("complete_tax_deadline", [organizationId, deadlineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2250,11 +1987,8 @@ export function useWaiveTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const r = await apiFetch("/api/call/waive_tax_deadline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, deadlineId]),
-      })
+      const { urlPath, init } = accountingBffPost("waive_tax_deadline", [organizationId, deadlineId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2269,11 +2003,8 @@ export function useRefreshTaxDeadlineStatuses(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const r = await apiFetch("/api/call/refresh_tax_deadline_statuses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId]),
-      })
+      const { urlPath, init } = accountingBffPost("refresh_tax_deadline_statuses", [organizationId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2286,11 +2017,8 @@ export function useScheduleTaxDeadlineUpdates(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const r = await apiFetch("/api/call/schedule_tax_deadline_updates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId]),
-      })
+      const { urlPath, init } = accountingBffPost("schedule_tax_deadline_updates", [organizationId])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
@@ -2305,11 +2033,8 @@ export function useImportTaxRateCsv(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_tax_rate_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_tax_rate_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateTaxQueries(qc, organizationId),
@@ -2322,11 +2047,8 @@ export function useImportBudgetCsv(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_budget_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_budget_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -2337,11 +2059,8 @@ export function useImportBudgetLineCsv(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_budget_line_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_budget_line_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateBudgetQueries(qc, organizationId),
@@ -2352,11 +2071,8 @@ export function useImportAnalyticAccountCsv(organizationId: number, companyId: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_analytic_account_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_analytic_account_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateAnalyticQueries(qc, organizationId),
@@ -2367,11 +2083,8 @@ export function useImportAccountCsv(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_account_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_account_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateChartStructureQueries(qc, organizationId),
@@ -2382,11 +2095,8 @@ export function useImportAccountMoveCsv(organizationId: number, companyId: bigin
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_account_move_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_account_move_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, organizationId),
@@ -2397,11 +2107,8 @@ export function useImportAccountMoveLineCsv(organizationId: number, companyId: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const r = await apiFetch("/api/call/import_account_move_line_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyReducerCallBody([organizationId, companyId, csvData]),
-      })
+      const { urlPath, init } = accountingBffPost("import_account_move_line_csv", [organizationId, companyId, csvData])
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => invalidateMoveQueries(qc, organizationId),
