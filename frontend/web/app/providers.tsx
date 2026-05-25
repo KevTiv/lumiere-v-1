@@ -9,6 +9,9 @@ import {
   ThemeProvider,
   type User,
   type Role,
+  type BackendRoleRow,
+  mapBackendRolesToRoles,
+  buildRbacUserFromServer,
 } from "@lumiere/ui"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
@@ -19,43 +22,6 @@ import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
-const getRBACRoles = (rolesData: Record<string, unknown>[]) => {
-  const colors = ["blue", "green", "orange", "red", "purple", "teal"] as const
-  return (rolesData as Record<string, unknown>[]).map((role, i) => ({
-    id: String(role.id ?? ""),
-    name: String(role.name ?? ""),
-    description: String(role.description ?? ""),
-    isSystem: Boolean(role.isSystem),
-    color: colors[i % colors.length],
-    permissions: [],
-    createdAt: String(role.createdAt ?? new Date().toISOString()),
-    updatedAt: String(role.updatedAt ?? new Date().toISOString()),
-  }))
-}
-
-const getRBACUser = (rbacRoles: Role[], serverRoleNames?: string[], serverIdentity?: string) => {
-  if (!serverIdentity) return null
-  const names = serverRoleNames ?? []
-  const assignedRoleIds = rbacRoles
-    .filter((r) => names.includes(r.name))
-    .map((r) => r.id)
-
-  return {
-    id: serverIdentity,
-    email: "",
-    name: "",
-    roles: assignedRoleIds,
-    status: "active" as const,
-    department: "",
-    lastLogin: new Date().toISOString(),
-  } as User
-}
-/**
- * Replaces the former WebSocket-based StdbRBACBridge.
- * Role definitions are fetched from /api/query/roles via React Query.
- * The current user is built from server-resolved identity + role names
- * (passed down from the RSC layout, which already calls the REST API).
- */
 function RBACBridge({
   children,
   serverIdentity,
@@ -65,20 +31,23 @@ function RBACBridge({
   serverIdentity?: string
   serverRoleNames?: string[]
 }) {
-  const { data: rolesData = [] } = useStdbQuery('roles', 0)
+  const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
+  const { data: rolesData = [] } = useStdbQuery('roles', 0, {
+    enabled: hasIdentity,
+  })
 
   const rbacRoles = useMemo<Role[]>(() => {
-    return getRBACRoles(rolesData);
+    return mapBackendRolesToRoles(rolesData as BackendRoleRow[])
   }, [rolesData])
 
-  const rbacUser = useMemo(() => {
-    return getRBACUser(rbacRoles, serverRoleNames, serverIdentity)
+  const rbacUser = useMemo<User | null>(() => {
+    return buildRbacUserFromServer(rbacRoles, serverRoleNames, serverIdentity)
   }, [serverIdentity, serverRoleNames, rbacRoles])
 
   return (
     <RBACProvider
-      initialUser={rbacUser ?? undefined}
-      initialRoles={rbacRoles.length > 0 ? rbacRoles : undefined}
+      initialUser={hasIdentity ? rbacUser : null}
+      initialRoles={hasIdentity ? rbacRoles : undefined}
     >
       {children}
     </RBACProvider>
@@ -138,7 +107,7 @@ export function Providers({
             <ErpSessionProvider
               value={{
                 identity: serverIdentity ?? null,
-                connected: Boolean(serverIdentity),
+                connected: Boolean(serverIdentity && serverIdentity !== "unknown"),
                 organizationId: organizationId ?? undefined,
               }}
             >

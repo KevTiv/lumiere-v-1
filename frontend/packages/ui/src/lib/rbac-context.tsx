@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from "react"
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react"
 import type { 
   User, 
   Role, 
@@ -10,7 +10,15 @@ import type {
   PermissionCheckResult,
   RBACContext as RBACContextType 
 } from "./rbac-types"
-import { defaultRoles, defaultUsers, defaultPolicies } from "./rbac-defaults"
+import {
+  defaultRoles,
+  defaultUsers,
+  defaultPolicies,
+  actionsMatch,
+  resourcesMatch,
+  isAdminRoleName,
+  roleHasWildcardPermission,
+} from "./rbac-defaults"
 
 /** When true, UI RBAC checks always pass (pair with server `ensureDevAdmin` in alpha). */
 const DEV_ADMIN_RBAC_BYPASS =
@@ -23,27 +31,59 @@ interface RBACProviderProps {
   initialUser?: User | null
   initialRoles?: Role[]
   initialPolicies?: PolicyRule[]
+  /** Seed demo users/roles when props are omitted (storybook/dev only). Default false. */
+  useDefaultFixtures?: boolean
 }
 
-export function RBACProvider({ children, initialUser, initialRoles, initialPolicies }: RBACProviderProps) {
-  const [currentUser, setCurrentUser] = useState<User | null>(
-    initialUser ?? defaultUsers.find(u => u.id === "user-1") ?? null
-  )
-  const [roles, setRoles] = useState<Role[]>(initialRoles ?? defaultRoles)
-  const [policies, setPolicies] = useState<PolicyRule[]>(initialPolicies ?? defaultPolicies)
+export function RBACProvider({
+  children,
+  initialUser,
+  initialRoles,
+  initialPolicies,
+  useDefaultFixtures = false,
+}: RBACProviderProps) {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (initialUser !== undefined) return initialUser
+    if (!useDefaultFixtures) return null
+    return defaultUsers.find((u) => u.id === "user-1") ?? null
+  })
+  const [roles, setRoles] = useState<Role[]>(() => {
+    if (initialRoles !== undefined) return initialRoles
+    return useDefaultFixtures ? defaultRoles : []
+  })
+  const [policies, setPolicies] = useState<PolicyRule[]>(() => {
+    if (initialPolicies !== undefined) return initialPolicies
+    return useDefaultFixtures ? defaultPolicies : []
+  })
 
-  // Get all policies applicable to the current user
+  useEffect(() => {
+    if (initialUser !== undefined) setCurrentUser(initialUser)
+  }, [initialUser])
+
+  useEffect(() => {
+    if (initialRoles !== undefined) setRoles(initialRoles)
+  }, [initialRoles])
+
+  useEffect(() => {
+    if (initialPolicies !== undefined) setPolicies(initialPolicies)
+  }, [initialPolicies])
+
+  const activeRoles = useMemo(
+    () => roles.filter((role) => role.isActive !== false),
+    [roles],
+  )
+
   const getUserPolicies = useCallback((user: User | null): PolicyRule[] => {
     if (!user) return []
     
-    const userRoles = roles.filter(r => user.roles.includes(r.id))
-    const rolePolicies = userRoles.flatMap(r => r.permissions)
+    const userRoles = activeRoles.filter((r) => user.roles.includes(r.id))
+    const rolePolicies = userRoles.flatMap((r) => r.permissions)
     
     // Also get direct user policies
-    const directPolicies = policies.filter(p => p.subject === user.id)
+    const directPolicies = policies.filter((p) => p.subject === user.id)
     
     return [...rolePolicies, ...directPolicies]
-  }, [roles, policies])
+  }, [activeRoles, policies])
 
   // Casbin-style permission check
   const checkPermission = useCallback((
@@ -56,6 +96,11 @@ export function RBACProvider({ children, initialUser, initialRoles, initialPolic
 
     if (!currentUser) {
       return { allowed: false, reason: "No user logged in" }
+    }
+
+    const userRoles = activeRoles.filter((role) => currentUser.roles.includes(role.id))
+    if (userRoles.some((role) => isAdminRoleName(role.name))) {
+      return { allowed: true, reason: "Allowed by admin role" }
     }
 
     const applicablePolicies = getUserPolicies(currentUser)
@@ -74,8 +119,8 @@ export function RBACProvider({ children, initialUser, initialRoles, initialPolic
 
     // Find matching rule
     for (const rule of sortedPolicies) {
-      const resourceMatch = rule.resource === "*" || rule.resource === resource
-      const actionMatch = rule.action === "*" || rule.action === action
+      const resourceMatch = resourcesMatch(rule.resource, resource)
+      const actionMatch = actionsMatch(rule.action, action)
       
       if (resourceMatch && actionMatch) {
         return {
@@ -100,8 +145,16 @@ export function RBACProvider({ children, initialUser, initialRoles, initialPolic
 
   const isAdmin = useCallback((): boolean => {
     if (DEV_ADMIN_RBAC_BYPASS) return true
-    return hasRole("role-admin")
-  }, [hasRole])
+    if (!currentUser) return false
+
+    const userRoles = activeRoles.filter((role) => currentUser.roles.includes(role.id))
+
+    if (userRoles.some((role) => isAdminRoleName(role.name))) return true
+    if (userRoles.some((role) => roleHasWildcardPermission(role))) return true
+    if (currentUser.roles.includes("role-admin")) return true
+
+    return false
+  }, [currentUser, activeRoles])
 
   const contextValue = useMemo<RBACContextType>(() => ({
     currentUser,

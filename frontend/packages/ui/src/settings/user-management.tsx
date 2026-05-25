@@ -2,7 +2,18 @@
 
 import { useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
-import { defaultUsers } from "@/lib/rbac-defaults"
+import {
+  useAssignRole,
+  useCreateUserInvite,
+  useRemoveUserFromOrganization,
+  useRevokeRole,
+  useSettingsRoles,
+  useSettingsUsers,
+  useUpdateUserOrganizationStatus,
+  type SettingsUserRecord,
+} from "@lumiere/query-hooks/hooks/auth"
+import { useErpSession } from "@lumiere/erp-session"
+import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,18 +52,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { User, Role } from "@/lib/rbac-types"
+import type { Role } from "@/lib/rbac-types"
 import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
 
+function identityHexForAssign(value: string): string {
+  const normalized = value.trim().replace(/^0x/i, "").toLowerCase()
+  return normalized ? `0x${normalized}` : value.trim()
+}
+
 export function UserManagement() {
   const { t } = useTranslation()
-  const { roles, checkPermission } = useRBAC()
-  const [users, setUsers] = useState<User[]>(defaultUsers)
+  const { organizationId } = useErpSession()
+  const orgReady = hasValidOrganizationId(organizationId)
+  const orgBigInt = orgReady ? BigInt(organizationId) : 0n
   const [searchQuery, setSearchQuery] = useState("")
-  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const { data: users = [], isLoading, refetch } = useSettingsUsers(orgBigInt, searchQuery)
+  const { data: roles = [] } = useSettingsRoles(orgBigInt)
+  const assignRole = useAssignRole(orgBigInt)
+  const revokeRole = useRevokeRole(orgBigInt)
+  const createInvite = useCreateUserInvite(orgBigInt)
+  const removeUser = useRemoveUserFromOrganization(orgBigInt)
+  const updateOrgStatus = useUpdateUserOrganizationStatus(orgBigInt)
+  const { checkPermission } = useRBAC()
+  const [editingUser, setEditingUser] = useState<SettingsUserRecord | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [isSaving, setIsSaving] = useState(false)
 
   const canEdit = checkPermission("admin:users", "update").allowed
   const canDelete = checkPermission("admin:users", "delete").allowed
@@ -64,7 +90,7 @@ export function UserManagement() {
     user.department?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: SettingsUserRecord) => {
     setEditingUser(user)
     setSelectedRoles(user.roles)
     setIsDialogOpen(true)
@@ -76,45 +102,84 @@ export function UserManagement() {
     setIsDialogOpen(true)
   }
 
-  const handleSaveUser = (formData: FormData) => {
-    const userData = {
-      name: formData.get("name") as string,
-      email: formData.get("email") as string,
-      department: formData.get("department") as string,
-      status: formData.get("status") as "active" | "inactive" | "pending",
-      roles: selectedRoles,
+  const syncUserRoles = async (user: SettingsUserRecord, nextRoleIds: string[]) => {
+    const previousRoleIds = new Set(user.roles)
+    const nextRoleSet = new Set(nextRoleIds)
+    const assignmentsByRole = new Map(
+      user.roleAssignments.map((entry) => [entry.roleId, entry.assignmentId]),
+    )
+
+    for (const roleId of nextRoleIds) {
+      if (previousRoleIds.has(roleId)) continue
+      await assignRole.mutateAsync({
+        userIdentity: identityHexForAssign(user.id),
+        roleId,
+        params: { expiresAtMicros: null, metadata: null },
+      })
     }
 
-    if (editingUser) {
-      setUsers(prev => prev.map(u => 
-        u.id === editingUser.id 
-          ? { ...u, ...userData, updatedAt: new Date().toISOString() }
-          : u
-      ))
-    } else {
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        ...userData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    for (const roleId of user.roles) {
+      if (nextRoleSet.has(roleId)) continue
+      const assignmentId = assignmentsByRole.get(roleId)
+      if (!assignmentId) continue
+      await revokeRole.mutateAsync({ assignmentId })
+    }
+  }
+
+  const handleSaveUser = async (formData: FormData) => {
+    if (!orgReady) return
+
+    const email = String(formData.get("email") ?? "").trim()
+
+    setIsSaving(true)
+    try {
+      if (editingUser) {
+        await syncUserRoles(editingUser, selectedRoles)
+      } else {
+        if (!email) throw new Error("Email is required")
+        if (selectedRoles.length === 0) throw new Error("At least one role is required")
+        await createInvite.mutateAsync({
+          email,
+          roleId: selectedRoles[0],
+        })
       }
-      setUsers(prev => [...prev, newUser])
+      await refetch()
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error(error)
+      alert(t("settings.formConfig.fieldUpdateError"))
+    } finally {
+      setIsSaving(false)
     }
-    setIsDialogOpen(false)
   }
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm(t("settings.users.deleteConfirm"))) {
-      setUsers(prev => prev.filter(u => u.id !== userId))
+  const handleDeleteUser = async (user: SettingsUserRecord) => {
+    if (!confirm(t("settings.users.deleteConfirm"))) return
+    try {
+      await removeUser.mutateAsync(identityHexForAssign(user.id))
+      await refetch()
+    } catch (error) {
+      console.error(error)
+      alert(t("settings.formConfig.fieldDeleteError"))
     }
   }
 
-  const handleToggleStatus = (userId: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId 
-        ? { ...u, status: u.status === "active" ? "inactive" : "active" }
-        : u
-    ))
+  const handleToggleStatus = async (user: SettingsUserRecord) => {
+    if (!user.userOrgId) {
+      console.warn("Missing organization membership id; cannot update user status.")
+      return
+    }
+    const nextActive = user.status !== "active"
+    try {
+      await updateOrgStatus.mutateAsync({
+        userOrgId: user.userOrgId,
+        isActive: nextActive,
+      })
+      await refetch()
+    } catch (error) {
+      console.error(error)
+      alert(t("settings.formConfig.fieldUpdateError"))
+    }
   }
 
   const getRoleName = (roleId: string): string => {
@@ -123,7 +188,7 @@ export function UserManagement() {
 
   const getRoleColor = (roleId: string): string => {
     const role = roles.find(r => r.id === roleId)
-    return rolePillClassForColor(role?.color)
+    return rolePillClassForColor(role?.color as Role["color"] | undefined)
   }
 
   return (
@@ -139,16 +204,23 @@ export function UserManagement() {
           />
         </div>
         {canCreate && (
-          <Button onClick={handleCreateUser} className="gap-2">
+          <Button onClick={handleCreateUser} className="gap-2" disabled={!orgReady || isSaving}>
             <Plus className="h-4 w-4" />
             {t("settings.users.addUser")}
           </Button>
         )}
       </div>
 
+      {!orgReady ? (
+        <p className="text-sm text-muted-foreground">{t("settings.formConfig.noOrganization")}</p>
+      ) : (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t("settings.users.usersCount", { count: filteredUsers.length })}</CardTitle>
+          <CardTitle className="text-base">
+            {isLoading
+              ? t("common.loading")
+              : t("settings.users.usersCount", { count: filteredUsers.length })}
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
@@ -208,7 +280,7 @@ export function UserManagement() {
                         </DropdownMenuItem>
                       )}
                       {canEdit && (
-                        <DropdownMenuItem onClick={() => handleToggleStatus(user.id)}>
+                        <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
                           {user.status === "active" ? (
                             <>
                               <UserX className="h-4 w-4 mr-2" />
@@ -226,7 +298,7 @@ export function UserManagement() {
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => void handleDeleteUser(user)}
                             className="text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -242,6 +314,7 @@ export function UserManagement() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -256,7 +329,13 @@ export function UserManagement() {
               }
             </DialogDescription>
           </DialogHeader>
-          <form action={handleSaveUser} className="space-y-4">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleSaveUser(new FormData(event.currentTarget))
+            }}
+            className="space-y-4"
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">{t("settings.users.fullName")}</Label>
@@ -265,6 +344,7 @@ export function UserManagement() {
                   name="name"
                   defaultValue={editingUser?.name}
                   required
+                  disabled={Boolean(editingUser)}
                 />
               </div>
               <div className="space-y-2">
@@ -275,6 +355,7 @@ export function UserManagement() {
                   type="email"
                   defaultValue={editingUser?.email}
                   required
+                  disabled={Boolean(editingUser)}
                 />
               </div>
             </div>
@@ -285,11 +366,12 @@ export function UserManagement() {
                   id="department" 
                   name="department"
                   defaultValue={editingUser?.department}
+                  disabled={Boolean(editingUser)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">{t("settings.users.status")}</Label>
-                <Select name="status" defaultValue={editingUser?.status || "pending"}>
+                <Select name="status" defaultValue={editingUser?.status || "pending"} disabled={Boolean(editingUser)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -328,7 +410,7 @@ export function UserManagement() {
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={isSaving || !orgReady}>
                 {editingUser ? t("settings.users.saveChanges") : t("settings.users.createUser")}
               </Button>
             </DialogFooter>

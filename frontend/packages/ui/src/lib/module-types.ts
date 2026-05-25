@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntitySurfacePermission, EntityViewConfig } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
 
 export interface ModuleTab {
@@ -15,6 +15,8 @@ export interface ModuleTab {
   createForm?: FormConfig
   /** Label for the create button, e.g. 'New Invoice' */
   createLabel?: string
+  /** When set, create button is hidden unless checkPermission(resource, action) allows */
+  createPermission?: EntitySurfacePermission
   /** Identifier passed to onFormSubmit so callers know which mutation to invoke */
   createAction?: string
   /** For type='custom': arbitrary content rendered inside the tab panel */

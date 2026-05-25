@@ -8,6 +8,23 @@ import {
 } from "./helpers"
 
 test.describe("ERP auth and shell smoke", () => {
+  test("root landing page is public", async ({ page }) => {
+    await page.goto("/")
+
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole("heading", { name: /run your operations/i })).toBeVisible()
+    await expect(page.getByRole("link", { name: /sign in/i })).toBeVisible()
+    await expect(page.getByRole("link", { name: /create account/i })).toBeVisible()
+  })
+
+  test("overview redirects unauthenticated users to sign-in", async ({ page }) => {
+    await page.goto("/overview")
+
+    await expect(page).toHaveURL(/\/sign-in\?/)
+    const url = new URL(page.url())
+    expect(url.searchParams.get("callbackUrl")).toBe("/overview")
+  })
+
   test("seeded user can sign in and see the authenticated shell", async ({ page }) => {
     await signIn(page)
     await expectAuthenticatedShell(page)

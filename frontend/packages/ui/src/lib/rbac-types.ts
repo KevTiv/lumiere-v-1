@@ -1,7 +1,7 @@
 // Casbin-style RBAC Types for ERP System
 
-// Resources that can be protected
-export type Resource =
+/** Well-known UI resources; backend roles may emit additional `namespace:…` strings. */
+export type KnownResource =
   | "dashboard:overview"
   | "dashboard:sales"
   | "dashboard:inventory"
@@ -42,8 +42,11 @@ export type Resource =
   | "admin:audit-log"
   | "admin:organization"
 
+/** Known resources plus arbitrary backend permission resource strings. */
+export type Resource = KnownResource | (string & {})
+
 // Actions that can be performed
-export type Action = "read" | "create" | "update" | "delete" | "manage"
+export type Action = "read" | "create" | "update" | "delete" | "manage" | "write"
 
 // Effect of a policy rule
 export type Effect = "allow" | "deny"
@@ -64,10 +67,28 @@ export interface Role {
   name: string
   description: string
   isSystem?: boolean // system roles cannot be deleted
+  isActive?: boolean
   color: "blue" | "green" | "orange" | "red" | "purple" | "teal"
   permissions: PolicyRule[]
   createdAt: string
   updatedAt: string
+}
+
+/** SpacetimeDB / REST `role` row shape (camelCase or snake_case). */
+export interface BackendRoleRow {
+  id?: number | string
+  name?: string
+  description?: string | null
+  permissions?: string[] | readonly string[]
+  isSystem?: boolean
+  is_system?: boolean
+  isActive?: boolean
+  is_active?: boolean
+  metadata?: string | null
+  createdAt?: string
+  created_at?: string | number | { microsSinceUnixEpoch?: number }
+  updatedAt?: string
+  updated_at?: string | number | { microsSinceUnixEpoch?: number }
 }
 
 // User with role assignments

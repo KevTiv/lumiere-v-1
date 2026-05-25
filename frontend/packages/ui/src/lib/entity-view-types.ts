@@ -1,6 +1,40 @@
 import type { ComponentType, ReactNode } from "react"
+import type { Action, PermissionCheckResult, Resource } from "./rbac-types"
 
 export type FieldWidth = "full" | "1/2" | "1/3" | "2/3" | "1/4"
+
+/** Optional RBAC gate for entity UI surfaces (columns, fields, actions). */
+export interface EntitySurfacePermission {
+  resource: Resource
+  action: Action
+}
+
+export type EntityPermissioned = {
+  permission?: EntitySurfacePermission
+}
+
+export type EntityPermissionChecker = (
+  resource: Resource,
+  action: Action,
+) => PermissionCheckResult
+
+/** Items without `permission` are always visible (backwards compatible). */
+export function isEntitySurfaceVisible<T extends EntityPermissioned>(
+  item: T,
+  checkPermission: EntityPermissionChecker,
+): boolean {
+  if (!item.permission) return true
+  return checkPermission(item.permission.resource, item.permission.action).allowed
+}
+
+/** Filter a list of permissioned entity UI items; undefined input → empty array. */
+export function filterEntitySurface<T extends EntityPermissioned>(
+  items: T[] | undefined,
+  checkPermission: EntityPermissionChecker,
+): T[] {
+  if (!items) return []
+  return items.filter((item) => isEntitySurfaceVisible(item, checkPermission))
+}
 
 export type ColumnType =
   | "text"
@@ -17,7 +51,7 @@ export type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
 
 // ─── Column (table view) ────────────────────────────────────────────────────
 
-export interface EntityColumn {
+export interface EntityColumn extends EntityPermissioned {
   key: string
   label: string
   type?: ColumnType
@@ -45,7 +79,7 @@ export interface EntityFilter {
 
 // ─── Action ─────────────────────────────────────────────────────────────────
 
-export interface EntityAction {
+export interface EntityAction extends EntityPermissioned {
   id: string
   label: string
   icon?: ComponentType<{ className?: string }>
@@ -78,7 +112,7 @@ export interface EntityTableConfig {
 
 // ─── Detail field (read-only display) ───────────────────────────────────────
 
-export interface EntityDetailField {
+export interface EntityDetailField extends EntityPermissioned {
   key: string
   label: string
   type?: ColumnType

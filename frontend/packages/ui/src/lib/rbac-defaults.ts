@@ -1,6 +1,203 @@
-import type { Role, User, PolicyRule, ResourceGroup, SettingsSection, DashboardViewPermission } from "./rbac-types"
+import type {
+  Role,
+  User,
+  PolicyRule,
+  ResourceGroup,
+  SettingsSection,
+  DashboardViewPermission,
+  BackendRoleRow,
+  Resource,
+  Action,
+} from "./rbac-types"
 
-// Default system roles
+// ── Backend bridge ───────────────────────────────────────────────────────────
+
+export const ADMIN_ROLE_NAMES = ["admin", "owner", "administrator"] as const
+
+export const ROLE_COLORS = ["blue", "green", "orange", "red", "purple", "teal"] as const
+
+const KNOWN_ACTIONS = new Set<Action>([
+  "read",
+  "create",
+  "update",
+  "delete",
+  "manage",
+  "write",
+])
+
+function readBool(row: BackendRoleRow, camel: "isSystem" | "isActive"): boolean {
+  const snake = camel === "isSystem" ? "is_system" : "is_active"
+  const camelVal = row[camel]
+  const snakeVal = row[snake as keyof BackendRoleRow]
+  if (typeof camelVal === "boolean") return camelVal
+  if (typeof snakeVal === "boolean") return snakeVal
+  return false
+}
+
+function readTimestamp(
+  row: BackendRoleRow,
+  camel: "createdAt" | "updatedAt",
+): string {
+  const snake = camel === "createdAt" ? "created_at" : "updated_at"
+  const raw = row[camel] ?? row[snake as keyof BackendRoleRow]
+  if (typeof raw === "string" && raw.length > 0) return raw
+  if (typeof raw === "number") return new Date(raw / 1000).toISOString()
+  if (raw && typeof raw === "object" && "microsSinceUnixEpoch" in raw) {
+    const micros = Number(raw.microsSinceUnixEpoch)
+    if (Number.isFinite(micros)) return new Date(micros / 1000).toISOString()
+  }
+  return new Date().toISOString()
+}
+
+function readMetadataPermissions(row: BackendRoleRow): string[] {
+  if (!row.metadata?.trim()) return []
+  try {
+    const metadata = JSON.parse(row.metadata) as { uiPermissions?: unknown }
+    if (!Array.isArray(metadata.uiPermissions)) return []
+    return metadata.uiPermissions.map((entry) => String(entry))
+  } catch {
+    return []
+  }
+}
+
+/** Parse backend permission strings such as `*:*`, `module:inventory:read`, `admin:roles:update`. */
+export function parsePermissionString(
+  permission: string,
+): { resource: Resource | "*"; action: Action | "*" } | null {
+  const trimmed = permission.trim()
+  if (!trimmed) return null
+
+  if (trimmed === "*:*") {
+    return { resource: "*", action: "*" }
+  }
+
+  const colon = trimmed.lastIndexOf(":")
+  if (colon <= 0) return null
+
+  const resourcePart = trimmed.slice(0, colon)
+  const actionPart = trimmed.slice(colon + 1)
+
+  if (!resourcePart || !actionPart) return null
+
+  const resource: Resource | "*" =
+    resourcePart === "*" ? "*" : (resourcePart as Resource)
+
+  const action: Action | "*" =
+    actionPart === "*"
+      ? "*"
+      : KNOWN_ACTIONS.has(actionPart as Action)
+        ? (actionPart as Action)
+        : (actionPart as Action)
+
+  return { resource, action }
+}
+
+export function permissionStringsToPolicyRules(
+  roleId: string,
+  permissions: readonly string[],
+): PolicyRule[] {
+  const rules: PolicyRule[] = []
+
+  permissions.forEach((permission, index) => {
+    const parsed = parsePermissionString(permission)
+    if (!parsed) return
+
+    rules.push({
+      id: `${roleId}-perm-${index}`,
+      subject: roleId,
+      resource: parsed.resource,
+      action: parsed.action,
+      effect: "allow",
+    })
+  })
+
+  return rules
+}
+
+export function mapBackendRoleToRole(row: BackendRoleRow, index = 0): Role | null {
+  const id = row.id
+  if (id === undefined || id === null || id === "") return null
+
+  const roleId = String(id)
+  const permissions = Array.isArray(row.permissions) && row.permissions.length > 0
+    ? row.permissions
+    : readMetadataPermissions(row)
+  const isActive = readBool(row, "isActive")
+
+  return {
+    id: roleId,
+    name: String(row.name ?? ""),
+    description: String(row.description ?? ""),
+    isSystem: readBool(row, "isSystem"),
+    isActive,
+    color: ROLE_COLORS[index % ROLE_COLORS.length],
+    permissions: isActive ? permissionStringsToPolicyRules(roleId, permissions) : [],
+    createdAt: readTimestamp(row, "createdAt"),
+    updatedAt: readTimestamp(row, "updatedAt"),
+  }
+}
+
+export function mapBackendRolesToRoles(rows: readonly BackendRoleRow[]): Role[] {
+  return rows
+    .map((row, index) => mapBackendRoleToRole(row, index))
+    .filter((role): role is Role => role != null)
+}
+
+export function isAdminRoleName(name: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  return (ADMIN_ROLE_NAMES as readonly string[]).includes(normalized)
+}
+
+export function roleHasWildcardPermission(role: Role): boolean {
+  return role.permissions.some(
+    (rule) => rule.effect === "allow" && rule.resource === "*" && rule.action === "*",
+  )
+}
+
+export function buildRbacUserFromServer(
+  roles: readonly Role[],
+  serverRoleNames: readonly string[] | undefined,
+  serverIdentity: string | undefined,
+): User | null {
+  if (!serverIdentity || serverIdentity === "unknown") return null
+
+  const names = (serverRoleNames ?? []).map((n) => n.trim().toLowerCase())
+  const assignedRoleIds = roles
+    .filter((role) => names.includes(role.name.trim().toLowerCase()))
+    .map((role) => role.id)
+
+  return {
+    id: serverIdentity,
+    email: "",
+    name: "",
+    roles: assignedRoleIds,
+    status: "active",
+    department: "",
+    lastLogin: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/** Whether a stored rule action satisfies a requested UI action. */
+export function actionsMatch(ruleAction: Action | "*", requested: Action): boolean {
+  if (ruleAction === "*") return true
+  if (ruleAction === requested) return true
+  if (ruleAction === "manage") return true
+  if (ruleAction === "write" && (requested === "update" || requested === "create")) {
+    return true
+  }
+  if (ruleAction === "update" && requested === "write") return true
+  return false
+}
+
+/** Whether a stored rule resource satisfies a requested UI resource. */
+export function resourcesMatch(ruleResource: Resource | "*", requested: Resource): boolean {
+  if (ruleResource === "*") return true
+  return ruleResource === requested
+}
+
+// ── Default fixtures (dev / storybook) ───────────────────────────────────────
 export const defaultRoles: Role[] = [
   {
     id: "role-admin",

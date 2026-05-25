@@ -1,7 +1,15 @@
 "use client"
 
+import { useMemo } from "react"
 import { cn } from "../lib/utils"
-import type { EntityViewConfig } from "../lib/entity-view-types"
+import type {
+  EntityDetailConfig,
+  EntityPermissioned,
+  EntityTableConfig,
+  EntityViewConfig,
+} from "../lib/entity-view-types"
+import { filterEntitySurface } from "../lib/entity-view-types"
+import { useRBAC } from "../lib/rbac-context"
 import { EntityTable } from "./entity-table"
 import { EntityDetail } from "./entity-detail"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
@@ -16,6 +24,48 @@ interface EntityViewProps {
   useCard?: boolean
   onRowClick?: (row: Record<string, unknown>) => void
   className?: string
+}
+
+/** Filter permissioned entity UI items using the current RBAC context. */
+export function useEntitySurfaceFilter<T extends EntityPermissioned>(
+  items: T[] | undefined,
+): T[] {
+  const { checkPermission } = useRBAC()
+  return useMemo(
+    () => filterEntitySurface(items, checkPermission),
+    [items, checkPermission],
+  )
+}
+
+/** Apply RBAC filtering to table columns and toolbar actions. */
+export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTableConfig {
+  const columns = useEntitySurfaceFilter(config.columns)
+  const actions = useEntitySurfaceFilter(config.actions)
+  return useMemo(
+    () => ({
+      ...config,
+      columns,
+      actions: actions.length > 0 ? actions : undefined,
+    }),
+    [config, columns, actions],
+  )
+}
+
+/** Apply RBAC filtering to detail sections and fields; drops empty sections. */
+export function useScopedEntityDetailConfig(config: EntityDetailConfig): EntityDetailConfig {
+  const { checkPermission } = useRBAC()
+  return useMemo(
+    () => ({
+      ...config,
+      sections: config.sections
+        .map((section) => ({
+          ...section,
+          fields: filterEntitySurface(section.fields, checkPermission),
+        }))
+        .filter((section) => section.fields.length > 0),
+    }),
+    [config, checkPermission],
+  )
 }
 
 export function EntityView({

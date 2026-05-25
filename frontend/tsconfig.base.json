@@ -8,7 +8,11 @@
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "paths": {
-      "@lumiere/stdb": ["./packages/stdb/src/index.ts"]
+      "@lumiere/stdb": ["./packages/stdb/src/index.ts"],
+      "@lumiere/stdb/commands": ["./packages/stdb/src/commands/index.ts"],
+      "@lumiere/stdb/subscriptions": ["./packages/stdb/src/subscriptions/index.ts"],
+      "@lumiere/stdb/read-models": ["./packages/stdb/src/read-models/index.ts"],
+      "@lumiere/stdb/types": ["./packages/stdb/src/types/index.ts"]
     }
   }
 }

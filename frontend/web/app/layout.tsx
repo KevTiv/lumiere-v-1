@@ -2,17 +2,15 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Providers } from './providers'
-import { getStdbSession } from '@/lib/api-session'
 import {
   serverQueryUserRoleAssignments,
   serverQueryRoles,
   serverQueryCompanies,
 } from '@lumiere/stdb/server'
 import './globals.css'
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 
 import { getDefaultStdbHttpConnect } from '@/lib/stdb-http-env'
+import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -45,8 +43,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const session = await getStdbSession()
-  const identityHex = session?.identityHex
+  const session = await getBrowserStdbSession()
+  const identityHex = hasAuthenticatedIdentity(session) ? session?.identityHex : undefined
   const organizationId = session?.organizationId
   const opts = session?.opts ?? {}
   const stdbModule = getDefaultStdbHttpConnect().module
@@ -84,13 +82,6 @@ export default async function RootLayout({
       companyIds = undefined
     }
   }
-
-  const store = await cookies()
-  const hasStdbCookie = Boolean(store.get("stdb_token")?.value)
-  const devAdmin = process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
-  // Dev admin: allow first paint without stdb cookies (local prototyping only).
-  // Production sessions rely on stdb_token from sign-in / WorkOS bridge (see saveStdbSession).
-  if (!hasStdbCookie && !devAdmin) redirect("/sign-in")
 
   return (
     <html lang="en" suppressHydrationWarning>

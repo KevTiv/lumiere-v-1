@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react"
 import { cn } from "../lib/utils"
 import type { EntityTableConfig } from "../lib/entity-view-types"
+import { filterEntitySurface } from "../lib/entity-view-types"
+import { useRBAC } from "../lib/rbac-context"
 import {
   Table,
   TableBody,
@@ -91,9 +93,19 @@ function formatValue(
 }
 
 export function EntityTable({ config, data, onRowClick, className }: EntityTableProps) {
+  const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  const columns = useMemo(
+    () => filterEntitySurface(config.columns, checkPermission),
+    [config.columns, checkPermission],
+  )
+  const actions = useMemo(
+    () => filterEntitySurface(config.actions, checkPermission),
+    [config.actions, checkPermission],
+  )
 
   const rowKey = config.rowKey ?? "id"
 
@@ -128,10 +140,10 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
     })
   }
 
-  const hasActions = (config.actions?.length ?? 0) > 0
+  const hasActions = actions.length > 0
   const selectionToggleOnRowClick =
     config.rowSelectionToggleOnClick ??
-    (hasActions && (config.actions?.some((a) => a.requiresSelection === true) ?? false))
+    (hasActions && actions.some((a) => a.requiresSelection === true))
 
   return (
     <div className={cn("space-y-4", className)} data-testid="entity-table">
@@ -181,7 +193,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
             )
           })}
           <div className="ml-auto flex items-center gap-2">
-            {config.actions?.map((action) => {
+            {actions.map((action) => {
               const Icon = action.icon
               return (
                 <Button
@@ -206,7 +218,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
         <Table>
           <TableHeader>
             <TableRow>
-              {config.columns.map((col) => (
+              {columns.map((col) => (
                 <TableHead
                   key={col.key}
                   className={cn(
@@ -224,7 +236,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={config.columns.length}
+                  colSpan={Math.max(columns.length, 1)}
                   className="text-center text-muted-foreground py-12"
                 >
                   {config.emptyMessage ?? "No records found."}
@@ -247,7 +259,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                       isSelected && "bg-primary/5",
                     )}
                   >
-                    {config.columns.map((col) => {
+                    {columns.map((col) => {
                       const value = row[col.key]
                       return (
                         <TableCell

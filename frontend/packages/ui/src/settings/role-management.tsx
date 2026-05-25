@@ -3,7 +3,14 @@
 import { useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import { resourceGroups } from "@/lib/rbac-defaults"
-import { useCreateRole, useUpdateRole } from "@lumiere/query-hooks/hooks/auth"
+import {
+  permissionsMapToStrings,
+  useCreateRole,
+  useSettingsRoles,
+  useUpdateRole,
+} from "@lumiere/query-hooks/hooks/auth"
+import { useErpSession } from "@lumiere/erp-session"
+import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,11 +58,19 @@ const roleColors = [
 
 export function RoleManagement() {
   const { t } = useTranslation()
-  const { roles, setRoles, checkPermission } = useRBAC()
+  const { organizationId } = useErpSession()
+  const orgReady = hasValidOrganizationId(organizationId)
+  const orgBigInt = orgReady ? BigInt(organizationId) : 0n
+  const { data: rolesData = [], isLoading, refetch } = useSettingsRoles(orgBigInt)
+  const roles = rolesData as Role[]
+  const createRole = useCreateRole(orgBigInt)
+  const updateRole = useUpdateRole(orgBigInt)
+  const { checkPermission } = useRBAC()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
+  const [isSaving, setIsSaving] = useState(false)
 
   const canEdit = checkPermission("admin:roles", "update").allowed
   const canDelete = checkPermission("admin:roles", "delete").allowed
@@ -63,6 +78,7 @@ export function RoleManagement() {
 
   const initializePermissions = (role: Role | null) => {
     const permMap = new Map<string, Set<Action>>()
+    const knownResources = new Set(resourceGroups.flatMap((group) => group.resources.map((res) => res.resource)))
     
     if (role) {
       // Check for wildcard permission
@@ -78,6 +94,7 @@ export function RoleManagement() {
       } else {
         role.permissions.forEach(perm => {
           if (perm.effect === "allow") {
+            if (perm.resource === "*" || !knownResources.has(perm.resource)) return
             const existing = permMap.get(perm.resource as string) || new Set()
             if (perm.action === "*") {
               const resourceDef = resourceGroups
@@ -147,51 +164,46 @@ export function RoleManagement() {
     })
   }
 
-  const handleSaveRole = (formData: FormData) => {
+  const handleSaveRole = async (formData: FormData) => {
+    if (!orgReady) return
+
     const name = formData.get("name") as string
     const description = formData.get("description") as string
-
-    // Convert permissions map to policy rules
-    const permissions: PolicyRule[] = []
-    selectedPermissions.forEach((actions, resource) => {
-      actions.forEach(action => {
-        permissions.push({
-          id: `perm-${Date.now()}-${resource}-${action}`,
-          subject: editingRole?.id || `role-${Date.now()}`,
-          resource: resource as Resource,
-          action,
-          effect: "allow"
-        })
-      })
+    const permissionStrings = permissionsMapToStrings(selectedPermissions)
+    const metadata = JSON.stringify({
+      color: selectedColor,
+      uiPermissions: permissionStrings,
     })
 
-    if (editingRole) {
-      setRoles(prev => prev.map(r => 
-        r.id === editingRole.id 
-          ? { 
-              ...r, 
-              name, 
-              description, 
-              color: selectedColor,
-              permissions,
-              updatedAt: new Date().toISOString() 
-            }
-          : r
-      ))
-    } else {
-      const newRole: Role = {
-        id: `role-${Date.now()}`,
-        name,
-        description,
-        isSystem: false,
-        color: selectedColor,
-        permissions,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    setIsSaving(true)
+    try {
+      if (editingRole) {
+        await updateRole.mutateAsync({
+          roleId: editingRole.id,
+          params: {
+            name,
+            description: description || null,
+            permissions: permissionStrings,
+          },
+        })
+      } else {
+        await createRole.mutateAsync({
+          name,
+          description: description || null,
+          permissions: permissionStrings,
+          isActive: true,
+          parentId: null,
+          metadata,
+        })
       }
-      setRoles(prev => [...prev, newRole])
+      await refetch()
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error(error)
+      alert(t("settings.formConfig.fieldUpdateError"))
+    } finally {
+      setIsSaving(false)
     }
-    setIsDialogOpen(false)
   }
 
   const handleDeleteRole = (roleId: string) => {
@@ -201,7 +213,7 @@ export function RoleManagement() {
       return
     }
     if (confirm(t("settings.roles.deleteConfirm"))) {
-      setRoles(prev => prev.filter(r => r.id !== roleId))
+      alert(t("settings.formConfig.fieldDeleteError"))
     }
   }
 
@@ -211,7 +223,8 @@ export function RoleManagement() {
         acc + group.resources.reduce((a, r) => a + r.actions.length, 0), 0
       )
     }
-    return role.permissions.filter(p => p.effect === "allow").length
+    const knownResources = new Set(resourceGroups.flatMap((group) => group.resources.map((res) => res.resource)))
+    return role.permissions.filter(p => p.effect === "allow" && p.resource !== "*" && knownResources.has(p.resource)).length
   }
 
   return (
@@ -227,13 +240,18 @@ export function RoleManagement() {
           </p>
         </div>
         {canCreate && (
-          <Button onClick={handleCreateRole} className="gap-2">
+          <Button onClick={handleCreateRole} className="gap-2" disabled={!orgReady || isSaving}>
             <Plus className="h-4 w-4" />
             {t("settings.roles.createRole")}
           </Button>
         )}
       </div>
 
+      {!orgReady ? (
+        <p className="text-sm text-muted-foreground">{t("settings.formConfig.noOrganization")}</p>
+      ) : isLoading ? (
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      ) : (
       <div className="grid gap-4 md:grid-cols-2">
         {roles.map((role) => (
           <Card key={role.id} className="relative">
@@ -291,6 +309,7 @@ export function RoleManagement() {
           </Card>
         ))}
       </div>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -302,7 +321,13 @@ export function RoleManagement() {
               {t("settings.roles.createDescription")}
             </DialogDescription>
           </DialogHeader>
-          <form action={handleSaveRole} className="space-y-6">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleSaveRole(new FormData(event.currentTarget))
+            }}
+            className="space-y-6"
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">{t("settings.roles.roleName")}</Label>
@@ -406,7 +431,7 @@ export function RoleManagement() {
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={isSaving || !orgReady}>
                 {editingRole ? t("settings.roles.saveChanges") : t("settings.roles.createRole")}
               </Button>
             </DialogFooter>

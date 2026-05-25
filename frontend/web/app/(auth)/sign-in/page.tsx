@@ -16,11 +16,16 @@ import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser
 
 const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
 
+function safeCallbackUrl(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/overview'
+  return value
+}
+
 export default function SignInPage() {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/overview"
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"))
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,48 +50,13 @@ export default function SignInPage() {
       }
       phIdentify(email)
       phCapture("user_signed_in", { method: "email" })
-      router.push(data.redirectTo ?? callbackUrl)
+      router.push(data.redirectTo === "/overview" ? callbackUrl : (data.redirectTo ?? callbackUrl))
     } catch (err) {
       phCaptureException(err)
       setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)
     }
-  }
-
-  if (useWorkOsAuth) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("auth.signIn.title")}</CardTitle>
-          <CardDescription>{t("auth.signIn.descriptionWorkOs")}</CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          <form action={redirectToWorkOsSignIn} className="space-y-2">
-            <input type="hidden" name="returnTo" value={callbackUrl} />
-            <Button type="submit" size="lg" className="w-full">
-              {t("auth.signIn.continueWithWorkOs")}
-            </Button>
-          </form>
-          <p className="text-xs text-muted-foreground text-center">
-            {t("auth.signIn.workOsProvidersHint")}
-          </p>
-        </CardContent>
-
-        <CardFooter className="justify-center flex-col gap-2">
-          <p className="text-sm text-muted-foreground">
-            {t("auth.signIn.noAccount")}{" "}
-            <Link href="/sign-up" className="font-medium text-foreground hover:underline">
-              {t("auth.signIn.createOne")}
-            </Link>
-          </p>
-          <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
-            {t("auth.signIn.forgotPassword")}
-          </Link>
-        </CardFooter>
-      </Card>
-    )
   }
 
   return (
@@ -96,7 +66,7 @@ export default function SignInPage() {
         <CardDescription>{t("auth.signIn.description")}</CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">{t("auth.fields.email")}</Label>
@@ -134,6 +104,20 @@ export default function SignInPage() {
             {loading ? t("auth.signIn.submitting") : t("auth.signIn.submit")}
           </Button>
         </form>
+
+        {useWorkOsAuth && (
+          <div className="space-y-3 border-t border-border pt-4">
+            <form action={redirectToWorkOsSignIn} className="space-y-2">
+              <input type="hidden" name="returnTo" value={callbackUrl} />
+              <Button type="submit" variant="outline" size="lg" className="w-full">
+                {t("auth.signIn.continueWithWorkOs")}
+              </Button>
+            </form>
+            <p className="text-center text-xs text-muted-foreground">
+              {t("auth.signIn.workOsProvidersHint")}
+            </p>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="justify-center">

@@ -8,6 +8,8 @@ import { DashboardHeader } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { FormModal } from "../forms/form-modal"
 import type { ModuleConfig } from "../lib/module-types"
+import { isEntitySurfaceVisible } from "../lib/entity-view-types"
+import { useRBAC } from "../lib/rbac-context"
 
 interface ModuleViewProps {
   config: ModuleConfig
@@ -37,6 +39,7 @@ export function ModuleView({
   onActiveTabChange,
   isPending,
 }: ModuleViewProps) {
+  const { checkPermission } = useRBAC()
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
   const activeTab = activeTabProp ?? internalTab
@@ -74,7 +77,11 @@ export function ModuleView({
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">
-                {tab.createForm && (
+                {tab.createForm &&
+                  isEntitySurfaceVisible(
+                    { permission: tab.createPermission },
+                    checkPermission,
+                  ) && (
                   <div className="flex justify-end">
                     <Button
                       size="lg"

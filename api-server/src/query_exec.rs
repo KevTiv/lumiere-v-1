@@ -101,6 +101,11 @@ pub async fn execute_resource_query(
 
     match resource {
         "roles" => {
+            let full_sql = "SELECT * FROM role WHERE is_active = true";
+            if let Ok(rows) = client.query_sql(full_sql).await {
+                return Ok(rows);
+            }
+
             let sql = stdb_auth::select_roles_active_sql(fa).map_err(ApiError::Internal)?;
             return client
                 .query_sql(&sql)

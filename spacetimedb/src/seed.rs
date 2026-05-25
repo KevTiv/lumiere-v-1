@@ -1828,6 +1828,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: None,
         metadata: None,
     });
+    let _at_equity = ctx.db.account_account_type().insert(AccountAccountType {
+        id: 0,
+        organization_id: org_id,
+        name: "Equity".to_string(),
+        type_: "equity".to_string(),
+        internal_group: AccountInternalGroup::Equity,
+        include_initial_balance: true,
+        is_deprecated: false,
+        company_id: Some(company_id),
+        create_uid: None,
+        create_date: None,
+        write_uid: None,
+        write_date: None,
+        metadata: None,
+    });
     let at_income = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
         organization_id: org_id,

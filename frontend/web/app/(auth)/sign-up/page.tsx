@@ -54,38 +54,6 @@ export default function SignUpPage() {
     }
   }
 
-  if (useWorkOsAuth) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("auth.signUp.title")}</CardTitle>
-          <CardDescription>{t("auth.signUp.descriptionWorkOs")}</CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <form action={redirectToWorkOsSignUp} className="space-y-2">
-            <input type="hidden" name="returnTo" value="/onboarding" />
-            <Button type="submit" size="lg" className="w-full">
-              {t("auth.signUp.continueWithWorkOs")}
-            </Button>
-          </form>
-          <p className="text-xs text-muted-foreground text-center mt-3">
-            {t("auth.signIn.workOsProvidersHint")}
-          </p>
-        </CardContent>
-
-        <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
-            {t("auth.signUp.hasAccount")}{" "}
-            <Link href="/sign-in" className="font-medium text-foreground hover:underline">
-              {t("auth.signUp.signIn")}
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    )
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -93,7 +61,7 @@ export default function SignUpPage() {
         <CardDescription>{t("auth.signUp.description")}</CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">{t("auth.fields.email")}</Label>
@@ -140,6 +108,20 @@ export default function SignUpPage() {
             {loading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
           </Button>
         </form>
+
+        {useWorkOsAuth && (
+          <div className="space-y-3 border-t border-border pt-4">
+            <form action={redirectToWorkOsSignUp} className="space-y-2">
+              <input type="hidden" name="returnTo" value="/onboarding" />
+              <Button type="submit" variant="outline" size="lg" className="w-full">
+                {t("auth.signUp.continueWithWorkOs")}
+              </Button>
+            </form>
+            <p className="text-center text-xs text-muted-foreground">
+              {t("auth.signIn.workOsProvidersHint")}
+            </p>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="justify-center">

@@ -3,7 +3,7 @@ import { Route as rootRoute } from './__root'
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/',
+  path: '/dev',
   beforeLoad: () => {
     throw redirect({ to: '/dev/reducer-lab', search: { reducer: '' } })
   },

@@ -1,7 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import { cn } from "../lib/utils"
 import type { EntityDetailConfig } from "../lib/entity-view-types"
+import { filterEntitySurface } from "../lib/entity-view-types"
+import { useRBAC } from "../lib/rbac-context"
 import { Badge } from "../components/badge"
 import { Separator } from "../components/separator"
 
@@ -77,9 +80,22 @@ const widthClasses: Record<string, string> = {
 }
 
 export function EntityDetail({ config, data, className }: EntityDetailProps) {
+  const { checkPermission } = useRBAC()
+
+  const sections = useMemo(
+    () =>
+      config.sections
+        .map((section) => ({
+          ...section,
+          fields: filterEntitySurface(section.fields, checkPermission),
+        }))
+        .filter((section) => section.fields.length > 0),
+    [config.sections, checkPermission],
+  )
+
   return (
     <div className={cn("space-y-8", className)}>
-      {config.sections.map((section, sectionIndex) => (
+      {sections.map((section, sectionIndex) => (
         <div key={section.id}>
           {sectionIndex > 0 && <Separator className="mb-8" />}
           {(section.title || section.description) && (

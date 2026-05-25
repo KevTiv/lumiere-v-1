@@ -153,11 +153,16 @@ pub async fn load_field_access_context(
         return Ok(None);
     };
 
-    let sql_roles = select_roles_active_sql(None).map_err(|e| e.to_string())?;
-    let roles = client
-        .query_sql(&sql_roles)
-        .await
-        .map_err(|e| e.to_string())?;
+    let roles = match client.query_sql("SELECT * FROM role WHERE is_active = true").await {
+        Ok(rows) => rows,
+        Err(_) => {
+            let sql_roles = select_roles_active_sql(None).map_err(|e| e.to_string())?;
+            client
+                .query_sql(&sql_roles)
+                .await
+                .map_err(|e| e.to_string())?
+        }
+    };
 
     let role_id = uo
         .get("roleId")
