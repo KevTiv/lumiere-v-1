@@ -1,10 +1,10 @@
 /**
- * POST /api/ai/rag — retrieval-augmented answers scoped to an ERP company the user can access.
+ * POST /api/ai/rag/stream — validated SSE proxy to ai-gateway RAG streaming.
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
 import { sanitizeRagUiContext } from '@lumiere/erp-shared/ai-ui-context'
-import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
+import { resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 import { companyIdBelongsToOrganization } from '@/lib/company-scope-server'
 import { resolveApiSession } from '@/lib/api-session'
 
@@ -38,7 +38,8 @@ function sanitizeIncludeTypes(raw: unknown): string[] | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  if (!resolveAiGatewayBaseUrl()) {
+  const gatewayBase = resolveAiGatewayBaseUrl()
+  if (!gatewayBase) {
     return NextResponse.json(
       {
         error:
@@ -95,30 +96,42 @@ export async function POST(request: NextRequest) {
   }
   limit = Math.min(40, Math.max(1, limit))
 
-  const include_types = sanitizeIncludeTypes(body.include_types)
-
-  const ui_context = sanitizeRagUiContext(body.ui_context)
-
   const gwPayload: Record<string, unknown> = {
     company_id: companyIdNum,
     org_id: orgId,
     query,
     limit,
   }
-  if (include_types?.length) gwPayload.include_types = include_types
-  if (ui_context) gwPayload.ui_context = ui_context
+  const includeTypes = sanitizeIncludeTypes(body.include_types)
+  const uiContext = sanitizeRagUiContext(body.ui_context)
+  if (includeTypes?.length) gwPayload.include_types = includeTypes
+  if (uiContext) gwPayload.ui_context = uiContext
 
-  const gwBody = JSON.stringify(gwPayload)
+  const headers = new Headers({ 'Content-Type': 'application/json' })
+  const secret = process.env['LUMIERE_AI_GATEWAY_INTERNAL_SECRET']
+  if (secret) headers.set('X-Lumiere-Gateway-Secret', secret)
 
-  try {
-    const gw = await fetchAiGateway('/v1/rag', {
-      method: 'POST',
-      body: gwBody,
-    })
-    const payload = gw.text ? JSON.parse(gw.text) : {}
-    return NextResponse.json(payload, { status: gw.ok ? 200 : gw.status })
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: 'AI gateway request failed', detail }, { status: 502 })
+  const gw = await fetch(`${gatewayBase}/v1/rag/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(gwPayload),
+    cache: 'no-store',
+  })
+
+  if (!gw.ok || !gw.body) {
+    const text = await gw.text().catch(() => '')
+    return NextResponse.json(
+      { error: 'AI gateway stream request failed', detail: text },
+      { status: gw.status || 502 },
+    )
   }
+
+  return new Response(gw.body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  })
 }

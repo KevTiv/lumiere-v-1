@@ -4,8 +4,8 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    registry_get, resolve_http_sql_columns, select_company_scoped_sql, select_org_scoped_sql,
-    FieldAccessContext,
+    identity_sql_literal, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
+    select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -84,10 +84,10 @@ pub async fn default_company_id(client: &StdbClient, org_id: u64) -> Result<Opti
         .query_sql(&sql)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows
-        .first()
-        .and_then(|r| r.get("id"))
-        .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))))
+    Ok(rows.first().and_then(|r| r.get("id")).and_then(|v| {
+        v.as_u64()
+            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    }))
 }
 
 pub async fn execute_resource_query(
@@ -115,6 +115,26 @@ pub async fn execute_resource_query(
         "user-roles" => {
             let sql = stdb_auth::select_user_role_assignments_for_identity_sql(identity_hex, fa)
                 .map_err(ApiError::Internal)?;
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "ai-chat-sessions" => {
+            let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT id, organization_id, company_id, session_key, title, route, module, active_tab, archived, create_uid, create_date, write_uid, write_date, metadata FROM ai_chat_session WHERE organization_id = {organization_id} AND create_uid = {id} ORDER BY write_date DESC"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "ai-chat-messages" => {
+            let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT id, organization_id, company_id, session_key, role, content, sources_json, ui_context_json, model, duration_ms, status, created_by, create_date, metadata FROM ai_chat_message WHERE organization_id = {organization_id} AND created_by = {id} ORDER BY create_date ASC"
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -357,9 +377,8 @@ pub async fn execute_resource_query(
             let Some(cid) = default_company_id(client, organization_id).await? else {
                 return Ok(vec![]);
             };
-            let reg = registry_get(resource).ok_or_else(|| {
-                ApiError::NotFound(format!("unknown resource: {resource}"))
-            })?;
+            let reg = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
             let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
                 .map_err(ApiError::Internal)?;
             return client
@@ -371,9 +390,8 @@ pub async fn execute_resource_query(
             let Some(cid) = default_company_id(client, organization_id).await? else {
                 return Ok(vec![]);
             };
-            let reg = registry_get(resource).ok_or_else(|| {
-                ApiError::NotFound(format!("unknown resource: {resource}"))
-            })?;
+            let reg = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
             let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
                 .map_err(ApiError::Internal)?;
             let rows = client
@@ -431,15 +449,8 @@ pub async fn execute_resource_query(
         _ => "",
     };
 
-    let sql = select_org_scoped_sql(
-        resource,
-        &reg.table,
-        organization_id,
-        fa,
-        "",
-        order,
-    )
-    .map_err(ApiError::Internal)?;
+    let sql = select_org_scoped_sql(resource, &reg.table, organization_id, fa, "", order)
+        .map_err(ApiError::Internal)?;
 
     let mut rows = client
         .query_sql(&sql)

@@ -60,9 +60,17 @@ interface AIChatPanelProps {
   onDockToggle?: () => void
   config?: Partial<AIChatConfig>
   context?: ChatContext
+  initialMessages?: ChatMessage[]
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
   onSendMessage?: (
     userText: string,
+  ) => Promise<{ content: string; sources?: ChatMessageSourceRef[] }>
+  onStreamMessage?: (
+    userText: string,
+    handlers: {
+      onDelta: (delta: string) => void
+      onSources: (sources: ChatMessageSourceRef[]) => void
+    },
   ) => Promise<{ content: string; sources?: ChatMessageSourceRef[] }>
 }
 
@@ -96,7 +104,17 @@ function selectionSummaryFromContext(context?: ChatContext): string | null {
   return typeof summary === "string" && summary.trim() ? summary.trim() : null
 }
 
-export function AIChatPanel({ open, onClose, docked = false, onDockToggle, config, context, onSendMessage }: AIChatPanelProps) {
+export function AIChatPanel({
+  open,
+  onClose,
+  docked = false,
+  onDockToggle,
+  config,
+  context,
+  initialMessages,
+  onSendMessage,
+  onStreamMessage,
+}: AIChatPanelProps) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
@@ -123,6 +141,12 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
 
   const commands = config?.commands || defaultAtCommands
   const selectionSummary = selectionSummaryFromContext(context)
+
+  useEffect(() => {
+    if (initialMessages) {
+      setMessages(initialMessages)
+    }
+  }, [initialMessages])
 
   const filteredCommands = commands.filter(
     (cmd) =>
@@ -341,7 +365,63 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
     try {
       let assistantMessage: ChatMessage
 
-      if (onSendMessage) {
+      if (onStreamMessage) {
+        const assistantId = (Date.now() + 1).toString()
+        let streamedContent = ""
+        let streamedSources: ChatMessageSourceRef[] = []
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            timestamp: new Date(),
+          },
+        ])
+
+        const reply = await onStreamMessage(userMessage.content, {
+          onDelta: (delta) => {
+            streamedContent += delta
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantId
+                  ? { ...message, content: streamedContent }
+                  : message,
+              ),
+            )
+          },
+          onSources: (sources) => {
+            streamedSources = sources
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantId
+                  ? { ...message, sources: sources.length > 0 ? sources : undefined }
+                  : message,
+              ),
+            )
+          },
+        })
+        const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
+        assistantMessage = {
+          id: assistantId,
+          role: "assistant",
+          content: reply.content || streamedContent,
+          timestamp: new Date(),
+          sources:
+            reply.sources && reply.sources.length > 0
+              ? reply.sources
+              : streamedSources.length > 0
+                ? streamedSources
+                : undefined,
+          metadata: {
+            duration: Math.round(t1 - t0),
+          },
+        }
+        setMessages((prev) =>
+          prev.map((message) => (message.id === assistantId ? assistantMessage : message)),
+        )
+        return
+      } else if (onSendMessage) {
         const reply = await onSendMessage(userMessage.content)
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
@@ -558,12 +638,12 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                           <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
                           <ul className="space-y-0.5 list-disc list-inside">
                             {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
-                              const scope = src.content_type ?? src.entity_type ?? "ref"
+                              const scope = src.entity_type ?? src.content_type ?? "ref"
                               const idLabel =
-                                src.content_id != null
-                                  ? String(src.content_id)
-                                  : src.entity_id != null && String(src.entity_id) !== ""
+                                src.entity_id != null && String(src.entity_id) !== ""
                                     ? String(src.entity_id)
+                                  : src.content_id != null
+                                    ? String(src.content_id)
                                     : null
                               const citationLabel =
                                 idLabel != null ? `${scope} #${idLabel}` : scope

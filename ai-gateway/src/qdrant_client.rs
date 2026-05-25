@@ -3,11 +3,10 @@
 use anyhow::{Context, Result};
 use qdrant_client::{
     qdrant::{
-        condition::ConditionOneOf, r#match::MatchValue, vectors_config::Config as VectorConfig,
-        Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, DeletePointsBuilder,
-        Distance, FieldCondition, FieldType, Filter, Match, PointStruct, PointsIdsList,
-        SearchParamsBuilder, SearchPointsBuilder, UpsertPointsBuilder, Value, VectorParamsBuilder,
-        VectorsConfig,
+        vectors_config::Config as VectorConfig, Condition, CreateCollectionBuilder,
+        CreateFieldIndexCollectionBuilder, DeletePointsBuilder, Distance, FieldType, Filter,
+        PointStruct, PointsIdsList, SearchParamsBuilder, SearchPointsBuilder, UpsertPointsBuilder,
+        Value, VectorParamsBuilder, VectorsConfig,
     },
     Qdrant,
 };
@@ -167,26 +166,39 @@ impl VectorStore {
         limit: u64,
         score_threshold: Option<f32>,
     ) -> Result<Vec<SearchResult>> {
-        let mut conditions = vec![Condition {
-            condition_one_of: Some(ConditionOneOf::Field(FieldCondition {
-                key: "company_id".to_string(),
-                r#match: Some(Match {
-                    match_value: Some(MatchValue::Integer(company_id as i64)),
-                }),
-                ..Default::default()
-            })),
-        }];
+        let content_types = content_type.map(|ct| vec![ct.to_string()]);
+        self.search_content_types(
+            query_vector,
+            company_id,
+            content_types.as_deref(),
+            limit,
+            score_threshold,
+        )
+        .await
+    }
 
-        if let Some(ct) = content_type {
-            conditions.push(Condition {
-                condition_one_of: Some(ConditionOneOf::Field(FieldCondition {
-                    key: "content_type".to_string(),
-                    r#match: Some(Match {
-                        match_value: Some(MatchValue::Keyword(ct.to_string())),
-                    }),
-                    ..Default::default()
-                })),
-            });
+    /// ANN search with mandatory company_id and optional multi-content-type filter.
+    pub async fn search_content_types(
+        &self,
+        query_vector: Vec<f32>,
+        company_id: u64,
+        content_types: Option<&[String]>,
+        limit: u64,
+        score_threshold: Option<f32>,
+    ) -> Result<Vec<SearchResult>> {
+        let mut conditions = vec![Condition::matches("company_id", company_id as i64)];
+
+        let content_types = content_types
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|ct| {
+                let trimmed = ct.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            })
+            .collect::<Vec<_>>();
+
+        if !content_types.is_empty() {
+            conditions.push(Condition::matches("content_type", content_types));
         }
 
         let mut builder = SearchPointsBuilder::new(self.collection.clone(), query_vector, limit)

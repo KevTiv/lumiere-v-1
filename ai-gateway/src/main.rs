@@ -1,4 +1,5 @@
 mod config;
+mod context_worker;
 mod embeddings;
 mod error;
 mod kaggle;
@@ -8,14 +9,13 @@ mod rig_agent;
 mod routes;
 mod state;
 mod stdb_embed;
-mod context_worker;
 mod worker;
 
 use std::sync::Arc;
 
 use axum::{
-    Router,
     routing::{delete, get, post},
+    Router,
 };
 use dashmap::DashMap;
 use tower_http::{
@@ -39,9 +39,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Init structured logging
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            "ai_gateway=debug,tower_http=info".parse().unwrap()
-        }))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "ai_gateway=debug,tower_http=info".parse().unwrap()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -117,6 +118,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/embed", delete(routes::embed::delete_embed))
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
+        .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route("/v1/context/document", post(routes::context::post_document))

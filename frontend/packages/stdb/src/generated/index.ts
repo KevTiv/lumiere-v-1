@@ -58,6 +58,7 @@ import AddUserToOrganizationReducer from "./add_user_to_organization_reducer";
 import AddWidgetToDashboardReducer from "./add_widget_to_dashboard_reducer";
 import AddWorkflowActivityReducer from "./add_workflow_activity_reducer";
 import AddWorkflowTransitionReducer from "./add_workflow_transition_reducer";
+import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyReconciliationRulesReducer from "./apply_reconciliation_rules_reducer";
 import ApproveDocumentProcessingJobReducer from "./approve_document_processing_job_reducer";
@@ -66,6 +67,7 @@ import ApproveIntercompanyTransactionReducer from "./approve_intercompany_transa
 import ApproveLeaveReducer from "./approve_leave_reducer";
 import ApprovePurchaseRequisitionReducer from "./approve_purchase_requisition_reducer";
 import ApproveSupplierIntakeReducer from "./approve_supplier_intake_reducer";
+import ArchiveAiChatSessionReducer from "./archive_ai_chat_session_reducer";
 import ArchiveEmployeeReducer from "./archive_employee_reducer";
 import ArchiveFinancialReportReducer from "./archive_financial_report_reducer";
 import AssignQualityAlertReducer from "./assign_quality_alert_reducer";
@@ -76,6 +78,7 @@ import AssignTagToContactReducer from "./assign_tag_to_contact_reducer";
 import AssignTaskUsersReducer from "./assign_task_users_reducer";
 import AssignTicketReducer from "./assign_ticket_reducer";
 import AssignUserToPickingReducer from "./assign_user_to_picking_reducer";
+import BackfillExternalIdsReducer from "./backfill_external_ids_reducer";
 import BillTimesheetsReducer from "./bill_timesheets_reducer";
 import BlockSerialReducer from "./block_serial_reducer";
 import BlockWorkcenterReducer from "./block_workcenter_reducer";
@@ -150,6 +153,7 @@ import CreateAccountTaxGroupReducer from "./create_account_tax_group_reducer";
 import CreateActivityReducer from "./create_activity_reducer";
 import CreateAdjustmentReasonReducer from "./create_adjustment_reason_reducer";
 import CreateAiAgentReducer from "./create_ai_agent_reducer";
+import CreateAiChatSessionReducer from "./create_ai_chat_session_reducer";
 import CreateAiInsightReducer from "./create_ai_insight_reducer";
 import CreateAiTeamMemberReducer from "./create_ai_team_member_reducer";
 import CreateAnalyticAccountReducer from "./create_analytic_account_reducer";
@@ -366,6 +370,7 @@ import GenerateHubPairingTokenReducer from "./generate_hub_pairing_token_reducer
 import GenerateSubscriptionInvoiceReducer from "./generate_subscription_invoice_reducer";
 import GetFormConfigurationReducer from "./get_form_configuration_reducer";
 import GetOrganizationFormConfigsReducer from "./get_organization_form_configs_reducer";
+import GrantPermissionReducer from "./grant_permission_reducer";
 import HoldSupplierIntakeReducer from "./hold_supplier_intake_reducer";
 import ImportAccountCsvReducer from "./import_account_csv_reducer";
 import ImportAccountMoveCsvReducer from "./import_account_move_csv_reducer";
@@ -511,6 +516,7 @@ import RestoreProductCategoryReducer from "./restore_product_category_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
 import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
+import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
@@ -574,6 +580,7 @@ import UpdateAccountReconciliationWidgetReducer from "./update_account_reconcili
 import UpdateAccountTaxReducer from "./update_account_tax_reducer";
 import UpdateAccountTaxGroupReducer from "./update_account_tax_group_reducer";
 import UpdateAiAgentReducer from "./update_ai_agent_reducer";
+import UpdateAiChatSessionTitleReducer from "./update_ai_chat_session_title_reducer";
 import UpdateAnalyticAccountReducer from "./update_analytic_account_reducer";
 import UpdateAnalyticDistributionModelReducer from "./update_analytic_distribution_model_reducer";
 import UpdateAnalyticLineReducer from "./update_analytic_line_reducer";
@@ -721,6 +728,8 @@ import ActivityRow from "./activity_table";
 import ActivityTypeRow from "./activity_type_table";
 import AdjustmentReasonRow from "./adjustment_reason_table";
 import AiAgentRow from "./ai_agent_table";
+import AiChatMessageRow from "./ai_chat_message_table";
+import AiChatSessionRow from "./ai_chat_session_table";
 import AiDocumentProcessingJobRow from "./ai_document_processing_job_table";
 import AiInsightRow from "./ai_insight_table";
 import AiTeamMemberRow from "./ai_team_member_table";
@@ -820,6 +829,7 @@ import MrpWorkorderRow from "./mrp_workorder_table";
 import OppStageRow from "./opp_stage_table";
 import OpportunityRow from "./opportunity_table";
 import OpportunityLineRow from "./opportunity_line_table";
+import OrgPermissionRow from "./org_permission_table";
 import OrganizationRow from "./organization_table";
 import OrganizationSettingsRow from "./organization_settings_table";
 import PackagingMaterialRow from "./packaging_material_table";
@@ -1470,6 +1480,49 @@ const tablesSchema = __schema({
       { name: 'ai_agent_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiAgentRow),
+  ai_chat_message: __table({
+    name: 'ai_chat_message',
+    indexes: [
+      { name: 'ai_chat_message_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'ai_chat_message_by_created_by', algorithm: 'btree', columns: [
+        'createdBy',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_chat_message_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_chat_message_by_session_key', algorithm: 'btree', columns: [
+        'sessionKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_chat_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiChatMessageRow),
+  ai_chat_session: __table({
+    name: 'ai_chat_session',
+    indexes: [
+      { name: 'ai_chat_session_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_chat_session_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_chat_session_by_key', algorithm: 'btree', columns: [
+        'sessionKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_chat_session_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiChatSessionRow),
   ai_document_processing_job: __table({
     name: 'ai_document_processing_job',
     indexes: [
@@ -3151,6 +3204,23 @@ const tablesSchema = __schema({
       { name: 'opportunity_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, OpportunityLineRow),
+  org_permission: __table({
+    name: 'org_permission',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'perm_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'perm_by_role', algorithm: 'btree', columns: [
+        'roleId',
+      ] },
+    ],
+    constraints: [
+      { name: 'org_permission_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, OrgPermissionRow),
   organization: __table({
     name: 'organization',
     indexes: [
@@ -5046,6 +5116,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_widget_to_dashboard", AddWidgetToDashboardReducer),
   __reducerSchema("add_workflow_activity", AddWorkflowActivityReducer),
   __reducerSchema("add_workflow_transition", AddWorkflowTransitionReducer),
+  __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_reconciliation_rules", ApplyReconciliationRulesReducer),
   __reducerSchema("approve_document_processing_job", ApproveDocumentProcessingJobReducer),
@@ -5054,6 +5125,7 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_leave", ApproveLeaveReducer),
   __reducerSchema("approve_purchase_requisition", ApprovePurchaseRequisitionReducer),
   __reducerSchema("approve_supplier_intake", ApproveSupplierIntakeReducer),
+  __reducerSchema("archive_ai_chat_session", ArchiveAiChatSessionReducer),
   __reducerSchema("archive_employee", ArchiveEmployeeReducer),
   __reducerSchema("archive_financial_report", ArchiveFinancialReportReducer),
   __reducerSchema("assign_quality_alert", AssignQualityAlertReducer),
@@ -5064,6 +5136,7 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_task_users", AssignTaskUsersReducer),
   __reducerSchema("assign_ticket", AssignTicketReducer),
   __reducerSchema("assign_user_to_picking", AssignUserToPickingReducer),
+  __reducerSchema("backfill_external_ids", BackfillExternalIdsReducer),
   __reducerSchema("bill_timesheets", BillTimesheetsReducer),
   __reducerSchema("block_serial", BlockSerialReducer),
   __reducerSchema("block_workcenter", BlockWorkcenterReducer),
@@ -5138,6 +5211,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_activity", CreateActivityReducer),
   __reducerSchema("create_adjustment_reason", CreateAdjustmentReasonReducer),
   __reducerSchema("create_ai_agent", CreateAiAgentReducer),
+  __reducerSchema("create_ai_chat_session", CreateAiChatSessionReducer),
   __reducerSchema("create_ai_insight", CreateAiInsightReducer),
   __reducerSchema("create_ai_team_member", CreateAiTeamMemberReducer),
   __reducerSchema("create_analytic_account", CreateAnalyticAccountReducer),
@@ -5354,6 +5428,7 @@ const reducersSchema = __reducers(
   __reducerSchema("generate_subscription_invoice", GenerateSubscriptionInvoiceReducer),
   __reducerSchema("get_form_configuration", GetFormConfigurationReducer),
   __reducerSchema("get_organization_form_configs", GetOrganizationFormConfigsReducer),
+  __reducerSchema("grant_permission", GrantPermissionReducer),
   __reducerSchema("hold_supplier_intake", HoldSupplierIntakeReducer),
   __reducerSchema("import_account_csv", ImportAccountCsvReducer),
   __reducerSchema("import_account_move_csv", ImportAccountMoveCsvReducer),
@@ -5499,6 +5574,7 @@ const reducersSchema = __reducers(
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
   __reducerSchema("retry_iot_action", RetryIotActionReducer),
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
+  __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
@@ -5562,6 +5638,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_account_tax", UpdateAccountTaxReducer),
   __reducerSchema("update_account_tax_group", UpdateAccountTaxGroupReducer),
   __reducerSchema("update_ai_agent", UpdateAiAgentReducer),
+  __reducerSchema("update_ai_chat_session_title", UpdateAiChatSessionTitleReducer),
   __reducerSchema("update_analytic_account", UpdateAnalyticAccountReducer),
   __reducerSchema("update_analytic_distribution_model", UpdateAnalyticDistributionModelReducer),
   __reducerSchema("update_analytic_line", UpdateAnalyticLineReducer),

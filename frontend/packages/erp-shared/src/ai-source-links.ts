@@ -52,11 +52,11 @@ function normalizeSourceKey(raw?: string): string | undefined {
 }
 
 function sourceRecordId(input: AiSourceLinkInput): string | undefined {
-  if (input.content_id != null && String(input.content_id).trim() !== "") {
-    return String(input.content_id).trim()
-  }
   if (input.entity_id != null && String(input.entity_id).trim() !== "") {
     return String(input.entity_id).trim()
+  }
+  if (input.content_id != null && String(input.content_id).trim() !== "") {
+    return String(input.content_id).trim()
   }
   return undefined
 }

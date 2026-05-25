@@ -9,7 +9,9 @@
 /// | **AiDocumentProcessingJob** | Document OCR / extraction / classification jobs |
 /// | **SearchEmbedding** | Vector embeddings for semantic search |
 pub mod agents;
+pub mod chat;
 pub mod intelligence;
 
 pub use agents::*;
+pub use chat::*;
 pub use intelligence::*;

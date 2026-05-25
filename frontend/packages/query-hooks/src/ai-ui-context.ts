@@ -90,11 +90,17 @@ export function buildEntitySelection(args: {
 }): AiEntitySelection {
   const rawId = args.row[args.rowKey ?? "id"]
   const entityId = rawId == null ? undefined : String(rawId)
+  const baseSummary = summarizeEntityRow(args.row)
+  const selectionSummary =
+    entityId && !baseSummary.includes(`#${entityId}`)
+      ? `#${entityId}, ${baseSummary}`
+      : baseSummary
+
   return {
     activeTab: args.activeTab,
     entityType: args.entityType,
     entityId,
-    selectionSummary: summarizeEntityRow(args.row),
+    selectionSummary,
   }
 }
 

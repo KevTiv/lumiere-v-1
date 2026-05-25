@@ -1,6 +1,8 @@
 "use client"
 
-import { useMutation } from "@tanstack/react-query"
+import { aiChatBffPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type { AiUiContext } from "../ai-ui-context"
 import { apiFetch } from "../http"
@@ -24,8 +26,62 @@ export type AiMemoryContextHit = {
 export type AiRagSource = {
   content_type: string
   content_id: number
+  entity_type?: string
+  entity_id?: string
   score: number
   text_snippet: string
+}
+
+export type AiChatSessionRow = {
+  id: number | string
+  organizationId?: number
+  organization_id?: number
+  companyId?: number
+  company_id?: number
+  sessionKey?: string
+  session_key?: string
+  title?: string | null
+  route?: string | null
+  module?: string | null
+  activeTab?: string | null
+  active_tab?: string | null
+  archived?: boolean
+  createDate?: number | string
+  create_date?: number | string
+  writeDate?: number | string
+  write_date?: number | string
+  metadata?: string | null
+}
+
+export type AiChatMessageRow = {
+  id: number | string
+  organizationId?: number
+  organization_id?: number
+  companyId?: number
+  company_id?: number
+  sessionKey?: string
+  session_key?: string
+  role: "user" | "assistant" | "system" | string
+  content: string
+  sourcesJson?: string | null
+  sources_json?: string | null
+  uiContextJson?: string | null
+  ui_context_json?: string | null
+  model?: string | null
+  durationMs?: number | string | null
+  duration_ms?: number | string | null
+  status?: string
+  createDate?: number | string
+  create_date?: number | string
+  metadata?: string | null
+}
+
+export function aiChatSessionsQueryKey(organizationId: number) {
+  return ["stdb", "ai-chat-sessions", String(organizationId)] as const
+}
+
+export function aiChatMessagesQueryKey(organizationId: number, sessionKey?: string) {
+  return ["stdb", "ai-chat-messages", String(organizationId), sessionKey ?? "all"] as const
 }
 
 export function useAiMemorySearch() {
@@ -82,6 +138,120 @@ export function useAiMemoryDocumentIngest() {
         structured_fields: unknown
         stdb_job_id: number
       }
+    },
+  })
+}
+
+export function useAiChatSessions(organizationId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: aiChatSessionsQueryKey(organizationId),
+    queryFn: async () => {
+      const r = await apiFetch("/api/query/ai-chat-sessions")
+      if (!r.ok) throw new Error(await parseAiError(r))
+      const j = (await r.json()) as { data?: AiChatSessionRow[] }
+      return j.data ?? []
+    },
+    enabled: enabled && organizationId > 0,
+    staleTime: 30_000,
+  })
+}
+
+export function useAiChatMessages(
+  organizationId: number,
+  sessionKey: string | null | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: aiChatMessagesQueryKey(organizationId, sessionKey ?? undefined),
+    queryFn: async () => {
+      const r = await apiFetch("/api/query/ai-chat-messages")
+      if (!r.ok) throw new Error(await parseAiError(r))
+      const j = (await r.json()) as { data?: AiChatMessageRow[] }
+      const rows = j.data ?? []
+      return sessionKey
+        ? rows.filter((row) => (row.sessionKey ?? row.session_key) === sessionKey)
+        : rows
+    },
+    enabled: enabled && organizationId > 0 && !!sessionKey,
+    staleTime: 10_000,
+  })
+}
+
+export function useCreateAiChatSession(organizationId: number, companyId: number | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      session_key: string
+      title?: string | null
+      route?: string | null
+      module?: string | null
+      active_tab?: string | null
+      archived?: boolean
+      metadata?: string | null
+    }) => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error("companyId is required")
+      }
+      const { urlPath, init } = aiChatBffPost("create_ai_chat_session", [
+        organizationId,
+        companyId,
+        stdbParamsToJson({
+          ...params,
+          archived: params.archived ?? false,
+          title: params.title ?? null,
+          route: params.route ?? null,
+          module: params.module ?? null,
+          active_tab: params.active_tab ?? null,
+          metadata: params.metadata ?? null,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseAiError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: aiChatSessionsQueryKey(organizationId) })
+    },
+  })
+}
+
+export function useAppendAiChatMessage(organizationId: number, companyId: number | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      session_key: string
+      role: "user" | "assistant" | "system"
+      content: string
+      sources_json?: string | null
+      ui_context_json?: string | null
+      model?: string | null
+      duration_ms?: number | null
+      status?: string
+      metadata?: string | null
+    }) => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error("companyId is required")
+      }
+      const { urlPath, init } = aiChatBffPost("append_ai_chat_message", [
+        organizationId,
+        companyId,
+        stdbParamsToJson({
+          ...params,
+          sources_json: params.sources_json ?? null,
+          ui_context_json: params.ui_context_json ?? null,
+          model: params.model ?? null,
+          duration_ms: params.duration_ms ?? null,
+          status: params.status ?? "completed",
+          metadata: params.metadata ?? null,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseAiError(r))
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: aiChatSessionsQueryKey(organizationId) })
+      void qc.invalidateQueries({
+        queryKey: aiChatMessagesQueryKey(organizationId, vars.session_key),
+      })
     },
   })
 }

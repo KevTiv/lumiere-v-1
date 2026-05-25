@@ -931,6 +931,42 @@ export const AiAgent = __t.object("AiAgent", {
 });
 export type AiAgent = __Infer<typeof AiAgent>;
 
+export const AiChatMessage = __t.object("AiChatMessage", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  sessionKey: __t.string(),
+  role: __t.string(),
+  content: __t.string(),
+  sourcesJson: __t.option(__t.string()),
+  uiContextJson: __t.option(__t.string()),
+  model: __t.option(__t.string()),
+  durationMs: __t.option(__t.u64()),
+  status: __t.string(),
+  createdBy: __t.identity(),
+  createDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiChatMessage = __Infer<typeof AiChatMessage>;
+
+export const AiChatSession = __t.object("AiChatSession", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  sessionKey: __t.string(),
+  title: __t.option(__t.string()),
+  route: __t.option(__t.string()),
+  module: __t.option(__t.string()),
+  activeTab: __t.option(__t.string()),
+  archived: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiChatSession = __Infer<typeof AiChatSession>;
+
 export const AiDocumentProcessingJob = __t.object("AiDocumentProcessingJob", {
   id: __t.u64(),
   documentType: __t.string(),
@@ -1044,6 +1080,19 @@ export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   metadata: __t.option(__t.string()),
 });
 export type AnalyticsMetric = __Infer<typeof AnalyticsMetric>;
+
+export const AppendAiChatMessageParams = __t.object("AppendAiChatMessageParams", {
+  sessionKey: __t.string(),
+  role: __t.string(),
+  content: __t.string(),
+  sourcesJson: __t.option(__t.string()),
+  uiContextJson: __t.option(__t.string()),
+  model: __t.option(__t.string()),
+  durationMs: __t.option(__t.u64()),
+  status: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type AppendAiChatMessageParams = __Infer<typeof AppendAiChatMessageParams>;
 
 // The tagged union or sum type for the algebraic type `AssetState`.
 export const AssetState = __t.enum("AssetState", {
@@ -1433,6 +1482,7 @@ export type CloseSubscriptionParams = __Infer<typeof CloseSubscriptionParams>;
 
 export const Company = __t.object("Company", {
   id: __t.u64(),
+  externalId: __t.string(),
   organizationId: __t.u64(),
   name: __t.string(),
   code: __t.string(),
@@ -2086,6 +2136,17 @@ export const CreateAiAgentParams = __t.object("CreateAiAgentParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateAiAgentParams = __Infer<typeof CreateAiAgentParams>;
+
+export const CreateAiChatSessionParams = __t.object("CreateAiChatSessionParams", {
+  sessionKey: __t.string(),
+  title: __t.option(__t.string()),
+  route: __t.option(__t.string()),
+  module: __t.option(__t.string()),
+  activeTab: __t.option(__t.string()),
+  archived: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiChatSessionParams = __Infer<typeof CreateAiChatSessionParams>;
 
 export const CreateAiInsightParams = __t.object("CreateAiInsightParams", {
   get severity() {
@@ -5337,6 +5398,20 @@ export const GoogleDriveConnection = __t.object("GoogleDriveConnection", {
 });
 export type GoogleDriveConnection = __Infer<typeof GoogleDriveConnection>;
 
+export const GrantOrgPermissionParams = __t.object("GrantOrgPermissionParams", {
+  get subject() {
+    return PermissionSubject;
+  },
+  resource: __t.string(),
+  get action() {
+    return PermissionAction;
+  },
+  get effect() {
+    return PermissionEffect;
+  },
+});
+export type GrantOrgPermissionParams = __Infer<typeof GrantOrgPermissionParams>;
+
 export const HelpdeskSla = __t.object("HelpdeskSla", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -6623,8 +6698,28 @@ export const OpportunityStage = __t.object("OpportunityStage", {
 });
 export type OpportunityStage = __Infer<typeof OpportunityStage>;
 
+export const OrgPermission = __t.object("OrgPermission", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  get subject() {
+    return PermissionSubject;
+  },
+  roleId: __t.option(__t.u64()),
+  resource: __t.string(),
+  get action() {
+    return PermissionAction;
+  },
+  get effect() {
+    return PermissionEffect;
+  },
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type OrgPermission = __Infer<typeof OrgPermission>;
+
 export const Organization = __t.object("Organization", {
   id: __t.u64(),
+  externalId: __t.string(),
   name: __t.string(),
   code: __t.string(),
   description: __t.option(__t.string()),
@@ -6749,6 +6844,30 @@ export const PeriodState = __t.enum("PeriodState", {
   Closed: __t.unit(),
 });
 export type PeriodState = __Infer<typeof PeriodState>;
+
+// The tagged union or sum type for the algebraic type `PermissionAction`.
+export const PermissionAction = __t.enum("PermissionAction", {
+  Read: __t.unit(),
+  Write: __t.unit(),
+  Create: __t.unit(),
+  Delete: __t.unit(),
+  All: __t.unit(),
+});
+export type PermissionAction = __Infer<typeof PermissionAction>;
+
+// The tagged union or sum type for the algebraic type `PermissionEffect`.
+export const PermissionEffect = __t.enum("PermissionEffect", {
+  Allow: __t.unit(),
+  Deny: __t.unit(),
+});
+export type PermissionEffect = __Infer<typeof PermissionEffect>;
+
+// The tagged union or sum type for the algebraic type `PermissionSubject`.
+export const PermissionSubject = __t.enum("PermissionSubject", {
+  Role: __t.u64(),
+  User: __t.identity(),
+});
+export type PermissionSubject = __Infer<typeof PermissionSubject>;
 
 export const PickingWave = __t.object("PickingWave", {
   id: __t.u64(),
@@ -9944,6 +10063,11 @@ export const UpdateAiAgentParams = __t.object("UpdateAiAgentParams", {
   monthlyBudget: __t.option(__t.f64()),
 });
 export type UpdateAiAgentParams = __Infer<typeof UpdateAiAgentParams>;
+
+export const UpdateAiChatSessionTitleParams = __t.object("UpdateAiChatSessionTitleParams", {
+  title: __t.option(__t.string()),
+});
+export type UpdateAiChatSessionTitleParams = __Infer<typeof UpdateAiChatSessionTitleParams>;
 
 export const UpdateAnalyticAccountParams = __t.object("UpdateAnalyticAccountParams", {
   companyId: __t.option(__t.u64()),
