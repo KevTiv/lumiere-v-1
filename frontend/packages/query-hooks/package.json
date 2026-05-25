@@ -8,6 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./http": "./src/http.ts",
+    "./ai-ui-context": "./src/ai-ui-context.ts",
+    "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
     "./hooks/*": "./src/hooks/*.ts"
   },
   "scripts": {

@@ -2,7 +2,10 @@
 
 import { useMutation } from "@tanstack/react-query"
 
+import type { AiUiContext } from "../ai-ui-context"
 import { apiFetch } from "../http"
+
+export type { AiUiContext } from "../ai-ui-context"
 
 async function parseAiError(r: Response): Promise<string> {
   const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
@@ -91,6 +94,7 @@ export function useAiMemoryRag() {
       companyId: number
       include_types?: string[]
       limit?: number
+      ui_context?: AiUiContext
     }) => {
       const r = await apiFetch("/api/ai/rag", {
         method: "POST",
@@ -98,8 +102,9 @@ export function useAiMemoryRag() {
         body: JSON.stringify({
           query: args.query,
           companyId: args.companyId,
-          include_types: args.include_types,
-          limit: args.limit,
+          ...(args.include_types?.length ? { include_types: args.include_types } : {}),
+          ...(args.limit != null ? { limit: args.limit } : {}),
+          ...(args.ui_context ? { ui_context: args.ui_context } : {}),
         }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))

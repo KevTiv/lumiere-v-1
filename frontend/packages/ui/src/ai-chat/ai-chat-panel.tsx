@@ -38,7 +38,7 @@ import {
   PanelRight,
   PanelRightClose,
 } from "lucide-react"
-import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef } from "@/lib/ai-chat-types"
+import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
@@ -59,10 +59,7 @@ interface AIChatPanelProps {
   docked?: boolean
   onDockToggle?: () => void
   config?: Partial<AIChatConfig>
-  context?: {
-    activeView?: string
-    selectedData?: unknown
-  }
+  context?: ChatContext
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
   onSendMessage?: (
     userText: string,
@@ -92,6 +89,13 @@ const MIN_HEIGHT = 300
 const DEFAULT_WIDTH = 400
 const DEFAULT_HEIGHT = 500
 
+function selectionSummaryFromContext(context?: ChatContext): string | null {
+  const selected = context?.selectedData
+  if (!selected || typeof selected !== "object" || Array.isArray(selected)) return null
+  const summary = (selected as { selectionSummary?: unknown }).selectionSummary
+  return typeof summary === "string" && summary.trim() ? summary.trim() : null
+}
+
 export function AIChatPanel({ open, onClose, docked = false, onDockToggle, config, context, onSendMessage }: AIChatPanelProps) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -118,6 +122,7 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
   const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; posX: number; posY: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 })
 
   const commands = config?.commands || defaultAtCommands
+  const selectionSummary = selectionSummaryFromContext(context)
 
   const filteredCommands = commands.filter(
     (cmd) =>
@@ -560,10 +565,20 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                                   : src.entity_id != null && String(src.entity_id) !== ""
                                     ? String(src.entity_id)
                                     : null
+                              const citationLabel =
+                                idLabel != null ? `${scope} #${idLabel}` : scope
                               return (
                               <li key={`${message.id}-src-${i}`} className="break-all">
-                                {scope}
-                                {idLabel != null ? ` #${idLabel}` : ""}
+                                {src.href ? (
+                                  <a
+                                    href={src.href}
+                                    className="text-primary hover:underline underline-offset-2"
+                                  >
+                                    {citationLabel}
+                                  </a>
+                                ) : (
+                                  citationLabel
+                                )}
                                 {src.score != null ? ` · ${src.score.toFixed(2)}` : ""}
                                 {src.excerpt ? ` — ${src.excerpt}` : ""}
                               </li>
@@ -709,6 +724,12 @@ export function AIChatPanel({ open, onClose, docked = false, onDockToggle, confi
                   <Badge variant="outline" className="text-[9px] h-4 px-1.5">
                     <Layout className="h-2.5 w-2.5 mr-0.5" />
                     {context.activeView}
+                  </Badge>
+                )}
+                {selectionSummary && (
+                  <Badge variant="outline" className="text-[9px] h-4 max-w-40 px-1.5">
+                    <CheckSquare className="h-2.5 w-2.5 mr-0.5" />
+                    <span className="truncate">{selectionSummary}</span>
                   </Badge>
                 )}
                 {/* Resize button — floating mode only */}

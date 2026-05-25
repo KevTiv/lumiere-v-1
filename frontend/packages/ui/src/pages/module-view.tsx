@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
+import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
 import { DashboardGrid } from "./dashboard-grid"
@@ -40,14 +42,22 @@ export function ModuleView({
   isPending,
 }: ModuleViewProps) {
   const { checkPermission } = useRBAC()
+  const aiReporter = useErpAiSelectionReporter()
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
   const activeTab = activeTabProp ?? internalTab
+  const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
     onActiveTabChange?.(v)
     if (activeTabProp === undefined) setInternalTab(v)
   }
   const [openForm, setOpenForm] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (prevActiveTabRef.current === activeTab) return
+    prevActiveTabRef.current = activeTab
+    aiReporter?.setActiveTab(activeTab)
+  }, [activeTab, aiReporter])
 
   return (
     <div className="flex flex-col min-h-full gap-2" data-testid={`module-view-${config.id}`}>
@@ -96,9 +106,20 @@ export function ModuleView({
                 <EntityView
                   config={tab.entityConfig}
                   data={data[tab.id] ?? []}
-                  onRowClick={
-                    onRowClick ? (row) => onRowClick(tab.id, row) : undefined
-                  }
+                  onRowClick={(row) => {
+                    aiReporter?.setSelection(
+                      buildEntitySelection({
+                        activeTab: tab.id,
+                        entityType: tab.entityConfig!.id,
+                        row,
+                        rowKey:
+                          tab.entityConfig!.view.mode === "table"
+                            ? tab.entityConfig!.view.rowKey
+                            : undefined,
+                      }),
+                    )
+                    onRowClick?.(tab.id, row)
+                  }}
                 />
 
                 {tab.createForm && (

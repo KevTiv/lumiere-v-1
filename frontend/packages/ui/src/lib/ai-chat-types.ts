@@ -8,6 +8,8 @@ export interface ChatMessageSourceRef {
   entity_id?: string
   score?: number
   excerpt?: string
+  /** In-app route when content/entity type maps to an ERP screen */
+  href?: string
 }
 
 export interface ChatMessage {
@@ -46,7 +48,12 @@ export interface AtCommand {
 }
 
 export interface ChatContext {
+  /** Human-readable view label (typically the module slug). */
   activeView?: string
+  route?: string
+  module?: string
+  activeTab?: string
+  companyId?: number
   selectedData?: unknown
   currentUser?: string
   permissions?: string[]

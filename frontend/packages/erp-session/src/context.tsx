@@ -8,6 +8,7 @@ export interface ErpSessionState {
   identity: string | null
   connected: boolean
   organizationId?: number
+  companyIds?: readonly number[]
 }
 
 const defaultState: ErpSessionState = {
