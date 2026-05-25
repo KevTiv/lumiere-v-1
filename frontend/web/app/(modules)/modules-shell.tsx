@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react"
+import { Suspense, useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
   AIChatPanel,
@@ -8,34 +8,48 @@ import {
   JournalPanel,
 } from "@lumiere/ui"
 import { useErpSession } from "@lumiere/erp-session"
-import type { ChatMessageSourceRef } from "@lumiere/ui"
+import type { ChatContext, ChatMessageSourceRef } from "@lumiere/ui"
+import {
+  atCommandsToIncludeTypes,
+  buildAiUiContext,
+  parseAtCommands,
+  resolveAiSourceHref,
+  resolveErpCompanyId,
+} from "@lumiere/query-hooks/ai-ui-context"
 import { useAiMemoryRag } from "@lumiere/query-hooks/hooks/ai-memory"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { ErpAiRouteContextProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 
-function numId(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v
-  if (typeof v === "bigint") return Number(v)
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number.parseInt(v, 10)
-    return Number.isFinite(n) ? n : null
-  }
-  return null
-}
-
-function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage">) {
-  const { organizationId } = useErpSession()
+function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context">) {
+  const { organizationId, companyIds } = useErpSession()
+  const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const companiesQuery = useCompanies(orgId, orgReady)
   const rag = useAiMemoryRag()
 
-  const defaultCompanyId = useMemo(() => {
-    const rows = companiesQuery.data ?? []
-    if (rows.length === 0) return null
-    const raw = rows[0]?.["id"]
-    return numId(raw)
-  }, [companiesQuery.data])
+  const defaultCompanyId = useMemo(
+    () =>
+      resolveErpCompanyId({
+        organizationId: orgId,
+        sessionCompanyIds: companyIds,
+        companyRows: companiesQuery.data ?? [],
+      }),
+    [companiesQuery.data, companyIds, orgId],
+  )
+
+  const chatContext = useMemo(
+    (): ChatContext => ({
+      activeView: module ?? route,
+      route,
+      module: module ?? undefined,
+      activeTab: activeTab ?? undefined,
+      companyId: defaultCompanyId ?? undefined,
+      selectedData: selection ?? undefined,
+    }),
+    [activeTab, defaultCompanyId, module, route, selection],
+  )
 
   const onSendMessage = useCallback(
     async (userText: string) => {
@@ -49,9 +63,21 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         }
       }
 
+      const atCommands = parseAtCommands(userText)
+      const includeTypes = atCommandsToIncludeTypes(atCommands)
+      const uiContext = buildAiUiContext({
+        pathname: route,
+        companyId: defaultCompanyId,
+        activeTab,
+        atCommands,
+        selection,
+      })
+
       const out = await rag.mutateAsync({
         query: userText,
         companyId: defaultCompanyId,
+        include_types: includeTypes,
+        ui_context: uiContext,
       })
 
       const sources: ChatMessageSourceRef[] = (out.sources ?? []).map((s) => ({
@@ -60,14 +86,18 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         score: s.score,
         excerpt:
           s.text_snippet.length > 220 ? `${s.text_snippet.slice(0, 220)}…` : s.text_snippet,
+        href: resolveAiSourceHref({
+          content_type: s.content_type,
+          content_id: s.content_id,
+        }),
       }))
 
       return { content: out.answer, sources }
     },
-    [companiesQuery.isLoading, defaultCompanyId, orgReady, rag],
+    [activeTab, companiesQuery.isLoading, defaultCompanyId, orgReady, rag, route, selection],
   )
 
-  return <AIChatPanel {...props} onSendMessage={onSendMessage} />
+  return <AIChatPanel {...props} context={chatContext} onSendMessage={onSendMessage} />
 }
 
 function ModulesContent({ children }: { children: ReactNode }) {
@@ -97,7 +127,6 @@ function ModulesContent({ children }: { children: ReactNode }) {
         }}
         docked={isAIChatDocked}
         onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
-        context={{}}
         config={{
           title: "ERP Assistant",
           welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
@@ -118,5 +147,11 @@ function ModulesContent({ children }: { children: ReactNode }) {
 }
 
 export default function ModulesShell({ children }: { children: ReactNode }) {
-  return <ModulesContent>{children}</ModulesContent>
+  return (
+    <Suspense fallback={null}>
+      <ErpAiRouteContextProvider>
+        <ModulesContent>{children}</ModulesContent>
+      </ErpAiRouteContextProvider>
+    </Suspense>
+  )
 }

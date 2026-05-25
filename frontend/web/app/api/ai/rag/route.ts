@@ -3,6 +3,7 @@
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
+import { sanitizeRagUiContext } from '@lumiere/erp-shared/ai-ui-context'
 import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 import { companyIdBelongsToOrganization } from '@/lib/company-scope-server'
 import { resolveApiSession } from '@/lib/api-session'
@@ -13,6 +14,7 @@ interface Body {
   companyId?: unknown
   include_types?: unknown
   limit?: unknown
+  ui_context?: unknown
 }
 
 export async function POST(request: NextRequest) {
@@ -77,12 +79,18 @@ export async function POST(request: NextRequest) {
     ? body.include_types.filter((x): x is string => typeof x === 'string' && x.length > 0)
     : undefined
 
-  const gwBody = JSON.stringify({
+  const ui_context = sanitizeRagUiContext(body.ui_context)
+
+  const gwPayload: Record<string, unknown> = {
     company_id: companyIdNum,
+    org_id: orgId,
     query,
-    include_types: include_types?.length ? include_types : undefined,
     limit,
-  })
+  }
+  if (include_types?.length) gwPayload.include_types = include_types
+  if (ui_context) gwPayload.ui_context = ui_context
+
+  const gwBody = JSON.stringify(gwPayload)
 
   try {
     const gw = await fetchAiGateway('/v1/rag', {

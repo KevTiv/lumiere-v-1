@@ -109,6 +109,7 @@ export function Providers({
                 identity: serverIdentity ?? null,
                 connected: Boolean(serverIdentity && serverIdentity !== "unknown"),
                 organizationId: organizationId ?? undefined,
+                companyIds,
               }}
             >
               <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
