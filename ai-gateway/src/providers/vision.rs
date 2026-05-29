@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde::Deserialize;
 
 /// Structured result of image/document analysis.
@@ -218,7 +218,12 @@ impl VisionProvider for MistralVision {
             .json()
             .await?;
 
-        let raw_text = resp.pages.iter().map(|p| p.markdown.as_str()).collect::<Vec<_>>().join("\n\n");
+        let raw_text = resp
+            .pages
+            .iter()
+            .map(|p| p.markdown.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
 
         Ok(ExtractedDocument {
             raw_text: raw_text.clone(),

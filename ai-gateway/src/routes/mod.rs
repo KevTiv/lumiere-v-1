@@ -1,6 +1,12 @@
+pub mod actions;
+pub mod briefing;
 pub mod context;
 pub mod embed;
+pub mod forms;
 pub mod health;
+pub mod import;
+pub mod insights;
 pub mod kaggle;
 pub mod rag;
+pub mod reports;
 pub mod search;

@@ -22,7 +22,10 @@ pub struct EmbedJobPayload {
 
 #[async_trait]
 pub trait LumiereStdbExt {
-    async fn fetch_pending_embedding_jobs(&self, limit: u32) -> anyhow::Result<Vec<PendingEmbedJob>>;
+    async fn fetch_pending_embedding_jobs(
+        &self,
+        limit: u32,
+    ) -> anyhow::Result<Vec<PendingEmbedJob>>;
     async fn mark_embedding_synced(
         &self,
         company_id: Option<u64>,
@@ -57,7 +60,10 @@ fn u64_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
 
 #[async_trait]
 impl LumiereStdbExt for StdbClient {
-    async fn fetch_pending_embedding_jobs(&self, limit: u32) -> anyhow::Result<Vec<PendingEmbedJob>> {
+    async fn fetch_pending_embedding_jobs(
+        &self,
+        limit: u32,
+    ) -> anyhow::Result<Vec<PendingEmbedJob>> {
         let sql = format!(
             "SELECT id, organization_id, payload FROM queue_job \
              WHERE queue_name = 'embedding' AND status = 'Pending' \

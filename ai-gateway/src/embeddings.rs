@@ -55,7 +55,10 @@ impl EmbeddingClient {
             anyhow::bail!("Voyage AI error {}: {}", status, body);
         }
 
-        let body: VoyageResponse = resp.json().await.context("Failed to parse Voyage response")?;
+        let body: VoyageResponse = resp
+            .json()
+            .await
+            .context("Failed to parse Voyage response")?;
         body.data
             .into_iter()
             .next()
@@ -87,7 +90,10 @@ impl EmbeddingClient {
             anyhow::bail!("Voyage AI batch error {}: {}", status, body);
         }
 
-        let body: VoyageResponse = resp.json().await.context("Failed to parse Voyage batch response")?;
+        let body: VoyageResponse = resp
+            .json()
+            .await
+            .context("Failed to parse Voyage batch response")?;
         Ok(body.data.into_iter().map(|e| e.embedding).collect())
     }
 }

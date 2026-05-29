@@ -13,7 +13,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{config::Config, embeddings::EmbeddingClient, qdrant_client::VectorStore, stdb_embed::LumiereStdbExt};
+use crate::{
+    config::Config, embeddings::EmbeddingClient, qdrant_client::VectorStore,
+    stdb_embed::LumiereStdbExt,
+};
 use stdb_client::StdbClient;
 
 pub async fn run(
@@ -50,7 +53,9 @@ async fn process_batch(
     vector_store: &VectorStore,
     stdb: &StdbClient,
 ) -> anyhow::Result<usize> {
-    let jobs = stdb.fetch_pending_embedding_jobs(config.worker_batch_size).await?;
+    let jobs = stdb
+        .fetch_pending_embedding_jobs(config.worker_batch_size)
+        .await?;
     let count = jobs.len();
 
     for job in jobs {
@@ -60,7 +65,11 @@ async fn process_batch(
 
         // Claim the job atomically
         if let Err(e) = stdb.claim_queue_job(org_id, job_id).await {
-            tracing::warn!(job_id, "Failed to claim job (may have been claimed already): {}", e);
+            tracing::warn!(
+                job_id,
+                "Failed to claim job (may have been claimed already): {}",
+                e
+            );
             continue;
         }
 

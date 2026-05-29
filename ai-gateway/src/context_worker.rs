@@ -4,10 +4,7 @@ use dashmap::DashMap;
 use tokio::time;
 use tracing::{error, info};
 
-use crate::{
-    rig_agent::Activity,
-    state::AppState,
-};
+use crate::{rig_agent::Activity, state::AppState};
 
 type WatermarkMap = Arc<DashMap<String, i64>>;
 
@@ -75,7 +72,12 @@ async fn ingest_sale_orders(state: &AppState, org_filter: Option<u64>) -> anyhow
             let entity_id = get_u64(row, "id")?.to_string();
             let ts = latest_timestamp_micros(
                 row,
-                &["write_date", "confirmation_date", "create_date", "date_order"],
+                &[
+                    "write_date",
+                    "confirmation_date",
+                    "create_date",
+                    "date_order",
+                ],
             );
             let amount = get_f64(row, "amount_total").unwrap_or(0.0);
             let state_name = get_string(row, "state").unwrap_or_else(|| "unknown".to_string());
@@ -239,10 +241,7 @@ async fn ingest_account_moves(state: &AppState, org_filter: Option<u64>) -> anyh
     upsert_batch(state, TABLE_ACCOUNT_MOVE, activities).await
 }
 
-async fn ingest_mrp_production(
-    state: &AppState,
-    org_filter: Option<u64>,
-) -> anyhow::Result<usize> {
+async fn ingest_mrp_production(state: &AppState, org_filter: Option<u64>) -> anyhow::Result<usize> {
     let rows = state.stdb.query_table(TABLE_MRP_PRODUCTION).await?;
     let activities = rows_to_activities(
         &state.activity_watermarks,
@@ -254,7 +253,12 @@ async fn ingest_mrp_production(
             let entity_id = get_u64(row, "id")?.to_string();
             let ts = latest_timestamp_micros(
                 row,
-                &["write_date", "create_date", "date_start", "date_planned_start"],
+                &[
+                    "write_date",
+                    "create_date",
+                    "date_start",
+                    "date_planned_start",
+                ],
             );
             let product = row_field(row, "product_id")
                 .map(display_value)
@@ -289,7 +293,9 @@ async fn upsert_batch(
 
     let mut max_by_org: HashMap<u64, i64> = HashMap::new();
     for activity in &activities {
-        let entry = max_by_org.entry(activity.org_id).or_insert(activity.timestamp);
+        let entry = max_by_org
+            .entry(activity.org_id)
+            .or_insert(activity.timestamp);
         if activity.timestamp > *entry {
             *entry = activity.timestamp;
         }

@@ -160,6 +160,14 @@ export interface FormConfig {
   onCancel?: () => void
 }
 
+export interface AiFormAssistConfig {
+  enabled?: boolean
+  companyId?: number
+  formId?: string
+  entityType?: string
+  initialPrompt?: string
+}
+
 export const fieldWidthClasses: Record<FieldWidth, string> = {
   full: "col-span-12",
   "2/3": "col-span-12 md:col-span-8",

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
@@ -42,7 +43,9 @@ export function ModuleView({
   isPending,
 }: ModuleViewProps) {
   const { checkPermission } = useRBAC()
+  const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
+  const defaultCompanyId = companyIds?.[0]
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
   const activeTab = activeTabProp ?? internalTab
@@ -128,6 +131,15 @@ export function ModuleView({
                     onOpenChange={(open) => !open && setOpenForm(null)}
                     config={tab.createForm}
                     isPending={isPending}
+                    aiAssist={
+                      defaultCompanyId && tab.entityConfig
+                        ? {
+                            companyId: defaultCompanyId,
+                            formId: tab.createForm.id,
+                            entityType: tab.entityConfig.id,
+                          }
+                        : undefined
+                    }
                     onSubmit={async (formData) => {
                       await onFormSubmit?.(
                         tab.id,

@@ -14,8 +14,8 @@ mod worker;
 use std::sync::Arc;
 
 use axum::{
-    routing::{delete, get, post},
     Router,
+    routing::{delete, get, post},
 };
 use dashmap::DashMap;
 use tower_http::{
@@ -119,6 +119,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
+        .route("/v1/actions/draft", post(routes::actions::post_draft))
+        .route(
+            "/v1/briefing/generate",
+            post(routes::briefing::post_generate),
+        )
+        .route("/v1/forms/suggest", post(routes::forms::post_suggest))
+        .route("/v1/forms/validate", post(routes::forms::post_validate))
+        .route("/v1/import/analyze", post(routes::import::post_analyze))
+        .route("/v1/import/preview", post(routes::import::post_preview))
+        .route("/v1/reports/explain", post(routes::reports::post_explain))
+        .route(
+            "/v1/insights/generate",
+            post(routes::insights::post_generate),
+        )
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route("/v1/context/document", post(routes::context::post_document))

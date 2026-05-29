@@ -9,12 +9,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use qdrant_client::{
-    qdrant::{
-        r#match::MatchValue, Condition, CreateFieldIndexCollectionBuilder, Distance,
-        FieldCondition, FieldType, Filter, Match, PointStruct, SearchPointsBuilder,
-        UpsertPointsBuilder, VectorParamsBuilder, VectorsConfigBuilder,
-    },
     Payload, Qdrant,
+    qdrant::{
+        Condition, CreateFieldIndexCollectionBuilder, Distance, FieldCondition, FieldType, Filter,
+        Match, PointStruct, SearchPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
+        VectorsConfigBuilder, r#match::MatchValue,
+    },
 };
 use uuid::Uuid;
 

@@ -30,6 +30,10 @@ interface FormFieldRendererProps {
   value: unknown
   onChange: (value: unknown) => void
   error?: string
+  aiSuggestion?: {
+    confidence: number
+    note?: string
+  }
 }
 
 export function FormFieldRenderer({
@@ -37,6 +41,7 @@ export function FormFieldRenderer({
   value,
   onChange,
   error,
+  aiSuggestion,
 }: FormFieldRendererProps) {
   const width = field.width || "full"
 
@@ -277,7 +282,14 @@ export function FormFieldRenderer({
   const showLabel = field.type !== "checkbox" && field.type !== "switch"
 
   return (
-    <div className={cn(fieldWidthClasses[width] ?? "col-span-12", "space-y-1.5", field.className)}>
+    <div
+      className={cn(
+        fieldWidthClasses[width] ?? "col-span-12",
+        "space-y-1.5 rounded-md",
+        aiSuggestion && "border border-primary/30 bg-primary/5 p-2",
+        field.className,
+      )}
+    >
       {showLabel && field.label && (
         <Label
           htmlFor={field.id}
@@ -297,6 +309,12 @@ export function FormFieldRenderer({
           {error}
         </p>
       )}
+      {aiSuggestion ? (
+        <p className="text-xs text-primary">
+          AI suggestion applied ({Math.round(aiSuggestion.confidence * 100)}% confidence)
+          {aiSuggestion.note ? `: ${aiSuggestion.note}` : ""}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -44,7 +44,10 @@ impl OllamaEmbed {
 impl EmbedProvider for OllamaEmbed {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         let results = self.embed_batch(&[text.to_string()]).await?;
-        results.into_iter().next().ok_or_else(|| anyhow::anyhow!("Empty embedding response"))
+        results
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Empty embedding response"))
     }
 
     async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
@@ -64,7 +67,11 @@ impl EmbedProvider for OllamaEmbed {
             .json()
             .await?;
 
-        Ok(resp.embeddings.into_iter().map(|v| v.into_iter().map(|x| x as f32).collect()).collect())
+        Ok(resp
+            .embeddings
+            .into_iter()
+            .map(|v| v.into_iter().map(|x| x as f32).collect())
+            .collect())
     }
 
     fn dimensions(&self) -> u64 {
@@ -106,7 +113,10 @@ impl MistralEmbed {
 impl EmbedProvider for MistralEmbed {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         let results = self.embed_batch(&[text.to_string()]).await?;
-        results.into_iter().next().ok_or_else(|| anyhow::anyhow!("Empty embedding response"))
+        results
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Empty embedding response"))
     }
 
     async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {

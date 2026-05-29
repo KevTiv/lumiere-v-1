@@ -90,8 +90,7 @@ impl Config {
             ),
             stdb_module: std::env::var("STDB_MODULE")
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
-            stdb_token: std::env::var("STDB_TOKEN")
-                .context("STDB_TOKEN is required")?,
+            stdb_token: std::env::var("STDB_TOKEN").context("STDB_TOKEN is required")?,
             worker_poll_secs: std::env::var("WORKER_POLL_SECS")
                 .unwrap_or_else(|_| "10".to_string())
                 .parse()

@@ -475,6 +475,14 @@ export function AIChatPanel({
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  const handleUseAnswerInForm = (text: string) => {
+    window.dispatchEvent(
+      new CustomEvent("lumiere:ai-form-fill-prompt", {
+        detail: { text },
+      }),
+    )
+  }
+
   const handleClearHistory = () => {
     setMessages([])
   }
@@ -674,12 +682,22 @@ export function AIChatPanel({
                           <button
                             onClick={() => handleCopy(message.content, message.id)}
                             className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy answer"
                           >
                             {copiedId === message.id ? (
                               <Check className="h-2.5 w-2.5 text-success" />
                             ) : (
                               <Copy className="h-2.5 w-2.5" />
                             )}
+                          </button>
+                        )}
+                        {message.role === "assistant" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUseAnswerInForm(message.content)}
+                            className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Use in form
                           </button>
                         )}
                         {message.metadata?.tokens != null ? (

@@ -1,15 +1,18 @@
 "use client"
 
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useEffect, useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
-import type { FormConfig, FormField } from "../lib/form-types"
+import type { AiFormAssistConfig, FormConfig, FormField } from "../lib/form-types"
+import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Separator } from "../components/separator"
-import { Check, Loader2 } from "lucide-react"
+import { Textarea } from "../components/textarea"
+import { Check, Loader2, Sparkles } from "lucide-react"
 import * as Icons from "lucide-react"
 import { toast } from "sonner"
 
@@ -24,6 +27,8 @@ interface ModularFormProps {
   onValuesChange?: (values: Record<string, unknown>) => void
   /** External mutation in-flight (e.g. React Query) — disables actions and shows loading on submit. */
   isPending?: boolean
+  /** Enables advisory AI suggestions that only update local form state when the user applies them. */
+  aiAssist?: AiFormAssistConfig
 }
 
 export function ModularForm({
@@ -34,8 +39,10 @@ export function ModularForm({
   leadingActions,
   onValuesChange,
   isPending,
+  aiAssist,
 }: ModularFormProps) {
   const { t } = useTranslation()
+  const aiSuggest = useAiFormSuggest()
   // Initialize form state with default values
   const getInitialValues = useCallback(() => {
     const values: Record<string, unknown> = {}
@@ -68,7 +75,28 @@ export function ModularForm({
   const [values, setValues] = useState<Record<string, unknown>>(getInitialValues)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState(aiAssist?.initialPrompt ?? "")
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, { value: unknown; confidence: number; note?: string }>>({})
+  const [aiAppliedFields, setAiAppliedFields] = useState<Record<string, { confidence: number; note?: string }>>({})
+  const [aiValidationNotes, setAiValidationNotes] = useState<string[]>([])
   const busy = isSubmitting || !!isPending
+  const aiSchema = useMemo(() => serializeAiFormSchema(config), [config])
+  const aiEnabled = aiAssist?.enabled !== false && !!aiAssist?.companyId && !!aiAssist?.entityType
+
+  useEffect(() => {
+    if (!aiEnabled) return
+
+    const handleAiFormPrompt = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: unknown }>).detail
+      if (typeof detail?.text !== "string" || !detail.text.trim()) return
+      setAiPrompt(detail.text)
+      setAiPanelOpen(true)
+    }
+
+    window.addEventListener("lumiere:ai-form-fill-prompt", handleAiFormPrompt)
+    return () => window.removeEventListener("lumiere:ai-form-fill-prompt", handleAiFormPrompt)
+  }, [aiEnabled])
 
   const handleChange = (name: string, value: unknown) => {
     setValues((prev) => {
@@ -76,6 +104,13 @@ export function ModularForm({
       onValuesChange?.(next)
       return next
     })
+    if (aiAppliedFields[name]) {
+      setAiAppliedFields((prev) => {
+        const next = { ...prev }
+        delete next[name]
+        return next
+      })
+    }
     // Clear error when field is modified
     if (errors[name]) {
       setErrors((prev) => {
@@ -84,6 +119,70 @@ export function ModularForm({
         return next
       })
     }
+  }
+
+  const handleAiSuggest = async () => {
+    if (!aiEnabled || !aiAssist?.companyId || !aiAssist.entityType) {
+      toast.warning("AI form fill needs company context")
+      return
+    }
+
+    if (!aiPrompt.trim()) {
+      toast.warning("Add text for AI to use")
+      return
+    }
+
+    try {
+      const result = await aiSuggest.mutateAsync({
+        companyId: aiAssist.companyId,
+        formId: aiAssist.formId ?? config.id,
+        entityType: aiAssist.entityType,
+        fields: aiSchema,
+        rawText: aiPrompt,
+      })
+      setAiSuggestions(result.suggestions)
+      setAiValidationNotes(result.validation_notes.map((note) => note.message))
+      const count = Object.keys(result.suggestions).length
+      if (count === 0) {
+        toast.info("AI did not find matching fields")
+      } else {
+        toast.success(`AI suggested ${count} field${count === 1 ? "" : "s"}`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI form suggestion failed"
+      toast.error(message)
+    }
+  }
+
+  const handleApplyAiSuggestions = () => {
+    const entries = Object.entries(aiSuggestions)
+    if (entries.length === 0) {
+      toast.warning("No AI suggestions to apply")
+      return
+    }
+
+    const applied: Record<string, { confidence: number; note?: string }> = {}
+    setValues((prev) => {
+      const next = { ...prev }
+      for (const [fieldName, suggestion] of entries) {
+        next[fieldName] = suggestion.value
+        applied[fieldName] = {
+          confidence: suggestion.confidence,
+          note: suggestion.note,
+        }
+      }
+      onValuesChange?.(next)
+      return next
+    })
+    setAiAppliedFields(applied)
+    setErrors((prev) => {
+      const next = { ...prev }
+      for (const fieldName of Object.keys(applied)) {
+        delete next[fieldName]
+      }
+      return next
+    })
+    toast.success("AI suggestions applied for review")
   }
 
   const validateField = (field: FormField, value: unknown): string | null => {
@@ -192,6 +291,70 @@ export function ModularForm({
 
   const formContent = (
     <form noValidate onSubmit={handleSubmit} className="space-y-6">
+      {aiEnabled ? (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Fill with AI</p>
+              <p className="text-xs text-muted-foreground">
+                Suggestions only update this form after you apply them.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAiPanelOpen((open) => !open)}
+              disabled={busy}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {aiPanelOpen ? "Hide AI" : "Fill with AI"}
+            </Button>
+          </div>
+
+          {aiPanelOpen ? (
+            <div className="space-y-3">
+              <Textarea
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+                placeholder="Paste notes, an email, invoice text, or describe what this form should contain..."
+                rows={4}
+                className="bg-background"
+              />
+              {aiValidationNotes.length > 0 ? (
+                <div className="space-y-1">
+                  {aiValidationNotes.map((note, index) => (
+                    <p key={`${note}-${index}`} className="text-xs text-muted-foreground">
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAiSuggest}
+                  disabled={busy || aiSuggest.isPending}
+                >
+                  {aiSuggest.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Suggest values
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleApplyAiSuggestions}
+                  disabled={busy || Object.keys(aiSuggestions).length === 0}
+                >
+                  Apply suggestions
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {config.sections.map((section, idx) => {
         // Resolve optional section icon
         const SectionIcon = section.icon
@@ -229,6 +392,7 @@ export function ModularForm({
                     value={values[field.name]}
                     onChange={(value) => handleChange(field.name, value)}
                     error={errors[field.name]}
+                    aiSuggestion={aiAppliedFields[field.name]}
                   />
                 ))}
               </div>

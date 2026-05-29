@@ -104,12 +104,8 @@ impl DocumentParser for UnstructuredParser {
             req = req.header("unstructured-api-key", key);
         }
 
-        let elements: Vec<UnstructuredElement> = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        let elements: Vec<UnstructuredElement> =
+            req.send().await?.error_for_status()?.json().await?;
 
         let chunks = elements
             .into_iter()

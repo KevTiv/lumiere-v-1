@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "../components/dialog"
 import { cn } from "../lib/utils"
-import type { FormConfig } from "../lib/form-types"
+import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
 import { ModularForm } from "./modular-form"
 import * as Icons from "lucide-react"
 
@@ -46,6 +46,8 @@ interface FormModalProps {
   formLeadingActions?: React.ReactNode
   /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
+  aiAssist?: AiFormAssistConfig
 }
 
 export function FormModal({
@@ -60,6 +62,7 @@ export function FormModal({
   submitError,
   formLeadingActions,
   isPending,
+  aiAssist,
 }: FormModalProps) {
   const { t } = useTranslation()
 
@@ -136,6 +139,7 @@ export function FormModal({
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}
+            aiAssist={aiAssist}
           />
         </div>
       </DialogContent>

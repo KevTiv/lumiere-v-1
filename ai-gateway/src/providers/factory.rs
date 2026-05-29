@@ -23,24 +23,28 @@ pub struct Providers {
 pub fn build(config: &Config) -> Result<Providers> {
     let embedder: Arc<dyn EmbedProvider> = match config.context_embedding_provider.as_str() {
         "mistral" => {
-            let key = config
-                .mistral_api_key
-                .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("MISTRAL_API_KEY required when CONTEXT_EMBEDDING_PROVIDER=mistral"))?;
+            let key = config.mistral_api_key.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("MISTRAL_API_KEY required when CONTEXT_EMBEDDING_PROVIDER=mistral")
+            })?;
             Arc::new(MistralEmbed::new(key))
         }
-        _ => Arc::new(OllamaEmbed::new(&config.ollama_url, &config.ollama_embed_model)),
+        _ => Arc::new(OllamaEmbed::new(
+            &config.ollama_url,
+            &config.ollama_embed_model,
+        )),
     };
 
     let vision: Arc<dyn VisionProvider> = match config.vision_provider.as_str() {
         "mistral" => {
-            let key = config
-                .mistral_api_key
-                .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("MISTRAL_API_KEY required when VISION_PROVIDER=mistral"))?;
+            let key = config.mistral_api_key.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("MISTRAL_API_KEY required when VISION_PROVIDER=mistral")
+            })?;
             Arc::new(MistralVision::new(key))
         }
-        _ => Arc::new(OllamaVision::new(&config.ollama_url, &config.ollama_vision_model)),
+        _ => Arc::new(OllamaVision::new(
+            &config.ollama_url,
+            &config.ollama_vision_model,
+        )),
     };
 
     let parser: Arc<dyn DocumentParser> = match config.document_parser.as_str() {
@@ -58,5 +62,9 @@ pub fn build(config: &Config) -> Result<Providers> {
         "Context providers initialized"
     );
 
-    Ok(Providers { embedder, vision, parser })
+    Ok(Providers {
+        embedder,
+        vision,
+        parser,
+    })
 }
