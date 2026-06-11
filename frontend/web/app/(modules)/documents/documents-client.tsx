@@ -15,6 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
+import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useDocuments,
   useKnowledgeArticles,
@@ -37,10 +38,49 @@ import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@lumier
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import type { QueryRows } from "@/lib/query-fetch"
+import { useAiInsightsGenerate } from "@lumiere/query-hooks/hooks/ai-harness"
 
 type DocumentRowAction =
   | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
   | null
+
+const aiInsightsGenerateForm: FormConfig = {
+  id: "ai-generate-insights",
+  title: "Generate AI Insights",
+  description: "Ask the AI harness to generate insights for a resource scope.",
+  submitLabel: "Generate insights",
+  sections: [
+    {
+      id: "scope",
+      fields: [
+        {
+          id: "resource",
+          type: "text",
+          name: "resource",
+          label: "Resource",
+          defaultValue: "documents",
+          width: "1/2",
+        },
+        {
+          id: "force",
+          type: "switch",
+          name: "force",
+          label: "Force regeneration",
+          width: "1/2",
+        },
+        {
+          id: "scope-json",
+          type: "textarea",
+          name: "scopeJson",
+          label: "Scope JSON",
+          placeholder: "{\"limit\": 20}",
+          rows: 4,
+          width: "full",
+        },
+      ],
+    },
+  ],
+}
 
 function editDocumentForm(row: Record<string, unknown>): FormConfig {
   return {
@@ -172,6 +212,9 @@ function DocumentsClientLoaded({
   const [completeSubmitError, setCompleteSubmitError] = useState<string | null>(null)
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
+  const [generateInsightsOpen, setGenerateInsightsOpen] = useState(false)
+  const [generateInsightsError, setGenerateInsightsError] = useState<string | null>(null)
+  const [generateInsightsResult, setGenerateInsightsResult] = useState<Record<string, unknown> | null>(null)
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
@@ -189,6 +232,7 @@ function DocumentsClientLoaded({
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
+  const aiInsightsGenerate = useAiInsightsGenerate()
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -441,6 +485,14 @@ function DocumentsClientLoaded({
                     setAckModalRows(eligible)
                   },
                 },
+                {
+                  id: "generate-insights",
+                  label: "Generate insights",
+                  onClick: (_rows) => {
+                    setGenerateInsightsError(null)
+                    setGenerateInsightsOpen(true)
+                  },
+                },
               ],
               true,
             ),
@@ -458,6 +510,7 @@ function DocumentsClientLoaded({
       lockDocument,
       recordDocumentView,
       unlockDocument,
+      aiInsightsGenerate,
     ],
   )
 
@@ -524,6 +577,7 @@ function DocumentsClientLoaded({
     completeProcessingJob.isPending ||
     approveProcessingJob.isPending ||
     acknowledgeInsight.isPending ||
+    aiInsightsGenerate.isPending ||
     csvImports.importKnowledgeCategory.isPending ||
     csvImports.importKnowledgeArticle.isPending
 
@@ -545,6 +599,15 @@ function DocumentsClientLoaded({
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
+      {generateInsightsResult ? (
+        <div className="mb-4">
+          <AiResultPanel
+            title="Generated AI insights"
+            result={generateInsightsResult}
+            onDismiss={() => setGenerateInsightsResult(null)}
+          />
+        </div>
+      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -588,6 +651,41 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
+      <FormModal
+        open={generateInsightsOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setGenerateInsightsOpen(false)
+            setGenerateInsightsError(null)
+          }
+        }}
+        config={aiInsightsGenerateForm}
+        isPending={isFormMutationPending}
+        closeOnSubmit={false}
+        submitError={generateInsightsError}
+        onSubmit={async (formData) => {
+          setGenerateInsightsError(null)
+          try {
+            const scopeRaw =
+              typeof formData.scopeJson === "string" ? formData.scopeJson.trim() : ""
+            const scope =
+              scopeRaw !== "" ? (JSON.parse(scopeRaw) as Record<string, unknown>) : undefined
+            const result = await aiInsightsGenerate.mutateAsync({
+              companyId: Number(companyId),
+              resource:
+                formData.resource != null && String(formData.resource).trim() !== ""
+                  ? String(formData.resource).trim()
+                  : undefined,
+              scope,
+              force: Boolean(formData.force),
+            })
+            setGenerateInsightsResult(result)
+            setGenerateInsightsOpen(false)
+          } catch (e) {
+            setGenerateInsightsError(e instanceof Error ? e.message : String(e))
+          }
+        }}
+      />
       {documentRowAction ? (
         <FormModal
           open

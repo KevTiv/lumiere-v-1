@@ -183,6 +183,8 @@ import {
   iotDevicesTableConfig,
   iotActionsTableConfig,
   iotTelemetryTableConfig,
+  iotAlertsTableConfig,
+  iotThresholdsTableConfig,
   newIotHubForm,
   newIotDeviceForm,
 } from "@lumiere/ui"
@@ -1865,10 +1867,22 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
       entityConfig: iotActionsTableConfig(t),
     },
     {
+      id: "iot-alerts",
+      label: "Alerts",
+      type: "entity",
+      entityConfig: iotAlertsTableConfig(t),
+    },
+    {
       id: "iot-telemetry",
       label: t("iot.tabs.telemetry"),
       type: "entity",
       entityConfig: iotTelemetryTableConfig(t),
+    },
+    {
+      id: "iot-thresholds",
+      label: "Thresholds",
+      type: "entity",
+      entityConfig: iotThresholdsTableConfig(t),
     },
   ],
 })

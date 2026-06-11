@@ -30,6 +30,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
+import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useFinancialReports,
   useTrialBalances,
@@ -84,6 +85,7 @@ import {
   Plus,
   Grid3X3,
 } from "lucide-react"
+import { useAiReportExplain } from "@lumiere/query-hooks/hooks/ai-harness"
 
 interface ReportsClientProps {
   initialReports?: Record<string, unknown>[]
@@ -96,6 +98,52 @@ interface ReportsClientProps {
 
 type ReportsClientLoadedProps = Omit<ReportsClientProps, "organizationId"> & {
   organizationId: number
+}
+
+type ReportExplainState = {
+  row: Record<string, unknown>
+  form: FormConfig
+} | null
+
+function reportExplainForm(row: Record<string, unknown>): FormConfig {
+  return {
+    id: "ai-report-explain",
+    title: "Explain Report",
+    description: "Ask AI to explain the selected report or answer a finance question about it.",
+    submitLabel: "Explain report",
+    sections: [
+      {
+        id: "report",
+        fields: [
+          {
+            id: "report-type",
+            type: "text",
+            name: "reportType",
+            label: "Report type",
+            required: true,
+            defaultValue: String(row.reportType ?? row.type ?? "financial_report"),
+            width: "1/2",
+          },
+          {
+            id: "comparison-report-id",
+            type: "number",
+            name: "comparisonReportId",
+            label: "Comparison report ID",
+            width: "1/2",
+          },
+          {
+            id: "question",
+            type: "textarea",
+            name: "question",
+            label: "Question",
+            defaultValue: "Explain the key movements, risks, and follow-up actions.",
+            rows: 4,
+            width: "full",
+          },
+        ],
+      },
+    ],
+  }
 }
 
 export function ReportsClient(props: ReportsClientProps) {
@@ -116,7 +164,7 @@ function ReportsClientLoaded({
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
-  const { orgId } = orgBigInts(organizationId)
+  const { orgId, companyId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -137,6 +185,9 @@ function ReportsClientLoaded({
   const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null)
   const [shareDashboardOpen, setShareDashboardOpen] = useState(false)
   const [shareDashboardId, setShareDashboardId] = useState<string | null>(null)
+  const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
+  const [reportExplainError, setReportExplainError] = useState<string | null>(null)
+  const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
@@ -176,6 +227,7 @@ function ReportsClientLoaded({
   const addWidgetToDashboard = useAddWidgetToDashboard(orgId)
   const updateWidgetLayout = useUpdateWidgetLayout(orgId)
   const shareDashboard = useShareDashboard(orgId)
+  const aiReportExplain = useAiReportExplain()
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -318,6 +370,18 @@ function ReportsClientLoaded({
               if (!first?.id) return
               setEditReportId(String(first.id))
               setEditReportOpen(true)
+            },
+          },
+          {
+            id: "ai-explain",
+            label: "AI Explain",
+            icon: FileText,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setReportExplainError(null)
+              setReportExplain({ row: first, form: reportExplainForm(first) })
             },
           },
         ],
@@ -613,6 +677,7 @@ function ReportsClientLoaded({
     addWidgetToDashboard.isPending ||
     updateWidgetLayout.isPending ||
     shareDashboard.isPending ||
+    aiReportExplain.isPending ||
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
@@ -630,6 +695,15 @@ function ReportsClientLoaded({
           }
         }}
       />
+      {reportExplainResult ? (
+        <div className="mt-4">
+          <AiResultPanel
+            title="AI report explanation"
+            result={reportExplainResult}
+            onDismiss={() => setReportExplainResult(null)}
+          />
+        </div>
+      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -642,6 +716,46 @@ function ReportsClientLoaded({
           }
         }}
       />
+      {reportExplain ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setReportExplain(null)
+              setReportExplainError(null)
+            }
+          }}
+          config={reportExplain.form}
+          isPending={isFormMutationPending}
+          closeOnSubmit={false}
+          submitError={reportExplainError}
+          onSubmit={async (formData) => {
+            setReportExplainError(null)
+            try {
+              const reportIdRaw = reportExplain.row.id
+              const comparisonRaw = formData.comparisonReportId
+              const result = await aiReportExplain.mutateAsync({
+                companyId: Number(companyId),
+                report_type: String(formData.reportType ?? "financial_report"),
+                report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
+                comparison_report_id:
+                  comparisonRaw != null && String(comparisonRaw).trim() !== ""
+                    ? Number(comparisonRaw)
+                    : undefined,
+                report_payload: reportExplain.row,
+                question:
+                  formData.question != null && String(formData.question).trim() !== ""
+                    ? String(formData.question)
+                    : undefined,
+              })
+              setReportExplainResult(result)
+              setReportExplain(null)
+            } catch (e) {
+              setReportExplainError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
       <FormModal
         open={editTemplateOpen}
         onOpenChange={(open) => {

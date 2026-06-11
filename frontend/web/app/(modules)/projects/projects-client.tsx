@@ -76,6 +76,123 @@ type ModalState =
   | { type: 'edit'; form: FormConfig; action: string; entityId: string | number }
   | { type: 'timesheet'; form: FormConfig; action: string }
 
+type LifecycleModalState =
+  | { type: null }
+  | { type: "taskState"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "taskParent"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "assignUsers"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "billTimesheets"; rows: Record<string, unknown>[]; form: FormConfig }
+
+type ProjectToolbarAction = {
+  id: string
+  label: string
+  requiresSelection?: boolean
+  variant?: "default" | "destructive"
+  onClick: (rows: Record<string, unknown>[]) => void
+}
+
+const taskStateForm: FormConfig = {
+  id: "projects-update-task-state",
+  title: "Update Task State",
+  submitLabel: "Update state",
+  sections: [
+    {
+      id: "state",
+      fields: [
+        {
+          id: "state",
+          type: "select",
+          name: "state",
+          label: "State",
+          required: true,
+          width: "full",
+          options: [
+            { value: "normal", label: "Normal" },
+            { value: "blocked", label: "Blocked" },
+            { value: "done", label: "Done" },
+            { value: "cancelled", label: "Cancelled" },
+          ],
+        },
+      ],
+    },
+  ],
+}
+
+const assignUsersForm: FormConfig = {
+  id: "projects-assign-task-users",
+  title: "Assign Task Users",
+  submitLabel: "Assign users",
+  sections: [
+    {
+      id: "users",
+      fields: [
+        {
+          id: "user-ids",
+          type: "textarea",
+          name: "userIds",
+          label: "User IDs, one per line",
+          required: true,
+          rows: 4,
+          width: "full",
+        },
+      ],
+    },
+  ],
+}
+
+const billTimesheetsForm: FormConfig = {
+  id: "projects-bill-timesheets",
+  title: "Bill Timesheets",
+  submitLabel: "Bill timesheets",
+  sections: [
+    {
+      id: "billing",
+      fields: [
+        { id: "journal", type: "number", name: "journalId", label: "Journal ID", required: true, width: "1/3" },
+        { id: "income-account", type: "number", name: "incomeAccountId", label: "Income account ID", required: true, width: "1/3" },
+        { id: "partner", type: "number", name: "partnerId", label: "Partner ID", required: true, width: "1/3" },
+        { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", width: "1/2" },
+      ],
+    },
+  ],
+}
+
+function taskParentForm(taskOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig {
+  return {
+    id: "projects-set-task-parent",
+    title: "Set Task Parent",
+    submitLabel: "Set parent",
+    sections: [
+      {
+        id: "parent",
+        fields: [
+          {
+            id: "parent-id",
+            type: "select",
+            name: "parentId",
+            label: "Parent task",
+            width: "full",
+            options: taskOptions,
+          },
+        ],
+      },
+    ],
+  }
+}
+
+function selectedIds(rows: Record<string, unknown>[]): Array<string | number | bigint> {
+  return rows
+    .map((row) => row.id as string | number | bigint | undefined)
+    .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "")
+}
+
+function idLines(value: unknown): Array<string | number | bigint> {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 export function ProjectsClient(props: ProjectsClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -94,6 +211,8 @@ function ProjectsClientLoaded({
   const { t } = useTranslation()
   const { orgId, companyId } = orgBigInts(organizationId)
   const [modal, setModal] = useState<ModalState>({ type: null })
+  const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
 
@@ -129,7 +248,7 @@ function ProjectsClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{ id: string; label: string; onClick: () => void }>,
+    actions: ProjectToolbarAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -183,6 +302,11 @@ function ProjectsClientLoaded({
     if (fromPairs.length > 0) return [optional, ...fromPairs]
     return [{ value: "", label: t("common.lookup.noTaskStages"), disabled: true }]
   }, [tasks, projects, t])
+
+  const taskParentFormConfig = useMemo(
+    () => taskParentForm(taskFieldOptions),
+    [taskFieldOptions],
+  )
 
   const projectFormConfig = useMemo(
     () =>
@@ -264,6 +388,17 @@ function ProjectsClientLoaded({
       })
     }
   }, [buildEditProjectForm, buildEditTaskForm])
+
+  const runForSelectedIds = useCallback(
+    async (
+      rows: Record<string, unknown>[],
+      action: (id: string | number | bigint) => Promise<unknown>,
+    ) => {
+      const ids = selectedIds(rows)
+      await Promise.all(ids.map((id) => action(id)))
+    },
+    [],
+  )
 
   // Live KPI overrides
   const liveSections = useMemo(() => {
@@ -382,6 +517,30 @@ function ProjectsClientLoaded({
                   label: t("projects.toolbar.importProjectCsv"),
                   onClick: () => setCsvKind("project"),
                 },
+                {
+                  id: "toggle-favorite",
+                  label: "Toggle favorite",
+                  requiresSelection: true,
+                  onClick: (rows) => void runForSelectedIds(rows, (id) => toggleFavorite.mutateAsync(id)),
+                },
+                {
+                  id: "activate-project",
+                  label: "Activate",
+                  requiresSelection: true,
+                  onClick: (rows) =>
+                    void runForSelectedIds(rows, (id) =>
+                      setProjectActive.mutateAsync({ projectId: id, active: true }),
+                    ),
+                },
+                {
+                  id: "archive-project",
+                  label: "Archive",
+                  requiresSelection: true,
+                  onClick: (rows) =>
+                    void runForSelectedIds(rows, (id) =>
+                      setProjectActive.mutateAsync({ projectId: id, active: false }),
+                    ),
+                },
               ]),
             }
           }
@@ -394,6 +553,33 @@ function ProjectsClientLoaded({
                   id: "csv-task",
                   label: t("projects.toolbar.importTaskCsv"),
                   onClick: () => setCsvKind("task"),
+                },
+                {
+                  id: "task-state",
+                  label: "Update state",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setLifecycleError(null)
+                    setLifecycleModal({ type: "taskState", rows, form: taskStateForm })
+                  },
+                },
+                {
+                  id: "task-parent",
+                  label: "Set parent",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setLifecycleError(null)
+                    setLifecycleModal({ type: "taskParent", rows, form: taskParentFormConfig })
+                  },
+                },
+                {
+                  id: "assign-users",
+                  label: "Assign users",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setLifecycleError(null)
+                    setLifecycleModal({ type: "assignUsers", rows, form: assignUsersForm })
+                  },
                 },
               ]),
             }
@@ -408,13 +594,52 @@ function ProjectsClientLoaded({
                   label: t("projects.toolbar.importTimesheetCsv"),
                   onClick: () => setCsvKind("timesheet"),
                 },
+                {
+                  id: "stop-timer",
+                  label: "Stop timer",
+                  requiresSelection: true,
+                  onClick: (rows) => void runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
+                },
+                {
+                  id: "validate-timesheets",
+                  label: "Validate",
+                  requiresSelection: true,
+                  onClick: (rows) =>
+                    void validateTimesheets.mutateAsync({
+                      companyId,
+                      timesheetIds: selectedIds(rows),
+                    }),
+                },
+                {
+                  id: "bill-timesheets",
+                  label: "Bill",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setLifecycleError(null)
+                    setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsForm })
+                  },
+                },
               ]),
             }
           }
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, projectFormConfig, taskFormConfig, timesheetFormConfig, t],
+    [
+      moduleConfig,
+      liveSections,
+      projectFormConfig,
+      taskFormConfig,
+      timesheetFormConfig,
+      t,
+      runForSelectedIds,
+      toggleFavorite,
+      setProjectActive,
+      taskParentFormConfig,
+      stopTimer,
+      validateTimesheets,
+      companyId,
+    ],
   )
 
   const data = useMemo(
@@ -500,6 +725,78 @@ function ProjectsClientLoaded({
           setModal({ type: null })
         }}
       />
+      {lifecycleModal.type !== null ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setLifecycleModal({ type: null })
+              setLifecycleError(null)
+            }
+          }}
+          config={lifecycleModal.form}
+          isPending={isFormMutationPending}
+          closeOnSubmit={false}
+          submitError={lifecycleError}
+          onSubmit={async (formData) => {
+            setLifecycleError(null)
+            try {
+              const ids = selectedIds(lifecycleModal.rows)
+              if (lifecycleModal.type === "taskState") {
+                await Promise.all(
+                  ids.map((taskId) =>
+                    updateTaskState.mutateAsync({
+                      taskId,
+                      state: formData.state,
+                    }),
+                  ),
+                )
+              } else if (lifecycleModal.type === "taskParent") {
+                const parentRaw = formData.parentId
+                const parentId =
+                  parentRaw != null && String(parentRaw).trim() !== ""
+                    ? (parentRaw as string | number | bigint)
+                    : null
+                await Promise.all(
+                  ids.map((taskId) =>
+                    setTaskParent.mutateAsync({
+                      taskId,
+                      parentId,
+                    }),
+                  ),
+                )
+              } else if (lifecycleModal.type === "assignUsers") {
+                const userIds = idLines(formData.userIds)
+                if (userIds.length === 0) throw new Error("At least one user ID is required")
+                await Promise.all(
+                  ids.map((taskId) =>
+                    assignTaskUsers.mutateAsync({
+                      taskId,
+                      userIds,
+                    }),
+                  ),
+                )
+              } else if (lifecycleModal.type === "billTimesheets") {
+                if (ids.length === 0) throw new Error("Select at least one timesheet")
+                await billTimesheets.mutateAsync({
+                  companyId,
+                  timesheetIds: ids,
+                  journalId: formData.journalId as string | number,
+                  incomeAccountId: formData.incomeAccountId as string | number,
+                  partnerId: formData.partnerId as string | number,
+                  invoiceDate:
+                    formData.invoiceDate != null && String(formData.invoiceDate).trim() !== ""
+                      ? (formData.invoiceDate as string | number | Date)
+                      : null,
+                })
+              }
+              setLifecycleModal({ type: null })
+            } catch (e) {
+              setLifecycleError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
       {csvKind && csvFormConfig ? (
         <FormModal
           key={csvKind}

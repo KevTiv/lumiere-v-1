@@ -23,7 +23,9 @@ import {
   useIotDevices,
   useIotHubs,
   useIotPairingTokens,
+  useIotAlerts,
   useIotTelemetry,
+  useIotThresholds,
   useGenerateHubPairingToken,
   useRegisterIotHub,
   useRegisterIotDevice,
@@ -36,7 +38,15 @@ import {
   useSyncHubDevices,
   useUpdateDeviceStatus,
   useRecordTelemetry,
+  useRecordTelemetryBatch,
   useMarkActionSent,
+  useCreateIotAction,
+  useAcknowledgeIotAction,
+  useFailIotAction,
+  useRetryIotAction,
+  useCreateIotAlert,
+  useResolveIotAlert,
+  useSetIotThreshold,
   useClaimHubWithToken,
   useTestIotDevice,
 } from "@lumiere/query-hooks/hooks/iot"
@@ -47,6 +57,8 @@ interface IotClientProps {
   initialPairingTokens?: QueryRows
   initialActions?: QueryRows
   initialTelemetry?: QueryRows
+  initialAlerts?: QueryRows
+  initialThresholds?: QueryRows
   organizationId?: number
 }
 
@@ -79,6 +91,116 @@ function withTableToolbar(ec: EntityViewConfig, actions: EntityAction[]): Entity
   }
 }
 
+type IotModalState =
+  | { type: null }
+  | { type: "createAction"; form: FormConfig; rows: Record<string, unknown>[] }
+  | { type: "failAction"; form: FormConfig; rows: Record<string, unknown>[] }
+  | { type: "createAlert"; form: FormConfig; rows: Record<string, unknown>[] }
+  | { type: "setThreshold"; form: FormConfig; rows: Record<string, unknown>[] }
+  | { type: "telemetryBatch"; form: FormConfig; rows: Record<string, unknown>[] }
+
+const createActionForm: FormConfig = {
+  id: "iot-create-action",
+  title: "Create IoT Action",
+  submitLabel: "Create action",
+  sections: [
+    {
+      id: "action",
+      fields: [
+        { id: "action-type", type: "text", name: "action_type", label: "Action type", required: true, width: "1/2" },
+        { id: "triggered-by", type: "text", name: "triggered_by", label: "Triggered by", defaultValue: "web", width: "1/2" },
+        { id: "payload", type: "textarea", name: "payload", label: "Payload JSON/string", required: true, rows: 4, width: "full" },
+      ],
+    },
+  ],
+}
+
+const failActionForm: FormConfig = {
+  id: "iot-fail-action",
+  title: "Fail IoT Action",
+  submitLabel: "Mark failed",
+  sections: [
+    {
+      id: "failure",
+      fields: [
+        { id: "reason", type: "textarea", name: "reason", label: "Reason", rows: 3, width: "full" },
+      ],
+    },
+  ],
+}
+
+const createAlertForm: FormConfig = {
+  id: "iot-create-alert",
+  title: "Create IoT Alert",
+  submitLabel: "Create alert",
+  sections: [
+    {
+      id: "alert",
+      fields: [
+        { id: "type", type: "text", name: "alert_type", label: "Alert type", required: true, width: "1/2" },
+        { id: "severity", type: "text", name: "severity", label: "Severity", defaultValue: "warning", width: "1/2" },
+        { id: "message", type: "textarea", name: "message", label: "Message", required: true, rows: 3, width: "full" },
+      ],
+    },
+  ],
+}
+
+const setThresholdForm: FormConfig = {
+  id: "iot-set-threshold",
+  title: "Set IoT Threshold",
+  submitLabel: "Save threshold",
+  sections: [
+    {
+      id: "threshold",
+      fields: [
+        { id: "sensor", type: "text", name: "sensor_type", label: "Sensor type", required: true, width: "1/2" },
+        { id: "severity", type: "text", name: "severity", label: "Severity", defaultValue: "warning", width: "1/2" },
+        { id: "min", type: "number", name: "min_value", label: "Min value", width: "1/2" },
+        { id: "max", type: "number", name: "max_value", label: "Max value", width: "1/2" },
+      ],
+    },
+  ],
+}
+
+const telemetryBatchForm: FormConfig = {
+  id: "iot-record-telemetry-batch",
+  title: "Record Telemetry Batch",
+  description: "Provide an array of telemetry readings with sensor_type, value, unit, and quality.",
+  submitLabel: "Record batch",
+  sections: [
+    {
+      id: "readings",
+      fields: [
+        { id: "readings-json", type: "textarea", name: "readingsJson", label: "Readings JSON", required: true, rows: 8, width: "full" },
+      ],
+    },
+  ],
+}
+
+function selectedIds(rows: Record<string, unknown>[]): Array<string | number | bigint> {
+  return rows
+    .map((row) => row.id as string | number | bigint | undefined)
+    .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "")
+}
+
+function parseTelemetryReadings(value: unknown) {
+  const parsed = JSON.parse(String(value ?? "")) as unknown
+  if (!Array.isArray(parsed)) throw new Error("Readings JSON must be an array")
+  return parsed.map((entry) => {
+    if (!entry || typeof entry !== "object") throw new Error("Each reading must be an object")
+    const row = entry as Record<string, unknown>
+    const value = Number(row.value)
+    if (!Number.isFinite(value)) throw new Error("Each reading needs a numeric value")
+    return {
+      sensor_type: String(row.sensor_type ?? row.sensorType ?? ""),
+      value,
+      raw_value: row.raw_value != null ? String(row.raw_value) : row.rawValue != null ? String(row.rawValue) : null,
+      unit: String(row.unit ?? ""),
+      quality: String(row.quality ?? "good"),
+    }
+  })
+}
+
 export function IotClient(props: IotClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -92,6 +214,8 @@ function IotClientLoaded({
   initialPairingTokens,
   initialActions,
   initialTelemetry,
+  initialAlerts,
+  initialThresholds,
   organizationId,
 }: Loaded) {
   const { t } = useTranslation()
@@ -103,6 +227,8 @@ function IotClientLoaded({
   const { data: pairingTokens = [] } = useIotPairingTokens(orgId, initialPairingTokens)
   const { data: actions = [] } = useIotActions(orgId, initialActions)
   const { data: telemetry = [] } = useIotTelemetry(orgId, initialTelemetry)
+  const { data: alerts = [] } = useIotAlerts(orgId, initialAlerts)
+  const { data: thresholds = [] } = useIotThresholds(orgId, initialThresholds)
   const { data: locations = [] } = useStockLocations(orgId)
 
   const genPairing = useGenerateHubPairingToken(orgId)
@@ -117,7 +243,15 @@ function IotClientLoaded({
   const syncDevices = useSyncHubDevices(orgId)
   const setDeviceStatus = useUpdateDeviceStatus(orgId)
   const recordTelemetry = useRecordTelemetry(orgId)
+  const recordTelemetryBatch = useRecordTelemetryBatch(orgId)
   const markSent = useMarkActionSent(orgId)
+  const createAction = useCreateIotAction(orgId)
+  const acknowledgeAction = useAcknowledgeIotAction(orgId)
+  const failAction = useFailIotAction(orgId)
+  const retryAction = useRetryIotAction(orgId)
+  const createAlert = useCreateIotAlert(orgId)
+  const resolveAlert = useResolveIotAlert(orgId)
+  const setThreshold = useSetIotThreshold(orgId)
   const claimHub = useClaimHubWithToken(orgId)
   const testDevice = useTestIotDevice(orgId)
 
@@ -129,6 +263,8 @@ function IotClientLoaded({
   const [dashFormError, setDashFormError] = useState<string | null>(null)
   const [deviceRow, setDeviceRow] = useState<Record<string, unknown> | null>(null)
   const [rowSubmitError, setRowSubmitError] = useState<string | null>(null)
+  const [iotModal, setIotModal] = useState<IotModalState>({ type: null })
+  const [iotModalError, setIotModalError] = useState<string | null>(null)
 
   const locationOptions = useMemo(() => {
     return [...locations]
@@ -259,10 +395,44 @@ function IotClientLoaded({
         if (tab.id === "iot-devices" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
           return {
             ...tab,
-            entityConfig: {
-              ...tab.entityConfig,
-              view: { ...tab.entityConfig.view, rowSelectionToggleOnClick: false },
-            },
+            entityConfig: withTableToolbar(tab.entityConfig, [
+              {
+                id: "device-action",
+                label: "Create action",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setIotModalError(null)
+                  setIotModal({ type: "createAction", form: createActionForm, rows })
+                },
+              },
+              {
+                id: "device-alert",
+                label: "Create alert",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setIotModalError(null)
+                  setIotModal({ type: "createAlert", form: createAlertForm, rows })
+                },
+              },
+              {
+                id: "device-threshold",
+                label: "Set threshold",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setIotModalError(null)
+                  setIotModal({ type: "setThreshold", form: setThresholdForm, rows })
+                },
+              },
+              {
+                id: "telemetry-batch",
+                label: "Record batch",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setIotModalError(null)
+                  setIotModal({ type: "telemetryBatch", form: telemetryBatchForm, rows })
+                },
+              },
+            ]),
           }
         }
         if (tab.id === "iot-hubs" && tab.entityConfig) {
@@ -343,13 +513,82 @@ function IotClientLoaded({
                   })
                 },
               },
+              {
+                id: "ack-action",
+                label: "Acknowledge",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setToolbarError(null)
+                  void Promise.all(
+                    selectedIds(rows).map((actionId) => acknowledgeAction.mutateAsync(actionId)),
+                  ).then(
+                    () => setBanner({ kind: "ok", text: "IoT action acknowledged" }),
+                    (e) => setToolbarError(e instanceof Error ? e.message : String(e)),
+                  )
+                },
+              },
+              {
+                id: "retry-action",
+                label: "Retry",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setToolbarError(null)
+                  void Promise.all(
+                    selectedIds(rows).map((actionId) => retryAction.mutateAsync(actionId)),
+                  ).then(
+                    () => setBanner({ kind: "ok", text: "IoT action retry queued" }),
+                    (e) => setToolbarError(e instanceof Error ? e.message : String(e)),
+                  )
+                },
+              },
+              {
+                id: "fail-action",
+                label: "Fail",
+                requiresSelection: true,
+                variant: "destructive",
+                onClick: (rows) => {
+                  setIotModalError(null)
+                  setIotModal({ type: "failAction", form: failActionForm, rows })
+                },
+              },
+            ]),
+          }
+        }
+        if (tab.id === "iot-alerts" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: withTableToolbar(tab.entityConfig, [
+              {
+                id: "resolve-alert",
+                label: "Resolve",
+                requiresSelection: true,
+                onClick: (rows) => {
+                  setToolbarError(null)
+                  void Promise.all(
+                    selectedIds(rows).map((alertId) => resolveAlert.mutateAsync(alertId)),
+                  ).then(
+                    () => setBanner({ kind: "ok", text: "IoT alert resolved" }),
+                    (e) => setToolbarError(e instanceof Error ? e.message : String(e)),
+                  )
+                },
+              },
             ]),
           }
         }
         return tab
       }),
     }),
-    [moduleConfigBase, liveSections, t, hubHeartbeat, deleteHub, markSent],
+    [
+      moduleConfigBase,
+      liveSections,
+      t,
+      hubHeartbeat,
+      deleteHub,
+      markSent,
+      acknowledgeAction,
+      retryAction,
+      resolveAlert,
+    ],
   )
 
   const data = useMemo(
@@ -359,8 +598,10 @@ function IotClientLoaded({
       "iot-devices": devices as Record<string, unknown>[],
       "iot-actions": actions as Record<string, unknown>[],
       "iot-telemetry": telemetry as Record<string, unknown>[],
+      "iot-alerts": alerts as Record<string, unknown>[],
+      "iot-thresholds": thresholds as Record<string, unknown>[],
     }),
-    [pairingTokens, hubs, devices, actions, telemetry],
+    [pairingTokens, hubs, devices, actions, telemetry, alerts, thresholds],
   )
 
   const handleFormSubmit = async (_tabId: string, action: string, formData: Record<string, unknown>) => {
@@ -435,6 +676,101 @@ function IotClientLoaded({
     setDeviceRow(null)
   }
 
+  const handleIotModalSubmit = async (formData: Record<string, unknown>) => {
+    if (iotModal.type === null) return
+    setIotModalError(null)
+    try {
+      const ids = selectedIds(iotModal.rows)
+      if (ids.length === 0) throw new Error("Select at least one row")
+      if (iotModal.type === "createAction") {
+        await Promise.all(
+          ids.map((deviceId) =>
+            createAction.mutateAsync({
+              deviceId,
+              action_type: String(formData.action_type ?? ""),
+              payload: String(formData.payload ?? ""),
+              triggered_by: String(formData.triggered_by ?? "web"),
+            }),
+          ),
+        )
+        setBanner({ kind: "ok", text: "IoT action created" })
+      } else if (iotModal.type === "failAction") {
+        await Promise.all(
+          ids.map((actionId) =>
+            failAction.mutateAsync({
+              actionId,
+              reason: formData.reason ? String(formData.reason) : null,
+            }),
+          ),
+        )
+        setBanner({ kind: "ok", text: "IoT action failed" })
+      } else if (iotModal.type === "createAlert") {
+        await Promise.all(
+          ids.map((deviceId) =>
+            createAlert.mutateAsync({
+              deviceId,
+              alert_type: String(formData.alert_type ?? ""),
+              severity: String(formData.severity ?? "warning"),
+              message: String(formData.message ?? ""),
+            }),
+          ),
+        )
+        setBanner({ kind: "ok", text: "IoT alert created" })
+      } else if (iotModal.type === "setThreshold") {
+        const minRaw = formData.min_value
+        const maxRaw = formData.max_value
+        await Promise.all(
+          ids.map((deviceId) =>
+            setThreshold.mutateAsync({
+              deviceId,
+              sensor_type: String(formData.sensor_type ?? ""),
+              min_value:
+                minRaw != null && String(minRaw).trim() !== "" ? Number(minRaw) : null,
+              max_value:
+                maxRaw != null && String(maxRaw).trim() !== "" ? Number(maxRaw) : null,
+              severity: String(formData.severity ?? "warning"),
+            }),
+          ),
+        )
+        setBanner({ kind: "ok", text: "IoT threshold saved" })
+      } else if (iotModal.type === "telemetryBatch") {
+        const readings = parseTelemetryReadings(formData.readingsJson)
+        await Promise.all(
+          ids.map((deviceId) => recordTelemetryBatch.mutateAsync({ deviceId, readings })),
+        )
+        setBanner({ kind: "ok", text: "IoT telemetry batch recorded" })
+      }
+      setIotModal({ type: null })
+    } catch (e) {
+      setIotModalError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const isIotMutationPending =
+    genPairing.isPending ||
+    registerHub.isPending ||
+    registerDevice.isPending ||
+    deleteHub.isPending ||
+    deleteDevice.isPending ||
+    linkLoc.isPending ||
+    linkPos.isPending ||
+    unlink.isPending ||
+    hubHeartbeat.isPending ||
+    syncDevices.isPending ||
+    setDeviceStatus.isPending ||
+    recordTelemetry.isPending ||
+    recordTelemetryBatch.isPending ||
+    markSent.isPending ||
+    createAction.isPending ||
+    acknowledgeAction.isPending ||
+    failAction.isPending ||
+    retryAction.isPending ||
+    createAlert.isPending ||
+    resolveAlert.isPending ||
+    setThreshold.isPending ||
+    claimHub.isPending ||
+    testDevice.isPending
+
   return (
     <>
       {banner && (
@@ -460,6 +796,7 @@ function IotClientLoaded({
         onRowClick={(tabId, row) => {
           if (tabId === "iot-devices") setDeviceRow(row)
         }}
+        isPending={isIotMutationPending}
       />
       <FormModal
         open={dashForm !== null}
@@ -470,6 +807,7 @@ function IotClientLoaded({
           }
         }}
         config={dashForm?.form ?? newIotHubForm(t)}
+        isPending={isIotMutationPending}
         submitError={dashFormError}
         onSubmit={async (formData) => {
           setDashFormError(null)
@@ -487,6 +825,7 @@ function IotClientLoaded({
         open={claimOpen}
         onOpenChange={setClaimOpen}
         config={claimIotHubForm(t)}
+        isPending={isIotMutationPending}
         onSubmit={async (fd) => {
           await claimHub.mutateAsync({
             token: String(fd.token ?? "").trim(),
@@ -502,6 +841,7 @@ function IotClientLoaded({
         open={syncOpen}
         onOpenChange={setSyncOpen}
         config={syncIotHubDevicesForm(t)}
+        isPending={isIotMutationPending}
         closeOnSubmit={false}
         onSubmit={async (fd) => {
           const hid = Number(fd.hub_id)
@@ -541,7 +881,24 @@ function IotClientLoaded({
           config={deviceRowFormConfig}
           closeOnSubmit={false}
           submitError={rowSubmitError}
+          isPending={isIotMutationPending}
           onSubmit={handleDeviceRowSubmit}
+        />
+      ) : null}
+      {iotModal.type !== null ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setIotModal({ type: null })
+              setIotModalError(null)
+            }
+          }}
+          config={iotModal.form}
+          isPending={isIotMutationPending}
+          closeOnSubmit={false}
+          submitError={iotModalError}
+          onSubmit={handleIotModalSubmit}
         />
       ) : null}
     </>
