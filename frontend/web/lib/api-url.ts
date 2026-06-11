@@ -1,27 +1,31 @@
 /**
- * Optional direct browser → Rust `api-server` (skips Next.js route handlers).
+ * Browser API URL resolver.
  *
- * When `NEXT_PUBLIC_API_GATEWAY_URL` is set (e.g. `http://localhost:8082`), relative
- * requests under the prefixes below go to `{base}/v1/...` from the browser.
+ * Default production/local layout is same-origin `/api/*` through Kong. Keep
+ * `NEXT_PUBLIC_API_GATEWAY_URL` unset for that path.
  *
- * **Preferred layout:** leave this unset so the browser calls same-origin `/api/*`;
- * Next.js route handlers forward to Axum using `LUMIERE_API_SERVER_URL` (see
- * `lib/api-server-forward.ts`) — one gateway, cookies stay on the Next origin.
+ * Optional escape hatch: set `NEXT_PUBLIC_API_GATEWAY_URL` to a direct Rust
+ * `api-server` base URL (e.g. `http://localhost:8082`) to rewrite selected
+ * `/api/*` paths to `{base}/v1/*`.
  *
- * Paths **not** listed here (e.g. `/api/auth/*`, `/api/stdb/*`, `/api/health`) always
- * stay on the Next.js origin. Realtime WebSockets go directly to api-server (see
- * `NEXT_PUBLIC_REALTIME_WS_URL` / `NEXT_PUBLIC_API_GATEWAY_URL` in `hooks/realtime.ts`).
+ * Paths not listed here stay same-origin because they still belong to Next.js
+ * BFF handlers (for example `/api/ai/*`, `/api/auth/signup`, `/api/auth/signout`).
  */
 
 const GATEWAY_PREFIXES = [
   '/api/query/',
   '/api/call/',
+  '/api/stdb/',
+  '/api/auth/signin',
+  '/api/auth/invite',
+  '/api/auth/accept-invite',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
   '/api/crm/',
   '/api/sales/',
   '/api/accounting/',
   '/api/inventory/',
   '/api/settings/',
-  '/api/bootstrap/',
   '/api/proposals/',
 ] as const
 

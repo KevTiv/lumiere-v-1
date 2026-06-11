@@ -1,0 +1,115 @@
+services:
+  kong:
+    image: kong:3.9
+    depends_on:
+      - redis
+      - web
+      - api-server
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    ports:
+      - "8000:8000"
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - ./infra/kong/kong.yml:/kong/declarative/kong.yml:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: web/Dockerfile
+    depends_on:
+      - api-server
+      - ai-gateway
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
+      LUMIERE_API_SERVER_URL: http://api-server:8082
+      LUMIERE_AI_GATEWAY_URL: http://ai-gateway:8080
+      LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      NEXT_PUBLIC_STDB_MODULE: ${NEXT_PUBLIC_STDB_MODULE:-}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+      WORKOS_API_KEY: ${WORKOS_API_KEY:-}
+      WORKOS_COOKIE_PASSWORD: ${WORKOS_COOKIE_PASSWORD:-}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: api-server
+    environment:
+      PORT: 8082
+      NODE_ENV: production
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      NEXT_PUBLIC_STDB_MODULE: ${NEXT_PUBLIC_STDB_MODULE:-}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      AI_GATEWAY_URL: http://ai-gateway:8080
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
+      LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
+      STDB_CREDENTIAL_ENCRYPTION_KEY: ${STDB_CREDENTIAL_ENCRYPTION_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@lumiere-erp.com}
+      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+    expose:
+      - "8082"
+    restart: unless-stopped
+
+  ai-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: gateway
+    depends_on:
+      - qdrant
+    environment:
+      PORT: 8080
+      LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
+      QDRANT_URL: http://qdrant:6333
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      STDB_TOKEN: ${STDB_TOKEN:?set STDB_TOKEN}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:?set VOYAGE_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      UNSTRUCTURED_URL: ${UNSTRUCTURED_URL:-http://host.docker.internal:8000}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.6
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+
+volumes:
+  qdrant-data:

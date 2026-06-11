@@ -1,0 +1,246 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: web
+    url: http://web:3000
+    routes:
+      - name: web-root
+        paths:
+          - /
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 600
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 20
+
+  - name: api-query
+    url: http://api-server:8082/v1/query
+    routes:
+      - name: api-query
+        paths:
+          - /api/query
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 240
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+
+  - name: api-call
+    url: http://api-server:8082/v1/call
+    routes:
+      - name: api-call
+        paths:
+          - /api/call
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 90
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 20
+
+  - name: api-stdb
+    url: http://api-server:8082/v1/stdb
+    routes:
+      - name: api-stdb
+        paths:
+          - /api/stdb
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 240
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 32
+
+  - name: api-auth-signin
+    url: http://api-server:8082/v1/auth/signin
+    routes:
+      - name: api-auth-signin
+        paths:
+          - /api/auth/signin
+        strip_path: true
+    plugins: &auth_plugins
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+
+  - name: api-auth-invite
+    url: http://api-server:8082/v1/auth/invite
+    routes:
+      - name: api-auth-invite
+        paths:
+          - /api/auth/invite
+        strip_path: true
+    plugins: *auth_plugins
+
+  - name: api-auth-accept-invite
+    url: http://api-server:8082/v1/auth/accept-invite
+    routes:
+      - name: api-auth-accept-invite
+        paths:
+          - /api/auth/accept-invite
+        strip_path: true
+    plugins: *auth_plugins
+
+  - name: api-auth-forgot-password
+    url: http://api-server:8082/v1/auth/forgot-password
+    routes:
+      - name: api-auth-forgot-password
+        paths:
+          - /api/auth/forgot-password
+        strip_path: true
+    plugins: *auth_plugins
+
+  - name: api-auth-reset-password
+    url: http://api-server:8082/v1/auth/reset-password
+    routes:
+      - name: api-auth-reset-password
+        paths:
+          - /api/auth/reset-password
+        strip_path: true
+    plugins: *auth_plugins
+
+  - name: api-crm
+    url: http://api-server:8082/v1/crm
+    routes:
+      - name: api-crm
+        paths:
+          - /api/crm
+        strip_path: true
+    plugins: &domain_plugins
+      - name: rate-limiting
+        config:
+          minute: 180
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 20
+
+  - name: api-sales
+    url: http://api-server:8082/v1/sales
+    routes:
+      - name: api-sales
+        paths:
+          - /api/sales
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-accounting
+    url: http://api-server:8082/v1/accounting
+    routes:
+      - name: api-accounting
+        paths:
+          - /api/accounting
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-inventory
+    url: http://api-server:8082/v1/inventory
+    routes:
+      - name: api-inventory
+        paths:
+          - /api/inventory
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-settings
+    url: http://api-server:8082/v1/settings
+    routes:
+      - name: api-settings
+        paths:
+          - /api/settings
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-proposals
+    url: http://api-server:8082/v1/proposals
+    routes:
+      - name: api-proposals
+        paths:
+          - /api/proposals
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-realtime
+    url: http://api-server:8082/v1/realtime
+    routes:
+      - name: api-realtime
+        paths:
+          - /v1/realtime
+        strip_path: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 120
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - http://localhost:8000
+        - http://127.0.0.1:8000
+      credentials: true
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+        - HEAD
+      headers:
+        - Accept
+        - Accept-Language
+        - Authorization
+        - Content-Type
+        - Cookie
+        - X-Stdb-Identity
+      exposed_headers:
+        - RateLimit-Limit
+        - RateLimit-Remaining
+        - RateLimit-Reset
+      max_age: 3600

@@ -1,0 +1,21 @@
+FROM rust:1-bookworm AS chef
+WORKDIR /app
+
+FROM chef AS builder
+ARG BIN
+COPY Cargo.toml Cargo.lock ./
+COPY api-server ./api-server
+COPY ai-gateway ./ai-gateway
+COPY iot-gateway ./iot-gateway
+COPY crates ./crates
+RUN cargo build --release --bin "${BIN}"
+
+FROM debian:bookworm-slim AS runtime
+ARG BIN
+ENV RUST_LOG=info
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=builder "/app/target/release/${BIN}" /usr/local/bin/lumiere-service
+EXPOSE 8080
+CMD ["/usr/local/bin/lumiere-service"]

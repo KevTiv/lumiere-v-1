@@ -5,10 +5,9 @@
  *
  * URL resolution:
  * - `NEXT_PUBLIC_REALTIME_WS_URL` — full `ws://` / `wss://` URL (production-friendly).
- * - Else `NEXT_PUBLIC_API_GATEWAY_URL` — same base as `apiUrl()` (e.g. `http://localhost:8082`).
- * - Else `NEXT_PUBLIC_REALTIME_SAME_ORIGIN=1` — `ws(s)://{window.location.host}/v1/realtime/ws` (reverse-proxy to api-server).
- * - Else on `localhost` / `127.0.0.1`: `ws://127.0.0.1:8082/v1/realtime/ws` (local api-server default).
- * - Else: no implicit URL (avoids guessing a host in production).
+ * - Else `NEXT_PUBLIC_API_GATEWAY_URL` — direct api-server base (e.g. `http://localhost:8082`).
+ * - Else plain Next dev (`localhost:3000`) uses local api-server default.
+ * - Else same-origin Kong/reverse-proxy: `ws(s)://{window.location.host}/v1/realtime/ws`.
  */
 
 import type { QueryClient } from "@tanstack/react-query"
@@ -34,16 +33,13 @@ function resolveRealtimeWsUrl(): string {
   if (typeof window === "undefined") {
     return ""
   }
-  const sameOriginFlag = process.env.NEXT_PUBLIC_REALTIME_SAME_ORIGIN?.trim()
-  if (sameOriginFlag === "1" || sameOriginFlag?.toLowerCase() === "true") {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
-    return `${proto}//${window.location.host}/v1/realtime/ws`
-  }
   const host = window.location.hostname
-  if (host === "localhost" || host === "127.0.0.1") {
+  const port = window.location.port
+  if ((host === "localhost" || host === "127.0.0.1") && port === "3000") {
     return "ws://127.0.0.1:8082/v1/realtime/ws"
   }
-  return ""
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${proto}//${window.location.host}/v1/realtime/ws`
 }
 
 type ServerRealtimeMsg =
