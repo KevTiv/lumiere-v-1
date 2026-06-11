@@ -10,9 +10,9 @@ import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb/proposal-r
 import { ProductLineItems } from "./product-line-items"
 import { CommentThread } from "./comment-thread"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type Section = Record<string, any>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type Product = Record<string, any>
 
 const getStatusOptions = (t: (key: string) => string): { value: SectionStatus; label: string }[] => [

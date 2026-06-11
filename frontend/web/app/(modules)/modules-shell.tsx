@@ -340,7 +340,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
   const [isJournalOpen, setIsJournalOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
       <DashboardSidebar
         forceCollapsed={isAIChatDocked || isNotebookOpen}
         onOpenJournal={() => setIsJournalOpen(true)}
@@ -349,7 +349,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
         onSignOut={() => void performSignOut()}
       />
       <main className="flex-1 overflow-auto scroll-smooth">
-        <div className="p-6 lg:p-8">{children}</div>
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
       </main>
 
       <ErpAiChatPanel

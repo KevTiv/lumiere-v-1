@@ -72,20 +72,18 @@ export function QuickActionsWidget({ data }: { data: QuickActionsData }) {
             onClick={action.onClick}
             data-testid={`quick-action-${action.id}`}
             className={cn(
-              "group flex flex-col items-center gap-3 p-4 rounded-2xl",
-              "border border-border/30 hover:border-border/60",
-              "transition-all duration-300 hover:shadow-lg",
-              "bg-secondary/30 backdrop-blur-sm",
-              colors.shadowGlow
+              "group flex flex-col items-center gap-3 rounded-xl p-4",
+              "border border-border bg-card shadow-xs hover:border-border/90 hover:bg-muted/20",
+              "transition-[background-color,border-color,box-shadow] duration-150"
             )}
           >
             <div className={cn(
-              "p-3 rounded-xl transition-colors",
-              colors.bgHover
+              "rounded-lg border border-border bg-muted/40 p-2.5 transition-colors",
+              colors.icon
             )}>
-              <IconComponent className={cn("w-5 h-5", colors.icon)} />
+              <IconComponent className="h-4 w-4" />
             </div>
-            <span className="text-sm font-medium text-center">{action.label}</span>
+            <span className="text-center text-sm font-medium">{action.label}</span>
           </button>
         )
       })}

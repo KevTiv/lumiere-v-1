@@ -10,20 +10,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   AlertTriangle,
   AlertCircle,
   Info,
   CheckCircle2,
-  Clock,
   Search,
   Calendar,
   User,
   Users,
   Tag,
-  FileText,
   ListChecks,
   Lightbulb,
   DollarSign,
@@ -33,7 +30,6 @@ import {
   ExternalLink,
   Download,
   Printer,
-  X,
   ChevronRight,
   Circle,
 } from "lucide-react"
@@ -270,7 +266,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                 <div className="relative">
                   <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
                   <div className="space-y-6">
-                    {report.timeline.map((event, idx) => (
+                    {report.timeline.map((event) => (
                       <div key={event.id} className="relative pl-10">
                         <div className={cn(
                           "absolute left-2 w-5 h-5 rounded-full flex items-center justify-center -translate-x-1/2",

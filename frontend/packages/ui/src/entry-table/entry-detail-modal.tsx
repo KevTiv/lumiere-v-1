@@ -116,7 +116,7 @@ export function EntryDetailModal({
           </label>
           {src ? (
             <div className="relative h-32 w-32 rounded-lg overflow-hidden bg-secondary/50">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={src}
                 alt={field.label || "Image"}

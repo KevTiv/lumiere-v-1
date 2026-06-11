@@ -2,7 +2,7 @@
  * Maps Projects module form payloads to SpacetimeDB reducer param types.
  */
 
-import type { CreateProjectParams, CreateTaskParams } from '@lumiere/stdb/generated/types'
+import type { CreateProjectParams, CreateTaskParams } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"

@@ -10,12 +10,10 @@ import {
   AlertCircle,
   Info,
   CheckCircle2,
-  Clock,
   Search,
   Calendar,
   User,
   Tag,
-  MessageSquare,
   Paperclip,
 } from "lucide-react"
 import type { ForensicReport } from "@/lib/forensic-report-types"

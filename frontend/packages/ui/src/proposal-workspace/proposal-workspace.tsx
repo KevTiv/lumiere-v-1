@@ -44,7 +44,7 @@ function mapSourceDocRow(d: unknown): SourceDocument {
 }
 
 // Keep diff utilities for version history
-function simpleLineDiff(
+function _simpleLineDiff(
   oldLines: string[],
   newLines: string[]
 ): import("@/lib/proposal-workspace-types").VersionLine[] {
@@ -391,7 +391,7 @@ export function ProposalWorkspace({
       clearPresence.mutate(proposalIdBig)
       if (presenceDebounceRef.current) clearTimeout(presenceDebounceRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [proposalId, clearPresence.mutate])
 
   // ── Handlers ────────────────────────────────────────────────────────────────

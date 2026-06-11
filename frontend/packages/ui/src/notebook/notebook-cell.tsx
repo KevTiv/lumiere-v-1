@@ -47,7 +47,7 @@ interface NotebookCellProps {
 
 export function NotebookCellComponent({
   cell,
-  index,
+  index: _index,
   isSelected,
   onSelect,
   onUpdate,

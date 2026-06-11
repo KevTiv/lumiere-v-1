@@ -14,7 +14,7 @@ import {
 import type {
   FieldType as StdbFieldType,
   FieldWidth as StdbFieldWidth,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 import type {
   FormConfig,
   FormConfigField,

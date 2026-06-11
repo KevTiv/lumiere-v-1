@@ -8,7 +8,7 @@ import type {
   CreateLoyaltyProgramParams,
   CreatePaymentMethodParams,
   CreateShippingMethodParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"

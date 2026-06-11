@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { ConfigurableForm, useFormConfiguration } from "@lumiere/ui/forms"
-import type { MergedFormConfiguration } from "@lumiere/ui/forms"
 import { Loader2 } from "lucide-react"
 
 interface JournalEntryFormProps {

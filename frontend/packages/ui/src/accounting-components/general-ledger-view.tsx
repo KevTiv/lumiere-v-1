@@ -36,7 +36,6 @@ import {
 import type { AccountMove } from "../lib/accounting-types"
 import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
-import { NumberFieldIncrement } from "@base-ui/react"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"

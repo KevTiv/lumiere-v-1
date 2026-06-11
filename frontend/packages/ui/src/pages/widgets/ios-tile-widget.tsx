@@ -95,19 +95,18 @@ function SingleTile({ tile }: { tile: IosTile }) {
   return (
     <div
       className={cn(
-        "group relative flex flex-col justify-between rounded-2xl p-4 transition-all duration-300",
-        "bg-secondary/50 backdrop-blur-sm border border-border/30",
-        "hover:border-border/60 hover:shadow-lg",
-        colors.shadowGlow,
+        "group relative flex flex-col justify-between rounded-xl p-4 transition-[background-color,border-color,box-shadow] duration-150",
+        "border border-border bg-card shadow-xs",
+        "hover:border-border/90 hover:bg-muted/20",
         isLarge ? "col-span-2 row-span-2 p-5" : "",
         isMedium ? "col-span-2" : ""
       )}
     >
       {/* Header with icon */}
       <div className="flex items-start justify-between">
-        <div className={cn("p-2 rounded-xl", colors.bgSoft)}>
+        <div className={cn("rounded-lg border border-border bg-muted/40 p-2", colors.ringText)}>
           {tile.icon || (
-            <div className={cn("w-5 h-5 rounded-full", colors.bgSoft, colors.ringText)} />
+            <div className="h-4 w-4 rounded-full bg-current opacity-70" />
           )}
         </div>
 
@@ -135,7 +134,7 @@ function SingleTile({ tile }: { tile: IosTile }) {
       {/* Content */}
       <div className={cn("mt-auto pt-3", isLarge && "pt-6")}>
         <p className={cn(
-          "font-semibold tracking-tight",
+              "font-semibold tracking-[-0.03em] tabular-nums",
           isLarge ? "text-3xl" : "text-2xl"
         )}>
           {tile.value}
@@ -146,11 +145,7 @@ function SingleTile({ tile }: { tile: IosTile }) {
         )}
       </div>
 
-      {/* Subtle gradient overlay on hover */}
-      <div className={cn(
-        "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none",
-        "bg-gradient-to-br from-transparent via-transparent to-white/[0.02]"
-      )} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
     </div>
   )
 }

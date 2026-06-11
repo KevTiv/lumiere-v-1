@@ -6,7 +6,7 @@ import type {
   CreateAdjustmentReasonParams,
   CreateStockTraceabilityReportParams,
   CreateTraceabilityRecordParams,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"

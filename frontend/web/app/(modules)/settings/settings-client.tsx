@@ -955,24 +955,25 @@ function SettingsLoaded({
       <DashboardHeader title={title} description={description} />
       <SettingsModule />
 
-      <section className="rounded-xl border border-border bg-card p-4">
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Admin action coverage</h2>
-          <p className="text-sm text-muted-foreground">
-            Direct form-builder surfaces for settings reducers that are not yet embedded in the settings subsections.
+      <section className="rounded-xl border border-dashed border-border bg-card">
+        <div className="border-b border-border px-4 py-4">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Advanced</p>
+          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">Admin action coverage</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Direct form-builder surfaces for settings reducers that are not yet embedded in the polished settings sections.
           </p>
         </div>
         {successMessage ? (
-          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div className="mx-4 mt-4 rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm text-success">
             {successMessage}
           </div>
         ) : null}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
           {actions.map((action) => (
             <button
               key={action.id}
               type="button"
-              className="rounded-lg border border-border p-3 text-left transition-colors hover:bg-muted/50"
+              className="rounded-lg border border-border bg-background p-3 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
               onClick={() => {
                 setSubmitError(null)
                 setSuccessMessage(null)
@@ -980,7 +981,7 @@ function SettingsLoaded({
               }}
             >
               <p className="text-sm font-medium">{action.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{action.description}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{action.description}</p>
             </button>
           ))}
         </div>

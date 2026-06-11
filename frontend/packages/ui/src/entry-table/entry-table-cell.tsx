@@ -11,7 +11,7 @@ import type { TableColumn, EntryData } from "@/lib/entry-table-types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { ImageIcon, Check, X, Clock, AlertCircle, CheckCircle2, XCircle, MinusCircle } from "lucide-react"
+import { ImageIcon, Clock, AlertCircle, CheckCircle2, XCircle, MinusCircle } from "lucide-react"
 
 interface EntryTableCellProps {
   column: TableColumn
@@ -103,7 +103,7 @@ export function EntryTableCell({
           "relative overflow-hidden bg-secondary/50",
           imgCol.rounded ? "rounded-full" : "rounded-md"
         )}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             src={src || imagePlaceholder || imgCol.fallback}
             alt=""

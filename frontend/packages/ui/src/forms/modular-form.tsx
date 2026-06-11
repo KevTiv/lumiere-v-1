@@ -292,11 +292,11 @@ export function ModularForm({
   const formContent = (
     <form noValidate onSubmit={handleSubmit} className="space-y-6">
       {aiEnabled ? (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-3">
+        <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-foreground">Fill with AI</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
                 Suggestions only update this form after you apply them.
               </p>
             </div>
@@ -366,25 +366,27 @@ export function ModularForm({
             {idx > 0 && <Separator className="mb-6" />}
             <div className="space-y-4">
               {(section.title || section.description) && (
-                <div className="flex items-start gap-3 bg-muted/40 rounded-lg px-4 py-3 mb-4">
+                <div className="mb-4 flex items-start gap-3">
                   {SectionIcon && (
-                    <SectionIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                    <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40">
+                      <SectionIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
                   )}
                   <div className="space-y-0.5">
                     {section.title && (
-                      <h3 className="text-sm font-semibold text-foreground">
+                      <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
                         {section.title}
                       </h3>
                     )}
                     {section.description && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs leading-5 text-muted-foreground">
                         {section.description}
                       </p>
                     )}
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-12 gap-4">
+              <div className="grid grid-cols-12 gap-x-4 gap-y-5">
                 {section.fields.map((field) => (
                   <FormFieldRenderer
                     key={field.id}
@@ -404,7 +406,7 @@ export function ModularForm({
       {config.showActions !== false ? (
         <div
           className={cn(
-            "flex items-center gap-3 bg-muted/20 rounded-b-lg px-4 py-3 -mx-1 mt-6 border-t border-border/50",
+            "mt-6 flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3",
             leadingActions ? "justify-between" : "justify-end",
           )}
         >
@@ -447,7 +449,7 @@ export function ModularForm({
 
   if (config.layout === "card") {
     return (
-      <Card className={cn("bg-card border-border/50", className)}>
+      <Card className={cn(className)}>
         {!config.hideTitle && (config.title || config.description) ? (
           <CardHeader>
             {config.title ? <CardTitle>{config.title}</CardTitle> : null}

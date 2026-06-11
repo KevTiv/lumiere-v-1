@@ -2,7 +2,7 @@
  * Partner bank forms → SpacetimeDB reducer params.
  */
 
-import type { CreatePartnerBankParams } from '@lumiere/stdb/generated/types'
+import type { CreatePartnerBankParams } from '@lumiere/stdb/types'
 
 function numU64(v: unknown): bigint | null {
   if (v == null || v === '') return null

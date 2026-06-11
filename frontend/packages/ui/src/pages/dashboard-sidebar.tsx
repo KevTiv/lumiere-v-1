@@ -152,29 +152,30 @@ export function DashboardSidebar({
     <aside
       data-testid="dashboard-sidebar"
       className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
+        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-200",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
         {!isCollapsed && (
-          <span className="font-bold text-lg text-sidebar-foreground">{t("nav.erpSystem")}</span>
+          <span className="truncate text-sm font-semibold tracking-[-0.01em] text-sidebar-foreground">{t("nav.erpSystem")}</span>
         )}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
           className="text-sidebar-foreground hover:bg-sidebar-accent"
         >
-          {isCollapsed ? <Menu className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          {isCollapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
 
-      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+      <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3">
         {navGroups.map((group, groupIndex) => (
           <div key={`sidebar-option-${String(groupIndex)}`}>
             {!isCollapsed && group.label && (
-              <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {group.label}
               </p>
             )}
@@ -193,15 +194,15 @@ export function DashboardSidebar({
                       title={isCollapsed ? item.label : undefined}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                        "w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/20",
                         active
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent"
+                          ? "bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-sidebar-border"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                       )}
                     >
-                      <Icon className="h-5 w-5 shrink-0" />
+                      <Icon className="h-4 w-4 shrink-0" />
                       {!isCollapsed && (
-                        <span className="text-sm font-medium truncate">{item.label}</span>
+                        <span className="truncate font-medium">{item.label}</span>
                       )}
                     </Link>
                   )
@@ -213,11 +214,11 @@ export function DashboardSidebar({
                     data-testid={`sidebar-link-${item.href.replace(/^\//, "")}-locked`}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                      "w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm",
                       "text-sidebar-foreground opacity-40 cursor-not-allowed"
                     )}
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
+                    <Icon className="h-4 w-4 shrink-0" />
                     {!isCollapsed && (
                       <>
                         <span className="text-sm font-medium truncate flex-1">{item.label}</span>
@@ -232,21 +233,20 @@ export function DashboardSidebar({
         ))}
       </nav>
 
-      {/* Tool buttons — Journal, Notebook, AI Chat */}
-      <div className="flex flex-col gap-2 px-2 pb-2">
+      <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
         {onOpenJournal && (
           <button
             type="button"
             onClick={onOpenJournal}
             title="Open Journal"
+            aria-label="Open Journal"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-linear-to-r from-accent/10 to-warning/10 border border-accent/25",
-              "text-sidebar-foreground hover:border-accent/40",
+              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
+              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
               isCollapsed && "justify-center"
             )}
           >
-            <BookMarked className="h-5 w-5 shrink-0 text-accent" />
+            <BookMarked className="h-4 w-4 shrink-0" />
             {!isCollapsed && (
               <span className="text-sm font-medium">{t("nav.journal")}</span>
             )}
@@ -258,14 +258,14 @@ export function DashboardSidebar({
             type="button"
             onClick={onOpenNotebook}
             title="Open Notebook"
+            aria-label="Open Notebook"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-linear-to-r from-primary/10 to-accent/10 border border-primary/20",
-              "text-sidebar-foreground hover:border-primary/35",
+              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
+              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
               isCollapsed && "justify-center"
             )}
           >
-            <BookOpen className="h-5 w-5 shrink-0 text-primary" />
+            <BookOpen className="h-4 w-4 shrink-0" />
             {!isCollapsed && (
               <span className="text-sm font-medium">{t("nav.notebook")}</span>
             )}
@@ -277,14 +277,14 @@ export function DashboardSidebar({
             type="button"
             onClick={onOpenAIChat}
             title="Open AI Assistant"
+            aria-label="Open AI Assistant"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-              "bg-linear-to-r from-primary/10 to-primary/5 border border-primary/20",
-              "text-sidebar-foreground hover:border-primary/40",
+              "flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-sm transition-colors",
+              "text-sidebar-foreground hover:bg-sidebar-accent/70",
               isCollapsed && "justify-center"
             )}
           >
-            <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+            <Sparkles className="h-4 w-4 shrink-0" />
             {!isCollapsed && (
               <span className="text-sm font-medium">{t("nav.aiAssistant")}</span>
             )}
@@ -292,9 +292,9 @@ export function DashboardSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-sidebar-border space-y-3">
+      <div className="space-y-3 border-t border-sidebar-border p-3">
         <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")} data-testid="sidebar-user">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-sm font-medium text-sidebar-foreground">
             {currentUser?.name.split(" ").map(n => n[0]).join("") || "?"}
           </div>
           {!isCollapsed && (

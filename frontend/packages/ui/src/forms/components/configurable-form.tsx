@@ -16,7 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormFieldRenderer } from "./form-field-renderer"
 import type { ParsedFormField, MergedFormConfiguration } from "../config/types"
 import { isCustomField } from "../config/types"
@@ -285,7 +285,7 @@ const FormFieldsGrid = React.memo(function FormFieldsGrid({
   fields, 
   form, 
   disabled, 
-  layout = "vertical" 
+  layout: _layout = "vertical" 
 }: FormFieldsGridProps) {
   const getWidthClass = React.useCallback((width: string): string => {
     switch (width) {

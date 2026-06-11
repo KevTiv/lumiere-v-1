@@ -144,16 +144,22 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
   const selectionToggleOnRowClick =
     config.rowSelectionToggleOnClick ??
     (hasActions && actions.some((a) => a.requiresSelection === true))
+  const rowsAreInteractive = Boolean(onRowClick || selectionToggleOnRowClick)
+
+  const activateRow = (key: string, row: Record<string, unknown>) => {
+    if (selectionToggleOnRowClick) toggleRow(key)
+    onRowClick?.(row)
+  }
 
   return (
     <div className={cn("space-y-4", className)} data-testid="entity-table">
-      {/* Toolbar */}
       {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs">
           {config.searchable && (
-            <div className="relative flex-1 min-w-48">
+            <div className="relative min-w-48 flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                aria-label="Search records"
                 placeholder={config.searchPlaceholder ?? "Search…"}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -168,28 +174,28 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                 ? "__all__"
                 : radixSelectControlledValue(raw, f.options)
             return (
-            <Select
-              key={f.key}
-              value={selectValue}
-              onValueChange={(val) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  [f.key]: val === "__all__" ? "__all__" : storedValueFromRadixSelect(val),
-                }))
-              }
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder={f.placeholder ?? f.label} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All {f.label}s</SelectItem>
-                {f.options?.map((o, idx) => (
-                  <SelectItem key={`${radixSelectItemValue(o, idx)}-${idx}`} value={radixSelectItemValue(o, idx)}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select
+                key={f.key}
+                value={selectValue}
+                onValueChange={(val) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    [f.key]: val === "__all__" ? "__all__" : storedValueFromRadixSelect(val),
+                  }))
+                }
+              >
+                <SelectTrigger className="w-40" aria-label={f.label}>
+                  <SelectValue placeholder={f.placeholder ?? f.label} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All {f.label}s</SelectItem>
+                  {f.options?.map((o, idx) => (
+                    <SelectItem key={`${radixSelectItemValue(o, idx)}-${idx}`} value={radixSelectItemValue(o, idx)}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )
           })}
           <div className="ml-auto flex items-center gap-2">
@@ -213,10 +219,9 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-md border border-border/50">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/25">
             <TableRow>
               {columns.map((col) => (
                 <TableHead
@@ -237,7 +242,7 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
               <TableRow>
                 <TableCell
                   colSpan={Math.max(columns.length, 1)}
-                  className="text-center text-muted-foreground py-12"
+                  className="py-12 text-center text-muted-foreground"
                 >
                   {config.emptyMessage ?? "No records found."}
                 </TableCell>
@@ -250,13 +255,19 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                   <TableRow
                     key={key}
                     data-testid={`entity-row-${key}`}
-                    onClick={() => {
-                      if (selectionToggleOnRowClick) toggleRow(key)
-                      onRowClick?.(row)
+                    onClick={rowsAreInteractive ? () => activateRow(key, row) : undefined}
+                    onKeyDown={(event) => {
+                      if (!rowsAreInteractive) return
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        activateRow(key, row)
+                      }
                     }}
+                    tabIndex={rowsAreInteractive ? 0 : undefined}
+                    aria-selected={selectionToggleOnRowClick ? isSelected : undefined}
+                    data-state={isSelected ? "selected" : undefined}
                     className={cn(
-                      onRowClick || selectionToggleOnRowClick ? "cursor-pointer" : "",
-                      isSelected && "bg-primary/5",
+                      rowsAreInteractive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/20",
                     )}
                   >
                     {columns.map((col) => {

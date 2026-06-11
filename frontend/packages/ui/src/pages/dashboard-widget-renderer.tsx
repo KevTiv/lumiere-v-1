@@ -71,7 +71,7 @@ export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererPr
     return (
       <div className={widthClass}>
         {widget.title && (
-          <h3 className="text-lg font-semibold mb-4">{widget.title}</h3>
+          <h3 className="mb-3 text-sm font-medium text-muted-foreground">{widget.title}</h3>
         )}
         {renderContent()}
       </div>
@@ -80,9 +80,9 @@ export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererPr
 
   return (
     <div className={widthClass}>
-      <Card className="h-full bg-card border-border/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">{widget.title}</CardTitle>
+      <Card className="h-full">
+        <CardHeader className="pb-1">
+          <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
         </CardHeader>
         <CardContent>
           {renderContent()}

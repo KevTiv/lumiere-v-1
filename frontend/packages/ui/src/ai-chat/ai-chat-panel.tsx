@@ -29,7 +29,6 @@ import {
   BookOpen,
   AtSign,
   Command,
-  GripVertical,
   Minimize2,
   Maximize2,
   Minus,

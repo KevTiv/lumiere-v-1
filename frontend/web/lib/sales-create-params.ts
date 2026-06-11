@@ -6,7 +6,7 @@ import type {
   CreatePickingBatchParams,
   CreatePricelistParams,
   CreateSaleOrderParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"

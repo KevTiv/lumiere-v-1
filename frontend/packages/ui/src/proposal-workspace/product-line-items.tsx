@@ -3,13 +3,12 @@
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Trash2, GripVertical } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { productKindBadgeClass } from "@/lib/theme-colors"
 import type { ProposalLineItem } from "@lumiere/stdb/proposal-row-types"
 import { rowBigint, rowNumber, rowString } from "./row-field-utils"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type Product = Record<string, any>
 
 function formatCurrency(val: number): string {

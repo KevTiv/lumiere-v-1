@@ -34,7 +34,6 @@ import { cn } from "@/lib/utils"
 import { taskPriorityOutlineBadgeClass } from "@/lib/theme-colors"
 import {
   Search,
-  Filter,
   Plus,
   Users,
   Calendar,
@@ -56,7 +55,6 @@ import {
   sampleSprint,
   type Task,
   type TaskStatus,
-  type TeamMember,
 } from "@/lib/task-board-types"
 
 interface TaskBoardViewProps {

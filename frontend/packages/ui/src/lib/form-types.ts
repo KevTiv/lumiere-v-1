@@ -1,4 +1,4 @@
-import type { ComponentType } from "react"
+import type { ComponentType, HTMLAttributes } from "react"
 
 export type FieldWidth = "full" | "1/2" | "1/3" | "2/3" | "1/4"
 
@@ -29,6 +29,8 @@ export interface BaseField {
   description?: string
   required?: boolean
   disabled?: boolean
+  autoComplete?: string
+  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"]
   width?: FieldWidth
   className?: string
   defaultValue?: unknown

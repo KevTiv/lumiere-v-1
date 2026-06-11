@@ -66,7 +66,7 @@ export function MapView({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [defaultCenter, defaultZoom]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [defaultCenter, defaultZoom])  
 
   // Update view when center/zoom props change
   useEffect(() => {

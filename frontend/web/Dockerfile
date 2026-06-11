@@ -5,7 +5,12 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY mobile/package.json ./mobile/
 COPY web/package.json ./web/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/erp-session/package.json ./packages/erp-session/
+COPY packages/erp-shared/package.json ./packages/erp-shared/
+COPY packages/query-hooks/package.json ./packages/query-hooks/
 COPY packages/stdb/package.json ./packages/stdb/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/i18n/package.json ./packages/i18n/
@@ -16,7 +21,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm --filter web build
+RUN pnpm --filter ./web build
 
 # --- runner ---
 FROM base AS runner

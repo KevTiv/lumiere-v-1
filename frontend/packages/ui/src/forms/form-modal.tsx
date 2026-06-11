@@ -98,27 +98,26 @@ export function FormModal({
         data-testid={`form-modal-${config.id}`}
         className={cn(
           maxW,
-          "max-h-[85vh] flex flex-col bg-card p-0 gap-0",
+          "max-h-[86vh] gap-0 overflow-hidden border-border bg-card p-0 shadow-2xl",
           className
         )}
       >
-        {/* Sticky header */}
-        <DialogHeader className="sticky top-0 bg-card z-10 px-6 pt-6 pb-4 border-b border-border/50 flex-shrink-0">
+        <DialogHeader className="sticky top-0 z-10 flex-shrink-0 border-b border-border/70 bg-card/95 px-6 py-5 backdrop-blur">
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 flex-shrink-0",
+                "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40",
                 config.iconColor
               )}>
-                <HeaderIcon className={cn("h-4 w-4", config.iconColor ?? "text-primary")} />
+                <HeaderIcon className={cn("h-4 w-4", config.iconColor ?? "text-muted-foreground")} />
               </div>
             )}
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold leading-tight" data-testid="form-modal-title">
+              <DialogTitle className="text-base font-semibold leading-tight tracking-[-0.01em]" data-testid="form-modal-title">
                 {config.title}
               </DialogTitle>
               {config.description && (
-                <DialogDescription className="text-xs mt-0.5">
+                <DialogDescription className="mt-1 text-sm leading-5">
                   {config.description}
                 </DialogDescription>
               )}
@@ -126,10 +125,9 @@ export function FormModal({
           </div>
         </DialogHeader>
 
-        {/* Scrollable form body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {submitError ? (
-            <p className="text-sm text-destructive mb-4" role="alert">
+            <p className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
               {submitError}
             </p>
           ) : null}

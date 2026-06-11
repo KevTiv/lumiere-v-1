@@ -25,22 +25,15 @@ import {
 import {
   Search,
   Plus,
-  Filter,
   LayoutGrid,
   List,
   AlertTriangle,
   AlertCircle,
-  CheckCircle2,
   Clock,
-  TrendingUp,
-  TrendingDown,
   FileText,
   BarChart3,
-  PieChart,
-  Calendar,
   ChevronDown,
   Download,
-  Printer,
 } from "lucide-react"
 import { ReportCard } from "./report-card"
 import { ReportDetailModal } from "./report-detail-modal"

@@ -41,22 +41,16 @@ import {
   Pencil,
   Trash2,
   Copy,
-  Eye,
-  EyeOff,
   MoreVertical,
   Save,
   Sparkles,
   Users,
-  Settings2,
   ChevronRight,
-  AlertCircle,
-  Check,
 } from "lucide-react"
 import type {
   FormConfiguration,
   ConfigurableField,
-  FieldType,
-  FieldOption
+  FieldType
 } from "@/lib/form-config-types"
 import {
   defaultJournalFormConfig,
@@ -89,7 +83,7 @@ interface FormConfigSettingsProps {
 
 export function FormConfigSettings({ className }: FormConfigSettingsProps) {
   const { t } = useTranslation()
-  const { isAdmin } = useRBAC()
+  const { isAdmin: _isAdmin } = useRBAC()
   const [activeTab, setActiveTab] = useState<"journal" | "forensic">("journal")
   const [journalConfig, setJournalConfig] = useState<FormConfiguration>(defaultJournalFormConfig)
   const [forensicConfig, setForensicConfig] = useState<FormConfiguration>(defaultForensicFormConfig)

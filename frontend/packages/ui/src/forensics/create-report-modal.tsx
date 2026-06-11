@@ -19,11 +19,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   FileText,
-  AlertTriangle,
-  Calendar,
-  User,
-  Building2,
-  Tag,
   Plus,
   X,
   Lightbulb,

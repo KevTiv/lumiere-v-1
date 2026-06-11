@@ -27,13 +27,13 @@ export function KPIWidget({ data }: { data: KPIWidgetType["data"] }) {
       : "text-muted-foreground"
 
   return (
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm text-muted-foreground">{data.label}</p>
-        <p className="text-3xl font-bold mt-1">{data.value}</p>
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-muted-foreground">{data.label}</p>
+        <p className="mt-1 text-3xl font-semibold tracking-[-0.03em] tabular-nums">{data.value}</p>
         {data.change !== undefined && (
-          <div className={`flex items-center gap-1 mt-2  text-sm ${trendColor}`}>
-            <TrendIcon className="h-4 w-4" />
+          <div className={`mt-3 flex items-center gap-1 text-sm ${trendColor}`}>
+            <TrendIcon className="h-3.5 w-3.5" />
             <span>{data.change > 0 ? "+" : ""}{data.change}%</span>
             {data.changeLabel && (
               <span className="text-muted-foreground ml-1">{data.changeLabel}</span>
@@ -42,8 +42,8 @@ export function KPIWidget({ data }: { data: KPIWidgetType["data"] }) {
         )}
       </div>
       {Icon && (
-        <div className="p-3 rounded-xl bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
+        <div className="rounded-lg border border-border bg-muted/40 p-2 text-muted-foreground">
+          <Icon className="h-4 w-4" />
         </div>
       )}
     </div>

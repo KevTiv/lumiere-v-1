@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import type { ProposalPresence } from "@lumiere/stdb/proposal-row-types"
 import { rowString } from "./row-field-utils"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type Section = Record<string, any>
 
 function avatarColor(userId: string): string {

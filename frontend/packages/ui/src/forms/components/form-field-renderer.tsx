@@ -1,20 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { useForm, Controller } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+
+
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -33,8 +23,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, FileIcon, X, Sparkles } from "lucide-react"
 import { format } from "date-fns"
-import type { ParsedFormField, FieldType, FieldOption, FieldValidation } from "../config/types"
-import { isCustomField } from "../config/types"
+import type { ParsedFormField, FieldOption } from "../config/types"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -308,7 +297,7 @@ function MultiSelectField({
   options,
   value,
   onChange,
-  placeholder,
+  placeholder: _placeholder,
   disabled,
 }: {
   options: FieldOption[]

@@ -22,7 +22,7 @@ import { instanceStateTag, workitemStateTag } from "@/lib/workflow-enum"
 import type {
   AddWorkflowActivityParams,
   AddWorkflowTransitionParams,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 
 function rowId(row: Record<string, unknown>): string {
   const v = row.id

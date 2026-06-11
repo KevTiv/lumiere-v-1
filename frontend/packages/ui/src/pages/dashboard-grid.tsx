@@ -10,15 +10,15 @@ interface DashboardGridProps {
 
 export function DashboardGrid({ sections }: DashboardGridProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {sections.map((section) => (
-        <section key={section.id}>
+        <section key={section.id} className="space-y-4">
           {section.title && (
-            <h2 className="text-lg font-semibold mb-4 text-foreground/90">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {section.title}
             </h2>
           )}
-          <div className="grid grid-cols-12 gap-4 lg:gap-6">
+          <div className="grid grid-cols-12 gap-4">
             {section.widgets.map((widget) => (
               <DashboardWidgetRenderer
                 key={widget.id}

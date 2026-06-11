@@ -31,7 +31,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { 
   Plus, 
@@ -42,7 +41,7 @@ import {
   Check,
   X
 } from "lucide-react"
-import type { Role, PolicyRule, Resource, Action } from "@/lib/rbac-types"
+import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"

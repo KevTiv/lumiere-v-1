@@ -6,19 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Play,
   Plus,
   Save,
   Download,
-  Upload,
   RotateCcw,
   Code,
   FileText,
-  Sparkles,
   X,
-  ChevronRight,
   FolderOpen,
   File,
   Clock,
@@ -26,7 +22,6 @@ import {
   Database,
   BarChart3,
   BookOpen,
-  PanelRightClose,
   Maximize2,
   Minimize2,
   Terminal,
@@ -70,7 +65,7 @@ const createCell = (type: "code" | "markdown"): NotebookCell => ({
 })
 
 // Simulated Python execution
-const simulateExecution = async (code: string, context?: unknown): Promise<CellOutput> => {
+const simulateExecution = async (code: string, _context?: unknown): Promise<CellOutput> => {
   await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000))
 
   // Simple pattern matching for demo responses

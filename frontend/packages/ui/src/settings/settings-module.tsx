@@ -1,12 +1,13 @@
 "use client"
 
+import type { ComponentType } from "react"
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
 import { settingsSections } from "@/lib/rbac-defaults"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -32,7 +33,7 @@ import { UserCustomFields } from "./user-custom-fields"
 import { OrganizationSettings } from "./organization-settings"
 import { AiSettings } from "./ai-settings"
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   user: User,
   bell: Bell,
   palette: Palette,
@@ -45,6 +46,29 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   sparkles: Sparkles,
 }
 
+const settingsGroups = [
+  {
+    id: "account",
+    title: "Account",
+    description: "Personal preferences and workspace experience.",
+    sectionIds: ["profile", "notifications", "appearance", "custom-fields"],
+  },
+  {
+    id: "organization",
+    title: "Organization",
+    description: "Company configuration and user access.",
+    sectionIds: ["organization", "users", "roles"],
+  },
+  {
+    id: "platform",
+    title: "Platform",
+    description: "Automation, AI, forms, and audit controls.",
+    sectionIds: ["ai", "form-config", "audit"],
+  },
+] as const
+
+type SettingsSectionItem = (typeof settingsSections)[number]
+
 interface SettingsModuleProps {
   className?: string
 }
@@ -54,6 +78,9 @@ export function SettingsModule({ className }: SettingsModuleProps) {
 
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const { checkPermission, isAdmin } = useRBAC()
+  const accessibleSections = settingsSections.filter((section) =>
+    checkPermission(section.requiredPermission, section.requiredAction).allowed
+  )
 
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -84,18 +111,19 @@ export function SettingsModule({ className }: SettingsModuleProps) {
     const section = settingsSections.find(s => s.id === activeSection)
     return (
       <div className={cn("space-y-6", className)}>
-        <div className="flex items-center gap-4">
+        <div className="flex items-start gap-3">
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => setActiveSection(null)}
             className="gap-2"
           >
             <ChevronRight className="h-4 w-4 rotate-180" />
             {t("settings.backToSettings")}
           </Button>
-          <div>
-            <h2 className="text-xl font-semibold">{section?.title}</h2>
-            <p className="text-sm text-muted-foreground">{section?.description}</p>
+          <div className="min-w-0 pt-1">
+            <h2 className="text-xl font-semibold tracking-[-0.02em]">{section?.title}</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{section?.description}</p>
           </div>
         </div>
         {renderSectionContent()}
@@ -106,52 +134,61 @@ export function SettingsModule({ className }: SettingsModuleProps) {
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between">
-        {/*<div>
-          <h2 className="text-2xl font-bold">Settings</h2>
-          <p className="text-muted-foreground">
-            Manage your account and system configuration
-          </p>
-        </div>*/}
         {isAdmin() && (
-          <Badge variant="outline" className="gap-1 border-primary text-primary">
+          <Badge variant="outline" className="gap-1 border-border text-muted-foreground">
             <Shield className="h-3 w-3" />
             {t("settings.adminAccess")}
           </Badge>
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {settingsSections.map((section) => {
-          const Icon = iconMap[section.icon] || User
-          const result = checkPermission(section.requiredPermission, section.requiredAction)
-          const hasAccess = result.allowed
+      <div className="space-y-5">
+        {settingsGroups.map((group) => {
+          const sections = group.sectionIds
+            .map((id) => accessibleSections.find((section) => section.id === id))
+            .filter((section): section is SettingsSectionItem => Boolean(section))
 
-          if (!hasAccess) return null
+          if (sections.length === 0) return null
 
           return (
-            <Card
-              key={section.id}
-              className="cursor-pointer transition-all hover:border-primary/50"
-              onClick={() => setActiveSection(section.id)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Icon className="h-5 w-5 text-primary" />
+            <section key={group.id} className="space-y-2">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold tracking-[-0.01em]">{group.title}</h3>
+                <p className="text-sm text-muted-foreground">{group.description}</p>
+              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border">
+                    {sections.map((section) => {
+                      const Icon = iconMap[section.icon] || User
+
+                      return (
+                        <button
+                          key={section.id}
+                          type="button"
+                          className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+                          onClick={() => setActiveSection(section.id)}
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground">{section.title}</p>
+                            <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                              {section.description}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+                            <span className="hidden sm:inline">{t("settings.configure")}</span>
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
-                </div>
-                <CardTitle className="text-base mt-3">{section.title}</CardTitle>
-                <CardDescription className="text-sm">
-                  {section.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <Button variant="ghost" className="w-full justify-between" size="sm">
-                  {t("settings.configure")}
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </section>
           )
         })}
       </div>
