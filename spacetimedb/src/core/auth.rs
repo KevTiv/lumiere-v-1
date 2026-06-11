@@ -86,6 +86,16 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+fn require_dev_reducers_enabled() -> Result<(), String> {
+    let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
+        .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
+    if enabled {
+        Ok(())
+    } else {
+        Err("Dev reducers are disabled in this build".to_string())
+    }
+}
+
 /// **Trusted local / dev nodes only.** Promotes `ctx.sender()` to `is_superuser` so HTTP calls
 /// using `STDB_SERVER_TOKEN` can invoke `store_user_credential` and other admin reducers.
 /// The JWT identity usually has no profile or `is_superuser: false` until this runs or `ensure_dev_admin`.
@@ -93,6 +103,8 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 /// can escalate; use only with local `spacetime` or controlled deployments.
 #[spacetimedb::reducer]
 pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> {
+    require_dev_reducers_enabled()?;
+
     let sender = ctx.sender();
     if let Some(profile) = ctx.db.user_profile().identity().find(sender) {
         if profile.is_superuser {

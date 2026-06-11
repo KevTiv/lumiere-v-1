@@ -17,8 +17,8 @@ use crate::core::organization::{
     OrganizationSettings,
 };
 use crate::core::permissions::{
-    casbin_rule, org_permission, role, seed_insert_org_permission, user_role_assignment, CasbinRule,
-    PermissionAction, PermissionEffect, PermissionSubject, Role, UserRoleAssignment,
+    casbin_rule, org_permission, role, seed_insert_org_permission, user_role_assignment,
+    CasbinRule, PermissionAction, PermissionEffect, PermissionSubject, Role, UserRoleAssignment,
 };
 use crate::core::privacy::{
     data_classification, data_classification_rule, privacy_consent, DataClassification,
@@ -109,8 +109,8 @@ use crate::accounting::chart_of_accounts::{
     AccountAccountType, AccountGroup, AccountJournal,
 };
 use crate::accounting::consolidation::{
-    consolidation_account, consolidation_elimination_entry, consolidation_journal, ConsolidationAccount,
-    ConsolidationEliminationEntry, ConsolidationJournal,
+    consolidation_account, consolidation_elimination_entry, consolidation_journal,
+    ConsolidationAccount, ConsolidationEliminationEntry, ConsolidationJournal,
 };
 use crate::accounting::financial_statements::{
     balance_sheet_line, cash_flow_line, financial_report, profit_loss_line, trial_balance,
@@ -122,6 +122,9 @@ use crate::accounting::fiscal_periods::{
 use crate::accounting::fixed_assets::{
     account_asset, account_asset_depreciation_line, AccountAsset, AccountAssetDepreciationLine,
 };
+use crate::accounting::intercompany::{
+    intercompany_rule, intercompany_transaction, IntercompanyRule, IntercompanyTransaction,
+};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
@@ -129,9 +132,6 @@ use crate::accounting::payment_terms::{
     account_payment_term, account_payment_term_line, AccountPaymentTerm, AccountPaymentTermLine,
 };
 use crate::accounting::payments::{account_payment, AccountPayment};
-use crate::accounting::intercompany::{
-    intercompany_rule, intercompany_transaction, IntercompanyRule, IntercompanyTransaction,
-};
 use crate::accounting::tax_management::{
     account_tax, account_tax_group, tax_deadline, tax_jurisdiction, tax_schedule, AccountTax,
     AccountTaxGroup, TaxDeadline, TaxJurisdiction, TaxSchedule,
@@ -154,16 +154,15 @@ use crate::helpdesk::tickets::{
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, AssetState, AssetType,
     BankStatementState, BomType, BudgetState, CardState, ConsolidationState, ContractState,
-    DepreciationMethod,
-    EmploymentType, ExpenseSheetState, ExpenseState, FiscalYearState, HelpdeskTicketState,
-    HrLeaveState,     InsightSeverity, InstanceState, IntakeState, IntegrationStatus, IntercompanyState, InvoiceStatus,
-    JobStatus, JournalType, LandedCostState, LineInvoiceStatus, LineState, MailMessageType,
-    MoState, MoveType, PartnerType, PaymentMethodType, PaymentState, PaymentStatus,
-    PaymentTermValue, PaymentType, PayslipState, PeriodState, PoInvoiceStatus, PoState,
-    PosOrderState, ReportState, ReportType, RequisitionState, RuleType, SaleState, SessionState,
-    SplitMethod,
-    SyncStatus, TaskState, TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse,
-    TicketPriority, WidgetType, WorkitemState, WorkorderState,
+    DepreciationMethod, EmploymentType, ExpenseSheetState, ExpenseState, FiscalYearState,
+    HelpdeskTicketState, HrLeaveState, InsightSeverity, InstanceState, IntakeState,
+    IntegrationStatus, IntercompanyState, InvoiceStatus, JobStatus, JournalType, LandedCostState,
+    LineInvoiceStatus, LineState, MailMessageType, MoState, MoveType, PartnerType,
+    PaymentMethodType, PaymentState, PaymentStatus, PaymentTermValue, PaymentType, PayslipState,
+    PeriodState, PoInvoiceStatus, PoState, PosOrderState, ReportState, ReportType,
+    RequisitionState, RuleType, SaleState, SessionState, SplitMethod, SyncStatus, TaskState,
+    TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse, TicketPriority, WidgetType,
+    WorkitemState, WorkorderState,
 };
 
 // ── Manufacturing ─────────────────────────────────────────────────────────────
@@ -241,8 +240,20 @@ use crate::workflow::runtime::{
     workflow_instance, workflow_workitem, WorkflowInstance, WorkflowWorkitem,
 };
 
+fn require_dev_reducers_enabled() -> Result<(), String> {
+    let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
+        .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
+    if enabled {
+        Ok(())
+    } else {
+        Err("Dev seed reducers are disabled in this build".to_string())
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
+    require_dev_reducers_enabled()?;
+
     // ── Idempotency guard ─────────────────────────────────────────────────────
     if ctx
         .db
@@ -4011,10 +4022,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _analytic_dist_model =
-        ctx.db
-            .account_analytic_distribution_model()
-            .insert(AccountAnalyticDistributionModel {
+    let _analytic_dist_model = ctx.db.account_analytic_distribution_model().insert(
+        AccountAnalyticDistributionModel {
             id: 0,
             organization_id: org_id,
             name: Some("Sales & Marketing Split".to_string()),
@@ -4033,7 +4042,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             write_uid: Some(seeder),
             write_date: Some(ctx.timestamp),
             metadata: Some("{\"seed\":true}".to_string()),
-        });
+        },
+    );
 
     // ── 5.8 Payment Terms ─────────────────────────────────────────────────────
     let payment_term_30 = ctx.db.account_payment_term().insert(AccountPaymentTerm {
@@ -4514,31 +4524,34 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _ic_txn_demo = ctx.db.intercompany_transaction().insert(IntercompanyTransaction {
-        id: 0,
-        name: "IC-INV-SEED-001".to_string(),
-        origin_company_id: company_id,
-        destination_company_id: company_sub.id,
-        origin_document_id: invoice1.id,
-        origin_document_model: "account.move".to_string(),
-        destination_document_id: None,
-        destination_document_model: None,
-        amount: 3_600.0,
-        currency_id: 1,
-        state: IntercompanyState::Draft,
-        transaction_type: RuleType::Invoice,
-        notes: Some("Awaiting counterparty posting".to_string()),
-        created_by: Some(seeder),
-        created_at: ctx.timestamp,
-        processed_at: None,
-        processed_by: None,
-        error_message: None,
-        auto_process: false,
-        requires_approval: true,
-        approved_by: None,
-        approved_at: None,
-        metadata: Some("{\"seed\":true}".to_string()),
-    });
+    let _ic_txn_demo = ctx
+        .db
+        .intercompany_transaction()
+        .insert(IntercompanyTransaction {
+            id: 0,
+            name: "IC-INV-SEED-001".to_string(),
+            origin_company_id: company_id,
+            destination_company_id: company_sub.id,
+            origin_document_id: invoice1.id,
+            origin_document_model: "account.move".to_string(),
+            destination_document_id: None,
+            destination_document_model: None,
+            amount: 3_600.0,
+            currency_id: 1,
+            state: IntercompanyState::Draft,
+            transaction_type: RuleType::Invoice,
+            notes: Some("Awaiting counterparty posting".to_string()),
+            created_by: Some(seeder),
+            created_at: ctx.timestamp,
+            processed_at: None,
+            processed_by: None,
+            error_message: None,
+            auto_process: false,
+            requires_approval: true,
+            approved_by: None,
+            approved_at: None,
+            metadata: Some("{\"seed\":true}".to_string()),
+        });
 
     let cons_acct = ctx.db.consolidation_account().insert(ConsolidationAccount {
         id: 0,
@@ -4588,40 +4601,43 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let elim_entry = ctx
-        .db
-        .consolidation_elimination_entry()
-        .insert(ConsolidationEliminationEntry {
-            id: 0,
-            journal_id: cons_journal.id,
-            sequence: 1,
-            name: "IC receivable elimination".to_string(),
-            account_id: cons_acct.id,
-            account_code: cons_acct.code.clone(),
-            account_name: cons_acct.name.clone(),
-            company_id: company_id,
-            counterparty_company_id: Some(company_sub.id),
-            debit: 1_000.0,
-            credit: 0.0,
-            currency_id: 1,
-            amount_currency: 1_000.0,
-            elimination_type: "intercompany_receivable".to_string(),
-            reference: Some("IC-ELIM-1".to_string()),
-            move_id: None,
-            is_matched: false,
-            matched_entry_id: None,
-            notes: None,
-            created_at: ctx.timestamp,
-            metadata: Some("{\"seed\":true}".to_string()),
-        });
+    let elim_entry =
+        ctx.db
+            .consolidation_elimination_entry()
+            .insert(ConsolidationEliminationEntry {
+                id: 0,
+                journal_id: cons_journal.id,
+                sequence: 1,
+                name: "IC receivable elimination".to_string(),
+                account_id: cons_acct.id,
+                account_code: cons_acct.code.clone(),
+                account_name: cons_acct.name.clone(),
+                company_id: company_id,
+                counterparty_company_id: Some(company_sub.id),
+                debit: 1_000.0,
+                credit: 0.0,
+                currency_id: 1,
+                amount_currency: 1_000.0,
+                elimination_type: "intercompany_receivable".to_string(),
+                reference: Some("IC-ELIM-1".to_string()),
+                move_id: None,
+                is_matched: false,
+                matched_entry_id: None,
+                notes: None,
+                created_at: ctx.timestamp,
+                metadata: Some("{\"seed\":true}".to_string()),
+            });
 
-    ctx.db.consolidation_journal().id().update(ConsolidationJournal {
-        elimination_entries: vec![elim_entry.id],
-        elimination_total: 1_000.0,
-        total_debit: 1_000.0,
-        total_credit: 0.0,
-        ..cons_journal
-    });
+    ctx.db
+        .consolidation_journal()
+        .id()
+        .update(ConsolidationJournal {
+            elimination_entries: vec![elim_entry.id],
+            elimination_total: 1_000.0,
+            total_debit: 1_000.0,
+            total_credit: 0.0,
+            ..cons_journal
+        });
 
     // =========================================================================
     // TIER 6 — HR, PROJECTS, HELPDESK
@@ -9154,6 +9170,8 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
 ///   spacetime call lumiere-v1-j1uo0 ensure_dev_admin '{}'
 #[spacetimedb::reducer]
 pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
+    require_dev_reducers_enabled()?;
+
     let caller = ctx.sender();
 
     ensure_minimal_dev_org(ctx)?;

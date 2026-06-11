@@ -177,6 +177,15 @@ pub struct UserRoleAssignment {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
+fn casbin_rule_belongs_to_org(rule: &CasbinRule, organization_id: u64) -> bool {
+    let org_id = organization_id.to_string();
+    match rule.ptype.as_str() {
+        "p" => rule.v1.as_deref() == Some(org_id.as_str()),
+        "g" => rule.v2.as_deref() == Some(org_id.as_str()),
+        _ => false,
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn create_role(
     ctx: &ReducerContext,
@@ -189,7 +198,7 @@ pub fn create_role(
         return Err("Role name cannot be empty".to_string());
     }
 
-    ctx.db.role().insert(Role {
+    let row = ctx.db.role().insert(Role {
         id: 0,
         organization_id,
         name: params.name,
@@ -203,6 +212,32 @@ pub fn create_role(
         updated_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "role",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": row.name,
+                    "permissions": row.permissions,
+                    "is_active": row.is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "permissions".to_string(),
+                "is_active".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -221,14 +256,66 @@ pub fn update_role(
 
     check_permission(ctx, role.organization_id, "role", "write")?;
 
+    let old_values = serde_json::json!({
+        "name": &role.name,
+        "description": &role.description,
+        "permissions": &role.permissions,
+        "is_active": role.is_active,
+    })
+    .to_string();
+    let organization_id = role.organization_id;
+
+    let updated_name = params.name.unwrap_or_else(|| role.name.clone());
+    let updated_description = params.description.or_else(|| role.description.clone());
+    let updated_permissions = params
+        .permissions
+        .unwrap_or_else(|| role.permissions.clone());
+    let updated_is_active = params.is_active.unwrap_or(role.is_active);
+    let mut changed_fields = Vec::new();
+    if updated_name != role.name {
+        changed_fields.push("name".to_string());
+    }
+    if updated_description != role.description {
+        changed_fields.push("description".to_string());
+    }
+    if updated_permissions != role.permissions {
+        changed_fields.push("permissions".to_string());
+    }
+    if updated_is_active != role.is_active {
+        changed_fields.push("is_active".to_string());
+    }
+
     ctx.db.role().id().update(Role {
-        name: params.name.unwrap_or(role.name),
-        description: params.description.or(role.description),
-        permissions: params.permissions.unwrap_or(role.permissions),
-        is_active: params.is_active.unwrap_or(role.is_active),
+        name: updated_name.clone(),
+        description: updated_description.clone(),
+        permissions: updated_permissions.clone(),
+        is_active: updated_is_active,
         updated_at: ctx.timestamp,
         ..role
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "role",
+            record_id: role_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: Some(
+                serde_json::json!({
+                    "name": updated_name,
+                    "description": updated_description,
+                    "permissions": updated_permissions,
+                    "is_active": updated_is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -247,7 +334,17 @@ pub fn add_casbin_rule(
         return Err("ptype must be 'p' (policy) or 'g' (grouping)".to_string());
     }
 
-    ctx.db.casbin_rule().insert(CasbinRule {
+    let org_id = organization_id.to_string();
+    let scoped_domain = if params.ptype == "p" {
+        params.v1.as_deref()
+    } else {
+        params.v2.as_deref()
+    };
+    if scoped_domain != Some(org_id.as_str()) {
+        return Err("Casbin rule domain must match organization".to_string());
+    }
+
+    let row = ctx.db.casbin_rule().insert(CasbinRule {
         id: 0,
         ptype: params.ptype,
         v0: params.v0,
@@ -260,6 +357,40 @@ pub fn add_casbin_rule(
         metadata: params.metadata,
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "casbin_rule",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "ptype": row.ptype,
+                    "v0": row.v0,
+                    "v1": row.v1,
+                    "v2": row.v2,
+                    "v3": row.v3,
+                    "v4": row.v4,
+                    "v5": row.v5,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "ptype".to_string(),
+                "v0".to_string(),
+                "v1".to_string(),
+                "v2".to_string(),
+                "v3".to_string(),
+                "v4".to_string(),
+                "v5".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -270,7 +401,45 @@ pub fn remove_casbin_rule(
     rule_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "casbin_rule", "delete")?;
+    let row = ctx
+        .db
+        .casbin_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Casbin rule not found")?;
+
+    if !casbin_rule_belongs_to_org(&row, organization_id) {
+        return Err("Casbin rule does not belong to this organization".to_string());
+    }
+
+    let old_values = serde_json::json!({
+        "ptype": row.ptype,
+        "v0": row.v0,
+        "v1": row.v1,
+        "v2": row.v2,
+        "v3": row.v3,
+        "v4": row.v4,
+        "v5": row.v5,
+    })
+    .to_string();
+
     ctx.db.casbin_rule().id().delete(&rule_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "casbin_rule",
+            record_id: rule_id,
+            action: "DELETE",
+            old_values: Some(old_values),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -303,27 +472,31 @@ pub fn grant_permission(
         created_at: ctx.timestamp,
     });
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "org_permission",
-        record_id: row.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: Some(
-            serde_json::json!({
-                "resource": params.resource,
-                "action": format!("{:?}", params.action),
-                "effect": format!("{:?}", params.effect),
-            })
-            .to_string(),
-        ),
-        changed_fields: vec![
-            "resource".to_string(),
-            "action".to_string(),
-            "effect".to_string(),
-        ],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "org_permission",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "resource": params.resource,
+                    "action": format!("{:?}", params.action),
+                    "effect": format!("{:?}", params.effect),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "resource".to_string(),
+                "action".to_string(),
+                "effect".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -356,16 +529,20 @@ pub fn revoke_permission(
 
     ctx.db.org_permission().id().delete(&permission_id);
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "org_permission",
-        record_id: permission_id,
-        action: "DELETE",
-        old_values: Some(old_values),
-        new_values: None,
-        changed_fields: vec![],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "org_permission",
+            record_id: permission_id,
+            action: "DELETE",
+            old_values: Some(old_values),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -401,7 +578,7 @@ pub fn assign_role(
         .expires_at_micros
         .map(|m| Timestamp::from_micros_since_unix_epoch(m as i64));
 
-    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+    let row = ctx.db.user_role_assignment().insert(UserRoleAssignment {
         id: 0,
         user_identity,
         role_id,
@@ -413,6 +590,32 @@ pub fn assign_role(
         is_active: true,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_role_assignment",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": user_identity.to_hex().to_string(),
+                    "role_id": role_id,
+                    "is_active": row.is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "user_identity".to_string(),
+                "role_id".to_string(),
+                "is_active".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -432,6 +635,20 @@ pub fn revoke_role(
         .find(&assignment_id)
         .ok_or("Role assignment not found")?;
 
+    if assignment.organization_id != organization_id {
+        return Err("Role assignment does not belong to this organization".to_string());
+    }
+
+    let old_values = serde_json::json!({
+        "user_identity": assignment.user_identity.to_hex().to_string(),
+        "role_id": assignment.role_id,
+        "is_active": assignment.is_active,
+    })
+    .to_string();
+
+    let user_identity = assignment.user_identity;
+    let role_id = assignment.role_id;
+
     ctx.db
         .user_role_assignment()
         .id()
@@ -439,6 +656,28 @@ pub fn revoke_role(
             is_active: false,
             ..assignment
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_role_assignment",
+            record_id: assignment_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": user_identity.to_hex().to_string(),
+                    "role_id": role_id,
+                    "is_active": false,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
