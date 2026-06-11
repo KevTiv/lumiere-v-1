@@ -67,11 +67,18 @@ import {
   useCreateProductVariant,
   useCreateStockPicking,
   useCreateInventoryAdjustment,
+  useCreateStockInventory,
+  useCreateStockInventoryLine,
+  useUpdateStockInventoryState,
   useCreateStockLocation,
+  useUpdateStockLocation,
   useCreateWarehouse,
   useUpdateWarehouse,
   useDeleteWarehouse,
   useDeleteStockLocation,
+  useCreateStockMove,
+  useConfirmStockMove,
+  useAssignStockMove,
   useConfirmStockPicking,
   useAssignStockPicking,
   useAssignUserToPicking,
@@ -93,17 +100,25 @@ import {
   useCancelQualityAlert,
   useDeleteQualityAlert,
   useCreateQualityPoint,
+  useUpdateQualityPoint,
   useDeleteQualityPoint,
   useCreateQualityTeam,
+  useUpdateQualityTeam,
   useDeleteQualityTeam,
   // Barcode management
   useCreateBarcodeRule,
   useUpdateBarcodeRule,
   useDeleteBarcodeRule,
   useRecordBarcodeScan,
+  useCreateBarcodeNomenclature,
+  useUpdateBarcodeNomenclature,
+  useDeleteBarcodeNomenclature,
+  useAddRuleToNomenclature,
   useRemoveRuleFromNomenclature,
   useCreateAdjustmentReason,
   useUseSerial,
+  useCreateStockProductionLot,
+  useCreateStockProductionSerial,
   useCreateTraceabilityRecord,
   useCreateTraceabilityReport,
   useRunTraceabilityReport,
@@ -151,6 +166,12 @@ import {
   useDeleteStockProductionLot,
   useUpdateStockProductionSerial,
   useDeleteStockProductionSerial,
+  useUpdateProductVariant,
+  useUpdateProductInventoryData,
+  useUpdateProductPricing,
+  useCreateUomCategory,
+  useCreateUom,
+  useCreateUomConversion,
   useCreateWarehouse3dZone,
   useUpdateWarehouse3dZone,
   useDeleteWarehouse3dZone,
@@ -162,7 +183,16 @@ import {
   useUpdateProductPackaging,
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
-  useInventoryCsvImportMutations,
+  useImportUomCategoryCsv,
+  useImportUomCsv,
+  useImportProductCategoryCsv,
+  useImportProductCsv,
+  useImportProductVariantCsv,
+  useImportWarehouseCsv,
+  useImportStockLocationCsv,
+  useImportStockQuantCsv,
+  useImportLotCsv,
+  useUpdateWhatsappQualityScore,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -209,6 +239,7 @@ import {
   warehouse3dZoneParamsFromForm,
 } from "@/lib/inventory-ext-params"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import { CycleCountWizard } from "./cycle-count-wizard"
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
@@ -310,7 +341,17 @@ function InventoryClientLoaded({
   const { data: stockTraceabilityReports = [] } = useStockTraceabilityReports(orgId)
   const { data: orgUsers = [] } = useOrgUsers()
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const csvImports = useInventoryCsvImportMutations(orgId, companyId)
+  const csvImports = {
+    importUomCategory: useImportUomCategoryCsv(orgId),
+    importUom: useImportUomCsv(orgId),
+    importProductCategory: useImportProductCategoryCsv(orgId),
+    importProduct: useImportProductCsv(orgId),
+    importProductVariant: useImportProductVariantCsv(orgId),
+    importWarehouse: useImportWarehouseCsv(orgId, companyId),
+    importStockLocation: useImportStockLocationCsv(orgId, companyId),
+    importStockQuant: useImportStockQuantCsv(orgId, companyId),
+    importLot: useImportLotCsv(orgId, companyId),
+  }
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -422,7 +463,11 @@ function InventoryClientLoaded({
   const createProduct = useCreateProduct(orgId)
   const createStockPicking = useCreateStockPicking(orgId, { companyId })
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId)
+  const createStockInventory = useCreateStockInventory(orgId, companyId)
+  const createStockInventoryLine = useCreateStockInventoryLine(orgId, companyId)
+  const updateStockInventoryState = useUpdateStockInventoryState(orgId, companyId)
   const createStockLocation = useCreateStockLocation(orgId)
+  const updateStockLocation = useUpdateStockLocation(orgId)
   const createWarehouse = useCreateWarehouse(orgId)
   const updateWarehouse = useUpdateWarehouse(orgId)
   const deleteWarehouse = useDeleteWarehouse(orgId)
@@ -430,6 +475,9 @@ function InventoryClientLoaded({
   const deleteProduct = useDeleteProduct(orgId)
   const createProductVariant = useCreateProductVariant(orgId)
   const deleteStockLocation = useDeleteStockLocation(orgId)
+  const createStockMove = useCreateStockMove(orgId, companyId)
+  const confirmStockMove = useConfirmStockMove(orgId, companyId)
+  const assignStockMove = useAssignStockMove(orgId, companyId)
   const doneStockMove = useDoneStockMove(orgId, companyId)
   const cancelStockMove = useCancelStockMove(orgId, companyId)
   const assignUserToPicking = useAssignUserToPicking(orgId, companyId)
@@ -525,8 +573,10 @@ function InventoryClientLoaded({
   const cancelQualityAlert = useCancelQualityAlert(orgId, companyId)
   const deleteQualityAlert = useDeleteQualityAlert(orgId, companyId)
   const createQualityPoint = useCreateQualityPoint(orgId, companyId)
+  const updateQualityPoint = useUpdateQualityPoint(orgId, companyId)
   const deleteQualityPoint = useDeleteQualityPoint(orgId, companyId)
   const createQualityTeam = useCreateQualityTeam(orgId, companyId)
+  const updateQualityTeam = useUpdateQualityTeam(orgId, companyId)
   const deleteQualityTeam = useDeleteQualityTeam(orgId, companyId)
 
   // Barcode hooks
@@ -534,9 +584,15 @@ function InventoryClientLoaded({
   const updateBarcodeRule = useUpdateBarcodeRule(orgId, companyId)
   const deleteBarcodeRule = useDeleteBarcodeRule(orgId, companyId)
   const recordBarcodeScan = useRecordBarcodeScan(orgId, companyId)
+  const createBarcodeNomenclature = useCreateBarcodeNomenclature(orgId, companyId)
+  const updateBarcodeNomenclature = useUpdateBarcodeNomenclature(orgId, companyId)
+  const deleteBarcodeNomenclature = useDeleteBarcodeNomenclature(orgId, companyId)
+  const addRuleToNomenclature = useAddRuleToNomenclature(orgId, companyId)
   const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(orgId, companyId)
   const createAdjustmentReason = useCreateAdjustmentReason(orgId, companyId)
   const useSerial = useUseSerial(orgId, companyId)
+  const createStockProductionLot = useCreateStockProductionLot(orgId, companyId)
+  const createStockProductionSerial = useCreateStockProductionSerial(orgId, companyId)
   const createTraceabilityRecord = useCreateTraceabilityRecord(orgId, companyId)
   const createTraceabilityReport = useCreateTraceabilityReport(orgId, companyId)
   const runTraceabilityReport = useRunTraceabilityReport(orgId, companyId)
@@ -590,6 +646,12 @@ function InventoryClientLoaded({
   const deleteStockProductionLot = useDeleteStockProductionLot(orgId)
   const updateStockProductionSerial = useUpdateStockProductionSerial(orgId)
   const deleteStockProductionSerial = useDeleteStockProductionSerial(orgId)
+  const updateProductVariant = useUpdateProductVariant(orgId, companyId)
+  const updateProductInventoryData = useUpdateProductInventoryData(orgId, companyId)
+  const updateProductPricing = useUpdateProductPricing(orgId, companyId)
+  const createUomCategory = useCreateUomCategory(orgId, companyId)
+  const createUom = useCreateUom(orgId, companyId)
+  const createUomConversion = useCreateUomConversion(orgId, companyId)
   const createWarehouse3dZone = useCreateWarehouse3dZone(orgId)
   const updateWarehouse3dZone = useUpdateWarehouse3dZone(orgId)
   const deleteWarehouse3dZone = useDeleteWarehouse3dZone(orgId)
@@ -601,6 +663,32 @@ function InventoryClientLoaded({
   const updateProductPackaging = useUpdateProductPackaging(orgId)
   const restoreProductCategory = useRestoreProductCategory(orgId)
   const upsertWarehouseGeo = useUpsertWarehouseGeo(orgId)
+  const updateWhatsappQualityScore = useUpdateWhatsappQualityScore(orgId)
+
+  const promptText = (message: string, defaultValue = ""): string | null => {
+    if (typeof window === "undefined") return null
+    const raw = window.prompt(message, defaultValue)
+    if (raw == null) return null
+    const text = raw.trim()
+    return text === "" ? null : text
+  }
+
+  const promptScalarId = (message: string): ScalarId | null => promptText(message)
+
+  const promptNumber = (message: string, defaultValue = "0"): number | null => {
+    const raw = promptText(message, defaultValue)
+    if (raw == null) return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const promptOptionalNumber = (message: string): number | undefined => {
+    if (typeof window === "undefined") return undefined
+    const raw = window.prompt(message)
+    if (raw == null || raw.trim() === "") return undefined
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : undefined
+  }
 
   const stockOnHandLocationOptions = useMemo(() => {
     const opts = locations.map((loc) => ({
@@ -1052,6 +1140,116 @@ function InventoryClientLoaded({
                   },
                 },
                 {
+                  id: "update-product-pricing",
+                  label: t("inventory.productActions.updatePricing"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const productId = rows[0]?.id as ScalarId | undefined
+                    if (productId == null) return
+                    const standardPrice = promptOptionalNumber(t("inventory.productActions.standardPricePrompt"))
+                    const listPrice = promptOptionalNumber(t("inventory.productActions.listPricePrompt"))
+                    if (standardPrice == null && listPrice == null) return
+                    void updateProductPricing.mutateAsync({
+                      productId,
+                      params: { standard_price: standardPrice, list_price: listPrice },
+                    })
+                  },
+                },
+                {
+                  id: "update-product-inventory-data",
+                  label: t("inventory.productActions.updateInventoryData"),
+                  icon: PackageOpen,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const productId = rows[0]?.id as ScalarId | undefined
+                    if (productId == null) return
+                    const qtyAvailable = promptOptionalNumber(t("inventory.productActions.qtyAvailablePrompt"))
+                    const virtualAvailable = promptOptionalNumber(t("inventory.productActions.virtualAvailablePrompt"))
+                    if (qtyAvailable == null && virtualAvailable == null) return
+                    void updateProductInventoryData.mutateAsync({
+                      productId,
+                      params: { qty_available: qtyAvailable, virtual_available: virtualAvailable },
+                    })
+                  },
+                },
+                {
+                  id: "update-product-variant",
+                  label: t("inventory.productActions.updateVariantById"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    const variantId = promptScalarId(t("inventory.productActions.variantIdPrompt"))
+                    if (variantId == null) return
+                    const name = promptText(t("inventory.productActions.variantNamePrompt"))
+                    const standardPrice = promptOptionalNumber(t("inventory.productActions.standardPricePrompt"))
+                    if (name == null && standardPrice == null) return
+                    void updateProductVariant.mutateAsync({
+                      variantId,
+                      params: { name: name ?? undefined, standard_price: standardPrice },
+                    })
+                  },
+                },
+                {
+                  id: "create-uom-category",
+                  label: t("inventory.uomActions.createCategory"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    const name = promptText(t("inventory.uomActions.categoryNamePrompt"))
+                    if (name == null) return
+                    void createUomCategory.mutateAsync({
+                      name,
+                      description: null,
+                      sequence: 10,
+                      metadata: null,
+                    })
+                  },
+                },
+                {
+                  id: "create-uom",
+                  label: t("inventory.uomActions.createUom"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    const categoryId = promptScalarId(t("inventory.uomActions.categoryIdPrompt"))
+                    const name = promptText(t("inventory.uomActions.uomNamePrompt"))
+                    const symbol = promptText(t("inventory.uomActions.symbolPrompt"))
+                    if (categoryId == null || name == null || symbol == null) return
+                    void createUom.mutateAsync({
+                      category_id: Number(categoryId),
+                      name,
+                      symbol,
+                      factor: 1,
+                      rounding: 0.01,
+                      times_bigger: 1,
+                      is_reference_unit: false,
+                      is_active: true,
+                      metadata: null,
+                    })
+                  },
+                },
+                {
+                  id: "create-uom-conversion",
+                  label: t("inventory.uomActions.createConversion"),
+                  requiresSelection: false,
+                  onClick: () => {
+                    const categoryId = promptScalarId(t("inventory.uomActions.categoryIdPrompt"))
+                    const fromUomId = promptScalarId(t("inventory.uomActions.fromUomIdPrompt"))
+                    const toUomId = promptScalarId(t("inventory.uomActions.toUomIdPrompt"))
+                    const factor = promptNumber(t("inventory.uomActions.factorPrompt"), "1")
+                    if (categoryId == null || fromUomId == null || toUomId == null || factor == null) return
+                    void createUomConversion.mutateAsync({
+                      categoryId,
+                      params: {
+                        from_uom_id: Number(fromUomId),
+                        to_uom_id: Number(toUomId),
+                        factor,
+                        product_id: null,
+                        is_active: true,
+                        metadata: null,
+                      },
+                    })
+                  },
+                },
+                {
                   id: "update-supplier-line",
                   label: t("inventory.productActions.updateSupplierLineById"),
                   requiresSelection: false,
@@ -1173,6 +1371,102 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "create-stock-move",
+                  label: t("inventory.stockMoveActions.create"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const productId = promptScalarId(t("inventory.stockMoveActions.productIdPrompt"))
+                    const productUom = promptScalarId(t("inventory.stockMoveActions.uomIdPrompt"))
+                    const locationId = promptScalarId(t("inventory.stockMoveActions.locationIdPrompt"))
+                    const locationDestId = promptScalarId(t("inventory.stockMoveActions.locationDestIdPrompt"))
+                    const qty = promptNumber(t("inventory.stockMoveActions.quantityPrompt"), "1")
+                    if (
+                      productId == null ||
+                      productUom == null ||
+                      locationId == null ||
+                      locationDestId == null ||
+                      qty == null
+                    ) {
+                      return
+                    }
+                    void createStockMove.mutateAsync({
+                      company_id: Number(companyId),
+                      name: promptText(t("inventory.stockMoveActions.namePrompt"), "Manual Stock Move") ?? "Manual Stock Move",
+                      product_id: Number(productId),
+                      product_tmpl_id: Number(productId),
+                      product_uom: Number(productUom),
+                      product_uom_qty: qty,
+                      location_id: Number(locationId),
+                      location_dest_id: Number(locationDestId),
+                      date_expected: stbTimestampFromDate(new Date()),
+                      move_type: "direct",
+                      priority: "0",
+                      reference: null,
+                      sequence: 10,
+                      origin: null,
+                      note: null,
+                      date: null,
+                      date_deadline: null,
+                      picking_id: null,
+                      picking_type_id: null,
+                      partner_id: null,
+                      product_variant_id: null,
+                      group_id: null,
+                      rule_id: null,
+                      procure_method: "make_to_stock",
+                      price_unit: 0,
+                      scrapped: false,
+                      to_refund: false,
+                      propagate_cancel: false,
+                      delay_alert: false,
+                      product_packaging_id: null,
+                      product_packaging_qty: 0,
+                      warehouse_id: null,
+                      production_id: null,
+                      raw_material_production_id: null,
+                      unbuild_id: null,
+                      consume_unbuild_id: null,
+                      cost_share: 0,
+                      is_subcontract: false,
+                      purchase_line_id: null,
+                      need_release: false,
+                      release_ready: false,
+                      propagation_cancel: false,
+                      has_tracking: false,
+                      inventory_id: null,
+                      sale_line_id: null,
+                      lot_id: null,
+                      package_id: null,
+                      result_package_id: null,
+                      owner_id: null,
+                      package_level_id: null,
+                      product_type: null,
+                      metadata: null,
+                    })
+                  },
+                },
+                {
+                  id: "confirm-move",
+                  label: t("inventory.stockMoveActions.confirm"),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void confirmStockMove.mutateAsync(id)
+                  },
+                },
+                {
+                  id: "assign-move",
+                  label: t("inventory.stockMoveActions.assign"),
+                  icon: UserCircle2,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) void assignStockMove.mutateAsync(id)
+                  },
+                },
+                {
                   id: "done-move",
                   label: t("inventory.stockMoveActions.done"),
                   icon: CheckCircle,
@@ -1271,6 +1565,98 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "create-stock-inventory",
+                  label: t("inventory.stockInventoryActions.create"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const name = promptText(t("inventory.stockInventoryActions.namePrompt"), "Cycle Count")
+                    if (name == null) return
+                    void createStockInventory.mutateAsync({
+                      company_id: Number(companyId),
+                      name,
+                      location_ids: [],
+                      product_ids: [],
+                      lot_ids: [],
+                      owner_ids: [],
+                      package_ids: [],
+                      state: "draft",
+                      accounting_date: null,
+                      category_id: null,
+                      counted_mode: "all",
+                      done_move_ids: [],
+                      move_ids: [],
+                      adjustment_count: 0,
+                      has_account_moves: false,
+                      exhausted: false,
+                      prefilled_count: 0,
+                      started: false,
+                      is_editable: true,
+                      is_stock_check: true,
+                      metadata: null,
+                    })
+                  },
+                },
+                {
+                  id: "create-stock-inventory-line",
+                  label: t("inventory.stockInventoryActions.addLine"),
+                  icon: ListChecks,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const inventoryId = promptScalarId(t("inventory.stockInventoryActions.inventoryIdPrompt"))
+                    const productId = promptScalarId(t("inventory.stockInventoryActions.productIdPrompt"))
+                    const uomId = promptScalarId(t("inventory.stockInventoryActions.uomIdPrompt"))
+                    const locationId = promptScalarId(t("inventory.stockInventoryActions.locationIdPrompt"))
+                    const qty = promptNumber(t("inventory.stockInventoryActions.productQtyPrompt"), "0")
+                    if (inventoryId == null || productId == null || uomId == null || locationId == null || qty == null) return
+                    void createStockInventoryLine.mutateAsync({
+                      inventoryId,
+                      params: {
+                        product_id: Number(productId),
+                        product_variant_id: null,
+                        product_uom_id: Number(uomId),
+                        location_id: Number(locationId),
+                        location_name: null,
+                        prod_lot_id: null,
+                        package_id: null,
+                        partner_id: null,
+                        theoretical_qty: 0,
+                        product_qty: qty,
+                        inventory_location_id: null,
+                        inventory_product_id: null,
+                        inventory_prod_lot_id: null,
+                        inventory_package_id: null,
+                        inventory_partner_id: null,
+                        package_level_id: null,
+                        package_level_id_visible: false,
+                        state: "draft",
+                        product_tracking: "none",
+                        product_barcode: null,
+                        product_type: "product",
+                        is_editable: true,
+                        outdated: false,
+                        inventory_location_id_name: null,
+                        inventory_product_id_name: null,
+                        theoretical_qty_text: null,
+                        product_uom_category_id: null,
+                        metadata: null,
+                      },
+                    })
+                  },
+                },
+                {
+                  id: "set-stock-inventory-state",
+                  label: t("inventory.stockInventoryActions.setState"),
+                  icon: Pencil,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const inventoryId = promptScalarId(t("inventory.stockInventoryActions.inventoryIdPrompt"))
+                    const newState = promptText(t("inventory.stockInventoryActions.statePrompt"), "confirm")
+                    if (inventoryId == null || newState == null) return
+                    void updateStockInventoryState.mutateAsync({ inventoryId, newState })
+                  },
+                },
+                {
                   id: "process-adjustment",
                   label: t("inventory.adjustmentActions.process"),
                   requiresSelection: true,
@@ -1299,6 +1685,24 @@ function InventoryClientLoaded({
                   onClick: () => setCsvKind("stockLocation"),
                 },
                 {
+                  id: "edit-location",
+                  label: t("common.edit"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    const locationId = row?.id as ScalarId | undefined
+                    if (locationId == null) return
+                    const name = promptText(t("inventory.locationActions.namePrompt"), String(row?.name ?? ""))
+                    const barcode = promptText(t("inventory.locationActions.barcodePrompt"), String(row?.barcode ?? ""))
+                    if (name == null && barcode == null) return
+                    void updateStockLocation.mutateAsync({
+                      locationId,
+                      params: { name: name ?? undefined, barcode: barcode ?? undefined },
+                    })
+                  },
+                },
+                {
                   id: "delete-location",
                   label: t("common.delete"),
                   variant: "destructive",
@@ -1325,6 +1729,36 @@ function InventoryClientLoaded({
                   id: "csv-lot",
                   label: t("inventory.csvImport.toolbarLots"),
                   onClick: () => setCsvKind("lot"),
+                },
+                {
+                  id: "create-lot",
+                  label: t("inventory.lotActions.create"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const name = promptText(t("inventory.lotActions.namePrompt"))
+                    const productId = promptScalarId(t("inventory.lotActions.productIdPrompt"))
+                    if (name == null || productId == null) return
+                    void createStockProductionLot.mutateAsync({
+                      company_id: Number(companyId),
+                      name,
+                      product_id: Number(productId),
+                      product_variant_id: null,
+                      ref_: null,
+                      note: null,
+                      expiration_date: null,
+                      use_date: null,
+                      removal_date: null,
+                      alert_date: null,
+                      product_qty: 0,
+                      location_id: null,
+                      package_id: null,
+                      owner_id: null,
+                      is_scrap: false,
+                      is_locked: false,
+                      metadata: null,
+                    })
+                  },
                 },
                 {
                   id: "edit-lot-note",
@@ -1369,6 +1803,43 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                {
+                  id: "create-serial",
+                  label: t("inventory.serialActions.create"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const name = promptText(t("inventory.serialActions.namePrompt"))
+                    const productId = promptScalarId(t("inventory.serialActions.productIdPrompt"))
+                    if (name == null || productId == null) return
+                    void createStockProductionSerial.mutateAsync({
+                      company_id: Number(companyId),
+                      name,
+                      product_id: Number(productId),
+                      product_variant_id: null,
+                      lot_id: null,
+                      ref_: null,
+                      note: null,
+                      expiration_date: null,
+                      use_date: null,
+                      removal_date: null,
+                      alert_date: null,
+                      product_qty: 1,
+                      location_id: null,
+                      package_id: null,
+                      owner_id: null,
+                      state: "available",
+                      is_scrap: false,
+                      is_locked: false,
+                      warranty_expiration: null,
+                      warranty_start: null,
+                      last_maintenance: null,
+                      next_maintenance: null,
+                      maintenance_count: 0,
+                      metadata: null,
+                    })
+                  },
+                },
                 {
                   id: "use-serial",
                   label: t("inventory.productionSerials.actions.markInUse"),
@@ -1573,6 +2044,40 @@ function InventoryClientLoaded({
                     const hex = window.prompt(t("inventory.qualityActions.memberIdentityPrompt"))
                     if (hex == null || hex.trim() === "") return
                     void addMemberToQualityTeam.mutateAsync({ teamId, memberIdentityHex: hex.trim() })
+                  },
+                },
+                {
+                  id: "update-quality-point",
+                  label: t("inventory.qualityActions.updatePoint"),
+                  icon: Pencil,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const pointId = promptScalarId(t("inventory.qualityActions.pointIdPrompt"))
+                    if (pointId == null) return
+                    const name = promptText(t("inventory.qualityActions.pointNamePrompt"))
+                    const testType = promptText(t("inventory.qualityActions.testTypePrompt"))
+                    if (name == null && testType == null) return
+                    void updateQualityPoint.mutateAsync({
+                      pointId,
+                      params: { name: name ?? undefined, test_type: testType ?? undefined },
+                    })
+                  },
+                },
+                {
+                  id: "update-quality-team",
+                  label: t("inventory.qualityActions.updateTeam"),
+                  icon: Pencil,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const teamId = promptScalarId(t("inventory.qualityActions.teamIdPrompt"))
+                    if (teamId == null) return
+                    const name = promptText(t("inventory.qualityActions.teamNamePrompt"))
+                    const email = promptText(t("inventory.qualityActions.teamEmailPrompt"))
+                    if (name == null && email == null) return
+                    void updateQualityTeam.mutateAsync({
+                      teamId,
+                      params: { name: name ?? undefined, email: email ?? undefined },
+                    })
                   },
                 },
                 {
@@ -1848,6 +2353,18 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "set-whatsapp-quality-score",
+                  label: t("inventory.barcodeActions.setWhatsappQualityScore"),
+                  icon: ScanLine,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const accountId = promptScalarId(t("inventory.barcodeActions.whatsappAccountIdPrompt"))
+                    const qualityScore = promptText(t("inventory.barcodeActions.whatsappQualityScorePrompt"), "UNKNOWN")
+                    if (accountId == null || qualityScore == null) return
+                    void updateWhatsappQualityScore.mutateAsync({ accountId, qualityScore })
+                  },
+                },
+                {
                   id: "delete-barcode-rule",
                   label: t("common.delete"),
                   icon: Trash2,
@@ -1880,6 +2397,53 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: "create-barcode-nomenclature",
+                  label: t("inventory.barcodeNomenclatures.actions.create"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => {
+                    const name = promptText(t("inventory.barcodeNomenclatures.actions.namePrompt"))
+                    if (name == null) return
+                    void createBarcodeNomenclature.mutateAsync({
+                      name,
+                      description: null,
+                      is_default: false,
+                      upc_ean_conv: "none",
+                      is_active: true,
+                      metadata: null,
+                    })
+                  },
+                },
+                {
+                  id: "update-barcode-nomenclature",
+                  label: t("common.edit"),
+                  icon: Pencil,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined
+                    const nomenclatureId = row?.id as ScalarId | undefined
+                    if (nomenclatureId == null) return
+                    const name = promptText(t("inventory.barcodeNomenclatures.actions.namePrompt"), String(row?.name ?? ""))
+                    if (name == null) return
+                    void updateBarcodeNomenclature.mutateAsync({
+                      nomenclatureId,
+                      params: { name, is_active: true },
+                    })
+                  },
+                },
+                {
+                  id: "add-rule-to-nomenclature",
+                  label: t("inventory.barcodeNomenclatures.actions.addRule"),
+                  icon: Plus,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const nomenclatureId = rows[0]?.id as ScalarId | undefined
+                    const ruleId = promptScalarId(t("inventory.barcodeNomenclatures.actions.ruleIdPrompt"))
+                    if (nomenclatureId == null || ruleId == null) return
+                    void addRuleToNomenclature.mutateAsync({ nomenclatureId, ruleId })
+                  },
+                },
+                {
                   id: "remove-rule-from-nomenclature",
                   label: t("inventory.barcodeNomenclatures.actions.removeRule"),
                   icon: Pencil,
@@ -1892,6 +2456,20 @@ function InventoryClientLoaded({
                     const ruleId = Number(raw.trim())
                     if (!Number.isFinite(ruleId)) return
                     void removeRuleFromNomenclature.mutateAsync({ nomenclatureId, ruleId })
+                  },
+                },
+                {
+                  id: "delete-barcode-nomenclature",
+                  label: t("common.delete"),
+                  icon: Trash2,
+                  variant: "destructive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const nomenclatureId = rows[0]?.id as ScalarId | undefined
+                    if (nomenclatureId == null || typeof window === "undefined") return
+                    if (window.confirm(t("inventory.barcodeNomenclatures.actions.confirmDelete"))) {
+                      void deleteBarcodeNomenclature.mutateAsync(nomenclatureId)
+                    }
                   },
                 },
               ],
@@ -2051,6 +2629,19 @@ function InventoryClientLoaded({
     deleteStockLocation,
     deleteProduct,
     deleteWarehouse,
+    updateProductPricing,
+    updateProductInventoryData,
+    updateProductVariant,
+    createUomCategory,
+    createUom,
+    createUomConversion,
+    createStockInventory,
+    createStockInventoryLine,
+    updateStockInventoryState,
+    updateStockLocation,
+    createStockMove,
+    confirmStockMove,
+    assignStockMove,
     doneStockMove,
     cancelStockMove,
     // Quality management
@@ -2058,7 +2649,9 @@ function InventoryClientLoaded({
     failQualityCheck,
     deleteQualityCheck,
     deleteQualityAlert,
+    updateQualityPoint,
     deleteQualityPoint,
+    updateQualityTeam,
     deleteQualityTeam,
     // Replenishment
     triggerReplenishment,
@@ -2075,6 +2668,11 @@ function InventoryClientLoaded({
     deleteStockRule,
     // Barcode
     deleteBarcodeRule,
+    updateWhatsappQualityScore,
+    createBarcodeNomenclature,
+    updateBarcodeNomenclature,
+    addRuleToNomenclature,
+    deleteBarcodeNomenclature,
     // Warehouse tasks
     startWarehouseTask,
     completeWarehouseTask,
@@ -2092,8 +2690,10 @@ function InventoryClientLoaded({
     removeMemberFromQualityTeam,
     updateStockQuantQuantity,
     updateStockProductionLot,
+    createStockProductionLot,
     deleteStockProductionLot,
     updateStockProductionSerial,
+    createStockProductionSerial,
     deleteStockProductionSerial,
     linkDeviceToQualityCheck,
     upsertWarehouseGeo,
@@ -2105,6 +2705,10 @@ function InventoryClientLoaded({
     useSerial,
     removeRuleFromNomenclature,
     runTraceabilityReport,
+    promptText,
+    promptScalarId,
+    promptNumber,
+    promptOptionalNumber,
     // Data dependencies for form configs
     products,
     warehouses,
@@ -2334,7 +2938,11 @@ function InventoryClientLoaded({
       createProduct,
       createStockPicking,
       createInventoryAdjustment,
+      createStockInventory,
+      createStockInventoryLine,
+      updateStockInventoryState,
       createStockLocation,
+      updateStockLocation,
       createWarehouse,
       updateWarehouse,
       deleteWarehouse,
@@ -2342,6 +2950,9 @@ function InventoryClientLoaded({
       deleteProduct,
       createProductVariant,
       deleteStockLocation,
+      createStockMove,
+      confirmStockMove,
+      assignStockMove,
       doneStockMove,
       cancelStockMove,
       assignUserToPicking,
@@ -2362,16 +2973,24 @@ function InventoryClientLoaded({
       cancelQualityAlert,
       deleteQualityAlert,
       createQualityPoint,
+      updateQualityPoint,
       deleteQualityPoint,
       createQualityTeam,
+      updateQualityTeam,
       deleteQualityTeam,
       createBarcodeRule,
       updateBarcodeRule,
       deleteBarcodeRule,
       recordBarcodeScan,
+      createBarcodeNomenclature,
+      updateBarcodeNomenclature,
+      deleteBarcodeNomenclature,
+      addRuleToNomenclature,
       removeRuleFromNomenclature,
       createAdjustmentReason,
       useSerial,
+      createStockProductionLot,
+      createStockProductionSerial,
       createTraceabilityRecord,
       createTraceabilityReport,
       runTraceabilityReport,
@@ -2414,6 +3033,12 @@ function InventoryClientLoaded({
       deleteStockProductionLot,
       updateStockProductionSerial,
       deleteStockProductionSerial,
+      updateProductVariant,
+      updateProductInventoryData,
+      updateProductPricing,
+      createUomCategory,
+      createUom,
+      createUomConversion,
       createWarehouse3dZone,
       updateWarehouse3dZone,
       deleteWarehouse3dZone,
@@ -2425,6 +3050,7 @@ function InventoryClientLoaded({
       updateProductPackaging,
       restoreProductCategory,
       upsertWarehouseGeo,
+      updateWhatsappQualityScore,
     ].some((h) => h.isPending) || Object.values(csvImports).some((h) => h.isPending)
 
   return (

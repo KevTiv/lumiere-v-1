@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import type { TFunction } from "i18next"
 import { EntityView } from "@/components/entity-views/entity-view"
 import { budgetsTableConfig } from "@/lib/entity-configs"
 import type { EntityTableConfig, EntityViewConfig } from "@/lib/entity-view-types"
-import { budgetPostForm, updateBudgetLineActualsForm } from "@/lib/accounting-form-configs"
+import type { FormConfig } from "@/lib/form-types"
+import { budgetPostForm, newBudgetForm, updateBudgetLineActualsForm } from "@/lib/accounting-form-configs"
 import { mergeFieldDefaultValues } from "@/lib/form-config-merge"
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
@@ -31,6 +33,16 @@ function rowState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
+}
+
+function dateInputValue(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "object" && "microsSinceUnixEpoch" in value) {
+    const micros = Number((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch)
+    if (Number.isFinite(micros)) return new Date(micros / 1000).toISOString().slice(0, 10)
+  }
+  const date = new Date(String(value))
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10)
 }
 
 const budgetPostsTableConfig: EntityViewConfig = {
@@ -66,10 +78,71 @@ const budgetPostsTableConfig: EntityViewConfig = {
   },
 }
 
+const budgetLineForm = (t: TFunction): FormConfig => ({
+  id: "budget-line",
+  title: t("accounting.budgets.workspace.lineFormTitle"),
+  description: t("accounting.budgets.workspace.lineFormDescription"),
+  submitLabel: t("common.save"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      columns: 2,
+      fields: [
+        { id: "lineId", name: "lineId", type: "hidden", defaultValue: "" },
+        {
+          id: "analyticAccountId",
+          name: "analyticAccountId",
+          type: "text",
+          label: t("accounting.budgets.workspace.colAnalytic"),
+          width: "1/2",
+        },
+        {
+          id: "plannedAmount",
+          name: "plannedAmount",
+          type: "number",
+          label: t("accounting.budgets.planned"),
+          required: true,
+          step: 0.01,
+          width: "1/2",
+        },
+        {
+          id: "dateFrom",
+          name: "dateFrom",
+          type: "date",
+          label: t("accounting.forms.newBudget.fields.dateFrom"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "dateTo",
+          name: "dateTo",
+          type: "date",
+          label: t("accounting.forms.newBudget.fields.dateTo"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "metadata",
+          name: "metadata",
+          type: "textarea",
+          label: t("common.metadata"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
 export interface BudgetsWorkspaceProps {
   budgets: Record<string, unknown>[]
   budgetLines: Record<string, unknown>[]
   budgetPosts: Record<string, unknown>[]
+  onCreateBudget: (params: Record<string, unknown>) => void | Promise<void>
+  onUpdateBudget: (budgetId: bigint, params: Record<string, unknown>) => void | Promise<void>
+  onCreateBudgetLine: (budgetId: bigint, params: Record<string, unknown>) => void | Promise<void>
+  onUpdateBudgetLine: (lineId: bigint, params: Record<string, unknown>) => void | Promise<void>
   onConfirmBudget: (budgetId: bigint) => void | Promise<void>
   onValidateBudget: (budgetId: bigint) => void | Promise<void>
   onDoneBudget: (budgetId: bigint) => void | Promise<void>
@@ -90,6 +163,10 @@ export function BudgetsWorkspace({
   budgets,
   budgetLines,
   budgetPosts,
+  onCreateBudget,
+  onUpdateBudget,
+  onCreateBudgetLine,
+  onUpdateBudgetLine,
   onConfirmBudget,
   onValidateBudget,
   onDoneBudget,
@@ -104,6 +181,27 @@ export function BudgetsWorkspace({
 }: BudgetsWorkspaceProps) {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null)
+
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false)
+  const [budgetFormKey, setBudgetFormKey] = useState(0)
+  const [budgetDefaults, setBudgetDefaults] = useState<Record<string, unknown>>({
+    budgetId: "",
+    name: "",
+    description: "",
+    dateFrom: "",
+    dateTo: "",
+  })
+
+  const [lineModalOpen, setLineModalOpen] = useState(false)
+  const [lineFormKey, setLineFormKey] = useState(0)
+  const [lineDefaults, setLineDefaults] = useState<Record<string, unknown>>({
+    lineId: "",
+    analyticAccountId: "",
+    plannedAmount: 0,
+    dateFrom: "",
+    dateTo: "",
+    metadata: "",
+  })
 
   const [postModalOpen, setPostModalOpen] = useState(false)
   const [postFormKey, setPostFormKey] = useState(0)
@@ -164,6 +262,23 @@ export function BudgetsWorkspace({
   }, [t])
 
   const baseBudgetPostForm = useMemo(() => budgetPostForm(t), [t])
+  const baseBudgetForm = useMemo(() => newBudgetForm(t), [t])
+  const budgetFormConfig = useMemo(() => {
+    const merged = mergeFieldDefaultValues(baseBudgetForm, budgetDefaults)
+    const isEdit = String(budgetDefaults.budgetId ?? "").trim() !== ""
+    return {
+      ...merged,
+      title: isEdit ? t("accounting.budgets.workspace.editBudget") : merged.title,
+      submitLabel: isEdit ? t("common.save") : merged.submitLabel,
+    }
+  }, [baseBudgetForm, budgetDefaults, t])
+
+  const baseBudgetLineForm = useMemo(() => budgetLineForm(t), [t])
+  const budgetLineFormConfig = useMemo(
+    () => mergeFieldDefaultValues(baseBudgetLineForm, lineDefaults),
+    [baseBudgetLineForm, lineDefaults],
+  )
+
   const budgetPostFormConfig = useMemo(() => {
     const merged = mergeFieldDefaultValues(baseBudgetPostForm, postDefaults)
     const isEdit = String(postDefaults.postId ?? "").trim() !== ""
@@ -187,6 +302,91 @@ export function BudgetsWorkspace({
     if (selectedId == null) return []
     return budgetLines.filter((l) => BigInt(String(l.generalBudgetId ?? 0)) === selectedId)
   }, [budgetLines, selectedId])
+
+  const openNewBudget = () => {
+    setBudgetFormKey((k) => k + 1)
+    setBudgetDefaults({
+      budgetId: "",
+      name: "",
+      description: "",
+      dateFrom: "",
+      dateTo: "",
+    })
+    setBudgetModalOpen(true)
+  }
+
+  const openEditBudget = () => {
+    if (!selected) return
+    setBudgetFormKey((k) => k + 1)
+    setBudgetDefaults({
+      budgetId: String(selected.id ?? ""),
+      name: String(selected.name ?? ""),
+      description: selected.description != null ? String(selected.description) : "",
+      dateFrom: dateInputValue(selected.dateFrom),
+      dateTo: dateInputValue(selected.dateTo),
+    })
+    setBudgetModalOpen(true)
+  }
+
+  const onSubmitBudget = async (data: Record<string, unknown>) => {
+    const budgetId = String(data.budgetId ?? "").trim()
+    const payload: Record<string, unknown> = {
+      name: data.name,
+      description: data.description,
+      dateFrom: data.dateFrom,
+      dateTo: data.dateTo,
+    }
+    if (budgetId) {
+      await onUpdateBudget(BigInt(budgetId), payload)
+    } else {
+      await onCreateBudget(payload)
+    }
+    setBudgetModalOpen(false)
+  }
+
+  const openNewLine = () => {
+    if (!selected) return
+    setLineFormKey((k) => k + 1)
+    setLineDefaults({
+      lineId: "",
+      analyticAccountId: "",
+      plannedAmount: 0,
+      dateFrom: dateInputValue(selected.dateFrom),
+      dateTo: dateInputValue(selected.dateTo),
+      metadata: "",
+    })
+    setLineModalOpen(true)
+  }
+
+  const openEditLine = (line: Record<string, unknown>) => {
+    setLineFormKey((k) => k + 1)
+    setLineDefaults({
+      lineId: String(line.id ?? ""),
+      analyticAccountId: line.analyticAccountId != null ? String(line.analyticAccountId) : "",
+      plannedAmount: Number(line.plannedAmount ?? 0),
+      dateFrom: dateInputValue(line.dateFrom),
+      dateTo: dateInputValue(line.dateTo),
+      metadata: line.metadata != null ? String(line.metadata) : "",
+    })
+    setLineModalOpen(true)
+  }
+
+  const onSubmitBudgetLine = async (data: Record<string, unknown>) => {
+    const lineId = String(data.lineId ?? "").trim()
+    const payload: Record<string, unknown> = {
+      analyticAccountId: data.analyticAccountId,
+      plannedAmount: data.plannedAmount,
+      dateFrom: data.dateFrom,
+      dateTo: data.dateTo,
+      metadata: data.metadata,
+    }
+    if (lineId) {
+      await onUpdateBudgetLine(BigInt(lineId), payload)
+    } else if (selectedId != null) {
+      await onCreateBudgetLine(selectedId, payload)
+    }
+    setLineModalOpen(false)
+  }
 
   const openNewPost = () => {
     setPostFormKey((k) => k + 1)
@@ -258,6 +458,11 @@ export function BudgetsWorkspace({
         data={budgetsNormalized}
         onRowClick={(row: Record<string, unknown>) => setSelected(row)}
       />
+      <div className="-mt-6 flex justify-end">
+        <Button size="sm" onClick={openNewBudget}>
+          {t("accounting.actions.newBudget")}
+        </Button>
+      </div>
 
       <Card className="bg-card border-border/50">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -302,6 +507,11 @@ export function BudgetsWorkspace({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {selectedState === "Draft" && (
+                    <Button size="sm" variant="outline" onClick={openEditBudget}>
+                      {t("accounting.budgets.workspace.editBudget")}
+                    </Button>
+                  )}
+                  {selectedState === "Draft" && (
                     <Button
                       size="sm"
                       disabled={workflowPending}
@@ -341,9 +551,16 @@ export function BudgetsWorkspace({
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-medium mb-2">
-                    {t("accounting.budgets.workspace.linesTitle")}
-                  </h4>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-medium">
+                      {t("accounting.budgets.workspace.linesTitle")}
+                    </h4>
+                    {selectedState === "Draft" && (
+                      <Button size="sm" variant="outline" onClick={openNewLine} disabled={linePending}>
+                        {t("accounting.budgets.workspace.newLine")}
+                      </Button>
+                    )}
+                  </div>
                   <div className="rounded-md border border-border/50">
                     <Table>
                       <TableHeader>
@@ -410,6 +627,17 @@ export function BudgetsWorkspace({
                                     )}
                                     {canDelete && (
                                       <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        disabled={linePending}
+                                        onClick={() => openEditLine(line)}
+                                      >
+                                        {t("common.edit")}
+                                      </Button>
+                                    )}
+                                    {canDelete && (
+                                      <Button
                                         variant="ghost"
                                         size="sm"
                                         className="h-7 text-xs text-destructive"
@@ -434,6 +662,22 @@ export function BudgetsWorkspace({
           )}
         </SheetContent>
       </Sheet>
+
+      <FormModal
+        key={`budget-${budgetFormKey}`}
+        open={budgetModalOpen}
+        onOpenChange={setBudgetModalOpen}
+        config={budgetFormConfig}
+        onSubmit={onSubmitBudget}
+      />
+
+      <FormModal
+        key={`budget-line-${lineFormKey}`}
+        open={lineModalOpen}
+        onOpenChange={setLineModalOpen}
+        config={budgetLineFormConfig}
+        onSubmit={onSubmitBudgetLine}
+      />
 
       <FormModal
         key={`budget-post-${postFormKey}`}

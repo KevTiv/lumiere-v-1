@@ -4,6 +4,24 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
 import {
+  archiveAiChatSession,
+  createGoogleDriveConnection,
+  createWhatsAppBusinessAccount,
+  deleteIntegration,
+  deleteWhatsAppBusinessAccount,
+  grantPermission,
+  recordGoogleDriveSync,
+  recordGoogleDriveSyncError,
+  recordWhatsAppHealthCheck,
+  recordWhatsAppMessageSent,
+  revokePermission,
+  setWhatsAppPrimaryAccount,
+  updateGoogleDriveConnection,
+  updateIntegrationStatus,
+  updateWhatsAppBusinessAccount,
+  updateWhatsAppVerificationStatus,
+} from "@lumiere/stdb/client-ui-bridge"
+import {
   useCreateAuditRule,
   useEndUserSession,
   useRecordPrivacyConsent,
@@ -36,6 +54,22 @@ type SettingsAction =
   | "recordPrivacyConsent"
   | "googleDriveCredentials"
   | "whatsappCredentials"
+  | "createGoogleDriveConnection"
+  | "updateGoogleDriveConnection"
+  | "recordGoogleDriveSync"
+  | "recordGoogleDriveSyncError"
+  | "updateIntegrationStatus"
+  | "deleteIntegration"
+  | "createWhatsappBusinessAccount"
+  | "updateWhatsappBusinessAccount"
+  | "deleteWhatsappBusinessAccount"
+  | "setWhatsappPrimaryAccount"
+  | "updateWhatsappVerificationStatus"
+  | "recordWhatsappHealthCheck"
+  | "recordWhatsappMessageSent"
+  | "grantPermission"
+  | "revokePermission"
+  | "archiveAiChatSession"
   | "createCompany"
   | "updateCompany"
   | "updateCompanyAddress"
@@ -44,6 +78,54 @@ type SettingsAction =
   | "deleteCompany"
   | "createDataClassification"
   | "createDataClassificationRule"
+
+const syncDirectionOptions = [
+  { value: "UploadOnly", label: "Upload only" },
+  { value: "DownloadOnly", label: "Download only" },
+  { value: "Bidirectional", label: "Bidirectional" },
+]
+
+const integrationTypeOptions = [
+  { value: "GoogleDrive", label: "Google Drive" },
+  { value: "WhatsAppBusiness", label: "WhatsApp Business" },
+]
+
+const integrationStatusOptions = [
+  { value: "Active", label: "Active" },
+  { value: "Inactive", label: "Inactive" },
+  { value: "Pending", label: "Pending" },
+  { value: "Suspended", label: "Suspended" },
+]
+
+const syncStatusOptions = [
+  { value: "Connected", label: "Connected" },
+  { value: "Disconnected", label: "Disconnected" },
+  { value: "Syncing", label: "Syncing" },
+  { value: "Error", label: "Error" },
+  { value: "PendingAuth", label: "Pending auth" },
+]
+
+const verificationStatusOptions = [
+  { value: "Pending", label: "Pending" },
+  { value: "Approved", label: "Approved" },
+  { value: "Rejected", label: "Rejected" },
+  { value: "Expired", label: "Expired" },
+  { value: "Revoked", label: "Revoked" },
+]
+
+const verificationLevelOptions = [
+  { value: "Unverified", label: "Unverified" },
+  { value: "BusinessPortfolio", label: "Business portfolio" },
+  { value: "BusinessVerified", label: "Business verified" },
+]
+
+const permissionActionOptions = [
+  { value: "Read", label: "Read" },
+  { value: "Write", label: "Write" },
+  { value: "Create", label: "Create" },
+  { value: "Delete", label: "Delete" },
+  { value: "All", label: "All" },
+]
 
 const settingsActionForms: Record<SettingsAction, FormConfig> = {
   createAuditRule: {
@@ -177,6 +259,213 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
         ],
       },
     ],
+  },
+  createGoogleDriveConnection: {
+    id: "settings-create-google-drive-connection",
+    title: "Create Google Drive Connection",
+    submitLabel: "Create connection",
+    sections: [
+      {
+        id: "connection",
+        fields: [
+          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
+          { id: "account-email", type: "text", name: "accountEmail", label: "Account email", required: true, width: "1/2" },
+          { id: "account-id", type: "text", name: "accountId", label: "Account ID", required: true, width: "1/2" },
+          { id: "credentials-ref", type: "text", name: "credentialsReference", label: "Credentials reference", required: true, width: "1/2" },
+          { id: "root-folder", type: "text", name: "rootFolderId", label: "Root folder ID", width: "1/2" },
+          { id: "shared-drive", type: "text", name: "sharedDriveId", label: "Shared drive ID", width: "1/2" },
+          { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", defaultValue: true, width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
+          { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/3" },
+          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "webhook-secret", type: "text", name: "webhookSecretReference", label: "Webhook secret reference", width: "1/2" },
+          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", defaultValue: 60, width: "1/2" },
+          { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", defaultValue: 50, width: "1/2" },
+          { id: "file-types", type: "text", name: "allowedFileTypes", label: "Allowed file types (CSV)", defaultValue: "pdf,docx,xlsx", width: "full" },
+        ],
+      },
+    ],
+  },
+  updateGoogleDriveConnection: {
+    id: "settings-update-google-drive-connection",
+    title: "Update Google Drive Connection",
+    submitLabel: "Update connection",
+    sections: [
+      {
+        id: "connection",
+        fields: [
+          { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
+          { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
+          { id: "root-folder", type: "text", name: "rootFolderId", label: "Root folder ID", width: "1/2" },
+          { id: "shared-drive", type: "text", name: "sharedDriveId", label: "Shared drive ID", width: "1/2" },
+          { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", width: "1/3" },
+          { id: "auto-sync", type: "switch", name: "autoSyncFiles", label: "Auto sync files", width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
+          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/2" },
+          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", width: "1/2" },
+          { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", width: "1/2" },
+          { id: "file-types", type: "text", name: "allowedFileTypes", label: "Allowed file types (CSV)", width: "full" },
+        ],
+      },
+    ],
+  },
+  recordGoogleDriveSync: {
+    id: "settings-record-google-drive-sync",
+    title: "Record Google Drive Sync",
+    submitLabel: "Record sync",
+    sections: [{ id: "sync", fields: [
+      { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
+      { id: "next-sync", type: "datetime", name: "nextSyncAt", label: "Next sync at", width: "1/2" },
+    ] }],
+  },
+  recordGoogleDriveSyncError: {
+    id: "settings-record-google-drive-sync-error",
+    title: "Record Google Drive Sync Error",
+    submitLabel: "Record error",
+    sections: [{ id: "sync-error", fields: [
+      { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
+      { id: "error", type: "textarea", name: "errorMessage", label: "Error message", required: true, rows: 3, width: "full" },
+    ] }],
+  },
+  updateIntegrationStatus: {
+    id: "settings-update-integration-status",
+    title: "Update Integration Status",
+    submitLabel: "Update status",
+    sections: [{ id: "status", fields: [
+      { id: "integration-id", type: "number", name: "integrationId", label: "Integration ID", required: true, width: "1/2" },
+      { id: "integration-type", type: "select", name: "integrationType", label: "Integration type", defaultValue: "GoogleDrive", options: integrationTypeOptions, width: "1/2" },
+      { id: "status", type: "select", name: "status", label: "Status", defaultValue: "Active", options: integrationStatusOptions, width: "1/2" },
+      { id: "sync-status", type: "select", name: "syncStatus", label: "Sync status", defaultValue: "Connected", options: syncStatusOptions, width: "1/2" },
+      { id: "error", type: "textarea", name: "errorMessage", label: "Error message", rows: 3, width: "full" },
+    ] }],
+  },
+  deleteIntegration: {
+    id: "settings-delete-integration",
+    title: "Delete Integration",
+    submitLabel: "Delete integration",
+    sections: [{ id: "integration", fields: [
+      { id: "integration-id", type: "number", name: "integrationId", label: "Integration ID", required: true, width: "1/2" },
+      { id: "integration-type", type: "select", name: "integrationType", label: "Integration type", defaultValue: "GoogleDrive", options: integrationTypeOptions, width: "1/2" },
+    ] }],
+  },
+  createWhatsappBusinessAccount: {
+    id: "settings-create-whatsapp-business-account",
+    title: "Create WhatsApp Business Account",
+    submitLabel: "Create account",
+    sections: [
+      {
+        id: "account",
+        fields: [
+          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
+          { id: "phone", type: "text", name: "phoneNumber", label: "Phone number", required: true, width: "1/2" },
+          { id: "phone-id", type: "text", name: "phoneNumberId", label: "Phone number ID", required: true, width: "1/2" },
+          { id: "business-id", type: "text", name: "businessAccountId", label: "Business account ID", required: true, width: "1/2" },
+          { id: "display-name", type: "text", name: "displayName", label: "Display name", required: true, width: "1/2" },
+          { id: "language", type: "text", name: "defaultLanguage", label: "Default language", defaultValue: "en", width: "1/2" },
+          { id: "credentials-ref", type: "text", name: "credentialsReference", label: "Credentials reference", required: true, width: "1/2" },
+          { id: "webhook-secret", type: "text", name: "webhookSecretReference", label: "Webhook secret reference", required: true, width: "1/2" },
+          { id: "messaging", type: "switch", name: "messagingEnabled", label: "Messaging", defaultValue: true, width: "1/4" },
+          { id: "notifications", type: "switch", name: "notificationsEnabled", label: "Notifications", defaultValue: true, width: "1/4" },
+          { id: "templates", type: "switch", name: "templateMessagingEnabled", label: "Templates", defaultValue: true, width: "1/4" },
+          { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", label: "Interactive", defaultValue: true, width: "1/4" },
+          { id: "primary", type: "switch", name: "isPrimary", label: "Primary account", width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
+          { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", defaultValue: 1000, width: "1/3" },
+          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", defaultValue: "messages,message_status,account_alerts", width: "1/2" },
+          { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
+          { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
+          { id: "metadata", type: "textarea", name: "metadata", label: "Metadata JSON/string", rows: 3, width: "full" },
+        ],
+      },
+    ],
+  },
+  updateWhatsappBusinessAccount: {
+    id: "settings-update-whatsapp-business-account",
+    title: "Update WhatsApp Business Account",
+    submitLabel: "Update account",
+    sections: [{ id: "account", fields: [
+      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/2" },
+      { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
+      { id: "display-name", type: "text", name: "displayName", label: "Display name", width: "1/2" },
+      { id: "language", type: "text", name: "defaultLanguage", label: "Default language", width: "1/2" },
+      { id: "messaging", type: "switch", name: "messagingEnabled", label: "Messaging", width: "1/4" },
+      { id: "notifications", type: "switch", name: "notificationsEnabled", label: "Notifications", width: "1/4" },
+      { id: "templates", type: "switch", name: "templateMessagingEnabled", label: "Templates", width: "1/4" },
+      { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", label: "Interactive", width: "1/4" },
+      { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/2" },
+      { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", width: "1/2" },
+      { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+      { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", width: "1/2" },
+      { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
+      { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
+    ] }],
+  },
+  deleteWhatsappBusinessAccount: {
+    id: "settings-delete-whatsapp-business-account",
+    title: "Delete WhatsApp Business Account",
+    submitLabel: "Delete account",
+    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
+  },
+  setWhatsappPrimaryAccount: {
+    id: "settings-set-whatsapp-primary-account",
+    title: "Set WhatsApp Primary Account",
+    submitLabel: "Set primary",
+    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
+  },
+  updateWhatsappVerificationStatus: {
+    id: "settings-update-whatsapp-verification-status",
+    title: "Update WhatsApp Verification Status",
+    submitLabel: "Update verification",
+    sections: [{ id: "verification", fields: [
+      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/3" },
+      { id: "status", type: "select", name: "verificationStatus", label: "Status", defaultValue: "Pending", options: verificationStatusOptions, width: "1/3" },
+      { id: "level", type: "select", name: "verificationLevel", label: "Level", defaultValue: "Unverified", options: verificationLevelOptions, width: "1/3" },
+    ] }],
+  },
+  recordWhatsappHealthCheck: {
+    id: "settings-record-whatsapp-health-check",
+    title: "Record WhatsApp Health Check",
+    submitLabel: "Record health",
+    sections: [{ id: "health", fields: [
+      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/2" },
+      { id: "healthy", type: "switch", name: "isHealthy", label: "Healthy", defaultValue: true, width: "1/2" },
+    ] }],
+  },
+  recordWhatsappMessageSent: {
+    id: "settings-record-whatsapp-message-sent",
+    title: "Record WhatsApp Message Sent",
+    submitLabel: "Record message",
+    sections: [{ id: "message", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
+  },
+  grantPermission: {
+    id: "settings-grant-permission",
+    title: "Grant Permission",
+    submitLabel: "Grant permission",
+    sections: [{ id: "permission", fields: [
+      { id: "subject-type", type: "select", name: "subjectType", label: "Subject type", defaultValue: "Role", options: [{ value: "Role", label: "Role" }, { value: "User", label: "User identity" }], width: "1/2" },
+      { id: "subject-value", type: "text", name: "subjectValue", label: "Role ID or user identity", required: true, width: "1/2" },
+      { id: "resource", type: "text", name: "resource", label: "Resource", required: true, width: "1/2" },
+      { id: "action", type: "select", name: "action", label: "Action", defaultValue: "Read", options: permissionActionOptions, width: "1/4" },
+      { id: "effect", type: "select", name: "effect", label: "Effect", defaultValue: "Allow", options: [{ value: "Allow", label: "Allow" }, { value: "Deny", label: "Deny" }], width: "1/4" },
+    ] }],
+  },
+  revokePermission: {
+    id: "settings-revoke-permission",
+    title: "Revoke Permission",
+    submitLabel: "Revoke permission",
+    sections: [{ id: "permission", fields: [{ id: "permission-id", type: "number", name: "permissionId", label: "Permission ID", required: true }] }],
+  },
+  archiveAiChatSession: {
+    id: "settings-archive-ai-chat-session",
+    title: "Archive AI Chat Session",
+    submitLabel: "Update archive state",
+    sections: [{ id: "session", fields: [
+      { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/2" },
+      { id: "session-key", type: "text", name: "sessionKey", label: "Session key", required: true, width: "1/2" },
+      { id: "archived", type: "switch", name: "archived", label: "Archived", defaultValue: true, width: "1/2" },
+    ] }],
   },
   createCompany: {
     id: "settings-create-company",
@@ -325,6 +614,26 @@ function toBigIntId(value: unknown, label: string): bigint {
   return BigInt(raw)
 }
 
+function optionalText(value: unknown): string | null {
+  const raw = String(value ?? "").trim()
+  return raw ? raw : null
+}
+
+function csvList(value: unknown): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function optionalTimestamp(value: unknown): { microsSinceUnixEpoch: bigint } | null {
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+  const millis = Date.parse(raw)
+  if (!Number.isFinite(millis)) throw new Error("Timestamp must be a valid date/time")
+  return { microsSinceUnixEpoch: BigInt(millis) * 1000n }
+}
+
 export function SettingsClient({ organizationId }: { organizationId?: number }) {
   const { t } = useTranslation()
   if (!hasValidOrganizationId(organizationId)) return <MissingOrganization />
@@ -428,6 +737,134 @@ function SettingsLoaded({
           userId: formData.userId as string | number,
           credentials: parseCredentials(formData.credentialsJson),
         })
+      } else if (activeAction === "createGoogleDriveConnection") {
+        await createGoogleDriveConnection(orgId, {
+          name: String(formData.name ?? ""),
+          accountEmail: String(formData.accountEmail ?? ""),
+          accountId: String(formData.accountId ?? ""),
+          credentialsReference: String(formData.credentialsReference ?? ""),
+          rootFolderId: optionalText(formData.rootFolderId),
+          sharedDriveId: optionalText(formData.sharedDriveId),
+          syncEnabled: Boolean(formData.syncEnabled),
+          webhookEnabled: Boolean(formData.webhookEnabled),
+          webhookUrl: optionalText(formData.webhookUrl),
+          webhookSecretReference: optionalText(formData.webhookSecretReference),
+          syncDirection: String(formData.syncDirection ?? "Bidirectional") as "UploadOnly" | "DownloadOnly" | "Bidirectional",
+          syncFrequencyMinutes: Number(formData.syncFrequencyMinutes ?? 60),
+          allowedFileTypes: csvList(formData.allowedFileTypes),
+          maxFileSizeMb: Number(formData.maxFileSizeMb ?? 50),
+        })
+      } else if (activeAction === "updateGoogleDriveConnection") {
+        await updateGoogleDriveConnection(orgId, toBigIntId(formData.connectionId, "Connection ID"), {
+          name: optionalText(formData.name) ?? undefined,
+          rootFolderId: optionalText(formData.rootFolderId),
+          sharedDriveId: optionalText(formData.sharedDriveId),
+          syncEnabled: formData.syncEnabled === undefined ? undefined : Boolean(formData.syncEnabled),
+          autoSyncFiles: formData.autoSyncFiles === undefined ? undefined : Boolean(formData.autoSyncFiles),
+          allowedFileTypes: csvList(formData.allowedFileTypes).length ? csvList(formData.allowedFileTypes) : undefined,
+          maxFileSizeMb: formData.maxFileSizeMb === undefined || formData.maxFileSizeMb === "" ? undefined : Number(formData.maxFileSizeMb),
+          webhookEnabled: formData.webhookEnabled === undefined ? undefined : Boolean(formData.webhookEnabled),
+          webhookUrl: optionalText(formData.webhookUrl),
+          syncDirection: formData.syncDirection ? (String(formData.syncDirection) as "UploadOnly" | "DownloadOnly" | "Bidirectional") : undefined,
+          syncFrequencyMinutes:
+            formData.syncFrequencyMinutes === undefined || formData.syncFrequencyMinutes === "" ? undefined : Number(formData.syncFrequencyMinutes),
+        })
+      } else if (activeAction === "recordGoogleDriveSync") {
+        await recordGoogleDriveSync(orgId, toBigIntId(formData.connectionId, "Connection ID"), optionalTimestamp(formData.nextSyncAt))
+      } else if (activeAction === "recordGoogleDriveSyncError") {
+        await recordGoogleDriveSyncError(orgId, toBigIntId(formData.connectionId, "Connection ID"), String(formData.errorMessage ?? ""))
+      } else if (activeAction === "updateIntegrationStatus") {
+        await updateIntegrationStatus(
+          orgId,
+          toBigIntId(formData.integrationId, "Integration ID"),
+          String(formData.integrationType ?? "GoogleDrive") as "GoogleDrive" | "WhatsAppBusiness",
+          String(formData.status ?? "Active") as "Active" | "Inactive" | "Pending" | "Suspended",
+          String(formData.syncStatus ?? "Connected") as "Connected" | "Disconnected" | "Syncing" | "Error" | "PendingAuth",
+          optionalText(formData.errorMessage),
+        )
+      } else if (activeAction === "deleteIntegration") {
+        if (!confirm("Delete this integration?")) return
+        await deleteIntegration(
+          orgId,
+          toBigIntId(formData.integrationId, "Integration ID"),
+          String(formData.integrationType ?? "GoogleDrive") as "GoogleDrive" | "WhatsAppBusiness",
+        )
+      } else if (activeAction === "createWhatsappBusinessAccount") {
+        await createWhatsAppBusinessAccount(orgId, {
+          name: String(formData.name ?? ""),
+          phoneNumber: String(formData.phoneNumber ?? ""),
+          phoneNumberId: String(formData.phoneNumberId ?? ""),
+          businessAccountId: String(formData.businessAccountId ?? ""),
+          displayName: String(formData.displayName ?? ""),
+          credentialsReference: String(formData.credentialsReference ?? ""),
+          webhookSecretReference: String(formData.webhookSecretReference ?? ""),
+          messagingEnabled: Boolean(formData.messagingEnabled),
+          notificationsEnabled: Boolean(formData.notificationsEnabled),
+          templateMessagingEnabled: Boolean(formData.templateMessagingEnabled),
+          interactiveMessagingEnabled: Boolean(formData.interactiveMessagingEnabled),
+          defaultLanguage: String(formData.defaultLanguage ?? "en"),
+          webhookEnabled: Boolean(formData.webhookEnabled),
+          webhookUrl: optionalText(formData.webhookUrl),
+          subscribedWebhookEvents: csvList(formData.subscribedWebhookEvents),
+          dailyMessageLimit: Number(formData.dailyMessageLimit ?? 1000),
+          isPrimary: Boolean(formData.isPrimary),
+          templateNamespace: optionalText(formData.templateNamespace),
+          mediaProvider: optionalText(formData.mediaProvider),
+          metadata: optionalText(formData.metadata),
+        })
+      } else if (activeAction === "updateWhatsappBusinessAccount") {
+        const events = csvList(formData.subscribedWebhookEvents)
+        await updateWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"), {
+          name: optionalText(formData.name) ?? undefined,
+          displayName: optionalText(formData.displayName) ?? undefined,
+          messagingEnabled: formData.messagingEnabled === undefined ? undefined : Boolean(formData.messagingEnabled),
+          notificationsEnabled: formData.notificationsEnabled === undefined ? undefined : Boolean(formData.notificationsEnabled),
+          templateMessagingEnabled: formData.templateMessagingEnabled === undefined ? undefined : Boolean(formData.templateMessagingEnabled),
+          interactiveMessagingEnabled: formData.interactiveMessagingEnabled === undefined ? undefined : Boolean(formData.interactiveMessagingEnabled),
+          defaultLanguage: optionalText(formData.defaultLanguage) ?? undefined,
+          webhookEnabled: formData.webhookEnabled === undefined ? undefined : Boolean(formData.webhookEnabled),
+          webhookUrl: optionalText(formData.webhookUrl),
+          subscribedWebhookEvents: events.length ? events : undefined,
+          dailyMessageLimit:
+            formData.dailyMessageLimit === undefined || formData.dailyMessageLimit === "" ? undefined : Number(formData.dailyMessageLimit),
+          templateNamespace: optionalText(formData.templateNamespace),
+          mediaProvider: optionalText(formData.mediaProvider),
+        })
+      } else if (activeAction === "deleteWhatsappBusinessAccount") {
+        if (!confirm("Delete this WhatsApp Business account?")) return
+        await deleteWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
+      } else if (activeAction === "setWhatsappPrimaryAccount") {
+        await setWhatsAppPrimaryAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
+      } else if (activeAction === "updateWhatsappVerificationStatus") {
+        await updateWhatsAppVerificationStatus(
+          orgId,
+          toBigIntId(formData.accountId, "Account ID"),
+          String(formData.verificationStatus ?? "Pending") as "Pending" | "Approved" | "Rejected" | "Expired" | "Revoked",
+          String(formData.verificationLevel ?? "Unverified") as "Unverified" | "BusinessPortfolio" | "BusinessVerified",
+        )
+      } else if (activeAction === "recordWhatsappHealthCheck") {
+        await recordWhatsAppHealthCheck(orgId, toBigIntId(formData.accountId, "Account ID"), Boolean(formData.isHealthy))
+      } else if (activeAction === "recordWhatsappMessageSent") {
+        await recordWhatsAppMessageSent(orgId, toBigIntId(formData.accountId, "Account ID"))
+      } else if (activeAction === "grantPermission") {
+        const subjectType = String(formData.subjectType ?? "Role") as "Role" | "User"
+        await grantPermission(orgId, {
+          subjectType,
+          subjectValue: subjectType === "Role" ? toBigIntId(formData.subjectValue, "Role ID") : String(formData.subjectValue ?? ""),
+          resource: String(formData.resource ?? ""),
+          action: String(formData.action ?? "Read") as "Read" | "Write" | "Create" | "Delete" | "All",
+          effect: String(formData.effect ?? "Allow") as "Allow" | "Deny",
+        })
+      } else if (activeAction === "revokePermission") {
+        if (!confirm("Revoke this permission?")) return
+        await revokePermission(orgId, toBigIntId(formData.permissionId, "Permission ID"))
+      } else if (activeAction === "archiveAiChatSession") {
+        await archiveAiChatSession(
+          orgId,
+          toBigIntId(formData.companyId, "Company ID"),
+          String(formData.sessionKey ?? ""),
+          Boolean(formData.archived),
+        )
       } else if (activeAction === "createCompany") {
         await createCompany.mutateAsync(compactParams(formData, ["name", "code", "currencyId", "addressCountryCode"]))
       } else if (activeAction === "updateCompany") {
@@ -487,6 +924,22 @@ function SettingsLoaded({
     { id: "recordPrivacyConsent", title: "Privacy consent", description: "Record a contact consent decision." },
     { id: "googleDriveCredentials", title: "Google Drive", description: "Update integration credentials." },
     { id: "whatsappCredentials", title: "WhatsApp", description: "Update integration credentials." },
+    { id: "createGoogleDriveConnection", title: "Create Google Drive", description: "Create a Google Drive connection record." },
+    { id: "updateGoogleDriveConnection", title: "Update Google Drive", description: "Patch Google Drive sync and webhook settings." },
+    { id: "recordGoogleDriveSync", title: "Google Drive sync", description: "Record a successful sync timestamp." },
+    { id: "recordGoogleDriveSyncError", title: "Google Drive error", description: "Record the latest sync error." },
+    { id: "updateIntegrationStatus", title: "Integration status", description: "Update status for a supported integration." },
+    { id: "deleteIntegration", title: "Delete integration", description: "Soft-delete a supported integration." },
+    { id: "createWhatsappBusinessAccount", title: "Create WhatsApp account", description: "Create a WhatsApp Business connection." },
+    { id: "updateWhatsappBusinessAccount", title: "Update WhatsApp account", description: "Patch WhatsApp Business settings." },
+    { id: "deleteWhatsappBusinessAccount", title: "Delete WhatsApp account", description: "Soft-delete a WhatsApp Business account." },
+    { id: "setWhatsappPrimaryAccount", title: "Primary WhatsApp account", description: "Set the organization primary account." },
+    { id: "updateWhatsappVerificationStatus", title: "WhatsApp verification", description: "Update Meta verification state." },
+    { id: "recordWhatsappHealthCheck", title: "WhatsApp health", description: "Record the latest health check result." },
+    { id: "recordWhatsappMessageSent", title: "WhatsApp sent count", description: "Increment the sent-message quota counter." },
+    { id: "grantPermission", title: "Grant permission", description: "Create a role or user permission grant." },
+    { id: "revokePermission", title: "Revoke permission", description: "Delete an organization permission by ID." },
+    { id: "archiveAiChatSession", title: "AI chat archive", description: "Archive or restore an AI chat session." },
     { id: "createCompany", title: "Create company", description: "Create a company record in the organization." },
     { id: "updateCompany", title: "Update company", description: "Patch core company fields." },
     { id: "updateCompanyAddress", title: "Company address", description: "Update company address fields." },

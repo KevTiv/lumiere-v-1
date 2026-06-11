@@ -27,7 +27,6 @@ import {
   MissingOrganization,
   mergeSelectOptionsByFieldName,
   mergeFieldDefaultValues,
-  budgetsTableConfig,
   bankStatementsTableConfig,
   fixedAssetsTableConfig,
   accountPaymentsTableConfig,
@@ -77,6 +76,8 @@ import {
   toUpdateAccountAccountTypeParams,
   toCreateAccountGroupParams,
   toUpdateAccountGroupParams,
+  toCreateBudgetPostParams,
+  toUpdateBudgetPostParams,
   fiscalYearStateTag,
   fiscalYearRowToFormDefaults,
   toCreateFiscalYearParams,
@@ -105,6 +106,8 @@ import {
   useAccountMoves,
   useAccountTaxes,
   useCrossoveredBudgets,
+  useBudgetLines,
+  useBudgetPosts,
   useAccountAnalyticAccounts,
   useAccountAnalyticLines,
   useAccountAnalyticDistributionModels,
@@ -118,6 +121,17 @@ import {
   useCreateAccountMove,
   useCreateAccountTax,
   useCreateCrossoveredBudget,
+  useUpdateCrossoveredBudget,
+  useCreateBudgetLine,
+  useUpdateBudgetLine,
+  useConfirmBudget,
+  useValidateBudget,
+  useDoneBudget,
+  useCancelBudget,
+  useDeleteBudgetLine,
+  useUpdateBudgetLineActuals,
+  useCreateBudgetPost,
+  useUpdateBudgetPost,
   usePostAccountMove,
   usePostInvoice,
   useCancelAccountMove,
@@ -223,9 +237,11 @@ import {
   ChartOfAccountsView,
   ChartStructureWorkspace,
   GeneralLedgerView,
+  BudgetsWorkspace,
   ConsolidationWorkspace,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   isInvoiceLikeMoveType,
   resolveDefaultCogsInventoryAccountIds,
@@ -257,6 +273,65 @@ function stdbTimestampToMs(ts: unknown): number | null {
   const n = typeof ts === "bigint" ? Number(ts) : Number(ts)
   if (!Number.isFinite(n)) return null
   return n / 1000
+}
+
+function dateInputToStdbTimestamp(value: unknown, fallback = new Date()) {
+  if (value != null && String(value).trim() !== "") {
+    const d = new Date(String(value))
+    if (!Number.isNaN(d.getTime())) return stbTimestampFromDate(d)
+  }
+  return stbTimestampFromDate(fallback)
+}
+
+function optionalText(value: unknown): string | undefined {
+  if (value == null) return undefined
+  const text = String(value).trim()
+  return text === "" ? undefined : text
+}
+
+function toUpdateBudgetParams(formData: Record<string, unknown>): Record<string, unknown> {
+  return {
+    companyId: undefined,
+    name: optionalText(formData.name),
+    description: formData.description == null ? undefined : optionalText(formData.description) ?? null,
+    dateFrom: formData.dateFrom ? dateInputToStdbTimestamp(formData.dateFrom) : undefined,
+    dateTo: formData.dateTo ? dateInputToStdbTimestamp(formData.dateTo) : undefined,
+    metadata: undefined,
+  }
+}
+
+function toCreateBudgetLineParams(formData: Record<string, unknown>): Record<string, unknown> {
+  const plannedAmount = Number(formData.plannedAmount ?? 0)
+  return {
+    analyticAccountId: optionalBigIntU64(formData.analyticAccountId),
+    dateFrom: dateInputToStdbTimestamp(formData.dateFrom),
+    dateTo: dateInputToStdbTimestamp(formData.dateTo),
+    paidDate: undefined,
+    plannedAmount,
+    practicalAmount: 0,
+    theoreticalAmount: 0,
+    achievePercentage: 0,
+    isAboveBudget: false,
+    variance: -plannedAmount,
+    variancePercentage: plannedAmount > 0 ? -100 : 0,
+    metadata: optionalText(formData.metadata),
+  }
+}
+
+function toUpdateBudgetLineParams(formData: Record<string, unknown>): Record<string, unknown> {
+  return {
+    plannedAmount:
+      formData.plannedAmount === "" || formData.plannedAmount == null
+        ? undefined
+        : Number(formData.plannedAmount),
+    analyticAccountId:
+      "analyticAccountId" in formData
+        ? optionalBigIntU64(formData.analyticAccountId) ?? null
+        : undefined,
+    dateFrom: formData.dateFrom ? dateInputToStdbTimestamp(formData.dateFrom) : undefined,
+    dateTo: formData.dateTo ? dateInputToStdbTimestamp(formData.dateTo) : undefined,
+    metadata: formData.metadata == null ? undefined : optionalText(formData.metadata) ?? null,
+  }
 }
 
 function budgetStateStr(row: Record<string, unknown>): string {
@@ -419,6 +494,8 @@ function AccountingClientLoaded({
     enabled: organizationId > 0,
     initialData: initialBudgets,
   })
+  const { data: budgetLines = [] } = useBudgetLines(orgId, { enabled: organizationId > 0 })
+  const { data: budgetPosts = [] } = useBudgetPosts(orgId, { enabled: organizationId > 0 })
   const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
   const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
   const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
@@ -632,6 +709,17 @@ function AccountingClientLoaded({
   const createMove = useCreateAccountMove(organizationId)
   const createTax = useCreateAccountTax(organizationId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
+  const updateBudget = useUpdateCrossoveredBudget(organizationId)
+  const createBudgetLine = useCreateBudgetLine(organizationId)
+  const updateBudgetLine = useUpdateBudgetLine(organizationId)
+  const confirmBudget = useConfirmBudget(organizationId)
+  const validateBudget = useValidateBudget(organizationId)
+  const doneBudget = useDoneBudget(organizationId)
+  const cancelBudget = useCancelBudget(organizationId)
+  const deleteBudgetLine = useDeleteBudgetLine(organizationId)
+  const updateBudgetLineActuals = useUpdateBudgetLineActuals(organizationId)
+  const createBudgetPost = useCreateBudgetPost(organizationId)
+  const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId)
   const postInvoice = usePostInvoice(organizationId)
   const cancelMove = useCancelAccountMove(organizationId)
@@ -990,17 +1078,6 @@ function AccountingClientLoaded({
     },
     [updateAccountPeriod],
   )
-
-  const budgetsEntityConfig = useMemo((): EntityViewConfig => {
-    const view = budgetsTableConfig.view as EntityTableConfig
-    return {
-      ...budgetsTableConfig,
-      view: {
-        ...view,
-        actions: [],
-      },
-    }
-  }, [])
 
   const fiscalYearsEntityConfig = useMemo((): EntityViewConfig => {
     const base = fiscalYearsTableConfig(t)
@@ -1872,18 +1949,78 @@ function AccountingClientLoaded({
           if (tab.id === "budgets") {
             return {
               ...tab,
-              entityConfig: addCsvToolbar(budgetsEntityConfig, [
-                {
-                  id: "csv-budget",
-                  label: t("accounting.csvImport.toolbarBudgets"),
-                  onClick: () => setCsvKind("budget"),
-                },
-                {
-                  id: "csv-budget-line",
-                  label: t("accounting.csvImport.toolbarBudgetLines"),
-                  onClick: () => setCsvKind("budgetLine"),
-                },
-              ]),
+              type: "custom" as const,
+              customContent: (
+                <div className="space-y-3">
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
+                      {t("accounting.csvImport.toolbarBudgets")}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
+                      {t("accounting.csvImport.toolbarBudgetLines")}
+                    </Button>
+                  </div>
+                  <BudgetsWorkspace
+                    budgets={budgets as unknown as Record<string, unknown>[]}
+                    budgetLines={budgetLines as unknown as Record<string, unknown>[]}
+                    budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
+                    onCreateBudget={(params) =>
+                      createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params)))
+                    }
+                    onUpdateBudget={(budgetId, params) =>
+                      updateBudget.mutateAsync([
+                        organizationId,
+                        budgetId,
+                        stdbParamsToJson(toUpdateBudgetParams(params)),
+                      ])
+                    }
+                    onCreateBudgetLine={(budgetId, params) =>
+                      createBudgetLine.mutateAsync([
+                        organizationId,
+                        budgetId,
+                        stdbParamsToJson(toCreateBudgetLineParams(params)),
+                      ])
+                    }
+                    onUpdateBudgetLine={(lineId, params) =>
+                      updateBudgetLine.mutateAsync([
+                        organizationId,
+                        lineId,
+                        stdbParamsToJson(toUpdateBudgetLineParams(params)),
+                      ])
+                    }
+                    onConfirmBudget={(budgetId) => confirmBudget.mutateAsync(budgetId)}
+                    onValidateBudget={(budgetId) => validateBudget.mutateAsync(budgetId)}
+                    onDoneBudget={(budgetId) => doneBudget.mutateAsync(budgetId)}
+                    onCancelBudget={(budgetId) => cancelBudget.mutateAsync(budgetId)}
+                    onDeleteBudgetLine={(lineId) => deleteBudgetLine.mutateAsync(lineId)}
+                    onUpdateLineActuals={(lineId, params) =>
+                      updateBudgetLineActuals.mutateAsync({ lineId, params })
+                    }
+                    onCreateBudgetPost={(params) =>
+                      createBudgetPost.mutateAsync(stdbParamsToJson(toCreateBudgetPostParams(params)))
+                    }
+                    onUpdateBudgetPost={(postId, params) =>
+                      updateBudgetPost.mutateAsync({
+                        postId,
+                        params: stdbParamsToJson(toUpdateBudgetPostParams(params)),
+                      })
+                    }
+                    workflowPending={
+                      confirmBudget.isPending ||
+                      validateBudget.isPending ||
+                      doneBudget.isPending ||
+                      cancelBudget.isPending
+                    }
+                    linePending={
+                      createBudgetLine.isPending ||
+                      updateBudgetLine.isPending ||
+                      deleteBudgetLine.isPending ||
+                      updateBudgetLineActuals.isPending
+                    }
+                    postPending={createBudgetPost.isPending || updateBudgetPost.isPending}
+                  />
+                </div>
+              ),
             }
           }
           if (tab.id === "taxes" && tab.entityConfig) {
@@ -2031,10 +2168,34 @@ function AccountingClientLoaded({
       bankStatements,
       bankStatementsEntityConfig,
       createAccount.mutate,
+      budgets,
+      budgetLines,
+      budgetPosts,
+      createBudget.mutateAsync,
+      updateBudget.mutateAsync,
+      createBudgetLine.mutateAsync,
+      updateBudgetLine.mutateAsync,
+      confirmBudget.mutateAsync,
+      validateBudget.mutateAsync,
+      doneBudget.mutateAsync,
+      cancelBudget.mutateAsync,
+      deleteBudgetLine.mutateAsync,
+      updateBudgetLineActuals.mutateAsync,
+      createBudgetPost.mutateAsync,
+      updateBudgetPost.mutateAsync,
+      createBudgetLine.isPending,
+      updateBudgetLine.isPending,
+      confirmBudget.isPending,
+      validateBudget.isPending,
+      doneBudget.isPending,
+      cancelBudget.isPending,
+      deleteBudgetLine.isPending,
+      updateBudgetLineActuals.isPending,
+      createBudgetPost.isPending,
+      updateBudgetPost.isPending,
       t,
       moduleConfigBase,
       journalEntryFormConfig,
-      budgetsEntityConfig,
       fiscalYearsEntityConfig,
       accountPeriodsEntityConfig,
       accountPeriodCreateFormConfig,
@@ -2071,7 +2232,8 @@ function AccountingClientLoaded({
       cancelConsolidation.mutateAsync,
       matchEliminationEntries.mutateAsync,
       unmatchEliminationEntry.mutateAsync,
-      addCsvToolbar, computeInvoiceTotals.isPending
+      addCsvToolbar,
+      computeInvoiceTotals.isPending,
     ],
   )
 

@@ -74,6 +74,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../..')
 const SPACETIMEDB_SRC = path.join(REPO_ROOT, 'spacetimedb/src')
 const WEB_SRC = path.join(REPO_ROOT, 'frontend/web')
 const STDB_COMMANDS_SRC = path.join(REPO_ROOT, 'frontend/packages/stdb/src/commands')
+const STDB_MUTATIONS_SRC = path.join(REPO_ROOT, 'frontend/packages/stdb/src/mutations')
 const QUERY_HOOKS_SRC = path.join(REPO_ROOT, 'frontend/packages/query-hooks/src/hooks')
 const UI_SRC = path.join(REPO_ROOT, 'frontend/packages/ui/src')
 const REPORTS_DIR = path.join(WEB_SRC, 'reports')
@@ -258,6 +259,9 @@ interface CoverageReport {
   productRustReducers: number // Excluding bootstrap/import/seed
   totalWebReducers: number
   missingFromWeb: string[]
+  coverageModel: 'matrix-hook-ui'
+  matrixStatusSummary: Record<string, number>
+  matrixClassificationSummary: Record<string, number>
   byModule: Record<
     string,
     {
@@ -282,6 +286,17 @@ interface CoverageReport {
     callReducersBatch: number
     stdbBrowserCall: number
   }
+}
+
+function countRowsBy(rows: ReducerCoverageRow[], key: 'status' | 'classification'): Record<string, number> {
+  return rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row[key]] = (acc[row[key]] ?? 0) + 1
+    return acc
+  }, {})
+}
+
+function hasHookOrUiLayer(row: ReducerCoverageRow): boolean {
+  return row.hook != null || row.uiCaller != null
 }
 
 type CoverageStatus =
@@ -529,19 +544,24 @@ function extractCommandWrappers(): Map<string, Set<string>> {
   return wrappers
 }
 
-function hookFunctionBefore(content: string, offset: number): string | null {
+function wrapperFunctionBefore(content: string, offset: number): string | null {
   const before = content.slice(0, offset)
-  const matches = Array.from(before.matchAll(/export function (use[A-Z][A-Za-z0-9_]*)\s*\(/g))
+  const matches = Array.from(before.matchAll(/export function ([A-Za-z_][A-Za-z0-9_]*)\s*\(/g))
   return matches.at(-1)?.[1] ?? null
 }
 
 function extractHookWrappers(): Map<string, Set<string>> {
   const hooks = new Map<string, Set<string>>()
-  const files = globSync('**/*.ts', { cwd: QUERY_HOOKS_SRC, absolute: true })
+  const files = [
+    ...globSync('**/*.ts', { cwd: QUERY_HOOKS_SRC, absolute: true }),
+    ...globSync('**/*.ts', { cwd: STDB_MUTATIONS_SRC, absolute: true }),
+  ]
   const patterns = [
     /\b[a-zA-Z]+BffPost\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
     /['"]\/api\/call\/([a-z_][a-z0-9_]*)/g,
+    /useAccountingCallMutation\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
     /useStdb(?:Reducer|CallMutation|ReducerWithInvalidation)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+    /stdbBrowserCall\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   ]
 
   for (const file of files) {
@@ -550,7 +570,7 @@ function extractHookWrappers(): Map<string, Set<string>> {
       let match: RegExpExecArray | null
       pattern.lastIndex = 0
       while ((match = pattern.exec(content)) !== null) {
-        const hook = hookFunctionBefore(content, match.index)
+        const hook = wrapperFunctionBefore(content, match.index)
         addIndexValue(
           hooks,
           match[1],
@@ -1212,14 +1232,20 @@ function categorizeByModule(reducerName: string): string {
 
 function generateReport(
   rustReducers: Set<string>,
-  webResult: { reducers: Set<string>; sources: Record<string, Set<string>> }
+  webResult: { reducers: Set<string>; sources: Record<string, Set<string>> },
+  matrixRows: ReducerCoverageRow[],
 ): CoverageReport {
-  const webReducers = webResult.reducers
+  const webCoveredReducers = new Set(
+    matrixRows.filter(hasHookOrUiLayer).map((row) => row.reducer),
+  )
   const report: CoverageReport = {
     totalRustReducers: rustReducers.size,
     productRustReducers: 0,
-    totalWebReducers: webReducers.size,
+    totalWebReducers: webCoveredReducers.size,
     missingFromWeb: [],
+    coverageModel: 'matrix-hook-ui',
+    matrixStatusSummary: countRowsBy(matrixRows, 'status'),
+    matrixClassificationSummary: countRowsBy(matrixRows, 'classification'),
     byModule: {},
     excludedReducers: {
       count: 0,
@@ -1274,7 +1300,7 @@ function generateReport(
   }
 
   // Categorize Web reducers
-  for (const name of webReducers) {
+  for (const name of webCoveredReducers) {
     const mod = categorizeByModule(name)
     if (report.byModule[mod]) {
       report.byModule[mod].web.push(name)
@@ -1297,9 +1323,7 @@ function generateReport(
   }
 
   // Overall missing
-  const rustSet = new Set(rustReducers)
-  const webSet = new Set(webReducers)
-  report.missingFromWeb = Array.from(rustReducers).filter((r) => !webSet.has(r)).sort()
+  report.missingFromWeb = Array.from(rustReducers).filter((r) => !webCoveredReducers.has(r)).sort()
 
   return report
 }
@@ -1477,13 +1501,27 @@ function printReport(report: CoverageReport): void {
   console.log(`Total Rust reducers: ${report.totalRustReducers}`)
   console.log(`  └─ Product reducers (excl. bootstrap/seed/import): ${report.productRustReducers}`)
   console.log(`  └─ Excluded reducers (internal): ${report.excludedReducers.count}`)
-  console.log(`Total Web hooks: ${report.totalWebReducers}`)
+  console.log(`Total reducers with hook/UI coverage: ${report.totalWebReducers}`)
 
+  const productLayerReducers = Object.values(report.byModule).reduce(
+    (count, data) => count + data.web.filter((name) => data.productReducers.includes(name)).length,
+    0,
+  )
   const rawCoverage = Math.round((report.totalWebReducers / report.totalRustReducers) * 100)
-  const productCoverage = Math.round((report.totalWebReducers / report.productRustReducers) * 100)
+  const productCoverage = Math.round((productLayerReducers / report.productRustReducers) * 100)
   console.log(`\n📊 Coverage (raw): ${rawCoverage}%`)
-  console.log(`📊 Coverage (product only): ${productCoverage}%`)
-  console.log(`Missing from web: ${report.missingFromWeb.length}`)
+  console.log(`📊 Coverage (product only, hook/UI): ${productCoverage}%`)
+  console.log(`Missing hook/UI coverage: ${report.missingFromWeb.length}`)
+
+  console.log('\n=== Matrix Status Summary ===')
+  for (const [status, count] of Object.entries(report.matrixStatusSummary).sort()) {
+    console.log(`  status:${status}: ${count}`)
+  }
+
+  console.log('\n=== Matrix Classification Summary ===')
+  for (const [classification, count] of Object.entries(report.matrixClassificationSummary).sort()) {
+    console.log(`  classification:${classification}: ${count}`)
+  }
 
   // Detection sources
   console.log('\n=== Detection Sources ===')
@@ -1608,9 +1646,6 @@ function main(): void {
   mergeWorkspacePackageReducerCalls(webResult)
   console.log(`Found ${webResult.reducers.size} reducer calls in Web + workspace packages`)
 
-  const report = generateReport(rustReducers, webResult)
-  printReport(report)
-
   const layerIndex: LayerIndex = {
     backendFiles: extractRustReducerFiles(),
     commandWrappers: extractCommandWrappers(),
@@ -1619,6 +1654,10 @@ function main(): void {
   }
   layerIndex.uiCallers = extractUiCallers(layerIndex.hooks)
   const matrixRows = buildCoverageMatrix(rustReducers, layerIndex)
+
+  const report = generateReport(rustReducers, webResult, matrixRows)
+  printReport(report)
+
   writeCoverageMatrix(matrixRows)
   if (checkMode) {
     assertCoverageMatrix(matrixRows)

@@ -16,3 +16,4 @@ export {
   subscribeToRecord,
   unsubscribeFromRecord,
 } from "./mutations/crm"
+export * from "./mutations/settings-admin"
