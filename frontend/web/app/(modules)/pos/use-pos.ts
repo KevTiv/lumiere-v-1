@@ -9,7 +9,18 @@ import {
   type POSPaymentMethod,
 } from "@lumiere/ui/lib/finance-types"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import { useCreatePosOrder, usePosTerminals } from "@lumiere/query-hooks/hooks/pos"
+import {
+  useActivatePosConfig,
+  useClosePosSession,
+  useComputePosSessionTotals,
+  useCreatePosConfig,
+  useCreatePosOrder,
+  useCreatePosTerminal,
+  useDeactivatePosConfig,
+  useOpenPosSession,
+  usePosTerminals,
+  useUpdatePosTerminal,
+} from "@lumiere/query-hooks/hooks/pos"
 
 export const POS_CATEGORIES = ["All", ...Array.from(new Set(posProducts.map((p) => p.category)))]
 
@@ -28,6 +39,9 @@ export interface UsePOSReturn {
   discountTotal: number
   total: number
   categories: string[]
+  terminals: Record<string, unknown>[]
+  posLifecycleError: string | null
+  isPosLifecyclePending: boolean
   setSearch: (v: string) => void
   setCategory: (v: string) => void
   setGridMode: (v: "grid" | "list") => void
@@ -40,6 +54,14 @@ export interface UsePOSReturn {
   clearCart: () => void
   applyDiscount: () => void
   handlePaymentComplete: (method: POSPaymentMethod, tendered: number) => void
+  createTerminal: (data: Record<string, unknown>) => Promise<void>
+  updatePrimaryTerminal: (data: Record<string, unknown>) => Promise<void>
+  createDefaultConfig: (data: Record<string, unknown>) => Promise<void>
+  activateConfig: (data: Record<string, unknown>) => Promise<void>
+  deactivateConfig: (data: Record<string, unknown>) => Promise<void>
+  openSession: (data: Record<string, unknown>) => Promise<void>
+  closeSession: (data: Record<string, unknown>) => Promise<void>
+  computeSessionTotals: (data: Record<string, unknown>) => Promise<void>
 }
 
 function toColor(seed: string): string {
@@ -85,6 +107,7 @@ function toPosProduct(row: Record<string, unknown>): POSProduct {
 
 export function usePOS(
   organizationId: bigint,
+  companyId: bigint,
   initialProducts?: Record<string, unknown>[],
   initialTerminals?: Record<string, unknown>[]
 ): UsePOSReturn {
@@ -97,10 +120,29 @@ export function usePOS(
   const [orderCount, setOrderCount] = useState(1)
   const [discountCode, setDiscountCode] = useState("")
   const [orderDiscount, setOrderDiscount] = useState(0)
+  const [posLifecycleError, setPosLifecycleError] = useState<string | null>(null)
 
   const { data: productRows = [] } = useProducts(organizationId, initialProducts)
   const { data: terminals = [] } = usePosTerminals(organizationId, initialTerminals)
   const createPosOrder = useCreatePosOrder(organizationId)
+  const createPosTerminal = useCreatePosTerminal(organizationId)
+  const updatePosTerminal = useUpdatePosTerminal(organizationId)
+  const createPosConfig = useCreatePosConfig(organizationId, companyId)
+  const activatePosConfig = useActivatePosConfig(organizationId)
+  const deactivatePosConfig = useDeactivatePosConfig(organizationId)
+  const openPosSession = useOpenPosSession(organizationId)
+  const closePosSession = useClosePosSession(organizationId)
+  const computePosSessionTotals = useComputePosSessionTotals(organizationId)
+
+  const isPosLifecyclePending =
+    createPosTerminal.isPending ||
+    updatePosTerminal.isPending ||
+    createPosConfig.isPending ||
+    activatePosConfig.isPending ||
+    deactivatePosConfig.isPending ||
+    openPosSession.isPending ||
+    closePosSession.isPending ||
+    computePosSessionTotals.isPending
 
   const liveProducts = useMemo(() => {
     if (productRows.length === 0) return posProducts
@@ -199,6 +241,113 @@ export function usePOS(
     else if (discountCode.toUpperCase() === "SAVE20") setOrderDiscount(20)
   }, [discountCode])
 
+  const firstTerminal = terminals[0] as Record<string, unknown> | undefined
+  const requireNumericId = useCallback((value: unknown, label: string) => {
+    const trimmed = String(value ?? "").trim()
+    if (!trimmed) throw new Error(`${label} is required`)
+    return trimmed
+  }, [])
+
+  const runLifecycle = useCallback(async (fn: () => Promise<void>) => {
+    setPosLifecycleError(null)
+    try {
+      await fn()
+    } catch (e) {
+      setPosLifecycleError(e instanceof Error ? e.message : String(e))
+      throw e
+    }
+  }, [])
+
+  const createTerminal = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await createPosTerminal.mutateAsync({
+          name: String(data.name ?? "POS Terminal"),
+          locationLabel: data.locationLabel ?? null,
+          latitude: data.latitude ?? null,
+          longitude: data.longitude ?? null,
+        })
+      }),
+    [createPosTerminal, runLifecycle],
+  )
+
+  const updatePrimaryTerminal = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        const terminalId = firstTerminal?.id
+        if (terminalId == null) throw new Error("Create or select a POS terminal first")
+        await updatePosTerminal.mutateAsync({
+          terminalId: String(terminalId),
+          status: String(data.status ?? "open"),
+          dailyRevenue: Number(data.dailyRevenue) || 0,
+          openOrders: Number(data.openOrders) || 0,
+        })
+      }),
+    [firstTerminal, runLifecycle, updatePosTerminal],
+  )
+
+  const createDefaultConfig = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await createPosConfig.mutateAsync({
+          name: String(data.name ?? "Default POS Config"),
+          companyId,
+          isActive: data.isActive ?? true,
+          currencyId: null,
+          journalId: null,
+          warehouseId: null,
+          pricelistId: null,
+        })
+      }),
+    [companyId, createPosConfig, runLifecycle],
+  )
+
+  const activateConfig = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await activatePosConfig.mutateAsync(requireNumericId(data.configId, "Config ID"))
+      }),
+    [activatePosConfig, requireNumericId, runLifecycle],
+  )
+
+  const deactivateConfig = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await deactivatePosConfig.mutateAsync(requireNumericId(data.configId, "Config ID"))
+      }),
+    [deactivatePosConfig, requireNumericId, runLifecycle],
+  )
+
+  const openSession = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await openPosSession.mutateAsync({
+          configId: requireNumericId(data.configId, "Config ID"),
+          openingBalance: Number(data.openingBalance) || 0,
+        })
+      }),
+    [openPosSession, requireNumericId, runLifecycle],
+  )
+
+  const closeSession = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await closePosSession.mutateAsync({
+          sessionId: requireNumericId(data.sessionId, "Session ID"),
+          closingBalance: Number(data.closingBalance) || 0,
+        })
+      }),
+    [closePosSession, requireNumericId, runLifecycle],
+  )
+
+  const computeSessionTotals = useCallback(
+    (data: Record<string, unknown>) =>
+      runLifecycle(async () => {
+        await computePosSessionTotals.mutateAsync(requireNumericId(data.sessionId, "Session ID"))
+      }),
+    [computePosSessionTotals, requireNumericId, runLifecycle],
+  )
+
   const handlePaymentComplete = useCallback(
     (method: POSPaymentMethod, tendered: number) => {
       const primaryTerminalId =
@@ -258,6 +407,9 @@ export function usePOS(
     discountTotal,
     total,
     categories,
+    terminals: terminals as Record<string, unknown>[],
+    posLifecycleError,
+    isPosLifecyclePending,
     setSearch,
     setCategory,
     setGridMode,
@@ -270,5 +422,13 @@ export function usePOS(
     clearCart,
     applyDiscount,
     handlePaymentComplete,
+    createTerminal,
+    updatePrimaryTerminal,
+    createDefaultConfig,
+    activateConfig,
+    deactivateConfig,
+    openSession,
+    closeSession,
+    computeSessionTotals,
   }
 }

@@ -33,6 +33,15 @@ import {
   useCreatePayslip,
   useCreateJobPosition,
   useCreateDepartment,
+  useArchiveEmployee,
+  useApproveLeave,
+  useRefuseLeave,
+  useResetLeaveToDraft,
+  useOpenContract,
+  useExpireContract,
+  useCancelContract,
+  useConfirmPayslip,
+  useCancelPayslip,
   useHrCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -52,6 +61,57 @@ import {
   leaveTypeRowsToSelectOptions,
   payrollStructureRowsToSelectOptions,
 } from "@/lib/form-lookup"
+
+type HrRowAction =
+  | { action: "archiveEmployee"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { action: "confirmPayslip"; rows: Record<string, unknown>[]; form: FormConfig }
+  | null
+
+const archiveEmployeeForm: FormConfig = {
+  id: "archive-employee",
+  title: "Archive Employee",
+  submitLabel: "Archive employee",
+  sections: [
+    {
+      id: "archive",
+      fields: [
+        {
+          id: "termination-date",
+          type: "date",
+          name: "terminationDate",
+          label: "Termination date",
+        },
+      ],
+    },
+  ],
+}
+
+const confirmPayslipForm: FormConfig = {
+  id: "confirm-payslip",
+  title: "Confirm Payslip",
+  submitLabel: "Confirm payslip",
+  sections: [
+    {
+      id: "wages",
+      fields: [
+        {
+          id: "gross-wage",
+          type: "number",
+          name: "grossWage",
+          label: "Gross wage",
+          width: "1/2",
+        },
+        {
+          id: "net-wage",
+          type: "number",
+          name: "netWage",
+          label: "Net wage",
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+}
 
 interface HrClientProps {
   initialEmployees?: Record<string, unknown>[]
@@ -88,6 +148,9 @@ function HrClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
+  const [toolbarError, setToolbarError] = useState<string | null>(null)
+  const [rowAction, setRowAction] = useState<HrRowAction>(null)
+  const [rowActionError, setRowActionError] = useState<string | null>(null)
 
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
@@ -105,6 +168,15 @@ function HrClientLoaded({
   const createPayslip = useCreatePayslip(orgId, companyId)
   const createJobPosition = useCreateJobPosition(orgId, companyId)
   const createDepartment = useCreateDepartment(orgId, companyId)
+  const archiveEmployee = useArchiveEmployee(orgId, companyId)
+  const approveLeave = useApproveLeave(orgId)
+  const refuseLeave = useRefuseLeave(orgId)
+  const resetLeave = useResetLeaveToDraft(orgId)
+  const openContract = useOpenContract(orgId)
+  const expireContract = useExpireContract(orgId)
+  const cancelContract = useCancelContract(orgId)
+  const confirmPayslip = useConfirmPayslip(orgId, companyId)
+  const cancelPayslip = useCancelPayslip(orgId, companyId)
   const csvImports = useHrCsvImportMutations(orgId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])
@@ -115,7 +187,12 @@ function HrClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{ id: string; label: string; onClick: () => void }>,
+    actions: Array<{
+      id: string
+      label: string
+      requiresSelection?: boolean
+      onClick: (selectedRows: Record<string, unknown>[]) => void
+    }>,
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -125,6 +202,23 @@ function HrClientLoaded({
         rowSelectionToggleOnClick: false,
         actions,
       },
+    }
+  }
+
+  const runSelectedRows = async (
+    rows: Record<string, unknown>[],
+    label: string,
+    fn: (row: Record<string, unknown>) => Promise<unknown>,
+  ) => {
+    setToolbarError(null)
+    if (rows.length === 0) {
+      setToolbarError(`Select at least one ${label}.`)
+      return
+    }
+    try {
+      for (const row of rows) await fn(row)
+    } catch (e) {
+      setToolbarError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -329,6 +423,20 @@ function HrClientLoaded({
                   label: t("hr.toolbar.importEmployeeCsv"),
                   onClick: () => setCsvKind("employee"),
                 },
+                {
+                  id: "archive-employee",
+                  label: "Archive",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setToolbarError(null)
+                    if (rows.length === 0) {
+                      setToolbarError("Select at least one employee.")
+                      return
+                    }
+                    setRowActionError(null)
+                    setRowAction({ action: "archiveEmployee", rows, form: archiveEmployeeForm })
+                  },
+                },
               ]),
             }
           }
@@ -362,6 +470,24 @@ function HrClientLoaded({
                   label: t("hr.toolbar.importLeaveCsv"),
                   onClick: () => setCsvKind("leave"),
                 },
+                {
+                  id: "approve-leave",
+                  label: "Approve",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
+                },
+                {
+                  id: "refuse-leave",
+                  label: "Refuse",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
+                },
+                {
+                  id: "reset-leave",
+                  label: "Reset to draft",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
+                },
               ]),
             }
           }
@@ -374,6 +500,24 @@ function HrClientLoaded({
                   id: "csv-contract",
                   label: t("hr.toolbar.importContractCsv"),
                   onClick: () => setCsvKind("contract"),
+                },
+                {
+                  id: "open-contract",
+                  label: "Open",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
+                },
+                {
+                  id: "expire-contract",
+                  label: "Expire",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
+                },
+                {
+                  id: "cancel-contract",
+                  label: "Cancel",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
             }
@@ -397,6 +541,26 @@ function HrClientLoaded({
                   id: "csv-payslip",
                   label: t("hr.toolbar.importPayslipCsv"),
                   onClick: () => setCsvKind("payslip"),
+                },
+                {
+                  id: "confirm-payslip",
+                  label: "Confirm",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setToolbarError(null)
+                    if (rows.length === 0) {
+                      setToolbarError("Select at least one payslip.")
+                      return
+                    }
+                    setRowActionError(null)
+                    setRowAction({ action: "confirmPayslip", rows, form: confirmPayslipForm })
+                  },
+                },
+                {
+                  id: "cancel-payslip",
+                  label: "Cancel",
+                  requiresSelection: true,
+                  onClick: (rows) => void runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
                 },
               ]),
             }
@@ -431,6 +595,13 @@ function HrClientLoaded({
       payslipFormConfig,
       jobFormConfig,
       t,
+      approveLeave,
+      refuseLeave,
+      resetLeave,
+      openContract,
+      expireContract,
+      cancelContract,
+      cancelPayslip,
     ],
   )
 
@@ -490,10 +661,24 @@ function HrClientLoaded({
     createPayslip.isPending ||
     createJobPosition.isPending ||
     createDepartment.isPending ||
+    archiveEmployee.isPending ||
+    approveLeave.isPending ||
+    refuseLeave.isPending ||
+    resetLeave.isPending ||
+    openContract.isPending ||
+    expireContract.isPending ||
+    cancelContract.isPending ||
+    confirmPayslip.isPending ||
+    cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
   return (
     <>
+      {toolbarError ? (
+        <p className="text-sm text-destructive mb-2" role="alert">
+          {toolbarError}
+        </p>
+      ) : null}
       <ModuleView
         config={config}
         data={data}
@@ -512,6 +697,48 @@ function HrClientLoaded({
           }
         }}
       />
+      {rowAction ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setRowAction(null)
+              setRowActionError(null)
+            }
+          }}
+          config={rowAction.form}
+          isPending={isFormMutationPending}
+          closeOnSubmit={false}
+          submitError={rowActionError}
+          onSubmit={async (formData) => {
+            setRowActionError(null)
+            try {
+              if (rowAction.action === "archiveEmployee") {
+                for (const row of rowAction.rows) {
+                  await archiveEmployee.mutateAsync({
+                    employeeId: Number(row.id),
+                    terminationDate:
+                      formData.terminationDate != null && formData.terminationDate !== ""
+                        ? new Date(String(formData.terminationDate))
+                        : undefined,
+                  })
+                }
+              } else if (rowAction.action === "confirmPayslip") {
+                for (const row of rowAction.rows) {
+                  await confirmPayslip.mutateAsync({
+                    payslipId: Number(row.id),
+                    grossWage: Number(formData.grossWage) || 0,
+                    netWage: Number(formData.netWage) || 0,
+                  })
+                }
+              }
+              setRowAction(null)
+            } catch (e) {
+              setRowActionError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
       {csvKind && csvFormConfig ? (
         <FormModal
           key={csvKind}

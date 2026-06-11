@@ -4,6 +4,8 @@ use stdb_config::{env_stdb_host_or_next_public, normalize_stdb_http_host};
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
+    /// Shared secret required on non-health HTTP routes (`X-Lumiere-Gateway-Secret`).
+    pub internal_secret: Option<String>,
     pub qdrant_url: String,
     pub qdrant_api_key: Option<String>,
     pub qdrant_collection: String,
@@ -69,6 +71,9 @@ impl Config {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .context("PORT must be a valid number")?,
+            internal_secret: std::env::var("LUMIERE_AI_GATEWAY_INTERNAL_SECRET")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
             qdrant_url: std::env::var("QDRANT_URL")
                 .unwrap_or_else(|_| "http://localhost:6333".to_string()),
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),

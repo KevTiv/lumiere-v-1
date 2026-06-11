@@ -14,8 +14,13 @@ mod worker;
 use std::sync::Arc;
 
 use axum::{
-    Router,
+    body::Body,
+    extract::State,
+    http::{Request, StatusCode},
+    middleware::{self, Next},
+    response::Response,
     routing::{delete, get, post},
+    Router,
 };
 use dashmap::DashMap;
 use tower_http::{
@@ -31,6 +36,30 @@ use qdrant_client::VectorStore;
 use rig_agent::RigContext;
 use state::AppState;
 use stdb_client::StdbClient;
+
+async fn require_gateway_secret(
+    State(state): State<AppState>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let Some(expected) = state.config.internal_secret.as_deref() else {
+        tracing::warn!(
+            "AI gateway internal secret is not configured; rejecting non-health request"
+        );
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    };
+
+    let provided = request
+        .headers()
+        .get("x-lumiere-gateway-secret")
+        .and_then(|value| value.to_str().ok());
+
+    if provided != Some(expected) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    Ok(next.run(request).await)
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -112,8 +141,7 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        .route("/health", get(routes::health::health))
+    let v1_routes = Router::new()
         .route("/v1/embed", post(routes::embed::post_embed))
         .route("/v1/embed", delete(routes::embed::delete_embed))
         .route("/v1/search", post(routes::search::post_search))
@@ -140,6 +168,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_gateway_secret,
+        ));
+
+    let app = Router::new()
+        .route("/health", get(routes::health::health))
+        .merge(v1_routes)
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state);

@@ -3,11 +3,20 @@
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { MapLayerLegend, MissingOrganization } from "@lumiere/ui"
+import {
+  FormModal,
+  MapLayerLegend,
+  MissingOrganization,
+  type FormConfig,
+} from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
 import type { MapPinData } from "@lumiere/ui/lib/map-types"
 import { Warehouse, Truck, Monitor, Package, TrendingUp, MapPin } from "lucide-react"
 import { useFleetVehicles, usePosTerminals, useWarehouseGeo } from "@lumiere/query-hooks/hooks/map"
+import {
+  useCreateFleetVehicle,
+  useUpdateVehiclePosition,
+} from "@lumiere/query-hooks/hooks/fleet"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
@@ -42,6 +51,45 @@ const STAT_ICONS: Record<string, React.ComponentType<{ className?: string; style
   pos: Monitor,
 }
 
+type FleetMapAction = "createVehicle" | "updatePosition"
+
+const fleetMapForms: Record<FleetMapAction, FormConfig> = {
+  createVehicle: {
+    id: "fleet-create-vehicle",
+    title: "Create Fleet Vehicle",
+    submitLabel: "Create vehicle",
+    sections: [
+      {
+        id: "vehicle",
+        fields: [
+          { id: "vehicle-name", type: "text", name: "name", label: "Name", required: true },
+          { id: "vehicle-type", type: "text", name: "vehicleType", label: "Vehicle type", required: true },
+          { id: "license-plate", type: "text", name: "licensePlate", label: "License plate", width: "1/2" },
+          { id: "driver-name", type: "text", name: "driverName", label: "Driver name", width: "1/2" },
+        ],
+      },
+    ],
+  },
+  updatePosition: {
+    id: "fleet-update-primary-position",
+    title: "Update Primary Vehicle Position",
+    description: "Updates the first vehicle in the current fleet list.",
+    submitLabel: "Update position",
+    sections: [
+      {
+        id: "position",
+        fields: [
+          { id: "vehicle-lat", type: "number", name: "latitude", label: "Latitude", required: true, width: "1/2" },
+          { id: "vehicle-lng", type: "number", name: "longitude", label: "Longitude", required: true, width: "1/2" },
+          { id: "vehicle-speed", type: "number", name: "speedKmh", label: "Speed km/h", width: "1/3" },
+          { id: "vehicle-heading", type: "number", name: "heading", label: "Heading", width: "1/3" },
+          { id: "vehicle-status", type: "text", name: "status", label: "Status", required: true, width: "1/3" },
+        ],
+      },
+    ],
+  },
+}
+
 interface MapClientProps {
   organizationId?: number
 }
@@ -62,6 +110,10 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const { data: vehicles = [] } = useFleetVehicles(orgId)
   const { data: posTerminals = [] } = usePosTerminals(orgId)
   const { data: warehouseGeos = [] } = useWarehouseGeo(orgId)
+  const createFleetVehicle = useCreateFleetVehicle(orgId)
+  const updateVehiclePosition = useUpdateVehiclePosition(orgId)
+  const [fleetAction, setFleetAction] = useState<FleetMapAction | null>(null)
+  const [vehicleError, setVehicleError] = useState<string | null>(null)
 
   // Build live pins from SpacetimeDB data; fall back to demo if empty
   const livePins: MapPinData[] = useMemo(() => {
@@ -153,6 +205,49 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   )
 
   const isLiveData = vehicles.length > 0 || posTerminals.length > 0 || warehouseGeos.length > 0
+  const primaryVehicle = vehicles[0] as Record<string, unknown> | undefined
+  const isFleetPending = createFleetVehicle.isPending || updateVehiclePosition.isPending
+
+  const handleCreateFleetVehicle = async (data: Record<string, unknown>) => {
+    setVehicleError(null)
+    try {
+      await createFleetVehicle.mutateAsync({
+        name: String(data.name ?? "Fleet Vehicle"),
+        vehicleType: String(data.vehicleType ?? "truck"),
+        licensePlate: data.licensePlate != null && String(data.licensePlate).trim() !== "" ? String(data.licensePlate) : null,
+        driverName: data.driverName != null && String(data.driverName).trim() !== "" ? String(data.driverName) : null,
+      })
+      setFleetAction(null)
+    } catch (e) {
+      setVehicleError(e instanceof Error ? e.message : String(e))
+      throw e
+    }
+  }
+
+  const handleUpdateVehiclePosition = async (data: Record<string, unknown>) => {
+    setVehicleError(null)
+    try {
+      const vehicleId = primaryVehicle?.id
+      if (vehicleId == null) throw new Error("Create a fleet vehicle first")
+      await updateVehiclePosition.mutateAsync({
+        vehicleId: String(vehicleId),
+        latitude: Number(data.latitude) || 0,
+        longitude: Number(data.longitude) || 0,
+        speedKmh: Number(data.speedKmh) || 0,
+        heading: Number(data.heading) || 0,
+        status: String(data.status ?? "active"),
+      })
+      setFleetAction(null)
+    } catch (e) {
+      setVehicleError(e instanceof Error ? e.message : String(e))
+      throw e
+    }
+  }
+
+  const handleFleetSubmit = async (data: Record<string, unknown>) => {
+    if (fleetAction === "createVehicle") await handleCreateFleetVehicle(data)
+    else if (fleetAction === "updatePosition") await handleUpdateVehiclePosition(data)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -188,6 +283,33 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t("map.summary")}
           </p>
+
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Fleet actions
+            </p>
+            <button
+              type="button"
+              className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+              disabled={isFleetPending}
+              onClick={() => setFleetAction("createVehicle")}
+            >
+              Create vehicle
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+              disabled={isFleetPending}
+              onClick={() => setFleetAction("updatePosition")}
+            >
+              Update primary position
+            </button>
+            {vehicleError ? (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                {vehicleError}
+              </p>
+            ) : null}
+          </div>
 
           {/* Layer counts */}
           <div className="space-y-2">
@@ -251,6 +373,16 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           </div>
         </aside>
       </div>
+      {fleetAction ? (
+        <FormModal
+          open
+          onOpenChange={(open) => !open && setFleetAction(null)}
+          config={fleetMapForms[fleetAction]}
+          isPending={isFleetPending}
+          submitError={vehicleError}
+          onSubmit={handleFleetSubmit}
+        />
+      ) : null}
     </div>
   )
 }

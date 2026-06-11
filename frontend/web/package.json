@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "analyze:coverage": "tsx scripts/track-reducer-coverage.ts",
+    "analyze:coverage:check": "tsx scripts/track-reducer-coverage.ts --check",
     "analyze:reducers": "tsx scripts/analyze-reducer-types.ts",
     "analyze:forms": "tsx scripts/analyze-form-mutation-contracts.ts",
     "seed-test-user": "node ./scripts/seed-test-user.mjs",

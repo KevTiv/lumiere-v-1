@@ -2,13 +2,13 @@
 /// Uses the official qdrant-client crate (gRPC).
 use anyhow::{Context, Result};
 use qdrant_client::{
-    Qdrant,
     qdrant::{
-        Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, DeletePointsBuilder,
-        Distance, FieldType, Filter, PointStruct, PointsIdsList, SearchParamsBuilder,
-        SearchPointsBuilder, UpsertPointsBuilder, Value, VectorParamsBuilder, VectorsConfig,
-        vectors_config::Config as VectorConfig,
+        vectors_config::Config as VectorConfig, Condition, CreateCollectionBuilder,
+        CreateFieldIndexCollectionBuilder, DeletePointsBuilder, Distance, FieldType, Filter,
+        PointStruct, PointsIdsList, SearchParamsBuilder, SearchPointsBuilder, UpsertPointsBuilder,
+        Value, VectorParamsBuilder, VectorsConfig,
     },
+    Qdrant,
 };
 use std::collections::HashMap;
 

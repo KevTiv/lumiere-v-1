@@ -19,6 +19,11 @@ import {
   useDocuments,
   useKnowledgeArticles,
   useCreateDocument,
+  useUpdateDocument,
+  useDeleteDocument,
+  useLockDocument,
+  useUnlockDocument,
+  useRecordDocumentView,
   useCreateKnowledgeArticle,
   useDocumentsCsvImportMutations,
   useAiDocumentProcessingJobs,
@@ -32,6 +37,75 @@ import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@lumier
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import type { QueryRows } from "@/lib/query-fetch"
+
+type DocumentRowAction =
+  | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
+  | null
+
+function editDocumentForm(row: Record<string, unknown>): FormConfig {
+  return {
+    id: "edit-document",
+    title: "Update Document",
+    submitLabel: "Update document",
+    sections: [
+      {
+        id: "document",
+        fields: [
+          {
+            id: "doc-name",
+            name: "name",
+            type: "text",
+            label: "Name",
+            required: true,
+            defaultValue: String(row.name ?? ""),
+            width: "full",
+          },
+          {
+            id: "doc-file-name",
+            name: "fileName",
+            type: "text",
+            label: "File name",
+            defaultValue: String(row.fileName ?? ""),
+            width: "1/2",
+          },
+          {
+            id: "doc-mimetype",
+            name: "mimetype",
+            type: "text",
+            label: "MIME type",
+            defaultValue: String(row.mimetype ?? ""),
+            width: "1/2",
+          },
+          {
+            id: "doc-description",
+            name: "description",
+            type: "textarea",
+            label: "Description",
+            defaultValue: String(row.description ?? ""),
+            rows: 3,
+            width: "full",
+          },
+          {
+            id: "doc-favorite",
+            name: "isFavorite",
+            type: "checkbox",
+            label: "Favorite",
+            defaultValue: Boolean(row.isFavorite),
+            width: "1/2",
+          },
+          {
+            id: "doc-shared",
+            name: "isShared",
+            type: "checkbox",
+            label: "Shared",
+            defaultValue: Boolean(row.isShared),
+            width: "1/2",
+          },
+        ],
+      },
+    ],
+  }
+}
 
 interface DocumentsClientProps {
   initialDocuments?: Record<string, unknown>[]
@@ -91,6 +165,9 @@ function DocumentsClientLoaded({
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
+  const [documentToolbarError, setDocumentToolbarError] = useState<string | null>(null)
+  const [documentRowAction, setDocumentRowAction] = useState<DocumentRowAction>(null)
+  const [documentRowSubmitError, setDocumentRowSubmitError] = useState<string | null>(null)
   const [completeModalRows, setCompleteModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [completeSubmitError, setCompleteSubmitError] = useState<string | null>(null)
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
@@ -101,6 +178,11 @@ function DocumentsClientLoaded({
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
   const createDocument = useCreateDocument(orgId, companyId)
+  const updateDocument = useUpdateDocument(orgId)
+  const deleteDocument = useDeleteDocument(orgId)
+  const lockDocument = useLockDocument(orgId)
+  const unlockDocument = useUnlockDocument(orgId)
+  const recordDocumentView = useRecordDocumentView(orgId)
   const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, companyId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, companyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
@@ -189,6 +271,87 @@ function DocumentsClientLoaded({
       ...moduleConfig,
       tabs: moduleConfig.tabs.map((tab) => {
         if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+        if (tab.id === "documents" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "edit-document",
+                  label: "Edit document",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setDocumentToolbarError(null)
+                    if (rows.length !== 1) {
+                      setDocumentToolbarError("Select one document to edit.")
+                      return
+                    }
+                    setDocumentRowSubmitError(null)
+                    setDocumentRowAction({
+                      action: "updateDocument",
+                      row: rows[0],
+                      form: editDocumentForm(rows[0]),
+                    })
+                  },
+                },
+                {
+                  id: "lock-document",
+                  label: "Lock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) await lockDocument.mutateAsync(row.id as string | number)
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "unlock-document",
+                  label: "Unlock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) await unlockDocument.mutateAsync(row.id as string | number)
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "record-document-view",
+                  label: "Record view",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) await recordDocumentView.mutateAsync(row.id as string | number)
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "delete-document",
+                  label: "Delete",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) await deleteDocument.mutateAsync(row.id as string | number)
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+              ],
+              true,
+            ),
+          }
+        }
         if (tab.id === "knowledge-base" && tab.entityConfig) {
           return {
             ...tab,
@@ -291,6 +454,10 @@ function DocumentsClientLoaded({
       moduleConfig,
       t,
       approveProcessingJob,
+      deleteDocument,
+      lockDocument,
+      recordDocumentView,
+      unlockDocument,
     ],
   )
 
@@ -347,6 +514,11 @@ function DocumentsClientLoaded({
 
   const isFormMutationPending =
     createDocument.isPending ||
+    updateDocument.isPending ||
+    deleteDocument.isPending ||
+    lockDocument.isPending ||
+    unlockDocument.isPending ||
+    recordDocumentView.isPending ||
     createKnowledgeArticle.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
@@ -360,6 +532,11 @@ function DocumentsClientLoaded({
       {processingToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
           {processingToolbarError}
+        </p>
+      ) : null}
+      {documentToolbarError ? (
+        <p className="text-sm text-destructive mb-2" role="alert">
+          {documentToolbarError}
         </p>
       ) : null}
       <ModuleView
@@ -407,6 +584,40 @@ function DocumentsClientLoaded({
               setCsvKind(null)
             } catch (e) {
               setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+      {documentRowAction ? (
+        <FormModal
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setDocumentRowAction(null)
+              setDocumentRowSubmitError(null)
+            }
+          }}
+          config={documentRowAction.form}
+          isPending={isFormMutationPending}
+          closeOnSubmit={false}
+          submitError={documentRowSubmitError}
+          onSubmit={async (formData) => {
+            setDocumentRowSubmitError(null)
+            try {
+              await updateDocument.mutateAsync({
+                documentId: documentRowAction.row.id as string | number,
+                params: {
+                  name: formData.name,
+                  fileName: formData.fileName,
+                  mimetype: formData.mimetype,
+                  description: formData.description,
+                  isFavorite: Boolean(formData.isFavorite),
+                  isShared: Boolean(formData.isShared),
+                },
+              })
+              setDocumentRowAction(null)
+            } catch (e) {
+              setDocumentRowSubmitError(e instanceof Error ? e.message : String(e))
             }
           }}
         />

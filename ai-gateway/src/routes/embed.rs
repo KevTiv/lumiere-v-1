@@ -1,11 +1,6 @@
 /// POST /v1/embed  — compute embedding and index to Qdrant
 /// DELETE /v1/embed — remove a point from Qdrant by STDB embedding ID
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -112,7 +107,10 @@ pub async fn delete_embed(
         .await
         .map_err(AppError::Qdrant)?;
 
-    tracing::info!(embedding_id = req.stdb_embedding_id, "Embedding deleted from Qdrant");
+    tracing::info!(
+        embedding_id = req.stdb_embedding_id,
+        "Embedding deleted from Qdrant"
+    );
 
     Ok(StatusCode::NO_CONTENT)
 }

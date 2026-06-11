@@ -248,6 +248,9 @@ export interface POSPageProps {
   discountTotal: number
   total: number
   categories: string[]
+  terminals: Record<string, unknown>[]
+  posLifecycleError: string | null
+  isPosLifecyclePending: boolean
   // Setters
   setSearch: (v: string) => void
   setCategory: (v: string) => void
@@ -262,6 +265,7 @@ export interface POSPageProps {
   clearCart: () => void
   applyDiscount: () => void
   handlePaymentComplete: (method: POSPaymentMethod, tendered: number) => void
+  onOpenPosAction: (action: string) => void
 }
 
 export function POSPage({
@@ -280,6 +284,9 @@ export function POSPage({
   discountTotal,
   total,
   categories,
+  terminals,
+  posLifecycleError,
+  isPosLifecyclePending,
   setSearch,
   setCategory,
   setGridMode,
@@ -292,6 +299,7 @@ export function POSPage({
   clearCart,
   applyDiscount,
   handlePaymentComplete,
+  onOpenPosAction,
 }: POSPageProps) {
   const { t } = useTranslation()
 
@@ -420,6 +428,52 @@ export function POSPage({
               </Button>
             )}
           </div>
+        </div>
+
+        <div className="space-y-2 border-b p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Operations
+            </p>
+            <Badge variant="outline" className="text-[10px]">
+              {terminals.length} terminals
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("createTerminal")}>
+              Create terminal
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("createConfig")}>
+              Create config
+            </Button>
+          </div>
+          <Button size="sm" variant="outline" className="w-full" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("updateTerminal")}>
+            Update primary terminal
+          </Button>
+          <div className="grid grid-cols-3 gap-1.5">
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("activateConfig")}>
+              Activate
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("deactivateConfig")}>
+              Deactivate
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("openSession")}>
+              Open
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("computeTotals")}>
+              Compute totals
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("closeSession")}>
+              Close session
+            </Button>
+          </div>
+          {posLifecycleError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+              {posLifecycleError}
+            </p>
+          ) : null}
         </div>
 
         {/* Cart items */}

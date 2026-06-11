@@ -187,11 +187,8 @@ pub async fn post_download(
     if zip_path.exists() {
         // Return a synthetic "done" job so client gets the path immediately
         let job_id = uuid::Uuid::new_v4().to_string();
-        let mut status = DownloadJobStatus::new(
-            job_id.clone(),
-            req.dataset_ref.clone(),
-            req.org_id.clone(),
-        );
+        let mut status =
+            DownloadJobStatus::new(job_id.clone(), req.dataset_ref.clone(), req.org_id.clone());
         status.status = JobStatus::Done;
         status.local_path = Some(zip_path.to_string_lossy().into_owned());
         state.download_jobs.insert(job_id.clone(), status);
@@ -204,9 +201,7 @@ pub async fn post_download(
     let job_id = uuid::Uuid::new_v4().to_string();
     let initial_status =
         DownloadJobStatus::new(job_id.clone(), req.dataset_ref.clone(), req.org_id.clone());
-    state
-        .download_jobs
-        .insert(job_id.clone(), initial_status);
+    state.download_jobs.insert(job_id.clone(), initial_status);
 
     // Clone everything the background task needs
     let jobs = state.download_jobs.clone();

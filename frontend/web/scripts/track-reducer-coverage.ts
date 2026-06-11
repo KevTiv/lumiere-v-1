@@ -11,6 +11,11 @@
 import { execSync } from 'child_process'
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import * as path from 'path'
+import {
+  INTENTIONALLY_API_ONLY_REDUCERS,
+  classifyReducerByHeuristic,
+  type ReducerClassification,
+} from './reducer-coverage-classifications'
 
 // Simple glob implementation to avoid module issues
 function globSync(pattern: string, options: { cwd: string; absolute?: boolean }): string[] {
@@ -24,6 +29,17 @@ function globSync(pattern: string, options: { cwd: string; absolute?: boolean })
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name)
         if (entry.isDirectory()) {
+          if (
+            entry.name === 'node_modules' ||
+            entry.name === '.next' ||
+            entry.name === '.turbo' ||
+            entry.name === '.claude' ||
+            entry.name === '.git' ||
+            entry.name === 'target' ||
+            entry.name === 'dist'
+          ) {
+            continue
+          }
           walk(fullPath)
         } else if (entry.isFile() && fullPath.endsWith(pattern.replace('**/', '').replace('*', ''))) {
           results.push(absolute ? fullPath : fullPath.replace(dir + path.sep, ''))
@@ -38,11 +54,30 @@ function globSync(pattern: string, options: { cwd: string; absolute?: boolean })
   return results
 }
 
+function repoRelative(file: string): string {
+  return path.relative(REPO_ROOT, file).split(path.sep).join('/')
+}
+
+function addIndexValue(index: Map<string, Set<string>>, key: string, value: string): void {
+  const existing = index.get(key) ?? new Set<string>()
+  existing.add(value)
+  index.set(key, existing)
+}
+
+function firstSetValue(values: Set<string> | undefined): string | null {
+  return values ? Array.from(values).sort()[0] ?? null : null
+}
+
 const __filename = new URL(import.meta.url).pathname
 const __dirname = path.dirname(__filename)
 const REPO_ROOT = path.resolve(__dirname, '../../..')
 const SPACETIMEDB_SRC = path.join(REPO_ROOT, 'spacetimedb/src')
 const WEB_SRC = path.join(REPO_ROOT, 'frontend/web')
+const STDB_COMMANDS_SRC = path.join(REPO_ROOT, 'frontend/packages/stdb/src/commands')
+const QUERY_HOOKS_SRC = path.join(REPO_ROOT, 'frontend/packages/query-hooks/src/hooks')
+const UI_SRC = path.join(REPO_ROOT, 'frontend/packages/ui/src')
+const REPORTS_DIR = path.join(WEB_SRC, 'reports')
+const DOCS_DIR = path.join(REPO_ROOT, 'docs')
 
 /** Roots scanned for `POST /api/call/:reducer` literals and `useStdbReducer` (includes shared hooks package). */
 const CLIENT_API_CALL_SCAN_ROOTS = [
@@ -148,6 +183,13 @@ const EXPLICIT_REDUCER_MODULE: Record<string, string> = {
   // Fixed assets
   set_asset_active: 'accounting',
   // IoT
+  acknowledge_iot_action: 'iot',
+  fail_iot_action: 'iot',
+  retry_iot_action: 'iot',
+  create_iot_action: 'iot',
+  create_iot_alert: 'iot',
+  resolve_iot_alert: 'iot',
+  set_iot_threshold: 'iot',
   update_device_status: 'iot',
   mark_action_sent: 'iot',
   // Search / embeddings
@@ -242,6 +284,36 @@ interface CoverageReport {
   }
 }
 
+type CoverageStatus =
+  | 'reachable-ui'
+  | 'hook-only'
+  | 'command-only'
+  | 'backend-only'
+  | 'api-only-intentional'
+  | 'internal-intentional'
+  | 'deprecated'
+  | 'needs-triage'
+
+interface ReducerCoverageRow {
+  reducer: string
+  backendFile: string | null
+  module: string
+  commandWrapper: string | null
+  hook: string | null
+  uiCaller: string | null
+  routeOrPage: string | null
+  classification: ReducerClassification
+  status: CoverageStatus
+  notes: string
+}
+
+interface LayerIndex {
+  backendFiles: Map<string, string>
+  commandWrappers: Map<string, Set<string>>
+  hooks: Map<string, Set<string>>
+  uiCallers: Map<string, Set<string>>
+}
+
 function isExcludedReducer(name: string): { excluded: boolean; category: string } {
   for (const pattern of EXCLUDED_PREFIXES) {
     if (pattern.test(name)) {
@@ -272,14 +344,33 @@ function extractRustReducers(): Set<string> {
   for (const file of files) {
     const content = readFileSync(file, 'utf-8')
     for (const pattern of REDUCER_PATTERNS) {
-      const match = pattern.exec(content)
-      while (match !== null) {
+      let match: RegExpExecArray | null
+      pattern.lastIndex = 0
+      while ((match = pattern.exec(content)) !== null) {
         reducers.add(match[1])
       }
     }
   }
 
   return reducers
+}
+
+function extractRustReducerFiles(): Map<string, string> {
+  const reducerFiles = new Map<string, string>()
+  const files = globSync('**/*.rs', { cwd: SPACETIMEDB_SRC, absolute: true })
+
+  for (const file of files) {
+    const content = readFileSync(file, 'utf-8')
+    for (const pattern of REDUCER_PATTERNS) {
+      let match: RegExpExecArray | null
+      pattern.lastIndex = 0
+      while ((match = pattern.exec(content)) !== null) {
+        reducerFiles.set(match[1], repoRelative(file))
+      }
+    }
+  }
+
+  return reducerFiles
 }
 
 function extractWebReducers(): {
@@ -328,59 +419,52 @@ function extractWebReducers(): {
 
       // apiCallLiteral pattern
       let match: RegExpExecArray | null
-      match = WEB_DETECTION_PATTERNS.apiCallLiteral.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.apiCallLiteral.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.apiCallLiteral.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.apiCallLiteral.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.apiCallLiteral.lastIndex = 0
 
       // useStdbReducer pattern
-      match = WEB_DETECTION_PATTERNS.useStdbReducer.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.useStdbReducer.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.useStdbReducer.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.useStdbReducer.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.useStdbReducer.lastIndex = 0
 
       // useStdbReducerWithInvalidation pattern
-      match = WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.useStdbReducerWithInvalidation.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.useStdbReducerWithInvalidation.lastIndex = 0
 
       // useStdbCallMutation pattern
-      match = WEB_DETECTION_PATTERNS.useStdbCallMutation.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.useStdbCallMutation.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.useStdbCallMutation.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.useStdbCallMutation.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.useStdbCallMutation.lastIndex = 0
 
       // callReducer pattern
-      match = WEB_DETECTION_PATTERNS.callReducerLiteral.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.callReducerLiteral.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.callReducerLiteral.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.callReducerLiteral.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.callReducerLiteral.lastIndex = 0
 
       // callReducersBatch pattern
-      match = WEB_DETECTION_PATTERNS.callReducersBatch.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.callReducersBatch.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.callReducersBatch.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.callReducersBatch.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.callReducersBatch.lastIndex = 0
 
-      match = WEB_DETECTION_PATTERNS.stdbBrowserCall.exec(content)
-      while (match !== null) {
+      WEB_DETECTION_PATTERNS.stdbBrowserCall.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.stdbBrowserCall.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.stdbBrowserCall.add(match[1])
       }
-      WEB_DETECTION_PATTERNS.stdbBrowserCall.lastIndex = 0
     } catch {
       // Skip unreadable files
     }
@@ -412,16 +496,110 @@ function mergeWorkspacePackageReducerCalls(webResult: ReturnType<typeof extractW
     for (const file of files) {
       try {
         const content = readFileSync(file, 'utf-8')
-        const match = pattern.exec(content)
-        while (match !== null) {
+        let match: RegExpExecArray | null
+        pattern.lastIndex = 0
+        while ((match = pattern.exec(content)) !== null) {
           webResult.reducers.add(camelReducerMethodToSnake(match[1]))
         }
-        pattern.lastIndex = 0
       } catch {
         // skip unreadable
       }
     }
   }
+}
+
+function extractCommandWrappers(): Map<string, Set<string>> {
+  const wrappers = new Map<string, Set<string>>()
+  const files = globSync('**/*.ts', { cwd: STDB_COMMANDS_SRC, absolute: true })
+  const reducerLiteral = /['"`]([a-z_][a-z0-9_]*)['"`]/g
+
+  for (const file of files) {
+    const content = readFileSync(file, 'utf-8')
+    if (!content.includes('_BFF_REDUCERS')) continue
+    let match: RegExpExecArray | null
+    reducerLiteral.lastIndex = 0
+    while ((match = reducerLiteral.exec(content)) !== null) {
+      const reducer = match[1]
+      if (reducer.includes('_')) {
+        addIndexValue(wrappers, reducer, repoRelative(file))
+      }
+    }
+  }
+
+  return wrappers
+}
+
+function hookFunctionBefore(content: string, offset: number): string | null {
+  const before = content.slice(0, offset)
+  const matches = Array.from(before.matchAll(/export function (use[A-Z][A-Za-z0-9_]*)\s*\(/g))
+  return matches.at(-1)?.[1] ?? null
+}
+
+function extractHookWrappers(): Map<string, Set<string>> {
+  const hooks = new Map<string, Set<string>>()
+  const files = globSync('**/*.ts', { cwd: QUERY_HOOKS_SRC, absolute: true })
+  const patterns = [
+    /\b[a-zA-Z]+BffPost\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+    /['"]\/api\/call\/([a-z_][a-z0-9_]*)/g,
+    /useStdb(?:Reducer|CallMutation|ReducerWithInvalidation)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+  ]
+
+  for (const file of files) {
+    const content = readFileSync(file, 'utf-8')
+    for (const pattern of patterns) {
+      let match: RegExpExecArray | null
+      pattern.lastIndex = 0
+      while ((match = pattern.exec(content)) !== null) {
+        const hook = hookFunctionBefore(content, match.index)
+        addIndexValue(
+          hooks,
+          match[1],
+          `${repoRelative(file)}${hook ? `#${hook}` : ''}`,
+        )
+      }
+    }
+  }
+
+  return hooks
+}
+
+function extractUiCallers(hooks: Map<string, Set<string>>): Map<string, Set<string>> {
+  const callers = new Map<string, Set<string>>()
+  const files = [
+    ...globSync('**/*.ts', { cwd: path.join(WEB_SRC, 'app'), absolute: true }),
+    ...globSync('**/*.tsx', { cwd: path.join(WEB_SRC, 'app'), absolute: true }),
+    ...globSync('**/*.ts', { cwd: UI_SRC, absolute: true }),
+    ...globSync('**/*.tsx', { cwd: UI_SRC, absolute: true }),
+  ]
+  const hookToReducers = new Map<string, Set<string>>()
+
+  for (const [reducer, hookRefs] of hooks.entries()) {
+    for (const ref of hookRefs) {
+      const hookName = ref.split('#')[1]
+      if (!hookName) continue
+      addIndexValue(hookToReducers, hookName, reducer)
+    }
+  }
+
+  for (const file of files) {
+    const rel = repoRelative(file)
+    const content = readFileSync(file, 'utf-8')
+
+    for (const [hookName, reducers] of hookToReducers.entries()) {
+      if (!content.includes(hookName)) continue
+      for (const reducer of reducers) {
+        addIndexValue(callers, reducer, rel)
+      }
+    }
+
+    for (const reducer of hooks.keys()) {
+      if (content.includes(`/api/call/${reducer}`) || content.includes(`"${reducer}"`) || content.includes(`'${reducer}'`)) {
+        addIndexValue(callers, reducer, rel)
+      }
+    }
+  }
+
+  return callers
 }
 
 function categorizeByModule(reducerName: string): string {
@@ -818,6 +996,7 @@ function categorizeByModule(reducerName: string): string {
     lock_document: 'documents',
     unlock_document: 'documents',
     add_document_version: 'documents',
+  record_document_view: 'documents',
     knowledge_: 'documents',
     create_knowledge_article: 'documents',
     update_knowledge_article: 'documents',
@@ -1125,6 +1304,174 @@ function generateReport(
   return report
 }
 
+function reducerStatus(
+  classification: ReducerClassification,
+  hasCommand: boolean,
+  hasHook: boolean,
+  hasUi: boolean,
+  reducerName: string,
+): CoverageStatus {
+  if (classification === 'deprecated') return 'deprecated'
+  if (INTENTIONALLY_API_ONLY_REDUCERS[reducerName]) return 'api-only-intentional'
+  if (classification === 'internal/background' || classification === 'dev-only') {
+    return 'internal-intentional'
+  }
+  if (hasUi) return 'reachable-ui'
+  if (hasHook) return 'hook-only'
+  if (hasCommand) return 'command-only'
+  if (classification === 'import' || classification === 'admin') return 'needs-triage'
+  return 'backend-only'
+}
+
+function routeOrPageFromCaller(caller: string | null): string | null {
+  if (!caller) return null
+  const appPrefix = 'frontend/web/app/'
+  if (!caller.startsWith(appPrefix)) return caller
+  const route = caller.slice(appPrefix.length)
+  return route.replace(/\/(page|route|[^/]*client)\.(tsx|ts)$/, '')
+}
+
+function buildCoverageMatrix(
+  rustReducers: Set<string>,
+  layerIndex: LayerIndex,
+): ReducerCoverageRow[] {
+  return Array.from(rustReducers)
+    .sort()
+    .map((reducer) => {
+      const moduleName = categorizeByModule(reducer)
+      const classification = classifyReducerByHeuristic(reducer, moduleName)
+      const commandWrapper = firstSetValue(layerIndex.commandWrappers.get(reducer))
+      const hook = firstSetValue(layerIndex.hooks.get(reducer))
+      const uiCaller = firstSetValue(layerIndex.uiCallers.get(reducer))
+      const status = reducerStatus(
+        classification,
+        commandWrapper != null,
+        hook != null,
+        uiCaller != null,
+        reducer,
+      )
+      const notes =
+        INTENTIONALLY_API_ONLY_REDUCERS[reducer] ??
+        (status === 'needs-triage' ? 'classification requires explicit UI/API decision' : '')
+
+      return {
+        reducer,
+        backendFile: layerIndex.backendFiles.get(reducer) ?? null,
+        module: moduleName,
+        commandWrapper,
+        hook,
+        uiCaller,
+        routeOrPage: routeOrPageFromCaller(uiCaller),
+        classification,
+        status,
+        notes,
+      }
+    })
+}
+
+function markdownCell(value: string | null): string {
+  if (!value) return ''
+  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ')
+}
+
+function generateCoverageMarkdown(rows: ReducerCoverageRow[]): string {
+  const generatedAt = new Date().toISOString()
+  const byStatus = rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.status] = (acc[row.status] ?? 0) + 1
+    return acc
+  }, {})
+  const byClassification = rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.classification] = (acc[row.classification] ?? 0) + 1
+    return acc
+  }, {})
+
+  const lines = [
+    '# Reducer Coverage Matrix',
+    '',
+    `Generated by \`frontend/web/scripts/track-reducer-coverage.ts\` at ${generatedAt}.`,
+    '',
+    '## Summary',
+    '',
+    '| Dimension | Count |',
+    '| --- | ---: |',
+    ...Object.entries(byStatus)
+      .sort()
+      .map(([status, count]) => `| status:${status} | ${count} |`),
+    ...Object.entries(byClassification)
+      .sort()
+      .map(([classification, count]) => `| classification:${classification} | ${count} |`),
+    '',
+    '## Matrix',
+    '',
+    '| Reducer | Module | Classification | Status | Backend | Command | Hook | UI caller | Route/Page | Notes |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  ]
+
+  for (const row of rows) {
+    lines.push(
+      [
+        row.reducer,
+        row.module,
+        row.classification,
+        row.status,
+        row.backendFile,
+        row.commandWrapper,
+        row.hook,
+        row.uiCaller,
+        row.routeOrPage,
+        row.notes,
+      ]
+        .map((value) => markdownCell(value))
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |'),
+    )
+  }
+
+  lines.push('')
+  return lines.join('\n')
+}
+
+function writeCoverageMatrix(rows: ReducerCoverageRow[]): void {
+  if (!existsSync(REPORTS_DIR)) mkdirSync(REPORTS_DIR, { recursive: true })
+  if (!existsSync(DOCS_DIR)) mkdirSync(DOCS_DIR, { recursive: true })
+
+  const jsonPath = path.join(REPORTS_DIR, 'reducer-coverage.json')
+  writeFileSync(jsonPath, JSON.stringify({ rows }, null, 2))
+  console.log(`📄 Reducer coverage matrix written to: ${jsonPath}`)
+
+  const markdownPath = path.join(DOCS_DIR, 'reducer-coverage-matrix.md')
+  writeFileSync(markdownPath, generateCoverageMarkdown(rows))
+  console.log(`📄 Reducer coverage matrix written to: ${markdownPath}`)
+}
+
+function assertCoverageMatrix(rows: ReducerCoverageRow[]): void {
+  const failures = rows.filter(
+    (row) =>
+      row.classification === 'user-facing' &&
+      row.status !== 'reachable-ui' &&
+      row.status !== 'api-only-intentional',
+  )
+  const untriaged = rows.filter((row) => row.status === 'needs-triage')
+
+  if (failures.length === 0 && untriaged.length === 0) return
+
+  console.error('\nReducer coverage check failed.')
+  if (failures.length > 0) {
+    console.error(`User-facing reducers without reachable UI/API-only intent: ${failures.length}`)
+    for (const row of failures.slice(0, 30)) {
+      console.error(`  - ${row.reducer} (${row.module}, ${row.status})`)
+    }
+  }
+  if (untriaged.length > 0) {
+    console.error(`Reducers requiring triage: ${untriaged.length}`)
+    for (const row of untriaged.slice(0, 30)) {
+      console.error(`  - ${row.reducer} (${row.module}, ${row.classification})`)
+    }
+  }
+  process.exitCode = 1
+}
+
 function printReport(report: CoverageReport): void {
   console.log('\n=== SpacetimeDB Reducer Coverage Report ===\n')
   console.log(`Total Rust reducers: ${report.totalRustReducers}`)
@@ -1251,6 +1598,7 @@ export function isProductReducer(name: string): boolean {
 }
 
 function main(): void {
+  const checkMode = process.argv.includes('--check')
   console.log('Scanning SpacetimeDB reducers...')
   const rustReducers = extractRustReducers()
   console.log(`Found ${rustReducers.size} reducers in Rust`)
@@ -1262,6 +1610,19 @@ function main(): void {
 
   const report = generateReport(rustReducers, webResult)
   printReport(report)
+
+  const layerIndex: LayerIndex = {
+    backendFiles: extractRustReducerFiles(),
+    commandWrappers: extractCommandWrappers(),
+    hooks: extractHookWrappers(),
+    uiCallers: new Map<string, Set<string>>(),
+  }
+  layerIndex.uiCallers = extractUiCallers(layerIndex.hooks)
+  const matrixRows = buildCoverageMatrix(rustReducers, layerIndex)
+  writeCoverageMatrix(matrixRows)
+  if (checkMode) {
+    assertCoverageMatrix(matrixRows)
+  }
 
   // Write JSON report for CI
   const reportPath = path.join(__dirname, '..', 'reducer-coverage-report.json')
