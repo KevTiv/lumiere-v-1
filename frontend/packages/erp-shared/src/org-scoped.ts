@@ -2,6 +2,9 @@
  * Organization scope for module clients. Never default missing org to `1` — that
  * can silently mutate the wrong tenant. Use `hasValidOrganizationId` and render
  * `@lumiere/ui` `MissingOrganization` when the user has no org.
+ *
+ * Historical reducer params call this value `companyId`, but in the ERP domain
+ * it represents the tenant/organization scope, not a company/partner register row.
  */
 export function hasValidOrganizationId(
   organizationId: number | undefined,
@@ -9,20 +12,46 @@ export function hasValidOrganizationId(
   return organizationId != null && Number.isFinite(organizationId) && organizationId > 0
 }
 
-/**
- * BigInt org ids for hooks and reducers. Call only when
- * {@link hasValidOrganizationId} is true.
- */
-export function orgBigInts(organizationId: number): { orgId: bigint; companyId: bigint } {
-  const id = BigInt(organizationId)
-  return { orgId: id, companyId: id }
+export interface OrganizationScopeBigInts {
+  orgId: bigint
+  organizationScopeId: bigint
+  /**
+   * @deprecated Use `organizationScopeId`. Kept for reducer wire compatibility
+   * while backend params are still named `companyId`.
+   */
+  companyId: bigint
 }
 
-/** Merge optional company scope into SpacetimeDB reducer JSON bodies (companyId as string). */
-export function withCompanyScope(
-  params: Record<string, unknown>,
-  companyId?: bigint,
-): Record<string, unknown> {
-  if (companyId === undefined) return params
-  return { ...params, companyId: companyId.toString() }
+/**
+ * BigInt organization ids for hooks and reducers. Call only when
+ * {@link hasValidOrganizationId} is true.
+ */
+export function organizationScopeBigInts(organizationId: number): OrganizationScopeBigInts {
+  const id = BigInt(organizationId)
+  return { orgId: id, organizationScopeId: id, companyId: id }
 }
+
+/**
+ * @deprecated Use `organizationScopeBigInts`. Kept to avoid a breaking rename
+ * across every module client in one step.
+ */
+export const orgBigInts = organizationScopeBigInts
+
+/**
+ * Merge optional organization scope into SpacetimeDB reducer JSON bodies.
+ *
+ * The wire key remains `companyId` until SpacetimeDB reducer params are renamed.
+ */
+export function withOrganizationScope(
+  params: Record<string, unknown>,
+  organizationScopeId?: bigint,
+): Record<string, unknown> {
+  if (organizationScopeId === undefined) return params
+  return { ...params, companyId: organizationScopeId }
+}
+
+/**
+ * @deprecated Use `withOrganizationScope`. This function writes the legacy
+ * `companyId` wire key for existing reducers.
+ */
+export const withCompanyScope = withOrganizationScope

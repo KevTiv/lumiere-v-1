@@ -107,6 +107,7 @@ export function DashboardSidebar({
       label: t("nav.groups.operations"),
       items: [
         { label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
+        { label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },
         { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
         { label: t("nav.map"), href: "/map", icon: MapIcon, resource: "module:map" },
         { label: t("nav.helpdesk"), href: "/helpdesk", icon: HelpCircle, resource: "module:helpdesk" },

@@ -13,6 +13,7 @@ export type KnownResource =
   | "module:sales"
   | "module:crm"
   | "module:inventory"
+  | "module:pos"
   | "module:purchasing"
   | "module:hr"
   | "module:manufacturing"
