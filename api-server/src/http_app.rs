@@ -24,8 +24,8 @@ use crate::config::Config;
 use crate::error::ApiError;
 use crate::openapi;
 use crate::query_exec::{default_company_id, execute_resource_query};
-use crate::session::resolve_api_session;
 use crate::routes;
+use crate::session::resolve_api_session;
 use crate::state::AppState;
 use crate::web_session::stdb_identity_hex_hint;
 
@@ -56,9 +56,7 @@ async fn get_query(
     Path(resource): Path<String>,
     Query(q): Query<OrgQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let auth = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(&headers, &cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
 
@@ -94,9 +92,7 @@ async fn post_call(
     Query(q): Query<CallQuery>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
-    let auth = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(&headers, &cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
 
@@ -145,9 +141,10 @@ fn load_dotenv_files() {
 pub async fn serve() -> anyhow::Result<()> {
     load_dotenv_files();
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            "api_server=debug,tower_http=info".parse().unwrap()
-        }))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "api_server=debug,tower_http=info".parse().unwrap()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 

@@ -3,7 +3,7 @@
  * Only draft reports accept updates on the server.
  */
 
-import type { UpdateFinancialReportParams } from "@lumiere/stdb/generated/types"
+import type { UpdateFinancialReportParams } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "./stb-timestamp"

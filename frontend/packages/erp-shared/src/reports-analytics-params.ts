@@ -2,7 +2,7 @@
  * Form → `CreateAnalyticsMetricParams` for `create_analytics_metric`.
  */
 
-import type { CreateAnalyticsMetricParams } from '@lumiere/stdb/generated/types'
+import type { CreateAnalyticsMetricParams } from '@lumiere/stdb/types'
 
 function parseU32(v: unknown, fallback: number): number {
   const n = Number(v)

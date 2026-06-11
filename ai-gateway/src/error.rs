@@ -4,12 +4,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Unauthorized: {0}")]
-    Unauthorized(String),
-
-    #[error("Forbidden: {0}")]
-    Forbidden(String),
-
     #[error("Not found: {0}")]
     NotFound(String),
 
@@ -29,8 +23,6 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         let (status, message) = match &self {
-            AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m.clone()),
-            AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             AppError::Qdrant(e) => (StatusCode::BAD_GATEWAY, e.to_string()),

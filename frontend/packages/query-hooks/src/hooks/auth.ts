@@ -957,5 +957,5 @@ export type {
   CreateRoleParams,
   UpdateRoleParams,
   CreateAuditRuleParams,
-} from '@lumiere/stdb/generated/types'
-export type { CreateUserInviteParams } from '@lumiere/stdb/generated/types/reducers'
+} from '@lumiere/stdb/types'
+export type { CreateUserInviteParams } from '@lumiere/stdb/types'

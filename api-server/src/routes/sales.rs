@@ -23,7 +23,9 @@ fn value_as_u64(v: &Value) -> Option<u64> {
 }
 
 fn find_order_by_id(rows: &[Value], order_id: u64) -> Option<Value> {
-    rows.iter().find(|o| value_as_u64(o.get("id").unwrap_or(&Value::Null)) == Some(order_id)).cloned()
+    rows.iter()
+        .find(|o| value_as_u64(o.get("id").unwrap_or(&Value::Null)) == Some(order_id))
+        .cloned()
 }
 
 async fn sale_order_get(
@@ -112,17 +114,16 @@ async fn sale_order_delete(
     let reason: Option<String> = if body.is_empty() {
         None
     } else {
-        serde_json::from_slice::<Value>(&body)
-            .ok()
-            .and_then(|v| v.get("reason").and_then(|x| x.as_str()).map(|s| s.to_string()))
+        serde_json::from_slice::<Value>(&body).ok().and_then(|v| {
+            v.get("reason")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_string())
+        })
     };
 
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
-            "cancel_sale_order",
-            json!([org_id, order_id, reason]),
-        )
+        .call_reducer("cancel_sale_order", json!([org_id, order_id, reason]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -132,9 +133,10 @@ async fn sale_order_delete(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route(
-            "/sales/orders/:id",
-            get(sale_order_get).put(sale_order_put).delete(sale_order_delete),
-        )
+    Router::new().route(
+        "/sales/orders/:id",
+        get(sale_order_get)
+            .put(sale_order_put)
+            .delete(sale_order_delete),
+    )
 }

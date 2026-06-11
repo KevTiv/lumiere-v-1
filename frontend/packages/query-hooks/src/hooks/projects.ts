@@ -416,4 +416,4 @@ export { useEmployees } from "./hr"
 export type {
   CreateProjectParams,
   CreateTaskParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'

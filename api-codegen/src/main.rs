@@ -75,7 +75,8 @@ async fn main() -> Result<()> {
     let hooks_ts = hooks_emit::emit_hooks_typescript(&v)?;
     fs::write(hooks_path, &hooks_ts).with_context(|| format!("write {}", hooks_path.display()))?;
 
-    let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("reducer-stdb-invalidation.json");
+    let manifest_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("reducer-stdb-invalidation.json");
     let stdb_inv_out = env_or_default(
         "API_CODEGEN_STDB_INVALIDATION_OUT",
         "frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts",
@@ -84,10 +85,10 @@ async fn main() -> Result<()> {
     if let Some(parent) = stdb_inv_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
     }
-    let manifest_text =
-        fs::read_to_string(&manifest_path).with_context(|| format!("read {}", manifest_path.display()))?;
-    let manifest: Value =
-        serde_json::from_str(&manifest_text).with_context(|| format!("parse {}", manifest_path.display()))?;
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("parse {}", manifest_path.display()))?;
     let stdb_inv_ts = stdb_invalidation_emit::emit_std_invalidation_typescript(&manifest)?;
     fs::write(stdb_inv_path, stdb_inv_ts)
         .with_context(|| format!("write {}", stdb_inv_path.display()))?;

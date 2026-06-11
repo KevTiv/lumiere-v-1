@@ -154,13 +154,7 @@ fn parse_credential(row: &Value) -> Option<StdbCredential> {
     let password_hash = row
         .get("passwordHash")
         .or_else(|| row.get("password_hash"))
-        .and_then(|v| {
-            if v.is_null() {
-                None
-            } else {
-                value_as_str(v)
-            }
-        });
+        .and_then(|v| if v.is_null() { None } else { value_as_str(v) });
     let stdb_token_enc = row
         .get("stdbTokenEnc")
         .or_else(|| row.get("stdb_token_enc"))
@@ -172,7 +166,10 @@ fn parse_credential(row: &Value) -> Option<StdbCredential> {
     })
 }
 
-pub async fn find_credential_by_email(state: &AppState, email: &str) -> Result<Option<StdbCredential>, ApiError> {
+pub async fn find_credential_by_email(
+    state: &AppState,
+    email: &str,
+) -> Result<Option<StdbCredential>, ApiError> {
     let client = admin_client(state)?;
     let safe = email.replace('\'', "''");
     let sql = format!(
@@ -190,7 +187,10 @@ pub async fn find_credential_by_identity(
     identity_hex: &str,
 ) -> Result<Option<StdbCredential>, ApiError> {
     let client = admin_client(state)?;
-    let hex = identity_hex.trim().trim_start_matches("0x").trim_start_matches("0X");
+    let hex = identity_hex
+        .trim()
+        .trim_start_matches("0x")
+        .trim_start_matches("0X");
     let sql = format!(
         "SELECT identity, password_hash, stdb_token_enc FROM user_credential WHERE identity = 0x{hex}"
     );
@@ -214,20 +214,17 @@ pub struct StdbInvite {
 fn parse_invite(row: &Value) -> Option<StdbInvite> {
     Some(StdbInvite {
         id: value_as_u64(row.get("id")?)?,
-        organization_id: value_as_u64(row.get("organizationId").or_else(|| row.get("organization_id"))?)?,
+        organization_id: value_as_u64(
+            row.get("organizationId")
+                .or_else(|| row.get("organization_id"))?,
+        )?,
         role_id: value_as_u64(row.get("roleId").or_else(|| row.get("role_id"))?)?,
         email: value_as_str(row.get("email")?)?,
         expires_at: value_as_i64(row.get("expiresAt").or_else(|| row.get("expires_at"))?)?,
         accepted_at: row
             .get("acceptedAt")
             .or_else(|| row.get("accepted_at"))
-            .and_then(|v| {
-                if v.is_null() {
-                    None
-                } else {
-                    value_as_i64(v)
-                }
-            }),
+            .and_then(|v| if v.is_null() { None } else { value_as_i64(v) }),
     })
 }
 
@@ -263,13 +260,7 @@ fn parse_reset_token(row: &Value) -> Option<StdbResetToken> {
         used_at: row
             .get("usedAt")
             .or_else(|| row.get("used_at"))
-            .and_then(|v| {
-                if v.is_null() {
-                    None
-                } else {
-                    value_as_i64(v)
-                }
-            }),
+            .and_then(|v| if v.is_null() { None } else { value_as_i64(v) }),
     })
 }
 
@@ -309,11 +300,7 @@ pub async fn get_role_name_in_organization(
         .map(|s| s.to_string()))
 }
 
-pub async fn user_has_organization_rows(
-    state: &AppState,
-    identity_hex: &str,
-    token: &str,
-) -> bool {
+pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str, token: &str) -> bool {
     let client = state.client_with_token(token);
     let id = normalize_identity_hex_for_sql(identity_hex);
     match query_user_organization_with_fallback(

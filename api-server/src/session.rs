@@ -7,8 +7,8 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
     select_casbin_rules_in_subjects_sql, select_roles_active_sql,
-    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql,
-    CasbinRuleLike, FieldAccessContext,
+    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql, CasbinRuleLike,
+    FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -114,7 +114,10 @@ pub async fn load_field_access_context(
     identity_hex: &str,
     organization_id: u64,
 ) -> Result<Option<FieldAccessContext>, String> {
-    if identity_hex.is_empty() || identity_hex == "unknown" || parse_stdb_identity_hex(identity_hex).is_none() {
+    if identity_hex.is_empty()
+        || identity_hex == "unknown"
+        || parse_stdb_identity_hex(identity_hex).is_none()
+    {
         return Ok(None);
     }
 
@@ -135,10 +138,7 @@ pub async fn load_field_access_context(
 
     let sql_uo =
         select_user_organization_for_identity_sql(identity_hex, None).map_err(|e| e.to_string())?;
-    let orgs = client
-        .query_sql(&sql_uo)
-        .await
-        .map_err(|e| e.to_string())?;
+    let orgs = client.query_sql(&sql_uo).await.map_err(|e| e.to_string())?;
     let uo = orgs.iter().find(|o| {
         o.get("organizationId")
             .and_then(|v| v.as_u64())
@@ -153,7 +153,10 @@ pub async fn load_field_access_context(
         return Ok(None);
     };
 
-    let roles = match client.query_sql("SELECT * FROM role WHERE is_active = true").await {
+    let roles = match client
+        .query_sql("SELECT * FROM role WHERE is_active = true")
+        .await
+    {
         Ok(rows) => rows,
         Err(_) => {
             let sql_roles = select_roles_active_sql(None).map_err(|e| e.to_string())?;
@@ -175,14 +178,11 @@ pub async fn load_field_access_context(
         .ok_or_else(|| "missing roleId on user_organization".to_string())?;
 
     let role = roles.iter().find(|r| {
-        r.get("id")
-            .and_then(|v| v.as_u64())
-            .or_else(|| {
-                r.get("id")
-                    .and_then(|x| x.as_str())
-                    .and_then(|s| s.parse().ok())
-            })
-            == Some(role_id)
+        r.get("id").and_then(|v| v.as_u64()).or_else(|| {
+            r.get("id")
+                .and_then(|x| x.as_str())
+                .and_then(|s| s.parse().ok())
+        }) == Some(role_id)
     });
     let Some(role) = role else {
         return Ok(None);
@@ -296,9 +296,8 @@ pub async fn resolve_api_session(
     let client = state.client_with_token(&stdb_token);
 
     // Prefer identity embedded in the SpacetimeDB JWT; `sub` may be a WorkOS UUID on hybrid tokens.
-    let identity_hex = decode_identity_hex_from_stdb_token(&stdb_token).or_else(|| {
-        x_std_identity.and_then(|s| parse_stdb_identity_hex(s))
-    });
+    let identity_hex = decode_identity_hex_from_stdb_token(&stdb_token)
+        .or_else(|| x_std_identity.and_then(|s| parse_stdb_identity_hex(s)));
 
     let admin = state.config.stdb_server_token.as_deref();
 

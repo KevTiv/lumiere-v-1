@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreateCalendarEventParams } from '@lumiere/stdb/generated/types'
+import type { CreateCalendarEventParams } from '@lumiere/stdb/types'
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
 }
 
 // ── Types (re-exported so client components import from one place) ────────────
-export type { CreateCalendarEventParams } from '@lumiere/stdb/generated/types'
+export type { CreateCalendarEventParams } from '@lumiere/stdb/types'
 
 // Local type until callers finish moving to generated camelCase timestamp params.
 export interface UpdateCalendarEventParams {

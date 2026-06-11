@@ -16,7 +16,7 @@ import type {
   AddWorkflowActivityParams,
   AddWorkflowTransitionParams,
   CreateWorkflowParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 
 const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
 
@@ -251,4 +251,4 @@ export function useSetWorkitemException(organizationId: bigint) {
   })
 }
 
-export type { CreateWorkflowParams } from '@lumiere/stdb/generated/types'
+export type { CreateWorkflowParams } from '@lumiere/stdb/types'

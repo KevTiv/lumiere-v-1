@@ -619,4 +619,4 @@ export type {
   CreateReportTemplateParams,
   CreateScheduledReportParams,
   CreateFinancialReportParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'

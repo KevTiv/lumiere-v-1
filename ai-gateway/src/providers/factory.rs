@@ -57,8 +57,12 @@ pub fn build(config: &Config) -> Result<Providers> {
 
     tracing::info!(
         embed = config.context_embedding_provider,
+        embed_provider = embedder.name(),
         vision = config.vision_provider,
+        vision_provider = vision.name(),
         parser = config.document_parser,
+        parser_provider = parser.name(),
+        supported_mime_types = ?parser.supported_mime_types(),
         "Context providers initialized"
     );
 

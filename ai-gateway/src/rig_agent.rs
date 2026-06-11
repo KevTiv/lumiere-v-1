@@ -136,39 +136,6 @@ impl RigContext {
         Ok(())
     }
 
-    /// Embed and upsert a single ERP activity. Idempotent — same entity_type+entity_id+org
-    /// always maps to the same point ID.
-    pub async fn upsert_activity(&self, activity: &Activity) -> Result<()> {
-        let vector = self.providers.embedder.embed(&activity.text).await?;
-        let point_id = deterministic_id(
-            &activity.org_id.to_string(),
-            &activity.entity_type,
-            &activity.entity_id,
-            "0",
-        );
-
-        let payload = serde_json::json!({
-            "org_id": activity.org_id,
-            "entity_type": activity.entity_type,
-            "entity_id": activity.entity_id,
-            "text": activity.text,
-            "timestamp": activity.timestamp,
-            "source": "erp_activity",
-        });
-
-        let point = PointStruct::new(
-            point_id.to_string(),
-            HashMap::from([("default".to_string(), vector)]),
-            Payload::try_from(payload)?,
-        );
-
-        self.qdrant
-            .upsert_points(UpsertPointsBuilder::new(&self.collection, vec![point]))
-            .await?;
-
-        Ok(())
-    }
-
     /// Upsert a batch of activities efficiently.
     pub async fn upsert_activities(&self, activities: &[Activity]) -> Result<usize> {
         if activities.is_empty() {
@@ -279,7 +246,11 @@ impl RigContext {
                 .extract(&req.content, &req.mime_type, &req.doc_type)
                 .await?;
             let text = extracted.raw_text.clone();
-            let fields = extracted.fields.clone();
+            let fields = serde_json::json!({
+                "doc_type": extracted.doc_type,
+                "confidence": extracted.confidence,
+                "fields": extracted.fields,
+            });
             // Single chunk for images
             let chunks = vec![crate::providers::DocumentChunk {
                 text: text.clone(),
@@ -288,6 +259,14 @@ impl RigContext {
             }];
             (text, fields, chunks)
         } else {
+            let supported = self.providers.parser.supported_mime_types();
+            if !supported.contains(&req.mime_type.as_str()) {
+                anyhow::bail!(
+                    "unsupported document mime type '{}' for parser '{}'",
+                    req.mime_type,
+                    self.providers.parser.name()
+                );
+            }
             let chunks = self
                 .providers
                 .parser

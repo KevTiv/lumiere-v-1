@@ -2,7 +2,7 @@
  * Form → `CreateReportTemplateParams` for `create_report_template`.
  */
 
-import type { CreateReportTemplateParams } from '@lumiere/stdb/generated/types'
+import type { CreateReportTemplateParams } from '@lumiere/stdb/types'
 
 function parseF64(v: unknown, fallback: number): number {
   const n = Number(v)

@@ -17,7 +17,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateDeferredRevenueScheduleParams,
   CreateRevenueRecognitionRuleParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -317,4 +317,4 @@ export function useImportSubscriptionCsv(organizationId: bigint, companyId?: big
 export type {
   CreateSubscriptionFromSaleOrderParams,
   CreateSubscriptionPlanParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'

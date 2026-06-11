@@ -30,12 +30,7 @@ fn mock_analysis(text: &str) -> Value {
         .enumerate()
         .map(|(i, s)| {
             let rel = ["high", "medium", "low", "medium"][i % 4];
-            let cat = [
-                "Requirements",
-                "Technical",
-                "Commercial",
-                "Compliance",
-            ][i % 4];
+            let cat = ["Requirements", "Technical", "Commercial", "Compliance"][i % 4];
             json!({
                 "id": format!("f-{i}"),
                 "title": format!("Finding {}", i + 1),

@@ -105,7 +105,9 @@ async fn accounts_get(
 
     let total = rows.len();
     let page_rows: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": page_rows, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": page_rows, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn accounts_post(
@@ -136,5 +138,8 @@ async fn accounts_post(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/accounting/accounts", get(accounts_get).post(accounts_post))
+    Router::new().route(
+        "/accounting/accounts",
+        get(accounts_get).post(accounts_post),
+    )
 }

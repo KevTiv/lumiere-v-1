@@ -35,9 +35,8 @@ impl Config {
 
         let prod = runtime_is_production();
 
-        let stdb_host_raw = env_stdb_host_or_next_public().unwrap_or_else(|| {
-            "https://maincloud.spacetimedb.com".to_string()
-        });
+        let stdb_host_raw = env_stdb_host_or_next_public()
+            .unwrap_or_else(|| "https://maincloud.spacetimedb.com".to_string());
         let stdb_host = normalize_stdb_http_host(&stdb_host_raw);
 
         let stdb_module = if prod {
@@ -45,11 +44,12 @@ impl Config {
                 "STDB_MODULE or NEXT_PUBLIC_STDB_MODULE must be set in production (publish name / database name)",
             )?
         } else {
-            env_stdb_module_or_next_public()
-                .unwrap_or_else(|| DEFAULT_STDB_MODULE_DEV.to_string())
+            env_stdb_module_or_next_public().unwrap_or_else(|| DEFAULT_STDB_MODULE_DEV.to_string())
         };
 
-        let stdb_server_token = std::env::var("STDB_SERVER_TOKEN").ok().filter(|s| !s.is_empty());
+        let stdb_server_token = std::env::var("STDB_SERVER_TOKEN")
+            .ok()
+            .filter(|s| !s.is_empty());
         if prod && stdb_server_token.is_none() {
             anyhow::bail!(
                 "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
@@ -109,14 +109,16 @@ impl Config {
         let resend_api_key = std::env::var("RESEND_API_KEY")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        let resend_from_email = std::env::var("RESEND_FROM_EMAIL")
-            .unwrap_or_else(|_| "noreply@lumiere-erp.com".into());
+        let resend_from_email =
+            std::env::var("RESEND_FROM_EMAIL").unwrap_or_else(|_| "noreply@lumiere-erp.com".into());
         let app_url = std::env::var("NEXT_PUBLIC_APP_URL")
             .unwrap_or_else(|_| "http://localhost:3000".into())
             .trim_end_matches('/')
             .to_string();
 
-        let cookie_secure = std::env::var("NODE_ENV").map(|v| v == "production").unwrap_or(false)
+        let cookie_secure = std::env::var("NODE_ENV")
+            .map(|v| v == "production")
+            .unwrap_or(false)
             || std::env::var("COOKIE_FORCE_SECURE")
                 .map(|v| v == "true")
                 .unwrap_or(false);

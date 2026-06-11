@@ -168,9 +168,7 @@ fn subject_matches(v0: Option<&str>, ctx: &FieldAccessContext) -> bool {
     let Some(v0) = v0 else {
         return false;
     };
-    v0 == ctx.identity_hex
-        || v0 == ctx.role_id.to_string()
-        || v0 == ctx.role_name
+    v0 == ctx.identity_hex || v0 == ctx.role_id.to_string() || v0 == ctx.role_name
 }
 
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
@@ -184,11 +182,7 @@ pub(crate) fn resolve_read_columns(
     if field_access.is_superuser {
         return Ok(None);
     }
-    if field_access
-        .role_permissions
-        .iter()
-        .any(|p| p == "*:*")
-    {
+    if field_access.role_permissions.iter().any(|p| p == "*:*") {
         return Ok(None);
     }
     let Some(reg) = RESOURCE_REGISTRY.get(resource_key) else {
@@ -323,7 +317,9 @@ pub fn select_company_scoped_sql(
     ))
 }
 
-pub fn select_roles_active_sql(field_access: Option<&FieldAccessContext>) -> Result<String, String> {
+pub fn select_roles_active_sql(
+    field_access: Option<&FieldAccessContext>,
+) -> Result<String, String> {
     let cols = resolve_http_sql_columns("roles", field_access)?;
     let col_part = cols.join(", ");
     Ok(format!(
@@ -394,7 +390,9 @@ pub fn select_casbin_rules_in_subjects_sql(
 
 /// Column list for a generated row type name (see `stdb-generated-sql-columns.json`).
 pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>, String> {
-    let from_schema = STDB_GENERATED_SQL_COLUMNS.get(type_name).filter(|v| !v.is_empty());
+    let from_schema = STDB_GENERATED_SQL_COLUMNS
+        .get(type_name)
+        .filter(|v| !v.is_empty());
     let Some(from_schema) = from_schema else {
         return Err(format!(
             "sql_column_list_for_generated_type: unknown type \"{type_name}\""

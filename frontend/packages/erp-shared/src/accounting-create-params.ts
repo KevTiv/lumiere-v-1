@@ -27,7 +27,7 @@ import type {
   UpdateAnalyticDistributionModelParams,
   UpdateAnalyticLineParams,
   UpdateBudgetPostParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { userTypeIdFromAccountTypes, userTypeIdFromInternalGroup } from "./accounting-defaults"
@@ -1115,7 +1115,7 @@ export function toUpdateAccountPeriodParams(formData: Record<string, unknown>): 
 
 // ── Depreciation lines ─────────────────────────────────────────────────────────
 
-import type { CreateDepreciationLineParams } from '@lumiere/stdb/generated/types'
+import type { CreateDepreciationLineParams } from '@lumiere/stdb/types'
 
 export function toCreateDepreciationLineParams(
   formData: Record<string, unknown>,
@@ -1147,7 +1147,7 @@ import type {
   CreateIntercompanyRuleParams,
   CreateIntercompanyTransactionParams,
   ProcessIntercompanyTransactionParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 
 /** Maps UI / legacy labels to SpacetimeDB `RuleType` for intercompany reducers. */
 function toIntercompanyRuleType(
@@ -1261,7 +1261,7 @@ export function processIntercompanyTransactionParamsToJson(
 
 // ── Moves / Payments ────────────────────────────────────────────────────────────
 
-import type { UpdateAccountMoveLineParams } from '@lumiere/stdb/generated/types'
+import type { UpdateAccountMoveLineParams } from '@lumiere/stdb/types'
 
 export function toUpdateAccountMoveLineParams(
   formData: Record<string, unknown>,
@@ -1296,7 +1296,7 @@ import type {
   UpdateTaxDeadlineParams,
   UpdateTaxJurisdictionParams,
   UpdateTaxScheduleParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'
 
 // Tax Groups
 export function toCreateAccountTaxGroupParams(

@@ -36,8 +36,6 @@ pub struct Config {
     pub ollama_url: String,
     /// Ollama embedding model (default: nomic-embed-text)
     pub ollama_embed_model: String,
-    /// Ollama chat/completion model (default: mistral)
-    pub ollama_chat_model: String,
     /// Ollama vision model for image OCR (default: llava)
     pub ollama_vision_model: String,
     /// Mistral API key (required if context_embedding_provider = "mistral" or vision_provider = "mistral")
@@ -56,12 +54,6 @@ pub struct Config {
     pub activity_ingest_interval_secs: u64,
     /// Max multipart upload size in bytes (default: 20 MB)
     pub max_upload_bytes: usize,
-
-    // ── Scaleway S3 stub (Phase 2) ────────────────────────────────────────────
-    pub scaleway_bucket: Option<String>,
-    pub scaleway_region: Option<String>,
-    /// S3-compatible endpoint URL (e.g. https://s3.nl-ams.scw.cloud)
-    pub scaleway_endpoint: Option<String>,
 }
 
 impl Config {
@@ -120,8 +112,6 @@ impl Config {
                 .unwrap_or_else(|_| "http://localhost:11434".to_string()),
             ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
                 .unwrap_or_else(|_| "nomic-embed-text".to_string()),
-            ollama_chat_model: std::env::var("OLLAMA_CHAT_MODEL")
-                .unwrap_or_else(|_| "mistral".to_string()),
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
             mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
@@ -142,11 +132,6 @@ impl Config {
                 .unwrap_or_else(|_| "20971520".to_string()) // 20 MB
                 .parse()
                 .context("MAX_UPLOAD_BYTES must be a valid number")?,
-
-            // Scaleway S3 stub
-            scaleway_bucket: std::env::var("SCALEWAY_BUCKET").ok(),
-            scaleway_region: std::env::var("SCALEWAY_REGION").ok(),
-            scaleway_endpoint: std::env::var("SCALEWAY_ENDPOINT").ok(),
         })
     }
 }

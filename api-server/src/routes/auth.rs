@@ -21,7 +21,12 @@ use crate::error::ApiError;
 use crate::session::normalize_identity_hex_for_sql;
 use crate::state::AppState;
 
-fn set_stdb_session_cookies(config: &crate::config::Config, cookies: &Cookies, token: &str, identity_hex: &str) {
+fn set_stdb_session_cookies(
+    config: &crate::config::Config,
+    cookies: &Cookies,
+    token: &str,
+    identity_hex: &str,
+) {
     let id = normalize_identity_hex_for_sql(identity_hex);
     let max_age = Duration::seconds(60 * 60 * 24 * 30);
     let mut t = Cookie::build(("stdb_token", token.to_string()))
@@ -60,7 +65,8 @@ async fn signin(
 ) -> Result<impl IntoResponse, ApiError> {
     if state.config.workos_client_id.is_some() {
         return Err(ApiError::Gone(
-            "Password sign-in is disabled. Use the WorkOS sign-in page (Continue with WorkOS).".into(),
+            "Password sign-in is disabled. Use the WorkOS sign-in page (Continue with WorkOS)."
+                .into(),
         ));
     }
 
@@ -68,7 +74,9 @@ async fn signin(
         .config
         .stdb_credential_encryption_key
         .as_ref()
-        .ok_or_else(|| ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into()))?;
+        .ok_or_else(|| {
+            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
+        })?;
 
     // Match sign-up / forgot-password: emails are stored lowercased in `user_credential`.
     let email = body.email.trim().to_lowercase();
@@ -81,7 +89,8 @@ async fn signin(
         return Err(ApiError::AccountUsesSso);
     }
 
-    let ok = bcrypt::verify(body.password.as_bytes(), ph).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let ok = bcrypt::verify(body.password.as_bytes(), ph)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     if !ok {
         return Err(ApiError::InvalidEmailOrPassword);
     }
@@ -109,7 +118,8 @@ async fn signup(
 ) -> Result<impl IntoResponse, ApiError> {
     if state.config.workos_client_id.is_some() {
         return Err(ApiError::Gone(
-            "Password sign-up is disabled. Use the WorkOS sign-up page (Continue with WorkOS).".into(),
+            "Password sign-up is disabled. Use the WorkOS sign-up page (Continue with WorkOS)."
+                .into(),
         ));
     }
 
@@ -123,7 +133,9 @@ async fn signup(
         .config
         .stdb_credential_encryption_key
         .as_ref()
-        .ok_or_else(|| ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into()))?;
+        .ok_or_else(|| {
+            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
+        })?;
 
     let email = body.email.trim().to_lowercase();
     if let Some(_) = find_credential_by_email(&state, &email).await? {
@@ -168,7 +180,10 @@ async fn signup(
             let text = format!(
                 "Welcome! Your account has been created.\n\nGet started at {app}/onboarding"
             );
-            if let Err(e) = send_resend_email(&http, &api_key, &from, &to, "Welcome to Lumiere ERP", &text).await {
+            if let Err(e) =
+                send_resend_email(&http, &api_key, &from, &to, "Welcome to Lumiere ERP", &text)
+                    .await
+            {
                 tracing::warn!(target: "api_server::auth", "welcome email failed: {e}");
             }
         });
@@ -269,7 +284,9 @@ async fn reset_password(
     Json(body): Json<ResetBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     if state.config.workos_client_id.is_some() {
-        return Err(ApiError::Gone("Password reset is handled by WorkOS.".into()));
+        return Err(ApiError::Gone(
+            "Password reset is handled by WorkOS.".into(),
+        ));
     }
 
     if body.new_password.len() < 8 {
@@ -282,7 +299,9 @@ async fn reset_password(
         .config
         .stdb_credential_encryption_key
         .as_ref()
-        .ok_or_else(|| ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into()))?;
+        .ok_or_else(|| {
+            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
+        })?;
 
     let hash = hex::encode(Sha256::digest(body.token.as_bytes()));
     let reset_token = find_reset_token_by_hash(&state, &hash)
@@ -290,7 +309,9 @@ async fn reset_password(
         .ok_or_else(|| ApiError::BadRequest("Invalid or expired reset link".into()))?;
 
     if reset_token.used_at.is_some() {
-        return Err(ApiError::BadRequest("Reset link has already been used".into()));
+        return Err(ApiError::BadRequest(
+            "Reset link has already been used".into(),
+        ));
     }
 
     let now_s = std::time::SystemTime::now()
@@ -351,7 +372,10 @@ async fn invite(
         .map(|c| c.value().to_string())
         .ok_or(ApiError::Unauthorized)?;
 
-    let hex = identity_hex.trim().trim_start_matches("0x").trim_start_matches("0X");
+    let hex = identity_hex
+        .trim()
+        .trim_start_matches("0x")
+        .trim_start_matches("0X");
     let admin = state
         .config
         .stdb_server_token
@@ -436,7 +460,10 @@ async fn invite(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let org_sql = format!("SELECT name FROM organization WHERE id = {}", body.organization_id);
+    let org_sql = format!(
+        "SELECT name FROM organization WHERE id = {}",
+        body.organization_id
+    );
     let org_rows = client
         .query_sql(&org_sql)
         .await
@@ -506,7 +533,9 @@ async fn accept_invite(
         .config
         .stdb_credential_encryption_key
         .as_ref()
-        .ok_or_else(|| ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into()))?;
+        .ok_or_else(|| {
+            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
+        })?;
 
     let hash = hex::encode(Sha256::digest(body.token.as_bytes()));
     let invite = find_invite_by_token_hash(&state, &hash)
@@ -514,7 +543,9 @@ async fn accept_invite(
         .ok_or_else(|| ApiError::BadRequest("Invalid or expired invitation".into()))?;
 
     if invite.accepted_at.is_some() {
-        return Err(ApiError::BadRequest("Invitation has already been used".into()));
+        return Err(ApiError::BadRequest(
+            "Invitation has already been used".into(),
+        ));
     }
 
     let now_micros_i = now_micros() as i64;
@@ -523,7 +554,9 @@ async fn accept_invite(
     }
 
     if invite.email.to_lowercase() != body.email.trim().to_lowercase() {
-        return Err(ApiError::BadRequest("Email does not match invitation".into()));
+        return Err(ApiError::BadRequest(
+            "Email does not match invitation".into(),
+        ));
     }
 
     let admin = state
@@ -535,27 +568,28 @@ async fn accept_invite(
     let client = state.client_with_token(admin);
 
     let email = body.email.trim().to_lowercase();
-    let (member_identity, stdb_token) = if let Some(existing) = find_credential_by_email(&state, &email).await? {
-        let tok = decrypt_token(key, &existing.stdb_token_enc)?;
-        (existing.identity_hex, tok)
-    } else {
-        let (identity, token) = state
-            .stdb
-            .provision_identity()
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-        let password_hash = bcrypt::hash(body.password.as_str(), bcrypt::DEFAULT_COST)
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-        let token_enc = encrypt_token(key, &token)?;
-        client
-            .call_reducer(
-                "store_user_credential",
-                json!([identity.clone(), email, password_hash, token_enc]),
-            )
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-        (identity, token)
-    };
+    let (member_identity, stdb_token) =
+        if let Some(existing) = find_credential_by_email(&state, &email).await? {
+            let tok = decrypt_token(key, &existing.stdb_token_enc)?;
+            (existing.identity_hex, tok)
+        } else {
+            let (identity, token) = state
+                .stdb
+                .provision_identity()
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let password_hash = bcrypt::hash(body.password.as_str(), bcrypt::DEFAULT_COST)
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let token_enc = encrypt_token(key, &token)?;
+            client
+                .call_reducer(
+                    "store_user_credential",
+                    json!([identity.clone(), email, password_hash, token_enc]),
+                )
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            (identity, token)
+        };
 
     let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
         .await?

@@ -70,9 +70,7 @@ fn parse_tables_from_sql(sql: &str) -> HashSet<String> {
 }
 
 fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
-    let allowed: HashSet<String> = subscription_resource_keys_vec()
-        .into_iter()
-        .collect();
+    let allowed: HashSet<String> = subscription_resource_keys_vec().into_iter().collect();
     for r in requested {
         let t = r.trim();
         if t.is_empty() || !allowed.contains(t) {
@@ -142,7 +140,8 @@ async fn handle_realtime_socket(
         Err(e) => {
             let _ = socket
                 .send(Message::Text(
-                    json!({ "type": "error", "error": format!("invalid subscribe: {e}") }).to_string(),
+                    json!({ "type": "error", "error": format!("invalid subscribe: {e}") })
+                        .to_string(),
                 ))
                 .await;
             return;
@@ -192,7 +191,8 @@ async fn handle_realtime_socket(
         Err(e) => {
             let _ = socket
                 .send(Message::Text(
-                    json!({ "type": "error", "error": format!("subscription SQL: {e}") }).to_string(),
+                    json!({ "type": "error", "error": format!("subscription SQL: {e}") })
+                        .to_string(),
                 ))
                 .await;
             return;
@@ -233,12 +233,14 @@ async fn handle_realtime_socket(
             .on_connect_error(move |_ctx, err| {
                 tracing::error!("realtime STDB connect error: {err:?}");
                 let _ = sdk_tx_err.send(
-                    json!({ "type": "error", "error": format!("connect_error: {err:?}") }).to_string(),
+                    json!({ "type": "error", "error": format!("connect_error: {err:?}") })
+                        .to_string(),
                 );
             })
             .on_connect(move |conn, _ident, _tok| {
                 for t in &tables_thread {
-                    if let Err(e) = wire::wire_realtime_table_callbacks(conn, t, &res_thread, &sdk_tx)
+                    if let Err(e) =
+                        wire::wire_realtime_table_callbacks(conn, t, &res_thread, &sdk_tx)
                     {
                         tracing::debug!("realtime skip wire for table {t}: {e}");
                     }

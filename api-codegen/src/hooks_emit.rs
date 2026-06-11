@@ -4,7 +4,9 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
 
-use crate::paths_emit::{collect_query_params, path_param_names, path_suffix_for_hooks, ts_fn_name_from_path};
+use crate::paths_emit::{
+    collect_query_params, path_param_names, path_suffix_for_hooks, ts_fn_name_from_path,
+};
 
 fn skip_hooks_path(path: &str) -> bool {
     matches!(
@@ -71,7 +73,12 @@ fn ts_path_literal(path: &str) -> String {
 }
 
 /// Expression for `apiFetch(paths.url…(…))` first argument.
-fn url_fetch_arg(openapi_path: &str, path_item: &Value, method: &str, list_query_var: Option<&str>) -> String {
+fn url_fetch_arg(
+    openapi_path: &str,
+    path_item: &Value,
+    method: &str,
+    list_query_var: Option<&str>,
+) -> String {
     let fn_name = ts_fn_name_from_path(openapi_path);
     let path_params = path_param_names(openapi_path);
     let query = if method == "get" {
@@ -150,10 +157,8 @@ pub fn emit_hooks_typescript(doc: &Value) -> Result<String> {
                     fn_args.push(format!("{p}: string | number"));
                 }
                 if !query.is_empty() {
-                    let fields: Vec<String> = query
-                        .iter()
-                        .map(|(n, t)| format!("  {n}?: {t}"))
-                        .collect();
+                    let fields: Vec<String> =
+                        query.iter().map(|(n, t)| format!("  {n}?: {t}")).collect();
                     fn_args.push(format!("listQuery?: {{\n{}\n}}", fields.join("\n")));
                 }
                 fn_args.push(
@@ -167,9 +172,8 @@ pub fn emit_hooks_typescript(doc: &Value) -> Result<String> {
                     "organizationId !== 0n".to_string(),
                 ];
                 for p in &path_params {
-                    enabled_parts.push(format!(
-                        "({p} !== undefined && {p} !== null && {p} !== '')"
-                    ));
+                    enabled_parts
+                        .push(format!("({p} !== undefined && {p} !== null && {p} !== '')"));
                 }
 
                 let enabled_join = enabled_parts.join("\n      && ");

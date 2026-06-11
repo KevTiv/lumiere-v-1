@@ -20,9 +20,7 @@ async fn field_access_get(
     headers: HeaderMap,
     cookies: Cookies,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let auth = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(&headers, &cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
 

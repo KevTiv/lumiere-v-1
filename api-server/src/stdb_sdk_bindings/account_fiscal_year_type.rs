@@ -2,12 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 use super::fiscal_year_state_type::FiscalYearState;
 
@@ -21,23 +16,21 @@ pub struct AccountFiscalYear {
     pub company_id: u64,
     pub state: FiscalYearState,
     pub r#type: String,
-    pub carry_over_accounts: Vec::<u64>,
-    pub closing_move_id: Option::<u64>,
-    pub opening_move_id: Option::<u64>,
+    pub carry_over_accounts: Vec<u64>,
+    pub closing_move_id: Option<u64>,
+    pub opening_move_id: Option<u64>,
     pub is_adjustment: bool,
-    pub notes: Option::<String>,
-    pub create_uid: Option::<__sdk::Identity>,
-    pub create_date: Option::<__sdk::Timestamp>,
-    pub write_uid: Option::<__sdk::Identity>,
-    pub write_date: Option::<__sdk::Timestamp>,
-    pub metadata: Option::<String>,
+    pub notes: Option<String>,
+    pub create_uid: Option<__sdk::Identity>,
+    pub create_date: Option<__sdk::Timestamp>,
+    pub write_uid: Option<__sdk::Identity>,
+    pub write_date: Option<__sdk::Timestamp>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for AccountFiscalYear {
     type Module = super::RemoteModule;
 }
-
 
 /// Column accessor struct for the table `AccountFiscalYear`.
 ///
@@ -50,16 +43,16 @@ pub struct AccountFiscalYearCols {
     pub company_id: __sdk::__query_builder::Col<AccountFiscalYear, u64>,
     pub state: __sdk::__query_builder::Col<AccountFiscalYear, FiscalYearState>,
     pub r#type: __sdk::__query_builder::Col<AccountFiscalYear, String>,
-    pub carry_over_accounts: __sdk::__query_builder::Col<AccountFiscalYear, Vec::<u64>>,
-    pub closing_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option::<u64>>,
-    pub opening_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option::<u64>>,
+    pub carry_over_accounts: __sdk::__query_builder::Col<AccountFiscalYear, Vec<u64>>,
+    pub closing_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option<u64>>,
+    pub opening_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option<u64>>,
     pub is_adjustment: __sdk::__query_builder::Col<AccountFiscalYear, bool>,
-    pub notes: __sdk::__query_builder::Col<AccountFiscalYear, Option::<String>>,
-    pub create_uid: __sdk::__query_builder::Col<AccountFiscalYear, Option::<__sdk::Identity>>,
-    pub create_date: __sdk::__query_builder::Col<AccountFiscalYear, Option::<__sdk::Timestamp>>,
-    pub write_uid: __sdk::__query_builder::Col<AccountFiscalYear, Option::<__sdk::Identity>>,
-    pub write_date: __sdk::__query_builder::Col<AccountFiscalYear, Option::<__sdk::Timestamp>>,
-    pub metadata: __sdk::__query_builder::Col<AccountFiscalYear, Option::<String>>,
+    pub notes: __sdk::__query_builder::Col<AccountFiscalYear, Option<String>>,
+    pub create_uid: __sdk::__query_builder::Col<AccountFiscalYear, Option<__sdk::Identity>>,
+    pub create_date: __sdk::__query_builder::Col<AccountFiscalYear, Option<__sdk::Timestamp>>,
+    pub write_uid: __sdk::__query_builder::Col<AccountFiscalYear, Option<__sdk::Identity>>,
+    pub write_date: __sdk::__query_builder::Col<AccountFiscalYear, Option<__sdk::Timestamp>>,
+    pub metadata: __sdk::__query_builder::Col<AccountFiscalYear, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for AccountFiscalYear {
@@ -73,7 +66,10 @@ impl __sdk::__query_builder::HasCols for AccountFiscalYear {
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             r#type: __sdk::__query_builder::Col::new(table_name, "type"),
-            carry_over_accounts: __sdk::__query_builder::Col::new(table_name, "carry_over_accounts"),
+            carry_over_accounts: __sdk::__query_builder::Col::new(
+                table_name,
+                "carry_over_accounts",
+            ),
             closing_move_id: __sdk::__query_builder::Col::new(table_name, "closing_move_id"),
             opening_move_id: __sdk::__query_builder::Col::new(table_name, "opening_move_id"),
             is_adjustment: __sdk::__query_builder::Col::new(table_name, "is_adjustment"),
@@ -83,7 +79,6 @@ impl __sdk::__query_builder::HasCols for AccountFiscalYear {
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
-
         }
     }
 }
@@ -104,10 +99,8 @@ impl __sdk::__query_builder::HasIxCols for AccountFiscalYear {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
-
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for AccountFiscalYear {}
-

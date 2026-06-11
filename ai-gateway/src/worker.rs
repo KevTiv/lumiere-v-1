@@ -74,7 +74,7 @@ async fn process_batch(
         }
 
         // Process: embed → Qdrant upsert → confirm
-        let result = process_job(config, embedder, vector_store, stdb, &payload).await;
+        let result = process_job(embedder, vector_store, &payload).await;
 
         match result {
             Ok((embedding_id, dim)) => {
@@ -118,10 +118,8 @@ async fn process_batch(
 /// content_type is unique per company). A future improvement would be to store
 /// the SearchEmbedding.id in the job payload.
 async fn process_job(
-    config: &Config,
     embedder: &EmbeddingClient,
     vector_store: &VectorStore,
-    _stdb: &StdbClient,
     payload: &crate::stdb_embed::EmbedJobPayload,
 ) -> anyhow::Result<(u64, u32)> {
     if payload.text.trim().is_empty() {

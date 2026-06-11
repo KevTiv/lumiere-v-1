@@ -636,4 +636,4 @@ export type DocumentsCsvImportMutations = ReturnType<typeof useDocumentsCsvImpor
 export type {
   CreateDocumentParams,
   CreateKnowledgeArticleParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'

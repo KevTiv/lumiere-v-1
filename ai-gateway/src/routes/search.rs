@@ -26,6 +26,7 @@ fn default_limit() -> u64 {
 #[derive(Serialize)]
 pub struct SearchHit {
     pub score: f32,
+    pub company_id: u64,
     pub content_type: String,
     pub content_id: u64,
     pub stdb_embedding_id: u64,
@@ -71,6 +72,7 @@ pub async fn post_search(
         .into_iter()
         .map(|h| SearchHit {
             score: h.score,
+            company_id: h.company_id,
             content_type: h.content_type,
             content_id: h.content_id,
             stdb_embedding_id: h.stdb_embedding_id,

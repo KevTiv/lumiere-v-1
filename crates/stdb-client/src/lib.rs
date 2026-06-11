@@ -205,8 +205,8 @@ fn parse_row(elements: &[Value], row: &[Value]) -> Value {
 
 /// Top-level JSON: array of `{ schema: { elements }, rows: [][] }`; use first set.
 pub fn parse_sats_sql_response(body: &str) -> Result<Vec<Value>> {
-    let root: Value = serde_json::from_str(body)
-        .map_err(|e| StdbClientError::Parse(e.to_string()))?;
+    let root: Value =
+        serde_json::from_str(body).map_err(|e| StdbClientError::Parse(e.to_string()))?;
     let arr = root
         .as_array()
         .ok_or_else(|| StdbClientError::Parse("expected top-level array".into()))?;

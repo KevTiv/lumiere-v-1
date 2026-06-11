@@ -257,6 +257,9 @@ fn explain_report(req: &ReportExplainRequest) -> ReportExplainResponse {
     if collect_sources(&req.lines).is_empty() {
         confidence_flags.push("no source references supplied".to_string());
     }
+    if req.lines.iter().any(|line| !line.metadata.is_null()) {
+        confidence_flags.push("line metadata supplied but not interpreted".to_string());
+    }
 
     let explanation_md = build_explanation(req, total, comparison_total, delta_total, &highlights);
     let source_refs = collect_sources(&req.lines);
@@ -292,6 +295,7 @@ pub async fn post_explain(
     tracing::info!(
         org_id = req.org_id,
         company_id = req.company_id,
+        report_id = req.report_id.as_deref().unwrap_or("adhoc"),
         report_type = %req.report_type,
         line_count = response.line_facts.len(),
         "Explained report deterministically"

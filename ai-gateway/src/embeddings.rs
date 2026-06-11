@@ -65,35 +65,4 @@ impl EmbeddingClient {
             .map(|e| e.embedding)
             .context("Empty embedding response from Voyage AI")
     }
-
-    /// Embed a batch of texts. Returns one Vec<f32> per input.
-    pub async fn embed_batch(&self, texts: Vec<&str>) -> Result<Vec<Vec<f32>>> {
-        if texts.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let resp = self
-            .http
-            .post("https://api.voyageai.com/v1/embeddings")
-            .bearer_auth(&self.api_key)
-            .json(&VoyageRequest {
-                input: texts,
-                model: &self.model,
-            })
-            .send()
-            .await
-            .context("Voyage AI batch request failed")?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Voyage AI batch error {}: {}", status, body);
-        }
-
-        let body: VoyageResponse = resp
-            .json()
-            .await
-            .context("Failed to parse Voyage batch response")?;
-        Ok(body.data.into_iter().map(|e| e.embedding).collect())
-    }
 }

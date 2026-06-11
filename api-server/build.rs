@@ -21,12 +21,15 @@ fn snake_to_pascal(table: &str) -> String {
 
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let registry_path = Path::new(&manifest_dir)
-        .join("../crates/stdb-auth/assets/resource_registry.json");
+    let registry_path =
+        Path::new(&manifest_dir).join("../crates/stdb-auth/assets/resource_registry.json");
     let bindings_dir = Path::new(&manifest_dir).join("src/stdb_sdk_bindings");
 
     let reg_raw = fs::read_to_string(&registry_path).unwrap_or_else(|e| {
-        panic!("read resource_registry.json: {e} (path {})", registry_path.display());
+        panic!(
+            "read resource_registry.json: {e} (path {})",
+            registry_path.display()
+        );
     });
     let reg: serde_json::Value =
         serde_json::from_str(&reg_raw).expect("parse resource_registry.json");

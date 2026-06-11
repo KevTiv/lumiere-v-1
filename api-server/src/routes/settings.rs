@@ -86,7 +86,9 @@ async fn users_get(
 
     let total = users.len();
     let page_rows: Vec<Value> = users.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": page_rows, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": page_rows, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn roles_get(
@@ -113,7 +115,9 @@ async fn roles_get(
 
     let total = roles.len();
     let page_rows: Vec<Value> = roles.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": page_rows, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": page_rows, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 pub fn router() -> Router<Arc<AppState>> {

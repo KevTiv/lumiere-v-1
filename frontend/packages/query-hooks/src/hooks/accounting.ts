@@ -4,7 +4,7 @@ import { apiFetch } from "../http"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreatePaymentParams } from "@lumiere/stdb/generated/types"
+import type { CreatePaymentParams } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
@@ -31,7 +31,7 @@ export type {
   CreateCrossoveredBudgetParams,
   CreateAccountBankStatementParams,
   CreateAccountJournalParams,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 

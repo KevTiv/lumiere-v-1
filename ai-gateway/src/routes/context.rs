@@ -105,6 +105,13 @@ pub async fn post_document(
         return Err(AppError::BadRequest("content must not be empty".into()));
     }
 
+    if req.content.len() > state.config.max_upload_bytes {
+        return Err(AppError::BadRequest(format!(
+            "content exceeds max upload size of {} bytes",
+            state.config.max_upload_bytes
+        )));
+    }
+
     let ingest_req = RigIngestRequest {
         org_id: req.org_id,
         doc_id: req.doc_id.trim().to_string(),

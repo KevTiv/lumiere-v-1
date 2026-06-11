@@ -2,7 +2,7 @@
  * Form → `CreateScheduledReportParams` for `create_scheduled_report`.
  */
 
-import type { CreateScheduledReportParams } from '@lumiere/stdb/generated/types'
+import type { CreateScheduledReportParams } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "./stb-timestamp"

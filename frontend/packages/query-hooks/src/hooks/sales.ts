@@ -23,7 +23,7 @@ import type {
   CreatePricelistParams,
   CreateSaleOrderParams,
   CreateShippingMethodParams,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -647,4 +647,4 @@ export type {
   CreateSaleOrderParams,
   CreateShippingMethodParams,
   UpdateSaleOrderParams,
-} from '@lumiere/stdb/generated/types'
+} from '@lumiere/stdb/types'

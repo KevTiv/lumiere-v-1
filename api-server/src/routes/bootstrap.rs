@@ -92,10 +92,14 @@ fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
         return Err(ApiError::BadRequest("Language is required".into()));
     }
     if b.default_company_name.trim().is_empty() {
-        return Err(ApiError::BadRequest("Default company name is required".into()));
+        return Err(ApiError::BadRequest(
+            "Default company name is required".into(),
+        ));
     }
     if b.default_company_code.trim().is_empty() {
-        return Err(ApiError::BadRequest("Default company code is required".into()));
+        return Err(ApiError::BadRequest(
+            "Default company code is required".into(),
+        ));
     }
     let cur = b.default_company_currency_code.trim();
     if cur.len() < 3 || cur.len() > 3 {

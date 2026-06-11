@@ -28,9 +28,7 @@ pub async fn resolve_session(
     headers: &HeaderMap,
     cookies: &Cookies,
 ) -> Result<Option<ApiSession>, ApiError> {
-    let auth = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(headers, cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
     resolve_api_session(state, auth, cookie_tok.as_deref(), id_hint.as_deref()).await

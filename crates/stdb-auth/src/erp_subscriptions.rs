@@ -56,7 +56,8 @@ static AUTH_SINGLE: Lazy<HashMap<String, String>> = Lazy::new(|| {
     );
     m.insert(
         "user-role-assignment".into(),
-        auth_select_all("user_role_assignment", "UserRoleAssignment").expect("UserRoleAssignment cols"),
+        auth_select_all("user_role_assignment", "UserRoleAssignment")
+            .expect("UserRoleAssignment cols"),
     );
     m.insert(
         "auth-role-table".into(),

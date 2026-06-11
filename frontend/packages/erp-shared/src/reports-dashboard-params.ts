@@ -6,7 +6,7 @@ import type {
   CreateDashboardParams,
   CreateDashboardWidgetParams,
   WidgetType,
-} from "@lumiere/stdb/generated/types"
+} from "@lumiere/stdb/types"
 
 function parseCompanyId(v: unknown): number | null {
   if (v == null || String(v).trim() === "") return null

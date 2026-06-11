@@ -63,4 +63,4 @@ export function usePostMessage(organizationId: bigint) {
 }
 
 // ── Types (re-exported so client components import from one place) ────────────
-export type { PostMessageParams } from "@lumiere/stdb/generated/types/reducers"
+export type { PostMessageParams } from "@lumiere/stdb/types"

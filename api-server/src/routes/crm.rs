@@ -106,7 +106,9 @@ async fn leads_get(
 
     let total = rows.len();
     let page_rows: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": page_rows, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": page_rows, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 fn lead_create_params(body: &Value) -> Result<Value, ApiError> {
@@ -182,14 +184,9 @@ async fn lead_get(
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
     let client = state.client_with_token(&session.stdb_token);
-    let lead = query_lead_by_id(
-        &client,
-        lead_id,
-        org_id,
-        session.field_access.as_ref(),
-    )
-    .await?
-    .ok_or_else(|| ApiError::NotFound("Lead not found".into()))?;
+    let lead = query_lead_by_id(&client, lead_id, org_id, session.field_access.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Lead not found".into()))?;
     Ok(Json(json!({ "data": lead })))
 }
 
@@ -207,7 +204,9 @@ async fn lead_put(
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
-    let b = body.as_object().ok_or_else(|| ApiError::BadRequest("Invalid body".into()))?;
+    let b = body
+        .as_object()
+        .ok_or_else(|| ApiError::BadRequest("Invalid body".into()))?;
 
     let has_details = b.contains_key("contactName")
         || b.contains_key("title")
@@ -219,8 +218,7 @@ async fn lead_put(
         || b.contains_key("city")
         || b.contains_key("zip")
         || b.contains_key("countryCode");
-    let has_revenue =
-        b.contains_key("expectedRevenue") || b.contains_key("probability");
+    let has_revenue = b.contains_key("expectedRevenue") || b.contains_key("probability");
 
     if !has_details && !has_address && !has_revenue {
         return Err(ApiError::BadRequest("No valid fields to update".into()));
@@ -291,7 +289,9 @@ async fn lead_put(
 
     tokio::try_join!(f1, f2, f3)?;
 
-    Ok(Json(json!({ "data": { "message": "Lead updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Lead updated successfully" } }),
+    ))
 }
 
 async fn lead_delete(
@@ -312,7 +312,9 @@ async fn lead_delete(
         .call_reducer("delete_lead", json!([lead_id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Lead deleted successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Lead deleted successfully" } }),
+    ))
 }
 
 fn contact_create_params(body: &Value) -> Result<Value, ApiError> {
@@ -398,9 +400,7 @@ async fn contacts_get(
     }
     if let Some(ref s) = q.is_vendor {
         let want = s == "true";
-        rows.retain(|r| {
-            r.get("isVendor").and_then(|v| v.as_bool()).unwrap_or(false) == want
-        });
+        rows.retain(|r| r.get("isVendor").and_then(|v| v.as_bool()).unwrap_or(false) == want);
     }
     if let Some(ref s) = q.is_prospect {
         let want = s == "true";
@@ -435,7 +435,9 @@ async fn contacts_get(
 
     let total = rows.len();
     let page_rows: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": page_rows, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": page_rows, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn contacts_post(

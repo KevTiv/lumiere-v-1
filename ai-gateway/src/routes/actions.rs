@@ -139,8 +139,11 @@ fn choose_catalog_entry<'a>(
     entries: &'a [&'static ActionCatalogEntry],
 ) -> Option<&'a ActionCatalogEntry> {
     let haystack = format!(
-        "{} {} {} {}",
+        "{} {} {} {} {}",
         query,
+        ui_context
+            .and_then(|ctx| ctx.route.as_deref())
+            .unwrap_or_default(),
         ui_context
             .and_then(|ctx| ctx.module.as_deref())
             .unwrap_or_default(),

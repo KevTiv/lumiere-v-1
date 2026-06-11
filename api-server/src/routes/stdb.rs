@@ -46,9 +46,7 @@ async fn subscription_queries(
     cookies: Cookies,
     Query(q): Query<SubscriptionQuery>,
 ) -> Result<Response, ApiError> {
-    let auth = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(&headers, &cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
 
@@ -86,7 +84,8 @@ async fn subscription_queries(
 
     if resource == "all" {
         let full = full_client_subscription_resources_vec();
-        let queries = create_client_subscriptions(&full, &ctx).map_err(|e| ApiError::Internal(e))?;
+        let queries =
+            create_client_subscriptions(&full, &ctx).map_err(|e| ApiError::Internal(e))?;
         return Ok(Json(json!({
             "resource": "all",
             "organizationId": session.organization_id,
@@ -95,7 +94,8 @@ async fn subscription_queries(
         .into_response());
     }
 
-    let queries = subscription_queries_for_resource(resource, &ctx).map_err(|e| ApiError::Internal(e))?;
+    let queries =
+        subscription_queries_for_resource(resource, &ctx).map_err(|e| ApiError::Internal(e))?;
     let Some(queries) = queries else {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -130,7 +130,10 @@ async fn stdb_http_proxy(
             .status(StatusCode::NO_CONTENT)
             .header("Access-Control-Allow-Origin", "*")
             .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            .header(
+                "Access-Control-Allow-Headers",
+                "Authorization, Content-Type",
+            )
             .body(Body::empty())
             .unwrap());
     }
