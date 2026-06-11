@@ -39,11 +39,7 @@ pub async fn ack(
     State(state): State<AppState>,
     Json(req): Json<AckRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "action_id": req.action_id,
-        "result_payload": req.result_payload,
-    });
+    let args = json!([req.organization_id, req.action_id, req.result_payload]);
 
     state
         .call_reducer("acknowledge_iot_action", args)
@@ -70,11 +66,7 @@ pub async fn fail(
     State(state): State<AppState>,
     Json(req): Json<FailRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "action_id": req.action_id,
-        "error": req.error,
-    });
+    let args = json!([req.organization_id, req.action_id, req.error]);
 
     state
         .call_reducer("fail_iot_action", args)

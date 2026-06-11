@@ -1,760 +1,335 @@
-# SpacetimeDB Rules (All Languages)
+---
+name: rust-skills
+description: >
+  Comprehensive Rust coding guidelines with 179 rules across 14 categories.
+  Use when writing, reviewing, or refactoring Rust code. Covers ownership,
+  error handling, async patterns, API design, memory optimization, performance,
+  testing, and common anti-patterns. Invoke with /rust-skills.
+license: MIT
+metadata:
+  author: leonardomso
+  version: "1.0.0"
+  sources:
+    - Rust API Guidelines
+    - Rust Performance Book
+    - ripgrep, tokio, serde, polars codebases
+---
 
-## Migrating from 1.0 to 2.0?
+# Rust Best Practices
 
-**If you are migrating existing SpacetimeDB 1.0 code to 2.0, apply `spacetimedb-migration-2.0.mdc` first.** It documents breaking changes (reducer callbacks → event tables, `name`→`accessor`, `sender()` method, etc.) and should be considered before other rules.
+Comprehensive guide for writing high-quality, idiomatic, and highly optimized Rust code. Contains 179 rules across 14 categories, prioritized by impact to guide LLMs in code generation and refactoring.
+
+## When to Apply
+
+Reference these guidelines when:
+- Writing new Rust functions, structs, or modules
+- Implementing error handling or async code
+- Designing public APIs for libraries
+- Reviewing code for ownership/borrowing issues
+- Optimizing memory usage or reducing allocations
+- Tuning performance for hot paths
+- Refactoring existing Rust code
+
+## Rule Categories by Priority
+
+| Priority | Category | Impact | Prefix | Rules |
+|----------|----------|--------|--------|-------|
+| 1 | Ownership & Borrowing | CRITICAL | `own-` | 12 |
+| 2 | Error Handling | CRITICAL | `err-` | 12 |
+| 3 | Memory Optimization | CRITICAL | `mem-` | 15 |
+| 4 | API Design | HIGH | `api-` | 15 |
+| 5 | Async/Await | HIGH | `async-` | 15 |
+| 6 | Compiler Optimization | HIGH | `opt-` | 12 |
+| 7 | Naming Conventions | MEDIUM | `name-` | 16 |
+| 8 | Type Safety | MEDIUM | `type-` | 10 |
+| 9 | Testing | MEDIUM | `test-` | 13 |
+| 10 | Documentation | MEDIUM | `doc-` | 11 |
+| 11 | Performance Patterns | MEDIUM | `perf-` | 11 |
+| 12 | Project Structure | LOW | `proj-` | 11 |
+| 13 | Clippy & Linting | LOW | `lint-` | 11 |
+| 14 | Anti-patterns | REFERENCE | `anti-` | 15 |
 
 ---
 
-## Language-Specific Rules
+## Quick Reference
 
-| Language | Rule File |
-|----------|-----------|
-| **TypeScript/React** | `spacetimedb-typescript.mdc` (MANDATORY) |
-| **Rust** | `spacetimedb-rust.mdc` (MANDATORY) |
-| **C#** | `spacetimedb-csharp.mdc` (MANDATORY) |
-| **Migrating 1.0 → 2.0** | `spacetimedb-migration-2.0.mdc` |
+### 1. Ownership & Borrowing (CRITICAL)
+
+- [`own-borrow-over-clone`](rules/own-borrow-over-clone.md) - Prefer `&T` borrowing over `.clone()`
+- [`own-slice-over-vec`](rules/own-slice-over-vec.md) - Accept `&[T]` not `&Vec<T>`, `&str` not `&String`
+- [`own-cow-conditional`](rules/own-cow-conditional.md) - Use `Cow<'a, T>` for conditional ownership
+- [`own-arc-shared`](rules/own-arc-shared.md) - Use `Arc<T>` for thread-safe shared ownership
+- [`own-rc-single-thread`](rules/own-rc-single-thread.md) - Use `Rc<T>` for single-threaded sharing
+- [`own-refcell-interior`](rules/own-refcell-interior.md) - Use `RefCell<T>` for interior mutability (single-thread)
+- [`own-mutex-interior`](rules/own-mutex-interior.md) - Use `Mutex<T>` for interior mutability (multi-thread)
+- [`own-rwlock-readers`](rules/own-rwlock-readers.md) - Use `RwLock<T>` when reads dominate writes
+- [`own-copy-small`](rules/own-copy-small.md) - Derive `Copy` for small, trivial types
+- [`own-clone-explicit`](rules/own-clone-explicit.md) - Make `Clone` explicit, avoid implicit copies
+- [`own-move-large`](rules/own-move-large.md) - Move large data instead of cloning
+- [`own-lifetime-elision`](rules/own-lifetime-elision.md) - Rely on lifetime elision when possible
+
+### 2. Error Handling (CRITICAL)
+
+- [`err-thiserror-lib`](rules/err-thiserror-lib.md) - Use `thiserror` for library error types
+- [`err-anyhow-app`](rules/err-anyhow-app.md) - Use `anyhow` for application error handling
+- [`err-result-over-panic`](rules/err-result-over-panic.md) - Return `Result`, don't panic on expected errors
+- [`err-context-chain`](rules/err-context-chain.md) - Add context with `.context()` or `.with_context()`
+- [`err-no-unwrap-prod`](rules/err-no-unwrap-prod.md) - Never use `.unwrap()` in production code
+- [`err-expect-bugs-only`](rules/err-expect-bugs-only.md) - Use `.expect()` only for programming errors
+- [`err-question-mark`](rules/err-question-mark.md) - Use `?` operator for clean propagation
+- [`err-from-impl`](rules/err-from-impl.md) - Use `#[from]` for automatic error conversion
+- [`err-source-chain`](rules/err-source-chain.md) - Use `#[source]` to chain underlying errors
+- [`err-lowercase-msg`](rules/err-lowercase-msg.md) - Error messages: lowercase, no trailing punctuation
+- [`err-doc-errors`](rules/err-doc-errors.md) - Document errors with `# Errors` section
+- [`err-custom-type`](rules/err-custom-type.md) - Create custom error types, not `Box<dyn Error>`
+
+### 3. Memory Optimization (CRITICAL)
+
+- [`mem-with-capacity`](rules/mem-with-capacity.md) - Use `with_capacity()` when size is known
+- [`mem-smallvec`](rules/mem-smallvec.md) - Use `SmallVec` for usually-small collections
+- [`mem-arrayvec`](rules/mem-arrayvec.md) - Use `ArrayVec` for bounded-size collections
+- [`mem-box-large-variant`](rules/mem-box-large-variant.md) - Box large enum variants to reduce type size
+- [`mem-boxed-slice`](rules/mem-boxed-slice.md) - Use `Box<[T]>` instead of `Vec<T>` when fixed
+- [`mem-thinvec`](rules/mem-thinvec.md) - Use `ThinVec` for often-empty vectors
+- [`mem-clone-from`](rules/mem-clone-from.md) - Use `clone_from()` to reuse allocations
+- [`mem-reuse-collections`](rules/mem-reuse-collections.md) - Reuse collections with `clear()` in loops
+- [`mem-avoid-format`](rules/mem-avoid-format.md) - Avoid `format!()` when string literals work
+- [`mem-write-over-format`](rules/mem-write-over-format.md) - Use `write!()` instead of `format!()` 
+- [`mem-arena-allocator`](rules/mem-arena-allocator.md) - Use arena allocators for batch allocations
+- [`mem-zero-copy`](rules/mem-zero-copy.md) - Use zero-copy patterns with slices and `Bytes`
+- [`mem-compact-string`](rules/mem-compact-string.md) - Use `CompactString` for small string optimization
+- [`mem-smaller-integers`](rules/mem-smaller-integers.md) - Use smallest integer type that fits
+- [`mem-assert-type-size`](rules/mem-assert-type-size.md) - Assert hot type sizes to prevent regressions
+
+### 4. API Design (HIGH)
+
+- [`api-builder-pattern`](rules/api-builder-pattern.md) - Use Builder pattern for complex construction
+- [`api-builder-must-use`](rules/api-builder-must-use.md) - Add `#[must_use]` to builder types
+- [`api-newtype-safety`](rules/api-newtype-safety.md) - Use newtypes for type-safe distinctions
+- [`api-typestate`](rules/api-typestate.md) - Use typestate for compile-time state machines
+- [`api-sealed-trait`](rules/api-sealed-trait.md) - Seal traits to prevent external implementations
+- [`api-extension-trait`](rules/api-extension-trait.md) - Use extension traits to add methods to foreign types
+- [`api-parse-dont-validate`](rules/api-parse-dont-validate.md) - Parse into validated types at boundaries
+- [`api-impl-into`](rules/api-impl-into.md) - Accept `impl Into<T>` for flexible string inputs
+- [`api-impl-asref`](rules/api-impl-asref.md) - Accept `impl AsRef<T>` for borrowed inputs
+- [`api-must-use`](rules/api-must-use.md) - Add `#[must_use]` to `Result` returning functions
+- [`api-non-exhaustive`](rules/api-non-exhaustive.md) - Use `#[non_exhaustive]` for future-proof enums/structs
+- [`api-from-not-into`](rules/api-from-not-into.md) - Implement `From`, not `Into` (auto-derived)
+- [`api-default-impl`](rules/api-default-impl.md) - Implement `Default` for sensible defaults
+- [`api-common-traits`](rules/api-common-traits.md) - Implement `Debug`, `Clone`, `PartialEq` eagerly
+- [`api-serde-optional`](rules/api-serde-optional.md) - Gate `Serialize`/`Deserialize` behind feature flag
+
+### 5. Async/Await (HIGH)
+
+- [`async-tokio-runtime`](rules/async-tokio-runtime.md) - Use Tokio for production async runtime
+- [`async-no-lock-await`](rules/async-no-lock-await.md) - Never hold `Mutex`/`RwLock` across `.await`
+- [`async-spawn-blocking`](rules/async-spawn-blocking.md) - Use `spawn_blocking` for CPU-intensive work
+- [`async-tokio-fs`](rules/async-tokio-fs.md) - Use `tokio::fs` not `std::fs` in async code
+- [`async-cancellation-token`](rules/async-cancellation-token.md) - Use `CancellationToken` for graceful shutdown
+- [`async-join-parallel`](rules/async-join-parallel.md) - Use `tokio::join!` for parallel operations
+- [`async-try-join`](rules/async-try-join.md) - Use `tokio::try_join!` for fallible parallel ops
+- [`async-select-racing`](rules/async-select-racing.md) - Use `tokio::select!` for racing/timeouts
+- [`async-bounded-channel`](rules/async-bounded-channel.md) - Use bounded channels for backpressure
+- [`async-mpsc-queue`](rules/async-mpsc-queue.md) - Use `mpsc` for work queues
+- [`async-broadcast-pubsub`](rules/async-broadcast-pubsub.md) - Use `broadcast` for pub/sub patterns
+- [`async-watch-latest`](rules/async-watch-latest.md) - Use `watch` for latest-value sharing
+- [`async-oneshot-response`](rules/async-oneshot-response.md) - Use `oneshot` for request/response
+- [`async-joinset-structured`](rules/async-joinset-structured.md) - Use `JoinSet` for dynamic task groups
+- [`async-clone-before-await`](rules/async-clone-before-await.md) - Clone data before await, release locks
+
+### 6. Compiler Optimization (HIGH)
+
+- [`opt-inline-small`](rules/opt-inline-small.md) - Use `#[inline]` for small hot functions
+- [`opt-inline-always-rare`](rules/opt-inline-always-rare.md) - Use `#[inline(always)]` sparingly
+- [`opt-inline-never-cold`](rules/opt-inline-never-cold.md) - Use `#[inline(never)]` for cold paths
+- [`opt-cold-unlikely`](rules/opt-cold-unlikely.md) - Use `#[cold]` for error/unlikely paths
+- [`opt-likely-hint`](rules/opt-likely-hint.md) - Use `likely()`/`unlikely()` for branch hints
+- [`opt-lto-release`](rules/opt-lto-release.md) - Enable LTO in release builds
+- [`opt-codegen-units`](rules/opt-codegen-units.md) - Use `codegen-units = 1` for max optimization
+- [`opt-pgo-profile`](rules/opt-pgo-profile.md) - Use PGO for production builds
+- [`opt-target-cpu`](rules/opt-target-cpu.md) - Set `target-cpu=native` for local builds
+- [`opt-bounds-check`](rules/opt-bounds-check.md) - Use iterators to avoid bounds checks
+- [`opt-simd-portable`](rules/opt-simd-portable.md) - Use portable SIMD for data-parallel ops
+- [`opt-cache-friendly`](rules/opt-cache-friendly.md) - Design cache-friendly data layouts (SoA)
+
+### 7. Naming Conventions (MEDIUM)
+
+- [`name-types-camel`](rules/name-types-camel.md) - Use `UpperCamelCase` for types, traits, enums
+- [`name-variants-camel`](rules/name-variants-camel.md) - Use `UpperCamelCase` for enum variants
+- [`name-funcs-snake`](rules/name-funcs-snake.md) - Use `snake_case` for functions, methods, modules
+- [`name-consts-screaming`](rules/name-consts-screaming.md) - Use `SCREAMING_SNAKE_CASE` for constants/statics
+- [`name-lifetime-short`](rules/name-lifetime-short.md) - Use short lowercase lifetimes: `'a`, `'de`, `'src`
+- [`name-type-param-single`](rules/name-type-param-single.md) - Use single uppercase for type params: `T`, `E`, `K`, `V`
+- [`name-as-free`](rules/name-as-free.md) - `as_` prefix: free reference conversion
+- [`name-to-expensive`](rules/name-to-expensive.md) - `to_` prefix: expensive conversion
+- [`name-into-ownership`](rules/name-into-ownership.md) - `into_` prefix: ownership transfer
+- [`name-no-get-prefix`](rules/name-no-get-prefix.md) - No `get_` prefix for simple getters
+- [`name-is-has-bool`](rules/name-is-has-bool.md) - Use `is_`, `has_`, `can_` for boolean methods
+- [`name-iter-convention`](rules/name-iter-convention.md) - Use `iter`/`iter_mut`/`into_iter` for iterators
+- [`name-iter-method`](rules/name-iter-method.md) - Name iterator methods consistently
+- [`name-iter-type-match`](rules/name-iter-type-match.md) - Iterator type names match method
+- [`name-acronym-word`](rules/name-acronym-word.md) - Treat acronyms as words: `Uuid` not `UUID`
+- [`name-crate-no-rs`](rules/name-crate-no-rs.md) - Crate names: no `-rs` suffix
+
+### 8. Type Safety (MEDIUM)
+
+- [`type-newtype-ids`](rules/type-newtype-ids.md) - Wrap IDs in newtypes: `UserId(u64)`
+- [`type-newtype-validated`](rules/type-newtype-validated.md) - Newtypes for validated data: `Email`, `Url`
+- [`type-enum-states`](rules/type-enum-states.md) - Use enums for mutually exclusive states
+- [`type-option-nullable`](rules/type-option-nullable.md) - Use `Option<T>` for nullable values
+- [`type-result-fallible`](rules/type-result-fallible.md) - Use `Result<T, E>` for fallible operations
+- [`type-phantom-marker`](rules/type-phantom-marker.md) - Use `PhantomData<T>` for type-level markers
+- [`type-never-diverge`](rules/type-never-diverge.md) - Use `!` type for functions that never return
+- [`type-generic-bounds`](rules/type-generic-bounds.md) - Add trait bounds only where needed
+- [`type-no-stringly`](rules/type-no-stringly.md) - Avoid stringly-typed APIs, use enums/newtypes
+- [`type-repr-transparent`](rules/type-repr-transparent.md) - Use `#[repr(transparent)]` for FFI newtypes
+
+### 9. Testing (MEDIUM)
+
+- [`test-cfg-test-module`](rules/test-cfg-test-module.md) - Use `#[cfg(test)] mod tests { }`
+- [`test-use-super`](rules/test-use-super.md) - Use `use super::*;` in test modules
+- [`test-integration-dir`](rules/test-integration-dir.md) - Put integration tests in `tests/` directory
+- [`test-descriptive-names`](rules/test-descriptive-names.md) - Use descriptive test names
+- [`test-arrange-act-assert`](rules/test-arrange-act-assert.md) - Structure tests as arrange/act/assert
+- [`test-proptest-properties`](rules/test-proptest-properties.md) - Use `proptest` for property-based testing
+- [`test-mockall-mocking`](rules/test-mockall-mocking.md) - Use `mockall` for trait mocking
+- [`test-mock-traits`](rules/test-mock-traits.md) - Use traits for dependencies to enable mocking
+- [`test-fixture-raii`](rules/test-fixture-raii.md) - Use RAII pattern (Drop) for test cleanup
+- [`test-tokio-async`](rules/test-tokio-async.md) - Use `#[tokio::test]` for async tests
+- [`test-should-panic`](rules/test-should-panic.md) - Use `#[should_panic]` for panic tests
+- [`test-criterion-bench`](rules/test-criterion-bench.md) - Use `criterion` for benchmarking
+- [`test-doctest-examples`](rules/test-doctest-examples.md) - Keep doc examples as executable tests
+
+### 10. Documentation (MEDIUM)
+
+- [`doc-all-public`](rules/doc-all-public.md) - Document all public items with `///`
+- [`doc-module-inner`](rules/doc-module-inner.md) - Use `//!` for module-level documentation
+- [`doc-examples-section`](rules/doc-examples-section.md) - Include `# Examples` with runnable code
+- [`doc-errors-section`](rules/doc-errors-section.md) - Include `# Errors` for fallible functions
+- [`doc-panics-section`](rules/doc-panics-section.md) - Include `# Panics` for panicking functions
+- [`doc-safety-section`](rules/doc-safety-section.md) - Include `# Safety` for unsafe functions
+- [`doc-question-mark`](rules/doc-question-mark.md) - Use `?` in examples, not `.unwrap()`
+- [`doc-hidden-setup`](rules/doc-hidden-setup.md) - Use `# ` prefix to hide example setup code
+- [`doc-intra-links`](rules/doc-intra-links.md) - Use intra-doc links: `[Vec]`
+- [`doc-link-types`](rules/doc-link-types.md) - Link related types and functions in docs
+- [`doc-cargo-metadata`](rules/doc-cargo-metadata.md) - Fill `Cargo.toml` metadata
+
+### 11. Performance Patterns (MEDIUM)
+
+- [`perf-iter-over-index`](rules/perf-iter-over-index.md) - Prefer iterators over manual indexing
+- [`perf-iter-lazy`](rules/perf-iter-lazy.md) - Keep iterators lazy, collect() only when needed
+- [`perf-collect-once`](rules/perf-collect-once.md) - Don't `collect()` intermediate iterators
+- [`perf-entry-api`](rules/perf-entry-api.md) - Use `entry()` API for map insert-or-update
+- [`perf-drain-reuse`](rules/perf-drain-reuse.md) - Use `drain()` to reuse allocations
+- [`perf-extend-batch`](rules/perf-extend-batch.md) - Use `extend()` for batch insertions
+- [`perf-chain-avoid`](rules/perf-chain-avoid.md) - Avoid `chain()` in hot loops
+- [`perf-collect-into`](rules/perf-collect-into.md) - Use `collect_into()` for reusing containers
+- [`perf-black-box-bench`](rules/perf-black-box-bench.md) - Use `black_box()` in benchmarks
+- [`perf-release-profile`](rules/perf-release-profile.md) - Optimize release profile settings
+- [`perf-profile-first`](rules/perf-profile-first.md) - Profile before optimizing
+
+### 12. Project Structure (LOW)
+
+- [`proj-lib-main-split`](rules/proj-lib-main-split.md) - Keep `main.rs` minimal, logic in `lib.rs`
+- [`proj-mod-by-feature`](rules/proj-mod-by-feature.md) - Organize modules by feature, not type
+- [`proj-flat-small`](rules/proj-flat-small.md) - Keep small projects flat
+- [`proj-mod-rs-dir`](rules/proj-mod-rs-dir.md) - Use `mod.rs` for multi-file modules
+- [`proj-pub-crate-internal`](rules/proj-pub-crate-internal.md) - Use `pub(crate)` for internal APIs
+- [`proj-pub-super-parent`](rules/proj-pub-super-parent.md) - Use `pub(super)` for parent-only visibility
+- [`proj-pub-use-reexport`](rules/proj-pub-use-reexport.md) - Use `pub use` for clean public API
+- [`proj-prelude-module`](rules/proj-prelude-module.md) - Create `prelude` module for common imports
+- [`proj-bin-dir`](rules/proj-bin-dir.md) - Put multiple binaries in `src/bin/`
+- [`proj-workspace-large`](rules/proj-workspace-large.md) - Use workspaces for large projects
+- [`proj-workspace-deps`](rules/proj-workspace-deps.md) - Use workspace dependency inheritance
+
+### 13. Clippy & Linting (LOW)
+
+- [`lint-deny-correctness`](rules/lint-deny-correctness.md) - `#![deny(clippy::correctness)]`
+- [`lint-warn-suspicious`](rules/lint-warn-suspicious.md) - `#![warn(clippy::suspicious)]`
+- [`lint-warn-style`](rules/lint-warn-style.md) - `#![warn(clippy::style)]`
+- [`lint-warn-complexity`](rules/lint-warn-complexity.md) - `#![warn(clippy::complexity)]`
+- [`lint-warn-perf`](rules/lint-warn-perf.md) - `#![warn(clippy::perf)]`
+- [`lint-pedantic-selective`](rules/lint-pedantic-selective.md) - Enable `clippy::pedantic` selectively
+- [`lint-missing-docs`](rules/lint-missing-docs.md) - `#![warn(missing_docs)]`
+- [`lint-unsafe-doc`](rules/lint-unsafe-doc.md) - `#![warn(clippy::undocumented_unsafe_blocks)]`
+- [`lint-cargo-metadata`](rules/lint-cargo-metadata.md) - `#![warn(clippy::cargo)]` for published crates
+- [`lint-rustfmt-check`](rules/lint-rustfmt-check.md) - Run `cargo fmt --check` in CI
+- [`lint-workspace-lints`](rules/lint-workspace-lints.md) - Configure lints at workspace level
+
+### 14. Anti-patterns (REFERENCE)
+
+- [`anti-unwrap-abuse`](rules/anti-unwrap-abuse.md) - Don't use `.unwrap()` in production code
+- [`anti-expect-lazy`](rules/anti-expect-lazy.md) - Don't use `.expect()` for recoverable errors
+- [`anti-clone-excessive`](rules/anti-clone-excessive.md) - Don't clone when borrowing works
+- [`anti-lock-across-await`](rules/anti-lock-across-await.md) - Don't hold locks across `.await`
+- [`anti-string-for-str`](rules/anti-string-for-str.md) - Don't accept `&String` when `&str` works
+- [`anti-vec-for-slice`](rules/anti-vec-for-slice.md) - Don't accept `&Vec<T>` when `&[T]` works
+- [`anti-index-over-iter`](rules/anti-index-over-iter.md) - Don't use indexing when iterators work
+- [`anti-panic-expected`](rules/anti-panic-expected.md) - Don't panic on expected/recoverable errors
+- [`anti-empty-catch`](rules/anti-empty-catch.md) - Don't use empty `if let Err(_) = ...` blocks
+- [`anti-over-abstraction`](rules/anti-over-abstraction.md) - Don't over-abstract with excessive generics
+- [`anti-premature-optimize`](rules/anti-premature-optimize.md) - Don't optimize before profiling
+- [`anti-type-erasure`](rules/anti-type-erasure.md) - Don't use `Box<dyn Trait>` when `impl Trait` works
+- [`anti-format-hot-path`](rules/anti-format-hot-path.md) - Don't use `format!()` in hot paths
+- [`anti-collect-intermediate`](rules/anti-collect-intermediate.md) - Don't `collect()` intermediate iterators
+- [`anti-stringly-typed`](rules/anti-stringly-typed.md) - Don't use strings for structured data
 
 ---
 
-## Core Concepts
-
-1. **Reducers are transactional** — they do not return data to callers
-2. **Reducers must be deterministic** — no filesystem, network, timers, or random
-3. **Read data via tables/subscriptions** — not reducer return values
-4. **Auto-increment IDs are not sequential** — gaps are normal, don't use for ordering
-5. **`ctx.sender` is the authenticated principal** — never trust identity args
-
----
-
-## Feature Implementation Checklist
-
-When implementing a feature that spans backend and client:
-
-1. **Backend:** Define table(s) to store the data
-2. **Backend:** Define reducer(s) to mutate the data
-3. **Client:** Subscribe to the table(s)
-4. **Client:** Call the reducer(s) from UI — **don't forget this step!**
-5. **Client:** Render the data from the table(s)
-
-**Common mistake:** Building backend tables/reducers but forgetting to wire up the client to call them.
-
----
-
-## Index System
-
-SpacetimeDB automatically creates indexes for:
-- Primary key columns
-- Columns marked as unique
-
-You can add explicit indexes on non-unique columns for query performance.
-
-**Index names must be unique across your entire module (all tables).** If two tables have indexes with the same declared name → conflict error.
-
-**Schema ↔ Code coupling:**
-- Your query code references indexes by name
-- If you add/remove/rename an index in the schema, update all code that uses it
-- Removing an index without updating queries causes runtime errors
-
----
-
-## Commands
-
-```bash
-# Login to allow remote database deployment e.g. to maincloud
-spacetime login
-
-# Start local SpacetimeDB
-spacetime start
-
-# Publish module
-spacetime publish <db-name> --module-path <module-path>
-
-# Clear and republish
-spacetime publish <db-name> --clear-database -y --module-path <module-path>
-
-# Generate client bindings
-spacetime generate --lang <lang> --out-dir <out> --module-path <module-path>
-
-# View logs
-spacetime logs <db-name>
-```
-
----
-
-## Deployment
-
-- Maincloud is the spacetimedb hosted cloud and the default location for module publishing
-- The default server marked by *** in `spacetime server list` should be used when publishing
-- If the default server is maincloud you should publish to maincloud
-- Publishing to maincloud is free of charge
-- When publishing to maincloud the database dashboard will be at the url: https://spacetimedb.com/@<username>/<database-name>
-- The database owner can view utilization and performance metrics on the dashboard
-
----
-
-## Debugging Checklist
-
-1. Is SpacetimeDB server running? (`spacetime start`)
-2. Is the module published? (`spacetime publish`)
-3. Are client bindings generated? (`spacetime generate`)
-4. Check server logs for errors (`spacetime logs <db-name>`)
-5. **Is the reducer actually being called from the client?**
-
----
-
-## Editing Behavior
-
-- Make the smallest change necessary
-- Do NOT touch unrelated files, configs, or dependencies
-- Do NOT invent new SpacetimeDB APIs — use only what exists in docs or this repo
-- Do NOT add restrictions the prompt didn't ask for — if "users can do X", implement X for all users
-
-
-# SpacetimeDB Rust SDK
-
-## ⛔ COMMON MISTAKES — LLM HALLUCINATIONS
-
-These are **actual errors** observed when LLMs generate SpacetimeDB Rust code:
-
-### 1. Wrong Crate for Server vs Client
-
-```rust
-// ❌ WRONG — using client crate for server module
-use spacetimedb_sdk::*;  // This is for CLIENTS only!
-
-// ✅ CORRECT — use spacetimedb for server modules
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-```
-
-### 2. Wrong Table Macro Syntax
-
-```rust
-// ❌ WRONG — using attribute-style like C#
-#[spacetimedb::table]
-#[primary_key]
-pub struct User { ... }
-
-// ❌ WRONG — SpacetimeType on tables (causes conflicts!)
-#[derive(SpacetimeType)]
-#[table(accessor = my_table)]
-pub struct MyTable { ... }
-
-// ✅ CORRECT — use #[table(...)] macro with options, NO SpacetimeType
-#[table(accessor = user, public)]
-pub struct User {
-    #[primary_key]
-    identity: Identity,
-    name: Option<String>,
-}
-```
-
-### 3. Wrong Table Access Pattern
-
-```rust
-// ❌ WRONG — using ctx.Db or ctx.db() method or field access
-ctx.Db.user.Insert(...);
-ctx.db().user().insert(...);
-ctx.db.player;  // Field access
-
-// ✅ CORRECT — ctx.db is a field, table names are methods with parentheses
-ctx.db.user().insert(User { ... });
-ctx.db.user().identity().find(ctx.sender);
-ctx.db.player().id().find(&player_id);
-```
-
-### 4. Wrong Update Pattern
-
-```rust
-// ❌ WRONG — partial update or using .update() directly on table
-ctx.db.user().update(User { name: Some("new".into()), ..Default::default() });
-
-// ✅ CORRECT — find existing, spread it, update via primary key accessor
-if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-    ctx.db.user().identity().update(User { name: Some("new".into()), ..user });
-}
-```
-
-### 5. Wrong Reducer Return Type
-
-```rust
-// ❌ WRONG — returning data from reducer
-#[reducer]
-pub fn get_user(ctx: &ReducerContext, id: Identity) -> Option<User> { ... }
-
-// ❌ WRONG — mutable context
-pub fn my_reducer(ctx: &mut ReducerContext, ...) { }
-
-// ✅ CORRECT — reducers return Result<(), String> or nothing, immutable context
-#[reducer]
-pub fn do_something(ctx: &ReducerContext, value: String) -> Result<(), String> {
-    if value.is_empty() {
-        return Err("Value cannot be empty".to_string());
-    }
-    Ok(())
-}
-```
-
-### 6. Wrong Client Connection Pattern
-
-```rust
-// ❌ WRONG — subscribing before connected
-let conn = DbConnection::builder().build()?;
-conn.subscription_builder().subscribe_to_all_tables();  // NOT CONNECTED YET!
-
-// ✅ CORRECT — subscribe in on_connect callback
-DbConnection::builder()
-    .on_connect(|conn, identity, token| {
-        conn.subscription_builder()
-            .on_applied(|ctx| println!("Ready!"))
-            .subscribe_to_all_tables();
-    })
-    .build()?;
-```
-
-### 7. Forgetting to Advance the Connection
-
-```rust
-// ❌ WRONG — connection never processes messages
-let conn = DbConnection::builder().build()?;
-// ... callbacks never fire ...
-
-// ✅ CORRECT — must call one of these to process messages
-conn.run_threaded();           // Spawn background thread
-// OR
-conn.run_async().await;        // Async task
-// OR (in game loop)
-conn.frame_tick()?;            // Manual polling
-```
-
-### 8. Missing Table Trait Import
-
-```rust
-// ❌ WRONG — "no method named `insert` found"
-use spacetimedb::{table, reducer, ReducerContext};
-ctx.db.user().insert(...);  // ERROR!
-
-// ✅ CORRECT — import Table trait for table methods
-use spacetimedb::{table, reducer, Table, ReducerContext};
-ctx.db.user().insert(...);  // Works!
-```
-
-### 9. Wrong ScheduleAt Variant
-
-```rust
-// ❌ WRONG — At variant doesn't exist
-scheduled_at: ScheduleAt::At(future_time),
-
-// ✅ CORRECT — use Time variant
-scheduled_at: ScheduleAt::Time(future_time),
-```
-
-### 10. Identity to String Conversion
-
-```rust
-// ❌ WRONG — to_hex() returns HexString<32>, not String
-let id: String = identity.to_hex();  // Type mismatch!
-
-// ✅ CORRECT — chain .to_string()
-let id: String = identity.to_hex().to_string();
-```
-
-### 11. Timestamp Duration Extraction
-
-```rust
-// ❌ WRONG — returns Result, not Duration directly
-let micros = ctx.timestamp.to_duration_since_unix_epoch().as_micros();
-
-// ✅ CORRECT — unwrap the Result
-let micros = ctx.timestamp.to_duration_since_unix_epoch()
-    .unwrap_or_default()
-    .as_micros();
-```
-
-### 12. Borrow After Move
-
-```rust
-// ❌ WRONG — `tool` moved into struct, then borrowed
-ctx.db.stroke().insert(Stroke { tool, color, ... });
-if tool == "eraser" { ... }  // ERROR: value moved!
-
-// ✅ CORRECT — check before move, or use clone
-let is_eraser = tool == "eraser";
-ctx.db.stroke().insert(Stroke { tool, color, ... });
-if is_eraser { ... }
-```
-
-### 13. Client SDK Uses Blocking I/O
-
-The SpacetimeDB Rust client SDK uses blocking I/O. If mixing with async runtimes (Tokio, async-std), use `spawn_blocking` or run the SDK on a dedicated thread to avoid blocking the async executor.
-
----
-
-## 1) Common Mistakes Table
-
-### Server-side errors
-
-| Wrong | Right | Error |
-|-------|-------|-------|
-| `#[derive(SpacetimeType)]` on `#[table]` | Remove it — macro handles this | Conflicting derive macros |
-| `ctx.db.player` (field access) | `ctx.db.player()` (method) | "no field `player` on type" |
-| `ctx.db.player().find(id)` | `ctx.db.player().id().find(&id)` | Must access via index |
-| `&mut ReducerContext` | `&ReducerContext` | Wrong context type |
-| Missing `use spacetimedb::Table;` | Add import | "no method named `insert`" |
-| `#[table(accessor = "my_table")]` | `#[table(accessor = my_table)]` | String literals not allowed |
-| Missing `public` on table | Add `public` flag | Clients can't subscribe |
-| `#[spacetimedb::reducer]` | `#[reducer]` after import | Wrong attribute path |
-| Network/filesystem in reducer | Use procedures instead | Sandbox violation |
-| Panic for expected errors | Return `Result<(), String>` | WASM instance destroyed |
-
----
-
-## 2) Table Definition (CRITICAL)
-
-**Tables use `#[table(...)]` macro on `pub struct`. DO NOT derive `SpacetimeType` on tables!**
-
-> ⚠️ **CRITICAL:** Always import `Table` trait — required for `.insert()`, `.iter()`, `.find()`, etc.
-
-```rust
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-
-// ❌ WRONG — DO NOT derive SpacetimeType on tables!
-#[derive(SpacetimeType)]  // REMOVE THIS!
-#[table(accessor = task)]
-pub struct Task { ... }
-
-// ✅ CORRECT — just the #[table] attribute
-#[table(accessor = user, public)]
-pub struct User {
-    #[primary_key]
-    identity: Identity,
-
-    #[unique]
-    username: Option<String>,
-
-    online: bool,
-}
-
-#[table(accessor = message, public)]
-pub struct Message {
-    #[primary_key]
-    id: u64,
-
-    sender: Identity,
-    text: String,
-    sent: Timestamp,
-}
-
-// With multi-column index
-#[table(accessor = task, public, index(name = by_owner, btree(columns = [owner_id])))]
-pub struct Task {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    pub owner_id: Identity,
-    pub title: String,
-}
-```
-
-### Table Options
-
-```rust
-#[table(accessor = my_table)]           // Private table (default)
-#[table(accessor = my_table, public)]   // Public table - clients can subscribe
-```
-
-### Column Attributes
-
-```rust
-#[primary_key]           // Primary key (auto-indexed, enables .find())
-#[auto_inc]              // Auto-increment (use with #[primary_key])
-#[unique]                // Unique constraint (auto-indexed)
-#[index(btree)]          // B-Tree index for queries
-```
-
-### Insert returns ROW, not ID
-
-```rust
-let row = ctx.db.task().insert(Task {
-    id: 0,  // auto-inc placeholder
-    owner_id: ctx.sender,
-    title: "New task".to_string(),
-    created_at: ctx.timestamp,
-});
-let new_id = row.id;  // Get the actual ID
+## Recommended Cargo.toml Settings
+
+```toml
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+inherits = "release"
+debug = true
+strip = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.dev.package."*"]
+opt-level = 3  # Optimize dependencies in dev
 ```
 
 ---
 
-## 3) Reducers
+## How to Use
 
-### Definition Syntax
+This skill provides rule identifiers for quick reference. When generating or reviewing Rust code:
 
-```rust
-use spacetimedb::{reducer, ReducerContext, Table};
+1. **Check relevant category** based on task type
+2. **Apply rules** with matching prefix
+3. **Prioritize** CRITICAL > HIGH > MEDIUM > LOW
+4. **Read rule files** in `rules/` for detailed examples
 
-#[reducer]
-pub fn send_message(ctx: &ReducerContext, text: String) -> Result<(), String> {
-    // Validate input
-    if text.is_empty() {
-        return Err("Message cannot be empty".to_string());
-    }
+### Rule Application by Task
 
-    // Insert returns the inserted row
-    let row = ctx.db.message().insert(Message {
-        id: 0,  // auto-inc placeholder
-        sender: ctx.sender,
-        text,
-        sent: ctx.timestamp,
-    });
-
-    log::info!("Message {} sent by {:?}", row.id, ctx.sender);
-    Ok(())
-}
-```
-
-### Update Pattern (CRITICAL)
-
-```rust
-#[reducer]
-pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
-    // Find existing row
-    let user = ctx.db.user().identity().find(ctx.sender)
-        .ok_or("User not found")?;
-
-    // ✅ CORRECT — spread existing row, override specific fields
-    ctx.db.user().identity().update(User {
-        name: Some(name),
-        ..user  // Preserves identity, online, etc.
-    });
-
-    Ok(())
-}
-
-// ❌ WRONG — partial update nulls out other fields!
-// ctx.db.user().identity().update(User { identity: ctx.sender, name: Some(name), ..Default::default() });
-```
-
-### Delete Pattern
-
-```rust
-#[reducer]
-pub fn delete_message(ctx: &ReducerContext, message_id: u64) -> Result<(), String> {
-    ctx.db.message().id().delete(&message_id);
-    Ok(())
-}
-```
-
-### Lifecycle Hooks
-
-```rust
-#[reducer(init)]
-pub fn init(ctx: &ReducerContext) {
-    // Called when module is first published
-}
-
-#[reducer(client_connected)]
-pub fn client_connected(ctx: &ReducerContext) {
-    // ctx.sender is the connecting identity
-    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        ctx.db.user().identity().update(User { online: true, ..user });
-    } else {
-        ctx.db.user().insert(User {
-            identity: ctx.sender,
-            username: None,
-            online: true,
-        });
-    }
-}
-
-#[reducer(client_disconnected)]
-pub fn client_disconnected(ctx: &ReducerContext) {
-    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        ctx.db.user().identity().update(User { online: false, ..user });
-    }
-}
-```
-
-### ReducerContext fields
-
-```rust
-ctx.sender          // Identity of the caller
-ctx.timestamp       // Current timestamp
-ctx.db              // Database access
-ctx.rng             // Deterministic RNG (use instead of rand)
-```
+| Task | Primary Categories |
+|------|-------------------|
+| New function | `own-`, `err-`, `name-` |
+| New struct/API | `api-`, `type-`, `doc-` |
+| Async code | `async-`, `own-` |
+| Error handling | `err-`, `api-` |
+| Memory optimization | `mem-`, `own-`, `perf-` |
+| Performance tuning | `opt-`, `mem-`, `perf-` |
+| Code review | `anti-`, `lint-` |
 
 ---
 
-## 4) Index Access
-
-### Primary Key / Unique — `.find()` returns `Option<Row>`
-
-```rust
-// Primary key lookup
-let user = ctx.db.user().identity().find(ctx.sender);
-
-// Unique column lookup
-let user = ctx.db.user().username().find(&"alice".to_string());
-
-if let Some(user) = user {
-    // Found
-}
-```
-
-### BTree Index — `.filter()` returns iterator
-
-```rust
-#[table(accessor = message, public)]
-pub struct Message {
-    #[primary_key]
-    id: u64,
-
-    #[index(btree)]
-    room_id: u64,
-
-    text: String,
-}
-
-// Filter by indexed column
-for msg in ctx.db.message().room_id().filter(&room_id) {
-    // Process each message in room
-}
-```
-
-### No Index — `.iter()` + manual filter
-
-```rust
-// Full table scan
-for user in ctx.db.user().iter() {
-    if user.online {
-        // Process online users
-    }
-}
-```
-
----
-
-## 5) Custom Types
-
-**Use `#[derive(SpacetimeType)]` ONLY for custom structs/enums used as fields or parameters.**
-
-```rust
-use spacetimedb::SpacetimeType;
-
-// Custom struct for table fields
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
-}
-
-// Custom enum
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub enum PlayerStatus {
-    Idle,
-    Walking(Position),
-    Fighting(Identity),
-}
-
-// Use in table (DO NOT derive SpacetimeType on the table!)
-#[table(accessor = player, public)]
-pub struct Player {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    pub position: Position,
-    pub status: PlayerStatus,
-}
-```
-
----
-
-## 6) Scheduled Tables
-
-```rust
-use spacetimedb::{table, reducer, ReducerContext, ScheduleAt, Timestamp};
-
-#[table(accessor = cleanup_job, scheduled(cleanup_expired))]
-pub struct CleanupJob {
-    #[primary_key]
-    scheduled_id: u64,
-
-    scheduled_at: ScheduleAt,
-    target_id: u64,
-}
-
-#[reducer]
-pub fn cleanup_expired(ctx: &ReducerContext, job: CleanupJob) {
-    // Job row is auto-deleted after reducer completes
-    log::info!("Cleaning up: {}", job.target_id);
-}
-
-// Schedule a job
-#[reducer]
-pub fn schedule_cleanup(ctx: &ReducerContext, target_id: u64, delay_ms: u64) {
-    let future_time = ctx.timestamp + std::time::Duration::from_millis(delay_ms);
-    ctx.db.cleanup_job().insert(CleanupJob {
-        scheduled_id: 0,  // auto-inc placeholder
-        scheduled_at: ScheduleAt::Time(future_time),
-        target_id,
-    });
-}
-
-// Cancel by deleting the row
-#[reducer]
-pub fn cancel_cleanup(ctx: &ReducerContext, job_id: u64) {
-    ctx.db.cleanup_job().scheduled_id().delete(&job_id);
-}
-```
-
----
-
-## 7) Client SDK
-
-```rust
-// Connection pattern
-let conn = DbConnection::builder()
-    .with_uri("http://localhost:3000")
-    .with_module_name("my-module")
-    .with_token(load_saved_token())  // None for first connection
-    .on_connect(on_connected)
-    .build()
-    .expect("Failed to connect");
-
-// Subscribe in on_connect callback, NOT before!
-fn on_connected(conn: &DbConnection, identity: Identity, token: &str) {
-    conn.subscription_builder()
-        .on_applied(|ctx| println!("Ready!"))
-        .subscribe_to_all_tables();
-}
-```
-
-### ⚠️ CRITICAL: Advance the Connection
-
-**You MUST call one of these** — without it, no callbacks fire:
-
-```rust
-conn.run_threaded();           // Background thread (simplest)
-conn.run_async().await;        // Async task
-conn.frame_tick()?;            // Manual polling (game loops)
-```
-
-### Table Access & Callbacks
-
-```rust
-// Iterate
-for user in ctx.db.user().iter() { ... }
-
-// Find by primary key
-if let Some(user) = ctx.db.user().identity().find(&identity) { ... }
-
-// Row callbacks
-ctx.db.user().on_insert(|ctx, user| { ... });
-ctx.db.user().on_update(|ctx, old, new| { ... });
-ctx.db.user().on_delete(|ctx, user| { ... });
-
-// Call reducers
-ctx.reducers.set_name("Alice".to_string()).unwrap();
-```
-
----
-
-## 8) Procedures (Beta)
-
-**Procedures are for side effects (HTTP, filesystem) that reducers can't do.**
-
-⚠️ Procedures are currently in beta. API may change.
-
-```rust
-use spacetimedb::{procedure, ProcedureContext};
-
-// Simple procedure
-#[procedure]
-fn add_numbers(_ctx: &mut ProcedureContext, a: u32, b: u32) -> u64 {
-    a as u64 + b as u64
-}
-
-// Procedure with database access
-#[procedure]
-fn save_external_data(ctx: &mut ProcedureContext, url: String) -> Result<(), String> {
-    // HTTP request (allowed in procedures, not reducers)
-    let data = fetch_from_url(&url)?;
-
-    // Database access requires explicit transaction
-    ctx.try_with_tx(|tx| {
-        tx.db.external_data().insert(ExternalData {
-            id: 0,
-            content: data,
-        });
-        Ok(())
-    })?;
-
-    Ok(())
-}
-```
-
-### Key differences from reducers
-
-| Reducers | Procedures |
-|----------|------------|
-| `&ReducerContext` (immutable) | `&mut ProcedureContext` (mutable) |
-| Direct `ctx.db` access | Must use `ctx.with_tx()` |
-| No HTTP/network | HTTP allowed |
-| No return values | Can return data |
-
----
-
-## 9) Logging
-
-```rust
-use spacetimedb::log;
-
-log::trace!("Detailed trace");
-log::debug!("Debug info");
-log::info!("Information");
-log::warn!("Warning");
-log::error!("Error occurred");
-```
-
----
-
-## 10) Commands
-
-```bash
-# Start local server
-spacetime start
-
-# Publish module
-spacetime publish <module-name> --module-path <backend-dir>
-
-# Clear database and republish
-spacetime publish <module-name> --clear-database -y --module-path <backend-dir>
-
-# Generate bindings
-spacetime generate --lang rust --out-dir <client>/src/module_bindings --module-path <backend-dir>
-
-# View logs
-spacetime logs <module-name>
-```
-
----
-
-## 11) Hard Requirements
-
-**Rust-specific:**
-
-1. **DO NOT derive `SpacetimeType` on `#[table]` structs** — the macro handles this
-2. **Import `Table` trait** — `use spacetimedb::Table;` required for `.insert()`, `.iter()`, etc.
-3. **Use `&ReducerContext`** — not `&mut ReducerContext`
-4. **Tables are methods** — `ctx.db.table()` not `ctx.db.table`
-5. **Server modules use `spacetimedb` crate** — clients use `spacetimedb-sdk`
-6. **Reducers must be deterministic** — no filesystem, network, timers, or external RNG
-7. **Use `ctx.rng`** — not `rand` crate for random numbers
-8. **Use `ctx.timestamp`** — never `std::time::SystemTime::now()` in reducers
-9. **Client MUST advance connection** — call `run_threaded()`, `run_async()`, or `frame_tick()`
-10. **Subscribe in `on_connect` callback** — not before connection is established
-11. **Update requires full row** — spread existing row with `..existing`
-12. **DO NOT edit generated bindings** — regenerate with `spacetime generate`
-13. **Identity to String needs `.to_string()`** — `identity.to_hex().to_string()`
-14. **Client SDK is blocking** — use `spawn_blocking` or dedicated thread if mixing with async runtimes
+## Sources
+
+This skill synthesizes best practices from:
+- [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
+- [Rust Performance Book](https://nnethercote.github.io/perf-book/)
+- [Rust Design Patterns](https://rust-unofficial.github.io/patterns/)
+- Production codebases: ripgrep, tokio, serde, polars, axum, deno
+- Clippy lint documentation
+- Community conventions (2024-2025)

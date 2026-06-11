@@ -7,8 +7,8 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
-use crate::core::users::user_profile;
 use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
+use crate::core::users::user_profile;
 use crate::core::users::{user_organization, UserOrganization};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};

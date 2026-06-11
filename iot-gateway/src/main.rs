@@ -172,17 +172,17 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
                 return;
             };
 
-            let args = serde_json::json!({
-                "organization_id": org_id,
-                "device_id": device_id,
-                "params": {
+            let args = serde_json::json!([
+                org_id,
+                device_id,
+                {
                     "sensor_type": body["sensor_type"],
                     "value": body["value"].as_f64().unwrap_or(0.0),
                     "raw_value": body.get("raw_value"),
                     "unit": body["unit"],
                     "quality": body.get("quality").and_then(|q| q.as_str()).unwrap_or("good"),
                 }
-            });
+            ]);
 
             if let Err(e) = state.call_reducer("record_telemetry", args).await {
                 tracing::error!("record_telemetry failed for device {}: {}", device_id, e);
@@ -195,11 +195,7 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
                 Err(_) => return,
             };
 
-            let args = serde_json::json!({
-                "organization_id": org_id,
-                "device_id": device_id,
-                "status": status,
-            });
+            let args = serde_json::json!([org_id, device_id, status]);
 
             if let Err(e) = state.call_reducer("update_device_status", args).await {
                 tracing::error!(
@@ -295,10 +291,7 @@ async fn dispatch_pending_actions(state: &AppState) {
 
         if delivered_via_ws {
             // Action pushed to the hub's WebSocket channel — mark as Sent.
-            let args = serde_json::json!({
-                "organization_id": org_id,
-                "action_id": action_id,
-            });
+            let args = serde_json::json!([org_id, action_id]);
             if let Err(e) = state.call_reducer("mark_action_sent", args).await {
                 tracing::error!(
                     "mark_action_sent failed for action {} (WS path): {}",
@@ -380,10 +373,7 @@ async fn deliver_via_mqtt(
     match mqtt.publish(&topic, QoS::AtLeastOnce, false, payload).await {
         Ok(_) => {
             // Mark action as Sent in SpacetimeDB
-            let args = serde_json::json!({
-                "organization_id": org_id,
-                "action_id": action_id,
-            });
+            let args = serde_json::json!([org_id, action_id]);
             if let Err(e) = state.call_reducer("mark_action_sent", args).await {
                 tracing::error!(
                     "mark_action_sent failed for action {} (MQTT path): {}",

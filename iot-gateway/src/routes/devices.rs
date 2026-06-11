@@ -40,8 +40,8 @@ pub struct PairResponse {
 /// A single device entry in the sync payload.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DeviceSyncEntry {
-    pub identifier: String,   // USB serial, MAC, or network address
-    pub device_type: String,  // "BarcodeScanner", "WeighingScale", etc.
+    pub identifier: String,  // USB serial, MAC, or network address
+    pub device_type: String, // "BarcodeScanner", "WeighingScale", etc.
     pub name: String,
     pub capabilities: Vec<String>,
 }
@@ -85,12 +85,13 @@ pub async fn heartbeat(
     State(state): State<AppState>,
     Json(req): Json<HeartbeatRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "hub_id": req.hub_id,
-        "ip_address": req.ip_address,
-        "firmware_version": req.firmware_version,
-    });
+    let args = json!([
+        req.organization_id,
+        req.hub_id,
+        req.ip_address,
+        req.firmware_version,
+        null,
+    ]);
 
     state
         .call_reducer("update_hub_heartbeat", args)
@@ -117,17 +118,17 @@ pub async fn telemetry(
     State(state): State<AppState>,
     Json(req): Json<TelemetryRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "device_id": req.device_id,
-        "params": {
+    let args = json!([
+        req.organization_id,
+        req.device_id,
+        {
             "sensor_type": req.sensor_type,
             "value": req.value,
             "raw_value": req.raw_value,
             "unit": req.unit,
             "quality": req.quality,
         }
-    });
+    ]);
 
     state
         .call_reducer("record_telemetry", args)
@@ -158,13 +159,13 @@ pub async fn pair(
     State(state): State<AppState>,
     Json(req): Json<PairRequest>,
 ) -> Result<Json<PairResponse>, (StatusCode, Json<PairResponse>)> {
-    let args = json!({
-        "token": req.token,
-        "serial_number": req.serial_number,
-        "name": req.name,
-        "ip_address": req.ip_address,
-        "firmware_version": req.firmware_version,
-    });
+    let args = json!([
+        req.token,
+        req.serial_number,
+        req.name,
+        req.ip_address,
+        req.firmware_version,
+    ]);
 
     state
         .call_reducer("claim_hub_with_token", args)
@@ -199,11 +200,7 @@ pub async fn sync_devices(
     State(state): State<AppState>,
     Json(req): Json<SyncRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "hub_id": req.hub_id,
-        "devices": req.devices,
-    });
+    let args = json!([req.organization_id, req.hub_id, req.devices]);
 
     state
         .call_reducer("sync_hub_devices", args)
@@ -230,11 +227,7 @@ pub async fn device_status(
     State(state): State<AppState>,
     Json(req): Json<StatusRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!({
-        "organization_id": req.organization_id,
-        "device_id": req.device_id,
-        "status": req.status,
-    });
+    let args = json!([req.organization_id, req.device_id, req.status]);
 
     state
         .call_reducer("update_device_status", args)

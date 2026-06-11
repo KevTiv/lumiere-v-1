@@ -7,7 +7,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::forms::{
     add_form_field, create_form_configuration, form_config, set_form_role_config,
-    CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams, FieldType,
+    CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams, FieldOption, FieldType,
     FieldValidation, FieldWidth,
 };
 
@@ -130,6 +130,14 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
         .ok_or("Failed to create journal config")?;
 
     // Add fields
+    let mood_options = vec![
+        ("great", "Great", "green"),
+        ("good", "Good", "blue"),
+        ("neutral", "Neutral", "yellow"),
+        ("challenging", "Challenging", "orange"),
+        ("difficult", "Difficult", "red"),
+    ];
+
     let fields = vec![
         ("mood", "How was your day?", FieldType::Radio, true, 1),
         (
@@ -180,7 +188,19 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
             description: None,
             placeholder: None,
             default_value: None,
-            options: vec![],
+            options: if field_id == "mood" {
+                mood_options
+                    .iter()
+                    .map(|(value, label, color)| FieldOption {
+                        value: value.to_string(),
+                        label: label.to_string(),
+                        color: Some(color.to_string()),
+                        icon: None,
+                    })
+                    .collect()
+            } else {
+                vec![]
+            },
             validation: FieldValidation {
                 required: field_id == "mood" || field_id == "accomplishments",
                 ..Default::default()
@@ -197,15 +217,6 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
 
         add_form_field(ctx, organization_id, config.id, field_params)?;
     }
-
-    // Add mood options
-    let mood_options = vec![
-        ("great", "Great", "green"),
-        ("good", "Good", "blue"),
-        ("neutral", "Neutral", "yellow"),
-        ("challenging", "Challenging", "orange"),
-        ("difficult", "Difficult", "red"),
-    ];
 
     // Add role configs
     let role_configs = vec![
@@ -277,7 +288,7 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
 }
 
 /// Seed Forensic form configuration
-fn seed_forensic_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_forensic_form(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // Similar implementation for Forensic
     // ... (abbreviated for brevity)
     log::info!("Seeded Forensic form config for org {}", organization_id);
@@ -285,63 +296,63 @@ fn seed_forensic_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), 
 }
 
 /// Seed CRM form configurations
-fn seed_crm_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_crm_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Lead, New Opportunity, New Contact, New Activity
     log::info!("Seeded CRM form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Sales form configurations
-fn seed_sales_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_sales_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Sale Order, New Price List
     log::info!("Seeded Sales form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Inventory form configurations
-fn seed_inventory_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_inventory_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Product, New Transfer, New Adjustment
     log::info!("Seeded Inventory form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Accounting form configurations
-fn seed_accounting_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_accounting_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Invoice, New Account, New Tax
     log::info!("Seeded Accounting form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed HR form configurations
-fn seed_hr_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_hr_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Employee, New Leave Request, New Contract
     log::info!("Seeded HR form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Purchasing form configurations
-fn seed_purchasing_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_purchasing_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Purchase Order, New Requisition
     log::info!("Seeded Purchasing form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Projects form configurations
-fn seed_projects_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_projects_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Project, New Task
     log::info!("Seeded Projects form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Documents form configurations
-fn seed_documents_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_documents_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Document, New Folder
     log::info!("Seeded Documents form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Manufacturing form configurations
-fn seed_manufacturing_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_manufacturing_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New BOM, New Work Order
     log::info!(
         "Seeded Manufacturing form configs for org {}",
@@ -351,28 +362,28 @@ fn seed_manufacturing_forms(ctx: &ReducerContext, organization_id: u64) -> Resul
 }
 
 /// Seed Helpdesk form configurations
-fn seed_helpdesk_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_helpdesk_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Ticket
     log::info!("Seeded Helpdesk form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Expenses form configurations
-fn seed_expenses_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_expenses_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Expense, New Expense Report
     log::info!("Seeded Expenses form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Calendar form configurations
-fn seed_calendar_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_calendar_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Event
     log::info!("Seeded Calendar form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Subscriptions form configurations
-fn seed_subscriptions_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_subscriptions_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Subscription, New Plan
     log::info!(
         "Seeded Subscriptions form configs for org {}",
@@ -382,14 +393,14 @@ fn seed_subscriptions_forms(ctx: &ReducerContext, organization_id: u64) -> Resul
 }
 
 /// Seed Proposals form configurations
-fn seed_proposals_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_proposals_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // New Proposal
     log::info!("Seeded Proposals form configs for org {}", organization_id);
     Ok(())
 }
 
 /// Seed Reports form configurations
-fn seed_reports_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn seed_reports_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     // Generate Report
     log::info!("Seeded Reports form configs for org {}", organization_id);
     Ok(())

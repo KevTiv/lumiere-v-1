@@ -162,10 +162,7 @@ async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
 
     match msg.msg_type.as_str() {
         "ack" => {
-            let args = serde_json::json!({
-                "organization_id": msg.organization_id,
-                "action_id": msg.action_id,
-            });
+            let args = serde_json::json!([msg.organization_id, msg.action_id, null]);
             if let Err(e) = state.call_reducer("acknowledge_iot_action", args).await {
                 tracing::error!(
                     "acknowledge_iot_action failed for hub {} action {}: {}",
@@ -180,11 +177,7 @@ async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
 
         "fail" => {
             let error = msg.error.unwrap_or_else(|| "unknown error".to_string());
-            let args = serde_json::json!({
-                "organization_id": msg.organization_id,
-                "action_id": msg.action_id,
-                "error": error,
-            });
+            let args = serde_json::json!([msg.organization_id, msg.action_id, error]);
             if let Err(e) = state.call_reducer("fail_iot_action", args).await {
                 tracing::error!(
                     "fail_iot_action failed for hub {} action {}: {}",
@@ -193,12 +186,7 @@ async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
                     e
                 );
             } else {
-                tracing::debug!(
-                    "Hub {} failed action {}: {}",
-                    hub_id,
-                    msg.action_id,
-                    error
-                );
+                tracing::debug!("Hub {} failed action {}: {}", hub_id, msg.action_id, error);
             }
         }
 

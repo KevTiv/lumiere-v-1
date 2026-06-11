@@ -44,11 +44,4 @@ impl AppState {
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))
     }
-
-    pub async fn query_sql(&self, sql: &str) -> anyhow::Result<Vec<serde_json::Value>> {
-        self.stdb
-            .query_sql(sql)
-            .await
-            .map_err(|e| anyhow::anyhow!("{e}"))
-    }
 }

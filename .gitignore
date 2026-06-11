@@ -8,3 +8,11 @@ target
 node_modules
 */**/playwright-report
 */**/test-results
+.next
+*/**/.next
+.turbo
+*/**/.turbo
+dist
+*/**/dist
+*.tsbuildinfo
+frontend/web/reports/

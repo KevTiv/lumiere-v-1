@@ -8,7 +8,6 @@ members = [
     "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",
-    "crates/stdb-types",
 ]
 
 [workspace.package]
@@ -42,7 +41,6 @@ dashmap = "6"
 stdb-config = { path = "crates/stdb-config" }
 stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
-stdb-types = { path = "crates/stdb-types" }
 
 [profile.release]
 opt-level = 3

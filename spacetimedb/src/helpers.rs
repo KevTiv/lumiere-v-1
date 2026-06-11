@@ -87,14 +87,9 @@ pub fn check_permission(
         .any(|r| {
             let subject_ok =
                 r.v0.as_deref() == Some(role_str.as_str()) || r.v0.as_deref() == Some(role_name);
-            let res_ok =
-                r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
-            let act_ok =
-                r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
-            subject_ok
-                && r.v1.as_deref() == Some(org_str.as_str())
-                && res_ok
-                && act_ok
+            let res_ok = r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
+            let act_ok = r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
+            subject_ok && r.v1.as_deref() == Some(org_str.as_str()) && res_ok && act_ok
         });
 
     if has_casbin {
