@@ -137,9 +137,9 @@ pub fn emit_hooks_typescript(doc: &Value) -> Result<String> {
         };
 
         for method in ["get", "post", "put", "patch", "delete"] {
-            let Some(_op) = item_obj.get(method) else {
+            if !item_obj.contains_key(method) {
                 continue;
-            };
+            }
             let fn_name = ts_fn_name_from_path(&openapi_path);
             used_url_fns.insert(fn_name, ());
 

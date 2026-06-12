@@ -594,7 +594,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // Individual contact (child of Acme)
-    let _contact_john = ctx.db.contact().insert(Contact {
+    let _ = ctx.db.contact().insert(Contact {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -642,7 +642,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // Prospect
-    let _contact_prospect = ctx.db.contact().insert(Contact {
+    let _ = ctx.db.contact().insert(Contact {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -1156,7 +1156,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _product_consulting = ctx.db.product().insert(Product {
+    let _ = ctx.db.product().insert(Product {
         id: 0,
         organization_id: org_id,
         name: "Software Consulting".to_string(),
@@ -1543,7 +1543,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // Draft SO
-    let _so2 = ctx.db.sale_order().insert(SaleOrder {
+    let _ = ctx.db.sale_order().insert(SaleOrder {
         id: 0,
         organization_id: org_id,
         company_id: company_id,
@@ -1750,7 +1750,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // Draft PO
-    let _po2 = ctx.db.purchase_order().insert(PurchaseOrder {
+    let _ = ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
         organization_id: org_id,
         name: Some("PO/2024/0002".to_string()),
@@ -1839,7 +1839,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: None,
         metadata: None,
     });
-    let _at_equity = ctx.db.account_account_type().insert(AccountAccountType {
+    let _ = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
         organization_id: org_id,
         name: "Equity".to_string(),
@@ -2056,7 +2056,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: None,
         metadata: None,
     });
-    let _acc_cogs = ctx.db.account_account().insert(AccountAccount {
+    let acc_cogs = ctx.db.account_account().insert(AccountAccount {
         id: 0,
         organization_id: org_id,
         code: "5000".to_string(),
@@ -2237,7 +2237,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
-    let _journal_bank = ctx.db.account_journal().insert(AccountJournal {
+    let journal_bank = ctx.db.account_journal().insert(AccountJournal {
         id: 0,
         organization_id: org_id,
         name: "Bank".to_string(),
@@ -2559,7 +2559,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         debit_currency: 1_200.0,
         credit_currency: 0.0,
         tax_base_amount: 0.0,
-        account_id: _acc_cogs.id,
+        account_id: acc_cogs.id,
         account_internal_type: Some("other".to_string()),
         account_internal_group: Some("expense".to_string()),
         account_root_id: None,
@@ -2751,7 +2751,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         debit_currency: 100.0,
         credit_currency: 0.0,
         tax_base_amount: 0.0,
-        account_id: _acc_cogs.id,
+        account_id: acc_cogs.id,
         account_internal_type: Some("other".to_string()),
         account_internal_group: Some("expense".to_string()),
         account_root_id: None,
@@ -3483,7 +3483,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         debit_currency: 5_500.0,
         credit_currency: 0.0,
         tax_base_amount: 0.0,
-        account_id: _acc_cogs.id,
+        account_id: acc_cogs.id,
         account_internal_type: Some("other".to_string()),
         account_internal_group: Some("expense".to_string()),
         account_root_id: None,
@@ -3553,7 +3553,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         debit_currency: 550.0,
         credit_currency: 0.0,
         tax_base_amount: 5_500.0,
-        account_id: _acc_cogs.id,
+        account_id: acc_cogs.id,
         account_internal_type: Some("other".to_string()),
         account_internal_group: Some("expense".to_string()),
         account_root_id: None,
@@ -3686,7 +3686,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         create_uid: seeder,
     });
 
-    let _payment2 = ctx.db.account_payment().insert(AccountPayment {
+    let _ = ctx.db.account_payment().insert(AccountPayment {
         id: 0,
         organization_id: org_id,
         company_id: company_id,
@@ -3754,7 +3754,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _tax_vat_purchase = ctx.db.account_tax().insert(AccountTax {
+    let _ = ctx.db.account_tax().insert(AccountTax {
         id: 0,
         organization_id: org_id,
         name: "VAT 20% (Purchase)".to_string(),
@@ -3801,7 +3801,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: None,
     });
 
-    let _tax_schedule_vat = ctx.db.tax_schedule().insert(TaxSchedule {
+    let _ = ctx.db.tax_schedule().insert(TaxSchedule {
         id: 0,
         organization_id: org_id,
         name: "Standard VAT Schedule".to_string(),
@@ -3819,7 +3819,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: None,
     });
 
-    let _tax_deadline_q1 = ctx.db.tax_deadline().insert(TaxDeadline {
+    let _ = ctx.db.tax_deadline().insert(TaxDeadline {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -3842,7 +3842,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         deleted_at: None,
     });
 
-    let _tax_deadline_q2 = ctx.db.tax_deadline().insert(TaxDeadline {
+    let _ = ctx.db.tax_deadline().insert(TaxDeadline {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -3865,7 +3865,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         deleted_at: None,
     });
 
-    let _tax_deadline_annual = ctx.db.tax_deadline().insert(TaxDeadline {
+    let _ = ctx.db.tax_deadline().insert(TaxDeadline {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -3888,7 +3888,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         deleted_at: None,
     });
 
-    let _tax_deadline_payroll = ctx.db.tax_deadline().insert(TaxDeadline {
+    let _ = ctx.db.tax_deadline().insert(TaxDeadline {
         id: 0,
         organization_id: org_id,
         company_id: Some(company_id),
@@ -3986,7 +3986,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
                 metadata: Some("{\"seed\":true}".to_string()),
             });
 
-    let _analytic_line1 = ctx.db.account_analytic_line().insert(AccountAnalyticLine {
+    let _ = ctx.db.account_analytic_line().insert(AccountAnalyticLine {
         id: 0,
         organization_id: org_id,
         name: "Sales Commission Q1".to_string(),
@@ -4022,8 +4022,10 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _analytic_dist_model = ctx.db.account_analytic_distribution_model().insert(
-        AccountAnalyticDistributionModel {
+    let _ = ctx
+        .db
+        .account_analytic_distribution_model()
+        .insert(AccountAnalyticDistributionModel {
             id: 0,
             organization_id: org_id,
             name: Some("Sales & Marketing Split".to_string()),
@@ -4042,8 +4044,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             write_uid: Some(seeder),
             write_date: Some(ctx.timestamp),
             metadata: Some("{\"seed\":true}".to_string()),
-        },
-    );
+        });
 
     // ── 5.8 Payment Terms ─────────────────────────────────────────────────────
     let payment_term_30 = ctx.db.account_payment_term().insert(AccountPaymentTerm {
@@ -4055,7 +4056,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
     });
 
-    let _payment_term_30_line = ctx
+    let _ = ctx
         .db
         .account_payment_term_line()
         .insert(AccountPaymentTermLine {
@@ -4078,33 +4079,33 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
     });
 
-    let _payment_term_50_50_line1 =
-        ctx.db
-            .account_payment_term_line()
-            .insert(AccountPaymentTermLine {
-                id: 0,
-                payment_term_id: payment_term_50_50.id,
-                value: PaymentTermValue::Percent,
-                value_amount: 50.0,
-                days: 0,
-                months: 0,
-                days_after_end_of_month: false,
-                sequence: 1,
-            });
+    let _ = ctx
+        .db
+        .account_payment_term_line()
+        .insert(AccountPaymentTermLine {
+            id: 0,
+            payment_term_id: payment_term_50_50.id,
+            value: PaymentTermValue::Percent,
+            value_amount: 50.0,
+            days: 0,
+            months: 0,
+            days_after_end_of_month: false,
+            sequence: 1,
+        });
 
-    let _payment_term_50_50_line2 =
-        ctx.db
-            .account_payment_term_line()
-            .insert(AccountPaymentTermLine {
-                id: 0,
-                payment_term_id: payment_term_50_50.id,
-                value: PaymentTermValue::Balance,
-                value_amount: 0.0,
-                days: 30,
-                months: 0,
-                days_after_end_of_month: false,
-                sequence: 2,
-            });
+    let _ = ctx
+        .db
+        .account_payment_term_line()
+        .insert(AccountPaymentTermLine {
+            id: 0,
+            payment_term_id: payment_term_50_50.id,
+            value: PaymentTermValue::Balance,
+            value_amount: 0.0,
+            days: 30,
+            months: 0,
+            days_after_end_of_month: false,
+            sequence: 2,
+        });
 
     // ── 5.9 Bank Reconciliation ───────────────────────────────────────────────
     let bank_statement = ctx
@@ -4138,7 +4139,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             metadata: Some("{\"seed\":true}".to_string()),
         });
 
-    let _bank_statement_line =
+    let bank_statement_line =
         ctx.db
             .account_bank_statement_line()
             .insert(AccountBankStatementLine {
@@ -4200,7 +4201,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
                 metadata: Some("{\"seed\":true,\"pending_reconcile\":true}".to_string()),
             });
 
-    let _bank_match_open_bill = ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+    let _ = ctx.db.bank_match_candidate().insert(BankMatchCandidate {
         id: 0,
         organization_id: org_id,
         statement_line_id: bank_stmt_line_pending.id,
@@ -4212,24 +4213,24 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
     });
 
-    let _reconciliation_widget =
-        ctx.db
-            .account_reconciliation_widget()
-            .insert(AccountReconciliationWidget {
-                id: 0,
-                organization_id: org_id,
-                partner_id: Some(contact_acme.id),
-                account_id: acc_ar.id,
-                move_line_ids: vec![],
-                to_check: false,
-                mode: "manual".to_string(),
-                company_id: company_id,
-                create_uid: Some(seeder),
-                create_date: Some(ctx.timestamp),
-                write_uid: Some(seeder),
-                write_date: Some(ctx.timestamp),
-                metadata: Some("{\"seed\":true}".to_string()),
-            });
+    let _ = ctx
+        .db
+        .account_reconciliation_widget()
+        .insert(AccountReconciliationWidget {
+            id: 0,
+            organization_id: org_id,
+            partner_id: Some(contact_acme.id),
+            account_id: acc_ar.id,
+            move_line_ids: vec![],
+            to_check: false,
+            mode: "manual".to_string(),
+            company_id: company_id,
+            create_uid: Some(seeder),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(seeder),
+            write_date: Some(ctx.timestamp),
+            metadata: Some("{\"seed\":true}".to_string()),
+        });
 
     // ── 5.10 Fixed Assets ─────────────────────────────────────────────────────
     let asset_laptop_fleet = ctx.db.account_asset().insert(AccountAsset {
@@ -4291,27 +4292,27 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _depreciation_line1 =
-        ctx.db
-            .account_asset_depreciation_line()
-            .insert(AccountAssetDepreciationLine {
-                id: 0,
-                asset_id: asset_laptop_fleet.id,
-                name: Some("Month 1 Depreciation".to_string()),
-                sequence: 1,
-                move_id: None,
-                move_check: false,
-                move_posted_check: false,
-                amount: 277.78,
-                depreciation_date: ctx.timestamp,
-                remaining_value: 9_722.22,
-                depreciated_value: 277.78,
-                create_uid: Some(seeder),
-                create_date: Some(ctx.timestamp),
-                write_uid: Some(seeder),
-                write_date: Some(ctx.timestamp),
-                metadata: Some("{\"seed\":true}".to_string()),
-            });
+    let _ = ctx
+        .db
+        .account_asset_depreciation_line()
+        .insert(AccountAssetDepreciationLine {
+            id: 0,
+            asset_id: asset_laptop_fleet.id,
+            name: Some("Month 1 Depreciation".to_string()),
+            sequence: 1,
+            move_id: None,
+            move_check: false,
+            move_posted_check: false,
+            amount: 277.78,
+            depreciation_date: ctx.timestamp,
+            remaining_value: 9_722.22,
+            depreciated_value: 277.78,
+            create_uid: Some(seeder),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(seeder),
+            write_date: Some(ctx.timestamp),
+            metadata: Some("{\"seed\":true}".to_string()),
+        });
 
     // ── 5.11 Fiscal Periods ───────────────────────────────────────────────────
     let fiscal_year_2026 = ctx.db.account_fiscal_year().insert(AccountFiscalYear {
@@ -4334,7 +4335,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _period_jan_2026 = ctx.db.account_period().insert(AccountPeriod {
+    let _ = ctx.db.account_period().insert(AccountPeriod {
         id: 0,
         name: "January 2026".to_string(),
         code: "JAN-2026".to_string(),
@@ -4352,7 +4353,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _period_feb_2026 = ctx.db.account_period().insert(AccountPeriod {
+    let _ = ctx.db.account_period().insert(AccountPeriod {
         id: 0,
         name: "February 2026".to_string(),
         code: "FEB-2026".to_string(),
@@ -4370,7 +4371,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _period_mar_2026 = ctx.db.account_period().insert(AccountPeriod {
+    let _ = ctx.db.account_period().insert(AccountPeriod {
         id: 0,
         name: "March 2026".to_string(),
         code: "MAR-2026".to_string(),
@@ -4389,7 +4390,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // ── 5.12 Budgeting ────────────────────────────────────────────────────────
-    let _budget_post_sales = ctx.db.budget_post().insert(BudgetPost {
+    let _ = ctx.db.budget_post().insert(BudgetPost {
         id: 0,
         organization_id: org_id,
         name: "Sales & Marketing".to_string(),
@@ -4426,7 +4427,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _budget_line_sales = ctx
+    let _ = ctx
         .db
         .crossovered_budget_lines()
         .insert(CrossoveredBudgetLines {
@@ -4452,7 +4453,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             metadata: Some("{\"seed\":true}".to_string()),
         });
 
-    let _budget_line_marketing = ctx
+    let _ = ctx
         .db
         .crossovered_budget_lines()
         .insert(CrossoveredBudgetLines {
@@ -4502,7 +4503,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _ic_rule_demo = ctx.db.intercompany_rule().insert(IntercompanyRule {
+    let _ = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
         name: "HQ → EU — mirrored invoices".to_string(),
         rule_type: RuleType::Invoice,
@@ -4524,7 +4525,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _ic_txn_demo = ctx
+    let _ = ctx
         .db
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
@@ -5143,7 +5144,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // =========================================================================
 
     // ── 7.1 Work Centers ──────────────────────────────────────────────────────
-    let _wc_assembly = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
+    let wc_assembly = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
         organization_id: org_id,
         name: "Assembly Line A".to_string(),
@@ -5181,7 +5182,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
-    let _wc_qc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
+    let wc_qc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
         organization_id: org_id,
         name: "QC Station".to_string(),
@@ -5371,7 +5372,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
     });
 
-    let _leave_type_unpaid = ctx.db.hr_leave_type().insert(HrLeaveType {
+    let _ = ctx.db.hr_leave_type().insert(HrLeaveType {
         id: 0,
         organization_id: org_id,
         company_id,
@@ -6347,21 +6348,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    let _utm_campaign = ctx.db.utm_campaign().insert(UtmCampaign {
+    let _ = ctx.db.utm_campaign().insert(UtmCampaign {
         id: 0,
         organization_id: org_id,
         name: "Spring Launch".to_string(),
         is_active: true,
         created_at: ctx.timestamp,
     });
-    let _utm_medium = ctx.db.utm_medium().insert(UtmMedium {
+    let _ = ctx.db.utm_medium().insert(UtmMedium {
         id: 0,
         organization_id: org_id,
         name: "Email".to_string(),
         is_active: true,
         created_at: ctx.timestamp,
     });
-    let _utm_source = ctx.db.utm_source().insert(UtmSource {
+    let _ = ctx.db.utm_source().insert(UtmSource {
         id: 0,
         organization_id: org_id,
         name: "Website".to_string(),
@@ -6440,7 +6441,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    let _lead_source = ctx.db.lead_source().insert(LeadSource {
+    let _ = ctx.db.lead_source().insert(LeadSource {
         id: 0,
         organization_id: org_id,
         name: "Website Form".to_string(),
@@ -6449,7 +6450,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         is_active: true,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _lead_lost_reason = ctx.db.lead_lost_reason().insert(LeadLostReason {
+    let _ = ctx.db.lead_lost_reason().insert(LeadLostReason {
         id: 0,
         organization_id: org_id,
         name: "Budget frozen".to_string(),
@@ -7266,7 +7267,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         updated_at: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _loc_customer = ctx.db.stock_location().insert(StockLocation {
+    let _ = ctx.db.stock_location().insert(StockLocation {
         id: 0,
         organization_id: org_id,
         name: "Customers".to_string(),
@@ -7303,7 +7304,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         name: "Cash Drawer".to_string(),
         outstanding_account_id: Some(acc_bank.id),
         receivable_account_id: Some(acc_ar.id),
-        journal_id: Some(_journal_bank.id),
+        journal_id: Some(journal_bank.id),
         company_id,
         config_ids: vec![],
         is_cash_count: true,
@@ -7311,7 +7312,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         use_payment_terminal: None,
         hide_use_payment_terminal: false,
         open_cashbox: true,
-        cash_journal_id: Some(_journal_bank.id),
+        cash_journal_id: Some(journal_bank.id),
         split_transactions: false,
         payment_method_type: PaymentMethodType::Cash,
         image: None,
@@ -7328,7 +7329,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         name: "Card Terminal".to_string(),
         outstanding_account_id: Some(acc_bank.id),
         receivable_account_id: Some(acc_ar.id),
-        journal_id: Some(_journal_bank.id),
+        journal_id: Some(journal_bank.id),
         company_id,
         config_ids: vec![],
         is_cash_count: false,
@@ -7414,7 +7415,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         trusted_config_ids: vec![],
         payment_method_ids: vec![pos_cash_method.id, pos_card_method.id],
         sequence_number: 1,
-        cash_journal_id: Some(_journal_bank.id),
+        cash_journal_id: Some(journal_bank.id),
         cash_register_id: None,
         create_uid: seeder,
         create_date: ctx.timestamp,
@@ -7434,7 +7435,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: ctx.timestamp,
         ..pos_card_method
     });
-    let _pos_loyalty_program_demo = ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
+    let _ = ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
         id: 0,
         organization_id: org_id,
         name: "VIP Demo Rewards".to_string(),
@@ -7488,12 +7489,12 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         state: SessionState::Closed,
         sequence_number: 1,
         login_number: 1,
-        cash_journal_id: Some(_journal_bank.id),
+        cash_journal_id: Some(journal_bank.id),
         cash_register_id: None,
         cash_register_balance_start: 500.0,
         cash_register_balance_end_real: 549.99,
         cash_register_total_entry_encoding: 49.99,
-        cash_journal_ids: vec![_journal_bank.id],
+        cash_journal_ids: vec![journal_bank.id],
         order_ids: vec![],
         order_count: 0,
         statement_ids: vec![],
@@ -7653,7 +7654,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         ..pos_loyalty_card_demo
     });
 
-    let _vendor_bank = ctx.db.res_partner_bank().insert(ResPartnerBank {
+    let _ = ctx.db.res_partner_bank().insert(ResPartnerBank {
         id: 0,
         organization_id: org_id,
         sanitized_acc_number: Some("US0012345678901234".to_string()),
@@ -7664,7 +7665,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         currency_id: Some(1),
         company_id: Some(company_id),
         active: true,
-        journal_id: Some(_journal_bank.id),
+        journal_id: Some(journal_bank.id),
         allow_out_payment: true,
         has_iban_warning: false,
         lock_trust_fields: false,
@@ -7674,7 +7675,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _supplier_intake_demo = ctx
+    let _ = ctx
         .db
         .supplier_intake_request()
         .insert(SupplierIntakeRequest {
@@ -7715,7 +7716,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             updated_at: ctx.timestamp,
             metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
         });
-    let _purchase_requisition_demo = ctx.db.purchase_requisition().insert(PurchaseRequisition {
+    let _ = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,
         organization_id: org_id,
         origin: Some("OPS-COVERAGE-REQ".to_string()),
@@ -8030,7 +8031,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             created_at: ctx.timestamp,
             metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
         });
-    let _traceability_report = ctx
+    let _ = ctx
         .db
         .stock_traceability_report()
         .insert(StockTraceabilityReport {
@@ -8092,7 +8093,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         updated_at: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _stock_inventory_line_demo = ctx.db.stock_inventory_line().insert(StockInventoryLine {
+    let _ = ctx.db.stock_inventory_line().insert(StockInventoryLine {
         id: 0,
         organization_id: org_id,
         inventory_id: stock_inventory_demo.id,
@@ -8129,7 +8130,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         updated_at: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _adjustment_reason_demo = ctx.db.adjustment_reason().insert(AdjustmentReason {
+    let _ = ctx.db.adjustment_reason().insert(AdjustmentReason {
         id: 0,
         organization_id: org_id,
         code: "COUNT_VARIANCE".to_string(),
@@ -8139,7 +8140,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _inventory_adjustment_demo = ctx.db.inventory_adjustment().insert(InventoryAdjustment {
+    let _ = ctx.db.inventory_adjustment().insert(InventoryAdjustment {
         id: 0,
         organization_id: org_id,
         name: "Mouse shelf variance".to_string(),
@@ -8177,7 +8178,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         target_move: "receipt".to_string(),
         company_id,
         account_move_id: None,
-        account_journal_id: Some(_journal_bank.id),
+        account_journal_id: Some(journal_bank.id),
         vendor_bill_id: None,
         currency_id: 1,
         amount_total: 0.0,
@@ -8255,7 +8256,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         product_ids: vec![product_laptop.id],
         product_category_ids: vec![cat_electronics.id],
         operation_id: None,
-        workcenter_id: Some(_wc_qc.id),
+        workcenter_id: Some(wc_qc.id),
         picking_type_id: None,
         code: Some("QC-FINAL".to_string()),
         control_type: "operation".to_string(),
@@ -8520,7 +8521,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     let mo_workorder_assembly = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
         organization_id: org_id,
-        workcenter_id: _wc_assembly.id,
+        workcenter_id: wc_assembly.id,
         production_id: manufacturing_order.id,
         product_id: product_laptop.id,
         product_tracking: product_laptop.tracking.clone(),
@@ -8562,7 +8563,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     let mo_workorder_qc = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
         organization_id: org_id,
-        workcenter_id: _wc_qc.id,
+        workcenter_id: wc_qc.id,
         production_id: manufacturing_order.id,
         product_id: product_laptop.id,
         product_tracking: product_laptop.tracking.clone(),
@@ -8601,27 +8602,27 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _productivity_demo =
-        ctx.db
-            .mrp_workcenter_productivity()
-            .insert(MrpWorkcenterProductivity {
-                id: 0,
-                organization_id: org_id,
-                workcenter_id: _wc_assembly.id,
-                workorder_id: mo_workorder_assembly.id,
-                description: Some("Seeded active assembly cycle".to_string()),
-                loss_id: 0,
-                date_start: ctx.timestamp,
-                date_end: Some(ctx.timestamp),
-                duration: 42.0,
-                user_id: seeder,
-                company_id,
-                create_uid: seeder,
-                create_date: ctx.timestamp,
-                write_uid: seeder,
-                write_date: ctx.timestamp,
-                metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-            });
+    let _ = ctx
+        .db
+        .mrp_workcenter_productivity()
+        .insert(MrpWorkcenterProductivity {
+            id: 0,
+            organization_id: org_id,
+            workcenter_id: wc_assembly.id,
+            workorder_id: mo_workorder_assembly.id,
+            description: Some("Seeded active assembly cycle".to_string()),
+            loss_id: 0,
+            date_start: ctx.timestamp,
+            date_end: Some(ctx.timestamp),
+            duration: 42.0,
+            user_id: seeder,
+            company_id,
+            create_uid: seeder,
+            create_date: ctx.timestamp,
+            write_uid: seeder,
+            write_date: ctx.timestamp,
+            metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
+        });
     let quality_check_demo = ctx.db.quality_check().insert(QualityCheck {
         id: 0,
         organization_id: org_id,
@@ -8676,7 +8677,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         lot_id: Some(receipt_lot.id),
         product_id: Some(product_laptop.id),
         product_variant_id: None,
-        workcenter_id: Some(_wc_qc.id),
+        workcenter_id: Some(wc_qc.id),
         team_id: quality_team_ops.id,
         user_id: Some(seeder),
         company_id,
@@ -8711,10 +8712,10 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         ..manufacturing_order
     });
 
-    let _bank_match_candidate = ctx.db.bank_match_candidate().insert(BankMatchCandidate {
+    let _ = ctx.db.bank_match_candidate().insert(BankMatchCandidate {
         id: 0,
         organization_id: org_id,
-        statement_line_id: _bank_statement_line.id,
+        statement_line_id: bank_statement_line.id,
         match_type: "invoice".to_string(),
         entity_id: invoice1.id,
         amount: 3_600.0,
@@ -8755,7 +8756,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: Some(ctx.timestamp),
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _trial_balance_receivable = ctx.db.trial_balance().insert(TrialBalance {
+    let _ = ctx.db.trial_balance().insert(TrialBalance {
         id: 0,
         organization_id: org_id,
         report_id: trial_balance_report.id,
@@ -8779,7 +8780,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: Some(ctx.timestamp),
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _trial_balance_revenue = ctx.db.trial_balance().insert(TrialBalance {
+    let _ = ctx.db.trial_balance().insert(TrialBalance {
         id: 0,
         organization_id: org_id,
         report_id: trial_balance_report.id,
@@ -8836,7 +8837,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: Some(ctx.timestamp),
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _balance_sheet_assets = ctx.db.balance_sheet_line().insert(BalanceSheetLine {
+    let _ = ctx.db.balance_sheet_line().insert(BalanceSheetLine {
         id: 0,
         organization_id: org_id,
         report_id: balance_sheet_report.id,
@@ -8893,7 +8894,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: Some(ctx.timestamp),
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _profit_loss_revenue = ctx.db.profit_loss_line().insert(ProfitLossLine {
+    let _ = ctx.db.profit_loss_line().insert(ProfitLossLine {
         id: 0,
         organization_id: org_id,
         report_id: profit_loss_report.id,
@@ -8950,7 +8951,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_date: Some(ctx.timestamp),
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let _cash_flow_operating = ctx.db.cash_flow_line().insert(CashFlowLine {
+    let _ = ctx.db.cash_flow_line().insert(CashFlowLine {
         id: 0,
         organization_id: org_id,
         report_id: cash_flow_report.id,

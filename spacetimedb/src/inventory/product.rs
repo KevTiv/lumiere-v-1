@@ -862,12 +862,15 @@ pub fn create_product_variant(
         return Err("Variant name cannot be empty".to_string());
     }
 
-    let _product = ctx
+    let product = ctx
         .db
         .product()
         .id()
         .find(&product_tmpl_id)
         .ok_or("Product template not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product template does not belong to this organization".to_string());
+    }
 
     let variant = ctx.db.product_variant().insert(ProductVariant {
         id: 0,
@@ -1128,12 +1131,15 @@ pub fn create_product_packaging(
         return Err("Packaging name cannot be empty".to_string());
     }
 
-    let _product = ctx
+    let product = ctx
         .db
         .product()
         .id()
         .find(&product_id)
         .ok_or("Product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
 
     let volume = params.length * params.width * params.height;
 

@@ -19,56 +19,33 @@ pub(crate) fn run_seed_organization_form_configs(
     // Initialize Journal form
     seed_journal_form(ctx, organization_id)?;
 
-    // Initialize Forensic form
-    seed_forensic_form(ctx, organization_id)?;
-
-    // Initialize CRM forms
-    seed_crm_forms(ctx, organization_id)?;
-
-    // Initialize Sales forms
-    seed_sales_forms(ctx, organization_id)?;
-
-    // Initialize Inventory forms
-    seed_inventory_forms(ctx, organization_id)?;
-
-    // Initialize Accounting forms
-    seed_accounting_forms(ctx, organization_id)?;
-
-    // Initialize HR forms
-    seed_hr_forms(ctx, organization_id)?;
-
-    // Initialize Purchasing forms
-    seed_purchasing_forms(ctx, organization_id)?;
-
-    // Initialize Projects forms
-    seed_projects_forms(ctx, organization_id)?;
-
-    // Initialize Documents forms
-    seed_documents_forms(ctx, organization_id)?;
-
-    // Initialize Manufacturing forms
-    seed_manufacturing_forms(ctx, organization_id)?;
-
-    // Initialize Helpdesk forms
-    seed_helpdesk_forms(ctx, organization_id)?;
-
-    // Initialize Expenses forms
-    seed_expenses_forms(ctx, organization_id)?;
-
-    // Initialize Calendar forms
-    seed_calendar_forms(ctx, organization_id)?;
-
-    // Initialize Subscriptions forms
-    seed_subscriptions_forms(ctx, organization_id)?;
-
-    // Initialize Proposals forms
-    seed_proposals_forms(ctx, organization_id)?;
-
-    // Initialize Reports forms
-    seed_reports_forms(ctx, organization_id)?;
+    for module_id in [
+        "forensic",
+        "crm",
+        "sales",
+        "inventory",
+        "accounting",
+        "hr",
+        "purchasing",
+        "projects",
+        "documents",
+        "manufacturing",
+        "helpdesk",
+        "expenses",
+        "calendar",
+        "subscriptions",
+        "proposals",
+        "reports",
+    ] {
+        log::warn!(
+            "No default form configuration seed exists yet for module '{}' in organization {}",
+            module_id,
+            organization_id
+        );
+    }
 
     log::info!(
-        "Seeded all default form configurations for organization {}",
+        "Seeded implemented default form configurations for organization {}",
         organization_id
     );
     Ok(())
@@ -284,125 +261,6 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
     }
 
     log::info!("Seeded Journal form config for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Forensic form configuration
-fn seed_forensic_form(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // Similar implementation for Forensic
-    // ... (abbreviated for brevity)
-    log::info!("Seeded Forensic form config for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed CRM form configurations
-fn seed_crm_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Lead, New Opportunity, New Contact, New Activity
-    log::info!("Seeded CRM form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Sales form configurations
-fn seed_sales_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Sale Order, New Price List
-    log::info!("Seeded Sales form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Inventory form configurations
-fn seed_inventory_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Product, New Transfer, New Adjustment
-    log::info!("Seeded Inventory form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Accounting form configurations
-fn seed_accounting_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Invoice, New Account, New Tax
-    log::info!("Seeded Accounting form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed HR form configurations
-fn seed_hr_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Employee, New Leave Request, New Contract
-    log::info!("Seeded HR form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Purchasing form configurations
-fn seed_purchasing_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Purchase Order, New Requisition
-    log::info!("Seeded Purchasing form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Projects form configurations
-fn seed_projects_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Project, New Task
-    log::info!("Seeded Projects form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Documents form configurations
-fn seed_documents_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Document, New Folder
-    log::info!("Seeded Documents form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Manufacturing form configurations
-fn seed_manufacturing_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New BOM, New Work Order
-    log::info!(
-        "Seeded Manufacturing form configs for org {}",
-        organization_id
-    );
-    Ok(())
-}
-
-/// Seed Helpdesk form configurations
-fn seed_helpdesk_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Ticket
-    log::info!("Seeded Helpdesk form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Expenses form configurations
-fn seed_expenses_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Expense, New Expense Report
-    log::info!("Seeded Expenses form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Calendar form configurations
-fn seed_calendar_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Event
-    log::info!("Seeded Calendar form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Subscriptions form configurations
-fn seed_subscriptions_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Subscription, New Plan
-    log::info!(
-        "Seeded Subscriptions form configs for org {}",
-        organization_id
-    );
-    Ok(())
-}
-
-/// Seed Proposals form configurations
-fn seed_proposals_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // New Proposal
-    log::info!("Seeded Proposals form configs for org {}", organization_id);
-    Ok(())
-}
-
-/// Seed Reports form configurations
-fn seed_reports_forms(_ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
-    // Generate Report
-    log::info!("Seeded Reports form configs for org {}", organization_id);
     Ok(())
 }
 

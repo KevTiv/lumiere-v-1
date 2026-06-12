@@ -91,7 +91,7 @@ pub fn update_integration_status(
         }
         _ => {
             return Err(format!(
-                "Status update not implemented for {:?}",
+                "Status update is unsupported for {:?}",
                 integration_type
             ));
         }
@@ -158,7 +158,7 @@ pub fn delete_integration(
         }
         _ => {
             return Err(format!(
-                "Deletion not implemented for {:?}",
+                "Deletion is unsupported for {:?}",
                 integration_type
             ));
         }

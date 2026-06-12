@@ -47,7 +47,7 @@ pub struct ContextDocumentResponse {
     pub chunks_embedded: usize,
     pub extracted_text: String,
     pub structured_fields: serde_json::Value,
-    pub stdb_job_id: u64,
+    pub stdb_job_id: Option<u64>,
 }
 
 pub async fn post_search(

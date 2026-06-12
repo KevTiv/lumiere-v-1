@@ -371,6 +371,44 @@ pub fn update_lead_revenue(
 }
 
 #[spacetimedb::reducer]
+pub fn delete_lead(ctx: &ReducerContext, organization_id: u64, lead_id: u64) -> Result<(), String> {
+    let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
+    if lead.organization_id != organization_id {
+        return Err("Lead does not belong to this organization".to_string());
+    }
+    check_permission(ctx, organization_id, "lead", "delete")?;
+
+    let old_deleted_at = lead.deleted_at;
+    ctx.db.lead().id().update(Lead {
+        deleted_at: Some(ctx.timestamp),
+        updated_at: ctx.timestamp,
+        ..lead
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead",
+            record_id: lead_id,
+            action: "delete",
+            old_values: Some(
+                serde_json::json!({ "deleted_at": old_deleted_at.map(|ts| format!("{:?}", ts)) })
+                    .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "deleted_at": format!("{:?}", ctx.timestamp) }).to_string(),
+            ),
+            changed_fields: vec!["deleted_at".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn convert_lead_to_customer(
     ctx: &ReducerContext,
     organization_id: u64,

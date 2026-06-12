@@ -332,8 +332,16 @@ fn validate_order_org_scope(order: &SaleOrder, organization_id: u64) -> Result<(
     Ok(())
 }
 
-fn merge_metadata(existing: &Option<String>, _key: &str, value: &Option<String>) -> Option<String> {
-    value.clone().or_else(|| existing.clone())
+fn merge_metadata(existing: &Option<String>, key: &str, value: &Option<String>) -> Option<String> {
+    let value = value.as_ref()?;
+    let mut metadata = existing
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|parsed| parsed.as_object().cloned())
+        .unwrap_or_default();
+
+    metadata.insert(key.to_string(), serde_json::Value::String(value.clone()));
+    Some(serde_json::Value::Object(metadata).to_string())
 }
 
 fn create_sale_order_line_internal(
@@ -731,6 +739,7 @@ pub fn cancel_sale_order(
         return Err("Cannot cancel a done order".to_string());
     }
 
+    let company_id = order.company_id;
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Cancelled,
         write_uid: ctx.sender(),
@@ -743,7 +752,7 @@ pub fn cancel_sale_order(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(order.company_id),
+            company_id: Some(company_id),
             table_name: "sale_order",
             record_id: order_id,
             action: "UPDATE",

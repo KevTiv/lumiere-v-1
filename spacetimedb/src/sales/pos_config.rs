@@ -267,12 +267,18 @@ pub fn create_pos_config(
     check_permission(ctx, organization_id, "pos_config", "create")?;
 
     for method_id in &params.payment_method_ids {
-        let _method = ctx
+        let method = ctx
             .db
             .pos_payment_method()
             .id()
             .find(method_id)
             .ok_or_else(|| format!("Payment method {} not found", method_id))?;
+        if method.company_id != company_id {
+            return Err(format!(
+                "Payment method {} does not belong to this company",
+                method_id
+            ));
+        }
     }
 
     let config = ctx.db.pos_config().insert(PosConfig {

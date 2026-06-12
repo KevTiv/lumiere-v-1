@@ -224,7 +224,7 @@ async fn handle_realtime_socket(
     let res_thread = resources_vec.clone();
     let queries_thread = queries.clone();
 
-    let _stdb_join = std::thread::spawn(move || {
+    std::thread::spawn(move || {
         let sdk_tx_err = sdk_tx.clone();
         let conn_result: Result<DbConnection, spacetimedb_sdk::Error> = DbConnection::builder()
             .with_uri(&stdb_uri)

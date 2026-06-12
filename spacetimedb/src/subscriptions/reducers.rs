@@ -662,9 +662,6 @@ pub fn generate_subscription_invoice(
         return Err("Subscription must be active to generate invoice".to_string());
     }
 
-    // TODO: Create actual invoice in accounting module
-    // For now, just update the subscription with next billing date
-
     let new_invoice_count = subscription.invoice_count + 1;
     let new_next_date = calculate_next_date(
         params.invoice_date,
@@ -695,11 +692,20 @@ pub fn generate_subscription_invoice(
                 "invoice_count".to_string(),
                 "recurring_next_date".to_string(),
             ],
-            metadata: None,
+            metadata: Some(
+                serde_json::json!({
+                    "billing_run_recorded": true,
+                    "accounting_invoice_created": false
+                })
+                .to_string(),
+            ),
         },
     );
 
-    log::info!("Generated invoice for subscription {}", subscription_id);
+    log::info!(
+        "Recorded subscription billing run for subscription {}; accounting invoice creation is not wired here",
+        subscription_id
+    );
     Ok(())
 }
 

@@ -1411,7 +1411,6 @@ pub fn match_bank_line(
 }
 
 // ── Helper Functions ─────────────────────────────────────────────────────────
-///TODO: should this be scoped to organization_id
 fn match_by_exact_amount(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1423,7 +1422,7 @@ fn match_by_exact_amount(
     let target_amount = amount.abs();
 
     for move_line in ctx.db.account_move_line().iter() {
-        if move_line.company_id != company_id {
+        if move_line.organization_id != organization_id || move_line.company_id != company_id {
             continue;
         }
 
@@ -1449,7 +1448,6 @@ fn match_by_exact_amount(
     Ok(())
 }
 
-///TODO: should this be scoped to organization_id
 fn match_by_partner(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1460,7 +1458,7 @@ fn match_by_partner(
     company_id: u64,
 ) -> Result<(), String> {
     for move_line in ctx.db.account_move_line().iter() {
-        if move_line.company_id != company_id {
+        if move_line.organization_id != organization_id || move_line.company_id != company_id {
             continue;
         }
 
@@ -1492,19 +1490,35 @@ fn match_by_reference(
     organization_id: u64,
     line_id: u64,
     rule_id: Option<u64>,
-    _account_number: &str,
+    account_number: &str,
     amount: f64,
     company_id: u64,
 ) -> Result<(), String> {
+    let reference = account_number.trim().to_lowercase();
     for move_line in ctx.db.account_move_line().iter() {
-        if move_line.company_id != company_id {
+        if move_line.organization_id != organization_id || move_line.company_id != company_id {
             continue;
         }
 
         let match_type = if amount < 0.0 { "payment" } else { "invoice" }.to_string();
-        let score = calculate_match_score_by_ids(ctx, line_id, &move_line, "reference");
+        let reference_matches = !reference.is_empty()
+            && [
+                Some(move_line.name.as_str()),
+                move_line.ref_.as_deref(),
+                move_line.move_name.as_deref(),
+                move_line.matching_label.as_deref(),
+                move_line.matching_number.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|candidate| candidate.to_lowercase().contains(&reference));
 
-        if score > 50 {
+        let mut score = calculate_match_score_by_ids(ctx, line_id, &move_line, "reference");
+        if reference_matches {
+            score = (score + 30).min(100);
+        }
+
+        if reference_matches && score > 50 {
             ctx.db.bank_match_candidate().insert(BankMatchCandidate {
                 id: 0,
                 organization_id,

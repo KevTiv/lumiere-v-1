@@ -630,12 +630,15 @@ pub fn add_rule_to_nomenclature(
         return Err("Nomenclature does not belong to this organization".to_string());
     }
 
-    let _rule = ctx
+    let rule = ctx
         .db
         .barcode_rule()
         .id()
         .find(&rule_id)
         .ok_or("Rule not found")?;
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
+    }
 
     if nomenclature.rule_ids.contains(&rule_id) {
         return Err("Rule already added to nomenclature".to_string());

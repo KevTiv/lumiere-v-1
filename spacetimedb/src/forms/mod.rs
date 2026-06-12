@@ -820,16 +820,17 @@ pub fn get_organization_form_configs(
     ctx: &ReducerContext,
     organization_id: u64,
 ) -> Result<(), String> {
-    let _configs: Vec<_> = ctx
+    let config_count = ctx
         .db
         .form_config()
         .iter()
         .filter(|c| c.organization_id == organization_id)
-        .collect();
+        .count();
 
     // Data synced via table subscriptions
     log::info!(
-        "Retrieved form configs for organization {}",
+        "Retrieved {} form configs for organization {}",
+        config_count,
         organization_id
     );
     Ok(())

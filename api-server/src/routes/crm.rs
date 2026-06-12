@@ -200,7 +200,7 @@ async fn lead_put(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let _org_id = require_org(&session)?;
+    let org_id = require_org(&session)?;
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
@@ -264,7 +264,7 @@ async fn lead_put(
 
     let f1 = async {
         if let Some(p) = params_details {
-            c1.call_reducer("update_lead_details", json!([lid, p]))
+            c1.call_reducer("update_lead_details", json!([org_id, lid, p]))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
         }
@@ -272,7 +272,7 @@ async fn lead_put(
     };
     let f2 = async {
         if let Some(p) = params_address {
-            c2.call_reducer("update_lead_address", json!([lid, p]))
+            c2.call_reducer("update_lead_address", json!([org_id, lid, p]))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
         }
@@ -280,7 +280,7 @@ async fn lead_put(
     };
     let f3 = async {
         if let Some(p) = params_revenue {
-            c3.call_reducer("update_lead_revenue", json!([lid, p]))
+            c3.call_reducer("update_lead_revenue", json!([org_id, lid, p]))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
         }
@@ -303,13 +303,13 @@ async fn lead_delete(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let _org_id = require_org(&session)?;
+    let org_id = require_org(&session)?;
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("delete_lead", json!([lead_id]))
+        .call_reducer("delete_lead", json!([org_id, lead_id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(

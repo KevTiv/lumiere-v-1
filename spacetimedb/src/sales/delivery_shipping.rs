@@ -420,12 +420,18 @@ pub fn create_delivery_carrier(
     check_permission(ctx, organization_id, "delivery_carrier", "create")?;
 
     for rule_id in &params.price_rule_ids {
-        let _rule = ctx
+        let rule = ctx
             .db
             .delivery_price_rule()
             .id()
             .find(rule_id)
             .ok_or_else(|| format!("Price rule {} not found", rule_id))?;
+        if rule.company_id != company_id {
+            return Err(format!(
+                "Price rule {} does not belong to this company",
+                rule_id
+            ));
+        }
     }
 
     ctx.db.delivery_carrier().insert(DeliveryCarrier {

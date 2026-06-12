@@ -61,8 +61,8 @@ pub struct IngestResult {
     pub extracted_text: String,
     pub structured_fields: serde_json::Value,
     pub chunks_embedded: usize,
-    /// SpacetimeDB AiDocumentProcessingJob id (0 if not created)
-    pub stdb_job_id: u64,
+    /// SpacetimeDB reducers do not return the inserted job id.
+    pub stdb_job_id: Option<u64>,
 }
 
 // ── RigContext ────────────────────────────────────────────────────────────────
@@ -354,7 +354,7 @@ async fn create_stdb_doc_job(
     req: &IngestRequest,
     extracted_text: &str,
     chunks: usize,
-) -> u64 {
+) -> Option<u64> {
     // Call create_document_processing_job reducer
     let args = serde_json::json!([
         req.org_id,
@@ -374,11 +374,11 @@ async fn create_stdb_doc_job(
     {
         Ok(_) => {
             tracing::info!(doc_id = %req.doc_id, chunks, "Document processing job created in SpacetimeDB");
-            0 // SpacetimeDB reducers don't return IDs; use 0 as placeholder
+            None
         }
         Err(e) => {
             tracing::warn!("Failed to create SpacetimeDB doc job: {}", e);
-            0
+            None
         }
     }
 }

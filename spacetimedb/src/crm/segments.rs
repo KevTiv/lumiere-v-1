@@ -141,13 +141,19 @@ pub fn add_contact_to_segment(
         .id()
         .find(&segment_id)
         .ok_or("Segment not found")?;
+    if segment.organization_id != organization_id {
+        return Err("Segment does not belong to this organization".to_string());
+    }
 
-    let _contact = ctx
+    let contact = ctx
         .db
         .contact()
         .id()
         .find(&contact_id)
         .ok_or("Contact not found")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
     let already_member = ctx
         .db
