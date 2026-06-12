@@ -9,10 +9,6 @@ pub struct Config {
     pub qdrant_url: String,
     pub qdrant_api_key: Option<String>,
     pub qdrant_collection: String,
-    pub voyage_api_key: String,
-    pub anthropic_api_key: String,
-    pub embedding_model: String,
-    pub embedding_dim: u32,
     // SpacetimeDB connection
     pub stdb_host: String,
     pub stdb_module: String,
@@ -29,35 +25,47 @@ pub struct Config {
     /// Kaggle search cache TTL in seconds
     pub kaggle_cache_ttl_secs: u64,
 
-    // ── Context / Activity Layer (Rig-rs) ────────────────────────────────────
-    /// Embedding provider for context layer: "ollama" (default) | "mistral"
-    pub context_embedding_provider: String,
-    /// Ollama base URL
+    // ── Embeddings (unified Qdrant pipeline) ─────────────────────────────────
+    /// Embedding provider: "ollama" (default) | "mistral" | "gemini"
+    pub embedding_provider: String,
     pub ollama_url: String,
-    /// Ollama embedding model (default: nomic-embed-text)
     pub ollama_embed_model: String,
-    /// Ollama vision model for image OCR (default: llava)
     pub ollama_vision_model: String,
-    /// Mistral API key (required if context_embedding_provider = "mistral" or vision_provider = "mistral")
+    pub ollama_llm_model: String,
     pub mistral_api_key: Option<String>,
-    /// Vision provider: "ollama" (default) | "mistral"
+    pub google_api_key: Option<String>,
+    pub gemini_embed_model: String,
+
+    // ── LLM (Kong internal route or direct provider HTTP) ────────────────────
+    /// When set, chat completions go through Kong AI Gateway (OpenAI-compatible).
+    pub kong_llm_url: Option<String>,
+    pub kong_llm_service_token: Option<String>,
+
+    // ── Context layer (vision / parser) ──────────────────────────────────────
     pub vision_provider: String,
-    /// Document text parser: "plaintext" (default) | "unstructured"
     pub document_parser: String,
-    /// Unstructured.io endpoint (local Docker or hosted)
     pub unstructured_url: String,
-    /// Unstructured.io hosted API key (optional)
     pub unstructured_api_key: Option<String>,
-    /// Qdrant collection for ERP activities (separate from embeddings collection)
     pub activities_collection: String,
-    /// How often the activity ingester polls SpacetimeDB tables (seconds)
     pub activity_ingest_interval_secs: u64,
-    /// Max multipart upload size in bytes (default: 20 MB)
     pub max_upload_bytes: usize,
 }
 
 impl Config {
+    pub fn embedding_model_name(&self) -> String {
+        match self.embedding_provider.as_str() {
+            "mistral" => "mistral-embed".to_string(),
+            "gemini" => self.gemini_embed_model.clone(),
+            _ => self.ollama_embed_model.clone(),
+        }
+    }
+
     pub fn from_env() -> Result<Self> {
+        let google_api_key = std::env::var("GOOGLE_API_KEY")
+            .ok()
+            .or_else(|| std::env::var("GEMINI_API_KEY").ok())
+            .filter(|v| !v.trim().is_empty());
+
         Ok(Config {
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "8080".to_string())
@@ -71,16 +79,6 @@ impl Config {
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),
             qdrant_collection: std::env::var("QDRANT_COLLECTION")
                 .unwrap_or_else(|_| "lumiere_embeddings".to_string()),
-            voyage_api_key: std::env::var("VOYAGE_API_KEY")
-                .context("VOYAGE_API_KEY is required")?,
-            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY")
-                .context("ANTHROPIC_API_KEY is required")?,
-            embedding_model: std::env::var("EMBEDDING_MODEL")
-                .unwrap_or_else(|_| "voyage-3".to_string()),
-            embedding_dim: std::env::var("EMBEDDING_DIM")
-                .unwrap_or_else(|_| "1024".to_string())
-                .parse()
-                .context("EMBEDDING_DIM must be a valid number")?,
             stdb_host: normalize_stdb_http_host(
                 &env_stdb_host_or_next_public()
                     .unwrap_or_else(|| "http://127.0.0.1:3000".to_string()),
@@ -105,16 +103,28 @@ impl Config {
                 .parse()
                 .context("KAGGLE_CACHE_TTL_SECS must be a valid number")?,
 
-            // Context / Activity Layer
-            context_embedding_provider: std::env::var("CONTEXT_EMBEDDING_PROVIDER")
-                .unwrap_or_else(|_| "ollama".to_string()),
+            embedding_provider: std::env::var("EMBEDDING_PROVIDER")
+                .ok()
+                .or_else(|| std::env::var("CONTEXT_EMBEDDING_PROVIDER").ok())
+                .unwrap_or_else(|| "ollama".to_string()),
             ollama_url: std::env::var("OLLAMA_URL")
                 .unwrap_or_else(|_| "http://localhost:11434".to_string()),
             ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
                 .unwrap_or_else(|_| "nomic-embed-text".to_string()),
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
+            ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")
+                .unwrap_or_else(|_| "llama3.2".to_string()),
             mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
+            google_api_key,
+            gemini_embed_model: std::env::var("GEMINI_EMBED_MODEL")
+                .unwrap_or_else(|_| "text-embedding-004".to_string()),
+
+            kong_llm_url: std::env::var("KONG_LLM_URL")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            kong_llm_service_token: std::env::var("KONG_LLM_SERVICE_TOKEN").ok(),
+
             vision_provider: std::env::var("VISION_PROVIDER")
                 .unwrap_or_else(|_| "ollama".to_string()),
             document_parser: std::env::var("DOCUMENT_PARSER")
@@ -129,7 +139,7 @@ impl Config {
                 .parse()
                 .context("ACTIVITY_INGEST_INTERVAL_SECS must be a valid number")?,
             max_upload_bytes: std::env::var("MAX_UPLOAD_BYTES")
-                .unwrap_or_else(|_| "20971520".to_string()) // 20 MB
+                .unwrap_or_else(|_| "20971520".to_string())
                 .parse()
                 .context("MAX_UPLOAD_BYTES must be a valid number")?,
         })

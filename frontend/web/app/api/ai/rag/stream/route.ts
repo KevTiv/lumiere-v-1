@@ -15,6 +15,8 @@ interface Body {
   include_types?: unknown
   limit?: unknown
   ui_context?: unknown
+  agent_id?: unknown
+  team_member_id?: unknown
 }
 
 const MAX_INCLUDE_TYPES = 8
@@ -106,6 +108,25 @@ export async function POST(request: NextRequest) {
   const uiContext = sanitizeRagUiContext(body.ui_context)
   if (includeTypes?.length) gwPayload.include_types = includeTypes
   if (uiContext) gwPayload.ui_context = uiContext
+
+  const agentIdRaw = body.agent_id
+  const teamMemberIdRaw = body.team_member_id
+  const agentId =
+    typeof agentIdRaw === 'number'
+      ? agentIdRaw
+      : typeof agentIdRaw === 'string' && agentIdRaw.trim() !== ''
+        ? Number.parseInt(agentIdRaw, 10)
+        : NaN
+  const teamMemberId =
+    typeof teamMemberIdRaw === 'number'
+      ? teamMemberIdRaw
+      : typeof teamMemberIdRaw === 'string' && teamMemberIdRaw.trim() !== ''
+        ? Number.parseInt(teamMemberIdRaw, 10)
+        : NaN
+  if (Number.isFinite(agentId) && agentId > 0) gwPayload.agent_id = agentId
+  if (Number.isFinite(teamMemberId) && teamMemberId > 0) {
+    gwPayload.team_member_id = teamMemberId
+  }
 
   const headers = new Headers({ 'Content-Type': 'application/json' })
   const secret = process.env['LUMIERE_AI_GATEWAY_INTERNAL_SECRET']

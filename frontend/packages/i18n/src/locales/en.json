@@ -6636,6 +6636,11 @@
     "commands": "Commands",
     "thinking": "Thinking...",
     "sources": "Sources",
+    "sourceLive": "Live",
+    "sourceMemory": "Memory",
+    "sourceActivity": "Activity",
+    "sourceAsOf": "Data as of {{time}}",
+    "selectionContext": "AI context",
     "placeholder": "Ask anything... @ for commands",
     "hints": {
       "cmds": "cmds",

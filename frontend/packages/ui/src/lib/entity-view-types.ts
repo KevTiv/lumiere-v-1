@@ -138,6 +138,8 @@ export interface EntityDetailConfig {
 
 export interface EntityViewConfig {
   id: string
+  /** Canonical SpacetimeDB entity_type for AI context / live snapshots (snake_case). */
+  entityType?: string
   title: string
   description?: string
   view: EntityTableConfig | EntityDetailConfig

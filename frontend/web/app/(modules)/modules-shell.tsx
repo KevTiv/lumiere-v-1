@@ -41,13 +41,31 @@ function ensureAiChatSessionKey(): string {
 }
 
 function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
+  const kind =
+    s.kind === "live" || s.kind === "memory" || s.kind === "activity"
+      ? s.kind
+      : s.content_type === "org_activity"
+        ? "activity"
+        : "memory"
+  const trust =
+    s.trust === "authoritative" || s.trust === "retrieved"
+      ? s.trust
+      : kind === "live"
+        ? "authoritative"
+        : "retrieved"
+
   return {
+    kind,
+    trust,
     content_type: s.content_type,
     content_id: s.content_id,
     entity_type: s.entity_type,
     entity_id: s.entity_id,
+    label: s.label,
+    field: s.field,
     score: s.score,
     excerpt: s.text_snippet.length > 220 ? `${s.text_snippet.slice(0, 220)}…` : s.text_snippet,
+    snapshot_at: s.snapshot_at,
     href: resolveAiSourceHref({
       content_type: s.content_type,
       content_id: s.content_id,
@@ -163,6 +181,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       sources: ChatMessageSourceRef[]
       uiContext: unknown
       durationMs?: number
+      model?: string | null
     }) => {
       if (!sessionKey || !orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return
       try {
@@ -179,7 +198,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           content: args.assistantText,
           sources_json: JSON.stringify(args.sources),
           ui_context_json: JSON.stringify(args.uiContext ?? null),
-          model: "claude-sonnet-4-6",
+          model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
         })
       } catch (err) {
@@ -237,6 +256,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         sources,
         uiContext,
         durationMs: Math.round(finished - started),
+        model: out.model ?? null,
       })
 
       return { content: out.answer, sources }
@@ -278,6 +298,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       let buffer = ""
       let content = ""
       let sources: ChatMessageSourceRef[] = []
+      let resolvedModel: string | null = null
 
       const processEvent = (raw: string) => {
         const lines = raw.split(/\r?\n/)
@@ -290,8 +311,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           content += data
           handlers.onDelta(data)
         } else if (event === "sources") {
-          const parsed = JSON.parse(data) as { sources?: AiRagSource[] }
+          const parsed = JSON.parse(data) as {
+            sources?: AiRagSource[]
+            model?: string
+          }
           sources = (parsed.sources ?? []).map(mapRagSourceToChatSource)
+          resolvedModel = parsed.model ?? null
           handlers.onSources(sources)
         }
       }
@@ -315,6 +340,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         sources,
         uiContext,
         durationMs: Math.round(finished - started),
+        model: resolvedModel,
       })
 
       return { content, sources }

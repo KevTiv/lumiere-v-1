@@ -5,34 +5,48 @@ use anyhow::Result;
 use crate::config::Config;
 
 use super::{
-    embed::{EmbedProvider, MistralEmbed, OllamaEmbed},
+    embed::{EmbedProvider, GeminiEmbed, MistralEmbed, OllamaEmbed},
+    llm::LlmClient,
     parser::{DocumentParser, PlainTextParser, UnstructuredParser},
     vision::{MistralVision, OllamaVision, VisionProvider},
 };
 
-/// All active providers for the context/activity layer.
+/// All active providers for embeddings, vision, parsing, and LLM chat.
 #[derive(Clone)]
 pub struct Providers {
     pub embedder: Arc<dyn EmbedProvider>,
     pub vision: Arc<dyn VisionProvider>,
     pub parser: Arc<dyn DocumentParser>,
+    pub llm: Arc<LlmClient>,
+}
+
+fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
+    match config.embedding_provider.as_str() {
+        "mistral" => {
+            let key = config.mistral_api_key.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("MISTRAL_API_KEY required when EMBEDDING_PROVIDER=mistral")
+            })?;
+            Ok(Arc::new(MistralEmbed::new(key)))
+        }
+        "gemini" => {
+            let key = config.google_api_key.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("GOOGLE_API_KEY required when EMBEDDING_PROVIDER=gemini")
+            })?;
+            Ok(Arc::new(GeminiEmbed::new(
+                key,
+                &config.gemini_embed_model,
+            )))
+        }
+        _ => Ok(Arc::new(OllamaEmbed::new(
+            &config.ollama_url,
+            &config.ollama_embed_model,
+        ))),
+    }
 }
 
 /// Build provider instances from config.
-/// To add a new provider: implement the relevant trait and add an arm here.
 pub fn build(config: &Config) -> Result<Providers> {
-    let embedder: Arc<dyn EmbedProvider> = match config.context_embedding_provider.as_str() {
-        "mistral" => {
-            let key = config.mistral_api_key.as_deref().ok_or_else(|| {
-                anyhow::anyhow!("MISTRAL_API_KEY required when CONTEXT_EMBEDDING_PROVIDER=mistral")
-            })?;
-            Arc::new(MistralEmbed::new(key))
-        }
-        _ => Arc::new(OllamaEmbed::new(
-            &config.ollama_url,
-            &config.ollama_embed_model,
-        )),
-    };
+    let embedder = build_embedder(config)?;
 
     let vision: Arc<dyn VisionProvider> = match config.vision_provider.as_str() {
         "mistral" => {
@@ -55,20 +69,25 @@ pub fn build(config: &Config) -> Result<Providers> {
         _ => Arc::new(PlainTextParser),
     };
 
+    let llm = Arc::new(LlmClient::from_config(config)?);
+
     tracing::info!(
-        embed = config.context_embedding_provider,
+        embed = config.embedding_provider,
         embed_provider = embedder.name(),
+        embed_model = config.embedding_model_name(),
+        embed_dim = embedder.dimensions(),
         vision = config.vision_provider,
         vision_provider = vision.name(),
         parser = config.document_parser,
         parser_provider = parser.name(),
-        supported_mime_types = ?parser.supported_mime_types(),
-        "Context providers initialized"
+        kong_llm = config.kong_llm_url.is_some(),
+        "AI providers initialized"
     );
 
     Ok(Providers {
         embedder,
         vision,
         parser,
+        llm,
     })
 }

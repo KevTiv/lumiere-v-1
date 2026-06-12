@@ -99,8 +99,33 @@ const DEFAULT_HEIGHT = 500
 function selectionSummaryFromContext(context?: ChatContext): string | null {
   const selected = context?.selectedData
   if (!selected || typeof selected !== "object" || Array.isArray(selected)) return null
-  const summary = (selected as { selectionSummary?: unknown }).selectionSummary
-  return typeof summary === "string" && summary.trim() ? summary.trim() : null
+  const record = selected as {
+    entityType?: unknown
+    entityId?: unknown
+    selectionSummary?: unknown
+  }
+  const summary =
+    typeof record.selectionSummary === "string" && record.selectionSummary.trim()
+      ? record.selectionSummary.trim()
+      : null
+  const entityType =
+    typeof record.entityType === "string" && record.entityType.trim()
+      ? record.entityType.trim()
+      : null
+  const entityId =
+    record.entityId != null && String(record.entityId).trim() !== ""
+      ? String(record.entityId).trim()
+      : null
+
+  if (entityType && entityId) {
+    const prefix = `${entityType} #${entityId}`
+    if (summary && !summary.startsWith(prefix)) {
+      return `${prefix} · ${summary}`
+    }
+    return summary ?? prefix
+  }
+
+  return summary
 }
 
 export function AIChatPanel({
@@ -653,9 +678,31 @@ export function AIChatPanel({
                                     ? String(src.content_id)
                                     : null
                               const citationLabel =
-                                idLabel != null ? `${scope} #${idLabel}` : scope
+                                src.label ??
+                                (idLabel != null ? `${scope} #${idLabel}` : scope)
+                              const isLive = src.kind === "live" || src.trust === "authoritative"
+                              const badgeLabel = isLive
+                                ? t("aiChat.sourceLive")
+                                : src.kind === "activity"
+                                  ? t("aiChat.sourceActivity")
+                                  : t("aiChat.sourceMemory")
                               return (
                               <li key={`${message.id}-src-${i}`} className="break-all">
+                                <span
+                                  className={cn(
+                                    "mr-1 inline-flex rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide",
+                                    isLive
+                                      ? "bg-success/15 text-success"
+                                      : "bg-muted text-muted-foreground",
+                                  )}
+                                  title={
+                                    src.snapshot_at
+                                      ? t("aiChat.sourceAsOf", { time: src.snapshot_at })
+                                      : undefined
+                                  }
+                                >
+                                  {badgeLabel}
+                                </span>
                                 {src.href ? (
                                   <a
                                     href={src.href}
@@ -666,7 +713,7 @@ export function AIChatPanel({
                                 ) : (
                                   citationLabel
                                 )}
-                                {src.score != null ? ` · ${src.score.toFixed(2)}` : ""}
+                                {src.score != null && src.kind !== "live" ? ` · ${src.score.toFixed(2)}` : ""}
                                 {src.excerpt ? ` — ${src.excerpt}` : ""}
                               </li>
                             )})}
@@ -824,7 +871,11 @@ export function AIChatPanel({
                   </Badge>
                 )}
                 {selectionSummary && (
-                  <Badge variant="outline" className="text-[9px] h-4 max-w-40 px-1.5">
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] h-4 max-w-48 px-1.5"
+                    title={t("aiChat.selectionContext")}
+                  >
                     <CheckSquare className="h-2.5 w-2.5 mr-0.5" />
                     <span className="truncate">{selectionSummary}</span>
                   </Badge>

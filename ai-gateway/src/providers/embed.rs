@@ -147,3 +147,83 @@ impl EmbedProvider for MistralEmbed {
         "mistral"
     }
 }
+
+// ── Gemini ────────────────────────────────────────────────────────────────────
+
+pub struct GeminiEmbed {
+    client: reqwest::Client,
+    api_key: String,
+    model: String,
+}
+
+#[derive(Deserialize)]
+struct GeminiEmbedResponse {
+    embedding: GeminiEmbeddingValues,
+}
+
+#[derive(Deserialize)]
+struct GeminiEmbeddingValues {
+    values: Vec<f32>,
+}
+
+impl GeminiEmbed {
+    pub fn new(api_key: &str, model: &str) -> Self {
+        GeminiEmbed {
+            client: reqwest::Client::new(),
+            api_key: api_key.to_string(),
+            model: model.to_string(),
+        }
+    }
+
+    fn embed_url(&self) -> String {
+        format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:embedContent",
+            self.model
+        )
+    }
+}
+
+#[async_trait]
+impl EmbedProvider for GeminiEmbed {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        let results = self.embed_batch(&[text.to_string()]).await?;
+        results
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Empty Gemini embedding response"))
+    }
+
+    async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        let mut out = Vec::with_capacity(texts.len());
+        for text in texts {
+            let url = format!("{}?key={}", self.embed_url(), self.api_key);
+            let body = serde_json::json!({
+                "content": {
+                    "parts": [{ "text": text }]
+                }
+            });
+
+            let resp: GeminiEmbedResponse = self
+                .client
+                .post(&url)
+                .json(&body)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+
+            out.push(resp.embedding.values);
+        }
+        Ok(out)
+    }
+
+    fn dimensions(&self) -> u64 {
+        // text-embedding-004 → 768
+        768
+    }
+
+    fn name(&self) -> &'static str {
+        "gemini"
+    }
+}

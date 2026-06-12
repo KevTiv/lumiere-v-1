@@ -33,6 +33,8 @@ import {
 interface EntityTableProps {
   config: EntityTableConfig
   data: Record<string, unknown>[]
+  /** Row key value highlighted as the ERP AI focus target */
+  aiFocusRowKey?: string
   onRowClick?: (row: Record<string, unknown>) => void
   className?: string
 }
@@ -92,7 +94,7 @@ function formatValue(
   }
 }
 
-export function EntityTable({ config, data, onRowClick, className }: EntityTableProps) {
+export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className }: EntityTableProps) {
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
   const [filters, setFilters] = useState<Record<string, string>>({})
@@ -251,10 +253,13 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
               filtered.map((row, i) => {
                 const key = String(row[rowKey] ?? i)
                 const isSelected = selectedKeys.has(key)
+                const isAiFocused =
+                  aiFocusRowKey != null && aiFocusRowKey !== "" && key === aiFocusRowKey
                 return (
                   <TableRow
                     key={key}
                     data-testid={`entity-row-${key}`}
+                    data-ai-focus={isAiFocused ? "true" : undefined}
                     onClick={rowsAreInteractive ? () => activateRow(key, row) : undefined}
                     onKeyDown={(event) => {
                       if (!rowsAreInteractive) return
@@ -267,7 +272,10 @@ export function EntityTable({ config, data, onRowClick, className }: EntityTable
                     aria-selected={selectionToggleOnRowClick ? isSelected : undefined}
                     data-state={isSelected ? "selected" : undefined}
                     className={cn(
-                      rowsAreInteractive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/20",
+                      rowsAreInteractive &&
+                        "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/20",
+                      isAiFocused && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+                      isSelected && !isAiFocused && "bg-muted/50",
                     )}
                   >
                     {columns.map((col) => {

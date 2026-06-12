@@ -4,8 +4,8 @@ use dashmap::DashMap;
 
 use crate::{
     config::Config,
-    embeddings::EmbeddingClient,
     kaggle::{DownloadJobStatus, KaggleCacheEntry},
+    providers::Providers,
     qdrant_client::VectorStore,
     rig_agent::RigContext,
 };
@@ -15,7 +15,7 @@ use stdb_client::StdbClient;
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
-    pub embedder: Arc<EmbeddingClient>,
+    pub providers: Providers,
     pub vector_store: Arc<VectorStore>,
     pub rig: Arc<RigContext>,
     pub stdb: Arc<StdbClient>,

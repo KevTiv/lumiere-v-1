@@ -92,6 +92,7 @@ export const productsTableConfig = (
 
   return {
     id: "products-table",
+    entityType: "product",
     title: t("inventory.products.title"),
     description: t("inventory.products.description"),
     view: {

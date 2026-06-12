@@ -16,6 +16,12 @@ pub enum AppError {
     #[error("Embedding error: {0}")]
     Embedding(String),
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
+    #[error("Budget exceeded: {0}")]
+    BudgetExceeded(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -25,6 +31,8 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
+            AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
+            AppError::BudgetExceeded(m) => (StatusCode::TOO_MANY_REQUESTS, m.clone()),
             AppError::Qdrant(e) => (StatusCode::BAD_GATEWAY, e.to_string()),
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),

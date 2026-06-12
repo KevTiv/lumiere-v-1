@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
-import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
-import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
+import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
+import {
+  useErpAiSelectionReporter,
+  useErpAiSelectionState,
+} from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
 import { DashboardGrid } from "./dashboard-grid"
@@ -45,6 +48,7 @@ export function ModuleView({
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
+  const aiSelection = useErpAiSelectionState()
   const defaultCompanyId = companyIds?.[0]
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
@@ -109,18 +113,28 @@ export function ModuleView({
                 <EntityView
                   config={tab.entityConfig}
                   data={data[tab.id] ?? []}
+                  aiFocusRowKey={
+                    aiSelection.selection?.activeTab === tab.id &&
+                    aiSelection.selection.entityId &&
+                    resolveAiEntityType(tab.entityConfig) === aiSelection.selection.entityType
+                      ? aiSelection.selection.entityId
+                      : undefined
+                  }
                   onRowClick={(row) => {
-                    aiReporter?.setSelection(
-                      buildEntitySelection({
-                        activeTab: tab.id,
-                        entityType: tab.entityConfig!.id,
-                        row,
-                        rowKey:
-                          tab.entityConfig!.view.mode === "table"
-                            ? tab.entityConfig!.view.rowKey
-                            : undefined,
-                      }),
-                    )
+                    const entityType = resolveAiEntityType(tab.entityConfig!)
+                    if (entityType) {
+                      aiReporter?.setSelection(
+                        buildEntitySelection({
+                          activeTab: tab.id,
+                          entityType,
+                          row,
+                          rowKey:
+                            tab.entityConfig!.view.mode === "table"
+                              ? tab.entityConfig!.view.rowKey
+                              : undefined,
+                        }),
+                      )
+                    }
                     onRowClick?.(tab.id, row)
                   }}
                 />
@@ -136,7 +150,8 @@ export function ModuleView({
                         ? {
                             companyId: defaultCompanyId,
                             formId: tab.createForm.id,
-                            entityType: tab.entityConfig.id,
+                            entityType:
+                              resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
                           }
                         : undefined
                     }

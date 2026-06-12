@@ -39,8 +39,9 @@ pub async fn post_embed(
     // Capture before moving into EmbedPoint
     let content_type = req.content_type.clone();
 
-    // Compute embedding via Voyage AI
+    // Compute embedding via unified EmbedProvider
     let vector = state
+        .providers
         .embedder
         .embed(&req.text)
         .await
@@ -63,7 +64,7 @@ pub async fn post_embed(
         .map_err(AppError::Qdrant)?;
 
     // Confirm sync back to SpacetimeDB so SearchEmbedding.sync_status = "synced"
-    let model = state.config.embedding_model.clone();
+    let model = state.config.embedding_model_name();
     if let Err(e) = state
         .stdb
         .mark_embedding_synced(Some(req.company_id), req.stdb_embedding_id, &model, dim)

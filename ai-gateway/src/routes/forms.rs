@@ -4,12 +4,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use crate::{
+    ai_agent::{
+        ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
+        resolve_agent,
+    },
     error::{AppError, AppResult},
+    providers::llm::LlmMessage,
     state::AppState,
 };
 
-const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL: &str = "claude-sonnet-4-6";
 const FORM_SUGGEST_MAX_TOKENS: u32 = 2048;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -62,6 +65,8 @@ pub struct FormSuggestRequest {
     pub fields: Vec<FormField>,
     pub raw_text: Option<String>,
     pub document_job_id: Option<Value>,
+    pub agent_id: Option<u64>,
+    pub team_member_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -394,42 +399,59 @@ pub async fn post_suggest(
     }
 
     let prompt = build_suggestion_prompt(&req);
-    let payload = json!({
-        "model": CLAUDE_MODEL,
-        "max_tokens": FORM_SUGGEST_MAX_TOKENS,
-        "system": "You suggest ERP form values from user-provided text. You must return schema-constrained JSON only. Never include fields outside the supplied schema. Suggestions are advisory and must not submit or mutate data.",
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
 
-    let response = state
-        .http
-        .post(CLAUDE_API_URL)
-        .header("x-api-key", state.config.anthropic_api_key.as_str())
-        .header("anthropic-version", "2023-06-01")
-        .json(&payload)
-        .send()
+    let agent = resolve_agent(
+        &state.stdb,
+        req.org_id,
+        req.agent_id,
+        req.team_member_id,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    ensure_allowed_action(&agent, "form_suggest")
+        .map_err(|e| AppError::Forbidden(e.to_string()))?;
+    ensure_model_allowed(&agent)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    ensure_within_budget(&agent)
+        .map_err(|e| AppError::BudgetExceeded(e.to_string()))?;
+
+    let system = format!(
+        "{}\n\nYou suggest ERP form values from user-provided text. You must return schema-constrained JSON only. Never include fields outside the supplied schema. Suggestions are advisory and must not submit or mutate data.",
+        agent.system_prompt
+    );
+
+    let llm_resp = state
+        .providers
+        .llm
+        .complete(crate::providers::llm::LlmRequest {
+            provider: agent.provider.clone(),
+            model: agent.model.clone(),
+            system,
+            messages: vec![LlmMessage {
+                role: "user".to_string(),
+                content: prompt,
+            }],
+            max_tokens: agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS),
+            temperature: Some(agent.temperature),
+            top_p: Some(agent.top_p),
+        })
         .await
-        .map_err(|e| AppError::Internal(format!("Claude API request failed: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(AppError::Internal(format!(
-            "Claude API error {}: {}",
-            status, body
-        )));
+    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
+    if total_tokens > 0 {
+        if let Err(e) = record_ai_spend(&state.stdb, req.org_id, agent.agent_id, total_tokens).await
+        {
+            tracing::warn!(
+                agent_id = agent.agent_id,
+                error = %e,
+                "record_ai_spend failed"
+            );
+        }
     }
 
-    let body: Value = response
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to parse Claude response: {}", e)))?;
-    let text = body["content"][0]["text"].as_str().unwrap_or("{}");
+    let text = llm_resp.text.as_str();
     let model_json: Value = serde_json::from_str(clean_json_response(text))
         .map_err(|e| AppError::Internal(format!("Failed to parse form suggestion JSON: {}", e)))?;
 

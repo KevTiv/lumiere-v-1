@@ -1,4 +1,4 @@
-/// POST /v1/rag — Retrieval-Augmented Generation via Qdrant + Claude
+/// POST /v1/rag — Retrieval-Augmented Generation via Qdrant + tenant AiAgent LLM
 use axum::{
     extract::State,
     response::sse::{Event, KeepAlive, Sse},
@@ -11,16 +11,22 @@ use std::convert::Infallible;
 use std::time::Instant;
 
 use crate::{
+    ai_agent::{
+        ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
+        resolve_agent,
+    },
     error::{AppError, AppResult},
+    harness::{
+        fetch_live_snapshots, format_live_context_block, resolve_snapshot_candidates,
+        LiveSnapshot, RAG_MAX_LIVE_SNAPSHOTS, SnapshotUiContext,
+    },
+    providers::llm::LlmMessage,
     qdrant_client::SearchResult,
     rig_agent::ContextHit,
     state::AppState,
 };
 
-const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL: &str = "claude-sonnet-4-6";
 const RAG_MAX_CONTEXT_CHUNKS: u64 = 20;
-const RAG_MAX_TOKENS: u32 = 2048;
 const RAG_ORG_ACTIVITY_TOP_K: usize = 8;
 const RAG_ENTITY_MATCH_BOOST: f32 = 0.15;
 const RAG_MAX_INCLUDE_TYPES: usize = 8;
@@ -50,14 +56,28 @@ pub struct RagRequest {
     #[serde(default = "default_limit")]
     pub limit: u64,
     pub ui_context: Option<UiContext>,
+    pub agent_id: Option<u64>,
+    pub team_member_id: Option<u64>,
 }
 
 fn default_limit() -> u64 {
     RAG_MAX_CONTEXT_CHUNKS
 }
 
+fn default_source_kind() -> String {
+    "memory".to_string()
+}
+
+fn default_source_trust() -> String {
+    "retrieved".to_string()
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct RagSource {
+    #[serde(default = "default_source_kind")]
+    pub kind: String,
+    #[serde(default = "default_source_trust")]
+    pub trust: String,
     pub content_type: String,
     pub content_id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -66,12 +86,24 @@ pub struct RagSource {
     pub entity_id: Option<String>,
     pub score: f32,
     pub text_snippet: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot_at: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
 pub struct RagResponse {
     pub answer: String,
     pub sources: Vec<RagSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 fn format_ui_context_block(ctx: &UiContext) -> Option<String> {
@@ -116,18 +148,38 @@ fn format_ui_context_block(ctx: &UiContext) -> Option<String> {
     }
 }
 
-const LEGACY_SYSTEM_PROMPT: &str =
-    "You are an intelligent ERP assistant. Answer the user's question using only the provided context. Be concise and factual. If the context doesn't contain enough information, say so.";
+const LEGACY_SYSTEM_SUFFIX: &str = "Answer the user's question using only the provided context. Be concise and factual. If the context doesn't contain enough information, say so.";
 
-const CONTEXT_AWARE_SYSTEM_PROMPT: &str = "You are an intelligent ERP assistant. Answer the user's question using the retrieved context documents. Use the ERP UI context block only to interpret what screen or module the user is viewing - it is not a data source. Be concise and factual. If the retrieved context doesn't contain enough information, say so.";
+const CONTEXT_AWARE_SYSTEM_SUFFIX: &str = "Answer the user's question using the retrieved context documents. Use the ERP UI context block only to interpret what screen or module the user is viewing - it is not a data source. Be concise and factual. If the retrieved context doesn't contain enough information, say so.";
 
-fn build_user_prompt(retrieved_context: &str, ui_block: Option<&str>, query: &str) -> String {
-    match ui_block {
-        Some(ui) => format!(
-            "Current ERP UI context (factual metadata - not retrieved documents):\n{ui}\n\nRetrieved context:\n{retrieved_context}\n\nQuestion: {query}"
-        ),
-        None => format!("Context:\n{retrieved_context}\n\nQuestion: {query}"),
+const LIVE_SNAPSHOT_SYSTEM_SUFFIX: &str = "Answer using the provided ERP context. Live ERP snapshots are authoritative for current field values and status. Retrieved memory documents may be stale; never contradict a live snapshot. Use the ERP UI context block only to interpret what screen the user is viewing. Be concise and factual. If the context is insufficient, say so.";
+
+fn build_user_prompt(
+    retrieved_context: &str,
+    live_context: Option<&str>,
+    ui_block: Option<&str>,
+    query: &str,
+) -> String {
+    let mut sections: Vec<String> = Vec::new();
+
+    if let Some(ui) = ui_block {
+        sections.push(format!(
+            "Current ERP UI context (metadata — not a data source):\n{ui}"
+        ));
     }
+
+    if let Some(live) = live_context.filter(|s| !s.is_empty()) {
+        sections.push(format!(
+            "Live ERP snapshots (authoritative — use for current field values):\n{live}"
+        ));
+    }
+
+    if !retrieved_context.trim().is_empty() {
+        sections.push(format!("Retrieved memory (may be stale):\n{retrieved_context}"));
+    }
+
+    sections.push(format!("Question: {query}"));
+    sections.join("\n\n")
 }
 
 #[derive(Debug, Clone)]
@@ -150,12 +202,17 @@ fn company_hit_to_ranked(hit: SearchResult) -> RankedSource {
         text: text.clone(),
         score: hit.score,
         rag_source: RagSource {
+            kind: "memory".to_string(),
+            trust: "retrieved".to_string(),
             content_type: hit.content_type,
             content_id: hit.content_id,
             entity_type: None,
             entity_id: None,
             score: hit.score,
             text_snippet: text,
+            label: None,
+            field: None,
+            snapshot_at: None,
         },
     }
 }
@@ -168,12 +225,17 @@ fn org_hit_to_ranked(hit: ContextHit) -> RankedSource {
         text: text.clone(),
         score: hit.score,
         rag_source: RagSource {
+            kind: "activity".to_string(),
+            trust: "retrieved".to_string(),
             content_type: "org_activity".to_string(),
             content_id: parse_entity_id(&hit.entity_id),
             entity_type: Some(hit.entity_type),
             entity_id: Some(hit.entity_id),
             score: hit.score,
             text_snippet: text,
+            label: None,
+            field: None,
+            snapshot_at: None,
         },
     }
 }
@@ -220,6 +282,40 @@ fn merge_retrieval_hits(
     merged
 }
 
+fn snapshot_ui_from(ctx: Option<&UiContext>) -> Option<SnapshotUiContext> {
+    ctx.map(|c| SnapshotUiContext {
+        entity_type: c.entity_type.clone(),
+        entity_id: c.entity_id.clone(),
+    })
+}
+
+fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
+    snapshots
+        .iter()
+        .map(|snapshot| {
+            let excerpt = serde_json::to_string(&snapshot.row).unwrap_or_default();
+            let text_snippet = if excerpt.len() > 280 {
+                format!("{}…", &excerpt[..280])
+            } else {
+                excerpt
+            };
+            RagSource {
+                kind: "live".to_string(),
+                trust: "authoritative".to_string(),
+                content_type: snapshot.entity_type.clone(),
+                content_id: snapshot.entity_id,
+                entity_type: Some(snapshot.entity_type.clone()),
+                entity_id: Some(snapshot.entity_id.to_string()),
+                score: 1.0,
+                text_snippet,
+                label: Some(snapshot.label.clone()),
+                field: None,
+                snapshot_at: Some(snapshot.snapshot_at.clone()),
+            }
+        })
+        .collect()
+}
+
 fn format_retrieved_context(sources: &[RankedSource]) -> String {
     sources
         .iter()
@@ -260,11 +356,6 @@ pub async fn post_rag(
         .ui_context
         .as_ref()
         .and_then(|ctx| format_ui_context_block(ctx));
-    let system_prompt = if ui_block.is_some() {
-        CONTEXT_AWARE_SYSTEM_PROMPT
-    } else {
-        LEGACY_SYSTEM_PROMPT
-    };
     let route_label = req
         .ui_context
         .as_ref()
@@ -276,8 +367,9 @@ pub async fn post_rag(
         .and_then(|c| c.module.as_deref())
         .unwrap_or("-");
 
-    // Embed the query
+    // Embed the query (unified EmbedProvider)
     let query_vector = state
+        .providers
         .embedder
         .embed(&req.query)
         .await
@@ -322,16 +414,47 @@ pub async fn post_rag(
 
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
+
+    let snapshot_candidates = resolve_snapshot_candidates(
+        snapshot_ui_from(req.ui_context.as_ref()).as_ref(),
+        &company_hits,
+        &org_hits,
+        RAG_MAX_LIVE_SNAPSHOTS,
+    );
+
+    let org_id = req.org_id.ok_or_else(|| {
+        AppError::BadRequest("org_id is required for RAG generation".into())
+    })?;
+
+    let live_snapshots = fetch_live_snapshots(
+        &state.stdb,
+        org_id,
+        req.company_id,
+        &snapshot_candidates,
+    )
+    .await
+    .unwrap_or_else(|err| {
+        tracing::warn!(
+            company_id = req.company_id,
+            org_id,
+            error = %err,
+            "Live snapshot fetch failed; continuing with memory retrieval only"
+        );
+        Vec::new()
+    });
+
+    let live_snapshot_count = live_snapshots.len();
     let ranked = merge_retrieval_hits(company_hits, org_hits, req.ui_context.as_ref());
 
-    if ranked.is_empty() {
+    if ranked.is_empty() && live_snapshots.is_empty() {
         tracing::info!(
             company_id = req.company_id,
-            org_id = req.org_id.unwrap_or(0),
+            org_id,
             route = route_label,
             module = module_label,
             company_hit_count,
             org_hit_count,
+            live_snapshot_count = 0,
             source_count = 0,
             duration_ms = started.elapsed().as_millis() as u64,
             "RAG query answered (no hits)"
@@ -339,71 +462,108 @@ pub async fn post_rag(
         return Ok(Json(RagResponse {
             answer: "No relevant information found for your query.".to_string(),
             sources: vec![],
+            agent_id: None,
+            provider: None,
+            model: None,
         }));
     }
 
-    // Build context string from merged company + org retrieval
-    let context = format_retrieved_context(&ranked);
+    let agent = resolve_agent(
+        &state.stdb,
+        org_id,
+        req.agent_id,
+        req.team_member_id,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
-    let user_content = build_user_prompt(&context, ui_block.as_deref(), &req.query);
+    ensure_allowed_action(&agent, "chat")
+        .map_err(|e| AppError::Forbidden(e.to_string()))?;
+    ensure_model_allowed(&agent)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    ensure_within_budget(&agent)
+        .map_err(|e| AppError::BudgetExceeded(e.to_string()))?;
 
-    // Call Claude API with retrieved context and UI metadata
-    let claude_payload = json!({
-        "model": CLAUDE_MODEL,
-        "max_tokens": RAG_MAX_TOKENS,
-        "system": system_prompt,
-        "messages": [
-            {
-                "role": "user",
-                "content": user_content
-            }
-        ]
-    });
+    let retrieved_context = format_retrieved_context(&ranked);
+    let live_context = if live_snapshots.is_empty() {
+        None
+    } else {
+        Some(format_live_context_block(&live_snapshots))
+    };
 
-    let claude_resp = state
-        .http
-        .post(CLAUDE_API_URL)
-        .header("x-api-key", state.config.anthropic_api_key.as_str())
-        .header("anthropic-version", "2023-06-01")
-        .json(&claude_payload)
-        .send()
+    let context_suffix = if live_context.is_some() {
+        LIVE_SNAPSHOT_SYSTEM_SUFFIX
+    } else if ui_block.is_some() {
+        CONTEXT_AWARE_SYSTEM_SUFFIX
+    } else {
+        LEGACY_SYSTEM_SUFFIX
+    };
+    let system_prompt = format!("{}\n\n{}", agent.system_prompt, context_suffix);
+
+    let user_content = build_user_prompt(
+        &retrieved_context,
+        live_context.as_deref(),
+        ui_block.as_deref(),
+        &req.query,
+    );
+
+    let llm_resp = state
+        .providers
+        .llm
+        .complete(crate::providers::llm::LlmRequest {
+            provider: agent.provider.clone(),
+            model: agent.model.clone(),
+            system: system_prompt,
+            messages: vec![LlmMessage {
+                role: "user".to_string(),
+                content: user_content,
+            }],
+            max_tokens: agent.max_tokens,
+            temperature: Some(agent.temperature),
+            top_p: Some(agent.top_p),
+        })
         .await
-        .map_err(|e| AppError::Internal(format!("Claude API request failed: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
 
-    if !claude_resp.status().is_success() {
-        let status = claude_resp.status();
-        let body = claude_resp.text().await.unwrap_or_default();
-        return Err(AppError::Internal(format!(
-            "Claude API error {}: {}",
-            status, body
-        )));
+    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
+    if total_tokens > 0 {
+        if let Err(e) = record_ai_spend(&state.stdb, org_id, agent.agent_id, total_tokens).await {
+            tracing::warn!(
+                agent_id = agent.agent_id,
+                error = %e,
+                "record_ai_spend failed"
+            );
+        }
     }
 
-    let claude_body: serde_json::Value = claude_resp
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to parse Claude response: {}", e)))?;
+    let answer = llm_resp.text;
+    let provider = Some(llm_resp.provider);
+    let model = Some(llm_resp.model);
+    let agent_id = Some(agent.agent_id);
 
-    let answer = claude_body["content"][0]["text"]
-        .as_str()
-        .unwrap_or("No answer generated.")
-        .to_string();
-
-    let sources: Vec<RagSource> = ranked.into_iter().map(|s| s.rag_source).collect();
+    let mut sources: Vec<RagSource> = live_snapshots_to_rag_sources(&live_snapshots);
+    sources.extend(ranked.into_iter().map(|s| s.rag_source));
 
     tracing::info!(
         company_id = req.company_id,
-        org_id = req.org_id.unwrap_or(0),
+        org_id,
         route = route_label,
         module = module_label,
         company_hit_count,
         org_hit_count,
+        live_snapshot_count,
         source_count = sources.len(),
         duration_ms = started.elapsed().as_millis() as u64,
         "RAG query answered"
     );
 
-    Ok(Json(RagResponse { answer, sources }))
+    Ok(Json(RagResponse {
+        answer,
+        sources,
+        agent_id,
+        provider,
+        model,
+    }))
 }
 
 pub async fn post_rag_stream(
@@ -422,7 +582,15 @@ pub async fn post_rag_stream(
     events.push(
         Event::default()
             .event("sources")
-            .data(json!({ "sources": response.sources }).to_string()),
+            .data(
+                json!({
+                    "sources": response.sources,
+                    "agent_id": response.agent_id,
+                    "provider": response.provider,
+                    "model": response.model,
+                })
+                .to_string(),
+            ),
     );
     events.push(Event::default().event("done").data("{}"));
 
@@ -453,26 +621,26 @@ mod tests {
     }
 
     #[test]
-    fn user_prompt_separates_ui_and_retrieved_context() {
+    fn user_prompt_separates_ui_live_and_retrieved_context() {
         let prompt = build_user_prompt(
             "[1] (invoice) Example",
+            Some("[L1] Sale order #42 (as of 2026-01-01T00:00:00Z)\n{\"state\":\"sale\"}"),
             Some("Route: /sales\nModule: sales"),
             "What is this?",
         );
         assert!(prompt.contains("Current ERP UI context"));
-        assert!(prompt.contains("Retrieved context:"));
+        assert!(prompt.contains("Live ERP snapshots"));
+        assert!(prompt.contains("Retrieved memory"));
         assert!(prompt.contains("Question: What is this?"));
     }
 
     #[test]
-    fn user_prompt_without_ui_context_matches_legacy_format() {
-        let prompt = build_user_prompt("[1] (invoice) Example", None, "What is this?");
-        assert_eq!(
-            prompt,
-            "Context:\n[1] (invoice) Example\n\nQuestion: What is this?"
-        );
-        assert!(!prompt.contains("Retrieved context:"));
+    fn user_prompt_memory_only_omits_live_block() {
+        let prompt = build_user_prompt("[1] (invoice) Example", None, None, "What is this?");
+        assert!(prompt.contains("Retrieved memory"));
+        assert!(!prompt.contains("Live ERP snapshots"));
         assert!(!prompt.contains("Current ERP UI context"));
+        assert!(prompt.contains("Question: What is this?"));
     }
 
     #[test]
@@ -521,7 +689,24 @@ mod tests {
         assert_eq!(ranked.rag_source.entity_type.as_deref(), Some("sale_order"));
         assert_eq!(ranked.rag_source.entity_id.as_deref(), Some("42"));
         assert_eq!(ranked.rag_source.content_id, 42);
+        assert_eq!(ranked.rag_source.kind, "activity");
+        assert_eq!(ranked.rag_source.trust, "retrieved");
         assert!(ranked.label.contains("org_activity"));
+    }
+
+    #[test]
+    fn live_snapshots_map_to_authoritative_sources() {
+        let sources = live_snapshots_to_rag_sources(&[LiveSnapshot {
+            entity_type: "sale_order".into(),
+            entity_id: 42,
+            label: "Sale order #42".into(),
+            snapshot_at: "2026-06-12T12:00:00Z".into(),
+            row: serde_json::json!({"state": "sale"}),
+        }]);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].kind, "live");
+        assert_eq!(sources[0].trust, "authoritative");
+        assert_eq!(sources[0].label.as_deref(), Some("Sale order #42"));
     }
 
     #[test]

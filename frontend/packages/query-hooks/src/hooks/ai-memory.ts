@@ -24,12 +24,17 @@ export type AiMemoryContextHit = {
 }
 
 export type AiRagSource = {
+  kind?: string
+  trust?: string
   content_type: string
   content_id: number
   entity_type?: string
   entity_id?: string
   score: number
   text_snippet: string
+  label?: string
+  field?: string
+  snapshot_at?: string
 }
 
 export type AiChatSessionRow = {
@@ -278,7 +283,13 @@ export function useAiMemoryRag() {
         }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as { answer: string; sources: AiRagSource[] }
+      return (await r.json()) as {
+        answer: string
+        sources: AiRagSource[]
+        agent_id?: number
+        provider?: string
+        model?: string
+      }
     },
   })
 }

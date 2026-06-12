@@ -41,7 +41,7 @@ pub fn import_ai_agent_csv(
         let provider = {
             let v = col(&headers, row, "provider");
             if v.is_empty() {
-                "anthropic".to_string()
+                "mistral".to_string()
             } else {
                 v.to_string()
             }

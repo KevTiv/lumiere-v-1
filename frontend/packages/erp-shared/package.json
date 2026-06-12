@@ -21,7 +21,9 @@
     "./reports-dashboard-params": "./src/reports-dashboard-params.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",
-    "./ai-source-links": "./src/ai-source-links.ts"
+    "./ai-source-links": "./src/ai-source-links.ts",
+    "./ai-entity-snapshot-registry": "./src/ai-entity-snapshot-registry.ts",
+    "./ai-entity-type-resolver": "./src/ai-entity-type-resolver.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

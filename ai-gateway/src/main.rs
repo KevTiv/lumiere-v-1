@@ -1,7 +1,8 @@
+mod ai_agent;
 mod config;
 mod context_worker;
-mod embeddings;
 mod error;
+mod harness;
 mod kaggle;
 mod providers;
 mod qdrant_client;
@@ -30,7 +31,6 @@ use tower_http::{
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use config::Config;
-use embeddings::EmbeddingClient;
 use providers::build as build_providers;
 use qdrant_client::VectorStore;
 use rig_agent::RigContext;
@@ -63,10 +63,8 @@ async fn require_gateway_secret(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Load .env file if present (dev convenience)
     let _ = dotenvy::dotenv();
 
-    // Init structured logging
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -78,23 +76,12 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::from_env()?;
     tracing::info!("Starting Lumiere AI Gateway on port {}", config.port);
 
-    // Build shared state
-    let embedder = EmbeddingClient::new(
-        config.voyage_api_key.clone(),
-        config.embedding_model.clone(),
-    );
-
     let vector_store = VectorStore::new(
         &config.qdrant_url,
         config.qdrant_api_key.as_deref(),
         config.qdrant_collection.clone(),
     )
     .await?;
-
-    // Ensure Qdrant collection exists with the configured dimensions
-    vector_store
-        .ensure_collection(config.embedding_dim as u64)
-        .await?;
 
     let stdb = StdbClient::new(
         config.stdb_host.clone(),
@@ -103,18 +90,21 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let providers = build_providers(&config)?;
-    let rig = RigContext::new(&config, providers).await?;
+    let embed_dim = providers.embedder.dimensions();
+
+    vector_store.ensure_collection(embed_dim).await?;
+
+    let rig = RigContext::new(&config, providers.clone()).await?;
     rig.ensure_collection().await?;
 
     let config = Arc::new(config);
-    let embedder = Arc::new(embedder);
     let vector_store = Arc::new(vector_store);
     let stdb = Arc::new(stdb);
     let rig = Arc::new(rig);
 
     let state = AppState {
         config: config.clone(),
-        embedder: embedder.clone(),
+        providers: providers.clone(),
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
         rig: rig.clone(),
@@ -124,18 +114,15 @@ async fn main() -> anyhow::Result<()> {
         activity_watermarks: Arc::new(DashMap::new()),
     };
 
-    // Spawn background queue worker
     tokio::spawn(worker::run(
         config.clone(),
-        embedder.clone(),
+        providers.embedder.clone(),
         vector_store.clone(),
         stdb.clone(),
     ));
 
-    // Spawn org-context activity ingester
     tokio::spawn(context_worker::run(state.clone()));
 
-    // Build Axum router
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -164,7 +151,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route("/v1/context/document", post(routes::context::post_document))
-        // Kaggle dataset proxy
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))

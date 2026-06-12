@@ -134,6 +134,7 @@ export const contactsTableConfig = (
 
   return {
     id: "contacts-table",
+    entityType: "contact",
     title: t("crm.contacts.title"),
     description: t("crm.contacts.description"),
     view: {

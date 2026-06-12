@@ -79,6 +79,7 @@ export const saleOrdersTableConfig = (
 
   return {
     id: "sale-orders-table",
+    entityType: "sale_order",
     title: t("sales.salesOrders.title"),
     description: t("sales.salesOrders.description"),
     view: {

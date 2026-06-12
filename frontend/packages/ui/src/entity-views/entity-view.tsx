@@ -22,6 +22,8 @@ interface EntityViewProps {
   record?: Record<string, unknown>
   /** Wrap in a Card (default: true) */
   useCard?: boolean
+  /** Highlight row key for ERP AI context focus */
+  aiFocusRowKey?: string
   onRowClick?: (row: Record<string, unknown>) => void
   className?: string
 }
@@ -73,6 +75,7 @@ export function EntityView({
   data = [],
   record = {},
   useCard = true,
+  aiFocusRowKey,
   onRowClick,
   className,
 }: EntityViewProps) {
@@ -81,6 +84,7 @@ export function EntityView({
       <EntityTable
         config={config.view}
         data={data}
+        aiFocusRowKey={aiFocusRowKey}
         onRowClick={onRowClick}
       />
     ) : (

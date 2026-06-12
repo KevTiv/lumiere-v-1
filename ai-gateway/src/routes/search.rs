@@ -50,6 +50,7 @@ pub async fn post_search(
 
     // Embed the query text
     let query_vector = state
+        .providers
         .embedder
         .embed(&req.query)
         .await

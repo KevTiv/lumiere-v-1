@@ -217,6 +217,26 @@ services:
             port: 6379
             timeout: 2000
 
+  - name: web-ai
+    url: http://web:3000
+    routes:
+      - name: web-ai
+        paths:
+          - /api/ai
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: redis
+          redis:
+            host: redis
+            port: 6379
+            timeout: 2000
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 20
+
 plugins:
   - name: cors
     config:

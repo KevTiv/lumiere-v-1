@@ -12,6 +12,10 @@ export {
   buildModuleTabHref,
   resolveAiSourceHref,
 } from "@lumiere/erp-shared/ai-source-links"
+export {
+  normalizeEntityTypeKey,
+  resolveAiEntityType,
+} from "@lumiere/erp-shared/ai-entity-type-resolver"
 
 import {
   buildRagUiContext,
@@ -19,6 +23,7 @@ import {
   summarizeEntityRow,
   type AiUiContext,
 } from "@lumiere/erp-shared/ai-ui-context"
+import { normalizeEntityTypeKey } from "@lumiere/erp-shared/ai-entity-type-resolver"
 
 export type AiEntitySelection = {
   activeTab?: string
@@ -90,6 +95,7 @@ export function buildEntitySelection(args: {
 }): AiEntitySelection {
   const rawId = args.row[args.rowKey ?? "id"]
   const entityId = rawId == null ? undefined : String(rawId)
+  const canonicalType = normalizeEntityTypeKey(args.entityType)
   const baseSummary = summarizeEntityRow(args.row)
   const selectionSummary =
     entityId && !baseSummary.includes(`#${entityId}`)
@@ -98,7 +104,7 @@ export function buildEntitySelection(args: {
 
   return {
     activeTab: args.activeTab,
-    entityType: args.entityType,
+    entityType: canonicalType,
     entityId,
     selectionSummary,
   }

@@ -94,11 +94,14 @@ services:
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
       STDB_TOKEN: ${STDB_TOKEN:?set STDB_TOKEN}
-      VOYAGE_API_KEY: ${VOYAGE_API_KEY:?set VOYAGE_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-llama3.2}
       UNSTRUCTURED_URL: ${UNSTRUCTURED_URL:-http://host.docker.internal:8000}
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      KONG_LLM_URL: ${KONG_LLM_URL:-}
+      KONG_LLM_SERVICE_TOKEN: ${KONG_LLM_SERVICE_TOKEN:-}
     expose:
       - "8080"
     restart: unless-stopped

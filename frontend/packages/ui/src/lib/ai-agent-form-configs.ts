@@ -40,14 +40,18 @@ export function aiAgentCreateFormConfig(t: TFunction): FormConfig {
             validation: { minLength: 1 },
           },
           {
-            type: "text",
+            type: "select",
             id: "provider",
             name: "provider",
             label: t("settings.ai.provider"),
             required: true,
             width: "1/2",
-            defaultValue: "OpenAI",
-            validation: { minLength: 1 },
+            defaultValue: "Mistral",
+            options: [
+              { value: "Mistral", label: "Mistral" },
+              { value: "Gemini", label: "Google Gemini" },
+              { value: "Ollama", label: "Ollama" },
+            ],
           },
           {
             type: "text",
@@ -56,7 +60,8 @@ export function aiAgentCreateFormConfig(t: TFunction): FormConfig {
             label: t("settings.ai.model"),
             required: true,
             width: "1/2",
-            defaultValue: "gpt-4o",
+            defaultValue: "mistral-small-latest",
+            placeholder: "mistral-small-latest | gemini-2.0-flash | llama3.2",
             validation: { minLength: 1 },
           },
           {
