@@ -14,11 +14,12 @@ use crate::{
     ai_agent::{
         ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
         resolve_agent,
+        agent_allows_live_read,
     },
     error::{AppError, AppResult},
     harness::{
-        fetch_live_snapshots, format_live_context_block, resolve_snapshot_candidates,
-        LiveSnapshot, RAG_MAX_LIVE_SNAPSHOTS, SnapshotUiContext,
+        fetch_live_snapshots, filter_entity_refs_by_allowed_types, format_live_context_block,
+        resolve_snapshot_candidates, LiveSnapshot, RAG_MAX_LIVE_SNAPSHOTS, SnapshotUiContext,
     },
     providers::llm::LlmMessage,
     qdrant_client::SearchResult,
@@ -58,6 +59,9 @@ pub struct RagRequest {
     pub ui_context: Option<UiContext>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    /// Optional BFF-provided entity allowlist for live snapshot reads.
+    #[serde(default)]
+    pub allowed_entity_types: Vec<String>,
 }
 
 fn default_limit() -> u64 {
@@ -415,33 +419,55 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
-    let snapshot_candidates = resolve_snapshot_candidates(
-        snapshot_ui_from(req.ui_context.as_ref()).as_ref(),
-        &company_hits,
-        &org_hits,
-        RAG_MAX_LIVE_SNAPSHOTS,
-    );
-
     let org_id = req.org_id.ok_or_else(|| {
         AppError::BadRequest("org_id is required for RAG generation".into())
     })?;
 
-    let live_snapshots = fetch_live_snapshots(
+    let agent = resolve_agent(
         &state.stdb,
         org_id,
-        req.company_id,
-        &snapshot_candidates,
+        req.agent_id,
+        req.team_member_id,
     )
     .await
-    .unwrap_or_else(|err| {
-        tracing::warn!(
-            company_id = req.company_id,
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    let allowed_types = (!req.allowed_entity_types.is_empty())
+        .then_some(req.allowed_entity_types.as_slice());
+    let snapshot_candidates = filter_entity_refs_by_allowed_types(
+        resolve_snapshot_candidates(
+            snapshot_ui_from(req.ui_context.as_ref()).as_ref(),
+            &company_hits,
+            &org_hits,
+            RAG_MAX_LIVE_SNAPSHOTS,
+        ),
+        allowed_types,
+    );
+
+    let live_snapshots = if agent_allows_live_read(&agent) {
+        fetch_live_snapshots(
+            &state.stdb,
             org_id,
-            error = %err,
-            "Live snapshot fetch failed; continuing with memory retrieval only"
+            req.company_id,
+            &snapshot_candidates,
+        )
+        .await
+        .unwrap_or_else(|err| {
+            tracing::warn!(
+                company_id = req.company_id,
+                org_id,
+                error = %err,
+                "Live snapshot fetch failed; continuing with memory retrieval only"
+            );
+            Vec::new()
+        })
+    } else {
+        tracing::debug!(
+            agent_id = agent.agent_id,
+            "Agent lacks live_read permission; skipping live snapshots"
         );
         Vec::new()
-    });
+    };
 
     let live_snapshot_count = live_snapshots.len();
     let ranked = merge_retrieval_hits(company_hits, org_hits, req.ui_context.as_ref());
@@ -467,15 +493,6 @@ pub async fn post_rag(
             model: None,
         }));
     }
-
-    let agent = resolve_agent(
-        &state.stdb,
-        org_id,
-        req.agent_id,
-        req.team_member_id,
-    )
-    .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     ensure_allowed_action(&agent, "chat")
         .map_err(|e| AppError::Forbidden(e.to_string()))?;
@@ -702,6 +719,7 @@ mod tests {
             label: "Sale order #42".into(),
             snapshot_at: "2026-06-12T12:00:00Z".into(),
             row: serde_json::json!({"state": "sale"}),
+            relations: vec![],
         }]);
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].kind, "live");

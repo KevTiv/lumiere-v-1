@@ -140,6 +140,34 @@ pub async fn execute_resource_query(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
+        "ai-action-drafts" => {
+            let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND proposed_by = {id} ORDER BY id DESC"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "ai-action-drafts-inbox" => {
+            let company_ids = company_ids_for_organization(client, organization_id, fa).await?;
+            if company_ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let company_filter = company_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND company_id IN ({company_filter}) AND status = 'pending' ORDER BY id DESC"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
         "consolidation-accounts" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
             let sql = format!("SELECT {} FROM consolidation_account", col.join(", "));

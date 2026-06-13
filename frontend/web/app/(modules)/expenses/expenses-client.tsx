@@ -39,6 +39,7 @@ import {
   useExpensesCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import {
@@ -104,7 +105,8 @@ function ExpensesClientLoaded({
 }: ExpensesClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowAction, setRowAction] = useState<
     { tabId: "expenses" | "expense-sheets"; row: Record<string, unknown> } | null
@@ -130,9 +132,9 @@ function ExpensesClientLoaded({
     [sheetsRaw],
   )
 
-  const createExpense = useCreateExpense(orgId, companyId)
-  const createExpenseSheet = useCreateExpenseSheet(orgId, companyId)
-  const updateExpense = useUpdateExpense(orgId, companyId)
+  const createExpense = useCreateExpense(orgId, operatingCompanyId)
+  const createExpenseSheet = useCreateExpenseSheet(orgId, operatingCompanyId)
+  const updateExpense = useUpdateExpense(orgId, operatingCompanyId)
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId)

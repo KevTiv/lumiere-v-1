@@ -14,6 +14,18 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
 | `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
 
+### AI gateway (`ai-gateway`)
+
+| Variable | Purpose |
+|----------|---------|
+| `EMBEDDING_PROVIDER` | Unified Qdrant embed backend: `ollama` (default), `mistral`, or `gemini` |
+| `MISTRAL_API_KEY` / `GOOGLE_API_KEY` | Provider keys for LLM + embed when configured on `AiAgent` or `EMBEDDING_PROVIDER` |
+| `OLLAMA_URL` | Local Ollama for embed, vision, and chat |
+| `KONG_LLM_URL` | Optional internal Kong AI route for LLM chat (else direct provider HTTP) |
+| `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | BFF → gateway auth header |
+
+Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mistral, Gemini, Ollama).
+
 ## Modes
 
 ### Local SpacetimeDB (`spacetime start`)

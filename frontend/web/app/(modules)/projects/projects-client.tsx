@@ -46,6 +46,7 @@ import {
   useProjectsCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/projects"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
 import {
@@ -209,7 +210,8 @@ function ProjectsClientLoaded({
   organizationId,
 }: ProjectsClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
@@ -224,13 +226,13 @@ function ProjectsClientLoaded({
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: users = [] } = useUsers(orgId)
 
-  const createProject = useCreateProject(orgId, companyId)
-  const createTask = useCreateTask(orgId, companyId)
-  const updateProject = useUpdateProject(orgId, companyId)
-  const updateTask = useUpdateTask(orgId, companyId)
+  const createProject = useCreateProject(orgId, operatingCompanyId)
+  const createTask = useCreateTask(orgId, operatingCompanyId)
+  const updateProject = useUpdateProject(orgId, operatingCompanyId)
+  const updateTask = useUpdateTask(orgId, operatingCompanyId)
   const updateTaskState = useUpdateTaskState(orgId)
-  const createTimesheet = useCreateTimesheet(orgId, companyId)
-  const startTimer = useStartTimesheetTimer(orgId, companyId)
+  const createTimesheet = useCreateTimesheet(orgId, operatingCompanyId)
+  const startTimer = useStartTimesheetTimer(orgId, operatingCompanyId)
   const stopTimer = useStopTimesheetTimer(orgId)
   const setProjectActive = useSetProjectActive(orgId)
   const toggleFavorite = useToggleProjectFavorite(orgId)
@@ -238,7 +240,7 @@ function ProjectsClientLoaded({
   const assignTaskUsers = useAssignTaskUsers(orgId)
   const validateTimesheets = useValidateTimesheets(orgId)
   const billTimesheets = useBillTimesheets(orgId)
-  const csvImports = useProjectsCsvImportMutations(orgId, companyId)
+  const csvImports = useProjectsCsvImportMutations(orgId, operatingCompanyId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
 
@@ -606,7 +608,7 @@ function ProjectsClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) =>
                     void validateTimesheets.mutateAsync({
-                      companyId,
+                      companyId: operatingCompanyId,
                       timesheetIds: selectedIds(rows),
                     }),
                 },
@@ -638,7 +640,7 @@ function ProjectsClientLoaded({
       taskParentFormConfig,
       stopTimer,
       validateTimesheets,
-      companyId,
+      operatingCompanyId,
     ],
   )
 
@@ -658,10 +660,10 @@ function ProjectsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createProject") {
-      const p = toCreateProjectParams(formData, pricelists, companyId)
+      const p = toCreateProjectParams(formData, pricelists, operatingCompanyId)
       if (p) await createProject.mutateAsync(projectsParamsToJson(p))
     } else if (action === "createTask") {
-      const p = toCreateTaskParams(formData, companyId)
+      const p = toCreateTaskParams(formData, operatingCompanyId)
       if (p) await createTask.mutateAsync(projectsParamsToJson(p))
     } else if (action === "updateProject" && modal.type === 'edit') {
       const p = toUpdateProjectParams(formData)
@@ -670,10 +672,10 @@ function ProjectsClientLoaded({
       const p = toUpdateTaskParams(formData)
       if (p) await updateTask.mutateAsync({ taskId: modal.entityId, params: projectsParamsToJson(p) })
     } else if (action === "logTimesheet") {
-      const p = toLogTimesheetParams(formData, companyId)
+      const p = toLogTimesheetParams(formData, operatingCompanyId)
       if (p) await createTimesheet.mutateAsync(projectsParamsToJson(p))
     } else if (action === "startTimer") {
-      const p = toLogTimesheetParams(formData, companyId)
+      const p = toLogTimesheetParams(formData, operatingCompanyId)
       if (p) await startTimer.mutateAsync(projectsParamsToJson(p))
     }
   }
@@ -779,7 +781,7 @@ function ProjectsClientLoaded({
               } else if (lifecycleModal.type === "billTimesheets") {
                 if (ids.length === 0) throw new Error("Select at least one timesheet")
                 await billTimesheets.mutateAsync({
-                  companyId,
+                  companyId: operatingCompanyId,
                   timesheetIds: ids,
                   journalId: formData.journalId as string | number,
                   incomeAccountId: formData.incomeAccountId as string | number,

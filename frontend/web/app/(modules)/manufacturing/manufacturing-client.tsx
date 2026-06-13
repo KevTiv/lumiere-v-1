@@ -28,6 +28,7 @@ import {
 } from "@lumiere/query-hooks/hooks/manufacturing"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   useProducts,
   useStockQuants,
@@ -84,7 +85,8 @@ function ManufacturingClientLoaded({
   organizationId,
 }: ManufacturingClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
@@ -104,7 +106,7 @@ function ManufacturingClientLoaded({
   const { data: transfers = [] } = useStockPickings(orgId, initialStockPickings)
   const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
 
-  const m = useManufacturingMutations(orgId, companyId)
+  const m = useManufacturingMutations(orgId, operatingCompanyId)
 
   const moduleConfig = useMemo(() => manufacturingModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(

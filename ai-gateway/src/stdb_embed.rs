@@ -28,6 +28,7 @@ pub trait LumiereStdbExt {
     ) -> anyhow::Result<Vec<PendingEmbedJob>>;
     async fn mark_embedding_synced(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         embedding_id: u64,
         model: &str,
@@ -40,6 +41,7 @@ pub trait LumiereStdbExt {
         error_message: Option<String>,
     ) -> anyhow::Result<()>;
     async fn claim_queue_job(&self, organization_id: u64, job_id: u64) -> anyhow::Result<()>;
+    async fn organization_id_for_company(&self, company_id: u64) -> anyhow::Result<Option<u64>>;
 }
 
 fn u64_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
@@ -105,6 +107,7 @@ impl LumiereStdbExt for StdbClient {
 
     async fn mark_embedding_synced(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         embedding_id: u64,
         model: &str,
@@ -112,7 +115,7 @@ impl LumiereStdbExt for StdbClient {
     ) -> anyhow::Result<()> {
         self.call_reducer(
             "mark_embedding_synced",
-            json!([company_id, embedding_id, model, dim]),
+            json!([organization_id, company_id, embedding_id, model, dim]),
         )
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))
@@ -136,5 +139,17 @@ impl LumiereStdbExt for StdbClient {
         self.call_reducer("claim_queue_job", json!([organization_id, job_id]))
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    async fn organization_id_for_company(&self, company_id: u64) -> anyhow::Result<Option<u64>> {
+        let sql = format!(
+            "SELECT organization_id FROM company WHERE id = {company_id} LIMIT 1"
+        );
+        let rows = self
+            .query_sql(&sql)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let row = rows.into_iter().next();
+        Ok(row.and_then(|r| u64_field(&r, "organizationId", "organization_id")))
     }
 }

@@ -107,17 +107,13 @@ export function resolveErpCompanyId(args: {
   sessionCompanyIds?: readonly number[] | null
   companyRows?: readonly Record<string, unknown>[] | null
 }): number | null {
-  const organizationId = args.organizationId != null && args.organizationId > 0
-    ? Math.floor(args.organizationId)
-    : null
+  void args.organizationId
+
   const sessionCompanyIds = (args.sessionCompanyIds ?? [])
     .map(numberFromUnknown)
     .filter((id): id is number => id != null && id > 0)
 
   if (sessionCompanyIds.length > 0) {
-    if (organizationId != null && sessionCompanyIds.includes(organizationId)) {
-      return organizationId
-    }
     return sessionCompanyIds[0] ?? null
   }
 
@@ -125,13 +121,10 @@ export function resolveErpCompanyId(args: {
     .map((row) => numberFromUnknown(row.id))
     .filter((id): id is number => id != null && id > 0)
   if (rowIds.length > 0) {
-    if (organizationId != null && rowIds.includes(organizationId)) {
-      return organizationId
-    }
     return rowIds[0] ?? null
   }
 
-  return organizationId
+  return null
 }
 
 export function summarizeEntityRow(row: Record<string, unknown>, maxLen = MAX_FIELD_LEN): string {

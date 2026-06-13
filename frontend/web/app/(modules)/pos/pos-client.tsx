@@ -3,6 +3,7 @@
 import { POSPage } from "@lumiere/ui/pos/pos-page"
 import { FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePOS } from "./use-pos"
 import { useState } from "react"
 
@@ -134,11 +135,12 @@ function PosClientLoaded({
   initialProducts,
   initialTerminals,
 }: PosClientLoadedProps) {
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [posAction, setPosAction] = useState<PosAction | null>(null)
   const pos = usePOS(
     orgId,
-    companyId,
+    operatingCompanyId,
     initialProducts,
     initialTerminals
   )

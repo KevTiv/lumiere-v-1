@@ -358,13 +358,20 @@ async fn create_stdb_doc_job(
     // Call create_document_processing_job reducer
     let args = serde_json::json!([
         req.org_id,
+        serde_json::Value::Null,
         {
             "document_type": req.doc_type,
             "job_type": "ocr",
-            "status": "Completed",
-            "extracted_data": extracted_text.chars().take(2000).collect::<String>(),
-            "confidence_score": 0.85_f32,
-            "tokens_used": chunks as u32 * 50,
+            "ai_agent_id": serde_json::Value::Null,
+            "input_data": serde_json::json!({
+                "doc_id": req.doc_id,
+                "filename": req.filename,
+                "extracted_preview": extracted_text.chars().take(2000).collect::<String>(),
+            }).to_string(),
+            "metadata": serde_json::json!({
+                "chunks_embedded": chunks,
+                "confidence_score": 0.85,
+            }).to_string(),
         }
     ]);
 

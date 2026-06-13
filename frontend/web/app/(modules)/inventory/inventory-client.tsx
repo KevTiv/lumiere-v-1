@@ -196,6 +196,7 @@ import {
 } from "@lumiere/query-hooks/hooks/inventory"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 type ScalarId = bigint | number | string
 
@@ -297,7 +298,8 @@ function InventoryClientLoaded({
   organizationId,
 }: InventoryClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editProductRow, setEditProductRow] = useState<Record<string, unknown> | null>(null)
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)
@@ -347,10 +349,10 @@ function InventoryClientLoaded({
     importProductCategory: useImportProductCategoryCsv(orgId),
     importProduct: useImportProductCsv(orgId),
     importProductVariant: useImportProductVariantCsv(orgId),
-    importWarehouse: useImportWarehouseCsv(orgId, companyId),
-    importStockLocation: useImportStockLocationCsv(orgId, companyId),
-    importStockQuant: useImportStockQuantCsv(orgId, companyId),
-    importLot: useImportLotCsv(orgId, companyId),
+    importWarehouse: useImportWarehouseCsv(orgId, operatingCompanyId),
+    importStockLocation: useImportStockLocationCsv(orgId, operatingCompanyId),
+    importStockQuant: useImportStockQuantCsv(orgId, operatingCompanyId),
+    importLot: useImportLotCsv(orgId, operatingCompanyId),
   }
 
   useEffect(() => {
@@ -461,11 +463,11 @@ function InventoryClientLoaded({
   )
 
   const createProduct = useCreateProduct(orgId)
-  const createStockPicking = useCreateStockPicking(orgId, { companyId })
+  const createStockPicking = useCreateStockPicking(orgId, { companyId: operatingCompanyId ?? undefined })
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId)
-  const createStockInventory = useCreateStockInventory(orgId, companyId)
-  const createStockInventoryLine = useCreateStockInventoryLine(orgId, companyId)
-  const updateStockInventoryState = useUpdateStockInventoryState(orgId, companyId)
+  const createStockInventory = useCreateStockInventory(orgId, operatingCompanyId)
+  const createStockInventoryLine = useCreateStockInventoryLine(orgId, operatingCompanyId)
+  const updateStockInventoryState = useUpdateStockInventoryState(orgId, operatingCompanyId)
   const createStockLocation = useCreateStockLocation(orgId)
   const updateStockLocation = useUpdateStockLocation(orgId)
   const createWarehouse = useCreateWarehouse(orgId)
@@ -475,19 +477,19 @@ function InventoryClientLoaded({
   const deleteProduct = useDeleteProduct(orgId)
   const createProductVariant = useCreateProductVariant(orgId)
   const deleteStockLocation = useDeleteStockLocation(orgId)
-  const createStockMove = useCreateStockMove(orgId, companyId)
-  const confirmStockMove = useConfirmStockMove(orgId, companyId)
-  const assignStockMove = useAssignStockMove(orgId, companyId)
-  const doneStockMove = useDoneStockMove(orgId, companyId)
-  const cancelStockMove = useCancelStockMove(orgId, companyId)
-  const assignUserToPicking = useAssignUserToPicking(orgId, companyId)
-  const confirmPicking = useConfirmStockPicking(orgId, companyId)
-  const assignPicking = useAssignStockPicking(orgId, companyId)
-  const validatePicking = useValidateStockPicking(orgId, companyId)
-  const cancelPicking = useCancelStockPicking(orgId, companyId)
+  const createStockMove = useCreateStockMove(orgId, operatingCompanyId)
+  const confirmStockMove = useConfirmStockMove(orgId, operatingCompanyId)
+  const assignStockMove = useAssignStockMove(orgId, operatingCompanyId)
+  const doneStockMove = useDoneStockMove(orgId, operatingCompanyId)
+  const cancelStockMove = useCancelStockMove(orgId, operatingCompanyId)
+  const assignUserToPicking = useAssignUserToPicking(orgId, operatingCompanyId)
+  const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId)
+  const assignPicking = useAssignStockPicking(orgId, operatingCompanyId)
+  const validatePicking = useValidateStockPicking(orgId, operatingCompanyId)
+  const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId)
   const processAdjustment = useProcessInventoryAdjustment(orgId)
-  const reserveQuant = useReserveStockQuant(orgId, companyId)
-  const unreserveQuant = useUnreserveStockQuant(orgId, companyId)
+  const reserveQuant = useReserveStockQuant(orgId, operatingCompanyId)
+  const unreserveQuant = useUnreserveStockQuant(orgId, operatingCompanyId)
 
   const locationParentOptions = useMemo(() => {
     const opts = locations.map((loc) => ({
@@ -560,76 +562,76 @@ function InventoryClientLoaded({
 
   // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
   const firstWarehouseId = warehouses[0]?.id ? BigInt(String(warehouses[0].id)) : 0n
-  const { zones, slots, items: warehouseItems } = useWarehouse3D(orgId, companyId, firstWarehouseId)
-  const moveStockItem = useMoveStockItem3D(orgId, companyId)
+  const { zones, slots, items: warehouseItems } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId)
+  const moveStockItem = useMoveStockItem3D(orgId, operatingCompanyId)
 
   // Quality management hooks
-  const createQualityCheck = useCreateQualityCheck(orgId, companyId)
-  const passQualityCheck = usePassQualityCheck(orgId, companyId)
-  const failQualityCheck = useFailQualityCheck(orgId, companyId)
-  const deleteQualityCheck = useDeleteQualityCheck(orgId, companyId)
-  const createQualityAlert = useCreateQualityAlert(orgId, companyId)
-  const assignQualityAlert = useAssignQualityAlert(orgId, companyId)
-  const cancelQualityAlert = useCancelQualityAlert(orgId, companyId)
-  const deleteQualityAlert = useDeleteQualityAlert(orgId, companyId)
-  const createQualityPoint = useCreateQualityPoint(orgId, companyId)
-  const updateQualityPoint = useUpdateQualityPoint(orgId, companyId)
-  const deleteQualityPoint = useDeleteQualityPoint(orgId, companyId)
-  const createQualityTeam = useCreateQualityTeam(orgId, companyId)
-  const updateQualityTeam = useUpdateQualityTeam(orgId, companyId)
-  const deleteQualityTeam = useDeleteQualityTeam(orgId, companyId)
+  const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId)
+  const passQualityCheck = usePassQualityCheck(orgId, operatingCompanyId)
+  const failQualityCheck = useFailQualityCheck(orgId, operatingCompanyId)
+  const deleteQualityCheck = useDeleteQualityCheck(orgId, operatingCompanyId)
+  const createQualityAlert = useCreateQualityAlert(orgId, operatingCompanyId)
+  const assignQualityAlert = useAssignQualityAlert(orgId, operatingCompanyId)
+  const cancelQualityAlert = useCancelQualityAlert(orgId, operatingCompanyId)
+  const deleteQualityAlert = useDeleteQualityAlert(orgId, operatingCompanyId)
+  const createQualityPoint = useCreateQualityPoint(orgId, operatingCompanyId)
+  const updateQualityPoint = useUpdateQualityPoint(orgId, operatingCompanyId)
+  const deleteQualityPoint = useDeleteQualityPoint(orgId, operatingCompanyId)
+  const createQualityTeam = useCreateQualityTeam(orgId, operatingCompanyId)
+  const updateQualityTeam = useUpdateQualityTeam(orgId, operatingCompanyId)
+  const deleteQualityTeam = useDeleteQualityTeam(orgId, operatingCompanyId)
 
   // Barcode hooks
-  const createBarcodeRule = useCreateBarcodeRule(orgId, companyId)
-  const updateBarcodeRule = useUpdateBarcodeRule(orgId, companyId)
-  const deleteBarcodeRule = useDeleteBarcodeRule(orgId, companyId)
-  const recordBarcodeScan = useRecordBarcodeScan(orgId, companyId)
-  const createBarcodeNomenclature = useCreateBarcodeNomenclature(orgId, companyId)
-  const updateBarcodeNomenclature = useUpdateBarcodeNomenclature(orgId, companyId)
-  const deleteBarcodeNomenclature = useDeleteBarcodeNomenclature(orgId, companyId)
-  const addRuleToNomenclature = useAddRuleToNomenclature(orgId, companyId)
-  const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(orgId, companyId)
-  const createAdjustmentReason = useCreateAdjustmentReason(orgId, companyId)
-  const useSerial = useUseSerial(orgId, companyId)
-  const createStockProductionLot = useCreateStockProductionLot(orgId, companyId)
-  const createStockProductionSerial = useCreateStockProductionSerial(orgId, companyId)
-  const createTraceabilityRecord = useCreateTraceabilityRecord(orgId, companyId)
-  const createTraceabilityReport = useCreateTraceabilityReport(orgId, companyId)
-  const runTraceabilityReport = useRunTraceabilityReport(orgId, companyId)
+  const createBarcodeRule = useCreateBarcodeRule(orgId, operatingCompanyId)
+  const updateBarcodeRule = useUpdateBarcodeRule(orgId, operatingCompanyId)
+  const deleteBarcodeRule = useDeleteBarcodeRule(orgId, operatingCompanyId)
+  const recordBarcodeScan = useRecordBarcodeScan(orgId, operatingCompanyId)
+  const createBarcodeNomenclature = useCreateBarcodeNomenclature(orgId, operatingCompanyId)
+  const updateBarcodeNomenclature = useUpdateBarcodeNomenclature(orgId, operatingCompanyId)
+  const deleteBarcodeNomenclature = useDeleteBarcodeNomenclature(orgId, operatingCompanyId)
+  const addRuleToNomenclature = useAddRuleToNomenclature(orgId, operatingCompanyId)
+  const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(orgId, operatingCompanyId)
+  const createAdjustmentReason = useCreateAdjustmentReason(orgId, operatingCompanyId)
+  const useSerial = useUseSerial(orgId, operatingCompanyId)
+  const createStockProductionLot = useCreateStockProductionLot(orgId, operatingCompanyId)
+  const createStockProductionSerial = useCreateStockProductionSerial(orgId, operatingCompanyId)
+  const createTraceabilityRecord = useCreateTraceabilityRecord(orgId, operatingCompanyId)
+  const createTraceabilityReport = useCreateTraceabilityReport(orgId, operatingCompanyId)
+  const runTraceabilityReport = useRunTraceabilityReport(orgId, operatingCompanyId)
 
   // Replenishment hooks
-  const createReplenishmentRule = useCreateReplenishmentRule(orgId, companyId)
-  const updateReplenishmentRule = useUpdateReplenishmentRule(orgId, companyId)
-  const deleteReplenishmentRule = useDeleteReplenishmentRule(orgId, companyId)
-  const triggerReplenishment = useTriggerReplenishment(orgId, companyId)
+  const createReplenishmentRule = useCreateReplenishmentRule(orgId, operatingCompanyId)
+  const updateReplenishmentRule = useUpdateReplenishmentRule(orgId, operatingCompanyId)
+  const deleteReplenishmentRule = useDeleteReplenishmentRule(orgId, operatingCompanyId)
+  const triggerReplenishment = useTriggerReplenishment(orgId, operatingCompanyId)
 
   // Picking wave hooks
-  const createPickingWave = useCreatePickingWave(orgId, companyId)
-  const updatePickingWave = useUpdatePickingWave(orgId, companyId)
-  const deletePickingWave = useDeletePickingWave(orgId, companyId)
-  const confirmPickingWave = useConfirmPickingWave(orgId, companyId)
-  const processPickingWave = useProcessPickingWave(orgId, companyId)
-  const completePickingWave = useCompletePickingWave(orgId, companyId)
+  const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId)
+  const updatePickingWave = useUpdatePickingWave(orgId, operatingCompanyId)
+  const deletePickingWave = useDeletePickingWave(orgId, operatingCompanyId)
+  const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId)
+  const processPickingWave = useProcessPickingWave(orgId, operatingCompanyId)
+  const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId)
 
   // Product category hooks
-  const createProductCategory = useCreateProductCategory(orgId, companyId)
-  const updateProductCategory = useUpdateProductCategory(orgId, companyId)
-  const deleteProductCategory = useDeleteProductCategory(orgId, companyId)
+  const createProductCategory = useCreateProductCategory(orgId, operatingCompanyId)
+  const updateProductCategory = useUpdateProductCategory(orgId, operatingCompanyId)
+  const deleteProductCategory = useDeleteProductCategory(orgId, operatingCompanyId)
 
   // Stock routes and rules hooks
-  const createStockRoute = useCreateStockRoute(orgId, companyId)
-  const updateStockRoute = useUpdateStockRoute(orgId, companyId)
-  const deleteStockRoute = useDeleteStockRoute(orgId, companyId)
-  const createStockRule = useCreateStockRule(orgId, companyId)
-  const updateStockRule = useUpdateStockRule(orgId, companyId)
-  const deleteStockRule = useDeleteStockRule(orgId, companyId)
+  const createStockRoute = useCreateStockRoute(orgId, operatingCompanyId)
+  const updateStockRoute = useUpdateStockRoute(orgId, operatingCompanyId)
+  const deleteStockRoute = useDeleteStockRoute(orgId, operatingCompanyId)
+  const createStockRule = useCreateStockRule(orgId, operatingCompanyId)
+  const updateStockRule = useUpdateStockRule(orgId, operatingCompanyId)
+  const deleteStockRule = useDeleteStockRule(orgId, operatingCompanyId)
 
   // Warehouse task hooks
-  const createWarehouseTask = useCreateWarehouseTask(orgId, companyId)
-  const deleteWarehouseTask = useDeleteWarehouseTask(orgId, companyId)
-  const startWarehouseTask = useStartWarehouseTask(orgId, companyId)
-  const completeWarehouseTask = useCompleteWarehouseTask(orgId, companyId)
-  const cancelWarehouseTask = useCancelWarehouseTask(orgId, companyId)
+  const createWarehouseTask = useCreateWarehouseTask(orgId, operatingCompanyId)
+  const deleteWarehouseTask = useDeleteWarehouseTask(orgId, operatingCompanyId)
+  const startWarehouseTask = useStartWarehouseTask(orgId, operatingCompanyId)
+  const completeWarehouseTask = useCompleteWarehouseTask(orgId, operatingCompanyId)
+  const cancelWarehouseTask = useCancelWarehouseTask(orgId, operatingCompanyId)
 
   const startQualityCheck = useStartQualityCheck(orgId)
   const openQualityAlert = useOpenQualityAlert(orgId)
@@ -640,18 +642,18 @@ function InventoryClientLoaded({
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId)
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId)
   const executeReplenishmentRule = useExecuteReplenishmentRule(orgId)
-  const createStockQuant = useCreateStockQuant(orgId, { companyId })
-  const updateStockQuantQuantity = useUpdateStockQuantQuantity(orgId, companyId)
+  const createStockQuant = useCreateStockQuant(orgId, { companyId: operatingCompanyId ?? undefined })
+  const updateStockQuantQuantity = useUpdateStockQuantQuantity(orgId, operatingCompanyId)
   const updateStockProductionLot = useUpdateStockProductionLot(orgId)
   const deleteStockProductionLot = useDeleteStockProductionLot(orgId)
   const updateStockProductionSerial = useUpdateStockProductionSerial(orgId)
   const deleteStockProductionSerial = useDeleteStockProductionSerial(orgId)
-  const updateProductVariant = useUpdateProductVariant(orgId, companyId)
-  const updateProductInventoryData = useUpdateProductInventoryData(orgId, companyId)
-  const updateProductPricing = useUpdateProductPricing(orgId, companyId)
-  const createUomCategory = useCreateUomCategory(orgId, companyId)
-  const createUom = useCreateUom(orgId, companyId)
-  const createUomConversion = useCreateUomConversion(orgId, companyId)
+  const updateProductVariant = useUpdateProductVariant(orgId, operatingCompanyId)
+  const updateProductInventoryData = useUpdateProductInventoryData(orgId, operatingCompanyId)
+  const updateProductPricing = useUpdateProductPricing(orgId, operatingCompanyId)
+  const createUomCategory = useCreateUomCategory(orgId, operatingCompanyId)
+  const createUom = useCreateUom(orgId, operatingCompanyId)
+  const createUomConversion = useCreateUomConversion(orgId, operatingCompanyId)
   const createWarehouse3dZone = useCreateWarehouse3dZone(orgId)
   const updateWarehouse3dZone = useUpdateWarehouse3dZone(orgId)
   const deleteWarehouse3dZone = useDeleteWarehouse3dZone(orgId)
@@ -1391,7 +1393,7 @@ function InventoryClientLoaded({
                       return
                     }
                     void createStockMove.mutateAsync({
-                      company_id: Number(companyId),
+                      company_id: Number(operatingCompanyId ?? 0),
                       name: promptText(t("inventory.stockMoveActions.namePrompt"), "Manual Stock Move") ?? "Manual Stock Move",
                       product_id: Number(productId),
                       product_tmpl_id: Number(productId),
@@ -1573,7 +1575,7 @@ function InventoryClientLoaded({
                     const name = promptText(t("inventory.stockInventoryActions.namePrompt"), "Cycle Count")
                     if (name == null) return
                     void createStockInventory.mutateAsync({
-                      company_id: Number(companyId),
+                      company_id: Number(operatingCompanyId ?? 0),
                       name,
                       location_ids: [],
                       product_ids: [],
@@ -1740,7 +1742,7 @@ function InventoryClientLoaded({
                     const productId = promptScalarId(t("inventory.lotActions.productIdPrompt"))
                     if (name == null || productId == null) return
                     void createStockProductionLot.mutateAsync({
-                      company_id: Number(companyId),
+                      company_id: Number(operatingCompanyId ?? 0),
                       name,
                       product_id: Number(productId),
                       product_variant_id: null,
@@ -1813,7 +1815,7 @@ function InventoryClientLoaded({
                     const productId = promptScalarId(t("inventory.serialActions.productIdPrompt"))
                     if (name == null || productId == null) return
                     void createStockProductionSerial.mutateAsync({
-                      company_id: Number(companyId),
+                      company_id: Number(operatingCompanyId ?? 0),
                       name,
                       product_id: Number(productId),
                       product_variant_id: null,

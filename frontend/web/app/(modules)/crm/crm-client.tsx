@@ -58,6 +58,7 @@ import {
 } from "@lumiere/ui"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 interface CrmClientProps {
   initialLeads?: Record<string, unknown>[]
@@ -144,7 +145,8 @@ function CrmClientLoaded({
   organizationId,
 }: CrmClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
@@ -206,8 +208,8 @@ function CrmClientLoaded({
   )
 
   const createLead = useCreateLead(orgId)
-  const createOpportunity = useCreateOpportunity(orgId, { companyId })
-  const createContact = useCreateContact(orgId, { companyId })
+  const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
+  const createContact = useCreateContact(orgId, { companyId: operatingCompanyId ?? undefined })
   const createActivity = useCreateActivity(orgId)
   const convertLead = useConvertLeadToCustomer(orgId)
   const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)

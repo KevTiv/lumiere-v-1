@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 
 import type { AiUiContext } from "../ai-ui-context"
 import { apiFetch } from "../http"
+import type { GatewayActionDraft } from "./ai-action-drafts"
 
 export type { AiUiContext } from "../ai-ui-context"
 
@@ -58,15 +59,53 @@ export function useAiActionDraft() {
       query: string
       ui_context?: AiUiContext
       allowed_reducers?: string[]
+      allowed_entity_types?: string[]
+      agent_id?: number
+      team_member_id?: number
     }) =>
       postAiBff("/api/ai/actions/draft", {
         companyId: args.companyId,
         query: args.query,
         ...(args.ui_context ? { ui_context: args.ui_context } : {}),
         ...(args.allowed_reducers?.length ? { allowed_reducers: args.allowed_reducers } : {}),
-      }),
+        ...(args.allowed_entity_types?.length
+          ? { allowed_entity_types: args.allowed_entity_types }
+          : {}),
+        ...(args.agent_id != null ? { agent_id: args.agent_id } : {}),
+        ...(args.team_member_id != null ? { team_member_id: args.team_member_id } : {}),
+      }) as Promise<{ drafts: GatewayActionDraft[] }>,
   })
 }
+
+export type AiHarnessLiveSnapshot = {
+  entity_type: string
+  entity_id: number
+  label: string
+  snapshot_at: string
+  row: Record<string, unknown>
+  relations?: Array<{ relation_key: string; rows: Record<string, unknown>[] }>
+}
+
+export function useAiHarnessSnapshot() {
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: number
+      ui_context?: AiUiContext
+      entities?: Array<{ entity_type: string; entity_id: number; priority?: number }>
+      allowed_entity_types?: string[]
+    }) =>
+      postAiBff("/api/ai/harness/snapshot", {
+        companyId: args.companyId,
+        ...(args.ui_context ? { ui_context: args.ui_context } : {}),
+        ...(args.entities?.length ? { entities: args.entities } : {}),
+        ...(args.allowed_entity_types?.length
+          ? { allowed_entity_types: args.allowed_entity_types }
+          : {}),
+      }) as Promise<{ snapshots: AiHarnessLiveSnapshot[] }>,
+  })
+}
+
+export type { GatewayActionDraft } from "./ai-action-drafts"
 
 export function useAiBriefing() {
   return useMutation({

@@ -47,6 +47,7 @@ import type {
   CreateSubscriptionPlanParams,
 } from "@lumiere/query-hooks/hooks/subscriptions"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useAccountJournals, useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
@@ -116,7 +117,8 @@ function SubscriptionsClientLoaded({
 }: SubscriptionsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,
   )

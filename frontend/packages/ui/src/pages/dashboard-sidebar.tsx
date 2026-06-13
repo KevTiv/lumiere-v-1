@@ -36,6 +36,7 @@ import {
   GitBranch,
   MessageSquare,
   ClipboardList,
+  ClipboardCheck,
   Map as MapIcon,
   LogOut,
 } from "lucide-react"
@@ -58,6 +59,8 @@ interface DashboardSidebarProps {
   onOpenJournal?: () => void
   onOpenNotebook?: () => void
   onOpenAIChat?: () => void
+  /** Optional nav badge counts keyed by href (e.g. pending AI approvals). */
+  navBadges?: Record<string, number>
   /** When set, shows a sidebar control that calls this handler (typically clears session + redirects). */
   onSignOut?: () => void | Promise<void>
 }
@@ -67,6 +70,7 @@ export function DashboardSidebar({
   onOpenJournal,
   onOpenNotebook,
   onOpenAIChat,
+  navBadges,
   onSignOut,
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -90,6 +94,7 @@ export function DashboardSidebar({
         { label: t("nav.forensics"), href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
         { label: t("nav.trackers"), href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
         { label: "AI Harness", href: "/ai-harness", icon: Sparkles, resource: "dashboard:analytics" },
+        { label: "AI Approvals", href: "/ai-action-drafts", icon: ClipboardCheck, resource: "dashboard:analytics" },
       ],
     },
     {
@@ -185,6 +190,8 @@ export function DashboardSidebar({
                 const active = isActive(item.href)
                 const hasAccess = checkPermission(item.resource, "read").allowed
 
+                const badgeCount = navBadges?.[item.href] ?? 0
+
                 if (hasAccess) {
                   return (
                     <Link
@@ -194,7 +201,7 @@ export function DashboardSidebar({
                       title={isCollapsed ? item.label : undefined}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/20",
+                        "relative w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/20",
                         active
                           ? "bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-sidebar-border"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -202,8 +209,18 @@ export function DashboardSidebar({
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       {!isCollapsed && (
-                        <span className="truncate font-medium">{item.label}</span>
+                        <span className="truncate font-medium flex-1">{item.label}</span>
                       )}
+                      {badgeCount > 0 ? (
+                        <span
+                          className={cn(
+                            "inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground",
+                            isCollapsed ? "absolute -top-1 -right-1 h-4 min-w-4 px-1" : "ml-auto",
+                          )}
+                        >
+                          {badgeCount > 99 ? "99+" : badgeCount}
+                        </span>
+                      ) : null}
                     </Link>
                   )
                 }

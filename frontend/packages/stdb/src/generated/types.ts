@@ -899,6 +899,33 @@ export const AdjustmentReason = __t.object("AdjustmentReason", {
 });
 export type AdjustmentReason = __Infer<typeof AdjustmentReason>;
 
+export const AiActionDraft = __t.object("AiActionDraft", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  status: __t.string(),
+  reducerName: __t.string(),
+  paramsJson: __t.string(),
+  summary: __t.string(),
+  confidence: __t.f64(),
+  elevated: __t.bool(),
+  warningsJson: __t.option(__t.string()),
+  sourceQuery: __t.option(__t.string()),
+  uiContextJson: __t.option(__t.string()),
+  proposedBy: __t.identity(),
+  reviewedBy: __t.option(__t.identity()),
+  reviewedAt: __t.option(__t.timestamp()),
+  rejectReason: __t.option(__t.string()),
+  executedAt: __t.option(__t.timestamp()),
+  executionError: __t.option(__t.string()),
+  executionRecordId: __t.option(__t.u64()),
+  expiresAt: __t.option(__t.timestamp()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiActionDraft = __Infer<typeof AiActionDraft>;
+
 export const AiAgent = __t.object("AiAgent", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -2112,6 +2139,20 @@ export const CreateAdjustmentReasonParams = __t.object("CreateAdjustmentReasonPa
   metadata: __t.option(__t.string()),
 });
 export type CreateAdjustmentReasonParams = __Infer<typeof CreateAdjustmentReasonParams>;
+
+export const CreateAiActionDraftParams = __t.object("CreateAiActionDraftParams", {
+  reducerName: __t.string(),
+  paramsJson: __t.string(),
+  summary: __t.string(),
+  confidence: __t.f64(),
+  elevated: __t.bool(),
+  warningsJson: __t.option(__t.string()),
+  sourceQuery: __t.option(__t.string()),
+  uiContextJson: __t.option(__t.string()),
+  expiresAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiActionDraftParams = __Infer<typeof CreateAiActionDraftParams>;
 
 export const CreateAiAgentParams = __t.object("CreateAiAgentParams", {
   name: __t.string(),
@@ -10050,6 +10091,12 @@ export const UpdateAccountTaxParams = __t.object("UpdateAccountTaxParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateAccountTaxParams = __Infer<typeof UpdateAccountTaxParams>;
+
+export const UpdateAiActionDraftParamsParams = __t.object("UpdateAiActionDraftParamsParams", {
+  paramsJson: __t.string(),
+  summary: __t.option(__t.string()),
+});
+export type UpdateAiActionDraftParamsParams = __Infer<typeof UpdateAiActionDraftParamsParams>;
 
 export const UpdateAiAgentParams = __t.object("UpdateAiAgentParams", {
   temperature: __t.f64(),

@@ -241,6 +241,7 @@ import {
   ConsolidationWorkspace,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   isInvoiceLikeMoveType,
@@ -452,7 +453,8 @@ function AccountingClientLoaded({
   const { toast } = useToast()
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
 
   // Quick-action form modal (dashboard tab)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -538,17 +540,17 @@ function AccountingClientLoaded({
     initialData: initialAccountPeriods,
   })
 
-  const createFiscalYear = useCreateFiscalYear(organizationId, companyId)
-  const updateFiscalYear = useUpdateFiscalYear(organizationId, companyId)
-  const deleteFiscalYear = useDeleteFiscalYear(organizationId, companyId)
-  const openFiscalYear = useOpenFiscalYear(organizationId, companyId)
-  const closeFiscalYear = useCloseFiscalYear(organizationId, companyId)
+  const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
+  const updateFiscalYear = useUpdateFiscalYear(organizationId, operatingCompanyId)
+  const deleteFiscalYear = useDeleteFiscalYear(organizationId, operatingCompanyId)
+  const openFiscalYear = useOpenFiscalYear(organizationId, operatingCompanyId)
+  const closeFiscalYear = useCloseFiscalYear(organizationId, operatingCompanyId)
 
-  const createAccountPeriod = useCreateAccountPeriod(organizationId, companyId)
-  const updateAccountPeriod = useUpdateAccountPeriod(organizationId, companyId)
-  const deleteAccountPeriod = useDeleteAccountPeriod(organizationId, companyId)
-  const openAccountPeriod = useOpenAccountPeriod(organizationId, companyId)
-  const closeAccountPeriod = useCloseAccountPeriod(organizationId, companyId)
+  const createAccountPeriod = useCreateAccountPeriod(organizationId, operatingCompanyId)
+  const updateAccountPeriod = useUpdateAccountPeriod(organizationId, operatingCompanyId)
+  const deleteAccountPeriod = useDeleteAccountPeriod(organizationId, operatingCompanyId)
+  const openAccountPeriod = useOpenAccountPeriod(organizationId, operatingCompanyId)
+  const closeAccountPeriod = useCloseAccountPeriod(organizationId, operatingCompanyId)
 
   const fiscalYearNameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -723,7 +725,7 @@ function AccountingClientLoaded({
   const postMove = usePostAccountMove(organizationId)
   const postInvoice = usePostInvoice(organizationId)
   const cancelMove = useCancelAccountMove(organizationId)
-  const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, companyId)
+  const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId)
   const refreshTaxDeadlineStatuses = useRefreshTaxDeadlineStatuses(organizationId)
   const scheduleTaxDeadlineUpdates = useScheduleTaxDeadlineUpdates(organizationId)
   const createAnalyticAccount = useCreateAnalyticAccount(organizationId)
@@ -756,27 +758,27 @@ function AccountingClientLoaded({
   const matchEliminationEntries = useMatchEliminationEntries(organizationId)
   const unmatchEliminationEntry = useUnmatchEliminationEntry(organizationId)
 
-  const deleteAccountAsset = useDeleteAccountAsset(organizationId, companyId)
-  const confirmAccountAsset = useConfirmAccountAsset(organizationId, companyId)
-  const closeAccountAsset = useCloseAccountAsset(organizationId, companyId)
-  const createDepreciationLine = useCreateDepreciationLine(organizationId, companyId)
-  const computeDepreciationBoard = useComputeDepreciationBoard(organizationId, companyId)
+  const deleteAccountAsset = useDeleteAccountAsset(organizationId, operatingCompanyId)
+  const confirmAccountAsset = useConfirmAccountAsset(organizationId, operatingCompanyId)
+  const closeAccountAsset = useCloseAccountAsset(organizationId, operatingCompanyId)
+  const createDepreciationLine = useCreateDepreciationLine(organizationId, operatingCompanyId)
+  const computeDepreciationBoard = useComputeDepreciationBoard(organizationId, operatingCompanyId)
 
   const createIntercompanyRule = useCreateIntercompanyRule(organizationId)
-  const updateIntercompanyRule = useUpdateIntercompanyRule(organizationId, companyId)
-  const deleteIntercompanyRule = useDeleteIntercompanyRule(organizationId, companyId)
-  const setIntercompanyRuleActive = useSetIntercompanyRuleActive(organizationId, companyId)
+  const updateIntercompanyRule = useUpdateIntercompanyRule(organizationId, operatingCompanyId)
+  const deleteIntercompanyRule = useDeleteIntercompanyRule(organizationId, operatingCompanyId)
+  const setIntercompanyRuleActive = useSetIntercompanyRuleActive(organizationId, operatingCompanyId)
   const createIntercompanyTransaction = useCreateIntercompanyTransaction(organizationId)
-  const approveIntercompanyTransaction = useApproveIntercompanyTransaction(organizationId, companyId)
-  const processIntercompanyTransaction = useProcessIntercompanyTransaction(organizationId, companyId)
-  const completeIntercompanyTransaction = useCompleteIntercompanyTransaction(organizationId, companyId)
-  const errorIntercompanyTransaction = useErrorIntercompanyTransaction(organizationId, companyId)
-  const cancelIntercompanyTransaction = useCancelIntercompanyTransaction(organizationId, companyId)
-  const retryIntercompanyTransaction = useRetryIntercompanyTransaction(organizationId, companyId)
+  const approveIntercompanyTransaction = useApproveIntercompanyTransaction(organizationId, operatingCompanyId)
+  const processIntercompanyTransaction = useProcessIntercompanyTransaction(organizationId, operatingCompanyId)
+  const completeIntercompanyTransaction = useCompleteIntercompanyTransaction(organizationId, operatingCompanyId)
+  const errorIntercompanyTransaction = useErrorIntercompanyTransaction(organizationId, operatingCompanyId)
+  const cancelIntercompanyTransaction = useCancelIntercompanyTransaction(organizationId, operatingCompanyId)
+  const retryIntercompanyTransaction = useRetryIntercompanyTransaction(organizationId, operatingCompanyId)
 
-  const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, companyId)
-  const reconcilePaymentWithInvoice = useReconcilePaymentWithInvoice(organizationId, companyId)
-  const csvImports = useAccountingCsvImportMutations(organizationId, companyId)
+  const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, operatingCompanyId)
+  const reconcilePaymentWithInvoice = useReconcilePaymentWithInvoice(organizationId, operatingCompanyId)
+  const csvImports = useAccountingCsvImportMutations(organizationId, operatingCompanyId)
 
   const createAccountPayment = useCreateAccountPayment(organizationId)
   const postAccountPayment = usePostAccountPayment(organizationId)
@@ -787,8 +789,8 @@ function AccountingClientLoaded({
   const deletePaymentTerm = useDeletePaymentTerm(organizationId)
   const createPaymentTermLine = useCreatePaymentTermLine(organizationId)
   const deletePaymentTermLine = useDeletePaymentTermLine(organizationId)
-  const createCurrencyRate = useCreateCurrencyRate(organizationId, companyId)
-  const setAccountAssetActive = useSetAccountAssetActive(organizationId, companyId)
+  const createCurrencyRate = useCreateCurrencyRate(organizationId, operatingCompanyId)
+  const setAccountAssetActive = useSetAccountAssetActive(organizationId, operatingCompanyId)
 
   const analyticAccountEditFormConfig = useMemo(() => {
     const base = editAnalyticAccountForm(t)
@@ -953,7 +955,7 @@ function AccountingClientLoaded({
           code: formData.code,
           isRequiredInMoveLines: formData.isRequiredInMoveLines,
         },
-        companyId,
+        operatingCompanyId,
       )
       await updateAnalyticAccount.mutateAsync({
         accountId: id,
@@ -964,7 +966,7 @@ function AccountingClientLoaded({
       }
       setAnalyticAccountEdit(null)
     },
-    [analyticAccountEdit, companyId, updateAnalyticAccount, setAnalyticAccountActive],
+    [analyticAccountEdit, operatingCompanyId, updateAnalyticAccount, setAnalyticAccountActive],
   )
 
   const onSubmitAnalyticLineEdit = useCallback(
@@ -996,7 +998,7 @@ function AccountingClientLoaded({
           analyticDistribution: formData.analyticDistribution,
           isActive: formData.isActive,
         },
-        companyId,
+        operatingCompanyId,
       )
       await updateAnalyticDistributionModel.mutateAsync({
         modelId: id,
@@ -1004,7 +1006,7 @@ function AccountingClientLoaded({
       })
       setAnalyticDistEdit(null)
     },
-    [companyId, updateAnalyticDistributionModel],
+    [operatingCompanyId, updateAnalyticDistributionModel],
   )
 
   const onSubmitNewBankStatementLine = useCallback(
@@ -1735,7 +1737,7 @@ function AccountingClientLoaded({
           })
         }}
         onCreateAccountGroup={async (fd) => {
-          const p = toCreateAccountGroupParams(fd, companyId)
+          const p = toCreateAccountGroupParams(fd, operatingCompanyId)
           if (p.name.trim()) {
             await createAccountGroup.mutateAsync(p as unknown as Record<string, unknown>)
           }
@@ -1743,7 +1745,7 @@ function AccountingClientLoaded({
         onUpdateAccountGroup={async (groupId, fd) => {
           await updateAccountGroup.mutateAsync({
             groupId,
-            params: toUpdateAccountGroupParams(fd, companyId) as unknown as Record<string, unknown>,
+            params: toUpdateAccountGroupParams(fd, operatingCompanyId) as unknown as Record<string, unknown>,
           })
         }}
       />
@@ -1751,7 +1753,7 @@ function AccountingClientLoaded({
     [
       accountTypes,
       accountGroups,
-      companyId,
+      operatingCompanyId,
       createAccountType,
       updateAccountType,
       createAccountGroup,
@@ -1776,7 +1778,7 @@ function AccountingClientLoaded({
     } else if (action === "createTax") {
       await createTax.mutateAsync([
         organizationId,
-        companyId,
+        operatingCompanyId,
         createAccountTaxParamsToStdbHttpJson(toCreateAccountTaxParams(formData)),
       ])
     } else if (action === "createBudget") {
@@ -1786,13 +1788,13 @@ function AccountingClientLoaded({
       if (fd.currencyId === "" || fd.currencyId == null) {
         fd.currencyId = defaultCurrencyId.toString()
       }
-      const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId, companyId)
+      const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId, operatingCompanyId)
       if (p) await createAnalyticAccount.mutateAsync(analyticParamsToJson(p))
     } else if (action === "createAnalyticLine") {
       const p = toCreateAnalyticLineParams(formData, defaultCurrencyId)
       if (p) await createAnalyticLine.mutateAsync(analyticParamsToJson(p))
     } else if (action === "createAnalyticDistributionModel") {
-      const p = toCreateAnalyticDistributionModelParams(formData, companyId)
+      const p = toCreateAnalyticDistributionModelParams(formData, operatingCompanyId)
       if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p))
     } else if (action === "createReconciliationWidget") {
       const p = toCreateAccountReconciliationWidgetParams(formData)
@@ -1804,7 +1806,7 @@ function AccountingClientLoaded({
       const p = toCreateAccountPeriodParams(formData)
       if (p) await createAccountPeriod.mutateAsync(accountingParamsToJson(p))
     } else if (action === "createAccountPayment") {
-      const p = toCreatePaymentParamsFromManualForm(formData, companyId)
+      const p = toCreatePaymentParamsFromManualForm(formData, operatingCompanyId)
       if (p) await createAccountPayment.mutateAsync(p)
     } else if (action === "createPaymentTerm") {
       const p = toCreatePaymentTermParamsFromForm(formData)

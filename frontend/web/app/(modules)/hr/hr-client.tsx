@@ -45,6 +45,7 @@ import {
   useHrCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import {
   toCreateContractParams,
@@ -144,7 +145,8 @@ function HrClientLoaded({
   organizationId,
 }: HrClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
@@ -162,21 +164,21 @@ function HrClientLoaded({
   const { data: payrollStructures = [] } = usePayrollStructures(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
-  const createEmployee = useCreateEmployee(orgId, companyId)
-  const createLeaveRequest = useCreateLeaveRequest(orgId, companyId)
-  const createContract = useCreateContract(orgId, companyId)
-  const createPayslip = useCreatePayslip(orgId, companyId)
-  const createJobPosition = useCreateJobPosition(orgId, companyId)
-  const createDepartment = useCreateDepartment(orgId, companyId)
-  const archiveEmployee = useArchiveEmployee(orgId, companyId)
+  const createEmployee = useCreateEmployee(orgId, operatingCompanyId)
+  const createLeaveRequest = useCreateLeaveRequest(orgId, operatingCompanyId)
+  const createContract = useCreateContract(orgId, operatingCompanyId)
+  const createPayslip = useCreatePayslip(orgId, operatingCompanyId)
+  const createJobPosition = useCreateJobPosition(orgId, operatingCompanyId)
+  const createDepartment = useCreateDepartment(orgId, operatingCompanyId)
+  const archiveEmployee = useArchiveEmployee(orgId, operatingCompanyId)
   const approveLeave = useApproveLeave(orgId)
   const refuseLeave = useRefuseLeave(orgId)
   const resetLeave = useResetLeaveToDraft(orgId)
   const openContract = useOpenContract(orgId)
   const expireContract = useExpireContract(orgId)
   const cancelContract = useCancelContract(orgId)
-  const confirmPayslip = useConfirmPayslip(orgId, companyId)
-  const cancelPayslip = useCancelPayslip(orgId, companyId)
+  const confirmPayslip = useConfirmPayslip(orgId, operatingCompanyId)
+  const cancelPayslip = useCancelPayslip(orgId, operatingCompanyId)
   const csvImports = useHrCsvImportMutations(orgId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])

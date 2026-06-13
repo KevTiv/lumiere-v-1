@@ -79,6 +79,7 @@ async fn process_batch(
             Ok((embedding_id, dim)) => {
                 if let Err(e) = stdb
                     .mark_embedding_synced(
+                        org_id,
                         Some(payload.company_id),
                         embedding_id,
                         &model,

@@ -69,6 +69,7 @@ import {
   toUpdateFinancialReportFormPayload,
 } from "@/lib/reports-module-form-payloads"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   Archive,
   FileDown,
@@ -164,7 +165,8 @@ function ReportsClientLoaded({
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -735,7 +737,7 @@ function ReportsClientLoaded({
               const reportIdRaw = reportExplain.row.id
               const comparisonRaw = formData.comparisonReportId
               const result = await aiReportExplain.mutateAsync({
-                companyId: Number(companyId),
+                companyId: Number(operatingCompanyId ?? 0),
                 report_type: String(formData.reportType ?? "financial_report"),
                 report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
                 comparison_report_id:

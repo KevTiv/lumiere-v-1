@@ -3,6 +3,7 @@ pub mod briefing;
 pub mod context;
 pub mod embed;
 pub mod forms;
+pub mod harness;
 pub mod health;
 pub mod import;
 pub mod insights;

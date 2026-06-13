@@ -9,6 +9,7 @@
 ///   - ContactTagAssignment
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -270,10 +271,12 @@ pub fn create_contact(
         .clone()
         .unwrap_or_else(|| params.name.clone());
 
+    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let contact = ctx.db.contact().insert(Contact {
         id: 0,
         organization_id,
-        company_id: params.company_id,
+        company_id: Some(operating_company_id),
         type_: params.type_,
         name: params.name.clone(),
         display_name,
@@ -322,7 +325,7 @@ pub fn create_contact(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: Some(operating_company_id),
             table_name: "contact",
             record_id: contact.id,
             action: "CREATE",

@@ -37,6 +37,7 @@ import {
 import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@lumiere/query-hooks/hooks/documents"
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
 import { useAiInsightsGenerate } from "@lumiere/query-hooks/hooks/ai-harness"
 
@@ -200,7 +201,8 @@ function DocumentsClientLoaded({
 }: DocumentsClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => documentsModuleConfig(t), [t])
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
@@ -220,14 +222,14 @@ function DocumentsClientLoaded({
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
-  const createDocument = useCreateDocument(orgId, companyId)
+  const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const updateDocument = useUpdateDocument(orgId)
   const deleteDocument = useDeleteDocument(orgId)
   const lockDocument = useLockDocument(orgId)
   const unlockDocument = useUnlockDocument(orgId)
   const recordDocumentView = useRecordDocumentView(orgId)
-  const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, companyId)
-  const createProcessingJob = useCreateDocumentProcessingJob(orgId, companyId)
+  const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, operatingCompanyId)
+  const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
@@ -671,7 +673,7 @@ function DocumentsClientLoaded({
             const scope =
               scopeRaw !== "" ? (JSON.parse(scopeRaw) as Record<string, unknown>) : undefined
             const result = await aiInsightsGenerate.mutateAsync({
-              companyId: Number(companyId),
+              companyId: Number(operatingCompanyId ?? 0),
               resource:
                 formData.resource != null && String(formData.resource).trim() !== ""
                   ? String(formData.resource).trim()

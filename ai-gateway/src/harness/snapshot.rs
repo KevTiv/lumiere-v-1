@@ -1,14 +1,15 @@
 //! Live ERP row snapshots via SpacetimeDB SQL (read-only grounding layer).
 
 use anyhow::{Context, Result};
+use serde::Serialize;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use stdb_client::StdbClient;
 
 use crate::{
     harness::entity_registry::{
-        content_type_to_entity, format_snapshot_label, lookup_entity_spec, EntitySnapshotSpec,
-        ScopeKind,
+        content_type_to_entity, entity_type_allowed, format_snapshot_label, lookup_entity_spec,
+        EntitySnapshotSpec, RelationSnapshotSpec, ScopeKind,
     },
     qdrant_client::SearchResult,
     rig_agent::ContextHit,
@@ -22,6 +23,7 @@ pub struct SnapshotUiContext {
 }
 
 pub const RAG_MAX_LIVE_SNAPSHOTS: usize = 3;
+pub const HARNESS_MAX_LIVE_SNAPSHOTS: usize = 5;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntityRef {
@@ -30,13 +32,30 @@ pub struct EntityRef {
     pub priority: f32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+pub struct RelationSnapshot {
+    pub relation_key: String,
+    pub rows: Vec<Value>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct LiveSnapshot {
     pub entity_type: String,
     pub entity_id: u64,
     pub label: String,
     pub snapshot_at: String,
     pub row: Value,
+    pub relations: Vec<RelationSnapshot>,
+}
+
+pub fn filter_entity_refs_by_allowed_types(
+    candidates: Vec<EntityRef>,
+    allowed_entity_types: Option<&[String]>,
+) -> Vec<EntityRef> {
+    candidates
+        .into_iter()
+        .filter(|candidate| entity_type_allowed(&candidate.entity_type, allowed_entity_types))
+        .collect()
 }
 
 pub fn resolve_snapshot_candidates(
@@ -177,6 +196,7 @@ async fn fetch_one_snapshot(
 
     let filtered = filter_prompt_fields(&row, spec.prompt_fields);
     let label = format_snapshot_label(spec.label_template, entity_id);
+    let relations = fetch_relation_snapshots(stdb, spec, org_id, company_id, entity_id).await?;
 
     Ok(Some(LiveSnapshot {
         entity_type: spec.entity_type.to_string(),
@@ -184,7 +204,116 @@ async fn fetch_one_snapshot(
         label,
         snapshot_at: snapshot_at.to_string(),
         row: filtered,
+        relations,
     }))
+}
+
+async fn fetch_relation_snapshots(
+    stdb: &StdbClient,
+    spec: &EntitySnapshotSpec,
+    org_id: u64,
+    company_id: u64,
+    entity_id: u64,
+) -> Result<Vec<RelationSnapshot>> {
+    let mut out = Vec::new();
+    for relation in spec.relations {
+        let select_list = relation.prompt_fields.join(", ");
+        let sql = build_relation_sql(relation, org_id, company_id, entity_id, &select_list);
+        let rows = stdb
+            .query_sql(&sql)
+            .await
+            .with_context(|| {
+                format!(
+                    "relation SQL for {} #{} ({})",
+                    spec.entity_type, entity_id, relation.relation_key
+                )
+            })?;
+
+        let filtered_rows: Vec<Value> = rows
+            .into_iter()
+            .filter(|row| row_matches_relation_scope(relation, row, org_id, company_id))
+            .map(|row| filter_prompt_fields(&row, relation.prompt_fields))
+            .collect();
+
+        if !filtered_rows.is_empty() {
+            out.push(RelationSnapshot {
+                relation_key: relation.relation_key.to_string(),
+                rows: filtered_rows,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn build_relation_sql(
+    relation: &RelationSnapshotSpec,
+    org_id: u64,
+    company_id: u64,
+    parent_entity_id: u64,
+    select_list: &str,
+) -> String {
+    match relation.scope {
+        ScopeKind::Company => {
+            format!(
+                "SELECT {select_list} FROM {} WHERE {} = {parent_entity_id} AND {} = {company_id} LIMIT {}",
+                relation.table,
+                relation.foreign_key,
+                relation.company_column.unwrap_or("company_id"),
+                relation.limit
+            )
+        }
+        ScopeKind::Organization => {
+            format!(
+                "SELECT {select_list} FROM {} WHERE {} = {parent_entity_id} AND {} = {org_id} LIMIT {}",
+                relation.table,
+                relation.foreign_key,
+                relation.org_column.unwrap_or("organization_id"),
+                relation.limit
+            )
+        }
+        ScopeKind::OrganizationOptionalCompany => {
+            format!(
+                "SELECT {select_list} FROM {} WHERE {} = {parent_entity_id} AND {} = {org_id} LIMIT {}",
+                relation.table,
+                relation.foreign_key,
+                relation.org_column.unwrap_or("organization_id"),
+                relation.limit
+            )
+        }
+    }
+}
+
+fn row_matches_relation_scope(
+    relation: &RelationSnapshotSpec,
+    row: &Value,
+    org_id: u64,
+    company_id: u64,
+) -> bool {
+    if let Some(org_col) = relation.org_column {
+        let camel = snake_to_camel(org_col);
+        if let Some(row_org) = json_u64(row.get(org_col).or_else(|| row.get(&camel))) {
+            if row_org != org_id {
+                return false;
+            }
+        }
+    }
+
+    match relation.scope {
+        ScopeKind::Company => {
+            let col = relation.company_column.unwrap_or("company_id");
+            let camel = snake_to_camel(col);
+            json_u64(row.get(col).or_else(|| row.get(&camel))) == Some(company_id)
+        }
+        ScopeKind::Organization => true,
+        ScopeKind::OrganizationOptionalCompany => {
+            let col = relation.company_column.unwrap_or("company_id");
+            let camel = snake_to_camel(col);
+            match row.get(col).or_else(|| row.get(&camel)) {
+                None | Some(Value::Null) => true,
+                Some(value) => json_u64(Some(value)).is_none_or(|cid| cid == company_id),
+            }
+        }
+    }
 }
 
 fn build_snapshot_sql(
@@ -276,13 +405,19 @@ pub fn format_live_context_block(snapshots: &[LiveSnapshot]) -> String {
         .enumerate()
         .map(|(i, snapshot)| {
             let json = serde_json::to_string(&snapshot.row).unwrap_or_else(|_| "{}".to_string());
-            format!(
+            let mut block = format!(
                 "[L{}] {} (as of {})\n{}",
                 i + 1,
                 snapshot.label,
                 snapshot.snapshot_at,
                 json
-            )
+            );
+            for relation in &snapshot.relations {
+                let rel_json =
+                    serde_json::to_string(&relation.rows).unwrap_or_else(|_| "[]".to_string());
+                block.push_str(&format!("\n  {}: {}", relation.relation_key, rel_json));
+            }
+            block
         })
         .collect::<Vec<_>>()
         .join("\n\n")
@@ -431,9 +566,34 @@ mod tests {
             label: "Sale order #42".into(),
             snapshot_at: "2026-06-12T12:00:00Z".into(),
             row: serde_json::json!({"state": "sale"}),
+            relations: vec![RelationSnapshot {
+                relation_key: "lines".into(),
+                rows: vec![serde_json::json!({"id": 1, "productId": 5})],
+            }],
         }]);
         assert!(block.contains("[L1]"));
-        assert!(block.contains("authoritative") == false);
         assert!(block.contains("Sale order #42"));
+        assert!(block.contains("lines:"));
+    }
+
+    #[test]
+    fn filter_entity_refs_respects_allowlist() {
+        let refs = filter_entity_refs_by_allowed_types(
+            vec![
+                EntityRef {
+                    entity_type: "sale_order".into(),
+                    entity_id: 1,
+                    priority: 1.0,
+                },
+                EntityRef {
+                    entity_type: "product".into(),
+                    entity_id: 2,
+                    priority: 0.5,
+                },
+            ],
+            Some(&["sale_order".to_string()]),
+        );
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].entity_type, "sale_order");
     }
 }

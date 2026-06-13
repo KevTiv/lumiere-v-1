@@ -13,7 +13,7 @@
 ///   - Shipping cost calculation
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
+use crate::core::organization::{company, company_id_from_scope};
 use crate::helpers::check_permission;
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
@@ -259,7 +259,17 @@ pub fn calculate_shipping_cost_internal(
         .find(&carrier_id)
         .ok_or("Delivery carrier not found")?;
 
-    check_permission(ctx, carrier.company_id, "delivery_carrier", "read")?;
+    check_permission(
+        ctx,
+        ctx.db
+            .company()
+            .id()
+            .find(&carrier.company_id)
+            .ok_or("Company not found for carrier")?
+            .organization_id,
+        "delivery_carrier",
+        "read",
+    )?;
 
     if !carrier.country_ids.is_empty() && !carrier.country_ids.contains(&destination_country_id) {
         return Err("Carrier does not service this country".to_string());

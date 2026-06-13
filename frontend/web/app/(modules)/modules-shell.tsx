@@ -8,7 +8,7 @@ import {
   JournalPanel,
 } from "@lumiere/ui"
 import { useErpSession } from "@lumiere/erp-session"
-import type { ChatContext, ChatMessage, ChatMessageSourceRef } from "@lumiere/ui"
+import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
   atCommandsToIncludeTypes,
   buildAiUiContext,
@@ -17,12 +17,28 @@ import {
   resolveErpCompanyId,
 } from "@lumiere/query-hooks/ai-ui-context"
 import {
+  chatActionsToMetadata,
+  looksLikeActionDraftRequest,
+  parseStoredChatActions,
+  persistedDraftsToChatActions,
+} from "@lumiere/query-hooks/action-draft-intent"
+import {
   useAiChatMessages,
   useAppendAiChatMessage,
   useCreateAiChatSession,
   useAiMemoryRag,
   type AiRagSource,
 } from "@lumiere/query-hooks/hooks/ai-memory"
+import {
+  useAiActionDraft,
+} from "@lumiere/query-hooks/hooks/ai-harness"
+import {
+  useApproveAiActionDraft,
+  useAiActionDraftInboxCount,
+  usePersistGatewayActionDrafts,
+  useRejectAiActionDraft,
+  useUpdateAiActionDraftParams,
+} from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { ErpAiRouteContextProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
@@ -105,6 +121,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const orgReady = organizationId != null && organizationId > 0
   const companiesQuery = useCompanies(orgId, orgReady)
   const rag = useAiMemoryRag()
+  const actionDraft = useAiActionDraft()
   const [sessionKey, setSessionKey] = useState<string | null>(null)
 
   const defaultCompanyId = useMemo(
@@ -116,6 +133,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       }),
     [companiesQuery.data, companyIds, orgId],
   )
+  const persistActionDrafts = usePersistGatewayActionDrafts(orgId, defaultCompanyId ?? 0)
+  const approveActionDraft = useApproveAiActionDraft(orgId, defaultCompanyId ?? 0)
+  const rejectActionDraft = useRejectAiActionDraft(orgId, defaultCompanyId ?? 0)
+  const updateActionDraft = useUpdateAiActionDraftParams(orgId, defaultCompanyId ?? 0)
   const createSession = useCreateAiChatSession(orgId, defaultCompanyId)
   const appendMessage = useAppendAiChatMessage(orgId, defaultCompanyId)
   const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && defaultCompanyId != null)
@@ -147,6 +168,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       content: row.content,
       timestamp: dateFromStored(row.createDate ?? row.create_date),
       sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
+      actions: parseStoredChatActions(row.metadata) as ChatAction[] | undefined,
       metadata: {
         model: row.model ?? undefined,
         duration:
@@ -182,6 +204,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       uiContext: unknown
       durationMs?: number
       model?: string | null
+      actions?: ChatAction[]
     }) => {
       if (!sessionKey || !orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return
       try {
@@ -200,6 +223,15 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
+          metadata:
+            args.actions?.length
+              ? chatActionsToMetadata(
+                  args.actions.filter(
+                    (action): action is Extract<ChatAction, { type: "draft" }> =>
+                      action.type === "draft" && action.draft != null,
+                  ),
+                )
+              : null,
         })
       } catch (err) {
         console.warn("Unable to persist AI chat message", err)
@@ -226,6 +258,70 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     [activeTab, defaultCompanyId, route, selection],
   )
 
+  const resolveActionDrafts = useCallback(
+    async (userText: string, uiContext: unknown): Promise<ChatAction[]> => {
+      if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return []
+      if (!looksLikeActionDraftRequest(userText)) return []
+
+      try {
+        const draftResponse = await actionDraft.mutateAsync({
+          companyId: defaultCompanyId,
+          query: userText,
+          ui_context: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["ui_context"],
+        })
+        const gatewayDrafts = draftResponse.drafts ?? []
+        if (gatewayDrafts.length === 0) return []
+
+        const persisted = await persistActionDrafts.mutateAsync({
+          drafts: gatewayDrafts,
+          sourceQuery: userText,
+          uiContextJson: JSON.stringify(uiContext ?? null),
+        })
+        return persistedDraftsToChatActions(persisted, defaultCompanyId ?? undefined) as ChatAction[]
+      } catch (err) {
+        console.warn("Unable to create AI action draft", err)
+        return []
+      }
+    },
+    [actionDraft, defaultCompanyId, orgReady, persistActionDrafts],
+  )
+
+  const chatConfig = useMemo(
+    () => ({
+      ...props.config,
+      onApproveActionDraft: async (draft: { draftId: number; companyId?: number }) => {
+        await approveActionDraft.mutateAsync({
+          draftId: draft.draftId,
+          companyId: draft.companyId,
+        })
+      },
+      onRejectActionDraft: async (
+        draft: { draftId: number; companyId?: number },
+        reason?: string,
+      ) => {
+        await rejectActionDraft.mutateAsync({
+          draftId: draft.draftId,
+          reason,
+          companyId: draft.companyId,
+        })
+      },
+      onUpdateActionDraft: async (draft: {
+        draftId: number
+        paramsJson: Record<string, unknown>
+        summary: string
+        companyId?: number
+      }) => {
+        await updateActionDraft.mutateAsync({
+          draftId: draft.draftId,
+          paramsJson: JSON.stringify(draft.paramsJson),
+          summary: draft.summary,
+          companyId: draft.companyId,
+        })
+      },
+    }),
+    [approveActionDraft, props.config, rejectActionDraft, updateActionDraft],
+  )
+
   const onSendMessage = useCallback(
     async (userText: string) => {
       if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) {
@@ -241,43 +337,60 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       const started = typeof performance !== "undefined" ? performance.now() : Date.now()
       const { includeTypes, uiContext } = buildRequestContext(userText)
 
-      const out = await rag.mutateAsync({
-        query: userText,
-        companyId: defaultCompanyId,
-        include_types: includeTypes,
-        ui_context: uiContext,
-      })
+      const [out, draftActions] = await Promise.all([
+        rag.mutateAsync({
+          query: userText,
+          companyId: defaultCompanyId,
+          include_types: includeTypes,
+          ui_context: uiContext,
+        }),
+        resolveActionDrafts(userText, uiContext),
+      ])
 
       const sources = (out.sources ?? []).map(mapRagSourceToChatSource)
       const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
+      const assistantText =
+        draftActions.length > 0 && !out.answer.includes("draft")
+          ? `${out.answer}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`
+          : out.answer
       void persistExchange({
         userText,
-        assistantText: out.answer,
+        assistantText,
         sources,
         uiContext,
         durationMs: Math.round(finished - started),
         model: out.model ?? null,
+        actions: draftActions.length > 0 ? draftActions : undefined,
       })
 
-      return { content: out.answer, sources }
+      return {
+        content: assistantText,
+        sources,
+        actions: draftActions.length > 0 ? draftActions : undefined,
+      }
     },
-    [buildRequestContext, companiesQuery.isLoading, defaultCompanyId, orgReady, persistExchange, rag],
+    [
+      buildRequestContext,
+      companiesQuery.isLoading,
+      defaultCompanyId,
+      orgReady,
+      persistExchange,
+      rag,
+      resolveActionDrafts,
+    ],
   )
 
-  const onStreamMessage = useCallback(
-    async (
-      userText: string,
-      handlers: {
-        onDelta: (delta: string) => void
-        onSources: (sources: ChatMessageSourceRef[]) => void
-      },
-    ) => {
+  const onStreamMessage = useCallback<
+    NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>
+  >(
+    async (userText, handlers) => {
       if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) {
         return onSendMessage(userText)
       }
 
       const started = typeof performance !== "undefined" ? performance.now() : Date.now()
       const { includeTypes, uiContext } = buildRequestContext(userText)
+      const draftPromise = resolveActionDrafts(userText, uiContext)
       const response = await fetch("/api/ai/rag/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -333,6 +446,17 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       }
       if (buffer.trim()) processEvent(buffer)
 
+      const draftActions = await draftPromise
+      if (draftActions.length > 0) {
+        handlers.onActions?.(draftActions)
+        if (!content.includes("draft")) {
+          content = `${content}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`
+          handlers.onDelta(
+            `\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`,
+          )
+        }
+      }
+
       const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
       void persistExchange({
         userText,
@@ -341,16 +465,29 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         uiContext,
         durationMs: Math.round(finished - started),
         model: resolvedModel,
+        actions: draftActions.length > 0 ? draftActions : undefined,
       })
 
-      return { content, sources }
+      return {
+        content,
+        sources,
+        actions: draftActions.length > 0 ? draftActions : undefined,
+      }
     },
-    [buildRequestContext, defaultCompanyId, onSendMessage, orgReady, persistExchange],
+    [
+      buildRequestContext,
+      defaultCompanyId,
+      onSendMessage,
+      orgReady,
+      persistExchange,
+      resolveActionDrafts,
+    ],
   )
 
   return (
     <AIChatPanel
       {...props}
+      config={chatConfig}
       context={chatContext}
       initialMessages={initialMessages}
       onSendMessage={onSendMessage}
@@ -364,11 +501,36 @@ function ModulesContent({ children }: { children: ReactNode }) {
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const { organizationId, companyIds } = useErpSession()
+  const orgId = organizationId ?? 0
+  const orgReady = organizationId != null && organizationId > 0
+  const companiesQuery = useCompanies(orgId, orgReady)
+  const defaultCompanyId = useMemo(
+    () =>
+      resolveErpCompanyId({
+        organizationId: orgId,
+        sessionCompanyIds: companyIds,
+        companyRows: companiesQuery.data ?? [],
+      }),
+    [companiesQuery.data, companyIds, orgId],
+  )
+  const inboxCountQuery = useAiActionDraftInboxCount(
+    orgId,
+    orgReady && defaultCompanyId != null && defaultCompanyId > 0,
+  )
+  const navBadges = useMemo(
+    () =>
+      inboxCountQuery.count > 0
+        ? { "/ai-action-drafts": inboxCountQuery.count }
+        : undefined,
+    [inboxCountQuery.count],
+  )
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
       <DashboardSidebar
         forceCollapsed={isAIChatDocked || isNotebookOpen}
+        navBadges={navBadges}
         onOpenJournal={() => setIsJournalOpen(true)}
         onOpenNotebook={() => setIsNotebookOpen(true)}
         onOpenAIChat={() => setIsAIChatOpen(true)}

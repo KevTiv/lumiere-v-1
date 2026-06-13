@@ -524,6 +524,7 @@ export function useCreateDocumentProcessingJob(organizationId: bigint, companyId
         aiAgentId = n
       }
       const { urlPath, init } = documentsBffPost("create_document_processing_job", [
+        organizationId,
         companyId,
         stdbParamsToJson({
           document_type: documentType,
@@ -577,6 +578,7 @@ export function useCompleteDocumentProcessingJob(organizationId: bigint) {
         errorMessage,
       }
       const { urlPath, init } = documentsBffPost("complete_document_processing_job", [
+        organizationId,
         companyIdArg(row),
         jobId,
         stdbParamsToJson(params),
@@ -595,6 +597,7 @@ export function useApproveDocumentProcessingJob(organizationId: bigint) {
     mutationFn: async (row: Record<string, unknown>) => {
       const jobId = rowId(row)
       const { urlPath, init } = documentsBffPost("approve_document_processing_job", [
+        organizationId,
         companyIdArg(row),
         jobId,
       ])
@@ -618,6 +621,7 @@ export function useAcknowledgeInsight(organizationId: bigint) {
     }) => {
       const insightId = rowId(row)
       const { urlPath, init } = documentsBffPost("acknowledge_insight", [
+        organizationId,
         companyIdArg(row),
         insightId,
         actionTaken,

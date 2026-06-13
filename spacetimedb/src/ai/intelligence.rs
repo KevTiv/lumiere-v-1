@@ -8,16 +8,50 @@
 /// | **SearchEmbedding** | Vector embeddings for semantic search |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::queue::{queue_job, QueueJob};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InsightSeverity, JobStatus};
+
+fn ensure_insight_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    insight_company_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(cid) = insight_company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+    Ok(())
+}
+
+fn ensure_doc_job_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    job_company_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(cid) = job_company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+    Ok(())
+}
+
+fn ensure_embedding_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    embedding_company_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(cid) = embedding_company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+    Ok(())
+}
 
 // ============================================================================
 // PARAMS TYPES
 // ============================================================================
 
 /// Params for creating an AI insight.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` and optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAiInsightParams {
     pub severity: InsightSeverity,
@@ -35,7 +69,7 @@ pub struct CreateAiInsightParams {
 }
 
 /// Params for creating a document processing job.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` and optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDocumentProcessingJobParams {
     pub document_type: String,
@@ -46,7 +80,7 @@ pub struct CreateDocumentProcessingJobParams {
 }
 
 /// Params for completing a document processing job.
-/// Scope: `company_id` + `job_id` are flat reducer params.
+/// Scope: `organization_id`, optional `company_id`, and `job_id` are flat reducer params.
 /// `status` is computed: Failed if `error_message` is Some, else Completed.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CompleteDocumentProcessingJobParams {
@@ -59,7 +93,7 @@ pub struct CompleteDocumentProcessingJobParams {
 }
 
 /// Params for upserting a search embedding.
-/// Scope: `company_id` is a flat reducer param (not in this struct).
+/// Scope: `organization_id` and optional `company_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpsertSearchEmbeddingParams {
     pub content_type: String,
@@ -195,16 +229,18 @@ pub struct SearchEmbedding {
 #[reducer]
 pub fn create_ai_insight(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateAiInsightParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_insight", "create")?;
+    check_permission(ctx, organization_id, "ai_insight", "create")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
 
     if params.confidence < 0.0 || params.confidence > 1.0 {
         return Err("Confidence must be between 0.0 and 1.0".to_string());
     }
 
+    let stored_company_id = Some(operating_company_id);
     let insight = ctx.db.ai_insight().insert(AiInsight {
         id: 0,
         severity: params.severity,
@@ -228,7 +264,7 @@ pub fn create_ai_insight(
         impact_score: params.impact_score,
         priority: params.priority,
         tags: params.tags,
-        company_id,
+        company_id: stored_company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -238,9 +274,9 @@ pub fn create_ai_insight(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: stored_company_id,
             table_name: "ai_insight",
             record_id: insight.id,
             action: "create",
@@ -263,12 +299,15 @@ pub fn create_ai_insight(
 #[reducer]
 pub fn acknowledge_insight(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     insight_id: u64,
     action_taken: Option<String>,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_insight", "write")?;
+    check_permission(ctx, organization_id, "ai_insight", "write")?;
+    if let Some(scope_company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, scope_company_id)?;
+    }
 
     let insight = ctx
         .db
@@ -276,6 +315,13 @@ pub fn acknowledge_insight(
         .id()
         .find(&insight_id)
         .ok_or("Insight not found")?;
+
+    ensure_insight_in_org(ctx, organization_id, insight.company_id)?;
+    if let (Some(scope_company_id), Some(row_company_id)) = (company_id, insight.company_id) {
+        if scope_company_id != row_company_id {
+            return Err("company_id does not match insight scope".to_string());
+        }
+    }
 
     if insight.is_acknowledged {
         return Ok(()); // Idempotent
@@ -293,9 +339,9 @@ pub fn acknowledge_insight(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: insight.company_id,
             table_name: "ai_insight",
             record_id: insight_id,
             action: "write",
@@ -314,11 +360,14 @@ pub fn acknowledge_insight(
 #[reducer]
 pub fn dismiss_insight(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     insight_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_insight", "write")?;
+    check_permission(ctx, organization_id, "ai_insight", "write")?;
+    if let Some(scope_company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, scope_company_id)?;
+    }
 
     let insight = ctx
         .db
@@ -326,6 +375,13 @@ pub fn dismiss_insight(
         .id()
         .find(&insight_id)
         .ok_or("Insight not found")?;
+
+    ensure_insight_in_org(ctx, organization_id, insight.company_id)?;
+    if let (Some(scope_company_id), Some(row_company_id)) = (company_id, insight.company_id) {
+        if scope_company_id != row_company_id {
+            return Err("company_id does not match insight scope".to_string());
+        }
+    }
 
     if insight.dismissed {
         return Ok(()); // Idempotent
@@ -342,9 +398,9 @@ pub fn dismiss_insight(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: insight.company_id,
             table_name: "ai_insight",
             record_id: insight_id,
             action: "write",
@@ -363,11 +419,13 @@ pub fn dismiss_insight(
 #[reducer]
 pub fn create_document_processing_job(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: CreateDocumentProcessingJobParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_document_processing_job", "create")?;
+    check_permission(ctx, organization_id, "ai_document_processing_job", "create")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    let stored_company_id = Some(operating_company_id);
 
     let job = ctx
         .db
@@ -393,7 +451,7 @@ pub fn create_document_processing_job(
             reviewed_at: None,
             // System-managed: set to true only via approve_document_processing_job
             is_approved: false,
-            company_id,
+            company_id: stored_company_id,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
@@ -403,9 +461,9 @@ pub fn create_document_processing_job(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: stored_company_id,
             table_name: "ai_document_processing_job",
             record_id: job.id,
             action: "create",
@@ -429,12 +487,15 @@ pub fn create_document_processing_job(
 #[reducer]
 pub fn complete_document_processing_job(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     job_id: u64,
     params: CompleteDocumentProcessingJobParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_document_processing_job", "write")?;
+    check_permission(ctx, organization_id, "ai_document_processing_job", "write")?;
+    if let Some(scope_company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, scope_company_id)?;
+    }
 
     let job = ctx
         .db
@@ -442,6 +503,13 @@ pub fn complete_document_processing_job(
         .id()
         .find(&job_id)
         .ok_or("Processing job not found")?;
+
+    ensure_doc_job_in_org(ctx, organization_id, job.company_id)?;
+    if let (Some(scope_company_id), Some(row_company_id)) = (company_id, job.company_id) {
+        if scope_company_id != row_company_id {
+            return Err("company_id does not match processing job scope".to_string());
+        }
+    }
 
     // status is computed: Failed if error_message present, else Completed
     let status = if params.error_message.is_some() {
@@ -469,9 +537,9 @@ pub fn complete_document_processing_job(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: job.company_id,
             table_name: "ai_document_processing_job",
             record_id: job_id,
             action: "write",
@@ -490,11 +558,14 @@ pub fn complete_document_processing_job(
 #[reducer]
 pub fn approve_document_processing_job(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     job_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "ai_document_processing_job", "write")?;
+    check_permission(ctx, organization_id, "ai_document_processing_job", "write")?;
+    if let Some(scope_company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, scope_company_id)?;
+    }
 
     let job = ctx
         .db
@@ -502,6 +573,13 @@ pub fn approve_document_processing_job(
         .id()
         .find(&job_id)
         .ok_or("Processing job not found")?;
+
+    ensure_doc_job_in_org(ctx, organization_id, job.company_id)?;
+    if let (Some(scope_company_id), Some(row_company_id)) = (company_id, job.company_id) {
+        if scope_company_id != row_company_id {
+            return Err("company_id does not match processing job scope".to_string());
+        }
+    }
 
     if job.status != JobStatus::Completed {
         return Err("Job must be completed before approval".to_string());
@@ -521,9 +599,9 @@ pub fn approve_document_processing_job(
 
     write_audit_log_v2(
         ctx,
-        cid,
+        organization_id,
         AuditLogParams {
-            company_id,
+            company_id: job.company_id,
             table_name: "ai_document_processing_job",
             record_id: job_id,
             action: "write",
@@ -542,11 +620,13 @@ pub fn approve_document_processing_job(
 #[reducer]
 pub fn upsert_search_embedding(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     params: UpsertSearchEmbeddingParams,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "search_embedding", "create")?;
+    check_permission(ctx, organization_id, "search_embedding", "create")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    let stored_company_id = Some(operating_company_id);
 
     // Check if an embedding already exists for this content
     let existing: Option<SearchEmbedding> = ctx
@@ -554,9 +634,10 @@ pub fn upsert_search_embedding(
         .search_embedding()
         .embedding_by_content()
         .filter(&params.content_type)
-        .find(|e| e.content_id == params.content_id && e.company_id == company_id);
+        .find(|e| e.content_id == params.content_id && e.company_id == stored_company_id);
 
     if let Some(existing) = existing {
+        ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
         // Reset sync_status to "pending" so the gateway re-indexes the updated content
         ctx.db.search_embedding().id().update(SearchEmbedding {
             text: params.text,
@@ -588,7 +669,7 @@ pub fn upsert_search_embedding(
             embedding_dim: None,
             last_synced_at: None,
             sync_error: None,
-            company_id,
+            company_id: stored_company_id,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
@@ -610,13 +691,16 @@ pub fn upsert_search_embedding(
 #[reducer]
 pub fn mark_embedding_synced(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     embedding_id: u64,
     model: String,
     dim: u32,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "search_embedding", "write")?;
+    check_permission(ctx, organization_id, "search_embedding", "write")?;
+    if let Some(scope_company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, scope_company_id)?;
+    }
 
     let existing = ctx
         .db
@@ -624,6 +708,13 @@ pub fn mark_embedding_synced(
         .id()
         .find(&embedding_id)
         .ok_or("Embedding not found")?;
+
+    ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
+    if let (Some(scope_company_id), Some(row_company_id)) = (company_id, existing.company_id) {
+        if scope_company_id != row_company_id {
+            return Err("company_id does not match embedding scope".to_string());
+        }
+    }
 
     ctx.db.search_embedding().id().update(SearchEmbedding {
         sync_status: "synced".to_string(),
@@ -646,20 +737,24 @@ pub fn mark_embedding_synced(
 #[reducer]
 pub fn delete_search_embedding(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     content_type: String,
     content_id: u64,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "search_embedding", "delete")?;
+    check_permission(ctx, organization_id, "search_embedding", "delete")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    let stored_company_id = Some(operating_company_id);
 
     let existing = ctx
         .db
         .search_embedding()
         .embedding_by_content()
         .filter(&content_type)
-        .find(|e| e.content_id == content_id && e.company_id == company_id)
+        .find(|e| e.content_id == content_id && e.company_id == stored_company_id)
         .ok_or("Embedding not found for this content")?;
+
+    ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
 
     ctx.db.search_embedding().id().update(SearchEmbedding {
         sync_status: "deleted".to_string(),
@@ -682,17 +777,18 @@ pub fn delete_search_embedding(
 #[reducer]
 pub fn request_embedding_job(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: Option<u64>,
     content_type: String,
     content_id: u64,
     text: String,
 ) -> Result<(), String> {
-    let cid = company_id.unwrap_or(0);
-    check_permission(ctx, cid, "search_embedding", "create")?;
+    check_permission(ctx, organization_id, "search_embedding", "create")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
 
     let payload = format!(
         r#"{{"company_id":{},"content_type":"{}","content_id":{},"text":{}}}"#,
-        cid,
+        operating_company_id,
         content_type,
         content_id,
         serde_json_escape(&text)
@@ -700,7 +796,7 @@ pub fn request_embedding_job(
 
     ctx.db.queue_job().insert(QueueJob {
         id: 0,
-        organization_id: cid,
+        organization_id,
         queue_name: "embedding".to_string(),
         job_type: "embed_content".to_string(),
         payload,

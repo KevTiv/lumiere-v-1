@@ -23,7 +23,8 @@
     "./ai-ui-context": "./src/ai-ui-context.ts",
     "./ai-source-links": "./src/ai-source-links.ts",
     "./ai-entity-snapshot-registry": "./src/ai-entity-snapshot-registry.ts",
-    "./ai-entity-type-resolver": "./src/ai-entity-type-resolver.ts"
+    "./ai-entity-type-resolver": "./src/ai-entity-type-resolver.ts",
+    "./action-draft-links": "./src/action-draft-links.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

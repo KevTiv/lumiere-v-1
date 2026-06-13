@@ -37,8 +37,9 @@ import {
   PanelRight,
   PanelRightClose,
 } from "lucide-react"
-import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext } from "@/lib/ai-chat-types"
+import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
+import { AiActionDraftCard } from "./ai-action-draft-card"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
 
@@ -52,6 +53,12 @@ interface Size {
   height: number
 }
 
+interface ChatReply {
+  content: string
+  sources?: ChatMessageSourceRef[]
+  actions?: ChatAction[]
+}
+
 interface AIChatPanelProps {
   open: boolean
   onClose: () => void
@@ -61,16 +68,15 @@ interface AIChatPanelProps {
   context?: ChatContext
   initialMessages?: ChatMessage[]
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
-  onSendMessage?: (
-    userText: string,
-  ) => Promise<{ content: string; sources?: ChatMessageSourceRef[] }>
+  onSendMessage?: (userText: string) => Promise<ChatReply>
   onStreamMessage?: (
     userText: string,
     handlers: {
       onDelta: (delta: string) => void
       onSources: (sources: ChatMessageSourceRef[]) => void
+      onActions?: (actions: ChatAction[]) => void
     },
-  ) => Promise<{ content: string; sources?: ChatMessageSourceRef[] }>
+  ) => Promise<ChatReply>
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -393,6 +399,7 @@ export function AIChatPanel({
         const assistantId = (Date.now() + 1).toString()
         let streamedContent = ""
         let streamedSources: ChatMessageSourceRef[] = []
+        let streamedActions: ChatAction[] = []
         setMessages((prev) => [
           ...prev,
           {
@@ -424,6 +431,16 @@ export function AIChatPanel({
               ),
             )
           },
+          onActions: (actions) => {
+            streamedActions = actions
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantId
+                  ? { ...message, actions: actions.length > 0 ? actions : undefined }
+                  : message,
+              ),
+            )
+          },
         })
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
@@ -436,6 +453,12 @@ export function AIChatPanel({
               ? reply.sources
               : streamedSources.length > 0
                 ? streamedSources
+                : undefined,
+          actions:
+            reply.actions && reply.actions.length > 0
+              ? reply.actions
+              : streamedActions.length > 0
+                ? streamedActions
                 : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
@@ -454,6 +477,7 @@ export function AIChatPanel({
           content: reply.content,
           timestamp: new Date(),
           sources: reply.sources && reply.sources.length > 0 ? reply.sources : undefined,
+          actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
           },
@@ -506,6 +530,57 @@ export function AIChatPanel({
       }),
     )
   }
+
+  const patchDraftInMessages = useCallback(
+    (draftId: number, patch: Partial<ChatActionDraftPayload>) => {
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (!message.actions?.length) return message
+          return {
+            ...message,
+            actions: message.actions.map((action) => {
+              if (action.type !== "draft" || action.draft?.draftId !== draftId) return action
+              return {
+                ...action,
+                draft: { ...action.draft, ...patch },
+              }
+            }),
+          }
+        }),
+      )
+    },
+    [],
+  )
+
+  const handleApproveDraft = useCallback(
+    async (draft: ChatActionDraftPayload) => {
+      if (!config?.onApproveActionDraft) return
+      await config.onApproveActionDraft(draft)
+      patchDraftInMessages(draft.draftId, { status: "approved" })
+    },
+    [config, patchDraftInMessages],
+  )
+
+  const handleRejectDraft = useCallback(
+    async (draft: ChatActionDraftPayload, reason?: string) => {
+      if (!config?.onRejectActionDraft) return
+      await config.onRejectActionDraft(draft, reason)
+      patchDraftInMessages(draft.draftId, { status: "rejected" })
+    },
+    [config, patchDraftInMessages],
+  )
+
+  const handleUpdateDraft = useCallback(
+    async (draft: ChatActionDraftPayload) => {
+      if (!config?.onUpdateActionDraft) return
+      await config.onUpdateActionDraft(draft)
+      patchDraftInMessages(draft.draftId, {
+        paramsJson: draft.paramsJson,
+        summary: draft.summary,
+      })
+    },
+    [config, patchDraftInMessages],
+  )
 
   const handleClearHistory = () => {
     setMessages([])
@@ -718,6 +793,27 @@ export function AIChatPanel({
                               </li>
                             )})}
                           </ul>
+                        </div>
+                      )}
+                      {message.role === "assistant" && message.actions != null && message.actions.length > 0 && (
+                        <div className="mt-1 w-full max-w-[95%] space-y-2">
+                          {message.actions.map((action) =>
+                            action.type === "draft" && action.draft ? (
+                              <AiActionDraftCard
+                                key={action.id}
+                                draft={action.draft}
+                                onApprove={
+                                  config?.onApproveActionDraft ? handleApproveDraft : undefined
+                                }
+                                onReject={
+                                  config?.onRejectActionDraft ? handleRejectDraft : undefined
+                                }
+                                onUpdateDraft={
+                                  config?.onUpdateActionDraft ? handleUpdateDraft : undefined
+                                }
+                              />
+                            ) : null,
+                          )}
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 px-1">

@@ -171,8 +171,8 @@ export function AiSettings() {
   const updateAgentMutation = useUpdateAiAgent(orgId)
   const setActiveMutation = useSetAiAgentActive(orgId)
   const createTeamMemberMutation = useCreateAiTeamMember(orgId)
-  const dismissInsightMutation = useDismissAiInsight()
-  const createInsightMutation = useCreateAiInsight()
+  const dismissInsightMutation = useDismissAiInsight(orgId)
+  const createInsightMutation = useCreateAiInsight(orgId)
   const recordSpendMutation = useRecordAiSpend(orgId)
 
   const memoryIngestMutation = useAiMemoryIngest()

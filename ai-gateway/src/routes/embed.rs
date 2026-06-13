@@ -65,17 +65,37 @@ pub async fn post_embed(
 
     // Confirm sync back to SpacetimeDB so SearchEmbedding.sync_status = "synced"
     let model = state.config.embedding_model_name();
-    if let Err(e) = state
+    let org_id = state
         .stdb
-        .mark_embedding_synced(Some(req.company_id), req.stdb_embedding_id, &model, dim)
+        .organization_id_for_company(req.company_id)
         .await
-    {
-        // Log but don't fail the request — Qdrant already has the vector.
-        // The reconciliation worker will retry.
+        .unwrap_or(None)
+        .unwrap_or(0);
+    if org_id > 0 {
+        if let Err(e) = state
+            .stdb
+            .mark_embedding_synced(
+                org_id,
+                Some(req.company_id),
+                req.stdb_embedding_id,
+                &model,
+                dim,
+            )
+            .await
+        {
+            // Log but don't fail the request — Qdrant already has the vector.
+            // The reconciliation worker will retry.
+            tracing::warn!(
+                embedding_id = req.stdb_embedding_id,
+                "mark_embedding_synced failed (will reconcile): {}",
+                e
+            );
+        }
+    } else {
         tracing::warn!(
             embedding_id = req.stdb_embedding_id,
-            "mark_embedding_synced failed (will reconcile): {}",
-            e
+            company_id = req.company_id,
+            "mark_embedding_synced skipped: company organization_id not found"
         );
     }
 

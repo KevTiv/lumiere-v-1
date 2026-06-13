@@ -42,14 +42,33 @@ export interface ChatMessage {
   }
 }
 
+export interface ChatActionDraftPayload {
+  draftId: number
+  reducerName: string
+  summary: string
+  paramsJson: Record<string, unknown>
+  confidence: number
+  warnings: string[]
+  elevated: boolean
+  status?: "pending" | "approved" | "rejected" | "failed" | "expired"
+  executionError?: string | null
+  executionRecordId?: number | null
+  executionRecordHref?: string
+  expiresAt?: string | null
+  sourceQuery?: string | null
+  companyId?: number
+  workflowInstanceId?: number
+}
+
 export interface ChatAction {
   id: string
-  type: "code" | "file" | "command" | "link"
+  type: "code" | "file" | "command" | "link" | "draft"
   label: string
   content?: string
   language?: string
   filePath?: string
   onClick?: () => void
+  draft?: ChatActionDraftPayload
 }
 
 export interface AtCommand {
@@ -83,6 +102,9 @@ export interface AIChatConfig {
   maxMessages?: number
   enableHistory?: boolean
   enableFileUpload?: boolean
+  onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
+  onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<void>
+  onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
 }
 
 export interface ContextProvider {

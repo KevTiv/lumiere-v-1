@@ -84,6 +84,7 @@ import {
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
@@ -153,7 +154,8 @@ function SalesClientLoaded({
 }: SalesClientLoadedProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { orgId, companyId } = orgBigInts(organizationId);
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
   const [quickActionForm, setQuickActionForm] = useState<{
     form: FormConfig;
     action: string;
@@ -199,9 +201,9 @@ function SalesClientLoaded({
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
 
-  const createSaleOrder = useCreateSaleOrder(orgId, companyId);
+  const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
-  const createPickingBatch = useCreatePickingBatch(orgId, companyId);
+  const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
   const confirmSaleOrder = useConfirmSaleOrder(orgId);
   const cancelSaleOrder = useCancelSaleOrder(orgId);
   const computeSoTotals = useComputeSoTotals(orgId);
@@ -213,22 +215,22 @@ function SalesClientLoaded({
   const cancelPickingBatch = useCancelPickingBatch(orgId);
 
   // Additional sale order operations
-  const updateSaleOrder = useUpdateSaleOrder(orgId, companyId);
+  const updateSaleOrder = useUpdateSaleOrder(orgId, operatingCompanyId);
   const lockSaleOrder = useLockSaleOrder(orgId);
   const unlockSaleOrder = useUnlockSaleOrder(orgId);
   const createSaleOrderLine = useCreateSaleOrderLine(orgId);
   const updateSaleOrderLine = useUpdateSaleOrderLine(orgId);
   const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
   const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
-  const importSaleOrderCsv = useImportSaleOrderCsv(orgId, companyId);
-  const importSaleOrderLineCsv = useImportSaleOrderLineCsv(orgId, companyId);
+  const importSaleOrderCsv = useImportSaleOrderCsv(orgId, operatingCompanyId);
+  const importSaleOrderLineCsv = useImportSaleOrderLineCsv(orgId, operatingCompanyId);
 
-  const createDeliveryCarrier = useCreateDeliveryCarrier(orgId, companyId);
-  const createDeliveryPriceRule = useCreateDeliveryPriceRule(orgId, companyId);
-  const createShippingMethod = useCreateShippingMethod(orgId, companyId);
-  const createPaymentMethod = useCreatePaymentMethod(orgId, companyId);
-  const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, companyId);
-  const createLoyaltyCard = useCreateLoyaltyCard(orgId, companyId);
+  const createDeliveryCarrier = useCreateDeliveryCarrier(orgId, operatingCompanyId);
+  const createDeliveryPriceRule = useCreateDeliveryPriceRule(orgId, operatingCompanyId);
+  const createShippingMethod = useCreateShippingMethod(orgId, operatingCompanyId);
+  const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
+  const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
+  const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
 
   useEffect(() => {
     if (csvKind) setCsvError(null);
@@ -773,7 +775,7 @@ function SalesClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === 'createSaleOrder') {
-      const p = toCreateSaleOrderParams(formData, pricelists, companyId);
+      const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
       if (p) {
         await createSaleOrder.mutateAsync(p);
         phCapture('sale_order_created', { organization_id: organizationId });

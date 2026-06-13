@@ -100,10 +100,11 @@ export function useCreateAiTeamMember(organizationId: number) {
   })
 }
 
-export function useDismissAiInsight() {
+export function useDismissAiInsight(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; insightId: number }) => {
       const { urlPath, init } = aiAgentsBffPost("dismiss_insight", [
+        organizationId,
         args.companyId != null ? args.companyId : null,
         args.insightId,
       ])
@@ -113,10 +114,11 @@ export function useDismissAiInsight() {
   })
 }
 
-export function useCreateAiInsight() {
+export function useCreateAiInsight(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
       const { urlPath, init } = aiAgentsBffPost("create_ai_insight", [
+        organizationId,
         args.companyId != null ? args.companyId : null,
         stdbParamsToJson(args.params as object),
       ])

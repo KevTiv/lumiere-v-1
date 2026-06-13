@@ -74,6 +74,7 @@ import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -168,7 +169,8 @@ function PurchasingClientLoaded({
   purchaseBillExpenseAccountId,
 }: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
-  const { orgId, companyId } = orgBigInts(organizationId)
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
@@ -203,8 +205,8 @@ function PurchasingClientLoaded({
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
 
-  const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId })
-  const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId })
+  const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
+  const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
   const sendPurchaseOrder = useSendPurchaseOrder(orgId)
   const confirmPurchaseOrder = useConfirmPurchaseOrder(orgId)
   const cancelPurchaseOrder = useCancelPurchaseOrder(orgId)
@@ -223,7 +225,7 @@ function PurchasingClientLoaded({
   const deleteLandedCost = useDeleteLandedCost(orgId)
   const computeLandedCosts = useComputeLandedCosts(orgId)
   const postLandedCosts = usePostLandedCosts(orgId)
-  const applyLandedCosts = useApplyLandedCosts(orgId, companyId)
+  const applyLandedCosts = useApplyLandedCosts(orgId, operatingCompanyId)
   const cancelLandedCost = useCancelLandedCost(orgId)
 
   // Supplier intake mutations
@@ -237,11 +239,11 @@ function PurchasingClientLoaded({
   const unlockPurchaseOrder = useUnlockPurchaseOrder(orgId)
   const createBillFromPurchaseOrder = useCreateBillFromPurchaseOrder(orgId)
   const updatePurchaseOrderLine = useUpdatePurchaseOrderLine(orgId)
-  const csvImports = usePurchasingCsvImportMutations(orgId, companyId)
+  const csvImports = usePurchasingCsvImportMutations(orgId, operatingCompanyId)
 
   const updatePoReceiptStatus = useUpdatePoReceiptStatus(orgId)
   const updatePoInvoiceStatus = useUpdatePoInvoiceStatus(orgId)
-  const createPartnerBank = useCreatePartnerBank(orgId, { companyId })
+  const createPartnerBank = useCreatePartnerBank(orgId, { companyId: operatingCompanyId ?? undefined })
   const updatePartnerBank = useUpdatePartnerBank(orgId)
   const deletePartnerBank = useDeletePartnerBank(orgId)
 

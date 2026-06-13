@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./http": "./src/http.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",
+    "./action-draft-intent": "./src/action-draft-intent.ts",
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
     "./hooks/*": "./src/hooks/*.ts"
   },
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
+    "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/stdb": "workspace:*",
     "@tanstack/react-query": "5.96.2",

@@ -16,10 +16,10 @@ export interface OrganizationScopeBigInts {
   orgId: bigint
   organizationScopeId: bigint
   /**
-   * @deprecated Use `organizationScopeId`. Kept for reducer wire compatibility
-   * while backend params are still named `companyId`.
+   * @deprecated Operating company id must come from {@link useDefaultOperatingCompanyBigInt}
+   * or an explicit company picker — never alias the organization id.
    */
-  companyId: bigint
+  companyId?: bigint
 }
 
 /**
@@ -28,7 +28,7 @@ export interface OrganizationScopeBigInts {
  */
 export function organizationScopeBigInts(organizationId: number): OrganizationScopeBigInts {
   const id = BigInt(organizationId)
-  return { orgId: id, organizationScopeId: id, companyId: id }
+  return { orgId: id, organizationScopeId: id }
 }
 
 /**

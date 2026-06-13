@@ -7,6 +7,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::{contact, Contact};
+use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::sales::sales_core::{
     create_sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
@@ -174,6 +175,8 @@ pub fn create_opportunity(
         .find(&params.stage_id)
         .ok_or("Stage not found")?;
 
+    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
     let opp = ctx.db.opportunity().insert(Opportunity {
         id: 0,
         organization_id,
@@ -192,7 +195,7 @@ pub fn create_opportunity(
         user_id: params.user_id,
         team_id: params.team_id,
         company_currency_id: params.company_currency_id,
-        company_id: params.company_id,
+        company_id: Some(operating_company_id),
         date_open: params.date_open,
         date_closed: params.date_closed,
         date_deadline: params.date_deadline,
@@ -216,7 +219,7 @@ pub fn create_opportunity(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: params.company_id,
+            company_id: Some(operating_company_id),
             table_name: "opportunity",
             record_id: opp.id,
             action: "create",

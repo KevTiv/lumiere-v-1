@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
 
   const uiContext = sanitizeRagUiContext(body.uiContext ?? body.ui_context)
   const allowedReducers = sanitizeStringList(body.allowedReducers ?? body.allowed_reducers, 50, 120)
+  const agentId = optionalPositiveInteger(body.agentId ?? body.agent_id)
+  const teamMemberId = optionalPositiveInteger(body.teamMemberId ?? body.team_member_id)
 
   return proxyAiGateway('/v1/actions/draft', {
     org_id: orgId,
@@ -41,5 +43,7 @@ export async function POST(request: NextRequest) {
     query,
     ...(uiContext ? { ui_context: uiContext } : {}),
     ...(allowedReducers?.length ? { allowed_reducers: allowedReducers } : {}),
+    ...(agentId != null ? { agent_id: agentId } : {}),
+    ...(teamMemberId != null ? { team_member_id: teamMemberId } : {}),
   })
 }

@@ -10,7 +10,8 @@ import {
   useAiSearch,
 } from "@lumiere/query-hooks/hooks/ai-harness"
 import { AiResultPanel } from "@/lib/ai-result-panel"
-import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { hasValidOrganizationId } from "@/lib/org-scoped"
+import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 type AiHarnessAction =
   | "search"
@@ -146,7 +147,7 @@ export function AiHarnessClient({ organizationId }: { organizationId?: number })
 }
 
 function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
-  const { companyId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
   const [activeAction, setActiveAction] = useState<AiHarnessAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<Record<string, unknown> | null>(null)
@@ -182,7 +183,7 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
       let next: Record<string, unknown>
       if (activeAction === "search") {
         next = await search.mutateAsync({
-          companyId: Number(companyId),
+          companyId: operatingCompanyId ?? 0,
           query: String(formData.query ?? ""),
           contentType: String(formData.contentType ?? "").trim() || undefined,
           limit: formData.limit != null && formData.limit !== "" ? Number(formData.limit) : undefined,
@@ -193,14 +194,14 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
         })
       } else if (activeAction === "actionDraft") {
         next = await actionDraft.mutateAsync({
-          companyId: Number(companyId),
+          companyId: operatingCompanyId ?? 0,
           query: String(formData.query ?? ""),
           allowed_reducers: lines(formData.allowedReducers),
           ui_context: optionalJsonObject(formData.uiContextJson, "UI context"),
         })
       } else if (activeAction === "briefing") {
         next = await briefing.mutateAsync({
-          companyId: Number(companyId),
+          companyId: operatingCompanyId ?? 0,
           window: String(formData.window ?? "").trim() || undefined,
           since_micros:
             formData.sinceMicros != null && formData.sinceMicros !== ""
@@ -211,7 +212,7 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
         })
       } else if (activeAction === "importAnalyze") {
         next = await importAnalyze.mutateAsync({
-          companyId: Number(companyId),
+          companyId: operatingCompanyId ?? 0,
           target_entity: String(formData.targetEntity ?? ""),
           header: lines(formData.header),
           sample_rows: optionalJsonArray(formData.sampleRowsJson, "Sample rows"),
@@ -220,7 +221,7 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
         })
       } else {
         next = await importPreview.mutateAsync({
-          companyId: Number(companyId),
+          companyId: operatingCompanyId ?? 0,
           target_entity: String(formData.targetEntity ?? ""),
           header: lines(formData.header),
           sample_rows: requiredJsonArray(formData.sampleRowsJson, "Sample rows"),

@@ -135,6 +135,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
         .route("/v1/actions/draft", post(routes::actions::post_draft))
+        .route("/v1/harness/snapshot", post(routes::harness::post_snapshot))
         .route(
             "/v1/briefing/generate",
             post(routes::briefing::post_generate),

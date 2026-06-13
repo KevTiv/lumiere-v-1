@@ -55,6 +55,13 @@ pub async fn resolve_agent(
     Ok(config)
 }
 
+pub fn agent_allows_live_read(agent: &ResolvedAgentConfig) -> bool {
+    agent
+        .allowed_actions
+        .iter()
+        .any(|action| action == "live_read" || action == "chat")
+}
+
 pub fn ensure_allowed_action(agent: &ResolvedAgentConfig, action: &str) -> Result<()> {
     if agent.allowed_actions.iter().any(|a| a == action) {
         return Ok(());
@@ -65,6 +72,19 @@ pub fn ensure_allowed_action(agent: &ResolvedAgentConfig, action: &str) -> Resul
             .allowed_actions
             .iter()
             .any(|a| a == "summarize" || a == "form_suggest")
+    {
+        return Ok(());
+    }
+    if action == "action_draft"
+        && agent
+            .allowed_actions
+            .iter()
+            .any(|a| {
+                a == "action_draft"
+                    || a == "chat"
+                    || a == "summarize"
+                    || a == "form_suggest"
+            })
     {
         return Ok(());
     }
