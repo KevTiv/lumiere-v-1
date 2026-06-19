@@ -7,6 +7,9 @@
   "exports": {
     ".": "./src/context.tsx"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "peerDependencies": {
     "react": ">=19"
   },

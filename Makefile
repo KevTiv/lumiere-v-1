@@ -1,8 +1,10 @@
 # SpacetimeDB: published database name(s). Override: `make publish STDB_MODULE=my-db`
 STDB_MODULE        ?= lumiere-v1-j1uo0
 STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
-# Local SpacetimeDB HTTP base (default local server)
+# Local SpacetimeDB HTTP base (default maincloud; e2e-smoke overrides to local)
 STDB_HOST          ?= https://maincloud.spacetimedb.com
+# Local E2E: always use the local SpacetimeDB server (see e2e-smoke target)
+E2E_STDB_HOST      ?= http://127.0.0.1:3000
 # Local E2E ports. Playwright starts Next.js; this Makefile starts api-server.
 E2E_WEB_PORT       ?= 3100
 E2E_API_PORT       ?= 8082
@@ -103,6 +105,7 @@ e2e-smoke:
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
+		E2E_STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}"; \
 		SPACETIME_STARTED=0; \
 		API_PID=""; \
 		cleanup() { \
@@ -115,12 +118,12 @@ e2e-smoke:
 			fi; \
 		}; \
 		trap cleanup EXIT INT TERM; \
-		if ! curl -fsS "$(STDB_HOST)/v1/identity" -X POST >/dev/null 2>&1; then \
+		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
 			echo "[e2e] Starting local SpacetimeDB..."; \
 			spacetime start >"$$LOG_DIR/spacetime.log" 2>&1 & \
 			SPACETIME_STARTED=1; \
 			for i in {1..60}; do \
-				if curl -fsS "$(STDB_HOST)/v1/identity" -X POST >/dev/null 2>&1; then break; fi; \
+				if curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then break; fi; \
 				sleep 1; \
 				if [ "$$i" = "60" ]; then \
 					echo "[e2e] SpacetimeDB did not become ready. See $$LOG_DIR/spacetime.log"; \
@@ -128,7 +131,7 @@ e2e-smoke:
 				fi; \
 			done; \
 		else \
-			echo "[e2e] Local SpacetimeDB is already reachable."; \
+			echo "[e2e] Local SpacetimeDB is already reachable at $$E2E_STDB_HOST."; \
 		fi; \
 		echo "[e2e] Publishing local database $(DB)..."; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
@@ -143,47 +146,41 @@ e2e-smoke:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
-		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
-		cd "$$ROOT/frontend/web"; \
-		set -a; \
-		[ ! -f "$$ROOT/.env.local" ] || . "$$ROOT/.env.local"; \
-		[ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; \
-		set +a; \
-		if [ -z "$${STDB_SERVER_TOKEN:-}" ]; then \
-			echo "[e2e] STDB_SERVER_TOKEN is missing after sourcing $$ROOT/.env.local"; \
+		echo "[e2e] Obtaining local SpacetimeDB token..."; \
+		spacetime login --server-issued-login local; \
+		STDB_SERVER_TOKEN="$$(grep -E "^spacetimedb_token\\s*=" "$$HOME/.config/spacetime/cli.toml" | sed -E "s/^[^\"]*\"([^\"]+)\".*/\\1/")"; \
+		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
+			echo "[e2e] Failed to read spacetimedb_token from $$HOME/.config/spacetime/cli.toml"; \
 			exit 1; \
 		fi; \
-		node -e '\''const t=process.env.STDB_SERVER_TOKEN||""; try { const p=JSON.parse(Buffer.from(t.split(".")[1]||"", "base64url").toString()); console.log(`[e2e] STDB_SERVER_TOKEN issuer: $${p.iss || "unknown"}`); } catch { console.log("[e2e] STDB_SERVER_TOKEN issuer: unreadable"); }'\''; \
-		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$(STDB_HOST)" NEXT_PUBLIC_STDB_HOST="$(STDB_HOST)" pnpm run e2e-seed-fixture; \
-		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$(STDB_HOST)" NEXT_PUBLIC_STDB_HOST="$(STDB_HOST)" pnpm run seed-test-user; \
+		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
+		cd "$$ROOT/frontend/web"; \
+		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
-		set -a; \
-		[ ! -f frontend/web/.env.local ] || . frontend/web/.env.local; \
-		[ ! -f api-server/.env.local ] || . api-server/.env.local; \
-		[ ! -f .env.local ] || . .env.local; \
-		set +a; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
-			echo "[e2e] api-server is already reachable on :$(E2E_API_PORT)."; \
-		else \
-			echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
-			PORT="$(E2E_API_PORT)" \
-			STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" \
-			STDB_MODULE="$(DB)" \
-			NEXT_PUBLIC_STDB_MODULE="$(DB)" \
-			STDB_HOST="$(STDB_HOST)" \
-			NEXT_PUBLIC_STDB_HOST="$(STDB_HOST)" \
-			CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-			cargo run -p api-server >"$$LOG_DIR/api-server.log" 2>&1 & \
-			API_PID="$$!"; \
-			for i in {1..90}; do \
-				if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
-				sleep 1; \
-				if [ "$$i" = "90" ]; then \
-					echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
-					exit 1; \
-				fi; \
-			done; \
+			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
+			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+			sleep 1; \
 		fi; \
+		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+		PORT="$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" \
+		STDB_MODULE="$(DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+		cargo run -p api-server >"$$LOG_DIR/api-server.log" 2>&1 & \
+		API_PID="$$!"; \
+		for i in {1..90}; do \
+			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+			sleep 1; \
+			if [ "$$i" = "90" ]; then \
+				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
+				exit 1; \
+			fi; \
+		done; \
 		echo "[e2e] Running Playwright smoke tests..."; \
 		cd "$$ROOT/frontend/web"; \
 		pnpm exec playwright install chromium; \
@@ -192,8 +189,8 @@ e2e-smoke:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_MODULE="$(DB)" \
 		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
-		STDB_HOST="$(STDB_HOST)" \
-		NEXT_PUBLIC_STDB_HOST="$(STDB_HOST)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		pnpm run test:e2e; \
 		echo "[e2e] Smoke tests passed."; \
 	'

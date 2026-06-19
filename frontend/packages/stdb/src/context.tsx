@@ -98,6 +98,7 @@ export function StdbConnectionProvider({
         process.env.NEXT_PUBLIC_STDB_HOST ||
         "ws://localhost:3000";
     }
+    const connectionUri = uri;
     const mod =
       moduleName ||
       process.env.NEXT_PUBLIC_STDB_MODULE ||
@@ -114,7 +115,7 @@ export function StdbConnectionProvider({
 
     try {
       conn = DbConnection.builder()
-        .withUri(uri)
+        .withUri(connectionUri)
         .withDatabaseName(mod)
         .withToken(savedToken)
         .onConnect((c, ident, refreshedToken) => {
