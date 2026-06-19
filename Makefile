@@ -154,9 +154,10 @@ e2e-smoke:
 		fi; \
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
 		cd "$$ROOT/frontend/web"; \
-		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
