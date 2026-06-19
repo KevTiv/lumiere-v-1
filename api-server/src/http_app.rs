@@ -130,6 +130,11 @@ async fn post_call(
 }
 
 fn load_dotenv_files() {
+    // Playwright e2e-smoke sets LUMIERE_E2E=1 and injects STDB_HOST/token via the Makefile so
+    // api-server/.env.local (maincloud) does not override local SpacetimeDB settings.
+    if std::env::var("LUMIERE_E2E").ok().as_deref() == Some("1") {
+        return;
+    }
     let _ = dotenvy::dotenv();
     // `dotenv()` only reads `.env` in CWD. When you `cargo run -p api-server` from the repo
     // root, `api-server/.env.local` is never loaded unless we pull it in explicitly.

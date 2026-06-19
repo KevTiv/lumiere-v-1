@@ -168,6 +168,7 @@ e2e-smoke:
 		cargo build -p api-server -q; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+		LUMIERE_E2E=1 \
 		PORT="$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_MODULE="$(DB)" \
