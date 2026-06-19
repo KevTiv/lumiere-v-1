@@ -9,6 +9,7 @@ import {
   useAiImportPreview,
   useAiSearch,
 } from "@lumiere/query-hooks/hooks/ai-harness"
+import { useRunAiSkill } from "@lumiere/query-hooks/hooks/ai-skills"
 import { AiResultPanel } from "@/lib/ai-result-panel"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -19,6 +20,7 @@ type AiHarnessAction =
   | "briefing"
   | "importAnalyze"
   | "importPreview"
+  | "runSkill"
 
 const aiHarnessForms: Record<AiHarnessAction, FormConfig> = {
   search: {
@@ -102,6 +104,58 @@ const aiHarnessForms: Record<AiHarnessAction, FormConfig> = {
       },
     ],
   },
+  runSkill: {
+    id: "ai-harness-run-skill",
+    title: "Run AI Skill",
+    submitLabel: "Run skill",
+    sections: [
+      {
+        id: "skill",
+        fields: [
+          {
+            id: "skill-key",
+            type: "text",
+            name: "skillKey",
+            label: "Skill key",
+            defaultValue: "report_analysis",
+            required: true,
+            width: "full",
+          },
+          {
+            id: "query",
+            type: "textarea",
+            name: "query",
+            label: "Query / goal",
+            required: true,
+            rows: 3,
+            width: "full",
+          },
+          {
+            id: "entity-type",
+            type: "text",
+            name: "entityType",
+            label: "Entity type (optional)",
+            width: "1/2",
+          },
+          {
+            id: "entity-id",
+            type: "number",
+            name: "entityId",
+            label: "Entity id (optional)",
+            width: "1/2",
+          },
+          {
+            id: "inputs-json",
+            type: "textarea",
+            name: "inputsJson",
+            label: "Extra inputs JSON",
+            rows: 4,
+            width: "full",
+          },
+        ],
+      },
+    ],
+  },
 }
 
 function optionalJsonObject(value: unknown, label: string): Record<string, unknown> | undefined {
@@ -157,17 +211,20 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
   const briefing = useAiBriefing()
   const importAnalyze = useAiImportAnalyze()
   const importPreview = useAiImportPreview()
+  const runSkill = useRunAiSkill()
 
   const isPending =
     search.isPending ||
     actionDraft.isPending ||
     briefing.isPending ||
     importAnalyze.isPending ||
-    importPreview.isPending
+    importPreview.isPending ||
+    runSkill.isPending
 
   const actions = useMemo(
     () => [
       { id: "search" as const, title: "Search", description: "Semantic search over indexed company context." },
+      { id: "runSkill" as const, title: "Run Skill", description: "Execute a configured AI skill with ERP tools and citations." },
       { id: "actionDraft" as const, title: "Action Draft", description: "Draft a reducer-backed action from natural language." },
       { id: "briefing" as const, title: "Briefing", description: "Summarize recent activity and notable records." },
       { id: "importAnalyze" as const, title: "Import Analyze", description: "Suggest field mappings for CSV-style imports." },
@@ -219,6 +276,22 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
           prior_mappings: optionalJsonObject(formData.priorMappingsJson, "Prior mappings"),
           instructions: String(formData.instructions ?? "").trim() || undefined,
         })
+      } else if (activeAction === "runSkill") {
+        const inputs: Record<string, unknown> = {
+          query: String(formData.query ?? ""),
+          ...(optionalJsonObject(formData.inputsJson, "Extra inputs") ?? {}),
+        }
+        const entityType = String(formData.entityType ?? "").trim()
+        const entityIdRaw = formData.entityId
+        if (entityType) inputs.entity_type = entityType
+        if (entityIdRaw != null && entityIdRaw !== "") {
+          inputs.entity_id = Number(entityIdRaw)
+        }
+        next = await runSkill.mutateAsync({
+          companyId: operatingCompanyId ?? 0,
+          skillKey: String(formData.skillKey ?? "report_analysis"),
+          inputs,
+        })
       } else {
         next = await importPreview.mutateAsync({
           companyId: operatingCompanyId ?? 0,
@@ -240,7 +313,7 @@ function AiHarnessLoaded({ organizationId }: { organizationId: number }) {
     <div className="space-y-6">
       <DashboardHeader
         title="AI Harness"
-        description="Run AI search, action drafting, briefings, and import mapping tools."
+        description="Run AI search, skills, action drafting, briefings, and import mapping tools."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

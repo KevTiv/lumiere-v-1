@@ -4,12 +4,15 @@ mod context_worker;
 mod error;
 mod harness;
 mod kaggle;
+mod orchestrator;
 mod providers;
 mod qdrant_client;
 mod rig_agent;
 mod routes;
+mod sandbox;
 mod state;
 mod stdb_embed;
+mod tools;
 mod worker;
 
 use std::sync::Arc;
@@ -89,7 +92,8 @@ async fn main() -> anyhow::Result<()> {
         config.stdb_token.clone(),
     );
 
-    let providers = build_providers(&config)?;
+    let http = reqwest::Client::new();
+    let providers = build_providers(&config, http.clone())?;
     let embed_dim = providers.embedder.dimensions();
 
     vector_store.ensure_collection(embed_dim).await?;
@@ -108,7 +112,7 @@ async fn main() -> anyhow::Result<()> {
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
         rig: rig.clone(),
-        http: Arc::new(reqwest::Client::new()),
+        http: Arc::new(http),
         download_jobs: Arc::new(DashMap::new()),
         kaggle_search_cache: Arc::new(DashMap::new()),
         activity_watermarks: Arc::new(DashMap::new()),
@@ -136,6 +140,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
         .route("/v1/actions/draft", post(routes::actions::post_draft))
         .route("/v1/harness/snapshot", post(routes::harness::post_snapshot))
+        .route("/v1/skills", get(routes::skills::get_skills))
+        .route("/v1/skills/run", post(routes::skills::post_run))
         .route(
             "/v1/briefing/generate",
             post(routes::briefing::post_generate),

@@ -16,6 +16,7 @@ pub struct UpdateAiAgentParams {
     pub presence_penalty: Option<f64>,
     pub system_prompt: Option<String>,
     pub monthly_budget: Option<f64>,
+    pub allowed_actions: Option<Vec<String>>,
 }
 
 impl __sdk::InModule for UpdateAiAgentParams {

@@ -53,6 +53,7 @@ pub struct UpdateAiAgentParams {
     pub presence_penalty: Option<f64>,
     pub system_prompt: Option<String>,
     pub monthly_budget: Option<f64>,
+    pub allowed_actions: Option<Vec<String>>,
 }
 
 /// Params for creating an AI team member persona.
@@ -283,6 +284,7 @@ pub fn update_ai_agent(
         top_p: params.top_p.unwrap_or(agent.top_p),
         frequency_penalty: params.frequency_penalty.unwrap_or(agent.frequency_penalty),
         presence_penalty: params.presence_penalty.unwrap_or(agent.presence_penalty),
+        allowed_actions: params.allowed_actions.unwrap_or(agent.allowed_actions),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..agent

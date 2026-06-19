@@ -63,6 +63,21 @@ function bool(v: unknown): boolean {
   return v === true
 }
 
+function agentAllowedActions(row: Row): string[] {
+  const raw = row.allowedActions ?? row.allowed_actions
+  if (!Array.isArray(raw)) return []
+  return raw.map((item) => String(item))
+}
+
+function buildAgentUpdateParams(row: Row, allowedActions: string[]): Record<string, unknown> {
+  return {
+    temperature: Number(row.temperature ?? 0.7),
+    maxTokens: num(row.maxTokens),
+    rateLimitPerMinute: num(row.rateLimitPerMinute),
+    allowedActions,
+  }
+}
+
 function numFromForm(v: unknown): number {
   if (typeof v === "number" && Number.isFinite(v)) return v
   const n = Number.parseFloat(String(v ?? ""))
@@ -374,6 +389,35 @@ export function AiSettings() {
     }
   }
 
+  const handleToggleAgentAction = async (
+    agent: Row,
+    action: "analytics_read" | "analytics_run" | "web_search",
+    enabled: boolean,
+  ) => {
+    if (!orgId) return
+    const id = num(agent.id)
+    const next = new Set(agentAllowedActions(agent))
+    if (enabled) next.add(action)
+    else next.delete(action)
+    try {
+      await updateAgentMutation.mutateAsync({
+        agentId: id,
+        params: buildAgentUpdateParams(agent, Array.from(next)),
+      })
+      toast({
+        title: enabled ? "Action enabled" : "Action disabled",
+        description: action.replace(/_/g, " "),
+      })
+      await refetchAgents()
+    } catch (e) {
+      toast({
+        title: t("settings.ai.mutationError"),
+        description: e instanceof Error ? e.message : "",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleRecordSpend = async (agentId: number) => {
     if (!orgId) return
     const raw = spendByAgent[String(agentId)] ?? "0"
@@ -637,6 +681,38 @@ export function AiSettings() {
                         {t("settings.ai.monthlySpend")}: {Number(a.monthlySpend ?? 0).toFixed(4)}
                         {a.monthlyBudget != null ? ` / ${t("settings.ai.budget")} ${Number(a.monthlyBudget).toFixed(2)}` : ""}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={agentAllowedActions(a).includes("analytics_read")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "analytics_read", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                          />
+                          <span className="text-xs text-muted-foreground">Analytics read</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={agentAllowedActions(a).includes("analytics_run")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "analytics_run", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                          />
+                          <span className="text-xs text-muted-foreground">Analytics run</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={agentAllowedActions(a).includes("web_search")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "web_search", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                          />
+                          <span className="text-xs text-muted-foreground">Web search</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-2">

@@ -49,6 +49,11 @@ pub struct Config {
     pub activities_collection: String,
     pub activity_ingest_interval_secs: u64,
     pub max_upload_bytes: usize,
+
+    /// Web search provider: `tavily` (default) | `disabled`
+    pub web_search_provider: String,
+    pub web_search_api_key: Option<String>,
+    pub web_fetch_max_bytes: usize,
 }
 
 impl Config {
@@ -142,6 +147,16 @@ impl Config {
                 .unwrap_or_else(|_| "20971520".to_string())
                 .parse()
                 .context("MAX_UPLOAD_BYTES must be a valid number")?,
+
+            web_search_provider: std::env::var("WEB_SEARCH_PROVIDER")
+                .unwrap_or_else(|_| "tavily".to_string()),
+            web_search_api_key: std::env::var("WEB_SEARCH_API_KEY")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            web_fetch_max_bytes: std::env::var("WEB_FETCH_MAX_BYTES")
+                .unwrap_or_else(|_| "262144".to_string())
+                .parse()
+                .context("WEB_FETCH_MAX_BYTES must be a valid number")?,
         })
     }
 }

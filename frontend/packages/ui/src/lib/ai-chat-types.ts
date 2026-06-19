@@ -1,6 +1,6 @@
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
-export type CitationKind = "live" | "memory" | "activity"
+export type CitationKind = "live" | "memory" | "activity" | "web"
 export type CitationTrust = "authoritative" | "retrieved"
 
 export interface ChatMessageSourceRef {
@@ -25,6 +25,10 @@ export interface ChatMessageSourceRef {
   href?: string
   /** ISO-8601 UTC when a live row was read from SpacetimeDB */
   snapshot_at?: string
+  /** External web citation URL */
+  url?: string
+  /** ISO-8601 UTC when a web page was fetched */
+  fetched_at?: string
 }
 
 export interface ChatMessage {

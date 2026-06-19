@@ -88,6 +88,14 @@ pub fn ensure_allowed_action(agent: &ResolvedAgentConfig, action: &str) -> Resul
     {
         return Ok(());
     }
+    if action == "skill_run"
+        && agent
+            .allowed_actions
+            .iter()
+            .any(|a| a == "skill_run" || a == "chat" || a == "summarize")
+    {
+        return Ok(());
+    }
     anyhow::bail!("Agent is not allowed to perform action '{action}'");
 }
 

@@ -2,7 +2,6 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 /* eslint-disable */
-/* tslint:disable */
 import {
   TypeBuilder as __TypeBuilder,
   t as __t,

@@ -26,15 +26,17 @@ export type AiMemoryContextHit = {
 export type AiRagSource = {
   kind?: string
   trust?: string
-  content_type: string
-  content_id: number
+  content_type?: string
+  content_id?: number
   entity_type?: string
   entity_id?: string
-  score: number
+  score?: number
   text_snippet: string
   label?: string
   field?: string
   snapshot_at?: string
+  url?: string
+  fetched_at?: string
 }
 
 export type AiChatSessionRow = {

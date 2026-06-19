@@ -232,6 +232,9 @@ use crate::ai::intelligence::{
     ai_document_processing_job, ai_insight, search_embedding, AiDocumentProcessingJob, AiInsight,
     SearchEmbedding,
 };
+use crate::ai::skills::{
+    ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
+};
 use crate::workflow::definitions::{
     workflow, workflow_activity, workflow_transition, Workflow, WorkflowActivity,
     WorkflowTransition,
@@ -248,6 +251,57 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
     } else {
         Err("Dev seed reducers are disabled in this build".to_string())
     }
+}
+
+fn seed_system_skill(
+    ctx: &ReducerContext,
+    skill_key: &str,
+    name: &str,
+    description: &str,
+    category: &str,
+    required_tools: Vec<String>,
+    optional_tools: Vec<String>,
+    prompt_template: &str,
+    dataset_specs: Option<String>,
+    allowed_action_drafts: Vec<String>,
+) -> AiSkill {
+    if let Some(existing) = ctx
+        .db
+        .ai_skill()
+        .ai_skill_by_org()
+        .filter(&0_u64)
+        .find(|row| row.skill_key == skill_key)
+    {
+        return existing;
+    }
+
+    ctx.db.ai_skill().insert(AiSkill {
+        id: 0,
+        organization_id: 0,
+        skill_key: skill_key.to_string(),
+        name: name.to_string(),
+        description: Some(description.to_string()),
+        category: category.to_string(),
+        prompt_template: prompt_template.to_string(),
+        required_tools,
+        optional_tools,
+        default_max_steps: 5,
+        default_max_tool_calls: 12,
+        output_schema: Some(
+            r#"{"type":"object","properties":{"summary":{"type":"string"}}}"#.to_string(),
+        ),
+        config_schema: Some(
+            r#"{"type":"object","properties":{"default_limit":{"type":"integer"},"max_snapshots":{"type":"integer"}}}"#
+                .to_string(),
+        ),
+        dataset_specs,
+        allowed_action_drafts,
+        is_active: true,
+        is_system: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"scope\":\"system\"}".to_string()),
+    })
 }
 
 #[spacetimedb::reducer]
@@ -6213,6 +6267,10 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             "summarize".to_string(),
             "form_suggest".to_string(),
             "action_draft".to_string(),
+            "skill_run".to_string(),
+            "analytics_read".to_string(),
+            "analytics_run".to_string(),
+            "web_search".to_string(),
         ],
         rate_limit_per_minute: 60,
         cost_per_1k_tokens: 0.003,
@@ -6227,7 +6285,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // ── 14.2 AI Team Member ───────────────────────────────────────────────────
-    ctx.db.ai_team_member().insert(AiTeamMember {
+    let team_member = ctx.db.ai_team_member().insert(AiTeamMember {
         id: 0,
         organization_id: org_id,
         name: "Lumiere Assistant".to_string(),
@@ -6256,6 +6314,197 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    // ── 14.3 System AI skills + tenant config ─────────────────────────────────
+    let report_dataset_specs = r#"{"datasets":[
+      {"source":"stdb_table","key":"sale_order_lines","table":"sale_order_line","limit":2000},
+      {"source":"stdb_table","key":"stock_moves","table":"stock_move","limit":2000},
+      {"source":"stdb_table","key":"financial_reports","table":"financial_report","limit":500},
+      {"source":"input","key":"report_lines","input_field":"report_lines"}
+    ]}"#;
+
+    let report_analysis = seed_system_skill(
+        ctx,
+        "report_analysis",
+        "Report Analysis",
+        "Analyze ERP report and entity data using sandbox SQL, live snapshots, and semantic search.",
+        "analytics",
+        vec![
+            "erp_snapshot".to_string(),
+            "erp_search".to_string(),
+            "list_datasets".to_string(),
+            "describe_dataset".to_string(),
+            "run_query".to_string(),
+            "save_artifact".to_string(),
+        ],
+        vec![],
+        r#"You are an ERP analytics assistant. Use sandbox SQL results, live ERP snapshots, and semantic search hits to produce concise factual summaries with cited sources.
+
+Inputs may include:
+- query or goal (required)
+- entity_type + entity_id (optional focus)
+- report_id / report_lines (optional report context)
+- analysis_sql (optional custom SELECT)
+
+Respond with grounded insights only. If data is insufficient, say so."#,
+        Some(report_dataset_specs.to_string()),
+        vec![],
+    );
+
+    let process_dataset_specs = r#"{"datasets":[
+      {"source":"stdb_table","key":"stock_moves","table":"stock_move","limit":2000},
+      {"source":"stdb_table","key":"purchase_orders","table":"purchase_order","limit":1000},
+      {"source":"stdb_table","key":"workflow_instances","table":"workflow_instance","company_column":"","limit":1000}
+    ]}"#;
+
+    let process_research = seed_system_skill(
+        ctx,
+        "process_research",
+        "Process Research",
+        "Research operational process health using stock, purchasing, and workflow datasets.",
+        "operations",
+        vec![
+            "erp_search".to_string(),
+            "list_datasets".to_string(),
+            "run_query".to_string(),
+            "save_artifact".to_string(),
+        ],
+        vec!["describe_dataset".to_string()],
+        r#"You are an ERP operations analyst. Use sandbox SQL aggregations and semantic search to identify bottlenecks, delays, and anomalies.
+
+Focus on state distributions, overdue items, and volume trends. Cite dataset evidence in your summary."#,
+        Some(process_dataset_specs.to_string()),
+        vec![],
+    );
+
+    let price_dataset_specs = r#"{"datasets":[
+      {"source":"stdb_table","key":"products","table":"product","limit":1000},
+      {"source":"stdb_table","key":"purchase_orders","table":"purchase_order","limit":1000},
+      {"source":"stdb_table","key":"partners","table":"contact","limit":500}
+    ]}"#;
+
+    let price_search = seed_system_skill(
+        ctx,
+        "price_search",
+        "Price Search",
+        "Compare ERP product pricing with external supplier candidates and optionally draft a purchase order.",
+        "procurement",
+        vec![
+            "erp_snapshot".to_string(),
+            "erp_search".to_string(),
+            "web_search".to_string(),
+            "fetch_url".to_string(),
+            "save_artifact".to_string(),
+        ],
+        vec!["action_draft".to_string()],
+        r#"You are a procurement analyst. Compare internal product context with external web results.
+
+Inputs:
+- product_id (required)
+- optional target_price, quantity, region, query
+
+Rank external candidates by relevance and price signals. Cite web URLs. If confidence is high and tenant config allows, propose a purchase order draft."#,
+        Some(price_dataset_specs.to_string()),
+        vec!["create_purchase_order".to_string()],
+    );
+
+    let supplier_discovery = seed_system_skill(
+        ctx,
+        "supplier_discovery",
+        "Supplier Discovery",
+        "Research external suppliers for a category or product using web search and ERP vendor context.",
+        "procurement",
+        vec![
+            "web_search".to_string(),
+            "fetch_url".to_string(),
+            "erp_search".to_string(),
+            "save_artifact".to_string(),
+        ],
+        vec![],
+        r#"You are a sourcing analyst. Use web search hits and ERP partner matches to recommend suppliers.
+
+Focus on credibility, region fit, and category relevance. Always cite URLs from web results."#,
+        None,
+        vec![],
+    );
+
+    ctx.db.ai_skill_config().insert(AiSkillConfig {
+        id: 0,
+        organization_id: org_id,
+        company_id: Some(company_id),
+        skill_id: report_analysis.id,
+        is_enabled: true,
+        config_json: "{\"default_limit\":10,\"max_snapshots\":3,\"max_output_rows\":500}".to_string(),
+        custom_instructions: None,
+        tool_overrides: vec![],
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    ctx.db.ai_skill_config().insert(AiSkillConfig {
+        id: 0,
+        organization_id: org_id,
+        company_id: Some(company_id),
+        skill_id: process_research.id,
+        is_enabled: true,
+        config_json: "{\"max_output_rows\":500}".to_string(),
+        custom_instructions: None,
+        tool_overrides: vec![],
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    ctx.db.ai_skill_config().insert(AiSkillConfig {
+        id: 0,
+        organization_id: org_id,
+        company_id: Some(company_id),
+        skill_id: price_search.id,
+        is_enabled: true,
+        config_json: "{\"currency\":\"EUR\",\"max_price_delta_pct\":15,\"preferred_supplier_domains\":[],\"blocked_domains\":[],\"match_on\":[\"sku\",\"product_name\"],\"require_existing_vendor\":false,\"min_confidence\":0.7,\"max_web_results\":8}".to_string(),
+        custom_instructions: None,
+        tool_overrides: vec![],
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    ctx.db.ai_skill_config().insert(AiSkillConfig {
+        id: 0,
+        organization_id: org_id,
+        company_id: Some(company_id),
+        skill_id: supplier_discovery.id,
+        is_enabled: true,
+        config_json: "{\"regions\":[],\"categories\":[],\"blocked_domains\":[],\"max_web_results\":8}".to_string(),
+        custom_instructions: None,
+        tool_overrides: vec![],
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    ctx.db.ai_team_member_skill().insert(AiTeamMemberSkill {
+        id: 0,
+        organization_id: org_id,
+        team_member_id: team_member.id,
+        skill_id: report_analysis.id,
+        is_default: true,
+        module_hint: Some("reports".to_string()),
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+    });
+
+    ctx.db.ai_team_member_skill().insert(AiTeamMemberSkill {
+        id: 0,
+        organization_id: org_id,
+        team_member_id: team_member.id,
+        skill_id: price_search.id,
+        is_default: false,
+        module_hint: Some("inventory".to_string()),
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
     });
 
     // =========================================================================

@@ -4,7 +4,6 @@
 // This was generated using spacetimedb cli version 2.0.1 (commit a4d29daec8ed35ce4913a335b7210b9ae3933d00).
 
 /* eslint-disable */
-/* tslint:disable */
 import {
   DbConnectionBuilder as __DbConnectionBuilder,
   DbConnectionImpl as __DbConnectionImpl,
@@ -58,6 +57,7 @@ import AddUserToOrganizationReducer from "./add_user_to_organization_reducer";
 import AddWidgetToDashboardReducer from "./add_widget_to_dashboard_reducer";
 import AddWorkflowActivityReducer from "./add_workflow_activity_reducer";
 import AddWorkflowTransitionReducer from "./add_workflow_transition_reducer";
+import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyReconciliationRulesReducer from "./apply_reconciliation_rules_reducer";
@@ -77,6 +77,7 @@ import AssignStockMoveReducer from "./assign_stock_move_reducer";
 import AssignStockPickingReducer from "./assign_stock_picking_reducer";
 import AssignTagToContactReducer from "./assign_tag_to_contact_reducer";
 import AssignTaskUsersReducer from "./assign_task_users_reducer";
+import AssignTeamMemberSkillReducer from "./assign_team_member_skill_reducer";
 import AssignTicketReducer from "./assign_ticket_reducer";
 import AssignUserToPickingReducer from "./assign_user_to_picking_reducer";
 import BackfillExternalIdsReducer from "./backfill_external_ids_reducer";
@@ -85,6 +86,7 @@ import BlockSerialReducer from "./block_serial_reducer";
 import BlockWorkcenterReducer from "./block_workcenter_reducer";
 import BootstrapNewTenantReducer from "./bootstrap_new_tenant_reducer";
 import CancelAccountMoveReducer from "./cancel_account_move_reducer";
+import CancelAiAgentRunReducer from "./cancel_ai_agent_run_reducer";
 import CancelBudgetReducer from "./cancel_budget_reducer";
 import CancelConsolidationReducer from "./cancel_consolidation_reducer";
 import CancelContractReducer from "./cancel_contract_reducer";
@@ -113,6 +115,7 @@ import ClosePurchaseRequisitionReducer from "./close_purchase_requisition_reduce
 import CloseSubscriptionReducer from "./close_subscription_reducer";
 import CloseTicketReducer from "./close_ticket_reducer";
 import CompleteActivityReducer from "./complete_activity_reducer";
+import CompleteAiAgentRunReducer from "./complete_ai_agent_run_reducer";
 import CompleteDocumentProcessingJobReducer from "./complete_document_processing_job_reducer";
 import CompleteIntercompanyTransactionReducer from "./complete_intercompany_transaction_reducer";
 import CompletePickingBatchReducer from "./complete_picking_batch_reducer";
@@ -155,8 +158,10 @@ import CreateActivityReducer from "./create_activity_reducer";
 import CreateAdjustmentReasonReducer from "./create_adjustment_reason_reducer";
 import CreateAiActionDraftReducer from "./create_ai_action_draft_reducer";
 import CreateAiAgentReducer from "./create_ai_agent_reducer";
+import CreateAiAgentRunReducer from "./create_ai_agent_run_reducer";
 import CreateAiChatSessionReducer from "./create_ai_chat_session_reducer";
 import CreateAiInsightReducer from "./create_ai_insight_reducer";
+import CreateAiSkillReducer from "./create_ai_skill_reducer";
 import CreateAiTeamMemberReducer from "./create_ai_team_member_reducer";
 import CreateAnalyticAccountReducer from "./create_analytic_account_reducer";
 import CreateAnalyticDistributionModelReducer from "./create_analytic_distribution_model_reducer";
@@ -530,6 +535,7 @@ import SeedDevDataReducer from "./seed_dev_data_reducer";
 import SeedOrganizationFormConfigsReducer from "./seed_organization_form_configs_reducer";
 import SendPurchaseOrderReducer from "./send_purchase_order_reducer";
 import SetAiAgentActiveReducer from "./set_ai_agent_active_reducer";
+import SetAiSkillActiveReducer from "./set_ai_skill_active_reducer";
 import SetAnalyticAccountActiveReducer from "./set_analytic_account_active_reducer";
 import SetArticlePublishedReducer from "./set_article_published_reducer";
 import SetAssetActiveReducer from "./set_asset_active_reducer";
@@ -563,6 +569,7 @@ import SubscribeToRecordReducer from "./subscribe_to_record_reducer";
 import SyncHubDevicesReducer from "./sync_hub_devices_reducer";
 import TestIotDeviceReducer from "./test_iot_device_reducer";
 import ToggleProjectFavoriteReducer from "./toggle_project_favorite_reducer";
+import UnassignTeamMemberSkillReducer from "./unassign_team_member_skill_reducer";
 import UnblockWorkcenterReducer from "./unblock_workcenter_reducer";
 import UnlinkDeviceReducer from "./unlink_device_reducer";
 import UnlockDocumentReducer from "./unlock_document_reducer";
@@ -693,6 +700,7 @@ import UpdateWhatsappQualityScoreReducer from "./update_whatsapp_quality_score_r
 import UpdateWhatsappVerificationStatusReducer from "./update_whatsapp_verification_status_reducer";
 import UpdateWidgetLayoutReducer from "./update_widget_layout_reducer";
 import UpdateWorkcenterReducer from "./update_workcenter_reducer";
+import UpsertAiSkillConfigReducer from "./upsert_ai_skill_config_reducer";
 import UpsertOrganizationSettingsReducer from "./upsert_organization_settings_reducer";
 import UpsertProposalSectionReducer from "./upsert_proposal_section_reducer";
 import UpsertSearchEmbeddingReducer from "./upsert_search_embedding_reducer";
@@ -735,11 +743,16 @@ import ActivityTypeRow from "./activity_type_table";
 import AdjustmentReasonRow from "./adjustment_reason_table";
 import AiActionDraftRow from "./ai_action_draft_table";
 import AiAgentRow from "./ai_agent_table";
+import AiAgentRunRow from "./ai_agent_run_table";
+import AiAgentRunStepRow from "./ai_agent_run_step_table";
 import AiChatMessageRow from "./ai_chat_message_table";
 import AiChatSessionRow from "./ai_chat_session_table";
 import AiDocumentProcessingJobRow from "./ai_document_processing_job_table";
 import AiInsightRow from "./ai_insight_table";
+import AiSkillRow from "./ai_skill_table";
+import AiSkillConfigRow from "./ai_skill_config_table";
 import AiTeamMemberRow from "./ai_team_member_table";
+import AiTeamMemberSkillRow from "./ai_team_member_skill_table";
 import AnalyticsMetricRow from "./analytics_metric_table";
 import AssignmentRuleRow from "./assignment_rule_table";
 import AuditLogRow from "./audit_log_table";
@@ -1507,6 +1520,46 @@ const tablesSchema = __schema({
       { name: 'ai_agent_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiAgentRow),
+  ai_agent_run: __table({
+    name: 'ai_agent_run',
+    indexes: [
+      { name: 'ai_agent_run_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_agent_run_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_agent_run_by_run_key', algorithm: 'btree', columns: [
+        'runKey',
+      ] },
+      { name: 'ai_agent_run_by_skill', algorithm: 'btree', columns: [
+        'skillId',
+      ] },
+      { name: 'ai_agent_run_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_agent_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiAgentRunRow),
+  ai_agent_run_step: __table({
+    name: 'ai_agent_run_step',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_agent_run_step_by_run', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_agent_run_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiAgentRunStepRow),
   ai_chat_message: __table({
     name: 'ai_chat_message',
     indexes: [
@@ -1584,6 +1637,42 @@ const tablesSchema = __schema({
       { name: 'ai_insight_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiInsightRow),
+  ai_skill: __table({
+    name: 'ai_skill',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_by_org_key', algorithm: 'btree', columns: [
+        'organizationId',
+        'skillKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillRow),
+  ai_skill_config: __table({
+    name: 'ai_skill_config',
+    indexes: [
+      { name: 'ai_skill_config_by_company_skill', algorithm: 'btree', columns: [
+        'companyId',
+        'skillId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_config_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_config_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillConfigRow),
   ai_team_member: __table({
     name: 'ai_team_member',
     indexes: [
@@ -1604,6 +1693,23 @@ const tablesSchema = __schema({
       { name: 'ai_team_member_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiTeamMemberRow),
+  ai_team_member_skill: __table({
+    name: 'ai_team_member_skill',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_team_member_skill_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_team_member_skill_by_member', algorithm: 'btree', columns: [
+        'teamMemberId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_team_member_skill_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiTeamMemberSkillRow),
   analytics_metric: __table({
     name: 'analytics_metric',
     indexes: [
@@ -5143,6 +5249,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_widget_to_dashboard", AddWidgetToDashboardReducer),
   __reducerSchema("add_workflow_activity", AddWorkflowActivityReducer),
   __reducerSchema("add_workflow_transition", AddWorkflowTransitionReducer),
+  __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_reconciliation_rules", ApplyReconciliationRulesReducer),
@@ -5162,6 +5269,7 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_stock_picking", AssignStockPickingReducer),
   __reducerSchema("assign_tag_to_contact", AssignTagToContactReducer),
   __reducerSchema("assign_task_users", AssignTaskUsersReducer),
+  __reducerSchema("assign_team_member_skill", AssignTeamMemberSkillReducer),
   __reducerSchema("assign_ticket", AssignTicketReducer),
   __reducerSchema("assign_user_to_picking", AssignUserToPickingReducer),
   __reducerSchema("backfill_external_ids", BackfillExternalIdsReducer),
@@ -5170,6 +5278,7 @@ const reducersSchema = __reducers(
   __reducerSchema("block_workcenter", BlockWorkcenterReducer),
   __reducerSchema("bootstrap_new_tenant", BootstrapNewTenantReducer),
   __reducerSchema("cancel_account_move", CancelAccountMoveReducer),
+  __reducerSchema("cancel_ai_agent_run", CancelAiAgentRunReducer),
   __reducerSchema("cancel_budget", CancelBudgetReducer),
   __reducerSchema("cancel_consolidation", CancelConsolidationReducer),
   __reducerSchema("cancel_contract", CancelContractReducer),
@@ -5198,6 +5307,7 @@ const reducersSchema = __reducers(
   __reducerSchema("close_subscription", CloseSubscriptionReducer),
   __reducerSchema("close_ticket", CloseTicketReducer),
   __reducerSchema("complete_activity", CompleteActivityReducer),
+  __reducerSchema("complete_ai_agent_run", CompleteAiAgentRunReducer),
   __reducerSchema("complete_document_processing_job", CompleteDocumentProcessingJobReducer),
   __reducerSchema("complete_intercompany_transaction", CompleteIntercompanyTransactionReducer),
   __reducerSchema("complete_picking_batch", CompletePickingBatchReducer),
@@ -5240,8 +5350,10 @@ const reducersSchema = __reducers(
   __reducerSchema("create_adjustment_reason", CreateAdjustmentReasonReducer),
   __reducerSchema("create_ai_action_draft", CreateAiActionDraftReducer),
   __reducerSchema("create_ai_agent", CreateAiAgentReducer),
+  __reducerSchema("create_ai_agent_run", CreateAiAgentRunReducer),
   __reducerSchema("create_ai_chat_session", CreateAiChatSessionReducer),
   __reducerSchema("create_ai_insight", CreateAiInsightReducer),
+  __reducerSchema("create_ai_skill", CreateAiSkillReducer),
   __reducerSchema("create_ai_team_member", CreateAiTeamMemberReducer),
   __reducerSchema("create_analytic_account", CreateAnalyticAccountReducer),
   __reducerSchema("create_analytic_distribution_model", CreateAnalyticDistributionModelReducer),
@@ -5615,6 +5727,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_organization_form_configs", SeedOrganizationFormConfigsReducer),
   __reducerSchema("send_purchase_order", SendPurchaseOrderReducer),
   __reducerSchema("set_ai_agent_active", SetAiAgentActiveReducer),
+  __reducerSchema("set_ai_skill_active", SetAiSkillActiveReducer),
   __reducerSchema("set_analytic_account_active", SetAnalyticAccountActiveReducer),
   __reducerSchema("set_article_published", SetArticlePublishedReducer),
   __reducerSchema("set_asset_active", SetAssetActiveReducer),
@@ -5648,6 +5761,7 @@ const reducersSchema = __reducers(
   __reducerSchema("sync_hub_devices", SyncHubDevicesReducer),
   __reducerSchema("test_iot_device", TestIotDeviceReducer),
   __reducerSchema("toggle_project_favorite", ToggleProjectFavoriteReducer),
+  __reducerSchema("unassign_team_member_skill", UnassignTeamMemberSkillReducer),
   __reducerSchema("unblock_workcenter", UnblockWorkcenterReducer),
   __reducerSchema("unlink_device", UnlinkDeviceReducer),
   __reducerSchema("unlock_document", UnlockDocumentReducer),
@@ -5778,6 +5892,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_whatsapp_verification_status", UpdateWhatsappVerificationStatusReducer),
   __reducerSchema("update_widget_layout", UpdateWidgetLayoutReducer),
   __reducerSchema("update_workcenter", UpdateWorkcenterReducer),
+  __reducerSchema("upsert_ai_skill_config", UpsertAiSkillConfigReducer),
   __reducerSchema("upsert_organization_settings", UpsertOrganizationSettingsReducer),
   __reducerSchema("upsert_proposal_section", UpsertProposalSectionReducer),
   __reducerSchema("upsert_search_embedding", UpsertSearchEmbeddingReducer),

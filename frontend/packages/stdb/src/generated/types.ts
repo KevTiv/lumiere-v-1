@@ -958,6 +958,48 @@ export const AiAgent = __t.object("AiAgent", {
 });
 export type AiAgent = __Infer<typeof AiAgent>;
 
+export const AiAgentRun = __t.object("AiAgentRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  skillId: __t.u64(),
+  skillConfigId: __t.option(__t.u64()),
+  agentId: __t.u64(),
+  teamMemberId: __t.option(__t.u64()),
+  runKey: __t.string(),
+  status: __t.string(),
+  inputsJson: __t.string(),
+  summary: __t.option(__t.string()),
+  artifactsJson: __t.option(__t.string()),
+  citationsJson: __t.option(__t.string()),
+  actionDraftIds: __t.array(__t.u64()),
+  stepCount: __t.u32(),
+  tokensUsed: __t.u32(),
+  errorMessage: __t.option(__t.string()),
+  triggeredByHex: __t.string(),
+  startedAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiAgentRun = __Infer<typeof AiAgentRun>;
+
+export const AiAgentRunStep = __t.object("AiAgentRunStep", {
+  id: __t.u64(),
+  runId: __t.u64(),
+  stepNo: __t.u32(),
+  toolName: __t.string(),
+  inputHash: __t.string(),
+  outputSummary: __t.string(),
+  outputRowCount: __t.option(__t.u32()),
+  citationsJson: __t.option(__t.string()),
+  durationMs: __t.u64(),
+  errorMessage: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+});
+export type AiAgentRunStep = __Infer<typeof AiAgentRunStep>;
+
 export const AiChatMessage = __t.object("AiChatMessage", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1055,6 +1097,45 @@ export const AiInsight = __t.object("AiInsight", {
 });
 export type AiInsight = __Infer<typeof AiInsight>;
 
+export const AiSkill = __t.object("AiSkill", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  skillKey: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  category: __t.string(),
+  promptTemplate: __t.string(),
+  requiredTools: __t.array(__t.string()),
+  optionalTools: __t.array(__t.string()),
+  defaultMaxSteps: __t.u32(),
+  defaultMaxToolCalls: __t.u32(),
+  outputSchema: __t.option(__t.string()),
+  configSchema: __t.option(__t.string()),
+  datasetSpecs: __t.option(__t.string()),
+  allowedActionDrafts: __t.array(__t.string()),
+  isActive: __t.bool(),
+  isSystem: __t.bool(),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkill = __Infer<typeof AiSkill>;
+
+export const AiSkillConfig = __t.object("AiSkillConfig", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  skillId: __t.u64(),
+  isEnabled: __t.bool(),
+  configJson: __t.string(),
+  customInstructions: __t.option(__t.string()),
+  toolOverrides: __t.array(__t.string()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillConfig = __Infer<typeof AiSkillConfig>;
+
 export const AiTeamMember = __t.object("AiTeamMember", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1076,6 +1157,18 @@ export const AiTeamMember = __t.object("AiTeamMember", {
   metadata: __t.option(__t.string()),
 });
 export type AiTeamMember = __Infer<typeof AiTeamMember>;
+
+export const AiTeamMemberSkill = __t.object("AiTeamMemberSkill", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  teamMemberId: __t.u64(),
+  skillId: __t.u64(),
+  isDefault: __t.bool(),
+  moduleHint: __t.option(__t.string()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+});
+export type AiTeamMemberSkill = __Infer<typeof AiTeamMemberSkill>;
 
 export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   id: __t.u64(),
@@ -1107,6 +1200,18 @@ export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   metadata: __t.option(__t.string()),
 });
 export type AnalyticsMetric = __Infer<typeof AnalyticsMetric>;
+
+export const AppendAiAgentRunStepParams = __t.object("AppendAiAgentRunStepParams", {
+  stepNo: __t.u32(),
+  toolName: __t.string(),
+  inputHash: __t.string(),
+  outputSummary: __t.string(),
+  outputRowCount: __t.option(__t.u32()),
+  citationsJson: __t.option(__t.string()),
+  durationMs: __t.u64(),
+  errorMessage: __t.option(__t.string()),
+});
+export type AppendAiAgentRunStepParams = __Infer<typeof AppendAiAgentRunStepParams>;
 
 export const AppendAiChatMessageParams = __t.object("AppendAiChatMessageParams", {
   sessionKey: __t.string(),
@@ -1142,6 +1247,14 @@ export const AssignRoleParams = __t.object("AssignRoleParams", {
   metadata: __t.option(__t.string()),
 });
 export type AssignRoleParams = __Infer<typeof AssignRoleParams>;
+
+export const AssignTeamMemberSkillParams = __t.object("AssignTeamMemberSkillParams", {
+  teamMemberId: __t.u64(),
+  skillId: __t.u64(),
+  isDefault: __t.bool(),
+  moduleHint: __t.option(__t.string()),
+});
+export type AssignTeamMemberSkillParams = __Infer<typeof AssignTeamMemberSkillParams>;
 
 export const AssignUserToPickingParams = __t.object("AssignUserToPickingParams", {
   companyId: __t.option(__t.u64()),
@@ -1535,6 +1648,18 @@ export const CompanyScopeParams = __t.object("CompanyScopeParams", {
   companyId: __t.option(__t.u64()),
 });
 export type CompanyScopeParams = __Infer<typeof CompanyScopeParams>;
+
+export const CompleteAiAgentRunParams = __t.object("CompleteAiAgentRunParams", {
+  status: __t.string(),
+  summary: __t.option(__t.string()),
+  artifactsJson: __t.option(__t.string()),
+  citationsJson: __t.option(__t.string()),
+  actionDraftIds: __t.array(__t.u64()),
+  stepCount: __t.u32(),
+  tokensUsed: __t.u32(),
+  errorMessage: __t.option(__t.string()),
+});
+export type CompleteAiAgentRunParams = __Infer<typeof CompleteAiAgentRunParams>;
 
 export const CompleteDocumentProcessingJobParams = __t.object("CompleteDocumentProcessingJobParams", {
   extractedData: __t.option(__t.string()),
@@ -2178,6 +2303,19 @@ export const CreateAiAgentParams = __t.object("CreateAiAgentParams", {
 });
 export type CreateAiAgentParams = __Infer<typeof CreateAiAgentParams>;
 
+export const CreateAiAgentRunParams = __t.object("CreateAiAgentRunParams", {
+  companyId: __t.u64(),
+  skillId: __t.u64(),
+  skillConfigId: __t.option(__t.u64()),
+  agentId: __t.u64(),
+  teamMemberId: __t.option(__t.u64()),
+  runKey: __t.string(),
+  inputsJson: __t.string(),
+  triggeredByHex: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiAgentRunParams = __Infer<typeof CreateAiAgentRunParams>;
+
 export const CreateAiChatSessionParams = __t.object("CreateAiChatSessionParams", {
   sessionKey: __t.string(),
   title: __t.option(__t.string()),
@@ -2206,6 +2344,26 @@ export const CreateAiInsightParams = __t.object("CreateAiInsightParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateAiInsightParams = __Infer<typeof CreateAiInsightParams>;
+
+export const CreateAiSkillParams = __t.object("CreateAiSkillParams", {
+  skillKey: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  category: __t.string(),
+  promptTemplate: __t.string(),
+  requiredTools: __t.array(__t.string()),
+  optionalTools: __t.array(__t.string()),
+  defaultMaxSteps: __t.u32(),
+  defaultMaxToolCalls: __t.u32(),
+  outputSchema: __t.option(__t.string()),
+  configSchema: __t.option(__t.string()),
+  datasetSpecs: __t.option(__t.string()),
+  allowedActionDrafts: __t.array(__t.string()),
+  isActive: __t.bool(),
+  isSystem: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiSkillParams = __Infer<typeof CreateAiSkillParams>;
 
 export const CreateAiTeamMemberParams = __t.object("CreateAiTeamMemberParams", {
   name: __t.string(),
@@ -10108,6 +10266,7 @@ export const UpdateAiAgentParams = __t.object("UpdateAiAgentParams", {
   presencePenalty: __t.option(__t.f64()),
   systemPrompt: __t.option(__t.string()),
   monthlyBudget: __t.option(__t.f64()),
+  allowedActions: __t.option(__t.array(__t.string())),
 });
 export type UpdateAiAgentParams = __Infer<typeof UpdateAiAgentParams>;
 
@@ -11149,6 +11308,17 @@ export const UpdateWorkcenterParams = __t.object("UpdateWorkcenterParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateWorkcenterParams = __Infer<typeof UpdateWorkcenterParams>;
+
+export const UpsertAiSkillConfigParams = __t.object("UpsertAiSkillConfigParams", {
+  companyId: __t.option(__t.u64()),
+  skillId: __t.u64(),
+  isEnabled: __t.bool(),
+  configJson: __t.string(),
+  customInstructions: __t.option(__t.string()),
+  toolOverrides: __t.array(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertAiSkillConfigParams = __Infer<typeof UpsertAiSkillConfigParams>;
 
 export const UpsertOrganizationSettingsParams = __t.object("UpsertOrganizationSettingsParams", {
   moduleConfig: __t.option(__t.string()),

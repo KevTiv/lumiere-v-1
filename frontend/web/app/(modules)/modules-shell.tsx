@@ -58,7 +58,7 @@ function ensureAiChatSessionKey(): string {
 
 function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
   const kind =
-    s.kind === "live" || s.kind === "memory" || s.kind === "activity"
+    s.kind === "live" || s.kind === "memory" || s.kind === "activity" || s.kind === "web"
       ? s.kind
       : s.content_type === "org_activity"
         ? "activity"
@@ -82,7 +82,9 @@ function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
     score: s.score,
     excerpt: s.text_snippet.length > 220 ? `${s.text_snippet.slice(0, 220)}…` : s.text_snippet,
     snapshot_at: s.snapshot_at,
-    href: resolveAiSourceHref({
+    url: s.url,
+    fetched_at: s.fetched_at,
+    href: s.url ?? resolveAiSourceHref({
       content_type: s.content_type,
       content_id: s.content_id,
       entity_type: s.entity_type,

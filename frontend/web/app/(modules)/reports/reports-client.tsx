@@ -85,8 +85,10 @@ import {
   Share2,
   Plus,
   Grid3X3,
+  Sparkles,
 } from "lucide-react"
 import { useAiReportExplain } from "@lumiere/query-hooks/hooks/ai-harness"
+import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 
 interface ReportsClientProps {
   initialReports?: Record<string, unknown>[]
@@ -105,6 +107,53 @@ type ReportExplainState = {
   row: Record<string, unknown>
   form: FormConfig
 } | null
+
+type ReportAnalyzeState = {
+  row: Record<string, unknown>
+  reportLines: Record<string, unknown>[]
+  form: FormConfig
+} | null
+
+function skillRunToPanel(result: AiSkillRunResponse): Record<string, unknown> {
+  const tableArtifact = result.artifacts.find((a) => a.kind === "table")
+  return {
+    summary: result.summary,
+    citations: result.citations,
+    artifacts: result.artifacts,
+    steps: result.steps,
+    run_id: result.run_id,
+    ...(tableArtifact?.content && typeof tableArtifact.content === "object"
+      ? { rows: (tableArtifact.content as { rows?: unknown[] }).rows ?? [] }
+      : {}),
+  }
+}
+
+function reportAnalyzeForm(row: Record<string, unknown>): FormConfig {
+  return {
+    id: "ai-report-analyze",
+    title: "Analyze with AI",
+    description:
+      "Run sandbox SQL and live ERP lookups on report data. Returns a summary plus query results.",
+    submitLabel: "Analyze report",
+    sections: [
+      {
+        id: "analysis",
+        fields: [
+          {
+            id: "question",
+            type: "textarea",
+            name: "question",
+            label: "Analysis goal",
+            defaultValue:
+              "Summarize revenue drivers, anomalies, and follow-up actions for this report.",
+            rows: 4,
+            width: "full",
+          },
+        ],
+      },
+    ],
+  }
+}
 
 function reportExplainForm(row: Record<string, unknown>): FormConfig {
   return {
@@ -190,6 +239,9 @@ function ReportsClientLoaded({
   const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
   const [reportExplainError, setReportExplainError] = useState<string | null>(null)
   const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
+  const [reportAnalyze, setReportAnalyze] = useState<ReportAnalyzeState>(null)
+  const [reportAnalyzeError, setReportAnalyzeError] = useState<string | null>(null)
+  const [reportAnalyzeResult, setReportAnalyzeResult] = useState<Record<string, unknown> | null>(null)
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
@@ -230,6 +282,7 @@ function ReportsClientLoaded({
   const updateWidgetLayout = useUpdateWidgetLayout(orgId)
   const shareDashboard = useShareDashboard(orgId)
   const aiReportExplain = useAiReportExplain()
+  const runReportAnalysis = useRunAiSkill()
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -386,6 +439,24 @@ function ReportsClientLoaded({
               setReportExplain({ row: first, form: reportExplainForm(first) })
             },
           },
+          {
+            id: "ai-analyze",
+            label: "Analyze with AI",
+            icon: Sparkles,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              const reportId = String(first.id)
+              const lines = trialBalances.filter((row) => String(row.reportId) === reportId)
+              setReportAnalyzeError(null)
+              setReportAnalyze({
+                row: first,
+                reportLines: lines,
+                form: reportAnalyzeForm(first),
+              })
+            },
+          },
         ],
       },
     }
@@ -395,6 +466,7 @@ function ReportsClientLoaded({
     generateFinancialReport,
     archiveFinancialReport,
     deleteFinancialReport,
+    trialBalances,
   ])
 
   const reportTemplatesEntityConfig = useMemo((): EntityViewConfig => {
@@ -680,6 +752,7 @@ function ReportsClientLoaded({
     updateWidgetLayout.isPending ||
     shareDashboard.isPending ||
     aiReportExplain.isPending ||
+    runReportAnalysis.isPending ||
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
@@ -703,6 +776,15 @@ function ReportsClientLoaded({
             title="AI report explanation"
             result={reportExplainResult}
             onDismiss={() => setReportExplainResult(null)}
+          />
+        </div>
+      ) : null}
+      {reportAnalyzeResult ? (
+        <div className="mt-4">
+          <AiResultPanel
+            title="AI report analysis"
+            result={reportAnalyzeResult}
+            onDismiss={() => setReportAnalyzeResult(null)}
           />
         </div>
       ) : null}
@@ -754,6 +836,42 @@ function ReportsClientLoaded({
               setReportExplain(null)
             } catch (e) {
               setReportExplainError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+      {reportAnalyze ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setReportAnalyze(null)
+              setReportAnalyzeError(null)
+            }
+          }}
+          config={reportAnalyze.form}
+          isPending={isFormMutationPending}
+          closeOnSubmit={false}
+          submitError={reportAnalyzeError}
+          onSubmit={async (formData) => {
+            setReportAnalyzeError(null)
+            try {
+              const reportIdRaw = reportAnalyze.row.id
+              const result = await runReportAnalysis.mutateAsync({
+                companyId: Number(operatingCompanyId ?? 0),
+                skillKey: "report_analysis",
+                inputs: {
+                  query: String(formData.question ?? "").trim(),
+                  entity_type: "financial_report",
+                  entity_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
+                  report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
+                  report_lines: reportAnalyze.reportLines,
+                },
+              })
+              setReportAnalyzeResult(skillRunToPanel(result))
+              setReportAnalyze(null)
+            } catch (e) {
+              setReportAnalyzeError(e instanceof Error ? e.message : String(e))
             }
           }}
         />

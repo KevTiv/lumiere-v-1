@@ -9,6 +9,7 @@ use super::{
     llm::LlmClient,
     parser::{DocumentParser, PlainTextParser, UnstructuredParser},
     vision::{MistralVision, OllamaVision, VisionProvider},
+    web_search::{build_web_search, WebSearchProvider},
 };
 
 /// All active providers for embeddings, vision, parsing, and LLM chat.
@@ -18,6 +19,7 @@ pub struct Providers {
     pub vision: Arc<dyn VisionProvider>,
     pub parser: Arc<dyn DocumentParser>,
     pub llm: Arc<LlmClient>,
+    pub web_search: Arc<dyn WebSearchProvider>,
 }
 
 fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
@@ -45,7 +47,7 @@ fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
 }
 
 /// Build provider instances from config.
-pub fn build(config: &Config) -> Result<Providers> {
+pub fn build(config: &Config, http: reqwest::Client) -> Result<Providers> {
     let embedder = build_embedder(config)?;
 
     let vision: Arc<dyn VisionProvider> = match config.vision_provider.as_str() {
@@ -70,6 +72,11 @@ pub fn build(config: &Config) -> Result<Providers> {
     };
 
     let llm = Arc::new(LlmClient::from_config(config)?);
+    let web_search: Arc<dyn WebSearchProvider> = Arc::from(build_web_search(
+        http.clone(),
+        &config.web_search_provider,
+        config.web_search_api_key.as_deref(),
+    ));
 
     tracing::info!(
         embed = config.embedding_provider,
@@ -81,6 +88,8 @@ pub fn build(config: &Config) -> Result<Providers> {
         parser = config.document_parser,
         parser_provider = parser.name(),
         kong_llm = config.kong_llm_url.is_some(),
+        web_search = config.web_search_provider,
+        web_search_provider = web_search.name(),
         "AI providers initialized"
     );
 
@@ -89,5 +98,6 @@ pub fn build(config: &Config) -> Result<Providers> {
         vision,
         parser,
         llm,
+        web_search,
     })
 }

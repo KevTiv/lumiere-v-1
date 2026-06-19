@@ -756,7 +756,10 @@ export function AIChatPanel({
                                 src.label ??
                                 (idLabel != null ? `${scope} #${idLabel}` : scope)
                               const isLive = src.kind === "live" || src.trust === "authoritative"
-                              const badgeLabel = isLive
+                              const isWeb = src.kind === "web"
+                              const badgeLabel = isWeb
+                                ? "Web"
+                                : isLive
                                 ? t("aiChat.sourceLive")
                                 : src.kind === "activity"
                                   ? t("aiChat.sourceActivity")

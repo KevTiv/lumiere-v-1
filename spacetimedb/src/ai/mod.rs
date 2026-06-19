@@ -13,8 +13,10 @@ pub mod action_drafts;
 pub mod agents;
 pub mod chat;
 pub mod intelligence;
+pub mod skills;
 
 pub use action_drafts::*;
 pub use agents::*;
 pub use chat::*;
 pub use intelligence::*;
+pub use skills::*;
