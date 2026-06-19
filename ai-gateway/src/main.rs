@@ -1,5 +1,6 @@
 mod ai_agent;
 mod config;
+mod rate_limit;
 mod context_worker;
 mod error;
 mod harness;
@@ -116,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
         download_jobs: Arc::new(DashMap::new()),
         kaggle_search_cache: Arc::new(DashMap::new()),
         activity_watermarks: Arc::new(DashMap::new()),
+        agent_rate_limiter: Arc::new(crate::rate_limit::AgentRateLimiter::new()),
     };
 
     tokio::spawn(worker::run(

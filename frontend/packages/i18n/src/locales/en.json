@@ -119,6 +119,13 @@
     "noRole": "No Role",
     "signOut": "Sign out",
     "erpSystem": "ERP System",
+    "companySwitcher": {
+      "switchCompany": "Switch company",
+      "current": "Active",
+      "selectCompany": "Select company",
+      "singleCompany": "Company",
+      "loading": "Loading companies…"
+    },
     "groups": {
       "analytics": "Analytics",
       "finance": "Finance",
@@ -6661,7 +6668,28 @@
   "tasks": {
     "page": {
       "title": "Tasks",
-      "description": "Board and list views for your work"
+      "description": "Cross-project task board backed by live project tasks"
+    },
+    "board": {
+      "createTask": "Create Task",
+      "searchPlaceholder": "Search tasks…",
+      "allProjects": "All projects",
+      "emptyColumn": "No tasks",
+      "stats": {
+        "total": "Total",
+        "inProgress": "In Progress",
+        "done": "Done",
+        "overdue": "Overdue"
+      },
+      "columns": {
+        "InProgress": "In Progress",
+        "ChangesRequested": "Changes Requested",
+        "Approved": "Approved",
+        "Done": "Done",
+        "Cancelled": "Cancelled"
+      },
+      "changeState": "Move to…",
+      "viewProjects": "Open in Projects"
     }
   },
   "trackers": {
@@ -6674,6 +6702,44 @@
     "page": {
       "title": "Overview",
       "description": "Your business at a glance"
+    },
+    "dashboard": {
+      "keyMetrics": "Key Metrics",
+      "sections": {
+        "attention": "Needs Attention",
+        "pipeline": "Open Pipeline"
+      },
+      "stats": {
+        "openSalesOrders": "Open Sales Orders",
+        "accountsReceivable": "Accounts Receivable",
+        "accountsPayable": "Accounts Payable",
+        "lowStockAlerts": "Low Stock Alerts",
+        "openTasks": "Open Project Tasks",
+        "pendingAiDrafts": "Pending AI Drafts"
+      },
+      "actions": {
+        "sales": "Sales",
+        "inventory": "Inventory",
+        "aiDrafts": "AI Approvals",
+        "projects": "Projects"
+      },
+      "widgets": {
+        "upcomingTasks": "Upcoming Task Deadlines",
+        "lowStock": "Low / Zero Stock",
+        "openPurchaseOrders": "Open Purchase Orders"
+      },
+      "tables": {
+        "task": "Task",
+        "project": "Project",
+        "due": "Due",
+        "status": "Status",
+        "sku": "SKU",
+        "product": "Product",
+        "qty": "Qty",
+        "reference": "Reference",
+        "vendor": "Vendor",
+        "amount": "Amount"
+      }
     }
   },
   "settings": {

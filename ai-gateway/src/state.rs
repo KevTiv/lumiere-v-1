@@ -7,6 +7,7 @@ use crate::{
     kaggle::{DownloadJobStatus, KaggleCacheEntry},
     providers::Providers,
     qdrant_client::VectorStore,
+    rate_limit::AgentRateLimiter,
     rig_agent::RigContext,
 };
 use stdb_client::StdbClient;
@@ -26,4 +27,6 @@ pub struct AppState {
     pub download_jobs: Arc<DashMap<String, DownloadJobStatus>>,
     /// Short-lived Kaggle search result cache (cache_key → entry).
     pub kaggle_search_cache: Arc<DashMap<String, KaggleCacheEntry>>,
+    /// Per-agent sliding-window rate limits keyed by `org:{org_id}:agent:{agent_id}`.
+    pub agent_rate_limiter: Arc<AgentRateLimiter>,
 }

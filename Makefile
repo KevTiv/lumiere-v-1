@@ -29,7 +29,7 @@ help:
 	@echo "  setup                Install wasm32 target and wasm-opt (one-time)"
 	@echo "  check                Run cargo check (fast type-check, no linking)"
 	@echo "  check-env            Print STDB_MODULE / STDB_CLOUD_MODULE / STDB_HOST (Makefile defaults)"
-	@echo "  check-env-prod       Print production env checklist (human-readable)"
+	@echo "  check-env-prod       Validate production env vars (exit 1 if required vars missing)"
 	@echo "  build                Compile to WASM (release)"
 	@echo ""
 	@echo "  --- Local (default) ---"
@@ -62,14 +62,7 @@ check-env:
 	@echo "DB_CLOUD=$(DB_CLOUD)"
 
 check-env-prod:
-	@echo "Production checklist (set in your host / orchestrator):"
-	@echo "  api-server (NODE_ENV=production or LUMIERE_ENV=production):"
-	@echo "    STDB_MODULE or NEXT_PUBLIC_STDB_MODULE"
-	@echo "    STDB_SERVER_TOKEN"
-	@echo "    AI_GATEWAY_URL (must not be localhost)"
-	@echo "  Next.js forward: LUMIERE_API_SERVER_URL"
-	@echo "  Client: NEXT_PUBLIC_STDB_HOST, NEXT_PUBLIC_STDB_MODULE"
-	@echo "  Realtime: NEXT_PUBLIC_API_GATEWAY_URL or NEXT_PUBLIC_REALTIME_WS_URL"
+	@bash scripts/check-prod-env.sh
 
 check:
 	cd $(MODULE) && cargo check --tests

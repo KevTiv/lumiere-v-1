@@ -172,8 +172,16 @@ export async function proxyAiGateway(path: string, payload: JsonObject) {
       method: 'POST',
       body: JSON.stringify(payload),
     })
-    const responsePayload = gw.text ? JSON.parse(gw.text) : {}
-    return NextResponse.json(responsePayload, { status: gw.ok ? 200 : gw.status })
+    const responsePayload = gw.text
+      ? (() => {
+          try {
+            return JSON.parse(gw.text) as JsonObject
+          } catch {
+            return { error: gw.text }
+          }
+        })()
+      : {}
+    return NextResponse.json(responsePayload, { status: gw.status })
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: 'AI gateway request failed', detail }, { status: 502 })

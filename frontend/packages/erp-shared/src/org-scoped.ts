@@ -16,8 +16,8 @@ export interface OrganizationScopeBigInts {
   orgId: bigint
   organizationScopeId: bigint
   /**
-   * @deprecated Operating company id must come from {@link useDefaultOperatingCompanyBigInt}
-   * or an explicit company picker — never alias the organization id.
+   * @deprecated Operating company id must come from {@link useOperatingCompanyBigInt}
+   * or the global company switcher — never alias the organization id.
    */
   companyId?: bigint
 }

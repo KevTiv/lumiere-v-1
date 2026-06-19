@@ -1,16 +1,43 @@
-"use client"
+import { getStdbSession } from "@/lib/api-session"
+import {
+  serverQuerySaleOrders,
+  serverQueryAccountMoves,
+  serverQueryStockQuants,
+  serverQueryProducts,
+  serverQueryTasks,
+  serverQueryProjects,
+  serverQueryPurchaseOrders,
+} from "@lumiere/stdb/server"
+import { OverviewClient } from "./overview-client"
 
-import { useTranslation } from "@lumiere/i18n"
-import { DashboardGrid, DashboardHeader } from "@lumiere/ui"
-import { dashboardConfigs } from "@/lib/dashboard-config"
+export default async function OverviewPage() {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
+    return <OverviewClient />
+  }
+  const { organizationId, opts } = session
 
-export default function OverviewPage() {
-  const { t } = useTranslation()
-  const config = dashboardConfigs.overview ?? dashboardConfigs.sales
+  const [orders, moves, stockQuants, products, tasks, projects, purchaseOrders] =
+    await Promise.all([
+      serverQuerySaleOrders(organizationId, opts),
+      serverQueryAccountMoves(organizationId, undefined, opts),
+      serverQueryStockQuants(organizationId, opts),
+      serverQueryProducts(organizationId, opts),
+      serverQueryTasks(organizationId, opts),
+      serverQueryProjects(organizationId, opts),
+      serverQueryPurchaseOrders(organizationId, opts),
+    ]).catch(() => [[], [], [], [], [], [], []])
+
   return (
-    <div className="space-y-6">
-      <DashboardHeader title={t("overview.page.title")} description={t("overview.page.description")} />
-      <DashboardGrid sections={config.sections} />
-    </div>
+    <OverviewClient
+      organizationId={organizationId}
+      initialOrders={orders as Record<string, unknown>[]}
+      initialMoves={moves as Record<string, unknown>[]}
+      initialStockQuants={stockQuants as Record<string, unknown>[]}
+      initialProducts={products as Record<string, unknown>[]}
+      initialTasks={tasks as Record<string, unknown>[]}
+      initialProjects={projects as Record<string, unknown>[]}
+      initialPurchaseOrders={purchaseOrders as Record<string, unknown>[]}
+    />
   )
 }

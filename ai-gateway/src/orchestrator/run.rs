@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
-        resolve_agent,
+        ensure_allowed_action, ensure_model_allowed, ensure_within_budget,
+        enforce_chargeable_limits, record_ai_spend, resolve_agent,
     },
     orchestrator::skill_loader::{complete_run, create_run, load_skill, resolve_dataset_specs, LoadedSkill},
     providers::llm::LlmMessage,
@@ -350,6 +350,7 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
 
     let (summary, tokens_used) = synthesize_summary(
         state,
+        req.org_id,
         &agent,
         &skill,
         &query,
@@ -544,6 +545,7 @@ fn extract_query(inputs: &Value) -> String {
 
 async fn synthesize_summary(
     state: &AppState,
+    org_id: u64,
     agent: &crate::ai_agent::ResolvedAgentConfig,
     skill: &LoadedSkill,
     query: &str,
@@ -556,6 +558,9 @@ async fn synthesize_summary(
             0,
         ));
     }
+
+    enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), org_id, agent)
+        .map_err(|violation| anyhow::Error::new(violation))?;
 
     let tool_context = serde_json::to_string_pretty(tool_payloads).unwrap_or_default();
     let custom = skill

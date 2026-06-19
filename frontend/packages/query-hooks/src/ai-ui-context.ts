@@ -111,6 +111,7 @@ export function buildEntitySelection(args: {
 }
 
 export {
+  resolveActiveErpCompanyId,
   resolveErpCompanyId,
   summarizeEntityRow,
 } from "@lumiere/erp-shared/ai-ui-context"

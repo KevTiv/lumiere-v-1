@@ -10,6 +10,7 @@ use crate::{
         run::{run_skill, RunSkillRequest, RunSkillResponse},
         skill_loader::list_skills,
     },
+    ai_agent::map_anyhow_limit_error,
     state::AppState,
 };
 
@@ -122,7 +123,7 @@ pub async fn post_run(
         },
     )
     .await
-    .map_err(|e| AppError::Internal(e.to_string()))?;
+    .map_err(map_anyhow_limit_error)?;
 
     Ok(Json(response))
 }

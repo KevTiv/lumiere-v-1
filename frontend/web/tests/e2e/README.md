@@ -8,6 +8,21 @@ These Playwright tests exercise the current high-value ERP web flows:
 - Minimal create flows for CRM, Helpdesk, Inventory, Sales, and Proposals.
 - Guarded workflow/action surfaces.
 - Sign-out plus PostHog reset signaling.
+- Accounting module tab coverage and create flows (`accounting-module.spec.ts`).
+- Purchasing module shell, key tabs, and seeded PO visibility (`purchasing-module.spec.ts`).
+- Inventory module shell, key tabs, and seeded product visibility (`inventory-module.spec.ts`).
+- Sales-to-invoice smoke linkage via seeded SO/INV records (`sales-invoice-flow.spec.ts`).
+
+## Spec files
+
+| File | Coverage |
+|------|----------|
+| `auth-shell.spec.ts` | Public landing, auth redirect, sign-in, shell navigation, sign-out |
+| `module-smoke.spec.ts` | Cross-module minimal creates (CRM, Helpdesk, Inventory, Sales, Proposals) |
+| `accounting-module.spec.ts` | All accounting tabs, creates, quick actions, CSV import guard |
+| `purchasing-module.spec.ts` | `/purchasing` shell, dashboard/orders/lines/requisitions/vendors/partner-banks tabs, seeded `PO/2024/0001` |
+| `inventory-module.spec.ts` | `/inventory` shell, key stock/product tabs, seeded `Lumiere Dev Laptop` |
+| `sales-invoice-flow.spec.ts` | Seeded `SO/2024/0001` on Sales, linked `INV/2024/00001` on Accounting Invoices, sale-order quick action |
 
 ## Local Setup
 
@@ -49,3 +64,15 @@ pnpm --dir frontend/web run test:e2e:ui
 - Tests create records with a `smoke-` prefix and unique suffixes.
 - The suite assumes email/password auth is enabled; WorkOS-only local envs should unset `NEXT_PUBLIC_WORKOS_REDIRECT_URI` for this smoke path.
 - PostHog is optional. The sign-out test listens for the `lumiere:posthog-reset` event, which `phReset()` dispatches in the browser whenever sign-out runs (independent of whether `NEXT_PUBLIC_POSTHOG_TOKEN` is set).
+
+### Seed data requirements
+
+`make e2e-smoke` runs `seed_dev_data` before Playwright. Several specs assert **read-only** fixture rows (no multi-step create flows):
+
+| Spec | Seeded records assumed |
+|------|------------------------|
+| `purchasing-module.spec.ts` | Purchase order `PO/2024/0001` |
+| `inventory-module.spec.ts` | Product `Lumiere Dev Laptop` |
+| `sales-invoice-flow.spec.ts` | Sale order `SO/2024/0001`, customer invoice `INV/2024/00001` (origin `SO/2024/0001`, partner Acme Corporation) |
+
+If the database was published without `seed_dev_data`, use `E2E_CLEAR_DB=1 make e2e-smoke` to republish and re-seed. The sales-invoice spec does **not** create invoices end-to-end; it verifies the seeded sales → accounting linkage only.

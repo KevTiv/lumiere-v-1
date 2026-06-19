@@ -140,11 +140,16 @@ export async function POST(request: NextRequest) {
   })
 
   if (!gw.ok || !gw.body) {
+    let errorPayload: Record<string, unknown> = { error: 'AI gateway stream request failed' }
     const text = await gw.text().catch(() => '')
-    return NextResponse.json(
-      { error: 'AI gateway stream request failed', detail: text },
-      { status: gw.status || 502 },
-    )
+    if (text) {
+      try {
+        errorPayload = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        errorPayload = { error: 'AI gateway stream request failed', detail: text }
+      }
+    }
+    return NextResponse.json(errorPayload, { status: gw.status || 502 })
   }
 
   return new Response(gw.body, {

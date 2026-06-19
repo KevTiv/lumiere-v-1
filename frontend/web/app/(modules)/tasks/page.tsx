@@ -1,14 +1,24 @@
-"use client"
+import { getStdbSession } from "@/lib/api-session"
+import { serverQueryProjects, serverQueryTasks } from "@lumiere/stdb/server"
+import { TasksClient } from "./tasks-client"
 
-import { useTranslation } from "@lumiere/i18n"
-import { TaskBoardView, DashboardHeader } from "@lumiere/ui"
+export default async function TasksPage() {
+  const session = await getStdbSession()
+  if (!session?.organizationId) {
+    return <TasksClient />
+  }
+  const { organizationId, opts } = session
 
-export default function TasksPage() {
-  const { t } = useTranslation()
+  const [projects, tasks] = await Promise.all([
+    serverQueryProjects(organizationId, opts),
+    serverQueryTasks(organizationId, opts),
+  ]).catch(() => [[], []])
+
   return (
-    <div className="space-y-4">
-      <DashboardHeader title={t("tasks.page.title")} description={t("tasks.page.description")} />
-      <TaskBoardView className="h-[calc(100vh-12rem)]" />
-    </div>
+    <TasksClient
+      organizationId={organizationId}
+      initialProjects={projects as Record<string, unknown>[]}
+      initialTasks={tasks as Record<string, unknown>[]}
+    />
   )
 }

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRBAC } from "@/lib/rbac-context"
 import { useTranslation } from "@lumiere/i18n"
+import { CompanySwitcher } from "../settings/company-switcher"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -174,6 +175,10 @@ export function DashboardSidebar({
         >
           {isCollapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
+      </div>
+
+      <div className="border-b border-sidebar-border px-2 py-2">
+        <CompanySwitcher collapsed={isCollapsed} />
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3">

@@ -4,7 +4,11 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use crate::providers::llm::normalize_provider;
+use crate::{
+    error::AppError,
+    providers::llm::normalize_provider,
+    rate_limit::AgentRateLimiter,
+};
 
 const BASE_ERP_RULES: &str = "You are an intelligent ERP assistant for Lumiere. Answer using only the provided context. Be concise and factual. If the context is insufficient, say so. Never invent data or claim to have performed mutations.";
 
@@ -22,6 +26,7 @@ pub struct ResolvedAgentConfig {
     pub monthly_budget: Option<f64>,
     pub monthly_spend: f64,
     pub cost_per_1k_tokens: f64,
+    pub rate_limit_per_minute: u32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -102,10 +107,66 @@ pub fn ensure_allowed_action(agent: &ResolvedAgentConfig, action: &str) -> Resul
 pub fn ensure_within_budget(agent: &ResolvedAgentConfig) -> Result<()> {
     if let Some(budget) = agent.monthly_budget {
         if agent.monthly_spend >= budget {
-            anyhow::bail!("AI agent monthly budget exceeded");
+            anyhow::bail!(
+                "AI agent monthly budget exceeded (spent {:.4} of {:.4} cap)",
+                agent.monthly_spend,
+                budget
+            );
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentLimitViolation {
+    BudgetExceeded(String),
+    RateLimitExceeded(String),
+}
+
+impl AgentLimitViolation {
+    pub fn into_app_error(self) -> AppError {
+        match self {
+            Self::BudgetExceeded(message) => AppError::BudgetExceeded(message),
+            Self::RateLimitExceeded(message) => AppError::RateLimitExceeded(message),
+        }
+    }
+}
+
+impl std::fmt::Display for AgentLimitViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BudgetExceeded(message) | Self::RateLimitExceeded(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for AgentLimitViolation {}
+
+/// Enforce monthly budget and per-minute rate limits immediately before a chargeable LLM call.
+pub fn enforce_chargeable_limits(
+    limiter: &AgentRateLimiter,
+    org_id: u64,
+    agent: &ResolvedAgentConfig,
+) -> Result<(), AgentLimitViolation> {
+    ensure_within_budget(agent).map_err(|err| AgentLimitViolation::BudgetExceeded(err.to_string()))?;
+
+    if agent.rate_limit_per_minute > 0
+        && !limiter.check_and_acquire(org_id, agent.agent_id, agent.rate_limit_per_minute)
+    {
+        return Err(AgentLimitViolation::RateLimitExceeded(format!(
+            "AI agent rate limit exceeded: maximum {} requests per minute",
+            agent.rate_limit_per_minute
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn map_anyhow_limit_error(err: anyhow::Error) -> AppError {
+    if let Some(violation) = err.downcast_ref::<AgentLimitViolation>() {
+        return violation.clone().into_app_error();
+    }
+    AppError::Internal(err.to_string())
 }
 
 pub fn ensure_model_allowed(agent: &ResolvedAgentConfig) -> Result<()> {
@@ -149,6 +210,7 @@ struct AgentRow {
     monthly_budget: Option<f64>,
     monthly_spend: f64,
     cost_per_1k_tokens: f64,
+    rate_limit_per_minute: u32,
 }
 
 struct TeamMemberRow {
@@ -232,6 +294,9 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
         monthly_spend: f64_field(row, "monthlySpend", Some("monthly_spend")).unwrap_or(0.0),
         cost_per_1k_tokens: f64_field(row, "costPer1KTokens", Some("cost_per_1k_tokens"))
             .unwrap_or(0.0),
+        rate_limit_per_minute: u64_field(row, "rateLimitPerMinute", "rate_limit_per_minute")
+            .map(|v| v as u32)
+            .unwrap_or(0),
     })
 }
 
@@ -275,6 +340,7 @@ fn row_to_agent_config(row: &AgentRow, persona: Option<&TeamMemberPersona>) -> R
         monthly_budget: row.monthly_budget,
         monthly_spend: row.monthly_spend,
         cost_per_1k_tokens: row.cost_per_1k_tokens,
+        rate_limit_per_minute: row.rate_limit_per_minute,
     })
 }
 
@@ -322,4 +388,43 @@ fn string_vec_field(row: &Value, camel: &str, snake: Option<&str>) -> Vec<String
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_agent(monthly_budget: Option<f64>, monthly_spend: f64, rate_limit: u32) -> ResolvedAgentConfig {
+        ResolvedAgentConfig {
+            agent_id: 9,
+            provider: "mistral".to_string(),
+            model: "mistral-small".to_string(),
+            system_prompt: "test".to_string(),
+            temperature: 0.7,
+            max_tokens: 1024,
+            top_p: 1.0,
+            allowed_actions: vec!["chat".to_string()],
+            allowed_models: vec![],
+            monthly_budget,
+            monthly_spend,
+            cost_per_1k_tokens: 0.01,
+            rate_limit_per_minute: rate_limit,
+        }
+    }
+
+    #[test]
+    fn ensure_within_budget_rejects_exhausted_cap() {
+        let agent = sample_agent(Some(10.0), 10.0, 60);
+        let err = ensure_within_budget(&agent).unwrap_err();
+        assert!(err.to_string().contains("monthly budget exceeded"));
+    }
+
+    #[test]
+    fn enforce_chargeable_limits_applies_rate_limit() {
+        let limiter = AgentRateLimiter::new();
+        let agent = sample_agent(None, 0.0, 1);
+        enforce_chargeable_limits(&limiter, 1, &agent).expect("first request");
+        let err = enforce_chargeable_limits(&limiter, 1, &agent).unwrap_err();
+        assert!(matches!(err, AgentLimitViolation::RateLimitExceeded(_)));
+    }
 }

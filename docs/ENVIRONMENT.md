@@ -46,7 +46,7 @@ When `NODE_ENV=production` or `LUMIERE_ENV=production`, **api-server** requires:
 - `STDB_SERVER_TOKEN`
 - `AI_GATEWAY_URL` (not pointing at localhost)
 
-Run `make check-env-prod` for a printable checklist.
+Run `make check-env-prod` to validate required production variables (see [`PRODUCTION_DEPLOY.md`](PRODUCTION_DEPLOY.md)).
 
 ## Realtime WebSocket (web app)
 

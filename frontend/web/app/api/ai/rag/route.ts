@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       body: gwBody,
     })
     const payload = gw.text ? JSON.parse(gw.text) : {}
-    return NextResponse.json(payload, { status: gw.ok ? 200 : gw.status })
+    return NextResponse.json(payload, { status: gw.status })
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: 'AI gateway request failed', detail }, { status: 502 })

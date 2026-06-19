@@ -108,7 +108,7 @@ impl SandboxSession {
         for i in 0..col_count {
             columns.push(
                 stmt.column_name(i)
-                    .map(|name: &'static str| name.to_string())
+                    .map(|name| name.to_string())
                     .unwrap_or_else(|_| "column".to_string()),
             );
         }

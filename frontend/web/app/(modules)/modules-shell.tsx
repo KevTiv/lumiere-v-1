@@ -14,7 +14,6 @@ import {
   buildAiUiContext,
   parseAtCommands,
   resolveAiSourceHref,
-  resolveErpCompanyId,
 } from "@lumiere/query-hooks/ai-ui-context"
 import {
   chatActionsToMetadata,
@@ -40,6 +39,7 @@ import {
   useUpdateAiActionDraftParams,
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 
@@ -117,31 +117,23 @@ function dateFromStored(raw: unknown): Date {
 }
 
 function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context">) {
-  const { organizationId, companyIds } = useErpSession()
+  const { organizationId } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
-  const companiesQuery = useCompanies(orgId, orgReady)
+  const operatingCompanyId = useOperatingCompanyId(organizationId)
   const rag = useAiMemoryRag()
   const actionDraft = useAiActionDraft()
   const [sessionKey, setSessionKey] = useState<string | null>(null)
 
-  const defaultCompanyId = useMemo(
-    () =>
-      resolveErpCompanyId({
-        organizationId: orgId,
-        sessionCompanyIds: companyIds,
-        companyRows: companiesQuery.data ?? [],
-      }),
-    [companiesQuery.data, companyIds, orgId],
-  )
-  const persistActionDrafts = usePersistGatewayActionDrafts(orgId, defaultCompanyId ?? 0)
-  const approveActionDraft = useApproveAiActionDraft(orgId, defaultCompanyId ?? 0)
-  const rejectActionDraft = useRejectAiActionDraft(orgId, defaultCompanyId ?? 0)
-  const updateActionDraft = useUpdateAiActionDraftParams(orgId, defaultCompanyId ?? 0)
-  const createSession = useCreateAiChatSession(orgId, defaultCompanyId)
-  const appendMessage = useAppendAiChatMessage(orgId, defaultCompanyId)
-  const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && defaultCompanyId != null)
+  const persistActionDrafts = usePersistGatewayActionDrafts(orgId, operatingCompanyId ?? 0)
+  const approveActionDraft = useApproveAiActionDraft(orgId, operatingCompanyId ?? 0)
+  const rejectActionDraft = useRejectAiActionDraft(orgId, operatingCompanyId ?? 0)
+  const updateActionDraft = useUpdateAiActionDraftParams(orgId, operatingCompanyId ?? 0)
+  const createSession = useCreateAiChatSession(orgId, operatingCompanyId)
+  const appendMessage = useAppendAiChatMessage(orgId, operatingCompanyId)
+  const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && operatingCompanyId != null)
+  const companiesQuery = useCompanies(orgId, orgReady)
 
   useEffect(() => {
     setSessionKey(ensureAiChatSessionKey())
@@ -153,10 +145,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       route,
       module: module ?? undefined,
       activeTab: activeTab ?? undefined,
-      companyId: defaultCompanyId ?? undefined,
+      companyId: operatingCompanyId ?? undefined,
       selectedData: selection ?? undefined,
     }),
-    [activeTab, defaultCompanyId, module, route, selection],
+    [activeTab, operatingCompanyId, module, route, selection],
   )
 
   const initialMessages = useMemo((): ChatMessage[] | undefined => {
@@ -184,7 +176,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   }, [messagesQuery.data])
 
   const ensureSession = useCallback(async () => {
-    if (!sessionKey || !orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return
+    if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
     try {
       await createSession.mutateAsync({
         session_key: sessionKey,
@@ -196,7 +188,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     } catch (err) {
       console.warn("Unable to persist AI chat session", err)
     }
-  }, [activeTab, createSession, defaultCompanyId, module, orgReady, route, sessionKey])
+  }, [activeTab, createSession, operatingCompanyId, module, orgReady, route, sessionKey])
 
   const persistExchange = useCallback(
     async (args: {
@@ -208,7 +200,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       model?: string | null
       actions?: ChatAction[]
     }) => {
-      if (!sessionKey || !orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return
+      if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       try {
         await ensureSession()
         await appendMessage.mutateAsync({
@@ -239,7 +231,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         console.warn("Unable to persist AI chat message", err)
       }
     },
-    [appendMessage, defaultCompanyId, ensureSession, orgReady, sessionKey],
+    [appendMessage, operatingCompanyId, ensureSession, orgReady, sessionKey],
   )
 
   const buildRequestContext = useCallback(
@@ -250,24 +242,24 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         includeTypes: atCommandsToIncludeTypes(atCommands),
         uiContext: buildAiUiContext({
           pathname: route,
-          companyId: defaultCompanyId,
+          companyId: operatingCompanyId,
           activeTab,
           atCommands,
           selection,
         }),
       }
     },
-    [activeTab, defaultCompanyId, route, selection],
+    [activeTab, operatingCompanyId, route, selection],
   )
 
   const resolveActionDrafts = useCallback(
     async (userText: string, uiContext: unknown): Promise<ChatAction[]> => {
-      if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) return []
+      if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return []
       if (!looksLikeActionDraftRequest(userText)) return []
 
       try {
         const draftResponse = await actionDraft.mutateAsync({
-          companyId: defaultCompanyId,
+          companyId: operatingCompanyId,
           query: userText,
           ui_context: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["ui_context"],
         })
@@ -279,13 +271,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           sourceQuery: userText,
           uiContextJson: JSON.stringify(uiContext ?? null),
         })
-        return persistedDraftsToChatActions(persisted, defaultCompanyId ?? undefined) as ChatAction[]
+        return persistedDraftsToChatActions(persisted, operatingCompanyId ?? undefined) as ChatAction[]
       } catch (err) {
         console.warn("Unable to create AI action draft", err)
         return []
       }
     },
-    [actionDraft, defaultCompanyId, orgReady, persistActionDrafts],
+    [actionDraft, operatingCompanyId, orgReady, persistActionDrafts],
   )
 
   const chatConfig = useMemo(
@@ -326,7 +318,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
   const onSendMessage = useCallback(
     async (userText: string) => {
-      if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) {
+      if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
           content:
             companiesQuery.isLoading
@@ -342,7 +334,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       const [out, draftActions] = await Promise.all([
         rag.mutateAsync({
           query: userText,
-          companyId: defaultCompanyId,
+          companyId: operatingCompanyId,
           include_types: includeTypes,
           ui_context: uiContext,
         }),
@@ -374,7 +366,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     [
       buildRequestContext,
       companiesQuery.isLoading,
-      defaultCompanyId,
+      operatingCompanyId,
       orgReady,
       persistExchange,
       rag,
@@ -386,7 +378,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>
   >(
     async (userText, handlers) => {
-      if (!orgReady || defaultCompanyId == null || defaultCompanyId <= 0) {
+      if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return onSendMessage(userText)
       }
 
@@ -398,7 +390,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: userText,
-          companyId: defaultCompanyId,
+          companyId: operatingCompanyId,
           ...(includeTypes.length ? { include_types: includeTypes } : {}),
           ...(uiContext ? { ui_context: uiContext } : {}),
         }),
@@ -478,7 +470,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     },
     [
       buildRequestContext,
-      defaultCompanyId,
+      operatingCompanyId,
       onSendMessage,
       orgReady,
       persistExchange,
@@ -503,22 +495,13 @@ function ModulesContent({ children }: { children: ReactNode }) {
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
-  const { organizationId, companyIds } = useErpSession()
+  const { organizationId } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
-  const companiesQuery = useCompanies(orgId, orgReady)
-  const defaultCompanyId = useMemo(
-    () =>
-      resolveErpCompanyId({
-        organizationId: orgId,
-        sessionCompanyIds: companyIds,
-        companyRows: companiesQuery.data ?? [],
-      }),
-    [companiesQuery.data, companyIds, orgId],
-  )
+  const operatingCompanyId = useOperatingCompanyId(organizationId)
   const inboxCountQuery = useAiActionDraftInboxCount(
     orgId,
-    orgReady && defaultCompanyId != null && defaultCompanyId > 0,
+    orgReady && operatingCompanyId != null && operatingCompanyId > 0,
   )
   const navBadges = useMemo(
     () =>

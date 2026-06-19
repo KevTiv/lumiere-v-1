@@ -1,0 +1,100 @@
+# Production deployment
+
+This checklist matches [`docker-compose.yml`](../docker-compose.yml) and runtime validation in **api-server** (`Config::from_env`) and **Next.js** (`lib/api-server-forward.ts`, `lib/ai-gateway-server.ts`).
+
+Validate your host environment before deploy:
+
+```bash
+make check-env-prod
+# or: scripts/check-prod-env.sh
+```
+
+Print the checklist without validating:
+
+```bash
+scripts/check-prod-env.sh --list
+```
+
+## Host `.env` (docker compose)
+
+These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails at parse time if they are missing:
+
+| Variable | Used by | Notes |
+|----------|---------|--------|
+| `STDB_MODULE` | web, api-server, ai-gateway | Published SpacetimeDB database name |
+| `STDB_SERVER_TOKEN` | web, api-server | Admin/service JWT for HTTP SQL and auth reducers |
+| `STDB_TOKEN` | ai-gateway | Service token for SpacetimeDB HTTP API (not the same as `STDB_SERVER_TOKEN`) |
+| `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | web, api-server, ai-gateway | Shared secret (`X-Lumiere-Gateway-Secret`) |
+
+Common optional host overrides (have defaults in compose):
+
+| Variable | Default in compose | Purpose |
+|----------|-------------------|---------|
+| `STDB_HOST` | `https://maincloud.spacetimedb.com` | SpacetimeDB HTTP base |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:8000` | Public app URL (set to your Kong/proxy URL in prod) |
+| `CORS_ORIGINS` | `http://localhost:8000,...` | Allowed browser origins for api-server CORS |
+| `EMBEDDING_PROVIDER` | `ollama` | ai-gateway embed backend |
+| `OLLAMA_URL` | `http://host.docker.internal:11434` | Local Ollama when using Ollama embed/LLM |
+
+## Service: api-server
+
+Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to start** if any of these are missing or invalid:
+
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `STDB_MODULE` or `NEXT_PUBLIC_STDB_MODULE` | yes | Database name |
+| `STDB_SERVER_TOKEN` | yes | Non-empty |
+| `AI_GATEWAY_URL` | yes | Internal ai-gateway base URL; must not contain `localhost` or `127.0.0.1` |
+| `STDB_HOST` or `NEXT_PUBLIC_STDB_HOST` | recommended | Defaults to maincloud if unset |
+| `CORS_ORIGINS` | recommended | Comma-separated origins for credentialed browser calls |
+| `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes (compose) | BFF → gateway auth |
+| `STDB_CREDENTIAL_ENCRYPTION_KEY` | for password auth | 64 hex chars (32-byte AES key) |
+| `WORKOS_CLIENT_ID` | optional | When set, password routes return 410 |
+| `RESEND_API_KEY` | optional | Transactional email |
+
+In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
+
+## Service: web (Next.js)
+
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `LUMIERE_API_SERVER_URL` | yes | Internal api-server base (compose: `http://api-server:8082`) |
+| `STDB_SERVER_TOKEN` | yes | Server-side SQL and auth |
+| `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes | AI BFF routes |
+| `STDB_MODULE` / `NEXT_PUBLIC_STDB_MODULE` | yes | Must match published database |
+| `STDB_HOST` / `NEXT_PUBLIC_STDB_HOST` | yes | SpacetimeDB host |
+| `NEXT_PUBLIC_APP_URL` | recommended | Public URL for links and cookie scope |
+| `LUMIERE_AI_GATEWAY_URL` | in compose | Internal ai-gateway (`http://ai-gateway:8080`) |
+
+### Build-time `NEXT_PUBLIC_*`
+
+The web Docker image runs `pnpm --filter web build` without build-args today. For production, ensure **`NEXT_PUBLIC_STDB_MODULE`** and **`NEXT_PUBLIC_STDB_HOST`** are available at **build** time (Docker build args or CI env) so the client bundle matches `STDB_MODULE` / `STDB_HOST`.
+
+Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/ws` by default. Override with `NEXT_PUBLIC_REALTIME_WS_URL` or `NEXT_PUBLIC_API_GATEWAY_URL` if the browser should connect elsewhere (see `docs/ENVIRONMENT.md`).
+
+## Service: ai-gateway
+
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `STDB_MODULE` | yes | |
+| `STDB_TOKEN` | yes | Service account token |
+| `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes | |
+| `QDRANT_URL` | in compose | `http://qdrant:6333` |
+| `STDB_HOST` | recommended | Defaults in gateway dev config only |
+
+Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.
+
+## Quick start (Docker)
+
+```bash
+cp frontend/web/.env.example .env   # edit with production values
+make check-env-prod
+docker compose up --build
+```
+
+Kong listens on `:8000`; api-server, web, and ai-gateway are internal-only (`expose`, not published).
+
+## Related docs
+
+- [`docs/ENVIRONMENT.md`](ENVIRONMENT.md) — full variable reference and local/maincloud modes
+- [`Makefile`](../Makefile) — `make check-env-prod`, SpacetimeDB publish targets

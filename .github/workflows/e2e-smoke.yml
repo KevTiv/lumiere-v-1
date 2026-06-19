@@ -1,0 +1,112 @@
+name: E2E smoke
+
+# Full browser smoke requires local SpacetimeDB, api-server, and seeded fixtures.
+# Default CI (ci.yml) only validates Playwright tests compile via `playwright test --list`.
+on:
+  workflow_dispatch:
+    inputs:
+      clear_db:
+        description: "Wipe local module data before publish (E2E_CLEAR_DB=1)"
+        type: boolean
+        default: true
+  schedule:
+    # Weekly Monday 08:00 UTC
+    - cron: "0 8 * * 1"
+
+concurrency:
+  group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STDB_MODULE: lumiere-v1-j1uo0
+  STDB_HOST: http://127.0.0.1:3000
+  E2E_WEB_PORT: "3100"
+  E2E_API_PORT: "8082"
+
+jobs:
+  e2e-smoke:
+    name: Playwright smoke (full stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            spacetimedb
+            .
+
+      - name: Install SpacetimeDB CLI
+        run: |
+          curl -sSf https://install.spacetimedb.com | sh -s -- -y
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.31.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        working-directory: frontend/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Obtain local SpacetimeDB token
+        run: |
+          spacetime start > /tmp/spacetime.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS "${STDB_HOST}/v1/identity" -X POST >/dev/null 2>&1; then
+              echo "SpacetimeDB ready after ${i}s"
+              break
+            fi
+            sleep 1
+            if [ "$i" = "90" ]; then
+              echo "SpacetimeDB did not become ready:"
+              tail -100 /tmp/spacetime.log || true
+              exit 1
+            fi
+          done
+          spacetime login --server-issued-login local
+          TOKEN="$(grep -E '^spacetimedb_token\s*=' "$HOME/.config/spacetime/cli.toml" | sed -E 's/^[^"]*"([^"]+)".*/\1/')"
+          if [ -z "$TOKEN" ]; then
+            echo "Failed to read spacetimedb_token from cli.toml"
+            exit 1
+          fi
+          echo "STDB_SERVER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Run make e2e-smoke
+        env:
+          E2E_CLEAR_DB: ${{ github.event_name == 'schedule' && '1' || (github.event.inputs.clear_db && '1' || '0') }}
+          NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
+          NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
+        run: |
+          # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
+          export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin"
+          make e2e-smoke
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/web/playwright-report/
+          retention-days: 7
+
+      - name: Upload E2E logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: .tmp/e2e/
+          retention-days: 7

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { DashboardHeader, MissingOrganization, AiActionDraftCard } from "@lumiere/ui"
-import { useErpSession } from "@lumiere/erp-session"
 import {
   aiActionDraftRowToPayload,
   useAiActionDraftInbox,
@@ -13,8 +12,7 @@ import {
   useRejectAiActionDraft,
   useUpdateAiActionDraftParams,
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
-import { resolveErpCompanyId } from "@lumiere/query-hooks/ai-ui-context"
-import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { ChatActionDraftPayload } from "@lumiere/ui"
 import { GitBranch, Loader2 } from "lucide-react"
 
@@ -28,31 +26,21 @@ export function AiActionDraftsClient({ organizationId }: { organizationId?: numb
 }
 
 function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
-  const { companyIds } = useErpSession()
-  const companiesQuery = useCompanies(organizationId, true)
-  const defaultCompanyId = useMemo(
-    () =>
-      resolveErpCompanyId({
-        organizationId,
-        sessionCompanyIds: companyIds,
-        companyRows: companiesQuery.data ?? [],
-      }),
-    [companiesQuery.data, companyIds, organizationId],
-  )
+  const operatingCompanyId = useOperatingCompanyId(organizationId)
 
-  const inboxQuery = useAiActionDraftInbox(organizationId, defaultCompanyId != null)
-  const notificationsQuery = useAiActionDraftNotifications(organizationId, defaultCompanyId != null)
-  const expireDrafts = useExpireAiActionDrafts(organizationId, defaultCompanyId ?? 0)
-  const approveDraft = useApproveAiActionDraft(organizationId, defaultCompanyId ?? 0)
-  const rejectDraft = useRejectAiActionDraft(organizationId, defaultCompanyId ?? 0)
-  const updateDraft = useUpdateAiActionDraftParams(organizationId, defaultCompanyId ?? 0)
+  const inboxQuery = useAiActionDraftInbox(organizationId, operatingCompanyId != null)
+  const notificationsQuery = useAiActionDraftNotifications(organizationId, operatingCompanyId != null)
+  const expireDrafts = useExpireAiActionDrafts(organizationId, operatingCompanyId ?? 0)
+  const approveDraft = useApproveAiActionDraft(organizationId, operatingCompanyId ?? 0)
+  const rejectDraft = useRejectAiActionDraft(organizationId, operatingCompanyId ?? 0)
+  const updateDraft = useUpdateAiActionDraftParams(organizationId, operatingCompanyId ?? 0)
 
   const [draftStates, setDraftStates] = useState<Record<number, ChatActionDraftPayload>>({})
 
   useEffect(() => {
-    if (defaultCompanyId == null || defaultCompanyId <= 0) return
+    if (operatingCompanyId == null || operatingCompanyId <= 0) return
     void expireDrafts.mutate()
-  }, [defaultCompanyId, organizationId])
+  }, [operatingCompanyId, organizationId])
 
   useEffect(() => {
     const next: Record<number, ChatActionDraftPayload> = {}

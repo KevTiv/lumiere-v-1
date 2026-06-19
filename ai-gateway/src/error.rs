@@ -22,6 +22,9 @@ pub enum AppError {
     #[error("Budget exceeded: {0}")]
     BudgetExceeded(String),
 
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -32,7 +35,8 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
-            AppError::BudgetExceeded(m) => (StatusCode::TOO_MANY_REQUESTS, m.clone()),
+            AppError::BudgetExceeded(m) => (StatusCode::PAYMENT_REQUIRED, m.clone()),
+            AppError::RateLimitExceeded(m) => (StatusCode::TOO_MANY_REQUESTS, m.clone()),
             AppError::Qdrant(e) => (StatusCode::BAD_GATEWAY, e.to_string()),
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),

@@ -5,8 +5,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
-        resolve_agent,
+        ensure_allowed_action, ensure_model_allowed, enforce_chargeable_limits, record_ai_spend,
+        resolve_agent, AgentLimitViolation,
     },
     error::{AppError, AppResult},
     harness::snapshot::{
@@ -17,6 +17,24 @@ use crate::{
 };
 
 const ACTION_DRAFT_MAX_TOKENS: u32 = 2048;
+
+#[derive(Debug)]
+enum DraftActionsError {
+    Limit(AgentLimitViolation),
+    Other(String),
+}
+
+impl DraftActionsError {
+    fn other(message: impl Into<String>) -> Self {
+        Self::Other(message.into())
+    }
+}
+
+impl From<AgentLimitViolation> for DraftActionsError {
+    fn from(value: AgentLimitViolation) -> Self {
+        Self::Limit(value)
+    }
+}
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ActionUiContext {
     pub route: Option<String>,
@@ -276,12 +294,13 @@ async fn draft_actions_llm(
     state: &AppState,
     req: &ActionDraftRequest,
     grounding_snapshots: Option<&[LiveSnapshot]>,
-) -> Result<Vec<ActionDraft>, String> {
+) -> Result<Vec<ActionDraft>, DraftActionsError> {
     let org_id = req
         .org_id
         .filter(|id| *id > 0)
-        .ok_or("org_id is required for LLM draft generation")?;
-    let entries = allowed_catalog_entries(&req.allowed_reducers)?;
+        .ok_or_else(|| DraftActionsError::other("org_id is required for LLM draft generation"))?;
+    let entries = allowed_catalog_entries(&req.allowed_reducers)
+        .map_err(DraftActionsError::other)?;
     if entries.is_empty() {
         return Ok(Vec::new());
     }
@@ -293,11 +312,12 @@ async fn draft_actions_llm(
         req.team_member_id,
     )
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
 
-    ensure_allowed_action(&agent, "action_draft").map_err(|e| e.to_string())?;
-    ensure_model_allowed(&agent).map_err(|e| e.to_string())?;
-    ensure_within_budget(&agent).map_err(|e| e.to_string())?;
+    ensure_allowed_action(&agent, "action_draft")
+        .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    ensure_model_allowed(&agent).map_err(|e| DraftActionsError::other(e.to_string()))?;
+    enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), org_id, &agent)?;
 
     let prompt = build_action_draft_prompt(req, &entries, grounding_snapshots);
     let system = format!(
@@ -321,7 +341,7 @@ async fn draft_actions_llm(
             top_p: Some(agent.top_p),
         })
         .await
-        .map_err(|e| format!("LLM request failed: {e}"))?;
+        .map_err(|e| DraftActionsError::other(format!("LLM request failed: {e}")))?;
 
     let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
     if total_tokens > 0 {
@@ -335,8 +355,8 @@ async fn draft_actions_llm(
     }
 
     let model_json: Value = serde_json::from_str(clean_json_response(&llm_resp.text))
-        .map_err(|e| format!("failed to parse action draft JSON: {e}"))?;
-    parse_llm_drafts(req, &entries, &model_json)
+        .map_err(|e| DraftActionsError::other(format!("failed to parse action draft JSON: {e}")))?;
+    parse_llm_drafts(req, &entries, &model_json).map_err(DraftActionsError::other)
 }
 
 fn non_empty(value: &str) -> bool {
@@ -627,7 +647,8 @@ pub async fn post_draft(
     {
         Ok(llm_drafts) if !llm_drafts.is_empty() => llm_drafts,
         Ok(_) => draft_actions_stub(&req).map_err(AppError::BadRequest)?,
-        Err(err) => {
+        Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
+        Err(DraftActionsError::Other(err)) => {
             tracing::warn!(error = %err, "LLM action draft generation failed; using keyword stub");
             draft_actions_stub(&req).map_err(AppError::BadRequest)?
         }

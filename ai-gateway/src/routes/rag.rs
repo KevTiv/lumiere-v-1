@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, ensure_within_budget, record_ai_spend,
+        ensure_allowed_action, ensure_model_allowed, enforce_chargeable_limits, record_ai_spend,
         resolve_agent,
         agent_allows_live_read,
     },
@@ -498,8 +498,8 @@ pub async fn post_rag(
         .map_err(|e| AppError::Forbidden(e.to_string()))?;
     ensure_model_allowed(&agent)
         .map_err(|e| AppError::BadRequest(e.to_string()))?;
-    ensure_within_budget(&agent)
-        .map_err(|e| AppError::BudgetExceeded(e.to_string()))?;
+    enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), org_id, &agent)
+        .map_err(|e| e.into_app_error())?;
 
     let retrieved_context = format_retrieved_context(&ranked);
     let live_context = if live_snapshots.is_empty() {

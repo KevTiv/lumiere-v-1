@@ -127,6 +127,40 @@ export function resolveErpCompanyId(args: {
   return null
 }
 
+function collectAllowedCompanyIds(args: {
+  sessionCompanyIds?: readonly number[] | null
+  companyRows?: readonly Record<string, unknown>[] | null
+}): number[] {
+  const allowed = new Set<number>()
+
+  for (const id of args.sessionCompanyIds ?? []) {
+    const n = numberFromUnknown(id)
+    if (n != null && n > 0) allowed.add(n)
+  }
+
+  for (const row of args.companyRows ?? []) {
+    const n = numberFromUnknown(row.id)
+    if (n != null && n > 0) allowed.add(n)
+  }
+
+  return [...allowed]
+}
+
+/** Prefer user-selected active company when it belongs to the session/org company set. */
+export function resolveActiveErpCompanyId(args: {
+  activeCompanyId?: number | null
+  organizationId?: number | null
+  sessionCompanyIds?: readonly number[] | null
+  companyRows?: readonly Record<string, unknown>[] | null
+}): number | null {
+  const allowed = collectAllowedCompanyIds(args)
+  const preferred = numberFromUnknown(args.activeCompanyId)
+  if (preferred != null && preferred > 0 && allowed.includes(preferred)) {
+    return preferred
+  }
+  return resolveErpCompanyId(args)
+}
+
 export function summarizeEntityRow(row: Record<string, unknown>, maxLen = MAX_FIELD_LEN): string {
   const parts: string[] = []
   const id = row.id ?? row.ID

@@ -1578,6 +1578,114 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
+// ─── Executive Overview (home dashboard) ─────────────────────────────────────
+
+export const overviewDashboard = (t: TFunction): DashboardConfig => ({
+  id: "overview",
+  title: t("overview.page.title"),
+  description: t("overview.page.description"),
+  sections: [
+    {
+      id: "overview-quick-actions",
+      widgets: [
+        {
+          id: "overview-actions",
+          type: "quick-actions",
+          title: "",
+          width: "full",
+          useCard: false,
+          data: {
+            columns: 4,
+            actions: [
+              { id: "sales", label: t("overview.dashboard.actions.sales"), icon: "trending", color: "blue" },
+              { id: "inventory", label: t("overview.dashboard.actions.inventory"), icon: "package", color: "green" },
+              { id: "ai_drafts", label: t("overview.dashboard.actions.aiDrafts"), icon: "bell", color: "purple" },
+              { id: "projects", label: t("overview.dashboard.actions.projects"), icon: "file", color: "teal" },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "overview-kpis",
+      widgets: [
+        {
+          id: "overview-stat-cards",
+          type: "stat-cards",
+          title: t("overview.dashboard.keyMetrics"),
+          width: "full",
+          data: {
+            stats: [
+              { label: t("overview.dashboard.stats.openSalesOrders"), value: "—", icon: "ShoppingCart" },
+              { label: t("overview.dashboard.stats.accountsReceivable"), value: "—", icon: "TrendingUp" },
+              { label: t("overview.dashboard.stats.accountsPayable"), value: "—", icon: "TrendingDown" },
+              { label: t("overview.dashboard.stats.lowStockAlerts"), value: "—", icon: "AlertTriangle" },
+              { label: t("overview.dashboard.stats.openTasks"), value: "—", icon: "CheckSquare" },
+              { label: t("overview.dashboard.stats.pendingAiDrafts"), value: "—", icon: "Bell" },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "overview-details",
+      title: t("overview.dashboard.sections.attention"),
+      widgets: [
+        {
+          id: "overview-upcoming-tasks",
+          type: "table",
+          title: t("overview.dashboard.widgets.upcomingTasks"),
+          width: "1/2",
+          data: {
+            columns: [
+              { key: "task", label: t("overview.dashboard.tables.task") },
+              { key: "project", label: t("overview.dashboard.tables.project") },
+              { key: "due", label: t("overview.dashboard.tables.due") },
+              { key: "status", label: t("overview.dashboard.tables.status") },
+            ],
+            rows: [],
+          },
+        },
+        {
+          id: "overview-low-stock",
+          type: "table",
+          title: t("overview.dashboard.widgets.lowStock"),
+          width: "1/2",
+          data: {
+            columns: [
+              { key: "sku", label: t("overview.dashboard.tables.sku") },
+              { key: "name", label: t("overview.dashboard.tables.product") },
+              { key: "qty", label: t("overview.dashboard.tables.qty"), align: "right" as const },
+            ],
+            rows: [],
+          },
+        },
+      ],
+    },
+    {
+      id: "overview-orders",
+      title: t("overview.dashboard.sections.pipeline"),
+      widgets: [
+        {
+          id: "overview-open-pos",
+          type: "table",
+          title: t("overview.dashboard.widgets.openPurchaseOrders"),
+          width: "full",
+          data: {
+            columns: [
+              { key: "reference", label: t("overview.dashboard.tables.reference") },
+              { key: "vendor", label: t("overview.dashboard.tables.vendor") },
+              { key: "amount", label: t("overview.dashboard.tables.amount"), align: "right" as const },
+              { key: "status", label: t("overview.dashboard.tables.status") },
+            ],
+            rows: [],
+          },
+        },
+      ],
+    },
+  ],
+})
+
 export const projectsDashboard: DashboardConfig = {
   id: "projects",
   title: "Projects",
