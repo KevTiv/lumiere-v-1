@@ -265,12 +265,23 @@ async function main() {
   const safeEmail = TEST_EMAIL.replace(/'/g, "''")
 
   let identityForReducer
-  const existing = await queryStdb(
-    host,
-    moduleName,
-    adminToken,
-    `SELECT identity FROM user_credential WHERE email = '${safeEmail}'`,
-  )
+  let existing = []
+  try {
+    existing = await queryStdb(
+      host,
+      moduleName,
+      adminToken,
+      `SELECT identity FROM user_credential WHERE email = '${safeEmail}'`,
+    )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (!msg.includes('private') && !msg.includes('no such table')) {
+      throw e
+    }
+    console.log(
+      '[seed-test-user] user_credential is private; skipping SQL lookup and provisioning credentials.',
+    )
+  }
 
   if (existing.length > 0) {
     console.log(`[seed-test-user] Credential exists for ${TEST_EMAIL}; skipping store_user_credential.`)
