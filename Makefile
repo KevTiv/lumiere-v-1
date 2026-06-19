@@ -164,6 +164,8 @@ e2e-smoke:
 			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
 			sleep 1; \
 		fi; \
+		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
+		cargo build -p api-server -q; \
 		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
 		PORT="$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" \
@@ -172,12 +174,12 @@ e2e-smoke:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		cargo run -p api-server >"$$LOG_DIR/api-server.log" 2>&1 & \
+		cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
 		API_PID="$$!"; \
-		for i in {1..90}; do \
+		for i in {1..180}; do \
 			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
 			sleep 1; \
-			if [ "$$i" = "90" ]; then \
+			if [ "$$i" = "180" ]; then \
 				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
 				exit 1; \
 			fi; \
