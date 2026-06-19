@@ -13,6 +13,7 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "@tailwindcss/postcss": "^4.2.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.2",

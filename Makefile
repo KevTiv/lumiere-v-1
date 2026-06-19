@@ -147,7 +147,7 @@ e2e-smoke:
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB token..."; \
-		STDB_SERVER_TOKEN="$$(curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(!j.token){process.exit(1)};process.stdout.write(j.token)})")"; \
+		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
 			echo "[e2e] Failed to obtain local SpacetimeDB token from $$E2E_STDB_HOST/v1/identity"; \
 			exit 1; \

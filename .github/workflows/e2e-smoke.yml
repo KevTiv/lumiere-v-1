@@ -77,7 +77,7 @@ jobs:
               exit 1
             fi
           done
-          TOKEN="$(curl -fsS "${STDB_HOST}/v1/identity" -X POST | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(!j.token){process.exit(1)};process.stdout.write(j.token)})")"
+          TOKEN="$(E2E_STDB_HOST="${STDB_HOST}" node scripts/e2e-local-stdb-token.mjs)"
           if [ -z "$TOKEN" ]; then
             echo "Failed to obtain local SpacetimeDB token"
             exit 1
