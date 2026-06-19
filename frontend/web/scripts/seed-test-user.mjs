@@ -288,17 +288,28 @@ async function main() {
     identityForReducer = toIdentityReducerArg(existing[0].identity)
   } else {
     console.log(`[seed-test-user] Provisioning identity and credentials…`)
-    const { identity, token } = await provisionStdbIdentity(host)
-    identityForReducer = toIdentityReducerArg(identity)
-    const passwordHash = bcrypt.hashSync(TEST_PASSWORD, 12)
-    const tokenEnc = await encryptToken(token)
-    await callStdbReducer(host, moduleName, adminToken, 'store_user_credential', [
-      identityForReducer,
-      TEST_EMAIL,
-      passwordHash,
-      tokenEnc,
-    ])
-    console.log('[seed-test-user] store_user_credential OK.')
+    try {
+      const { identity, token } = await provisionStdbIdentity(host)
+      identityForReducer = toIdentityReducerArg(identity)
+      const passwordHash = bcrypt.hashSync(TEST_PASSWORD, 12)
+      const tokenEnc = await encryptToken(token)
+      await callStdbReducer(host, moduleName, adminToken, 'store_user_credential', [
+        identityForReducer,
+        TEST_EMAIL,
+        passwordHash,
+        tokenEnc,
+      ])
+      console.log('[seed-test-user] store_user_credential OK.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('Email already registered')) {
+        console.log(
+          `[seed-test-user] ${TEST_EMAIL} already registered (private user_credential table); assuming prior seed succeeded.`,
+        )
+        return
+      }
+      throw e
+    }
   }
 
   const orgId = await resolveTargetOrg(host, moduleName, adminToken)
