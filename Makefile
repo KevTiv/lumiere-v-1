@@ -166,9 +166,10 @@ e2e-smoke:
 		fi; \
 		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
 		cargo build -p api-server -q; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
 		PORT="$(E2E_API_PORT)" \
-		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_MODULE="$(DB)" \
 		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
@@ -187,6 +188,7 @@ e2e-smoke:
 		echo "[e2e] Running Playwright smoke tests..."; \
 		cd "$$ROOT/frontend/web"; \
 		pnpm exec playwright install chromium; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
