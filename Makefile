@@ -136,10 +136,10 @@ e2e-smoke:
 		echo "[e2e] Publishing local database $(DB)..."; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-			spacetime publish "$(DB)" --module-path "$(MODULE)" --server local --clear-database -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local --clear-database -y; \
 		else \
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-			spacetime publish "$(DB)" --module-path "$(MODULE)" --server local -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local -y; \
 		fi; \
 		if spacetime call "$(DB)" run_all_core_tests --server local; then \
 			echo "[e2e] Core reducer tests passed."; \
@@ -155,6 +155,7 @@ e2e-smoke:
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
 		cd "$$ROOT/frontend/web"; \
 		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		STDB_SERVER_TOKEN="$$STDB_SERVER_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
