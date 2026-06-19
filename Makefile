@@ -147,10 +147,9 @@ e2e-smoke:
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB token..."; \
-		spacetime login --server-issued-login local; \
-		STDB_SERVER_TOKEN="$$(grep -E "^spacetimedb_token\\s*=" "$$HOME/.config/spacetime/cli.toml" | sed -E "s/^[^\"]*\"([^\"]+)\".*/\\1/")"; \
+		STDB_SERVER_TOKEN="$$(curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(!j.token){process.exit(1)};process.stdout.write(j.token)})")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
-			echo "[e2e] Failed to read spacetimedb_token from $$HOME/.config/spacetime/cli.toml"; \
+			echo "[e2e] Failed to obtain local SpacetimeDB token from $$E2E_STDB_HOST/v1/identity"; \
 			exit 1; \
 		fi; \
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \

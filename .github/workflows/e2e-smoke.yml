@@ -77,10 +77,9 @@ jobs:
               exit 1
             fi
           done
-          spacetime login --server-issued-login local
-          TOKEN="$(grep -E '^spacetimedb_token\s*=' "$HOME/.config/spacetime/cli.toml" | sed -E 's/^[^"]*"([^"]+)".*/\1/')"
+          TOKEN="$(curl -fsS "${STDB_HOST}/v1/identity" -X POST | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(!j.token){process.exit(1)};process.stdout.write(j.token)})")"
           if [ -z "$TOKEN" ]; then
-            echo "Failed to read spacetimedb_token from cli.toml"
+            echo "Failed to obtain local SpacetimeDB token"
             exit 1
           fi
           echo "STDB_SERVER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
