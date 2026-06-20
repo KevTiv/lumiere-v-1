@@ -8,7 +8,7 @@ use crate::{
     error::{AppError, AppResult},
     orchestrator::{
         run::{run_skill, RunSkillRequest, RunSkillResponse},
-        skill_loader::list_skills,
+        skill_loader::{list_skills, sync_bundled_skills},
     },
     ai_agent::map_anyhow_limit_error,
     state::AppState,
@@ -36,6 +36,8 @@ pub struct SkillListItem {
     pub description: Option<String>,
     pub category: String,
     pub is_system: bool,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 pub async fn get_skills(
@@ -84,10 +86,51 @@ pub async fn get_skills(
                 .get("isSystem")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
+            source: row
+                .get("source")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
         });
     }
 
     Ok(Json(out))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GatewaySyncSkillsRequest {
+    pub org_id: u64,
+    pub stdb_token: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncSkillsResponse {
+    pub synced: Vec<String>,
+    pub skills_dir: String,
+}
+
+pub async fn post_sync(
+    State(state): State<AppState>,
+    Json(req): Json<GatewaySyncSkillsRequest>,
+) -> AppResult<Json<SyncSkillsResponse>> {
+    if req.org_id == 0 {
+        return Err(AppError::BadRequest("org_id is required".into()));
+    }
+
+    let stdb = req
+        .stdb_token
+        .as_ref()
+        .filter(|t| !t.trim().is_empty())
+        .map(|token| state.stdb.with_token(token.clone()))
+        .unwrap_or_else(|| state.stdb.as_ref().clone());
+
+    let synced = sync_bundled_skills(&stdb, req.org_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(SyncSkillsResponse {
+        synced,
+        skills_dir: crate::skills::resolve_skills_dir().to_string_lossy().to_string(),
+    }))
 }
 
 pub async fn post_run(

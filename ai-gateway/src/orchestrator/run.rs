@@ -12,6 +12,10 @@ use crate::{
     orchestrator::skill_loader::{complete_run, create_run, load_skill, resolve_dataset_specs, LoadedSkill},
     providers::llm::LlmMessage,
     sandbox::{default_analysis_sql, SandboxSession},
+    skills::{
+        analyze_import_mapping, collect_briefing_context, preview_import_mapping, scan_insights,
+        BriefingContextRequest, ImportAnalyzeRequest, ImportPreviewRequest, InsightsScanRequest,
+    },
     state::AppState,
     tools::{
         registry::ToolRegistry,
@@ -111,18 +115,22 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
         .to_string();
 
-    let run_id = create_run(
-        &stdb,
-        req.org_id,
-        req.company_id,
-        &skill,
-        agent.agent_id,
-        req.team_member_id,
-        &run_key,
-        &inputs_json,
-        &triggered_by_hex,
-    )
-    .await?;
+    let run_id = if skill.id > 0 {
+        create_run(
+            &stdb,
+            req.org_id,
+            req.company_id,
+            &skill,
+            agent.agent_id,
+            req.team_member_id,
+            &run_key,
+            &inputs_json,
+            &triggered_by_hex,
+        )
+        .await?
+    } else {
+        0
+    };
 
     let registry = ToolRegistry::new();
     let allowed_tools = resolve_allowed_tools(&skill, &agent);
@@ -174,6 +182,52 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     let mut tool_payloads: Vec<Value> = Vec::new();
 
     let query = extract_query(&req.inputs);
+
+    if skill.skill_key == "daily_briefing" {
+        let briefing = collect_briefing_context(
+            state.rig.as_ref(),
+            BriefingContextRequest {
+                org_id: req.org_id,
+                company_id: Some(req.company_id),
+                since_micros: req.inputs.get("since_micros").and_then(|v| v.as_i64()),
+                until_micros: req.inputs.get("until_micros").and_then(|v| v.as_i64()),
+                allowed_modules: string_list_from_input(&req.inputs, "resources")
+                    .or_else(|| string_list_from_input(&req.inputs, "allowed_modules")),
+                activity_query: req
+                    .inputs
+                    .get("activity_query")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                top_k: req.inputs.get("top_k").and_then(|v| v.as_u64()).map(|v| v as usize),
+            },
+        )
+        .await;
+        tool_payloads.push(json!({ "tool": "daily_briefing", "data": briefing }));
+    }
+
+    if skill.skill_key == "import_mapping" {
+        if let Some(result) = run_import_mapping_skill(&req.inputs) {
+            tool_payloads.push(json!({ "tool": "import_mapping", "data": result }));
+        }
+    }
+
+    if skill.skill_key == "insights_scan" {
+        let scan = scan_insights(
+            state,
+            InsightsScanRequest {
+                org_id: req.org_id,
+                company_id: Some(req.company_id),
+                max_insights: req.inputs.get("max_insights").and_then(|v| v.as_u64()).map(|v| v as usize),
+                abnormal_amount_threshold: req
+                    .inputs
+                    .get("abnormal_amount_threshold")
+                    .and_then(|v| v.as_f64()),
+            },
+        )
+        .await;
+        tool_payloads.push(json!({ "tool": "insights_scan", "data": scan }));
+    }
+
     let entity_type = req
         .inputs
         .get("entity_type")
@@ -365,6 +419,17 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     };
 
     let mut artifacts = vec![artifact.clone()];
+    if skill.skill_key == "insights_scan" {
+        if let Some(payload) = tool_payloads.iter().find(|p| p.get("tool").and_then(|v| v.as_str()) == Some("insights_scan")) {
+            if let Some(data) = payload.get("data") {
+                artifacts.push(SkillArtifact {
+                    kind: "insights".to_string(),
+                    title: "Insight scan preview".to_string(),
+                    content: data.clone(),
+                });
+            }
+        }
+    }
     if let Some(table) = query_artifact {
         artifacts.push(table);
     }
@@ -402,20 +467,22 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     let artifacts_json = serde_json::to_string(&artifacts).ok();
     let citations_json = serde_json::to_string(&citations).ok();
 
-    complete_run(
-        &stdb,
-        req.org_id,
-        req.company_id,
-        run_id,
-        "completed",
-        Some(summary.clone()),
-        artifacts_json,
-        citations_json,
-        step_no,
-        tokens_used,
-        None,
-    )
-    .await?;
+    if run_id > 0 {
+        complete_run(
+            &stdb,
+            req.org_id,
+            req.company_id,
+            run_id,
+            "completed",
+            Some(summary.clone()),
+            artifacts_json,
+            citations_json,
+            step_no,
+            tokens_used,
+            None,
+        )
+        .await?;
+    }
 
     if tokens_used > 0 {
         let _ = record_ai_spend(&stdb, req.org_id, agent.agent_id, tokens_used).await;
@@ -604,4 +671,94 @@ async fn synthesize_summary(
 
     let tokens_used = response.input_tokens.saturating_add(response.output_tokens);
     Ok((response.text.trim().to_string(), tokens_used))
+}
+
+fn string_list_from_input(inputs: &Value, key: &str) -> Option<Vec<String>> {
+    inputs.get(key).and_then(|value| {
+        if let Some(items) = value.as_array() {
+            return Some(
+                items
+                    .iter()
+                    .filter_map(|v| v.as_str().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string))
+                    .collect(),
+            );
+        }
+        value.as_str().map(|raw| {
+            raw.split(|c| c == ',' || c == '\n')
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+    })
+}
+
+fn string_matrix_from_input(inputs: &Value, key: &str) -> Option<Vec<Vec<String>>> {
+    inputs.get(key).and_then(|value| {
+        let rows = value.as_array()?;
+        Some(
+            rows.iter()
+                .filter_map(|row| {
+                    row.as_array().map(|cells| {
+                        cells
+                            .iter()
+                            .map(|cell| match cell {
+                                Value::String(s) => s.clone(),
+                                other => other.to_string(),
+                            })
+                            .collect()
+                    })
+                })
+                .collect(),
+        )
+    })
+}
+
+fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
+    let target_entity = inputs
+        .get("target_entity")
+        .or_else(|| inputs.get("targetEntity"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())?;
+
+    let headers = string_list_from_input(inputs, "header")
+        .or_else(|| string_list_from_input(inputs, "headers"))?;
+
+    if inputs.get("mapping").is_some() || inputs.get("mappingJson").is_some() {
+        let mapping_value = inputs
+            .get("mapping")
+            .cloned()
+            .or_else(|| inputs.get("mappingJson").cloned())?;
+        let mapping = mapping_value.as_object()?.clone();
+        let sample_rows = string_matrix_from_input(inputs, "sample_rows")
+            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
+            .unwrap_or_default();
+        let preview = preview_import_mapping(ImportPreviewRequest {
+            target_entity: target_entity.to_string(),
+            headers: headers.clone(),
+            rows: sample_rows,
+            mapping: mapping.into_iter().collect(),
+            max_rows: inputs.get("max_rows").and_then(|v| v.as_u64()).map(|v| v as usize),
+        })
+        .ok()?;
+        return Some(json!(preview));
+    }
+
+    let prior_mappings = inputs
+        .get("prior_mappings")
+        .or_else(|| inputs.get("priorMappings"))
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let analyze = analyze_import_mapping(ImportAnalyzeRequest {
+        target_entity: target_entity.to_string(),
+        headers,
+        sample_rows: string_matrix_from_input(inputs, "sample_rows")
+            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
+            .unwrap_or_default(),
+        prior_mappings: prior_mappings.into_iter().collect(),
+    })
+    .ok()?;
+    Some(json!(analyze))
 }

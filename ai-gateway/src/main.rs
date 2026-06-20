@@ -11,6 +11,7 @@ mod qdrant_client;
 mod rig_agent;
 mod routes;
 mod sandbox;
+mod skills;
 mod state;
 mod stdb_embed;
 mod tools;
@@ -141,22 +142,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
         .route("/v1/actions/draft", post(routes::actions::post_draft))
-        .route("/v1/harness/snapshot", post(routes::harness::post_snapshot))
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
-        .route(
-            "/v1/briefing/generate",
-            post(routes::briefing::post_generate),
-        )
+        .route("/v1/skills/sync", post(routes::skills::post_sync))
         .route("/v1/forms/suggest", post(routes::forms::post_suggest))
         .route("/v1/forms/validate", post(routes::forms::post_validate))
-        .route("/v1/import/analyze", post(routes::import::post_analyze))
-        .route("/v1/import/preview", post(routes::import::post_preview))
-        .route("/v1/reports/explain", post(routes::reports::post_explain))
-        .route(
-            "/v1/insights/generate",
-            post(routes::insights::post_generate),
-        )
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route("/v1/context/document", post(routes::context::post_document))

@@ -39,7 +39,7 @@ import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
-import { useAiInsightsGenerate } from "@lumiere/query-hooks/hooks/ai-harness"
+import { useRunAiSkill } from "@lumiere/query-hooks/hooks/ai-skills"
 
 type DocumentRowAction =
   | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
@@ -48,7 +48,7 @@ type DocumentRowAction =
 const aiInsightsGenerateForm: FormConfig = {
   id: "ai-generate-insights",
   title: "Generate AI Insights",
-  description: "Ask the AI harness to generate insights for a resource scope.",
+  description: "Run the insights_scan skill for a resource scope.",
   submitLabel: "Generate insights",
   sections: [
     {
@@ -234,7 +234,7 @@ function DocumentsClientLoaded({
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
-  const aiInsightsGenerate = useAiInsightsGenerate()
+  const runInsightsScan = useRunAiSkill()
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -512,7 +512,7 @@ function DocumentsClientLoaded({
       lockDocument,
       recordDocumentView,
       unlockDocument,
-      aiInsightsGenerate,
+      runInsightsScan,
     ],
   )
 
@@ -579,7 +579,7 @@ function DocumentsClientLoaded({
     completeProcessingJob.isPending ||
     approveProcessingJob.isPending ||
     acknowledgeInsight.isPending ||
-    aiInsightsGenerate.isPending ||
+    runInsightsScan.isPending ||
     csvImports.importKnowledgeCategory.isPending ||
     csvImports.importKnowledgeArticle.isPending
 
@@ -672,16 +672,26 @@ function DocumentsClientLoaded({
               typeof formData.scopeJson === "string" ? formData.scopeJson.trim() : ""
             const scope =
               scopeRaw !== "" ? (JSON.parse(scopeRaw) as Record<string, unknown>) : undefined
-            const result = await aiInsightsGenerate.mutateAsync({
+            const result = await runInsightsScan.mutateAsync({
               companyId: Number(operatingCompanyId ?? 0),
-              resource:
-                formData.resource != null && String(formData.resource).trim() !== ""
-                  ? String(formData.resource).trim()
-                  : undefined,
-              scope,
-              force: Boolean(formData.force),
+              skillKey: "insights_scan",
+              inputs: {
+                resource:
+                  formData.resource != null && String(formData.resource).trim() !== ""
+                    ? String(formData.resource).trim()
+                    : undefined,
+                scope,
+                force: Boolean(formData.force),
+              },
             })
-            setGenerateInsightsResult(result)
+            setGenerateInsightsResult({
+              summary: result.summary,
+              preview_insights:
+                result.artifacts.find((artifact) => artifact.kind === "insights")?.content ??
+                result.artifacts,
+              steps: result.steps,
+              skill_key: result.skill_key,
+            })
             setGenerateInsightsOpen(false)
           } catch (e) {
             setGenerateInsightsError(e instanceof Error ? e.message : String(e))

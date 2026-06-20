@@ -6442,6 +6442,51 @@ Focus on credibility, region fit, and category relevance. Always cite URLs from 
         vec![],
     );
 
+    let _daily_briefing = seed_system_skill(
+        ctx,
+        "daily_briefing",
+        "Daily Briefing",
+        "Summarize recent ERP activity, approvals, and notable changes for the operating company.",
+        "operations",
+        vec!["erp_search".to_string(), "save_artifact".to_string()],
+        vec![],
+        r#"You are an ERP operations assistant producing a daily briefing.
+
+Use activity search results and semantic ERP hits. Group by module. Highlight items needing attention."#,
+        None,
+        vec![],
+    );
+
+    let _import_mapping = seed_system_skill(
+        ctx,
+        "import_mapping",
+        "Import Mapping",
+        "Suggest CSV column mappings and preview transformed rows before import execution.",
+        "data",
+        vec!["save_artifact".to_string()],
+        vec![],
+        r#"You are a data import assistant for Lumiere ERP.
+
+Explain mapping confidence, unmapped columns, and validation warnings."#,
+        None,
+        vec![],
+    );
+
+    let _insights_scan = seed_system_skill(
+        ctx,
+        "insights_scan",
+        "Insights Scan",
+        "Run read-only anomaly detectors across ERP tables and summarize findings.",
+        "analytics",
+        vec!["erp_search".to_string(), "save_artifact".to_string()],
+        vec![],
+        r#"You are an ERP insights analyst. Review detector output and semantic search hits.
+
+Prioritize high-severity findings and cite related records."#,
+        None,
+        vec![],
+    );
+
     ctx.db.ai_skill_config().insert(AiSkillConfig {
         id: 0,
         organization_id: org_id,

@@ -87,7 +87,6 @@ import {
   Grid3X3,
   Sparkles,
 } from "lucide-react"
-import { useAiReportExplain } from "@lumiere/query-hooks/hooks/ai-harness"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 
 interface ReportsClientProps {
@@ -281,7 +280,6 @@ function ReportsClientLoaded({
   const addWidgetToDashboard = useAddWidgetToDashboard(orgId)
   const updateWidgetLayout = useUpdateWidgetLayout(orgId)
   const shareDashboard = useShareDashboard(orgId)
-  const aiReportExplain = useAiReportExplain()
   const runReportAnalysis = useRunAiSkill()
 
   useEffect(() => {
@@ -751,7 +749,6 @@ function ReportsClientLoaded({
     addWidgetToDashboard.isPending ||
     updateWidgetLayout.isPending ||
     shareDashboard.isPending ||
-    aiReportExplain.isPending ||
     runReportAnalysis.isPending ||
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
@@ -818,21 +815,26 @@ function ReportsClientLoaded({
             try {
               const reportIdRaw = reportExplain.row.id
               const comparisonRaw = formData.comparisonReportId
-              const result = await aiReportExplain.mutateAsync({
+              const result = await runReportAnalysis.mutateAsync({
                 companyId: Number(operatingCompanyId ?? 0),
-                report_type: String(formData.reportType ?? "financial_report"),
-                report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
-                comparison_report_id:
-                  comparisonRaw != null && String(comparisonRaw).trim() !== ""
-                    ? Number(comparisonRaw)
-                    : undefined,
-                report_payload: reportExplain.row,
-                question:
-                  formData.question != null && String(formData.question).trim() !== ""
-                    ? String(formData.question)
-                    : undefined,
+                skillKey: "report_analysis",
+                inputs: {
+                  query:
+                    formData.question != null && String(formData.question).trim() !== ""
+                      ? String(formData.question)
+                      : "Explain this report",
+                  entity_type: "financial_report",
+                  entity_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
+                  report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
+                  report_type: String(formData.reportType ?? "financial_report"),
+                  comparison_report_id:
+                    comparisonRaw != null && String(comparisonRaw).trim() !== ""
+                      ? Number(comparisonRaw)
+                      : undefined,
+                  report_payload: reportExplain.row,
+                },
               })
-              setReportExplainResult(result)
+              setReportExplainResult(skillRunToPanel(result))
               setReportExplain(null)
             } catch (e) {
               setReportExplainError(e instanceof Error ? e.message : String(e))

@@ -191,6 +191,26 @@ pub struct UpsertAiSkillConfigParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct UpsertAiSkillParams {
+    pub skill_key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: String,
+    pub prompt_template: String,
+    pub required_tools: Vec<String>,
+    pub optional_tools: Vec<String>,
+    pub default_max_steps: u32,
+    pub default_max_tool_calls: u32,
+    pub output_schema: Option<String>,
+    pub config_schema: Option<String>,
+    pub dataset_specs: Option<String>,
+    pub allowed_action_drafts: Vec<String>,
+    pub is_active: bool,
+    pub is_system: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct AssignTeamMemberSkillParams {
     pub team_member_id: u64,
     pub skill_id: u64,
@@ -310,6 +330,128 @@ pub fn create_ai_skill(
             metadata: None,
         },
     );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn upsert_ai_skill(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: UpsertAiSkillParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_skill", "write")?;
+
+    let skill_key = params.skill_key.trim().to_string();
+    if skill_key.is_empty() {
+        return Err("skill_key is required".to_string());
+    }
+    if params.name.trim().is_empty() {
+        return Err("name is required".to_string());
+    }
+    if params.prompt_template.len() > MAX_PROMPT_TEMPLATE_LEN {
+        return Err("prompt_template is too long".to_string());
+    }
+    if params.default_max_steps == 0 || params.default_max_steps > 32 {
+        return Err("default_max_steps must be between 1 and 32".to_string());
+    }
+    if params.default_max_tool_calls == 0 || params.default_max_tool_calls > 64 {
+        return Err("default_max_tool_calls must be between 1 and 64".to_string());
+    }
+
+    let existing = ctx
+        .db
+        .ai_skill()
+        .ai_skill_by_org()
+        .filter(&organization_id)
+        .find(|row| row.skill_key == skill_key);
+
+    if let Some(row) = existing {
+        ctx.db.ai_skill().id().update(AiSkill {
+            name: params.name,
+            description: params.description,
+            category: params.category,
+            prompt_template: params.prompt_template,
+            required_tools: params.required_tools,
+            optional_tools: params.optional_tools,
+            default_max_steps: params.default_max_steps,
+            default_max_tool_calls: params.default_max_tool_calls,
+            output_schema: params.output_schema,
+            config_schema: params.config_schema,
+            dataset_specs: params.dataset_specs,
+            allowed_action_drafts: params.allowed_action_drafts,
+            is_active: params.is_active,
+            is_system: params.is_system,
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+            ..row
+        });
+
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: None,
+                table_name: "ai_skill",
+                record_id: row.id,
+                action: "UPDATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({
+                        "skill_key": skill_key,
+                        "source": "upsert",
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["prompt_template".to_string(), "name".to_string()],
+                metadata: None,
+            },
+        );
+    } else {
+        let row = ctx.db.ai_skill().insert(AiSkill {
+            id: 0,
+            organization_id,
+            skill_key: skill_key.clone(),
+            name: params.name,
+            description: params.description,
+            category: params.category,
+            prompt_template: params.prompt_template,
+            required_tools: params.required_tools,
+            optional_tools: params.optional_tools,
+            default_max_steps: params.default_max_steps,
+            default_max_tool_calls: params.default_max_tool_calls,
+            output_schema: params.output_schema,
+            config_schema: params.config_schema,
+            dataset_specs: params.dataset_specs,
+            allowed_action_drafts: params.allowed_action_drafts,
+            is_active: params.is_active,
+            is_system: params.is_system,
+            create_date: ctx.timestamp,
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
+
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: None,
+                table_name: "ai_skill",
+                record_id: row.id,
+                action: "CREATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({
+                        "skill_key": skill_key,
+                        "source": "upsert",
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["skill_key".to_string(), "name".to_string()],
+                metadata: None,
+            },
+        );
+    }
 
     Ok(())
 }

@@ -11,6 +11,7 @@ export type AiSkillListItem = {
   description?: string
   category: string
   is_system: boolean
+  source?: string
 }
 
 export type AiSkillCitation = {
@@ -122,6 +123,16 @@ export function useUpsertAiSkillConfig() {
       })
       if (!r.ok) throw new Error(await parseAiError(r))
       return (await r.json()) as { ok: boolean }
+    },
+  })
+}
+
+export function useSyncAiSkills() {
+  return useMutation({
+    mutationFn: async () => {
+      const r = await apiFetch("/api/ai/skills/sync", { method: "POST" })
+      if (!r.ok) throw new Error(await parseAiError(r))
+      return (await r.json()) as { synced: string[]; skills_dir: string }
     },
   })
 }

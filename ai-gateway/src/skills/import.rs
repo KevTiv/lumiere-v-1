@@ -1,11 +1,9 @@
-//! Deterministic CSV import analysis and preview helpers. No business rows are mutated here.
+//! Deterministic CSV import analysis and preview helpers used by the import_mapping skill.
+
 use std::collections::{HashMap, HashSet};
 
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-
-use crate::error::{AppError, AppResult};
 
 const MAX_ANALYZE_HEADERS: usize = 200;
 const MAX_SAMPLE_ROWS: usize = 50;
@@ -431,46 +429,15 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
     })
 }
 
-pub async fn post_analyze(
-    Json(req): Json<ImportAnalyzeRequest>,
-) -> AppResult<Json<ImportAnalyzeResponse>> {
-    if req.target_entity.trim().is_empty() {
-        return Err(AppError::BadRequest("target_entity is required".into()));
-    }
-    if req.headers.is_empty() {
-        return Err(AppError::BadRequest("headers must not be empty".into()));
-    }
+pub type ImportAnalyzeResult = ImportAnalyzeResponse;
+pub type ImportPreviewResult = ImportPreviewResponse;
 
-    let response = analyze_mapping(&req).map_err(AppError::BadRequest)?;
-    tracing::info!(
-        target_entity = %response.target_entity,
-        mapping_count = response.mappings.len(),
-        "Analyzed import column mapping"
-    );
-    Ok(Json(response))
+pub fn analyze_import_mapping(req: ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, String> {
+    analyze_mapping(&req)
 }
 
-pub async fn post_preview(
-    Json(req): Json<ImportPreviewRequest>,
-) -> AppResult<Json<ImportPreviewResponse>> {
-    if req.target_entity.trim().is_empty() {
-        return Err(AppError::BadRequest("target_entity is required".into()));
-    }
-    if req.headers.is_empty() {
-        return Err(AppError::BadRequest("headers must not be empty".into()));
-    }
-    if req.rows.is_empty() {
-        return Err(AppError::BadRequest("rows must not be empty".into()));
-    }
-
-    let response = preview_rows(&req).map_err(AppError::BadRequest)?;
-    tracing::info!(
-        target_entity = %response.target_entity,
-        row_count = response.rows.len(),
-        error_count = response.validation_errors.len(),
-        "Generated import preview"
-    );
-    Ok(Json(response))
+pub fn preview_import_mapping(req: ImportPreviewRequest) -> Result<ImportPreviewResponse, String> {
+    preview_rows(&req)
 }
 
 #[cfg(test)]

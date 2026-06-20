@@ -1,12 +1,9 @@
-//! Manual read-only insight generation preview. This MVP does not persist AiInsight rows.
-use axum::{extract::State, Json};
+//! Read-only insight detectors used by the insights_scan skill.
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{
-    error::{AppError, AppResult},
-    state::AppState,
-};
+use crate::state::AppState;
 
 const DETECTOR_TABLES: &[&str] = &[
     "sale_order",
@@ -17,8 +14,31 @@ const DETECTOR_TABLES: &[&str] = &[
 ];
 const MAX_PREVIEW_INSIGHTS: usize = 20;
 
+pub type InsightsScanResult = InsightsGenerateResponse;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct InsightsScanRequest {
+    pub org_id: u64,
+    pub company_id: Option<u64>,
+    pub max_insights: Option<usize>,
+    pub abnormal_amount_threshold: Option<f64>,
+}
+
+pub async fn scan_insights(
+    state: &AppState,
+    req: InsightsScanRequest,
+) -> InsightsGenerateResponse {
+    let inner = InsightsGenerateRequest {
+        org_id: req.org_id,
+        company_id: req.company_id,
+        max_insights: req.max_insights,
+        abnormal_amount_threshold: req.abnormal_amount_threshold,
+    };
+    generate_insights(state, inner).await
+}
+
 #[derive(Debug, Deserialize)]
-pub struct InsightsGenerateRequest {
+struct InsightsGenerateRequest {
     pub org_id: u64,
     pub company_id: Option<u64>,
     pub max_insights: Option<usize>,
@@ -259,19 +279,10 @@ fn counts_from_insights(insights: &[PreviewInsight]) -> Vec<DetectorCount> {
         .collect()
 }
 
-pub async fn post_generate(
-    State(state): State<AppState>,
-    Json(req): Json<InsightsGenerateRequest>,
-) -> AppResult<Json<InsightsGenerateResponse>> {
-    if req.org_id == 0 {
-        return Err(AppError::BadRequest("org_id is required".into()));
-    }
-    if req.company_id == Some(0) {
-        return Err(AppError::BadRequest(
-            "company_id must be non-zero when provided".into(),
-        ));
-    }
-
+async fn generate_insights(
+    state: &AppState,
+    req: InsightsGenerateRequest,
+) -> InsightsGenerateResponse {
     let mut warnings = vec![
         "read-only MVP: generated insights are returned as previews and are not persisted"
             .to_string(),
@@ -304,7 +315,7 @@ pub async fn post_generate(
         "Generated read-only insight previews"
     );
 
-    Ok(Json(InsightsGenerateResponse {
+    InsightsGenerateResponse {
         created_count: 0,
         skipped_count: candidate_count,
         candidate_count,
@@ -312,7 +323,7 @@ pub async fn post_generate(
         preview_insights: candidates,
         persisted: false,
         warnings,
-    }))
+    }
 }
 
 #[cfg(test)]
