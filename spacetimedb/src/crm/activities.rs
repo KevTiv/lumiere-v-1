@@ -7,7 +7,7 @@
 ///   - CalendarEvent
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -207,7 +207,7 @@ pub fn create_activity(
         return Err("Activity summary cannot be empty".to_string());
     }
 
-    ctx.db.activity().insert(Activity {
+    let activity = ctx.db.activity().insert(Activity {
         id: 0,
         organization_id,
         activity_type: params.activity_type,
@@ -235,6 +235,28 @@ pub fn create_activity(
         metadata: params.metadata,
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "activity",
+            record_id: activity.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "summary": activity.summary,
+                    "activity_type": activity.activity_type,
+                    "state": activity.state,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["summary".to_string(), "activity_type".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -256,6 +278,10 @@ pub fn complete_activity(
     }
     check_permission(ctx, organization_id, "activity", "write")?;
 
+    let old_is_done = activity.is_done;
+    let old_state = activity.state.clone();
+    let old_date_done = activity.date_done.map(|ts| ts.to_micros_since_unix_epoch());
+
     ctx.db.activity().id().update(Activity {
         is_done: true,
         state: "done".to_string(),
@@ -263,6 +289,38 @@ pub fn complete_activity(
         updated_at: ctx.timestamp,
         ..activity
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "activity",
+            record_id: activity_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "is_done": old_is_done,
+                    "state": old_state,
+                    "date_done": old_date_done,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "is_done": true,
+                    "state": "done",
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "is_done".to_string(),
+                "state".to_string(),
+                "date_done".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -293,7 +351,7 @@ pub fn create_calendar_event(
         )
     };
 
-    ctx.db.calendar_event().insert(CalendarEvent {
+    let event = ctx.db.calendar_event().insert(CalendarEvent {
         id: 0,
         organization_id,
         name: params.name,
@@ -320,6 +378,29 @@ pub fn create_calendar_event(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "calendar_event",
+            record_id: event.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": event.name,
+                    "start": event.start.to_micros_since_unix_epoch(),
+                    "stop": event.stop.to_micros_since_unix_epoch(),
+                    "state": event.state,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "start".to_string(), "stop".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -373,6 +454,71 @@ pub fn update_calendar_event(
         )
     };
 
+    let mut changed_fields = Vec::new();
+    if params.name.is_some() {
+        changed_fields.push("name".to_string());
+    }
+    if params.start.is_some() {
+        changed_fields.push("start".to_string());
+    }
+    if params.stop.is_some() {
+        changed_fields.push("stop".to_string());
+    }
+    if params.allday.is_some() {
+        changed_fields.push("allday".to_string());
+    }
+    if params.privacy.is_some() {
+        changed_fields.push("privacy".to_string());
+    }
+    if params.show_as.is_some() {
+        changed_fields.push("show_as".to_string());
+    }
+    if params.state.is_some() {
+        changed_fields.push("state".to_string());
+    }
+    if params.description.is_some() {
+        changed_fields.push("description".to_string());
+    }
+    if params.location.is_some() {
+        changed_fields.push("location".to_string());
+    }
+    if params.videocall_location.is_some() {
+        changed_fields.push("videocall_location".to_string());
+    }
+    if params.color.is_some() {
+        changed_fields.push("color".to_string());
+    }
+    if params.user_id.is_some() {
+        changed_fields.push("user_id".to_string());
+    }
+    if params.partner_ids.is_some() {
+        changed_fields.push("partner_ids".to_string());
+    }
+    if params.alarm_ids.is_some() {
+        changed_fields.push("alarm_ids".to_string());
+    }
+    if params.recurrency.is_some() {
+        changed_fields.push("recurrency".to_string());
+    }
+    if params.recurrence_id.is_some() {
+        changed_fields.push("recurrence_id".to_string());
+    }
+    if params.final_date.is_some() {
+        changed_fields.push("final_date".to_string());
+    }
+    if params.rrule.is_some() {
+        changed_fields.push("rrule".to_string());
+    }
+    if params.rrule_type.is_some() {
+        changed_fields.push("rrule_type".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+
+    let old_name = event.name.clone();
+    let old_state = event.state.clone();
+
     ctx.db.calendar_event().id().update(CalendarEvent {
         name: params.name.unwrap_or(event.name),
         description: params.description.or(event.description),
@@ -398,6 +544,27 @@ pub fn update_calendar_event(
         ..event
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "calendar_event",
+            record_id: event_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": old_name,
+                    "state": old_state,
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields,
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -421,6 +588,27 @@ pub fn delete_calendar_event(
     }
 
     ctx.db.calendar_event().id().delete(&event_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "calendar_event",
+            record_id: event_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": event.name,
+                    "state": event.state,
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

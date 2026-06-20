@@ -165,6 +165,102 @@ export const newOpportunityForm = (
     ],
 })
 
+export const changeOpportunityStageForm = (
+  t: TFunction,
+  stageOptions: OpportunityStageOption[] = [],
+): FormConfig => ({
+  id: "change-opportunity-stage",
+  title: t("crm.forms.changeStage.title"),
+  description: t("crm.forms.changeStage.description"),
+  submitLabel: t("crm.forms.changeStage.submit"),
+  sections: [
+    {
+      id: "stage",
+      title: t("crm.forms.changeStage.sections.stage"),
+      fields: [
+        ...(stageOptions.length > 0
+          ? ([
+              {
+                id: "stageId",
+                name: "stageId",
+                type: "select",
+                label: t("crm.forms.changeStage.fields.stage"),
+                required: true,
+                width: "full",
+                options: stageOptions,
+              },
+            ] as const satisfies readonly FormField[])
+          : ([
+              {
+                id: "stageId",
+                name: "stageId",
+                type: "number",
+                label: t("crm.forms.changeStage.fields.stageId"),
+                placeholder: t("crm.forms.changeStage.fields.stageIdPlaceholder"),
+                required: true,
+                width: "full",
+              },
+            ] as const satisfies readonly FormField[])),
+      ],
+    },
+  ],
+})
+
+export const editOpportunityForm = (t: TFunction): FormConfig => ({
+  id: "edit-opportunity",
+  title: t("crm.forms.editOpportunity.title"),
+  description: t("crm.forms.editOpportunity.description"),
+  submitLabel: t("crm.forms.editOpportunity.submit"),
+  sections: [
+    {
+      id: "opp-edit",
+      title: t("crm.forms.editOpportunity.sections.opportunity"),
+      fields: [
+        {
+          id: "partnerId",
+          name: "partnerId",
+          type: "select",
+          label: t("crm.forms.editOpportunity.fields.partner"),
+          width: "full",
+          options: [],
+        },
+        {
+          id: "expectedRevenue",
+          name: "expectedRevenue",
+          type: "number",
+          label: t("crm.forms.editOpportunity.fields.expectedRevenue"),
+          placeholder: "0",
+          width: "1/2",
+        },
+        {
+          id: "dateDeadline",
+          name: "dateDeadline",
+          type: "date",
+          label: t("crm.forms.editOpportunity.fields.dateDeadline"),
+          width: "1/2",
+        },
+        {
+          id: "stageId",
+          name: "stageId",
+          type: "select",
+          label: t("crm.forms.editOpportunity.fields.stage"),
+          width: "full",
+          options: [],
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("crm.forms.editOpportunity.fields.description"),
+          placeholder: t("crm.forms.editOpportunity.fields.descriptionPlaceholder"),
+          width: "full",
+          rows: 3,
+        },
+      ],
+    },
+  ],
+})
+
 export const newContactForm = (t: TFunction): FormConfig => ({
   id: "new-contact",
   title: t("crm.forms.newContact.title"),
@@ -424,6 +520,8 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
 export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-lead": newLeadForm(t),
   "new-opportunity": newOpportunityForm(t),
+  "edit-opportunity": editOpportunityForm(t),
+  "change-opportunity-stage": changeOpportunityStageForm(t),
   "new-contact": newContactForm(t),
   "new-activity": newActivityForm(t),
   "convert-lead": convertLeadForm(t),

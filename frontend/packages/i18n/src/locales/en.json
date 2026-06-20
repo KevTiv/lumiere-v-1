@@ -2127,7 +2127,12 @@
       "assignTag": "Assign tag",
       "addToSegment": "Add to segment",
       "markComplete": "Mark complete",
-      "alreadyComplete": "This activity is already complete."
+      "alreadyComplete": "This activity is already complete.",
+      "changeStage": "Change stage",
+      "markWon": "Mark won",
+      "markLost": "Mark lost",
+      "editOpportunity": "Edit",
+      "alreadyClosed": "This opportunity is already won or lost."
     },
     "forms": {
       "newLead": {
@@ -2175,6 +2180,41 @@
             "Medium": "Medium",
             "High": "High"
           }
+        }
+      },
+      "changeStage": {
+        "title": "Change pipeline stage",
+        "description": "Move the selected opportunity to another stage.",
+        "submit": "Update stage",
+        "sections": {
+          "stage": "Stage"
+        },
+        "fields": {
+          "stage": "Pipeline stage",
+          "stageId": "Stage ID",
+          "stageIdPlaceholder": "e.g. 1"
+        },
+        "validation": {
+          "stageRequired": "Choose a pipeline stage."
+        }
+      },
+      "editOpportunity": {
+        "title": "Edit opportunity",
+        "description": "Update deal details and pipeline stage.",
+        "submit": "Save changes",
+        "sections": {
+          "opportunity": "Opportunity"
+        },
+        "fields": {
+          "partner": "Customer / partner",
+          "expectedRevenue": "Expected revenue",
+          "dateDeadline": "Expected close date",
+          "stage": "Pipeline stage",
+          "description": "Notes",
+          "descriptionPlaceholder": "Deal context and next steps…"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "newContact": {

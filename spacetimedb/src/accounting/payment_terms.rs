@@ -120,15 +120,61 @@ pub fn update_payment_term(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
+
+    let mut changed_fields = Vec::new();
+    if name.is_some() {
+        changed_fields.push("name".to_string());
+    }
+    if note.is_some() {
+        changed_fields.push("note".to_string());
+    }
+    if is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+
+    let new_name = name.unwrap_or(term.name.clone());
+    let new_note = note.or(term.note.clone());
+    let new_is_active = is_active.unwrap_or(term.is_active);
+
     ctx.db
         .account_payment_term()
         .id()
         .update(AccountPaymentTerm {
-            name: name.unwrap_or(term.name.clone()),
-            note: note.or(term.note.clone()),
-            is_active: is_active.unwrap_or(term.is_active),
+            name: new_name.clone(),
+            note: new_note.clone(),
+            is_active: new_is_active,
             ..term
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term",
+            record_id: term_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": term.name,
+                    "note": term.note,
+                    "is_active": term.is_active,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "name": new_name,
+                    "note": new_note,
+                    "is_active": new_is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -148,6 +194,29 @@ pub fn delete_payment_term(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term",
+            record_id: term_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": term.name,
+                    "note": term.note,
+                    "is_active": term.is_active,
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
+
     ctx.db.account_payment_term().id().delete(&term_id);
     // Cascade: delete all lines
     let line_ids: Vec<u64> = ctx
@@ -182,7 +251,7 @@ pub fn create_payment_term_line(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
-    ctx.db
+    let line = ctx.db
         .account_payment_term_line()
         .insert(AccountPaymentTermLine {
             id: 0,
@@ -194,6 +263,37 @@ pub fn create_payment_term_line(
             days_after_end_of_month: params.days_after_end_of_month,
             sequence: params.sequence,
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term_line",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "payment_term_id": line.payment_term_id,
+                    "value": format!("{:?}", line.value),
+                    "value_amount": line.value_amount,
+                    "days": line.days,
+                    "sequence": line.sequence,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "payment_term_id".to_string(),
+                "value".to_string(),
+                "value_amount".to_string(),
+                "days".to_string(),
+                "sequence".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -226,19 +326,82 @@ pub fn update_payment_term_line(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
+
+    let mut changed_fields = Vec::new();
+    if value.is_some() {
+        changed_fields.push("value".to_string());
+    }
+    if value_amount.is_some() {
+        changed_fields.push("value_amount".to_string());
+    }
+    if days.is_some() {
+        changed_fields.push("days".to_string());
+    }
+    if months.is_some() {
+        changed_fields.push("months".to_string());
+    }
+    if days_after_end_of_month.is_some() {
+        changed_fields.push("days_after_end_of_month".to_string());
+    }
+    if sequence.is_some() {
+        changed_fields.push("sequence".to_string());
+    }
+
+    let new_value = value.unwrap_or(line.value.clone());
+    let new_value_amount = value_amount.unwrap_or(line.value_amount);
+    let new_days = days.unwrap_or(line.days);
+    let new_months = months.unwrap_or(line.months);
+    let new_days_after_end_of_month = days_after_end_of_month.unwrap_or(line.days_after_end_of_month);
+    let new_sequence = sequence.unwrap_or(line.sequence);
+
     ctx.db
         .account_payment_term_line()
         .id()
         .update(AccountPaymentTermLine {
-            value: value.unwrap_or(line.value.clone()),
-            value_amount: value_amount.unwrap_or(line.value_amount),
-            days: days.unwrap_or(line.days),
-            months: months.unwrap_or(line.months),
-            days_after_end_of_month: days_after_end_of_month
-                .unwrap_or(line.days_after_end_of_month),
-            sequence: sequence.unwrap_or(line.sequence),
+            value: new_value.clone(),
+            value_amount: new_value_amount,
+            days: new_days,
+            months: new_months,
+            days_after_end_of_month: new_days_after_end_of_month,
+            sequence: new_sequence,
             ..line
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "value": format!("{:?}", line.value),
+                    "value_amount": line.value_amount,
+                    "days": line.days,
+                    "months": line.months,
+                    "days_after_end_of_month": line.days_after_end_of_month,
+                    "sequence": line.sequence,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "value": format!("{:?}", new_value),
+                    "value_amount": new_value_amount,
+                    "days": new_days,
+                    "months": new_months,
+                    "days_after_end_of_month": new_days_after_end_of_month,
+                    "sequence": new_sequence,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -264,6 +427,31 @@ pub fn delete_payment_term_line(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "account_payment_term_line",
+            record_id: line_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({
+                    "payment_term_id": line.payment_term_id,
+                    "value": format!("{:?}", line.value),
+                    "value_amount": line.value_amount,
+                    "days": line.days,
+                    "sequence": line.sequence,
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
+
     ctx.db.account_payment_term_line().id().delete(&line_id);
     Ok(())
 }

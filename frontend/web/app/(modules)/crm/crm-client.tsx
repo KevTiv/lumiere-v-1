@@ -10,6 +10,11 @@ import {
   toCreateLeadParams,
   toCreateOpportunityParams,
 } from "@/lib/crm-create-params"
+import {
+  timestampToDateInputValue,
+  toUpdateOpportunityParams,
+  toUpdateOpportunityStageParams,
+} from "@/lib/crm-update-params"
 import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
 import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
@@ -29,6 +34,7 @@ import {
   useLeads,
   useOpportunities,
   useOpportunityStages,
+  useUpdateOpportunity,
   useCrmCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
@@ -45,7 +51,10 @@ import {
   assignTagToContactForm,
   convertLeadForm,
   convertOpportunityToOrderForm,
+  changeOpportunityStageForm,
+  editOpportunityForm,
   mergeFieldDefaultValues,
+  mergeSelectOptionsByFieldName,
   mergeSelectOptionsForFields,
   newActivityForm,
   newContactForm,
@@ -76,6 +85,8 @@ type WorkflowModal =
   | { kind: "convertOpp"; form: FormConfig; opportunityId: bigint }
   | { kind: "assignTag"; form: FormConfig; contactId: bigint }
   | { kind: "addSegment"; form: FormConfig; contactId: bigint }
+  | { kind: "changeStage"; form: FormConfig; opportunityId: bigint; companyId: bigint }
+  | { kind: "editOpportunity"; form: FormConfig; opportunityId: bigint; companyId: bigint }
   | null
 
 function rowIdBigInt(row: Record<string, unknown>): bigint {
@@ -183,6 +194,56 @@ function CrmClientLoaded({
     [opportunityStages],
   )
 
+  const stageById = useMemo(
+    () =>
+      new Map(
+        opportunityStages.map((s) => {
+          const row = s as Record<string, unknown>
+          return [String(row.id ?? ""), String(row.name ?? "—")]
+        }),
+      ),
+    [opportunityStages],
+  )
+
+  const partnerSelectOptions = useMemo(
+    () =>
+      contacts.map((c) => {
+        const row = c as Record<string, unknown>
+        const label = contactPrimaryLabel(row).trim() || String(row.name ?? row.id ?? "")
+        return { value: String(row.id ?? ""), label }
+      }),
+    [contacts],
+  )
+
+  const wonStageId = useMemo(() => {
+    const stage = opportunityStages.find(
+      (s) => (s as Record<string, unknown>).isWon === true,
+    ) as Record<string, unknown> | undefined
+    if (!stage?.id) return null
+    return BigInt(String(stage.id))
+  }, [opportunityStages])
+
+  const lostStageId = useMemo(() => {
+    const stage = opportunityStages.find(
+      (s) => String((s as Record<string, unknown>).name ?? "") === "Lost",
+    ) as Record<string, unknown> | undefined
+    if (!stage?.id) return null
+    return BigInt(String(stage.id))
+  }, [opportunityStages])
+
+  const enrichedOpportunities = useMemo(
+    () =>
+      opportunities.map((o) => {
+        const row = o as Record<string, unknown>
+        const stageId = String(row.stageId ?? row.stage_id ?? "")
+        return {
+          ...row,
+          stageName: stageById.get(stageId) ?? "—",
+        }
+      }),
+    [opportunities, stageById],
+  )
+
   const pricelistSelectOptions = useMemo(
     () =>
       pricelists.map((p) => {
@@ -209,6 +270,7 @@ function CrmClientLoaded({
 
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
+  const updateOpportunity = useUpdateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
   const createContact = useCreateContact(orgId, { companyId: operatingCompanyId ?? undefined })
   const createActivity = useCreateActivity(orgId)
   const convertLead = useConvertLeadToCustomer(orgId)
@@ -302,6 +364,99 @@ function CrmClientLoaded({
     [t],
   )
 
+  const openChangeStageModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      if (oppIsClosed(row)) {
+        window.alert(t("crm.actions.alreadyClosed"))
+        return
+      }
+      let base = changeOpportunityStageForm(t, opportunityStageOptions)
+      base = mergeSelectOptionsByFieldName(base, "stageId", opportunityStageOptions)
+      const form = mergeFieldDefaultValues(base, {
+        stageId: String(row.stageId ?? row.stage_id ?? ""),
+      })
+      setWorkflowModal({
+        kind: "changeStage",
+        opportunityId: rowIdBigInt(row),
+        companyId: rowCompanyId(row, operatingCompanyId),
+        form,
+      })
+    },
+    [t, opportunityStageOptions, operatingCompanyId],
+  )
+
+  const openEditOpportunityModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      let base = editOpportunityForm(t)
+      base = mergeSelectOptionsByFieldName(base, "stageId", opportunityStageOptions)
+      base = mergeSelectOptionsByFieldName(base, "partnerId", partnerSelectOptions)
+      const form = mergeFieldDefaultValues(base, {
+        partnerId: String(row.partnerId ?? row.partner_id ?? ""),
+        expectedRevenue: Number(row.expectedRevenue ?? row.expected_revenue ?? 0),
+        dateDeadline: timestampToDateInputValue(row.dateDeadline ?? row.date_deadline),
+        stageId: String(row.stageId ?? row.stage_id ?? ""),
+        description: row.description != null ? String(row.description) : "",
+      })
+      setWorkflowModal({
+        kind: "editOpportunity",
+        opportunityId: rowIdBigInt(row),
+        companyId: rowCompanyId(row, operatingCompanyId),
+        form,
+      })
+    },
+    [t, opportunityStageOptions, partnerSelectOptions, operatingCompanyId],
+  )
+
+  const markOpportunityWon = useCallback(
+    async (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      if (oppIsClosed(row)) {
+        window.alert(t("crm.actions.alreadyClosed"))
+        return
+      }
+      const params: Record<string, unknown> = { isWon: true }
+      if (wonStageId != null) params.stageId = wonStageId
+      try {
+        await updateOpportunity.mutateAsync({
+          opportunityId: rowIdBigInt(row),
+          companyId: rowCompanyId(row, operatingCompanyId),
+          params,
+        })
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : "Action failed")
+      }
+    },
+    [t, wonStageId, updateOpportunity, operatingCompanyId],
+  )
+
+  const markOpportunityLost = useCallback(
+    async (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      if (oppIsClosed(row)) {
+        window.alert(t("crm.actions.alreadyClosed"))
+        return
+      }
+      const params: Record<string, unknown> = { isLost: true }
+      if (lostStageId != null) params.stageId = lostStageId
+      try {
+        await updateOpportunity.mutateAsync({
+          opportunityId: rowIdBigInt(row),
+          companyId: rowCompanyId(row, operatingCompanyId),
+          params,
+        })
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : "Action failed")
+      }
+    },
+    [t, lostStageId, updateOpportunity, operatingCompanyId],
+  )
+
   const moduleConfig = useMemo((): ModuleConfig => {
     const base = crmModuleConfig(t)
 
@@ -341,6 +496,35 @@ function CrmClientLoaded({
             id: "csv-opportunities",
             label: t("crm.csvImport.toolbarOpportunities"),
             onClick: () => setCsvKind("opportunity"),
+          },
+          {
+            id: "edit-opportunity",
+            label: t("crm.actions.editOpportunity"),
+            requiresSelection: true,
+            onClick: openEditOpportunityModal,
+          },
+          {
+            id: "change-stage",
+            label: t("crm.actions.changeStage"),
+            requiresSelection: true,
+            onClick: openChangeStageModal,
+          },
+          {
+            id: "mark-won",
+            label: t("crm.actions.markWon"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              void markOpportunityWon(rows)
+            },
+          },
+          {
+            id: "mark-lost",
+            label: t("crm.actions.markLost"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              void markOpportunityLost(rows)
+            },
           },
           {
             id: "convert-opp-order",
@@ -446,6 +630,10 @@ function CrmClientLoaded({
     openConvertOppModal,
     openAssignTagModal,
     openAddSegmentModal,
+    openEditOpportunityModal,
+    openChangeStageModal,
+    markOpportunityWon,
+    markOpportunityLost,
     deleteContact,
     completeActivity,
     opportunityStageOptions,
@@ -457,7 +645,13 @@ function CrmClientLoaded({
       const s = leadStateRaw(l as Record<string, unknown>)
       return s !== "lost" && s !== "won" && s !== "converted"
     }).length
-    const pipelineValue = opportunities.reduce((s, o) => s + Number(o.expectedRevenue ?? 0), 0)
+    const openOpportunities = opportunities.filter(
+      (o) => !oppIsClosed(o as Record<string, unknown>),
+    )
+    const pipelineValue = openOpportunities.reduce(
+      (s, o) => s + Number(o.expectedRevenue ?? 0),
+      0,
+    )
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
 
@@ -471,7 +665,7 @@ function CrmClientLoaded({
               stats: [
                 { label: t("crm.dashboard.activeLeads"), value: String(activeLeads), icon: "Users" },
                 { label: t("crm.dashboard.pipelineValue"), value: `$${pipelineValue.toLocaleString()}`, icon: "TrendingUp" },
-                { label: t("crm.dashboard.openOpportunities"), value: String(opportunities.length), icon: "Target" },
+                { label: t("crm.dashboard.openOpportunities"), value: String(openOpportunities.length), icon: "Target" },
                 { label: t("crm.dashboard.totalContacts"), value: String(contacts.length), icon: "BookUser" },
               ],
             },
@@ -504,9 +698,14 @@ function CrmClientLoaded({
           return { ...w, data: { ...(w.data as Record<string, unknown>), values: stageValues } }
         }
         if (w.id === "crm-pipeline-health") {
-          const stageGroups = groupBy(opportunities, (o) => String((o as Record<string, unknown>).stageId ?? "0"))
+          const stageGroups = groupBy(openOpportunities, (o) =>
+            String((o as Record<string, unknown>).stageId ?? "0"),
+          )
           const stages = Object.entries(stageGroups)
-            .map(([stage, items]) => ({ label: `Stage ${stage.slice(-4)}`, count: items.length }))
+            .map(([stageId, items]) => ({
+              label: stageById.get(stageId) ?? "—",
+              count: items.length,
+            }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 4)
           const colors = ["#6366f1", "#8b5cf6", "#a78bfa", "#22c55e"]
@@ -523,9 +722,15 @@ function CrmClientLoaded({
           const recentRows = contacts.slice(0, 4).map((c) => {
             const row = c as Record<string, unknown>
             const primary = contactPrimaryLabel(row).trim()
+            const companyRow =
+              c.companyId != null
+                ? contacts.find((other) => String(other.id) === String(c.companyId))
+                : undefined
             return {
               name: primary || String(c.name ?? ""),
-              company: c.companyId ? `ID ${String(c.companyId).slice(-4)}` : "—",
+              company: companyRow
+                ? contactPrimaryLabel(companyRow as Record<string, unknown>).trim() || "—"
+                : "—",
               stage: "—",
               value: "—",
               lastContact: "—",
@@ -536,7 +741,7 @@ function CrmClientLoaded({
         return w
       }),
     }))
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, t])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, t])
 
   const config = useMemo(
     () =>
@@ -552,11 +757,11 @@ function CrmClientLoaded({
   const data = useMemo(
     () => ({
       leads: leads as unknown as Record<string, unknown>[],
-      opportunities: opportunities as unknown as Record<string, unknown>[],
+      opportunities: enrichedOpportunities,
       contacts: contacts as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
     }),
-    [leads, opportunities, contacts, activities],
+    [leads, enrichedOpportunities, contacts, activities],
   )
 
   const handleFormSubmit = async (
@@ -589,6 +794,7 @@ function CrmClientLoaded({
     createActivity.isPending ||
     convertLead.isPending ||
     convertOppToOrder.isPending ||
+    updateOpportunity.isPending ||
     assignTag.isPending ||
     addToSegment.isPending ||
     csvImports.importContact.isPending ||
@@ -628,6 +834,22 @@ function CrmClientLoaded({
           segmentId: String(segmentId),
           contactId: workflowModal.contactId,
         })
+      } else if (workflowModal.kind === "changeStage") {
+        const p = toUpdateOpportunityStageParams(formData)
+        if (!p) throw new Error(t("crm.forms.changeStage.validation.stageRequired"))
+        await updateOpportunity.mutateAsync({
+          opportunityId: workflowModal.opportunityId,
+          companyId: workflowModal.companyId,
+          params: p,
+        })
+      } else if (workflowModal.kind === "editOpportunity") {
+        const p = toUpdateOpportunityParams(formData)
+        if (!p) throw new Error(t("crm.forms.editOpportunity.validation.noChanges"))
+        await updateOpportunity.mutateAsync({
+          opportunityId: workflowModal.opportunityId,
+          companyId: workflowModal.companyId,
+          params: p,
+        })
       }
       setWorkflowModal(null)
     } catch (e) {
@@ -645,7 +867,11 @@ function CrmClientLoaded({
           ? `co-${workflowModal.opportunityId.toString()}`
           : workflowModal.kind === "assignTag"
             ? `at-${workflowModal.contactId.toString()}`
-            : `as-${workflowModal.contactId.toString()}`
+            : workflowModal.kind === "changeStage"
+              ? `cs-${workflowModal.opportunityId.toString()}`
+              : workflowModal.kind === "editOpportunity"
+                ? `eo-${workflowModal.opportunityId.toString()}`
+                : `as-${workflowModal.contactId.toString()}`
 
   return (
     <>

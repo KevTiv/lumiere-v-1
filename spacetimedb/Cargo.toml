@@ -6,6 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
+# WASM module artifact for `spacetime publish` / `cargo build --target wasm32-unknown-unknown`.
+# Native `cargo test` uses the cdylib artifact for unit tests; domain reducer tests run as
+# in-module test reducers (see tests/harness/mod.rs) inside the SpacetimeDB runtime.
 crate-type = ["cdylib"]
 
 [dependencies]

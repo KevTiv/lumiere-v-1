@@ -14,7 +14,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, company_id_from_scope};
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
 
@@ -417,6 +417,32 @@ pub fn create_picking_batch(
         }
     }
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_picking_batch",
+            record_id: batch.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": batch.name,
+                    "state": format!("{:?}", batch.state),
+                    "picking_ids": batch.picking_ids,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "state".to_string(),
+                "picking_ids".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -444,7 +470,7 @@ pub fn create_delivery_carrier(
         }
     }
 
-    ctx.db.delivery_carrier().insert(DeliveryCarrier {
+    let carrier = ctx.db.delivery_carrier().insert(DeliveryCarrier {
         id: 0,
         name: params.name,
         active: true,
@@ -479,6 +505,27 @@ pub fn create_delivery_carrier(
         metadata: params.metadata,
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "delivery_carrier",
+            record_id: carrier.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": carrier.name,
+                    "delivery_type": carrier.delivery_type,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "delivery_type".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -491,7 +538,7 @@ pub fn create_delivery_price_rule(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "delivery_price_rule", "create")?;
 
-    ctx.db.delivery_price_rule().insert(DeliveryPriceRule {
+    let rule = ctx.db.delivery_price_rule().insert(DeliveryPriceRule {
         id: 0,
         carrier_id: 0, // Should be set when linking to carrier
         variable: params.variable,
@@ -508,6 +555,32 @@ pub fn create_delivery_price_rule(
         metadata: params.metadata,
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "delivery_price_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "variable": rule.variable,
+                    "operator": rule.operator,
+                    "list_price": rule.list_price,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "variable".to_string(),
+                "operator".to_string(),
+                "list_price".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -520,7 +593,7 @@ pub fn create_shipping_method(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "shipping_method", "create")?;
 
-    ctx.db.shipping_method().insert(ShippingMethod {
+    let method = ctx.db.shipping_method().insert(ShippingMethod {
         id: 0,
         name: params.name,
         provider: params.provider,
@@ -540,6 +613,27 @@ pub fn create_shipping_method(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "shipping_method",
+            record_id: method.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": method.name,
+                    "provider": method.provider,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "provider".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -563,12 +657,28 @@ pub fn start_picking_batch(
         return Err("Batch must be in Draft state to start".to_string());
     }
 
+    let old_state = format!("{:?}", batch.state);
     ctx.db.stock_picking_batch().id().update(StockPickingBatch {
         state: BatchState::InProgress,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..batch
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(batch.company_id),
+            table_name: "stock_picking_batch",
+            record_id: batch_id,
+            action: "START_BATCH",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "InProgress" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -592,12 +702,28 @@ pub fn complete_picking_batch(
         return Err("Batch must be In Progress to complete".to_string());
     }
 
+    let old_state = format!("{:?}", batch.state);
     ctx.db.stock_picking_batch().id().update(StockPickingBatch {
         state: BatchState::Done,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..batch
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(batch.company_id),
+            table_name: "stock_picking_batch",
+            record_id: batch_id,
+            action: "COMPLETE_BATCH",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Done" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -621,12 +747,28 @@ pub fn cancel_picking_batch(
         return Err("Cannot cancel a completed batch".to_string());
     }
 
+    let old_state = format!("{:?}", batch.state);
     ctx.db.stock_picking_batch().id().update(StockPickingBatch {
         state: BatchState::Cancelled,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..batch
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(batch.company_id),
+            table_name: "stock_picking_batch",
+            record_id: batch_id,
+            action: "CANCEL_BATCH",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Cancelled" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

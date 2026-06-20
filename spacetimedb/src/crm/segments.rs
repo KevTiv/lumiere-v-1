@@ -7,7 +7,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::contact;
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -106,7 +106,7 @@ pub fn create_contact_segment(
         return Err("Segment name cannot be empty".to_string());
     }
 
-    ctx.db.contact_segment().insert(ContactSegment {
+    let segment = ctx.db.contact_segment().insert(ContactSegment {
         id: 0,
         organization_id,
         name: params.name,
@@ -122,6 +122,28 @@ pub fn create_contact_segment(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_segment",
+            record_id: segment.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": segment.name,
+                    "is_dynamic": segment.is_dynamic,
+                    "is_active": segment.is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "is_dynamic".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -165,7 +187,7 @@ pub fn add_contact_to_segment(
         return Err("Contact is already a member of this segment".to_string());
     }
 
-    ctx.db.segment_member().insert(SegmentMember {
+    let member = ctx.db.segment_member().insert(SegmentMember {
         id: 0,
         organization_id,
         segment_id,
@@ -180,6 +202,33 @@ pub fn add_contact_to_segment(
         member_count: segment.member_count + 1,
         ..segment
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "segment_member",
+            record_id: member.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "segment_id": segment_id,
+                    "contact_id": contact_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["segment_id".to_string(), "contact_id".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "junction": "segment_member",
+                    "segment_member_count_updated": segment.member_count + 1,
+                })
+                .to_string(),
+            ),
+        },
+    );
 
     Ok(())
 }

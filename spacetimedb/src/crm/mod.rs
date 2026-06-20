@@ -36,7 +36,10 @@ pub use leads::{
     convert_lead_to_customer, create_lead, update_lead_address, update_lead_details,
     update_lead_revenue, Lead, LeadLostReason, LeadSource,
 };
-pub use opportunities::{create_opportunity, Opportunity, OpportunityLine, OpportunityStage};
+pub use opportunities::{
+    convert_opportunity_to_sale_order, create_opportunity, update_opportunity, Opportunity,
+    OpportunityLine, OpportunityStage, UpdateOpportunityParams,
+};
 pub use segments::{
     add_contact_to_segment, create_contact_segment, AssignmentRule, ContactSegment, SegmentMember,
 };

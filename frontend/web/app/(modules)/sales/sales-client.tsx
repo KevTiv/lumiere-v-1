@@ -40,6 +40,7 @@ import {
 } from '@/lib/sales-logistics-params';
 import { salesModuleConfig } from '@/lib/module-dashboard-configs';
 import { groupBy, groupByMonth } from '@/lib/utils';
+import { identityToHex } from '@/lib/helpdesk-display';
 import {
   useSaleOrders,
   useSaleOrderLines,
@@ -81,7 +82,7 @@ import {
   useCreateLoyaltyProgram,
   useCreateLoyaltyCard,
 } from '@lumiere/query-hooks/hooks/sales';
-import { useContacts } from '@lumiere/query-hooks/hooks/crm';
+import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
@@ -199,6 +200,7 @@ function SalesClientLoaded({
   );
   const { data: loyaltyCards = [] } = usePosLoyaltyCards(orgId, initialLoyaltyCards);
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
+  const { data: users = [] } = useUsers(orgId);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
@@ -270,6 +272,17 @@ function SalesClientLoaded({
       { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
     ];
   }, [warehouses, t]);
+
+  const salesRepLabelByIdentity = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of users) {
+      const row = user as Record<string, unknown>;
+      const key = identityToHex(row.identity ?? row.id);
+      if (!key) continue;
+      map.set(key, String(row.name ?? row.email ?? 'Unassigned'));
+    }
+    return map;
+  }, [users]);
 
   const saleOrderFormConfig = useMemo(
     () =>
@@ -604,12 +617,13 @@ function SalesClientLoaded({
           };
         }
         if (w.id === 'sales-by-rep') {
-          const byRep = groupBy(confirmedOrders, (o) =>
-            String(o.userId ?? 'Unknown'),
-          );
+          const byRep = groupBy(confirmedOrders, (o) => {
+            const key = identityToHex(o.userId);
+            return salesRepLabelByIdentity.get(key) ?? 'Unassigned';
+          });
           const repMetrics = Object.entries(byRep)
             .map(([rep, repOrders]) => ({
-              label: rep.slice(-8),
+              label: rep,
               value: Math.round(
                 repOrders.reduce((s, o) => s + Number(o.amountTotal ?? 0), 0),
               ),
@@ -655,6 +669,7 @@ function SalesClientLoaded({
     saleOrderFormConfig,
     pickingBatchFormConfig,
     router,
+    salesRepLabelByIdentity,
   ]);
 
   // Config with live dashboard sections + lookup-backed create forms + entity actions

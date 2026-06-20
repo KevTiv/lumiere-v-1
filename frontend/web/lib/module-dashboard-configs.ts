@@ -227,10 +227,10 @@ export const accountingDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Accounts Receivable", value: "$248,320", change: 12, icon: "TrendingUp" },
-              { label: "Accounts Payable", value: "$134,780", change: -5, icon: "TrendingDown" },
-              { label: "Cash Balance", value: "$892,450", change: 8, icon: "DollarSign" },
-              { label: "Net Revenue MTD", value: "$1,204,300", change: 18, icon: "BarChart2" },
+              { label: "Accounts Receivable", value: "—", icon: "TrendingUp" },
+              { label: "Accounts Payable", value: "—", icon: "TrendingDown" },
+              { label: "Cash Balance", value: "—", icon: "DollarSign" },
+              { label: "Net Revenue MTD", value: "—", icon: "BarChart2" },
             ],
           },
         },
@@ -497,10 +497,10 @@ export const salesDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Revenue MTD", value: "$1,204,300", change: 18, icon: "TrendingUp" },
-              { label: "Orders Closed", value: "84", change: 9, icon: "ShoppingCart" },
-              { label: "Avg Deal Size", value: "$14,337", change: 7, icon: "DollarSign" },
-              { label: "Win Rate", value: "38%", change: 4, icon: "Target" },
+              { label: "Revenue MTD", value: "—", icon: "TrendingUp" },
+              { label: "Orders Closed", value: "—", icon: "ShoppingCart" },
+              { label: "Avg Deal Size", value: "—", icon: "DollarSign" },
+              { label: "Win Rate", value: "—", icon: "Target" },
             ],
           },
         },
@@ -700,10 +700,10 @@ export const crmDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Active Leads", value: "312", change: 22, icon: "Users" },
-              { label: "Pipeline Value", value: "$4,820,000", change: 14, icon: "TrendingUp" },
-              { label: "Win Rate", value: "38%", change: 4, icon: "Target" },
-              { label: "Churn Rate", value: "2.1%", change: -0.4, icon: "UserMinus" },
+              { label: "Active Leads", value: "—", icon: "Users" },
+              { label: "Pipeline Value", value: "—", icon: "TrendingUp" },
+              { label: "Win Rate", value: "—", icon: "Target" },
+              { label: "Churn Rate", value: "—", icon: "UserMinus" },
             ],
           },
         },
@@ -849,10 +849,10 @@ export const inventoryDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Total SKUs", value: "2,847", change: 3, icon: "Package" },
-              { label: "Stock Value", value: "$3,240,800", change: -2, icon: "DollarSign" },
-              { label: "Low Stock Alerts", value: "47", change: 12, icon: "AlertTriangle" },
-              { label: "Inventory Turnover", value: "6.2×", change: 8, icon: "RefreshCw" },
+              { label: "Total SKUs", value: "—", icon: "Package" },
+              { label: "Stock Value", value: "—", icon: "DollarSign" },
+              { label: "Low Stock Alerts", value: "—", icon: "AlertTriangle" },
+              { label: "Inventory Turnover", value: "—", icon: "RefreshCw" },
             ],
           },
         },
@@ -1136,10 +1136,10 @@ export const purchasingDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Open POs", value: "38", change: -6, icon: "FileText" },
-              { label: "Spend MTD", value: "$428,700", change: 11, icon: "DollarSign" },
-              { label: "Active Vendors", value: "124", change: 2, icon: "Building" },
-              { label: "Avg Lead Time", value: "8.4 days", change: -5, icon: "Clock" },
+              { label: "Open POs", value: "—", icon: "FileText" },
+              { label: "Spend MTD", value: "—", icon: "DollarSign" },
+              { label: "Active Vendors", value: "—", icon: "Building" },
+              { label: "Avg Lead Time", value: "—", icon: "Clock" },
             ],
           },
         },
@@ -1287,10 +1287,10 @@ export const hrDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Total Headcount", value: "247", change: 3, icon: "Users" },
-              { label: "Open Positions", value: "18", change: 6, icon: "UserPlus" },
-              { label: "Turnover Rate", value: "8.4%", change: -1.2, icon: "UserMinus" },
-              { label: "Satisfaction Score", value: "4.2/5", change: 5, icon: "Star" },
+              { label: "Total Headcount", value: "—", icon: "Users" },
+              { label: "Open Positions", value: "—", icon: "UserPlus" },
+              { label: "Turnover Rate", value: "—", icon: "UserMinus" },
+              { label: "Satisfaction Score", value: "—", icon: "Star" },
             ],
           },
         },
@@ -1448,10 +1448,10 @@ export const manufacturingDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Active Orders", value: "63", change: 8, icon: "Factory" },
-              { label: "On-Time Rate", value: "91%", change: 3, icon: "CheckCircle" },
-              { label: "OEE Efficiency", value: "78%", change: -2, icon: "Settings" },
-              { label: "Scrap Rate", value: "1.8%", change: -0.4, icon: "Trash2" },
+              { label: "Active Orders", value: "—", icon: "Factory" },
+              { label: "On-Time Rate", value: "—", icon: "CheckCircle" },
+              { label: "OEE Efficiency", value: "—", icon: "Settings" },
+              { label: "Scrap Rate", value: "—", icon: "Trash2" },
             ],
           },
         },
@@ -1721,10 +1721,10 @@ export const projectsDashboard: DashboardConfig = {
           width: "full",
           data: {
             stats: [
-              { label: "Active Projects", value: "24", change: 2, icon: "FolderKanban" },
-              { label: "On Schedule", value: "17 / 24", change: 0, icon: "Clock" },
-              { label: "Over Budget", value: "3", change: 1, icon: "AlertCircle" },
-              { label: "Billable Hours MTD", value: "1,840h", change: 6, icon: "Clock" },
+              { label: "Active Projects", value: "—", icon: "FolderKanban" },
+              { label: "On Schedule", value: "—", icon: "Clock" },
+              { label: "Over Budget", value: "—", icon: "AlertCircle" },
+              { label: "Billable Hours MTD", value: "—", icon: "Clock" },
             ],
           },
         },

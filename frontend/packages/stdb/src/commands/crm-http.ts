@@ -9,6 +9,7 @@ import type { ReducerCommandContractMeta } from "./types";
 export const CRM_BFF_REDUCERS = [
   "create_lead",
   "create_opportunity",
+  "update_opportunity",
   "create_contact",
   "create_activity",
   "update_contact",
@@ -64,6 +65,7 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
 > = {
   create_lead: ["leads"],
   create_opportunity: ["opportunities"],
+  update_opportunity: ["opportunities"],
   create_contact: ["contacts"],
   create_activity: ["activities"],
   update_contact: ["contacts"],

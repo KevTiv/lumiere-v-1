@@ -248,10 +248,25 @@ pub fn cancel_payment(
     if payment.state == PaymentState::Reversed {
         return Err("Payment is already cancelled".to_string());
     }
+    let old_state = format!("{:?}", payment.state);
     ctx.db.account_payment().id().update(AccountPayment {
         state: PaymentState::Reversed,
         ..payment
     });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(payment.company_id),
+            table_name: "account_payment",
+            record_id: payment_id,
+            action: "CANCEL",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Reversed" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -293,9 +308,41 @@ pub fn register_payment_on_invoice(
     }
 
     ctx.db.account_payment().id().update(AccountPayment {
-        reconciled_invoice_ids,
-        reconciled_bill_ids,
+        reconciled_invoice_ids: reconciled_invoice_ids.clone(),
+        reconciled_bill_ids: reconciled_bill_ids.clone(),
         ..payment
     });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(payment.company_id),
+            table_name: "account_payment",
+            record_id: payment_id,
+            action: "REGISTER_ON_INVOICE",
+            old_values: Some(
+                serde_json::json!({
+                    "reconciled_invoice_ids": payment.reconciled_invoice_ids,
+                    "reconciled_bill_ids": payment.reconciled_bill_ids,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "reconciled_invoice_ids": reconciled_invoice_ids,
+                    "reconciled_bill_ids": reconciled_bill_ids,
+                    "invoice_ids": invoice_ids,
+                    "is_bill": is_bill,
+                })
+                .to_string(),
+            ),
+            changed_fields: if is_bill {
+                vec!["reconciled_bill_ids".to_string()]
+            } else {
+                vec!["reconciled_invoice_ids".to_string()]
+            },
+            metadata: None,
+        },
+    );
     Ok(())
 }

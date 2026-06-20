@@ -1,0 +1,20 @@
+//! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
+mod helpers;
+pub mod journal_entries_test;
+pub mod payments_test;
+
+use spacetimedb::ReducerContext;
+
+/// Run all accounting domain tests. Call from SpacetimeDB client or CLI:
+/// `spacetime call <db> run_all_accounting_tests`
+#[spacetimedb::reducer]
+pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
+    journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
+        .map_err(|e| format!("post_customer_invoice: {e}"))?;
+
+    payments_test::test_payment_reconciles_invoice(ctx)
+        .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
+
+    log::info!("✅ run_all_accounting_tests complete");
+    Ok(())
+}

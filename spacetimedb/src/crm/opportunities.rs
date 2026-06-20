@@ -62,6 +62,25 @@ pub struct ConvertOpportunityParams {
     pub warehouse_id: u64,
 }
 
+/// Params for updating an opportunity.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateOpportunityParams {
+    pub name: Option<String>,
+    pub expected_revenue: Option<f64>,
+    pub probability: Option<f64>,
+    pub stage_id: Option<u64>,
+    pub priority: Option<String>,
+    pub is_won: Option<bool>,
+    pub is_lost: Option<bool>,
+    pub partner_id: Option<u64>,
+    pub contact_id: Option<u64>,
+    pub date_deadline: Option<Timestamp>,
+    pub date_closed: Option<Timestamp>,
+    pub lost_reason_id: Option<u64>,
+    pub description: Option<String>,
+    pub tag_ids: Option<Vec<u64>>,
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: OPPORTUNITIES
 // ══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +255,190 @@ pub fn create_opportunity(
     Ok(())
 }
 
+#[spacetimedb::reducer]
+pub fn update_opportunity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    opportunity_id: u64,
+    params: UpdateOpportunityParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity", "write")?;
+
+    let opp = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opportunity_id)
+        .ok_or("Opportunity not found")?;
+
+    if opp.organization_id != organization_id {
+        return Err("Opportunity does not belong to this organization".to_string());
+    }
+
+    if opp.company_id != Some(company_id) {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    let mut name = opp.name.clone();
+    let mut expected_revenue = opp.expected_revenue;
+    let mut probability = opp.probability;
+    let mut stage_id = opp.stage_id;
+    let mut priority = opp.priority.clone();
+    let mut is_won = opp.is_won;
+    let mut is_lost = opp.is_lost;
+    let mut partner_id = opp.partner_id;
+    let mut contact_id = opp.contact_id;
+    let mut date_deadline = opp.date_deadline;
+    let mut date_closed = opp.date_closed;
+    let mut date_last_stage_update = opp.date_last_stage_update;
+    let mut lost_reason_id = opp.lost_reason_id;
+    let mut description = opp.description.clone();
+    let mut tag_ids = opp.tag_ids.clone();
+    let mut changed_fields = Vec::new();
+
+    if let Some(v) = &params.name {
+        if v.is_empty() {
+            return Err("Opportunity name cannot be empty".to_string());
+        }
+        name = v.clone();
+        changed_fields.push("name".to_string());
+    }
+    if let Some(v) = params.expected_revenue {
+        expected_revenue = v;
+        changed_fields.push("expected_revenue".to_string());
+    }
+    if let Some(v) = &params.priority {
+        priority = v.clone();
+        changed_fields.push("priority".to_string());
+    }
+    if let Some(v) = params.partner_id {
+        partner_id = Some(v);
+        changed_fields.push("partner_id".to_string());
+    }
+    if let Some(v) = params.contact_id {
+        contact_id = Some(v);
+        changed_fields.push("contact_id".to_string());
+    }
+    if let Some(v) = params.date_deadline {
+        date_deadline = Some(v);
+        changed_fields.push("date_deadline".to_string());
+    }
+    if let Some(v) = params.lost_reason_id {
+        lost_reason_id = Some(v);
+        changed_fields.push("lost_reason_id".to_string());
+    }
+    if let Some(v) = &params.description {
+        description = Some(v.clone());
+        changed_fields.push("description".to_string());
+    }
+    if let Some(v) = &params.tag_ids {
+        tag_ids = v.clone();
+        changed_fields.push("tag_ids".to_string());
+    }
+
+    if let Some(new_stage_id) = params.stage_id {
+        if new_stage_id != opp.stage_id {
+            let stage = ctx
+                .db
+                .opp_stage()
+                .id()
+                .find(&new_stage_id)
+                .ok_or("Stage not found")?;
+
+            if stage.organization_id != organization_id {
+                return Err("Stage does not belong to this organization".to_string());
+            }
+
+            stage_id = new_stage_id;
+            date_last_stage_update = Some(ctx.timestamp);
+            changed_fields.push("stage_id".to_string());
+            changed_fields.push("date_last_stage_update".to_string());
+
+            if params.probability.is_none() {
+                probability = stage.probability;
+                changed_fields.push("probability".to_string());
+            }
+
+            if stage.is_won {
+                is_won = true;
+                is_lost = false;
+                date_closed = Some(ctx.timestamp);
+                changed_fields.push("is_won".to_string());
+                changed_fields.push("is_lost".to_string());
+                changed_fields.push("date_closed".to_string());
+            } else if stage.name == "Lost" {
+                is_lost = true;
+                is_won = false;
+                changed_fields.push("is_lost".to_string());
+                changed_fields.push("is_won".to_string());
+            }
+        }
+    }
+
+    if let Some(v) = params.probability {
+        probability = v;
+        if !changed_fields.contains(&"probability".to_string()) {
+            changed_fields.push("probability".to_string());
+        }
+    }
+    if let Some(v) = params.is_won {
+        is_won = v;
+        if !changed_fields.contains(&"is_won".to_string()) {
+            changed_fields.push("is_won".to_string());
+        }
+    }
+    if let Some(v) = params.is_lost {
+        is_lost = v;
+        if !changed_fields.contains(&"is_lost".to_string()) {
+            changed_fields.push("is_lost".to_string());
+        }
+    }
+    if let Some(v) = params.date_closed {
+        date_closed = Some(v);
+        if !changed_fields.contains(&"date_closed".to_string()) {
+            changed_fields.push("date_closed".to_string());
+        }
+    }
+
+    ctx.db.opportunity().id().update(Opportunity {
+        name,
+        expected_revenue,
+        probability,
+        stage_id,
+        priority,
+        is_won,
+        is_lost,
+        partner_id,
+        contact_id,
+        date_deadline,
+        date_closed,
+        date_last_stage_update,
+        lost_reason_id,
+        description,
+        tag_ids,
+        updated_at: ctx.timestamp,
+        ..opp
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "opportunity",
+            record_id: opportunity_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 /// Convert a CRM Opportunity into a Sale Order.
 ///
 /// Fetches the opportunity and its lines, ensures the partner is flagged as
@@ -355,6 +558,24 @@ pub fn convert_opportunity_to_sale_order(
 
     create_sale_order(ctx, organization_id, so_params)?;
 
+    let won_stage = ctx
+        .db
+        .opp_stage()
+        .iter()
+        .find(|s| s.organization_id == organization_id && s.is_won)
+        .ok_or("Won stage not found")?;
+
+    ctx.db.opportunity().id().update(Opportunity {
+        is_won: true,
+        is_lost: false,
+        stage_id: won_stage.id,
+        date_closed: Some(ctx.timestamp),
+        date_last_stage_update: Some(ctx.timestamp),
+        probability: 100.0,
+        updated_at: ctx.timestamp,
+        ..opp
+    });
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -365,10 +586,22 @@ pub fn convert_opportunity_to_sale_order(
             action: "CONVERT_TO_SO",
             old_values: None,
             new_values: Some(
-                serde_json::json!({ "partner_id": partner_id, "currency_id": currency_id })
+                serde_json::json!({
+                    "partner_id": partner_id,
+                    "currency_id": currency_id,
+                    "stage_id": won_stage.id,
+                    "is_won": true,
+                })
                     .to_string(),
             ),
-            changed_fields: vec![],
+            changed_fields: vec![
+                "stage_id".to_string(),
+                "is_won".to_string(),
+                "is_lost".to_string(),
+                "date_closed".to_string(),
+                "date_last_stage_update".to_string(),
+                "probability".to_string(),
+            ],
             metadata: None,
         },
     );

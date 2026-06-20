@@ -904,6 +904,19 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         is_active: true,
         metadata: None,
     });
+    let _stage_lost = ctx.db.opp_stage().insert(OpportunityStage {
+        id: 0,
+        organization_id: org_id,
+        name: "Lost".to_string(),
+        sequence: 9,
+        probability: 0.0,
+        requirements: None,
+        fold: true,
+        is_won: false,
+        team_id: None,
+        is_active: true,
+        metadata: None,
+    });
     let stage_won = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
         organization_id: org_id,

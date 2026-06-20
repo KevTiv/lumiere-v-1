@@ -28,6 +28,7 @@ import type {
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
+  UpdateOpportunityParams,
 } from "@lumiere/stdb/types"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -49,6 +50,11 @@ function toScalarU64(v: ScalarId): bigint {
 
 type ContactPatch<P> = { contactId: ScalarId; params: Partial<P> }
 type LeadPatch<P> = { leadId: ScalarId; params: Partial<P> }
+type OpportunityPatch<P> = {
+  opportunityId: ScalarId
+  companyId?: ScalarId
+  params: Partial<P>
+}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +146,33 @@ export function useCreateLead(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create lead')
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useUpdateOpportunity(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
+  const qc = useQueryClient()
+  const defaultCompanyId = options?.companyId
+  return useMutation<void, Error, OpportunityPatch<UpdateOpportunityParams>>({
+    mutationFn: async ({ opportunityId, companyId, params }) => {
+      const scopedCompanyId =
+        companyId != null ? toScalarU64(companyId) : defaultCompanyId
+      if (scopedCompanyId == null || scopedCompanyId === 0n) {
+        throw new Error("Company scope required to update opportunity")
+      }
+      const { urlPath, init } = crmBffPost("update_opportunity", [
+        organizationId,
+        scopedCompanyId,
+        toScalarU64(opportunityId),
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update opportunity")
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["opportunities", rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -528,4 +561,5 @@ export type {
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
+  UpdateOpportunityParams,
 } from '@lumiere/stdb/types'

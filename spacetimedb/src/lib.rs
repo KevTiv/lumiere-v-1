@@ -78,8 +78,37 @@ pub mod seed;
 pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
 pub mod workflow; // Phase 13 — Workflow Engine // Dev-only — seed_dev_data reducer for local development
 
+/// Shared org/company/COA fixture for domain test reducers.
+/// Source lives in `tests/harness/mod.rs`.
+#[path = "../tests/harness/mod.rs"]
+pub mod test_harness;
+
+/// Inventory domain tests — call `run_all_inventory_tests` reducer to execute.
+#[path = "../tests/inventory/tests/mod.rs"]
+pub mod inventory_tests;
+
+/// Accounting domain tests — call `run_all_accounting_tests` reducer to execute.
+#[path = "../tests/accounting/mod.rs"]
+pub mod accounting_tests;
+
+/// Sales domain tests — call `run_all_sales_tests` reducer to execute.
+#[path = "../tests/sales/mod.rs"]
+pub mod sales_tests;
+
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 use crate::proposals::proposals::proposal_presence;
+
+/// Run accounting, inventory, and sales domain test suites in one call.
+/// `spacetime call <db> run_all_domain_tests`
+#[spacetimedb::reducer]
+pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
+    accounting_tests::run_all_accounting_tests(ctx)
+        .map_err(|e| format!("accounting: {e}"))?;
+    inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;
+    sales_tests::run_all_sales_tests(ctx).map_err(|e| format!("sales: {e}"))?;
+    log::info!("✅ run_all_domain_tests complete");
+    Ok(())
+}
 
 // ── Lifecycle reducers ────────────────────────────────────────────────────────
 
