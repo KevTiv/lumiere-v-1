@@ -2059,6 +2059,14 @@
       "description": "Active pipeline and deals in progress",
       "searchPlaceholder": "Search opportunities…",
       "emptyMessage": "No opportunities found.",
+      "board": {
+        "viewToggleLabel": "Opportunity view",
+        "viewTable": "Table",
+        "viewKanban": "Kanban",
+        "emptyColumn": "Drop opportunities here",
+        "moveFailed": "Failed to move opportunity",
+        "newOpportunity": "New Opportunity"
+      },
       "columns": {
         "name": "Opportunity",
         "stageName": "Stage",

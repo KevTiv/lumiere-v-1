@@ -41,6 +41,7 @@ import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
+  DEFAULT_KANBAN_COLUMN_COLORS,
   CrmRecordChatterDialog,
   CrmUtmSettings,
   FormModal,
@@ -128,6 +129,17 @@ function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string
 
 function leadStateRaw(row: Record<string, unknown>): string {
   return String(row.state ?? row.State ?? "").toLowerCase()
+}
+
+function oppIsClosed(row: Record<string, unknown>): boolean {
+  return row.isWon === true || row.is_won === true || row.isLost === true || row.is_lost === true
+}
+
+function rowCompanyId(row: Record<string, unknown>, fallback: bigint): bigint {
+  const raw = row.companyId ?? row.company_id
+  if (raw == null || raw === "") return fallback
+  if (typeof raw === "bigint") return raw
+  return BigInt(String(raw))
 }
 
 function partnerId(row: Record<string, unknown>): unknown {
@@ -457,6 +469,79 @@ function CrmClientLoaded({
     [t, lostStageId, updateOpportunity, operatingCompanyId],
   )
 
+  const handleOpportunityStageMove = useCallback(
+    async ({
+      opportunityId,
+      companyId,
+      stageId,
+    }: {
+      opportunityId: bigint
+      companyId: bigint
+      stageId: bigint
+    }) => {
+      try {
+        await updateOpportunity.mutateAsync({
+          opportunityId,
+          companyId,
+          params: { stageId },
+        })
+      } catch (e) {
+        window.alert(
+          e instanceof Error ? e.message : t("crm.opportunities.board.moveFailed"),
+        )
+      }
+    },
+    [t, updateOpportunity],
+  )
+
+  const opportunityBoardColumns = useMemo(
+    () =>
+      [...opportunityStages]
+        .filter((s) => {
+          const row = s as Record<string, unknown>
+          return row.isActive !== false && row.is_active !== false
+        })
+        .sort(
+          (a, b) =>
+            Number((a as Record<string, unknown>).sequence ?? 0) -
+            Number((b as Record<string, unknown>).sequence ?? 0),
+        )
+        .map((s, index) => {
+          const row = s as Record<string, unknown>
+          return {
+            id: String(row.id ?? ""),
+            title: String(row.name ?? row.id ?? "—"),
+            colorClass:
+              DEFAULT_KANBAN_COLUMN_COLORS[index % DEFAULT_KANBAN_COLUMN_COLORS.length] ??
+              "bg-primary",
+          }
+        }),
+    [opportunityStages],
+  )
+
+  const entityBoardContext = useMemo(
+    () => ({
+      opportunities: {
+        columns: opportunityBoardColumns,
+        filterItem: (row: Record<string, unknown>) => !oppIsClosed(row),
+        onMove: async ({
+          item,
+          toColumnId,
+        }: {
+          item: Record<string, unknown>
+          toColumnId: string
+        }) => {
+          await handleOpportunityStageMove({
+            opportunityId: rowIdBigInt(item),
+            companyId: rowCompanyId(item, operatingCompanyId),
+            stageId: BigInt(toColumnId),
+          })
+        },
+      },
+    }),
+    [handleOpportunityStageMove, opportunityBoardColumns, operatingCompanyId],
+  )
+
   const moduleConfig = useMemo((): ModuleConfig => {
     const base = crmModuleConfig(t)
 
@@ -487,54 +572,66 @@ function CrmClientLoaded({
       },
     }
 
-    const oppEntity: EntityViewConfig = {
-      ...oppCfg,
-      view: {
-        ...(oppCfg.view as EntityTableConfig),
-        actions: [
-          {
-            id: "csv-opportunities",
-            label: t("crm.csvImport.toolbarOpportunities"),
-            onClick: () => setCsvKind("opportunity"),
-          },
-          {
-            id: "edit-opportunity",
-            label: t("crm.actions.editOpportunity"),
-            requiresSelection: true,
-            onClick: openEditOpportunityModal,
-          },
-          {
-            id: "change-stage",
-            label: t("crm.actions.changeStage"),
-            requiresSelection: true,
-            onClick: openChangeStageModal,
-          },
-          {
-            id: "mark-won",
-            label: t("crm.actions.markWon"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              void markOpportunityWon(rows)
+    const oppEntity: EntityViewConfig =
+      oppCfg.view.mode === "table-or-board"
+        ? {
+            ...oppCfg,
+            view: {
+              ...oppCfg.view,
+              table: {
+                ...oppCfg.view.table,
+                actions: [
+                  {
+                    id: "csv-opportunities",
+                    label: t("crm.csvImport.toolbarOpportunities"),
+                    onClick: () => setCsvKind("opportunity"),
+                  },
+                  {
+                    id: "edit-opportunity",
+                    label: t("crm.actions.editOpportunity"),
+                    requiresSelection: true,
+                    onClick: openEditOpportunityModal,
+                  },
+                  {
+                    id: "change-stage",
+                    label: t("crm.actions.changeStage"),
+                    requiresSelection: true,
+                    onClick: openChangeStageModal,
+                  },
+                  {
+                    id: "mark-won",
+                    label: t("crm.actions.markWon"),
+                    requiresSelection: true,
+                    onClick: (rows) => {
+                      void markOpportunityWon(rows)
+                    },
+                  },
+                  {
+                    id: "mark-lost",
+                    label: t("crm.actions.markLost"),
+                    requiresSelection: true,
+                    variant: "destructive",
+                    onClick: (rows) => {
+                      void markOpportunityLost(rows)
+                    },
+                  },
+                  {
+                    id: "convert-opp-order",
+                    label: t("crm.actions.convertToSaleOrder"),
+                    requiresSelection: true,
+                    onClick: openConvertOppModal,
+                  },
+                ],
+              },
             },
-          },
-          {
-            id: "mark-lost",
-            label: t("crm.actions.markLost"),
-            requiresSelection: true,
-            variant: "destructive",
-            onClick: (rows) => {
-              void markOpportunityLost(rows)
+          }
+        : {
+            ...oppCfg,
+            view: {
+              ...(oppCfg.view as EntityTableConfig),
+              actions: [],
             },
-          },
-          {
-            id: "convert-opp-order",
-            label: t("crm.actions.convertToSaleOrder"),
-            requiresSelection: true,
-            onClick: openConvertOppModal,
-          },
-        ],
-      },
-    }
+          }
 
     const contactEntity: EntityViewConfig = {
       ...contactCfg,
@@ -604,6 +701,7 @@ function CrmClientLoaded({
           ...tab,
           entityConfig: oppEntity,
           createForm: newOpportunityForm(t, opportunityStageOptions),
+          createLabel: t("crm.opportunities.board.newOpportunity"),
         }
       }
       if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
@@ -634,8 +732,6 @@ function CrmClientLoaded({
     openChangeStageModal,
     markOpportunityWon,
     markOpportunityLost,
-    deleteContact,
-    completeActivity,
     opportunityStageOptions,
   ])
 
@@ -878,6 +974,7 @@ function CrmClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {

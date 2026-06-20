@@ -134,6 +134,39 @@ export interface EntityDetailConfig {
   sections: EntityDetailSection[]
 }
 
+// ─── Board view config ───────────────────────────────────────────────────────
+
+export interface EntityBoardCardConfig {
+  titleKey: string
+  fields?: EntityColumn[]
+  footerFields?: EntityColumn[]
+  render?: (row: Record<string, unknown>) => ReactNode
+}
+
+export interface EntityBoardConfig {
+  mode: "board"
+  groupKey: string
+  rowKey?: string
+  card: EntityBoardCardConfig
+  emptyColumnMessage?: string
+}
+
+// ─── Table + board hybrid ────────────────────────────────────────────────────
+
+export interface EntityTableBoardViewConfig {
+  mode: "table-or-board"
+  table: EntityTableConfig
+  board: Omit<EntityBoardConfig, "mode">
+  /** Labels for the table/kanban view toggle */
+  viewToggleLabels?: {
+    table: string
+    board: string
+    ariaLabel?: string
+  }
+  /** Default surface when the tab opens */
+  defaultView?: "table" | "board"
+}
+
 // ─── Top-level config ────────────────────────────────────────────────────────
 
 export interface EntityViewConfig {
@@ -142,5 +175,5 @@ export interface EntityViewConfig {
   entityType?: string
   title: string
   description?: string
-  view: EntityTableConfig | EntityDetailConfig
+  view: EntityTableConfig | EntityDetailConfig | EntityBoardConfig | EntityTableBoardViewConfig
 }

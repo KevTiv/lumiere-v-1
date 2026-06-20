@@ -11,9 +11,11 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_all_accounting_tests);
     let _ = stringify!(run_all_inventory_tests);
     let _ = stringify!(run_all_sales_tests);
+    let _ = stringify!(run_all_crm_tests);
 }
 
 fn run_all_domain_tests() {}
 fn run_all_accounting_tests() {}
 fn run_all_inventory_tests() {}
 fn run_all_sales_tests() {}
+fn run_all_crm_tests() {}

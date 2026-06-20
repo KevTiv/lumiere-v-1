@@ -1,5 +1,13 @@
 /// Dashboards Module — Widgets and dashboard definitions
 ///
+/// **DEPRECATED (MVP):** Do not extend for module dashboard charts. Module dashboards
+/// (CRM, Sales, Accounting, etc.) render from client-side `liveSections` built in
+/// `frontend/web/app/(modules)/*/*-client.tsx` over SpacetimeDB entity subscriptions.
+/// Tables and reducers here are retained (breaking change to remove) and remain used
+/// only for seed data and Reports-module write-only CRUD forms — no UI subscribes to
+/// `dashboard` / `dashboard_widget` rows for chart rendering. Server-side aggregation
+/// is out of scope unless profiling proves client-side `groupBy` slow at scale.
+///
 /// # Tables
 /// | Table | Description |
 /// |-------|-------------|

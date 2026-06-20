@@ -1,5 +1,5 @@
 /// Journal entry / customer invoice domain tests.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};

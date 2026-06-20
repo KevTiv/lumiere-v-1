@@ -7,10 +7,12 @@ use crate::accounting::journal_entries::{
     CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
-    account_payment, create_payment, post_payment, register_payment_on_invoice, CreatePaymentParams,
+    account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
+    CreatePaymentParams,
 };
+use crate::core::audit::audit_log;
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{AccountMoveState, MoveType, PartnerType, PaymentType};
+use crate::types::{MoveType, PartnerType, PaymentState, PaymentType};
 
 use super::helpers::{create_balanced_customer_invoice, patch_receivable_line_type, seed_bank_journal};
 
@@ -139,6 +141,92 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
             "Invoice residual should be near zero after reconcile, got {}",
             invoice.amount_residual
         ));
+    }
+
+    Ok(())
+}
+
+pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let amount = 50.0;
+
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+
+    create_payment(
+        ctx,
+        org_id,
+        CreatePaymentParams {
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount,
+            currency_id: 1,
+            date: None,
+            journal_id: bank_journal_id,
+            ref_: Some("Harness cancel payment".to_string()),
+            memo: Some("To be cancelled".to_string()),
+        },
+    )?;
+
+    let payment_id = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|p| {
+            p.organization_id == org_id && p.ref_ == Some("Harness cancel payment".to_string())
+        })
+        .map(|p| p.id)
+        .ok_or("Payment record not found after create")?;
+
+    post_payment(ctx, org_id, payment_id)?;
+
+    let posted = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found after post")?;
+
+    if posted.state != PaymentState::Paid {
+        return Err(format!(
+            "Expected Paid state before cancel, got {:?}",
+            posted.state
+        ));
+    }
+
+    cancel_payment(ctx, org_id, payment_id)?;
+
+    let cancelled = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found after cancel")?;
+
+    if cancelled.state != PaymentState::Reversed {
+        return Err(format!(
+            "Expected Reversed state after cancel, got {:?}",
+            cancelled.state
+        ));
+    }
+
+    let has_cancel_audit = ctx
+        .db
+        .audit_log()
+        .audit_by_org()
+        .filter(&org_id)
+        .any(|entry| {
+            entry.table_name == "account_payment"
+                && entry.record_id == payment_id
+                && entry.action == "CANCEL"
+        });
+
+    if !has_cancel_audit {
+        return Err("Expected CANCEL audit row for payment".to_string());
     }
 
     Ok(())

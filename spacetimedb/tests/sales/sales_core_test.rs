@@ -3,7 +3,12 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{account_journal, create_account_journal, CreateAccountJournalParams};
 use crate::accounting::journal_entries::{account_move, create_invoice_from_sale_order};
+use crate::core::organization::CompanyScopeParams;
 use crate::inventory::product::product;
+use crate::inventory::stock::{
+    assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
+    stock_picking, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
+};
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
     confirm_sales_order, create_sale_order, sale_order, sale_order_line, CreateSaleOrderLineParams,
@@ -173,7 +178,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             CreateAccountJournalParams {
                 company_id: Some(company_id),
                 name: "Harness SO Sales Journal".to_string(),
-                code: journal_code,
+                code: journal_code.clone(),
                 type_: JournalType::Sale,
                 currency_id: Some(1),
                 default_account_id: Some(revenue_id),
@@ -242,6 +247,312 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
 
     if invoice.sale_order_id != Some(order.id) {
         return Err("Invoice not linked back to sale order".to_string());
+    }
+
+    Ok(())
+}
+
+/// Delivery path smoke test.
+///
+/// `confirm_sales_order` does not auto-create pickings yet; we manually wire
+/// picking → move → confirm → assign → validate to assert done state and
+/// qty_delivered propagation on the SO line.
+pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Harness Delivery Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Harness Delivery Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found after create")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        CreateSaleOrderParams {
+            company_id: Some(company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id: 1,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![CreateSaleOrderLineParams {
+                product_id: fixture.product_id,
+                quantity: 2.0,
+                uom_id: product.uom_id,
+                price_unit: Some(product.list_price),
+                discount: 0.0,
+                tax_ids: vec![],
+                name: None,
+                sequence: 1,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            }],
+            origin: Some("Harness delivery SO".to_string()),
+            client_order_ref: Some("HARNESS-SO-DEL".to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: None,
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: Some(r#"{"test":"order_to_delivery_state"}"#.to_string()),
+        },
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id
+                && o.client_order_ref == Some("HARNESS-SO-DEL".to_string())
+        })
+        .ok_or("Sale order not found after create")?;
+
+    confirm_sales_order(ctx, org_id, order.id)?;
+
+    let confirmed = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Sale order not found after confirm")?;
+
+    if confirmed.state != SaleState::Sale {
+        return Err(format!(
+            "Expected Sale state after confirm, got {:?}",
+            confirmed.state
+        ));
+    }
+
+    let order_line = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order.id)
+        .next()
+        .ok_or("Sale order line not found")?;
+
+    // Location stubs — full stock location graph not seeded in harness yet.
+    let src_location = fixture.warehouse_id;
+    let dest_location = fixture.warehouse_id + 1;
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "Harness Out Picking".to_string(),
+            picking_type_id: 1,
+            location_id: src_location,
+            location_dest_id: dest_location,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some(format!("SO/{}", order.id)),
+            note: None,
+            user_id: None,
+            sale_id: Some(order.id),
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: false,
+            show_check_availability: true,
+            show_validate: false,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(fixture.product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: false,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: Some(r#"{"test":"delivery_picking"}"#.to_string()),
+        },
+    )?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| {
+            p.organization_id == org_id && p.name == "Harness Out Picking"
+        })
+        .ok_or("Delivery picking not found after create")?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Harness delivery move".to_string(),
+            product_id: fixture.product_id,
+            product_tmpl_id: fixture.product_id,
+            product_uom: product.uom_id,
+            product_uom_qty: order_line.product_uom_qty,
+            location_id: src_location,
+            location_dest_id: dest_location,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: Some(format!("SO/{}", order.id)),
+            sequence: 10,
+            origin: Some(format!("SO/{}", order.id)),
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: Some(picking.id),
+            picking_type_id: Some(1),
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: product.list_price,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: Some(order_line.id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    confirm_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    validate_stock_picking(ctx, org_id, picking.id, scope)?;
+
+    let done_picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking.id)
+        .ok_or("Picking not found after validate")?;
+
+    if done_picking.state != "done" {
+        return Err(format!(
+            "Expected picking state done, got {}",
+            done_picking.state
+        ));
+    }
+
+    let delivered_line = ctx
+        .db
+        .sale_order_line()
+        .id()
+        .find(&order_line.id)
+        .ok_or("Sale order line not found after delivery")?;
+
+    if delivered_line.qty_delivered < order_line.product_uom_qty {
+        return Err(format!(
+            "Expected qty_delivered >= {}, got {}",
+            order_line.product_uom_qty, delivered_line.qty_delivered
+        ));
     }
 
     Ok(())

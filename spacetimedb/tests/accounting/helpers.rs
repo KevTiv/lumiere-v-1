@@ -2,9 +2,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
-    account_journal, create_account_account, create_account_account_type,
-    create_account_journal, CreateAccountAccountParams, CreateAccountAccountTypeParams,
-    CreateAccountJournalParams,
+    account_account, account_account_type, account_journal, create_account_account,
+    create_account_account_type, create_account_journal, CreateAccountAccountParams,
+    CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move, post_invoice,
@@ -48,7 +48,7 @@ pub fn create_balanced_customer_invoice(
             CreateAccountJournalParams {
                 company_id: Some(company_id),
                 name: "Test Sales Journal".to_string(),
-                code: journal_code,
+                code: journal_code.clone(),
                 type_: JournalType::Sale,
                 currency_id: Some(1),
                 default_account_id: Some(revenue_id),
@@ -277,7 +277,6 @@ pub fn seed_bank_journal(
                 type_: "liquidity".to_string(),
                 internal_group: AccountInternalGroup::Asset,
                 include_initial_balance: false,
-                note: None,
                 metadata: None,
             },
         )?;
@@ -347,7 +346,7 @@ pub fn seed_bank_journal(
             CreateAccountJournalParams {
                 company_id: Some(company_id),
                 name: "Test Bank Journal".to_string(),
-                code: journal_code,
+                code: journal_code.clone(),
                 type_: JournalType::Bank,
                 currency_id: Some(1),
                 default_account_id: Some(bank_account_id),

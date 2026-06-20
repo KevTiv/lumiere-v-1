@@ -2,6 +2,13 @@ import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
 import type { EntitySurfacePermission, EntityViewConfig } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
+import type { KanbanColumnDef, KanbanMoveHandler } from "./kanban-board-types"
+
+export interface EntityBoardRuntimeContext {
+  columns: KanbanColumnDef[]
+  onMove: KanbanMoveHandler
+  filterItem?: (row: Record<string, unknown>) => boolean
+}
 
 export interface ModuleTab {
   id: string

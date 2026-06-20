@@ -95,10 +95,14 @@ pub mod accounting_tests;
 #[path = "../tests/sales/mod.rs"]
 pub mod sales_tests;
 
+/// CRM domain tests — call `run_all_crm_tests` reducer to execute.
+#[path = "../tests/crm/mod.rs"]
+pub mod crm_tests;
+
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 use crate::proposals::proposals::proposal_presence;
 
-/// Run accounting, inventory, and sales domain test suites in one call.
+/// Run accounting, inventory, sales, and CRM domain test suites in one call.
 /// `spacetime call <db> run_all_domain_tests`
 #[spacetimedb::reducer]
 pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
@@ -106,6 +110,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("accounting: {e}"))?;
     inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;
     sales_tests::run_all_sales_tests(ctx).map_err(|e| format!("sales: {e}"))?;
+    crm_tests::run_all_crm_tests(ctx).map_err(|e| format!("crm: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

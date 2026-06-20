@@ -1,6 +1,7 @@
 //! Inventory domain test suite — invoke via `run_all_inventory_tests` reducer.
 pub mod inventory_adjustments_tests;
 pub mod product_category_tests;
+pub mod stock_test;
 
 use spacetimedb::ReducerContext;
 
@@ -16,6 +17,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
 
     inventory_adjustments_tests::test_inventory_adjustment_create(ctx)
         .map_err(|e| format!("inventory_adjustment: {e}"))?;
+
+    stock_test::test_stock_quant_create(ctx).map_err(|e| format!("stock_quant: {e}"))?;
 
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())

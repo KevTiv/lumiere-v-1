@@ -78,23 +78,77 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
 // ── Opportunities ─────────────────────────────────────────────────────────────
 export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "opportunities-table",
+  entityType: "opportunity",
   title: t("crm.opportunities.title"),
   description: t("crm.opportunities.description"),
   view: {
-    mode: "table",
-    rowKey: "id",
-    searchable: true,
-    searchPlaceholder: t("crm.opportunities.searchPlaceholder"),
-    searchKeys: ["name"],
-    columns: [
-      { key: "name", label: t("crm.opportunities.columns.name"), width: "min-w-48" },
-      { key: "stageName", label: t("crm.opportunities.columns.stageName"), width: "min-w-28" },
-      { key: "priority", label: t("crm.opportunities.columns.priority"), type: "badge", ...opportunityPriorityBadges(t) },
-      { key: "expectedRevenue", label: t("crm.opportunities.columns.expectedRevenue"), type: "currency", align: "right" },
-      { key: "probability", label: t("crm.opportunities.columns.probability"), type: "percent", align: "right" },
-      { key: "dateDeadline", label: t("crm.opportunities.columns.dateDeadline"), type: "date" },
-    ],
-    emptyMessage: t("crm.opportunities.emptyMessage"),
+    mode: "table-or-board",
+    table: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("crm.opportunities.searchPlaceholder"),
+      searchKeys: ["name"],
+      columns: [
+        { key: "name", label: t("crm.opportunities.columns.name"), width: "min-w-48" },
+        { key: "stageName", label: t("crm.opportunities.columns.stageName"), width: "min-w-28" },
+        {
+          key: "priority",
+          label: t("crm.opportunities.columns.priority"),
+          type: "badge",
+          ...opportunityPriorityBadges(t),
+        },
+        {
+          key: "expectedRevenue",
+          label: t("crm.opportunities.columns.expectedRevenue"),
+          type: "currency",
+          align: "right",
+        },
+        {
+          key: "probability",
+          label: t("crm.opportunities.columns.probability"),
+          type: "percent",
+          align: "right",
+        },
+        {
+          key: "dateDeadline",
+          label: t("crm.opportunities.columns.dateDeadline"),
+          type: "date",
+        },
+      ],
+      emptyMessage: t("crm.opportunities.emptyMessage"),
+    },
+    board: {
+      groupKey: "stageId",
+      rowKey: "id",
+      emptyColumnMessage: t("crm.opportunities.board.emptyColumn"),
+      card: {
+        titleKey: "name",
+        fields: [
+          { key: "expectedRevenue", label: t("crm.opportunities.columns.expectedRevenue"), type: "currency" },
+          { key: "probability", label: t("crm.opportunities.columns.probability"), type: "percent" },
+        ],
+        footerFields: [
+          {
+            key: "priority",
+            label: t("crm.opportunities.columns.priority"),
+            type: "badge",
+            ...opportunityPriorityBadges(t),
+          },
+          {
+            key: "dateDeadline",
+            label: t("crm.opportunities.columns.dateDeadline"),
+            type: "date",
+          },
+        ],
+      },
+    },
+    viewToggleLabels: {
+      table: t("crm.opportunities.board.viewTable"),
+      board: t("crm.opportunities.board.viewKanban"),
+      ariaLabel: t("crm.opportunities.board.viewToggleLabel"),
+    },
+    defaultView: "table",
   },
 })
 

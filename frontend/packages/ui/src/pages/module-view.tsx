@@ -14,7 +14,9 @@ import { DashboardHeader } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { FormModal } from "../forms/form-modal"
 import type { ModuleConfig } from "../lib/module-types"
+import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import { isEntitySurfaceVisible } from "../lib/entity-view-types"
+import { getEntityRowKey } from "../lib/entity-row-utils"
 import { useRBAC } from "../lib/rbac-context"
 
 interface ModuleViewProps {
@@ -34,6 +36,8 @@ interface ModuleViewProps {
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
   activeTab?: string
   onActiveTabChange?: (tab: string) => void
+  /** Runtime kanban columns + move handlers keyed by entity tab id */
+  entityBoardContext?: Record<string, EntityBoardRuntimeContext>
 }
 
 export function ModuleView({
@@ -44,6 +48,7 @@ export function ModuleView({
   activeTab: activeTabProp,
   onActiveTabChange,
   isPending,
+  entityBoardContext,
 }: ModuleViewProps) {
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
@@ -113,6 +118,9 @@ export function ModuleView({
                 <EntityView
                   config={tab.entityConfig}
                   data={data[tab.id] ?? []}
+                  boardColumns={entityBoardContext?.[tab.id]?.columns}
+                  onBoardMove={entityBoardContext?.[tab.id]?.onMove}
+                  boardFilterItem={entityBoardContext?.[tab.id]?.filterItem}
                   aiFocusRowKey={
                     aiSelection.selection?.activeTab === tab.id &&
                     aiSelection.selection.entityId &&
@@ -128,10 +136,7 @@ export function ModuleView({
                           activeTab: tab.id,
                           entityType,
                           row,
-                          rowKey:
-                            tab.entityConfig!.view.mode === "table"
-                              ? tab.entityConfig!.view.rowKey
-                              : undefined,
+                          rowKey: getEntityRowKey(tab.entityConfig!),
                         }),
                       )
                     }

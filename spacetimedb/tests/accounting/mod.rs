@@ -15,6 +15,9 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
 
+    payments_test::test_cancel_payment_audited(ctx)
+        .map_err(|e| format!("cancel_payment_audited: {e}"))?;
+
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }

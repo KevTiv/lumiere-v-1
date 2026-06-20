@@ -1,18 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core"
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -44,8 +32,8 @@ import {
   TrendingUp,
   CheckCircle2,
 } from "lucide-react"
-import { TaskColumn } from "./task-column"
-import { TaskCard } from "./task-card"
+import { TaskCardContent } from "./task-card"
+import { KanbanBoard } from "../kanban/kanban-board"
 import { TaskDetailModal } from "./task-detail-modal"
 import { CreateTaskModal } from "./create-task-modal"
 import {
@@ -66,23 +54,10 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterAssignee, setFilterAssignee] = useState<string>("all")
   const [viewMode, setViewMode] = useState<"board" | "list">("board")
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       const matchesSearch =
@@ -99,21 +74,6 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
     })
   }, [tasks, searchQuery, filterAssignee])
 
-  // Group tasks by status
-  const tasksByStatus = useMemo(() => {
-    const grouped: Record<TaskStatus, Task[]> = {
-      backlog: [],
-      todo: [],
-      "in-progress": [],
-      review: [],
-      done: [],
-    }
-    filteredTasks.forEach((task) => {
-      grouped[task.status].push(task)
-    })
-    return grouped
-  }, [filteredTasks])
-
   // Sprint stats
   const sprintStats = useMemo(() => {
     const total = tasks.length
@@ -125,28 +85,6 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
       .reduce((acc, t) => acc + (t.storyPoints || 0), 0)
     return { total, done, inProgress, totalPoints, completedPoints }
   }, [tasks])
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
-
-    if (!over) return
-
-    const taskId = active.id as string
-    const newStatus = over.id as TaskStatus
-
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
-          : task
-      )
-    )
-  }
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
@@ -173,8 +111,6 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
     setTasks((prev) => [...prev, task])
     setIsCreateModalOpen(false)
   }
-
-  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -330,36 +266,37 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
 
       {/* Board View */}
       {viewMode === "board" && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex-1 overflow-x-auto">
-            <div className="flex gap-4 h-full pb-4">
-              {defaultColumns.map((column) => (
-                <TaskColumn
-                  key={column.id}
-                  column={column}
-                  tasks={tasksByStatus[column.id]}
-                  onTaskClick={handleTaskClick}
-                  onAddTask={
-                    column.id !== "done"
-                      ? () => setIsCreateModalOpen(true)
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          <DragOverlay>
-            {activeTask ? (
-              <TaskCard task={activeTask} isDragOverlay />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+        <KanbanBoard
+          columns={defaultColumns.map((column) => ({
+            id: column.id,
+            title: column.title,
+            colorClass: column.color,
+            limit: column.limit,
+          }))}
+          items={filteredTasks as unknown as Record<string, unknown>[]}
+          getItemId={(item) => String(item.id ?? "")}
+          getColumnId={(item) => String(item.status ?? "")}
+          renderCard={(item) => <TaskCardContent task={item as unknown as Task} />}
+          onItemClick={(item) => handleTaskClick(item as unknown as Task)}
+          onMove={({ itemId, toColumnId }) => {
+            setTasks((prev) =>
+              prev.map((task) =>
+                task.id === itemId
+                  ? {
+                      ...task,
+                      status: toColumnId as TaskStatus,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : task,
+              ),
+            )
+          }}
+          labels={{
+            emptyColumn: "Drop tasks here",
+            wipLimitReached: (limit) => `WIP limit reached (${limit})`,
+          }}
+          className="flex-1"
+        />
       )}
 
       {/* List View */}
