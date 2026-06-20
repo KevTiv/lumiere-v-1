@@ -9,6 +9,7 @@ use super::complete_document_processing_job_params_type::CompleteDocumentProcess
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CompleteDocumentProcessingJobArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub job_id: u64,
     pub params: CompleteDocumentProcessingJobParams,
@@ -17,6 +18,7 @@ pub(super) struct CompleteDocumentProcessingJobArgs {
 impl From<CompleteDocumentProcessingJobArgs> for super::Reducer {
     fn from(args: CompleteDocumentProcessingJobArgs) -> Self {
         Self::CompleteDocumentProcessingJob {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             job_id: args.job_id,
             params: args.params,
@@ -41,11 +43,18 @@ pub trait complete_document_processing_job {
     /// /// Use [`complete_document_processing_job:complete_document_processing_job_then`] to run a callback after the reducer completes.
     fn complete_document_processing_job(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
         params: CompleteDocumentProcessingJobParams,
     ) -> __sdk::Result<()> {
-        self.complete_document_processing_job_then(company_id, job_id, params, |_, _| {})
+        self.complete_document_processing_job_then(
+            organization_id,
+            company_id,
+            job_id,
+            params,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `complete_document_processing_job` to run as soon as possible,
@@ -56,6 +65,7 @@ pub trait complete_document_processing_job {
     ///  and its status can be observed with the `callback`.
     fn complete_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
         params: CompleteDocumentProcessingJobParams,
@@ -69,6 +79,7 @@ pub trait complete_document_processing_job {
 impl complete_document_processing_job for super::RemoteReducers {
     fn complete_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
         params: CompleteDocumentProcessingJobParams,
@@ -79,6 +90,7 @@ impl complete_document_processing_job for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             CompleteDocumentProcessingJobArgs {
+                organization_id,
                 company_id,
                 job_id,
                 params,

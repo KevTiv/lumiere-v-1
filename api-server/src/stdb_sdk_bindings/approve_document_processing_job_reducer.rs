@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ApproveDocumentProcessingJobArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub job_id: u64,
 }
@@ -14,6 +15,7 @@ pub(super) struct ApproveDocumentProcessingJobArgs {
 impl From<ApproveDocumentProcessingJobArgs> for super::Reducer {
     fn from(args: ApproveDocumentProcessingJobArgs) -> Self {
         Self::ApproveDocumentProcessingJob {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             job_id: args.job_id,
         }
@@ -37,10 +39,11 @@ pub trait approve_document_processing_job {
     /// /// Use [`approve_document_processing_job:approve_document_processing_job_then`] to run a callback after the reducer completes.
     fn approve_document_processing_job(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
     ) -> __sdk::Result<()> {
-        self.approve_document_processing_job_then(company_id, job_id, |_, _| {})
+        self.approve_document_processing_job_then(organization_id, company_id, job_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `approve_document_processing_job` to run as soon as possible,
@@ -51,6 +54,7 @@ pub trait approve_document_processing_job {
     ///  and its status can be observed with the `callback`.
     fn approve_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
 
@@ -63,6 +67,7 @@ pub trait approve_document_processing_job {
 impl approve_document_processing_job for super::RemoteReducers {
     fn approve_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         job_id: u64,
 
@@ -71,7 +76,11 @@ impl approve_document_processing_job for super::RemoteReducers {
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            ApproveDocumentProcessingJobArgs { company_id, job_id },
+            ApproveDocumentProcessingJobArgs {
+                organization_id,
+                company_id,
+                job_id,
+            },
             callback,
         )
     }

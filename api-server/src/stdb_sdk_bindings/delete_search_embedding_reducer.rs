@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct DeleteSearchEmbeddingArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub content_type: String,
     pub content_id: u64,
@@ -15,6 +16,7 @@ pub(super) struct DeleteSearchEmbeddingArgs {
 impl From<DeleteSearchEmbeddingArgs> for super::Reducer {
     fn from(args: DeleteSearchEmbeddingArgs) -> Self {
         Self::DeleteSearchEmbedding {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             content_type: args.content_type,
             content_id: args.content_id,
@@ -39,11 +41,18 @@ pub trait delete_search_embedding {
     /// /// Use [`delete_search_embedding:delete_search_embedding_then`] to run a callback after the reducer completes.
     fn delete_search_embedding(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
     ) -> __sdk::Result<()> {
-        self.delete_search_embedding_then(company_id, content_type, content_id, |_, _| {})
+        self.delete_search_embedding_then(
+            organization_id,
+            company_id,
+            content_type,
+            content_id,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `delete_search_embedding` to run as soon as possible,
@@ -54,6 +63,7 @@ pub trait delete_search_embedding {
     ///  and its status can be observed with the `callback`.
     fn delete_search_embedding_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
@@ -67,6 +77,7 @@ pub trait delete_search_embedding {
 impl delete_search_embedding for super::RemoteReducers {
     fn delete_search_embedding_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
@@ -77,6 +88,7 @@ impl delete_search_embedding for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             DeleteSearchEmbeddingArgs {
+                organization_id,
                 company_id,
                 content_type,
                 content_id,

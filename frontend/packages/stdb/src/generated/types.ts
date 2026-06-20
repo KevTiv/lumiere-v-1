@@ -10728,6 +10728,24 @@ export const UpdateMetricValuesParams = __t.object("UpdateMetricValuesParams", {
 });
 export type UpdateMetricValuesParams = __Infer<typeof UpdateMetricValuesParams>;
 
+export const UpdateOpportunityParams = __t.object("UpdateOpportunityParams", {
+  name: __t.option(__t.string()),
+  expectedRevenue: __t.option(__t.f64()),
+  probability: __t.option(__t.f64()),
+  stageId: __t.option(__t.u64()),
+  priority: __t.option(__t.string()),
+  isWon: __t.option(__t.bool()),
+  isLost: __t.option(__t.bool()),
+  partnerId: __t.option(__t.u64()),
+  contactId: __t.option(__t.u64()),
+  dateDeadline: __t.option(__t.timestamp()),
+  dateClosed: __t.option(__t.timestamp()),
+  lostReasonId: __t.option(__t.u64()),
+  description: __t.option(__t.string()),
+  tagIds: __t.option(__t.array(__t.u64())),
+});
+export type UpdateOpportunityParams = __Infer<typeof UpdateOpportunityParams>;
+
 export const UpdateOrgMemberDetailsParams = __t.object("UpdateOrgMemberDetailsParams", {
   departmentId: __t.option(__t.u64()),
   jobTitle: __t.option(__t.string()),

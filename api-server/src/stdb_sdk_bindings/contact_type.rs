@@ -2,38 +2,44 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct Contact {
     pub id: u64,
     pub organization_id: u64,
-    pub company_id: Option<u64>,
+    pub company_id: Option::<u64>,
     pub r#type: String,
     pub name: String,
     pub display_name: String,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub title: Option<String>,
-    pub email: Option<String>,
-    pub email_secondary: Option<String>,
-    pub phone: Option<String>,
-    pub mobile: Option<String>,
-    pub fax: Option<String>,
-    pub website: Option<String>,
-    pub street: Option<String>,
-    pub street_2: Option<String>,
-    pub city: Option<String>,
-    pub state_code: Option<String>,
-    pub zip: Option<String>,
-    pub country_code: Option<String>,
-    pub tax_id: Option<String>,
-    pub company_registry: Option<String>,
-    pub industry: Option<String>,
-    pub employees_count: Option<i32>,
-    pub annual_revenue: Option<f64>,
-    pub description: Option<String>,
+    pub first_name: Option::<String>,
+    pub last_name: Option::<String>,
+    pub title: Option::<String>,
+    pub email: Option::<String>,
+    pub email_secondary: Option::<String>,
+    pub phone: Option::<String>,
+    pub mobile: Option::<String>,
+    pub fax: Option::<String>,
+    pub website: Option::<String>,
+    pub street: Option::<String>,
+    pub street_2: Option::<String>,
+    pub city: Option::<String>,
+    pub state_code: Option::<String>,
+    pub zip: Option::<String>,
+    pub country_code: Option::<String>,
+    pub tax_id: Option::<String>,
+    pub company_registry: Option::<String>,
+    pub industry: Option::<String>,
+    pub employees_count: Option::<i32>,
+    pub annual_revenue: Option::<f64>,
+    pub description: Option::<String>,
     pub is_customer: bool,
     pub is_vendor: bool,
     pub is_employee: bool,
@@ -41,21 +47,23 @@ pub struct Contact {
     pub is_partner: bool,
     pub customer_rank: i32,
     pub supplier_rank: i32,
-    pub salesperson_id: Option<__sdk::Identity>,
-    pub assigned_user_id: Option<__sdk::Identity>,
-    pub parent_id: Option<u64>,
-    pub user_id: Option<__sdk::Identity>,
-    pub color: Option<String>,
+    pub salesperson_id: Option::<__sdk::Identity>,
+    pub assigned_user_id: Option::<__sdk::Identity>,
+    pub parent_id: Option::<u64>,
+    pub user_id: Option::<__sdk::Identity>,
+    pub color: Option::<String>,
     pub created_by: __sdk::Identity,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
-    pub deleted_at: Option<__sdk::Timestamp>,
-    pub metadata: Option<String>,
+    pub deleted_at: Option::<__sdk::Timestamp>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for Contact {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `Contact`.
 ///
@@ -63,31 +71,31 @@ impl __sdk::InModule for Contact {
 pub struct ContactCols {
     pub id: __sdk::__query_builder::Col<Contact, u64>,
     pub organization_id: __sdk::__query_builder::Col<Contact, u64>,
-    pub company_id: __sdk::__query_builder::Col<Contact, Option<u64>>,
+    pub company_id: __sdk::__query_builder::Col<Contact, Option::<u64>>,
     pub r#type: __sdk::__query_builder::Col<Contact, String>,
     pub name: __sdk::__query_builder::Col<Contact, String>,
     pub display_name: __sdk::__query_builder::Col<Contact, String>,
-    pub first_name: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub last_name: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub title: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub email: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub email_secondary: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub phone: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub mobile: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub fax: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub website: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub street: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub street_2: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub city: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub state_code: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub zip: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub country_code: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub tax_id: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub company_registry: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub industry: __sdk::__query_builder::Col<Contact, Option<String>>,
-    pub employees_count: __sdk::__query_builder::Col<Contact, Option<i32>>,
-    pub annual_revenue: __sdk::__query_builder::Col<Contact, Option<f64>>,
-    pub description: __sdk::__query_builder::Col<Contact, Option<String>>,
+    pub first_name: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub last_name: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub title: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub email: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub email_secondary: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub phone: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub mobile: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub fax: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub website: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub street: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub street_2: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub city: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub state_code: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub zip: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub country_code: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub tax_id: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub company_registry: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub industry: __sdk::__query_builder::Col<Contact, Option::<String>>,
+    pub employees_count: __sdk::__query_builder::Col<Contact, Option::<i32>>,
+    pub annual_revenue: __sdk::__query_builder::Col<Contact, Option::<f64>>,
+    pub description: __sdk::__query_builder::Col<Contact, Option::<String>>,
     pub is_customer: __sdk::__query_builder::Col<Contact, bool>,
     pub is_vendor: __sdk::__query_builder::Col<Contact, bool>,
     pub is_employee: __sdk::__query_builder::Col<Contact, bool>,
@@ -95,16 +103,16 @@ pub struct ContactCols {
     pub is_partner: __sdk::__query_builder::Col<Contact, bool>,
     pub customer_rank: __sdk::__query_builder::Col<Contact, i32>,
     pub supplier_rank: __sdk::__query_builder::Col<Contact, i32>,
-    pub salesperson_id: __sdk::__query_builder::Col<Contact, Option<__sdk::Identity>>,
-    pub assigned_user_id: __sdk::__query_builder::Col<Contact, Option<__sdk::Identity>>,
-    pub parent_id: __sdk::__query_builder::Col<Contact, Option<u64>>,
-    pub user_id: __sdk::__query_builder::Col<Contact, Option<__sdk::Identity>>,
-    pub color: __sdk::__query_builder::Col<Contact, Option<String>>,
+    pub salesperson_id: __sdk::__query_builder::Col<Contact, Option::<__sdk::Identity>>,
+    pub assigned_user_id: __sdk::__query_builder::Col<Contact, Option::<__sdk::Identity>>,
+    pub parent_id: __sdk::__query_builder::Col<Contact, Option::<u64>>,
+    pub user_id: __sdk::__query_builder::Col<Contact, Option::<__sdk::Identity>>,
+    pub color: __sdk::__query_builder::Col<Contact, Option::<String>>,
     pub created_by: __sdk::__query_builder::Col<Contact, __sdk::Identity>,
     pub created_at: __sdk::__query_builder::Col<Contact, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<Contact, __sdk::Timestamp>,
-    pub deleted_at: __sdk::__query_builder::Col<Contact, Option<__sdk::Timestamp>>,
-    pub metadata: __sdk::__query_builder::Col<Contact, Option<String>>,
+    pub deleted_at: __sdk::__query_builder::Col<Contact, Option::<__sdk::Timestamp>>,
+    pub metadata: __sdk::__query_builder::Col<Contact, Option::<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for Contact {
@@ -155,6 +163,7 @@ impl __sdk::__query_builder::HasCols for Contact {
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
             deleted_at: __sdk::__query_builder::Col::new(table_name, "deleted_at"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+
         }
     }
 }
@@ -163,8 +172,8 @@ impl __sdk::__query_builder::HasCols for Contact {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct ContactIxCols {
-    pub company_id: __sdk::__query_builder::IxCol<Contact, Option<u64>>,
-    pub email: __sdk::__query_builder::IxCol<Contact, Option<String>>,
+    pub company_id: __sdk::__query_builder::IxCol<Contact, Option::<u64>>,
+    pub email: __sdk::__query_builder::IxCol<Contact, Option::<String>>,
     pub id: __sdk::__query_builder::IxCol<Contact, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<Contact, u64>,
 }
@@ -177,8 +186,10 @@ impl __sdk::__query_builder::HasIxCols for Contact {
             email: __sdk::__query_builder::IxCol::new(table_name, "email"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for Contact {}
+

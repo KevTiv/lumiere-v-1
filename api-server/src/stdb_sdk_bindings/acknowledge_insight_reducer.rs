@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct AcknowledgeInsightArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub insight_id: u64,
     pub action_taken: Option<String>,
@@ -15,6 +16,7 @@ pub(super) struct AcknowledgeInsightArgs {
 impl From<AcknowledgeInsightArgs> for super::Reducer {
     fn from(args: AcknowledgeInsightArgs) -> Self {
         Self::AcknowledgeInsight {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             insight_id: args.insight_id,
             action_taken: args.action_taken,
@@ -39,11 +41,18 @@ pub trait acknowledge_insight {
     /// /// Use [`acknowledge_insight:acknowledge_insight_then`] to run a callback after the reducer completes.
     fn acknowledge_insight(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         insight_id: u64,
         action_taken: Option<String>,
     ) -> __sdk::Result<()> {
-        self.acknowledge_insight_then(company_id, insight_id, action_taken, |_, _| {})
+        self.acknowledge_insight_then(
+            organization_id,
+            company_id,
+            insight_id,
+            action_taken,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `acknowledge_insight` to run as soon as possible,
@@ -54,6 +63,7 @@ pub trait acknowledge_insight {
     ///  and its status can be observed with the `callback`.
     fn acknowledge_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         insight_id: u64,
         action_taken: Option<String>,
@@ -67,6 +77,7 @@ pub trait acknowledge_insight {
 impl acknowledge_insight for super::RemoteReducers {
     fn acknowledge_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         insight_id: u64,
         action_taken: Option<String>,
@@ -77,6 +88,7 @@ impl acknowledge_insight for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             AcknowledgeInsightArgs {
+                organization_id,
                 company_id,
                 insight_id,
                 action_taken,

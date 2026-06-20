@@ -2,30 +2,38 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateStockProductionLotParams {
-    pub company_id: Option<u64>,
+    pub company_id: Option::<u64>,
     pub name: String,
     pub product_id: u64,
-    pub product_variant_id: Option<u64>,
-    pub r#ref: Option<String>,
-    pub note: Option<String>,
-    pub expiration_date: Option<__sdk::Timestamp>,
-    pub use_date: Option<__sdk::Timestamp>,
-    pub removal_date: Option<__sdk::Timestamp>,
-    pub alert_date: Option<__sdk::Timestamp>,
+    pub product_variant_id: Option::<u64>,
+    pub r#ref: Option::<String>,
+    pub note: Option::<String>,
+    pub expiration_date: Option::<__sdk::Timestamp>,
+    pub use_date: Option::<__sdk::Timestamp>,
+    pub removal_date: Option::<__sdk::Timestamp>,
+    pub alert_date: Option::<__sdk::Timestamp>,
     pub product_qty: f64,
-    pub location_id: Option<u64>,
-    pub package_id: Option<u64>,
-    pub owner_id: Option<u64>,
+    pub location_id: Option::<u64>,
+    pub package_id: Option::<u64>,
+    pub owner_id: Option::<u64>,
     pub is_scrap: bool,
     pub is_locked: bool,
-    pub metadata: Option<String>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for CreateStockProductionLotParams {
     type Module = super::RemoteModule;
 }
+

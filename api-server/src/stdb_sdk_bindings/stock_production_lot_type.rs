@@ -2,7 +2,13 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -10,29 +16,31 @@ pub struct StockProductionLot {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub r#ref: Option<String>,
+    pub r#ref: Option::<String>,
     pub product_id: u64,
-    pub product_variant_id: Option<u64>,
+    pub product_variant_id: Option::<u64>,
     pub company_id: u64,
-    pub note: Option<String>,
-    pub expiration_date: Option<__sdk::Timestamp>,
-    pub use_date: Option<__sdk::Timestamp>,
-    pub removal_date: Option<__sdk::Timestamp>,
-    pub alert_date: Option<__sdk::Timestamp>,
+    pub note: Option::<String>,
+    pub expiration_date: Option::<__sdk::Timestamp>,
+    pub use_date: Option::<__sdk::Timestamp>,
+    pub removal_date: Option::<__sdk::Timestamp>,
+    pub alert_date: Option::<__sdk::Timestamp>,
     pub product_qty: f64,
-    pub location_id: Option<u64>,
-    pub package_id: Option<u64>,
-    pub owner_id: Option<u64>,
+    pub location_id: Option::<u64>,
+    pub package_id: Option::<u64>,
+    pub owner_id: Option::<u64>,
     pub is_scrap: bool,
     pub is_locked: bool,
     pub create_date: __sdk::Timestamp,
     pub write_date: __sdk::Timestamp,
-    pub metadata: Option<String>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for StockProductionLot {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `StockProductionLot`.
 ///
@@ -41,24 +49,24 @@ pub struct StockProductionLotCols {
     pub id: __sdk::__query_builder::Col<StockProductionLot, u64>,
     pub organization_id: __sdk::__query_builder::Col<StockProductionLot, u64>,
     pub name: __sdk::__query_builder::Col<StockProductionLot, String>,
-    pub r#ref: __sdk::__query_builder::Col<StockProductionLot, Option<String>>,
+    pub r#ref: __sdk::__query_builder::Col<StockProductionLot, Option::<String>>,
     pub product_id: __sdk::__query_builder::Col<StockProductionLot, u64>,
-    pub product_variant_id: __sdk::__query_builder::Col<StockProductionLot, Option<u64>>,
+    pub product_variant_id: __sdk::__query_builder::Col<StockProductionLot, Option::<u64>>,
     pub company_id: __sdk::__query_builder::Col<StockProductionLot, u64>,
-    pub note: __sdk::__query_builder::Col<StockProductionLot, Option<String>>,
-    pub expiration_date: __sdk::__query_builder::Col<StockProductionLot, Option<__sdk::Timestamp>>,
-    pub use_date: __sdk::__query_builder::Col<StockProductionLot, Option<__sdk::Timestamp>>,
-    pub removal_date: __sdk::__query_builder::Col<StockProductionLot, Option<__sdk::Timestamp>>,
-    pub alert_date: __sdk::__query_builder::Col<StockProductionLot, Option<__sdk::Timestamp>>,
+    pub note: __sdk::__query_builder::Col<StockProductionLot, Option::<String>>,
+    pub expiration_date: __sdk::__query_builder::Col<StockProductionLot, Option::<__sdk::Timestamp>>,
+    pub use_date: __sdk::__query_builder::Col<StockProductionLot, Option::<__sdk::Timestamp>>,
+    pub removal_date: __sdk::__query_builder::Col<StockProductionLot, Option::<__sdk::Timestamp>>,
+    pub alert_date: __sdk::__query_builder::Col<StockProductionLot, Option::<__sdk::Timestamp>>,
     pub product_qty: __sdk::__query_builder::Col<StockProductionLot, f64>,
-    pub location_id: __sdk::__query_builder::Col<StockProductionLot, Option<u64>>,
-    pub package_id: __sdk::__query_builder::Col<StockProductionLot, Option<u64>>,
-    pub owner_id: __sdk::__query_builder::Col<StockProductionLot, Option<u64>>,
+    pub location_id: __sdk::__query_builder::Col<StockProductionLot, Option::<u64>>,
+    pub package_id: __sdk::__query_builder::Col<StockProductionLot, Option::<u64>>,
+    pub owner_id: __sdk::__query_builder::Col<StockProductionLot, Option::<u64>>,
     pub is_scrap: __sdk::__query_builder::Col<StockProductionLot, bool>,
     pub is_locked: __sdk::__query_builder::Col<StockProductionLot, bool>,
     pub create_date: __sdk::__query_builder::Col<StockProductionLot, __sdk::Timestamp>,
     pub write_date: __sdk::__query_builder::Col<StockProductionLot, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<StockProductionLot, Option<String>>,
+    pub metadata: __sdk::__query_builder::Col<StockProductionLot, Option::<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for StockProductionLot {
@@ -86,6 +94,7 @@ impl __sdk::__query_builder::HasCols for StockProductionLot {
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+
         }
     }
 }
@@ -110,8 +119,10 @@ impl __sdk::__query_builder::HasIxCols for StockProductionLot {
             name: __sdk::__query_builder::IxCol::new(table_name, "name"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             product_id: __sdk::__query_builder::IxCol::new(table_name, "product_id"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for StockProductionLot {}
+

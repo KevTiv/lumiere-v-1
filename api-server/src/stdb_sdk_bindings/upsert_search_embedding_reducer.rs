@@ -9,6 +9,7 @@ use super::upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpsertSearchEmbeddingArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub params: UpsertSearchEmbeddingParams,
 }
@@ -16,6 +17,7 @@ pub(super) struct UpsertSearchEmbeddingArgs {
 impl From<UpsertSearchEmbeddingArgs> for super::Reducer {
     fn from(args: UpsertSearchEmbeddingArgs) -> Self {
         Self::UpsertSearchEmbedding {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             params: args.params,
         }
@@ -39,10 +41,11 @@ pub trait upsert_search_embedding {
     /// /// Use [`upsert_search_embedding:upsert_search_embedding_then`] to run a callback after the reducer completes.
     fn upsert_search_embedding(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: UpsertSearchEmbeddingParams,
     ) -> __sdk::Result<()> {
-        self.upsert_search_embedding_then(company_id, params, |_, _| {})
+        self.upsert_search_embedding_then(organization_id, company_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `upsert_search_embedding` to run as soon as possible,
@@ -53,6 +56,7 @@ pub trait upsert_search_embedding {
     ///  and its status can be observed with the `callback`.
     fn upsert_search_embedding_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: UpsertSearchEmbeddingParams,
 
@@ -65,6 +69,7 @@ pub trait upsert_search_embedding {
 impl upsert_search_embedding for super::RemoteReducers {
     fn upsert_search_embedding_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: UpsertSearchEmbeddingParams,
 
@@ -73,7 +78,11 @@ impl upsert_search_embedding for super::RemoteReducers {
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            UpsertSearchEmbeddingArgs { company_id, params },
+            UpsertSearchEmbeddingArgs {
+                organization_id,
+                company_id,
+                params,
+            },
             callback,
         )
     }

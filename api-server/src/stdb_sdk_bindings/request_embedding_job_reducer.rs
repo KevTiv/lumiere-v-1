@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct RequestEmbeddingJobArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub content_type: String,
     pub content_id: u64,
@@ -16,6 +17,7 @@ pub(super) struct RequestEmbeddingJobArgs {
 impl From<RequestEmbeddingJobArgs> for super::Reducer {
     fn from(args: RequestEmbeddingJobArgs) -> Self {
         Self::RequestEmbeddingJob {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             content_type: args.content_type,
             content_id: args.content_id,
@@ -41,12 +43,20 @@ pub trait request_embedding_job {
     /// /// Use [`request_embedding_job:request_embedding_job_then`] to run a callback after the reducer completes.
     fn request_embedding_job(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
         text: String,
     ) -> __sdk::Result<()> {
-        self.request_embedding_job_then(company_id, content_type, content_id, text, |_, _| {})
+        self.request_embedding_job_then(
+            organization_id,
+            company_id,
+            content_type,
+            content_id,
+            text,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `request_embedding_job` to run as soon as possible,
@@ -57,6 +67,7 @@ pub trait request_embedding_job {
     ///  and its status can be observed with the `callback`.
     fn request_embedding_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
@@ -71,6 +82,7 @@ pub trait request_embedding_job {
 impl request_embedding_job for super::RemoteReducers {
     fn request_embedding_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         content_type: String,
         content_id: u64,
@@ -82,6 +94,7 @@ impl request_embedding_job for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             RequestEmbeddingJobArgs {
+                organization_id,
                 company_id,
                 content_type,
                 content_id,

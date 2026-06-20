@@ -9,6 +9,7 @@ use super::create_document_processing_job_params_type::CreateDocumentProcessingJ
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateDocumentProcessingJobArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub params: CreateDocumentProcessingJobParams,
 }
@@ -16,6 +17,7 @@ pub(super) struct CreateDocumentProcessingJobArgs {
 impl From<CreateDocumentProcessingJobArgs> for super::Reducer {
     fn from(args: CreateDocumentProcessingJobArgs) -> Self {
         Self::CreateDocumentProcessingJob {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             params: args.params,
         }
@@ -39,10 +41,11 @@ pub trait create_document_processing_job {
     /// /// Use [`create_document_processing_job:create_document_processing_job_then`] to run a callback after the reducer completes.
     fn create_document_processing_job(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateDocumentProcessingJobParams,
     ) -> __sdk::Result<()> {
-        self.create_document_processing_job_then(company_id, params, |_, _| {})
+        self.create_document_processing_job_then(organization_id, company_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_document_processing_job` to run as soon as possible,
@@ -53,6 +56,7 @@ pub trait create_document_processing_job {
     ///  and its status can be observed with the `callback`.
     fn create_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateDocumentProcessingJobParams,
 
@@ -65,6 +69,7 @@ pub trait create_document_processing_job {
 impl create_document_processing_job for super::RemoteReducers {
     fn create_document_processing_job_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateDocumentProcessingJobParams,
 
@@ -73,7 +78,11 @@ impl create_document_processing_job for super::RemoteReducers {
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            CreateDocumentProcessingJobArgs { company_id, params },
+            CreateDocumentProcessingJobArgs {
+                organization_id,
+                company_id,
+                params,
+            },
             callback,
         )
     }

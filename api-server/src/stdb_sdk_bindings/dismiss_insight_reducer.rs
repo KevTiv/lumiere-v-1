@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct DismissInsightArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub insight_id: u64,
 }
@@ -14,6 +15,7 @@ pub(super) struct DismissInsightArgs {
 impl From<DismissInsightArgs> for super::Reducer {
     fn from(args: DismissInsightArgs) -> Self {
         Self::DismissInsight {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             insight_id: args.insight_id,
         }
@@ -35,8 +37,13 @@ pub trait dismiss_insight {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`dismiss_insight:dismiss_insight_then`] to run a callback after the reducer completes.
-    fn dismiss_insight(&self, company_id: Option<u64>, insight_id: u64) -> __sdk::Result<()> {
-        self.dismiss_insight_then(company_id, insight_id, |_, _| {})
+    fn dismiss_insight(
+        &self,
+        organization_id: u64,
+        company_id: Option<u64>,
+        insight_id: u64,
+    ) -> __sdk::Result<()> {
+        self.dismiss_insight_then(organization_id, company_id, insight_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `dismiss_insight` to run as soon as possible,
@@ -47,6 +54,7 @@ pub trait dismiss_insight {
     ///  and its status can be observed with the `callback`.
     fn dismiss_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         insight_id: u64,
 
@@ -59,6 +67,7 @@ pub trait dismiss_insight {
 impl dismiss_insight for super::RemoteReducers {
     fn dismiss_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         insight_id: u64,
 
@@ -68,6 +77,7 @@ impl dismiss_insight for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             DismissInsightArgs {
+                organization_id,
                 company_id,
                 insight_id,
             },

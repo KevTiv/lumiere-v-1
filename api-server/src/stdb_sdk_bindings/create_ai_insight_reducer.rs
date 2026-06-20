@@ -9,6 +9,7 @@ use super::create_ai_insight_params_type::CreateAiInsightParams;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateAiInsightArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub params: CreateAiInsightParams,
 }
@@ -16,6 +17,7 @@ pub(super) struct CreateAiInsightArgs {
 impl From<CreateAiInsightArgs> for super::Reducer {
     fn from(args: CreateAiInsightArgs) -> Self {
         Self::CreateAiInsight {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             params: args.params,
         }
@@ -39,10 +41,11 @@ pub trait create_ai_insight {
     /// /// Use [`create_ai_insight:create_ai_insight_then`] to run a callback after the reducer completes.
     fn create_ai_insight(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateAiInsightParams,
     ) -> __sdk::Result<()> {
-        self.create_ai_insight_then(company_id, params, |_, _| {})
+        self.create_ai_insight_then(organization_id, company_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_ai_insight` to run as soon as possible,
@@ -53,6 +56,7 @@ pub trait create_ai_insight {
     ///  and its status can be observed with the `callback`.
     fn create_ai_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateAiInsightParams,
 
@@ -65,6 +69,7 @@ pub trait create_ai_insight {
 impl create_ai_insight for super::RemoteReducers {
     fn create_ai_insight_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         params: CreateAiInsightParams,
 
@@ -72,7 +77,13 @@ impl create_ai_insight for super::RemoteReducers {
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(CreateAiInsightArgs { company_id, params }, callback)
+        self.imp.invoke_reducer_with_callback(
+            CreateAiInsightArgs {
+                organization_id,
+                company_id,
+                params,
+            },
+            callback,
+        )
     }
 }

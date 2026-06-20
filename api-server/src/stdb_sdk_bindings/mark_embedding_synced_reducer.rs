@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct MarkEmbeddingSyncedArgs {
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub embedding_id: u64,
     pub model: String,
@@ -16,6 +17,7 @@ pub(super) struct MarkEmbeddingSyncedArgs {
 impl From<MarkEmbeddingSyncedArgs> for super::Reducer {
     fn from(args: MarkEmbeddingSyncedArgs) -> Self {
         Self::MarkEmbeddingSynced {
+            organization_id: args.organization_id,
             company_id: args.company_id,
             embedding_id: args.embedding_id,
             model: args.model,
@@ -41,12 +43,20 @@ pub trait mark_embedding_synced {
     /// /// Use [`mark_embedding_synced:mark_embedding_synced_then`] to run a callback after the reducer completes.
     fn mark_embedding_synced(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         embedding_id: u64,
         model: String,
         dim: u32,
     ) -> __sdk::Result<()> {
-        self.mark_embedding_synced_then(company_id, embedding_id, model, dim, |_, _| {})
+        self.mark_embedding_synced_then(
+            organization_id,
+            company_id,
+            embedding_id,
+            model,
+            dim,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `mark_embedding_synced` to run as soon as possible,
@@ -57,6 +67,7 @@ pub trait mark_embedding_synced {
     ///  and its status can be observed with the `callback`.
     fn mark_embedding_synced_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         embedding_id: u64,
         model: String,
@@ -71,6 +82,7 @@ pub trait mark_embedding_synced {
 impl mark_embedding_synced for super::RemoteReducers {
     fn mark_embedding_synced_then(
         &self,
+        organization_id: u64,
         company_id: Option<u64>,
         embedding_id: u64,
         model: String,
@@ -82,6 +94,7 @@ impl mark_embedding_synced for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             MarkEmbeddingSyncedArgs {
+                organization_id,
                 company_id,
                 embedding_id,
                 model,

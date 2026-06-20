@@ -4,6 +4,7 @@
 // This was generated using spacetimedb cli version 2.0.1 (commit a4d29daec8ed35ce4913a335b7210b9ae3933d00).
 
 /* eslint-disable */
+/* tslint:disable */
 import {
   DbConnectionBuilder as __DbConnectionBuilder,
   DbConnectionImpl as __DbConnectionImpl,
@@ -528,6 +529,11 @@ import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
+import RunAllAccountingTestsReducer from "./run_all_accounting_tests_reducer";
+import RunAllCrmTestsReducer from "./run_all_crm_tests_reducer";
+import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
+import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
+import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
@@ -638,6 +644,7 @@ import UpdateLeadDetailsReducer from "./update_lead_details_reducer";
 import UpdateLeadRevenueReducer from "./update_lead_revenue_reducer";
 import UpdateLeaveTypeReducer from "./update_leave_type_reducer";
 import UpdateMetricValuesReducer from "./update_metric_values_reducer";
+import UpdateOpportunityReducer from "./update_opportunity_reducer";
 import UpdateOrgMemberDetailsReducer from "./update_org_member_details_reducer";
 import UpdateOrgMemberRoleReducer from "./update_org_member_role_reducer";
 import UpdateOrganizationReducer from "./update_organization_reducer";
@@ -5720,6 +5727,11 @@ const reducersSchema = __reducers(
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
+  __reducerSchema("run_all_accounting_tests", RunAllAccountingTestsReducer),
+  __reducerSchema("run_all_crm_tests", RunAllCrmTestsReducer),
+  __reducerSchema("run_all_domain_tests", RunAllDomainTestsReducer),
+  __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
+  __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
@@ -5830,6 +5842,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_lead_revenue", UpdateLeadRevenueReducer),
   __reducerSchema("update_leave_type", UpdateLeaveTypeReducer),
   __reducerSchema("update_metric_values", UpdateMetricValuesReducer),
+  __reducerSchema("update_opportunity", UpdateOpportunityReducer),
   __reducerSchema("update_org_member_details", UpdateOrgMemberDetailsReducer),
   __reducerSchema("update_org_member_role", UpdateOrgMemberRoleReducer),
   __reducerSchema("update_organization", UpdateOrganizationReducer),

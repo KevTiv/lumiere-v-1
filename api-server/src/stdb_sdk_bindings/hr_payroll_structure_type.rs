@@ -2,7 +2,13 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -15,9 +21,11 @@ pub struct HrPayrollStructure {
     pub created_at: __sdk::Timestamp,
 }
 
+
 impl __sdk::InModule for HrPayrollStructure {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `HrPayrollStructure`.
 ///
@@ -41,6 +49,7 @@ impl __sdk::__query_builder::HasCols for HrPayrollStructure {
             r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             is_active: __sdk::__query_builder::Col::new(table_name, "is_active"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+
         }
     }
 }
@@ -59,8 +68,10 @@ impl __sdk::__query_builder::HasIxCols for HrPayrollStructure {
         HrPayrollStructureIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for HrPayrollStructure {}
+
