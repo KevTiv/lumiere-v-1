@@ -11338,6 +11338,26 @@ export const UpsertAiSkillConfigParams = __t.object("UpsertAiSkillConfigParams",
 });
 export type UpsertAiSkillConfigParams = __Infer<typeof UpsertAiSkillConfigParams>;
 
+export const UpsertAiSkillParams = __t.object("UpsertAiSkillParams", {
+  skillKey: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  category: __t.string(),
+  promptTemplate: __t.string(),
+  requiredTools: __t.array(__t.string()),
+  optionalTools: __t.array(__t.string()),
+  defaultMaxSteps: __t.u32(),
+  defaultMaxToolCalls: __t.u32(),
+  outputSchema: __t.option(__t.string()),
+  configSchema: __t.option(__t.string()),
+  datasetSpecs: __t.option(__t.string()),
+  allowedActionDrafts: __t.array(__t.string()),
+  isActive: __t.bool(),
+  isSystem: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertAiSkillParams = __Infer<typeof UpsertAiSkillParams>;
+
 export const UpsertOrganizationSettingsParams = __t.object("UpsertOrganizationSettingsParams", {
   moduleConfig: __t.option(__t.string()),
   featureFlags: __t.array(__t.string()),

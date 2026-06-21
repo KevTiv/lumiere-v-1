@@ -622,6 +622,7 @@ pub mod update_whats_app_verification_params_type;
 pub mod update_widget_layout_params_type;
 pub mod update_workcenter_params_type;
 pub mod upsert_ai_skill_config_params_type;
+pub mod upsert_ai_skill_params_type;
 pub mod upsert_organization_settings_params_type;
 pub mod upsert_search_embedding_params_type;
 pub mod user_credential_type;
@@ -1325,6 +1326,7 @@ pub mod update_whatsapp_quality_score_reducer;
 pub mod update_whatsapp_verification_status_reducer;
 pub mod update_widget_layout_reducer;
 pub mod update_workcenter_reducer;
+pub mod upsert_ai_skill_reducer;
 pub mod upsert_ai_skill_config_reducer;
 pub mod upsert_organization_settings_reducer;
 pub mod upsert_proposal_section_reducer;
@@ -2189,6 +2191,7 @@ pub use update_whats_app_verification_params_type::UpdateWhatsAppVerificationPar
 pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
 pub use update_workcenter_params_type::UpdateWorkcenterParams;
 pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
+pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 pub use user_credential_type::UserCredential;
@@ -3131,6 +3134,7 @@ pub use update_whatsapp_quality_score_reducer::update_whatsapp_quality_score;
 pub use update_whatsapp_verification_status_reducer::update_whatsapp_verification_status;
 pub use update_widget_layout_reducer::update_widget_layout;
 pub use update_workcenter_reducer::update_workcenter;
+pub use upsert_ai_skill_reducer::upsert_ai_skill;
 pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
 pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
@@ -6328,6 +6332,10 @@ pub enum Reducer {
         workcenter_id: u64,
         params: UpdateWorkcenterParams,
 }    ,
+    UpsertAiSkill {
+        organization_id: u64,
+        params: UpsertAiSkillParams,
+}    ,
     UpsertAiSkillConfig {
         organization_id: u64,
         params: UpsertAiSkillConfigParams,
@@ -7077,6 +7085,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateWhatsappVerificationStatus { .. } => "update_whatsapp_verification_status",
             Reducer::UpdateWidgetLayout { .. } => "update_widget_layout",
             Reducer::UpdateWorkcenter { .. } => "update_workcenter",
+            Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
             Reducer::UpsertAiSkillConfig { .. } => "upsert_ai_skill_config",
             Reducer::UpsertOrganizationSettings { .. } => "upsert_organization_settings",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
@@ -12781,6 +12790,13 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_workcenter_reducer::UpdateWorkcenterArgs {
                 organization_id: organization_id.clone(),
                 workcenter_id: workcenter_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpsertAiSkill{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_ai_skill_reducer::UpsertAiSkillArgs {
+                organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpsertAiSkillConfig{

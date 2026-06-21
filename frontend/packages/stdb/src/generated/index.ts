@@ -707,6 +707,7 @@ import UpdateWhatsappQualityScoreReducer from "./update_whatsapp_quality_score_r
 import UpdateWhatsappVerificationStatusReducer from "./update_whatsapp_verification_status_reducer";
 import UpdateWidgetLayoutReducer from "./update_widget_layout_reducer";
 import UpdateWorkcenterReducer from "./update_workcenter_reducer";
+import UpsertAiSkillReducer from "./upsert_ai_skill_reducer";
 import UpsertAiSkillConfigReducer from "./upsert_ai_skill_config_reducer";
 import UpsertOrganizationSettingsReducer from "./upsert_organization_settings_reducer";
 import UpsertProposalSectionReducer from "./upsert_proposal_section_reducer";
@@ -5905,6 +5906,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_whatsapp_verification_status", UpdateWhatsappVerificationStatusReducer),
   __reducerSchema("update_widget_layout", UpdateWidgetLayoutReducer),
   __reducerSchema("update_workcenter", UpdateWorkcenterReducer),
+  __reducerSchema("upsert_ai_skill", UpsertAiSkillReducer),
   __reducerSchema("upsert_ai_skill_config", UpsertAiSkillConfigReducer),
   __reducerSchema("upsert_organization_settings", UpsertOrganizationSettingsReducer),
   __reducerSchema("upsert_proposal_section", UpsertProposalSectionReducer),

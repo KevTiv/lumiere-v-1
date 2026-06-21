@@ -679,6 +679,7 @@ import UpdateWhatsappQualityScoreReducer from "../update_whatsapp_quality_score_
 import UpdateWhatsappVerificationStatusReducer from "../update_whatsapp_verification_status_reducer";
 import UpdateWidgetLayoutReducer from "../update_widget_layout_reducer";
 import UpdateWorkcenterReducer from "../update_workcenter_reducer";
+import UpsertAiSkillReducer from "../upsert_ai_skill_reducer";
 import UpsertAiSkillConfigReducer from "../upsert_ai_skill_config_reducer";
 import UpsertOrganizationSettingsReducer from "../upsert_organization_settings_reducer";
 import UpsertProposalSectionReducer from "../upsert_proposal_section_reducer";
@@ -1366,6 +1367,7 @@ export type UpdateWhatsappQualityScoreParams = __Infer<typeof UpdateWhatsappQual
 export type UpdateWhatsappVerificationStatusParams = __Infer<typeof UpdateWhatsappVerificationStatusReducer>;
 export type UpdateWidgetLayoutParams = __Infer<typeof UpdateWidgetLayoutReducer>;
 export type UpdateWorkcenterParams = __Infer<typeof UpdateWorkcenterReducer>;
+export type UpsertAiSkillParams = __Infer<typeof UpsertAiSkillReducer>;
 export type UpsertAiSkillConfigParams = __Infer<typeof UpsertAiSkillConfigReducer>;
 export type UpsertOrganizationSettingsParams = __Infer<typeof UpsertOrganizationSettingsReducer>;
 export type UpsertProposalSectionParams = __Infer<typeof UpsertProposalSectionReducer>;
