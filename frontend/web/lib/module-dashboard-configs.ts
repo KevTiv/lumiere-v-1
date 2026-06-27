@@ -1671,7 +1671,7 @@ export const overviewDashboard = (t: TFunction): DashboardConfig => ({
             columns: 6,
             actions: [
               { id: "sales", label: t("overview.dashboard.actions.sales"), icon: "trending", color: "blue" },
-              { id: "accounting", label: t("overview.dashboard.actions.accounting"), icon: "dollar", color: "indigo" },
+              { id: "accounting", label: t("overview.dashboard.actions.accounting"), icon: "dollar", color: "red" },
               { id: "crm", label: t("overview.dashboard.actions.crm"), icon: "users", color: "orange" },
               { id: "inventory", label: t("overview.dashboard.actions.inventory"), icon: "package", color: "green" },
               { id: "ai_drafts", label: t("overview.dashboard.actions.aiDrafts"), icon: "bell", color: "purple" },

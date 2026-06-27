@@ -1263,11 +1263,7 @@ function SalesClientLoaded({
             }
             try {
               const text = await file.text();
-              if (csvKind === 'order') {
-                await importSaleOrderCsv.mutateAsync(text);
-              } else {
-                await importSaleOrderLineCsv.mutateAsync(text);
-              }
+              await importSaleOrderLineCsv.mutateAsync(text);
               setCsvKind(null);
             } catch (e) {
               setCsvError(e instanceof Error ? e.message : String(e));

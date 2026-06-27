@@ -31,8 +31,9 @@ export async function POST(request: NextRequest) {
   let headers = Array.isArray(body.headers)
     ? body.headers.filter((value): value is string => typeof value === 'string').slice(0, 200)
     : []
-  let sampleRows = Array.isArray(body.sampleRows ?? body.sample_rows)
-    ? (body.sampleRows ?? body.sample_rows as unknown[])
+  const rawSampleRows = body.sampleRows ?? body.sample_rows
+  let sampleRows = Array.isArray(rawSampleRows)
+    ? rawSampleRows
         .filter((row): row is unknown[] => Array.isArray(row))
         .slice(0, 50)
         .map((row) => row.filter((cell): cell is string => typeof cell === 'string'))

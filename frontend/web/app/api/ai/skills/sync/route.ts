@@ -4,7 +4,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
 import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
-import { requireAiRouteContext } from '../_lib/route-helpers'
+import { requireAiRouteContext } from '../../_lib/route-helpers'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
