@@ -2,9 +2,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::journal_entries::{
-    account_move, account_move_line, create_account_move, post_account_move,
-    reconcile_payment_with_invoice, AccountMoveLine, AddAccountMoveLineParams,
-    CreateAccountMoveParams,
+    account_move, create_account_move, post_account_move, reconcile_payment_with_invoice,
+    AddAccountMoveLineParams, CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
     account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
@@ -333,21 +332,6 @@ fn add_payment_move_lines(
     )?;
 
     patch_receivable_line_type(ctx, move_id, ar_account_id)?;
-
-    // Ensure residual reflects open amount on the credit AR line.
-    if let Some(line) = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_id)
-        .find(|l| l.account_id == ar_account_id)
-    {
-        ctx.db.account_move_line().id().update(AccountMoveLine {
-            amount_residual: (line.credit - line.debit).abs(),
-            amount_residual_currency: (line.credit - line.debit).abs(),
-            ..line
-        });
-    }
 
     Ok(())
 }

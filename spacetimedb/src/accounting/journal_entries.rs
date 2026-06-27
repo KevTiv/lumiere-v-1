@@ -733,6 +733,47 @@ pub fn compute_invoice_totals(
     Ok(())
 }
 
+/// Mark all lines on a draft move as posted, re-loading each row by primary key so
+/// stale index snapshots cannot trigger WASM update panics.
+fn mark_move_lines_posted(
+    ctx: &ReducerContext,
+    move_id: u64,
+    name: &str,
+) -> Result<(), String> {
+    let line_ids: Vec<u64> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .map(|l| l.id)
+        .collect();
+
+    if line_ids.is_empty() {
+        return Err("Cannot post a move without lines".to_string());
+    }
+
+    for line_id in line_ids {
+        if line_id == 0 {
+            return Err("Encountered move line with invalid id 0".to_string());
+        }
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&line_id)
+            .ok_or_else(|| format!("Move line {line_id} not found before post"))?;
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            move_name: Some(name.to_string()),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..line
+        });
+    }
+
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn post_invoice(
     ctx: &ReducerContext,
@@ -788,15 +829,7 @@ pub fn post_invoice(
         move_record.name.clone()
     };
 
-    for line in lines {
-        ctx.db.account_move_line().id().update(AccountMoveLine {
-            parent_state: AccountMoveState::Posted,
-            move_name: Some(name.clone()),
-            write_uid: Some(ctx.sender()),
-            write_date: Some(ctx.timestamp),
-            ..line
-        });
-    }
+    mark_move_lines_posted(ctx, move_id, &name)?;
 
     let refreshed = ctx
         .db
@@ -1139,16 +1172,17 @@ pub fn post_account_move(
         move_record.name.clone()
     };
 
-    // Update all lines to posted state
-    for line in lines {
-        ctx.db.account_move_line().id().update(AccountMoveLine {
-            parent_state: AccountMoveState::Posted,
-            move_name: Some(name.clone()),
-            ..line
-        });
-    }
+    // Update all lines to posted state (re-fetch each row by id — avoid stale snapshots).
+    mark_move_lines_posted(ctx, move_id, &name)?;
 
     // Update move to posted
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("Move not found before state update")?;
+
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
         name,

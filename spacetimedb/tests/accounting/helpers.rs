@@ -243,8 +243,8 @@ pub fn patch_receivable_line_type(
 
     ctx.db.account_move_line().id().update(AccountMoveLine {
         account_internal_type: Some("receivable".to_string()),
-        amount_residual: line.debit - line.credit,
-        amount_residual_currency: line.debit - line.credit,
+        amount_residual: (line.credit - line.debit).abs(),
+        amount_residual_currency: (line.credit - line.debit).abs(),
         ..line
     });
 
