@@ -266,6 +266,7 @@ import CreateRoleReducer from "./create_role_reducer";
 import CreateRoutingWorkcenterReducer from "./create_routing_workcenter_reducer";
 import CreateSalaryRuleReducer from "./create_salary_rule_reducer";
 import CreateSaleOrderReducer from "./create_sale_order_reducer";
+import CreateSaleOrderLineReducer from "./create_sale_order_line_reducer";
 import CreateScheduledReportReducer from "./create_scheduled_report_reducer";
 import CreateShippingMethodReducer from "./create_shipping_method_reducer";
 import CreateStockInventoryReducer from "./create_stock_inventory_reducer";
@@ -532,6 +533,7 @@ import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import RunAllAccountingTestsReducer from "./run_all_accounting_tests_reducer";
+import RunAllCoreTestsReducer from "./run_all_core_tests_reducer";
 import RunAllCrmTestsReducer from "./run_all_crm_tests_reducer";
 import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
@@ -576,7 +578,37 @@ import SubmitPurchaseRequisitionReducer from "./submit_purchase_requisition_redu
 import SubmitSupplierIntakeReducer from "./submit_supplier_intake_reducer";
 import SubscribeToRecordReducer from "./subscribe_to_record_reducer";
 import SyncHubDevicesReducer from "./sync_hub_devices_reducer";
+import TestAuditAuthorizationReducer from "./test_audit_authorization_reducer";
+import TestAuditLogDataIntegrityReducer from "./test_audit_log_data_integrity_reducer";
+import TestAuditLoggingReducer from "./test_audit_logging_reducer";
+import TestAuditRuleEdgeCasesReducer from "./test_audit_rule_edge_cases_reducer";
+import TestCasbinRulePatternsReducer from "./test_casbin_rule_patterns_reducer";
+import TestClassificationLevelValidationReducer from "./test_classification_level_validation_reducer";
+import TestClassificationRuleEdgeCasesReducer from "./test_classification_rule_edge_cases_reducer";
+import TestCountryDataIntegrityReducer from "./test_country_data_integrity_reducer";
+import TestCurrencyDataIntegrityReducer from "./test_currency_data_integrity_reducer";
+import TestCurrencyRateEdgeCasesReducer from "./test_currency_rate_edge_cases_reducer";
+import TestDataProtectionSettingsReducer from "./test_data_protection_settings_reducer";
 import TestIotDeviceReducer from "./test_iot_device_reducer";
+import TestOnboardingRbacMembershipFlowsReducer from "./test_onboarding_rbac_membership_flows_reducer";
+import TestOrganizationIsolationReducer from "./test_organization_isolation_reducer";
+import TestOrganizationLifecycleReducer from "./test_organization_lifecycle_reducer";
+import TestOrganizationSettingsEdgeCasesReducer from "./test_organization_settings_edge_cases_reducer";
+import TestPermissionSystemReducer from "./test_permission_system_reducer";
+import TestPermissionsErrorCasesReducer from "./test_permissions_error_cases_reducer";
+import TestPrivacyConsentEdgeCasesReducer from "./test_privacy_consent_edge_cases_reducer";
+import TestPrivacySystemReducer from "./test_privacy_system_reducer";
+import TestQueueJobEdgeCasesReducer from "./test_queue_job_edge_cases_reducer";
+import TestQueueSystemReducer from "./test_queue_system_reducer";
+import TestReferenceDataReducer from "./test_reference_data_reducer";
+import TestRoleHierarchyReducer from "./test_role_hierarchy_reducer";
+import TestRoleUpdateEdgeCasesReducer from "./test_role_update_edge_cases_reducer";
+import TestUomEdgeCasesReducer from "./test_uom_edge_cases_reducer";
+import TestUserManagementReducer from "./test_user_management_reducer";
+import TestUserOrganizationMembershipReducer from "./test_user_organization_membership_reducer";
+import TestUserProfileEdgeCasesReducer from "./test_user_profile_edge_cases_reducer";
+import TestUserSessionEdgeCasesReducer from "./test_user_session_edge_cases_reducer";
+import TestWorkerEdgeCasesReducer from "./test_worker_edge_cases_reducer";
 import ToggleProjectFavoriteReducer from "./toggle_project_favorite_reducer";
 import UnassignTeamMemberSkillReducer from "./unassign_team_member_skill_reducer";
 import UnblockWorkcenterReducer from "./unblock_workcenter_reducer";
@@ -5484,6 +5516,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_routing_workcenter", CreateRoutingWorkcenterReducer),
   __reducerSchema("create_salary_rule", CreateSalaryRuleReducer),
   __reducerSchema("create_sale_order", CreateSaleOrderReducer),
+  __reducerSchema("create_sale_order_line", CreateSaleOrderLineReducer),
   __reducerSchema("create_scheduled_report", CreateScheduledReportReducer),
   __reducerSchema("create_shipping_method", CreateShippingMethodReducer),
   __reducerSchema("create_stock_inventory", CreateStockInventoryReducer),
@@ -5750,6 +5783,7 @@ const reducersSchema = __reducers(
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("run_all_accounting_tests", RunAllAccountingTestsReducer),
+  __reducerSchema("run_all_core_tests", RunAllCoreTestsReducer),
   __reducerSchema("run_all_crm_tests", RunAllCrmTestsReducer),
   __reducerSchema("run_all_domain_tests", RunAllDomainTestsReducer),
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
@@ -5794,7 +5828,37 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_supplier_intake", SubmitSupplierIntakeReducer),
   __reducerSchema("subscribe_to_record", SubscribeToRecordReducer),
   __reducerSchema("sync_hub_devices", SyncHubDevicesReducer),
+  __reducerSchema("test_audit_authorization", TestAuditAuthorizationReducer),
+  __reducerSchema("test_audit_log_data_integrity", TestAuditLogDataIntegrityReducer),
+  __reducerSchema("test_audit_logging", TestAuditLoggingReducer),
+  __reducerSchema("test_audit_rule_edge_cases", TestAuditRuleEdgeCasesReducer),
+  __reducerSchema("test_casbin_rule_patterns", TestCasbinRulePatternsReducer),
+  __reducerSchema("test_classification_level_validation", TestClassificationLevelValidationReducer),
+  __reducerSchema("test_classification_rule_edge_cases", TestClassificationRuleEdgeCasesReducer),
+  __reducerSchema("test_country_data_integrity", TestCountryDataIntegrityReducer),
+  __reducerSchema("test_currency_data_integrity", TestCurrencyDataIntegrityReducer),
+  __reducerSchema("test_currency_rate_edge_cases", TestCurrencyRateEdgeCasesReducer),
+  __reducerSchema("test_data_protection_settings", TestDataProtectionSettingsReducer),
   __reducerSchema("test_iot_device", TestIotDeviceReducer),
+  __reducerSchema("test_onboarding_rbac_membership_flows", TestOnboardingRbacMembershipFlowsReducer),
+  __reducerSchema("test_organization_isolation", TestOrganizationIsolationReducer),
+  __reducerSchema("test_organization_lifecycle", TestOrganizationLifecycleReducer),
+  __reducerSchema("test_organization_settings_edge_cases", TestOrganizationSettingsEdgeCasesReducer),
+  __reducerSchema("test_permission_system", TestPermissionSystemReducer),
+  __reducerSchema("test_permissions_error_cases", TestPermissionsErrorCasesReducer),
+  __reducerSchema("test_privacy_consent_edge_cases", TestPrivacyConsentEdgeCasesReducer),
+  __reducerSchema("test_privacy_system", TestPrivacySystemReducer),
+  __reducerSchema("test_queue_job_edge_cases", TestQueueJobEdgeCasesReducer),
+  __reducerSchema("test_queue_system", TestQueueSystemReducer),
+  __reducerSchema("test_reference_data", TestReferenceDataReducer),
+  __reducerSchema("test_role_hierarchy", TestRoleHierarchyReducer),
+  __reducerSchema("test_role_update_edge_cases", TestRoleUpdateEdgeCasesReducer),
+  __reducerSchema("test_uom_edge_cases", TestUomEdgeCasesReducer),
+  __reducerSchema("test_user_management", TestUserManagementReducer),
+  __reducerSchema("test_user_organization_membership", TestUserOrganizationMembershipReducer),
+  __reducerSchema("test_user_profile_edge_cases", TestUserProfileEdgeCasesReducer),
+  __reducerSchema("test_user_session_edge_cases", TestUserSessionEdgeCasesReducer),
+  __reducerSchema("test_worker_edge_cases", TestWorkerEdgeCasesReducer),
   __reducerSchema("toggle_project_favorite", ToggleProjectFavoriteReducer),
   __reducerSchema("unassign_team_member_skill", UnassignTeamMemberSkillReducer),
   __reducerSchema("unblock_workcenter", UnblockWorkcenterReducer),
