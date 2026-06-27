@@ -128,14 +128,14 @@ impl OrgFixture {
             },
         )?;
 
-        let company_name = format!("Test Company {suffix}");
-        let company = ctx
+        let company_id = ctx
             .db
             .company()
-            .iter()
-            .find(|c| c.organization_id == organization_id && c.name == company_name)
+            .company_by_org()
+            .filter(&organization_id)
+            .map(|c| c.id)
+            .max()
             .ok_or("Harness: company not found after create")?;
-        let company_id = company.id;
 
         let year_start = ctx.timestamp - Duration::from_secs(180 * 86400);
         let year_end = ctx.timestamp + Duration::from_secs(180 * 86400);
@@ -297,7 +297,8 @@ impl OrgFixture {
         let uom_category_id = ctx
             .db
             .uom_cat()
-            .iter()
+            .uom_cat_by_org()
+            .filter(&organization_id)
             .find(|c| c.name == format!("Units-{suffix}"))
             .map(|c| c.id)
             .ok_or("Harness: UOM category not found")?;
@@ -340,7 +341,9 @@ impl OrgFixture {
             .db
             .product_category()
             .iter()
-            .find(|c| c.name == format!("Harness Goods {suffix}"))
+            .find(|c| {
+                c.organization_id == organization_id && c.name == format!("Harness Goods {suffix}")
+            })
             .map(|c| c.id)
             .ok_or("Harness: product category not found")?;
 
@@ -402,7 +405,8 @@ impl OrgFixture {
         let product_id = ctx
             .db
             .product()
-            .iter()
+            .product_by_org()
+            .filter(&organization_id)
             .find(|p| p.default_code == Some(format!("HP-{suffix}")))
             .map(|p| p.id)
             .ok_or("Harness: product not found")?;
@@ -454,7 +458,8 @@ impl OrgFixture {
         let partner_id = ctx
             .db
             .contact()
-            .iter()
+            .contact_by_org()
+            .filter(&organization_id)
             .find(|c| c.email == Some(format!("customer-{suffix}@harness.test")))
             .map(|c| c.id)
             .ok_or("Harness: partner contact not found")?;

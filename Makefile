@@ -17,6 +17,18 @@ DB         := $(STDB_MODULE)
 DB_CLOUD   := $(STDB_CLOUD_MODULE)
 MODULE     := ./spacetimedb
 LOCAL      := $(STDB_HOST)
+# One reducer per domain test case — avoids WASM limits and yields clearer CI errors.
+E2E_DOMAIN_TEST_REDUCERS := \
+	run_accounting_post_invoice_test \
+	run_accounting_payment_reconcile_test \
+	run_accounting_payment_cancel_test \
+	run_inventory_product_category_test \
+	run_inventory_stock_inventory_test \
+	run_inventory_adjustment_test \
+	run_inventory_stock_quant_test \
+	run_sales_order_invoice_test \
+	run_sales_order_delivery_test \
+	run_crm_opportunity_convert_test
 
 .PHONY: help setup check check-env check-env-prod build \
         start stop \
@@ -148,11 +160,12 @@ e2e-smoke-setup:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
-		echo "[e2e] Running domain test suites (one reducer per domain)..."; \
-		for _domain_reducer in run_all_accounting_tests run_all_inventory_tests run_all_sales_tests run_all_crm_tests; do \
+		echo "[e2e] Running domain test reducers (one case per call)..."; \
+		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
 			echo "[e2e] Calling $$_domain_reducer..."; \
 			if ! spacetime call "$(DB)" "$$_domain_reducer" --server local; then \
-				echo "[e2e] $$_domain_reducer failed — fix domain suites before MVP gate."; \
+				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+				spacetime logs "$(DB)" --server local 2>/dev/null | tail -40 || true; \
 				exit 1; \
 			fi; \
 		done; \
@@ -380,11 +393,12 @@ e2e-smoke:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
-		echo "[e2e] Running domain test suites (one reducer per domain)..."; \
-		for _domain_reducer in run_all_accounting_tests run_all_inventory_tests run_all_sales_tests run_all_crm_tests; do \
+		echo "[e2e] Running domain test reducers (one case per call)..."; \
+		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
 			echo "[e2e] Calling $$_domain_reducer..."; \
 			if ! spacetime call "$(DB)" "$$_domain_reducer" --server local; then \
-				echo "[e2e] $$_domain_reducer failed — fix domain suites before MVP gate."; \
+				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+				spacetime logs "$(DB)" --server local 2>/dev/null | tail -40 || true; \
 				exit 1; \
 			fi; \
 		done; \

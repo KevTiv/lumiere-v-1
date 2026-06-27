@@ -71,7 +71,10 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .account_move()
         .iter()
-        .find(|m| m.ref_ == Some("Harness payment entry".to_string()))
+        .find(|m| {
+            m.organization_id == org_id
+                && m.ref_ == Some("Harness payment entry".to_string())
+        })
         .map(|m| m.id)
         .ok_or("Payment move not found after create")?;
 
@@ -108,7 +111,9 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .account_payment()
         .iter()
-        .find(|p| p.organization_id == org_id && p.ref_ == Some("Harness payment".to_string()))
+        .find(|p| {
+            p.organization_id == org_id && p.ref_ == Some("Harness payment".to_string())
+        })
         .map(|p| p.id)
         .ok_or("Payment record not found after create")?;
 

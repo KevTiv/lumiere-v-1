@@ -103,6 +103,8 @@ pub mod crm_tests;
 #[path = "../tests/core/tests/mod.rs"]
 pub mod core_tests;
 
+use crate::core::reference::currency;
+use crate::core::reference::Currency;
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 use crate::proposals::proposals::proposal_presence;
 
@@ -125,7 +127,21 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
 /// Called once when the module is first published.
 /// Use this to seed system roles, default currencies, etc.
 #[spacetimedb::reducer(init)]
-pub fn init(_ctx: &ReducerContext) {
+pub fn init(ctx: &ReducerContext) {
+    // Legacy company.currency_id and harness fixtures expect USD (id 1) on fresh databases.
+    if ctx.db.currency().code().find(&"USD".to_string()).is_none() {
+        ctx.db.currency().insert(Currency {
+            code: "USD".to_string(),
+            name: "US Dollar".to_string(),
+            symbol: "$".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "before".to_string(),
+            created_at: ctx.timestamp,
+            metadata: Some(r#"{"seed":"init"}"#.to_string()),
+        });
+    }
     log::info!("Lumiere ERP module initialised");
 }
 

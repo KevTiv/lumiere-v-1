@@ -9,15 +9,27 @@ use spacetimedb::ReducerContext;
 /// `spacetime call <db> run_all_accounting_tests`
 #[spacetimedb::reducer]
 pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
-    journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
-        .map_err(|e| format!("post_customer_invoice: {e}"))?;
-
-    payments_test::test_payment_reconciles_invoice(ctx)
-        .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
-
-    payments_test::test_cancel_payment_audited(ctx)
-        .map_err(|e| format!("cancel_payment_audited: {e}"))?;
-
+    run_accounting_post_invoice_test(ctx)?;
+    run_accounting_payment_reconcile_test(ctx)?;
+    run_accounting_payment_cancel_test(ctx)?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
+    journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
+        .map_err(|e| format!("post_customer_invoice: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
+    payments_test::test_payment_reconciles_invoice(ctx)
+        .map_err(|e| format!("payment_reconciles_invoice: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_payment_cancel_test(ctx: &ReducerContext) -> Result<(), String> {
+    payments_test::test_cancel_payment_audited(ctx)
+        .map_err(|e| format!("cancel_payment_audited: {e}"))
 }
