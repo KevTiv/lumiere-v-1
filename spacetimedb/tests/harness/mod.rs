@@ -38,7 +38,7 @@ use crate::accounting::fiscal_periods::{
     account_fiscal_year, create_fiscal_year, CreateFiscalYearParams,
 };
 use crate::core::organization::{
-    company, create_company, create_organization, organization, CreateCompanyParams,
+    company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
     CreateOrganizationParams,
 };
 use crate::core::reference::{
@@ -85,7 +85,9 @@ impl OrgFixture {
         let org_code = format!("T{suffix}");
         let company_code = format!("C{suffix}");
 
-        create_organization(
+        // Use insert path directly — org `code` is not unique, so find-by-code can return
+        // a prior fixture when suffix values collide inside one reducer invocation.
+        let (org, _owner_role) = insert_organization_with_owner(
             ctx,
             CreateOrganizationParams {
                 name: format!("Test Org {suffix}"),
@@ -103,13 +105,6 @@ impl OrgFixture {
                 metadata: Some(r#"{"harness":"minimal"}"#.to_string()),
             },
         )?;
-
-        let org = ctx
-            .db
-            .organization()
-            .iter()
-            .find(|o| o.code == org_code)
-            .ok_or("Harness: organization not found after create")?;
         let organization_id = org.id;
 
         create_company(
@@ -133,11 +128,12 @@ impl OrgFixture {
             },
         )?;
 
+        let company_name = format!("Test Company {suffix}");
         let company = ctx
             .db
             .company()
             .iter()
-            .find(|c| c.code == company_code && c.organization_id == organization_id)
+            .find(|c| c.organization_id == organization_id && c.name == company_name)
             .ok_or("Harness: company not found after create")?;
         let company_id = company.id;
 
@@ -562,11 +558,13 @@ fn unique_suffix(ctx: &ReducerContext) -> u64 {
         .as_micros() as u64;
     // Timestamp alone collides when several harness seeds run in one reducer
     // invocation (domain suites). Mix org count + deterministic rng for uniqueness.
+    // Do not truncate with modulo — org codes are not unique and collisions reuse companies.
     let seq = ctx.db.organization().iter().count() as u64;
-    let nonce = ctx.rng().gen::<u32>() as u64;
-    (micros
-        .wrapping_add(seq.wrapping_mul(1_000_003))
-        .wrapping_add(nonce)) % 1_000_000_000
+    let nonce = ctx.rng().gen::<u64>();
+    micros
+        .wrapping_mul(1_000_003)
+        .wrapping_add(seq.wrapping_mul(1_000_033))
+        .wrapping_add(nonce)
 }
 
 fn seed_account_type(

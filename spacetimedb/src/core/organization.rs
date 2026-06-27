@@ -226,7 +226,7 @@ pub struct Company {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 /// Shared insert path for `create_organization` and `bootstrap_new_tenant`.
-fn insert_organization_with_owner(
+pub(crate) fn insert_organization_with_owner(
     ctx: &ReducerContext,
     params: CreateOrganizationParams,
 ) -> Result<(Organization, Role), String> {
