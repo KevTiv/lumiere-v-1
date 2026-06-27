@@ -253,6 +253,17 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
     }
 }
 
+/// Insert a document counter only when missing (domain tests may create JRNL/PAY before seed runs).
+fn ensure_document_sequence(ctx: &ReducerContext, doc_type: &str, next_number: u64) {
+    let key = doc_type.to_string();
+    if ctx.db.document_sequence().doc_type().find(&key).is_none() {
+        ctx.db.document_sequence().insert(DocumentSequence {
+            doc_type: key,
+            next_number,
+        });
+    }
+}
+
 fn seed_system_skill(
     ctx: &ReducerContext,
     skill_key: &str,
@@ -6607,30 +6618,12 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "SO".to_string(),
-        next_number: 1001,
-    });
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "PO".to_string(),
-        next_number: 1001,
-    });
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "INV".to_string(),
-        next_number: 1001,
-    });
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "BILL".to_string(),
-        next_number: 1001,
-    });
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "JRNL".to_string(),
-        next_number: 1001,
-    });
-    ctx.db.document_sequence().insert(DocumentSequence {
-        doc_type: "PAY".to_string(),
-        next_number: 1001,
-    });
+    ensure_document_sequence(ctx, "SO", 1001);
+    ensure_document_sequence(ctx, "PO", 1001);
+    ensure_document_sequence(ctx, "INV", 1001);
+    ensure_document_sequence(ctx, "BILL", 1001);
+    ensure_document_sequence(ctx, "JRNL", 1001);
+    ensure_document_sequence(ctx, "PAY", 1001);
 
     let uom_box = ctx.db.uom().insert(UOM {
         id: 0,
