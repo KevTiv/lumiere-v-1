@@ -7,6 +7,7 @@ pub mod error;
 pub mod openapi;
 pub mod query_exec;
 pub mod realtime;
+pub mod reducer_allowlist;
 pub mod routes;
 pub mod session;
 pub mod state;

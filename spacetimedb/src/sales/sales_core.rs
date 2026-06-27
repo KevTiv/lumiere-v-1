@@ -1071,3 +1071,82 @@ pub fn update_sale_order(
 
     Ok(())
 }
+
+#[reducer]
+pub fn create_sale_order_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    params: CreateSaleOrderLineParams,
+) -> Result<(), String> {
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    match order.state {
+        SaleState::Draft | SaleState::Sent => {}
+        _ => return Err("Only draft or sent orders can receive new lines".to_string()),
+    }
+
+    let line = create_sale_order_line_internal(
+        ctx,
+        order_id,
+        params,
+        order.currency_id,
+        organization_id,
+        order.company_id,
+        order.partner_id,
+    )?;
+
+    let mut order_line = order.order_line.clone();
+    order_line.push(line.id);
+
+    let amount_untaxed = order.amount_untaxed + line.price_subtotal;
+    let amount_tax = order.amount_tax + line.price_tax;
+    let amount_total = amount_untaxed + amount_tax;
+
+    ctx.db.sale_order().id().update(SaleOrder {
+        order_line,
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total - order.amount_paid,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "sale_order_line",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "order_id": order_id,
+                    "product_id": line.product_id,
+                    "quantity": line.product_uom_qty,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "order_id".to_string(),
+                "product_id".to_string(),
+                "quantity".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}

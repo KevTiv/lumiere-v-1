@@ -500,7 +500,7 @@ pub fn convert_lead_to_customer(
             stage_id,
             priority: lead.priority.clone(),
             color: None,
-            partner_id: None,
+            partner_id: contact_id,
             contact_id,
             campaign_id: lead.campaign_id,
             medium_id: lead.medium_id,

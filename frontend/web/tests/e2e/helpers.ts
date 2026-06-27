@@ -197,3 +197,93 @@ export async function installPostHogResetProbe(page: Page) {
     wasReset: () => resetSeen,
   }
 }
+
+/** Click the entity table row whose text includes `text`. Enables selection actions. */
+export async function selectEntityRowByText(page: Page, text: string | RegExp) {
+  const row = page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: text }).first()
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
+  await expect(row).toHaveAttribute("data-state", "selected")
+}
+
+/** First organization id for the authenticated session (dev seed org). */
+export async function fetchSessionOrganizationId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/organizations")
+  if (!res.ok()) {
+    throw new Error(`organizations query failed: ${res.status()}`)
+  }
+  const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
+  const id = json.data?.[0]?.id
+  if (id == null) throw new Error("no organization in session")
+  return Number(id)
+}
+
+/** Authenticated BFF reducer call (same-origin `/api/call`). */
+export async function callReducerBff(
+  page: Page,
+  reducer: string,
+  args: unknown[],
+  options?: { withCompany?: boolean },
+) {
+  const qs = options?.withCompany ? "?withCompany=true" : ""
+  const res = await page.request.post(`/api/call/${reducer}${qs}`, {
+    data: args,
+    headers: { "Content-Type": "application/json" },
+  })
+  if (!res.ok()) {
+    const json = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(json.error ?? `Reducer ${reducer} failed (${res.status()})`)
+  }
+}
+
+/** Resolve seeded product id by display name via BFF query. */
+export async function fetchProductIdByName(page: Page, name: string): Promise<number> {
+  const res = await page.request.get("/api/query/products")
+  if (!res.ok()) throw new Error(`products query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: number | string; name?: string; displayName?: string }> }
+  const row = json.data?.find(
+    (p) => p.name === name || p.displayName === name,
+  )
+  if (row?.id == null) throw new Error(`product not found: ${name}`)
+  return Number(row.id)
+}
+
+/** Lead id whose name or contactName matches (BFF `/api/query/leads`). */
+export async function fetchLeadIdByName(page: Page, name: string): Promise<number> {
+  const res = await page.request.get("/api/query/leads")
+  if (!res.ok()) throw new Error(`leads query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: number | string; name?: string; contactName?: string; state?: string }>
+  }
+  const row = json.data?.find(
+    (l) => l.name === name || l.contactName === name,
+  )
+  if (row?.id == null) throw new Error(`lead not found: ${name}`)
+  return Number(row.id)
+}
+
+/** Draft customer invoice move id for a partner display name. */
+export async function fetchDraftInvoiceMoveIdByPartner(
+  page: Page,
+  partnerName: string,
+): Promise<number> {
+  const res = await page.request.get("/api/query/account-moves")
+  if (!res.ok()) throw new Error(`account-moves query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{
+      id?: number | string
+      state?: string
+      moveType?: string
+      invoicePartnerDisplayName?: string
+      partnerName?: string
+    }>
+  }
+  const row = json.data?.find((m) => {
+    const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
+    const isOutInvoice = (m.moveType ?? "").toLowerCase().includes("out")
+    const isDraft = (m.state ?? "").toLowerCase() === "draft"
+    return isOutInvoice && isDraft && partner.includes(partnerName)
+  })
+  if (row?.id == null) throw new Error(`draft invoice not found for partner: ${partnerName}`)
+  return Number(row.id)
+}

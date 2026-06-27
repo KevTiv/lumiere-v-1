@@ -148,6 +148,12 @@ e2e-smoke-setup:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
+		echo "[e2e] Running domain test suite (run_all_domain_tests)..."; \
+		if ! spacetime call "$(DB)" run_all_domain_tests --server local; then \
+			echo "[e2e] run_all_domain_tests failed — fix domain suites before MVP gate."; \
+			exit 1; \
+		fi; \
+		echo "[e2e] Domain reducer tests passed."; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
@@ -371,6 +377,12 @@ e2e-smoke:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
+		echo "[e2e] Running domain test suite (run_all_domain_tests)..."; \
+		if ! spacetime call "$(DB)" run_all_domain_tests --server local; then \
+			echo "[e2e] run_all_domain_tests failed — fix domain suites before MVP gate."; \
+			exit 1; \
+		fi; \
+		echo "[e2e] Domain reducer tests passed."; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \

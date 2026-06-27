@@ -23,6 +23,7 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `purchasing-module.spec.ts` | `/purchasing` shell, dashboard/orders/lines/requisitions/vendors/partner-banks tabs, seeded `PO/2024/0001` |
 | `inventory-module.spec.ts` | `/inventory` shell, key stock/product tabs, seeded `Lumiere Dev Laptop` |
 | `sales-invoice-flow.spec.ts` | Seeded `SO/2024/0001` on Sales, linked `INV/2024/00001` on Accounting Invoices, sale-order quick action |
+| `mvp-lead-to-cash.spec.ts` | **MVP golden path** — contact → lead → convert → SO → line (BFF) → confirm → invoice → post (@p0) |
 
 ## Local Setup
 

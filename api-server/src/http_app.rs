@@ -24,6 +24,7 @@ use crate::config::Config;
 use crate::error::ApiError;
 use crate::openapi;
 use crate::query_exec::{default_company_id, execute_resource_query};
+use crate::reducer_allowlist::{blocked_reducer_reason, ReducerAllowlistMode};
 use crate::routes;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
@@ -64,11 +65,15 @@ async fn get_query(
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    let mut org_id = session
+    let org_id = session
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
     if let Some(override_org) = q.organization_id {
-        org_id = override_org;
+        if override_org != org_id {
+            return Err(ApiError::Forbidden(
+                "Cannot query another organization's data".into(),
+            ));
+        }
     }
 
     let client = state.client_with_token(&session.stdb_token);
@@ -104,6 +109,13 @@ async fn post_call(
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
 
+    let allowlist_mode = ReducerAllowlistMode::from_env();
+    if let Some(reason) = blocked_reducer_reason(&reducer, allowlist_mode) {
+        return Err(ApiError::Forbidden(format!(
+            "Reducer '{reducer}' is not allowed: {reason}"
+        )));
+    }
+
     let mut args: Vec<Value> = if let Some(a) = body.as_array() {
         a.clone()
     } else {
@@ -118,6 +130,12 @@ async fn post_call(
         let mut next = vec![json!(org_id), json!(company_id)];
         next.append(&mut args);
         args = next;
+    } else if let Some(requested_org) = args.first().and_then(|v| v.as_u64()) {
+        if requested_org != org_id {
+            return Err(ApiError::Forbidden(
+                "organization scope mismatch for reducer call".into(),
+            ));
+        }
     }
 
     let client = state.client_with_token(&session.stdb_token);

@@ -1,3 +1,5 @@
+> **Deprecated (2026-06):** This document describes the removed `server.js` SpacetimeDB WebSocket proxy. Current architecture: Browser → Next.js `/api/*` BFF → Rust **api-server** → SpacetimeDB HTTP + **api-server realtime WS**. See [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
+
 lumiere-v-1/frontend/web/PHASE0_IMPLEMENTATION.md
 ```
 

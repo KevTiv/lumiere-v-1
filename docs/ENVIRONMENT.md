@@ -11,6 +11,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `NEXT_PUBLIC_STDB_HOST` / `NEXT_PUBLIC_STDB_MODULE` | Browser bundle (inlined at build) | Client-side SDK connection; must match server for the same database. |
 | `STDB_SERVER_TOKEN` | Next server, api-server | JWT for HTTP SQL and admin reducer calls. |
 | `LUMIERE_API_SERVER_URL` | Next `lib/api-server-forward.ts` | Internal base URL of the Rust api-server for Next routes that still perform local side effects before proxying (e.g. `http://api-server:8082`). In development, defaults to `http://127.0.0.1:8082` if unset. |
+| `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
 | `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
 
