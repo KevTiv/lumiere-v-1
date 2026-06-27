@@ -8,6 +8,7 @@ fn domain_test_reducers_are_wasm_linked() {
     // If this test compiles, domain test reducers are linked into the WASM module.
     // Execute after publish: `spacetime call <db> run_all_domain_tests`
     let _ = stringify!(run_all_domain_tests);
+    let _ = stringify!(run_all_core_tests);
     let _ = stringify!(run_all_accounting_tests);
     let _ = stringify!(run_all_inventory_tests);
     let _ = stringify!(run_all_sales_tests);
@@ -15,6 +16,7 @@ fn domain_test_reducers_are_wasm_linked() {
 }
 
 fn run_all_domain_tests() {}
+fn run_all_core_tests() {}
 fn run_all_accounting_tests() {}
 fn run_all_inventory_tests() {}
 fn run_all_sales_tests() {}

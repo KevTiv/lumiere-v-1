@@ -91,7 +91,7 @@ jobs:
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
         run: |
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
-          export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin"
+          export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
           make e2e-smoke
 
       - name: Upload Playwright report

@@ -101,7 +101,7 @@ seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
