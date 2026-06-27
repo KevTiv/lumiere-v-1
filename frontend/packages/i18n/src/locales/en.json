@@ -77,6 +77,57 @@
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
       "submit": "Import",
       "fileLabel": "CSV file"
+    },
+    "importAssistant": {
+      "description": "Upload a CSV, review AI-suggested column mappings, preview transformed rows, then import into ERP.",
+      "stepUpload": "Upload",
+      "stepMap": "Map columns",
+      "stepPreview": "Preview",
+      "uploadHint": "Select a UTF-8 CSV file to begin.",
+      "structureSummary": "{{columns}} columns · {{rows}} data rows detected",
+      "safetyPassed": "CSV passed client-side safety checks",
+      "analyze": "Analyze columns",
+      "analyzing": "Analyzing…",
+      "preview": "Preview import",
+      "previewing": "Previewing…",
+      "confirmImport": "Confirm import",
+      "sourceColumn": "Source column",
+      "targetField": "ERP field",
+      "confidence": "Confidence",
+      "skipColumn": "Skip column",
+      "unmappedTargets": "Required ERP fields still unmapped: {{fields}}",
+      "validationErrors": "{{count}} validation error(s) in preview",
+      "previewClean": "Preview looks good for {{count}} row(s)",
+      "row": "Row",
+      "field": "Field",
+      "message": "Message",
+      "targetEntity": "Target entity",
+      "stepDone": "Import status",
+      "jobPending": "Waiting for import job status…",
+      "jobNotFound": "Import started. Job status will appear here once SpacetimeDB finishes processing.",
+      "jobStatusTitle": "Import job",
+      "jobTotal": "Total rows",
+      "jobImported": "Imported",
+      "jobErrors": "Errors",
+      "downloadErrors": "Download error report (CSV)",
+      "savedTemplateLabel": "Saved mapping template",
+      "savedTemplatePlaceholder": "Choose a saved template (optional)",
+      "noSavedTemplate": "No saved template",
+      "templateUses": "uses",
+      "deleteTemplate": "Delete template",
+      "saveTemplateLabel": "Save this mapping for future imports",
+      "saveTemplatePlaceholder": "Template name",
+      "saveTemplate": "Save template",
+      "savingTemplate": "Saving…",
+      "templateSaved": "Mapping template saved",
+      "templateDeleted": "Mapping template deleted",
+      "bundleModeHint": "This CSV looks like orders with line items. Map header fields first, then line fields.",
+      "lineMappingTitle": "Order line columns",
+      "linePreviewTitle": "Line preview",
+      "bundleActive": "parent + lines",
+      "bundleLinkRequired": "Map an order reference column (client_order_ref) before importing bundled orders.",
+      "retryFailedRows": "Retry {{count}} failed row(s)",
+      "retrySessionHint": "Retrying {{count}} failed row(s) from the previous import."
     }
   },
   "navigation": {
@@ -1019,7 +1070,9 @@
       "taxDeadlines": "Deadlines",
       "payments": "Payments",
       "paymentTerms": "Payment terms",
-      "paymentTermLines": "Term lines"
+      "paymentTermLines": "Term lines",
+      "journals": "Journals",
+      "moveLines": "Move lines"
     },
     "overview": {
       "title": "Accounting",
@@ -1205,9 +1258,41 @@
         "actions": {
           "deleteSelected": "Delete selected",
           "deleteLinesSelected": "Delete selected lines",
+          "editLinesSelected": "Edit line…",
           "addLine": "Add line",
           "deactivateSelected": "Deactivate",
           "activateSelected": "Activate"
+        }
+      },
+      "journals": {
+        "title": "Journals",
+        "description": "Sales, purchase, bank, and general journals",
+        "searchPlaceholder": "Search by code or name…",
+        "emptyMessage": "No journals found.",
+        "columns": {
+          "code": "Code",
+          "name": "Name",
+          "type": "Type",
+          "active": "Active"
+        },
+        "actions": {
+          "editSelected": "Edit…"
+        }
+      },
+      "moveLines": {
+        "title": "Journal entry lines",
+        "description": "Individual debit/credit lines on journal entries",
+        "searchPlaceholder": "Search by label or account…",
+        "emptyMessage": "No move lines found.",
+        "columns": {
+          "moveId": "Entry",
+          "accountId": "Account",
+          "name": "Label",
+          "debit": "Debit",
+          "credit": "Credit"
+        },
+        "actions": {
+          "deleteSelected": "Delete selected"
         }
       },
       "intercompanyRules": {
@@ -1749,6 +1834,55 @@
           "sequence": "Sequence"
         }
       },
+      "editPaymentTermLine": {
+        "title": "Edit installment line",
+        "description": "Update split type, amount, and due offsets.",
+        "submitLabel": "Save line",
+        "sections": {
+          "main": "Line"
+        }
+      },
+      "newAccountJournal": {
+        "title": "New journal",
+        "description": "Create a sales, purchase, bank, or general journal.",
+        "submitLabel": "Create journal",
+        "sections": {
+          "main": "Journal"
+        },
+        "fields": {
+          "name": "Name",
+          "code": "Code",
+          "type": "Type",
+          "typeSale": "Sales",
+          "typePurchase": "Purchase",
+          "typeBank": "Bank",
+          "typeCash": "Cash",
+          "typeGeneral": "General",
+          "active": "Active"
+        }
+      },
+      "editAccountJournal": {
+        "title": "Edit journal",
+        "submitLabel": "Save changes",
+        "sections": {
+          "main": "Journal"
+        }
+      },
+      "addAccountMoveLine": {
+        "title": "Add journal line",
+        "description": "Add a debit or credit line to a draft journal entry.",
+        "submitLabel": "Add line",
+        "sections": {
+          "line": "Line"
+        },
+        "fields": {
+          "moveId": "Journal entry",
+          "accountId": "Account",
+          "name": "Label",
+          "debit": "Debit",
+          "credit": "Credit"
+        }
+      },
       "newCurrencyRate": {
         "title": "New currency rate",
         "description": "Record an exchange rate for this organization.",
@@ -1960,6 +2094,8 @@
       "newPayment": "New payment",
       "newPaymentTerm": "New payment term",
       "newPaymentTermLine": "Add installment line",
+      "newJournal": "New journal",
+      "addMoveLine": "Add line",
       "newReconciliationWidget": "New widget",
       "newTax": "New Tax",
       "newTaxDeadline": "New Deadline",
@@ -2140,7 +2276,42 @@
       "markWon": "Mark won",
       "markLost": "Mark lost",
       "editOpportunity": "Edit",
+      "editLeadDetails": "Edit details",
+      "editLeadAddress": "Edit address",
+      "editLeadRevenue": "Edit revenue",
+      "editContact": "Edit contact",
+      "editContactAddress": "Edit address",
+      "editContactBusiness": "Edit business info",
+      "editContactDetails": "Edit details",
       "alreadyClosed": "This opportunity is already won or lost."
+    },
+    "contactTags": {
+      "tabLabel": "Contact tags",
+      "createLabel": "New tag",
+      "title": "Contact tags",
+      "description": "Labels for segmenting and filtering contacts",
+      "searchPlaceholder": "Search tags…",
+      "emptyMessage": "No contact tags yet.",
+      "columns": {
+        "name": "Name",
+        "color": "Color",
+        "description": "Description"
+      }
+    },
+    "contactSegments": {
+      "tabLabel": "Contact segments",
+      "createLabel": "New segment",
+      "title": "Contact segments",
+      "description": "Static or dynamic groups of contacts",
+      "searchPlaceholder": "Search segments…",
+      "emptyMessage": "No contact segments yet.",
+      "columns": {
+        "name": "Name",
+        "isDynamic": "Dynamic",
+        "isActive": "Active",
+        "memberCount": "Members",
+        "description": "Description"
+      }
     },
     "forms": {
       "newLead": {
@@ -2319,6 +2490,135 @@
         },
         "validation": {
           "segmentId": "Enter a valid segment ID."
+        }
+      },
+      "newContactTag": {
+        "title": "New contact tag",
+        "description": "Create a tag for labeling contacts.",
+        "sections": {
+          "tag": "Tag"
+        },
+        "fields": {
+          "name": "Name",
+          "color": "Color",
+          "colorPlaceholder": "e.g. #3b82f6",
+          "description": "Description"
+        }
+      },
+      "newContactSegment": {
+        "title": "New contact segment",
+        "description": "Define a static or dynamic contact group.",
+        "sections": {
+          "segment": "Segment"
+        },
+        "fields": {
+          "name": "Name",
+          "isDynamic": "Dynamic segment",
+          "isActive": "Active",
+          "description": "Description",
+          "domain": "Domain filter",
+          "domainPlaceholder": "Optional filter expression"
+        }
+      },
+      "editContact": {
+        "title": "Edit contact",
+        "description": "Update core contact fields.",
+        "submit": "Save changes",
+        "sections": {
+          "core": "Contact"
+        },
+        "fields": {
+          "name": "Name",
+          "email": "Email",
+          "phone": "Phone",
+          "mobile": "Mobile",
+          "isCustomer": "Customer",
+          "isVendor": "Vendor",
+          "isProspect": "Prospect"
+        }
+      },
+      "editContactAddress": {
+        "title": "Edit address",
+        "submit": "Save address",
+        "sections": {
+          "address": "Address"
+        },
+        "fields": {
+          "street": "Street",
+          "street2": "Street 2",
+          "city": "City",
+          "stateCode": "State / province",
+          "zip": "ZIP / postal code",
+          "countryCode": "Country code"
+        }
+      },
+      "editContactBusiness": {
+        "title": "Edit business info",
+        "submit": "Save changes",
+        "sections": {
+          "business": "Business"
+        },
+        "fields": {
+          "taxId": "Tax ID",
+          "industry": "Industry",
+          "companyRegistry": "Company registry",
+          "employeesCount": "Employees",
+          "annualRevenue": "Annual revenue"
+        }
+      },
+      "editContactDetails": {
+        "title": "Edit contact details",
+        "submit": "Save changes",
+        "sections": {
+          "details": "Details"
+        },
+        "fields": {
+          "firstName": "First name",
+          "lastName": "Last name",
+          "title": "Job title",
+          "website": "Website",
+          "emailSecondary": "Secondary email",
+          "fax": "Fax",
+          "description": "Notes"
+        }
+      },
+      "editLeadDetails": {
+        "title": "Edit lead details",
+        "submit": "Save changes",
+        "sections": {
+          "details": "Details"
+        },
+        "fields": {
+          "contactName": "Contact name",
+          "title": "Job title",
+          "website": "Website",
+          "industry": "Industry",
+          "referredBy": "Referred by",
+          "description": "Notes"
+        }
+      },
+      "editLeadAddress": {
+        "title": "Edit lead address",
+        "submit": "Save address",
+        "sections": {
+          "address": "Address"
+        },
+        "fields": {
+          "street": "Street",
+          "city": "City",
+          "zip": "ZIP / postal code",
+          "countryCode": "Country code"
+        }
+      },
+      "editLeadRevenue": {
+        "title": "Edit lead revenue",
+        "submit": "Save changes",
+        "sections": {
+          "revenue": "Revenue"
+        },
+        "fields": {
+          "expectedRevenue": "Expected revenue",
+          "probability": "Win probability %"
         }
       }
     }
@@ -3040,9 +3340,13 @@
       "confirmDelete": "Delete this lot? Quants may still reference it."
     },
     "serialActions": {
+      "create": "New serial",
+      "namePrompt": "Serial number",
+      "productIdPrompt": "Product ID",
       "editNote": "Edit note…",
       "notePrompt": "Serial note",
-      "confirmDelete": "Delete this serial number?"
+      "confirmDelete": "Delete this serial number?",
+      "block": "Block serial"
     },
     "z3dActions": {
       "addZone": "Add 3D zone",
@@ -3073,11 +3377,60 @@
         "name": "Serial #",
         "productId": "Product",
         "state": "State",
+        "isLocked": "Locked",
+        "locationId": "Location",
         "createDate": "Created"
+      },
+      "states": {
+        "available": "Available",
+        "inUse": "In use",
+        "blocked": "Blocked"
       },
       "actions": {
         "markInUse": "Mark in use (reserved → in use)"
       }
+    },
+    "qualityAlerts": {
+      "tabLabel": "Quality alerts",
+      "title": "Quality alerts",
+      "description": "Track open quality issues from draft through resolution",
+      "searchPlaceholder": "Search alerts…",
+      "emptyMessage": "No quality alerts found.",
+      "emptyHint": "No alerts loaded yet. Create an alert from the Quality Checks tab, or register the quality-alerts query resource to list existing rows.",
+      "filters": {
+        "state": {
+          "label": "State"
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "open": "Open",
+        "inProgress": "In progress",
+        "solved": "Solved",
+        "cancelled": "Cancelled"
+      },
+      "columns": {
+        "title": "Title",
+        "state": "State",
+        "priority": "Priority",
+        "productId": "Product",
+        "teamId": "Team",
+        "createDate": "Created"
+      },
+      "actions": {
+        "open": "Open alert",
+        "assign": "Assign…",
+        "solve": "Resolve…",
+        "cancel": "Cancel alert"
+      }
+    },
+    "locationTree": {
+      "tabLabel": "Location tree",
+      "title": "Location hierarchy",
+      "description": "Browse warehouse locations by parent/child structure and jump to on-hand stock.",
+      "quantCount": "{{count}} quants",
+      "viewQuants": "View stock",
+      "filteredStock": "Showing stock on hand for location {{locationId}}"
     },
     "barcodeRules": {
       "title": "Barcode rules",
@@ -3288,12 +3641,17 @@
     "cycleCountWizard": {
       "tabLabel": "Count wizard",
       "title": "Cycle count",
+      "subtitle": "Plan a count, record lines, validate variances, and post adjustments.",
       "stepPlan": "1. Plan",
       "stepStart": "2. Start",
       "stepRecord": "3. Record line",
       "stepValidate": "4. Validate",
       "stepPost": "5. Post",
       "openWizard": "Open wizard",
+      "activeCount": "Active count #{{id}} — state: {{state}}",
+      "planNamePlaceholder": "Optional plan label",
+      "validateHint": "Review counted lines, then validate to lock the session.",
+      "postHint": "Post inventory adjustments for validated variances.",
       "locationId": "Location",
       "planName": "Plan name",
       "countBy": "Count by",
@@ -3624,6 +3982,41 @@
             "critical": "Critical"
           }
         }
+      },
+      "assignQualityAlert": {
+        "title": "Assign quality alert",
+        "description": "Assign this alert to a team member for follow-up.",
+        "submitLabel": "Assign",
+        "fields": {
+          "userIdentity": "Assignee",
+          "userPlaceholder": "Select user"
+        }
+      },
+      "solveQualityAlert": {
+        "title": "Resolve quality alert",
+        "description": "Mark the alert solved and record resolution notes.",
+        "submitLabel": "Resolve",
+        "fields": {
+          "description": "Resolution notes",
+          "descriptionPlaceholder": "What was done to close this alert?"
+        }
+      },
+      "blockSerial": {
+        "title": "Block serial number",
+        "description": "Prevent this serial from being used until unblocked.",
+        "submitLabel": "Block serial",
+        "fields": {
+          "reason": "Reason",
+          "reasonPlaceholder": "Why is this serial blocked?"
+        }
+      },
+      "serialDetail": {
+        "title": "Serial detail",
+        "description": "Serialized unit attributes and status."
+      },
+      "lotDetail": {
+        "title": "Lot detail",
+        "description": "Batch lot attributes and expiry."
       },
       "newQualityPoint": {
         "title": "New quality control point",
@@ -4051,7 +4444,10 @@
         "reference": "Reference",
         "state": "Status",
         "requestedAt": "Requested At",
-        "requestedBy": "Requested By"
+        "requestedBy": "Requested By",
+        "companyName": "Company",
+        "contactName": "Contact",
+        "email": "Email"
       }
     },
     "tabs": {
@@ -4097,7 +4493,21 @@
       "rejectSelected": "Reject",
       "holdSelected": "Hold",
       "refreshReceiptStatus": "Refresh receipt status",
-      "refreshInvoiceStatus": "Refresh billing status"
+      "refreshInvoiceStatus": "Refresh billing status",
+      "manageLandedCostLines": "Manage lines…",
+      "addLandedCostLineForm": "Add cost line…",
+      "removeLandedCostLineForm": "Remove cost line…",
+      "editLandedCostForm": "Edit landed cost…",
+      "reviewSupplierIntakeForm": "Review intake…",
+      "editSupplierIntakeForm": "Edit intake…"
+    },
+    "landedCostDetail": {
+      "title": "Landed cost lines",
+      "description": "Add or remove cost lines for this allocation.",
+      "amountTotal": "Total amount",
+      "state": "Status",
+      "addLine": "Add line",
+      "removeLine": "Remove line"
     },
     "forms": {
       "newPartnerBank": {
@@ -4232,6 +4642,118 @@
           "lineId": "Order line",
           "linePlaceholder": "Select a line with quantity to bill…",
           "qty": "Quantity to invoice"
+        }
+      },
+      "newLandedCost": {
+        "title": "New landed cost",
+        "description": "Allocate additional costs to incoming receipts.",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "pickingId": "Receipt / transfer",
+          "pickingPlaceholder": "Select incoming transfer…",
+          "targetMove": "Target moves",
+          "currencyId": "Currency ID",
+          "amountTotal": "Total amount",
+          "date": "Date",
+          "description": "Description",
+          "descriptionPlaceholder": "Freight, duties, insurance…"
+        },
+        "targetMoves": {
+          "receipt": "Receipt",
+          "posted": "Posted"
+        }
+      },
+      "editLandedCost": {
+        "title": "Edit landed cost",
+        "description": "Update draft landed cost details.",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "landedCostId": "Landed cost",
+          "landedCostPlaceholder": "Select landed cost…",
+          "targetMove": "Target moves",
+          "currencyId": "Currency ID",
+          "amountTotal": "Total amount",
+          "date": "Date",
+          "description": "Description",
+          "noChange": "(no change)"
+        }
+      },
+      "landedCostLine": {
+        "addTitle": "Add landed cost line",
+        "addDescription": "Add a cost component to a draft landed cost.",
+        "removeTitle": "Remove landed cost line",
+        "removeDescription": "Remove a cost line by its line ID.",
+        "sections": {
+          "landedCost": "Landed cost",
+          "line": "Cost line",
+          "remove": "Line to remove"
+        },
+        "fields": {
+          "landedCostId": "Landed cost",
+          "landedCostPlaceholder": "Select draft landed cost…",
+          "productId": "Product / service",
+          "productPlaceholder": "Select product…",
+          "currencyId": "Currency ID",
+          "priceUnit": "Unit cost",
+          "splitMethod": "Split method",
+          "lineId": "Cost line ID",
+          "lineIdPlaceholder": "Enter line ID from cost lines"
+        },
+        "splitMethods": {
+          "Equal": "Equal",
+          "ByQuantity": "By quantity",
+          "ByCurrentCost": "By current cost",
+          "ByWeight": "By weight",
+          "ByVolume": "By volume"
+        }
+      },
+      "newSupplierIntake": {
+        "title": "New supplier intake",
+        "description": "Submit a supplier onboarding request.",
+        "sections": {
+          "company": "Company & contact"
+        },
+        "fields": {
+          "companyName": "Company name",
+          "contactName": "Contact name",
+          "email": "Email",
+          "phone": "Phone",
+          "industry": "Industry",
+          "website": "Website",
+          "notes": "Notes"
+        }
+      },
+      "reviewSupplierIntake": {
+        "title": "Review supplier intake",
+        "description": "Move a submitted intake into review.",
+        "sections": {
+          "main": "Review"
+        },
+        "fields": {
+          "intakeId": "Intake request",
+          "intakePlaceholder": "Select intake…",
+          "reviewerNotes": "Reviewer notes",
+          "reviewerNotesPlaceholder": "Notes for the review team…"
+        }
+      },
+      "editSupplierIntake": {
+        "title": "Edit supplier intake",
+        "description": "Update intake details before approval.",
+        "sections": {
+          "main": "Details"
+        },
+        "fields": {
+          "intakeId": "Intake request",
+          "intakePlaceholder": "Select intake…",
+          "companyName": "Company name",
+          "contactName": "Contact name",
+          "email": "Email",
+          "phone": "Phone",
+          "notes": "Notes"
         }
       }
     }
@@ -4497,6 +5019,32 @@
           }
         }
       },
+      "newPricelistItem": {
+        "title": "New pricelist rule",
+        "description": "Add a pricing rule to a pricelist.",
+        "sections": {
+          "scope": "Scope",
+          "pricing": "Pricing"
+        },
+        "fields": {
+          "pricelistId": "Pricelist",
+          "appliedOn": "Applies to",
+          "appliedOnAll": "All products",
+          "appliedOnCategory": "Product category",
+          "appliedOnProduct": "Product",
+          "computePrice": "Price type",
+          "computeFixed": "Fixed price",
+          "computePercentage": "Percentage",
+          "computeFormula": "Formula",
+          "productId": "Product ID",
+          "categId": "Category ID",
+          "minQuantity": "Minimum quantity",
+          "fixedPrice": "Fixed price",
+          "percentPrice": "Percent price",
+          "priceDiscount": "Discount %",
+          "sequence": "Sequence"
+        }
+      },
       "newPickingBatch": {
         "title": "New delivery batch",
         "createButton": "New batch",
@@ -4643,6 +5191,7 @@
       "confirmSelected": "Confirm",
       "cancelOrders": "Cancel orders",
       "recalculateTotals": "Recalculate totals",
+      "newPricelistItem": "New rule",
       "togglePricelistActive": "Toggle active",
       "deletePricelists": "Delete",
       "deletePricelistsConfirm": "Delete {{count}} pricelist(s)? This cannot be undone.",
@@ -7056,7 +7605,101 @@
       "saveChanges": "Save Changes",
       "systemCannotDelete": "System roles cannot be deleted",
       "deleteConfirm": "Are you sure you want to delete this role?",
-      "fieldPolicyHint": "API row field access: store a Casbin policy (ptype p) with v0 = role id or identity hex, v1 = organization id, v2 = resource key (e.g. products) or table name (product), v3 = read, and metadata JSON {\"fields\":[\"id\",\"name\",\"list_price\"]}. Superusers and roles with permission *:* receive full columns. Use add_casbin_rule from SpacetimeDB to persist policies."
+      "fieldPolicyHint": "API row field access: store a Casbin policy (ptype p) with v0 = role id or identity hex, v1 = organization id, v2 = resource key (e.g. products) or table name (product), v3 = read, and metadata JSON {\"fields\":[\"id\",\"name\",\"list_price\"]}. Superusers and roles with permission *:* receive full columns. Use the Casbin policy tools below to persist policies."
+    },
+    "adminOps": {
+      "sectionTitle": "Platform admin operations",
+      "sectionDescription": "Low-level auth and reference-data reducers for onboarding and policy management. Requires elevated permissions.",
+      "adminOnly": "Superuser or admin permission required.",
+      "success": "Operation completed.",
+      "casbin": {
+        "cardTitle": "Casbin policies",
+        "cardDescription": "Add or remove field-level and RBAC policies for this organization.",
+        "addButton": "Add policy",
+        "removeButton": "Remove policy",
+        "addTitle": "Add Casbin rule",
+        "addDescription": "ptype p = policy, g = grouping. v1 must equal the organization id for p rules.",
+        "addSubmit": "Add rule",
+        "removeTitle": "Remove Casbin rule",
+        "removeSubmit": "Remove rule",
+        "ptype": "Policy type",
+        "ptypePolicy": "Policy (p)",
+        "ptypeGrouping": "Grouping (g)",
+        "metadata": "Metadata JSON",
+        "ruleId": "Rule ID"
+      },
+      "members": {
+        "cardTitle": "Organization membership",
+        "addExistingButton": "Add existing user (role name)",
+        "addByRoleIdButton": "Add existing user (role ID)",
+        "updateDetailsButton": "Update member details",
+        "updateRoleButton": "Update member role",
+        "addByRoleNameTitle": "Add member by role name",
+        "addByRoleNameDescription": "Onboarding-friendly path when you know the role display name.",
+        "addByRoleIdTitle": "Add member by role ID",
+        "addByRoleIdDescription": "Use when you have the numeric role id from the roles table.",
+        "addSubmit": "Add member",
+        "userIdentity": "User identity (hex)",
+        "roleName": "Role name",
+        "userOrgId": "User organization membership ID",
+        "employeeId": "Employee ID",
+        "isDefault": "Default organization",
+        "updateDetailsTitle": "Update org member details",
+        "updateRoleTitle": "Update org member role"
+      },
+      "reference": {
+        "cardTitle": "Reference masters",
+        "cardDescription": "Create global country and currency rows (superuser). Prefer CSV import for bulk loads.",
+        "createCountryButton": "Create country",
+        "createCurrencyButton": "Create currency",
+        "createCountryTitle": "Create country",
+        "createCountrySubmit": "Create country",
+        "createCurrencyTitle": "Create currency",
+        "createCurrencySubmit": "Create currency",
+        "superuserNote": "Requires superuser. Use only for platform bootstrap—not routine tenant admin.",
+        "countryCode": "ISO code",
+        "countryName": "Name",
+        "numcode": "Numeric code",
+        "phoneCode": "Phone code",
+        "currencyCode": "Currency code",
+        "currencyName": "Name",
+        "symbol": "Symbol",
+        "decimalPlaces": "Decimal places",
+        "position": "Symbol position",
+        "positionBefore": "Before amount",
+        "positionAfter": "After amount"
+      },
+      "audit": {
+        "logEventButton": "Log audit event",
+        "logEventTitle": "Log audit event",
+        "logEventDescription": "Insert a manual audit row (testing or integrations).",
+        "logEventSubmit": "Log event",
+        "tableName": "Table name",
+        "recordId": "Record ID",
+        "action": "Action",
+        "companyId": "Company ID (optional)",
+        "oldValues": "Old values JSON",
+        "newValues": "New values JSON",
+        "changedFields": "Changed fields (CSV)"
+      },
+      "sessions": {
+        "createButton": "Create user session",
+        "createTitle": "Create user session",
+        "createDescription": "Record a session row for the current identity (admin/testing).",
+        "createSubmit": "Create session",
+        "sessionToken": "Session token",
+        "expiresAt": "Expires at"
+      },
+      "credentials": {
+        "storeUserTitle": "Store user credential",
+        "storeUserDescription": "Superuser-only. Provision password credentials after server-side identity creation.",
+        "storeSsoTitle": "Store SSO credential",
+        "storeSsoDescription": "Superuser-only. Link WorkOS SSO credentials to a SpacetimeDB identity.",
+        "passwordResetTitle": "Create password reset token",
+        "passwordResetDescription": "Superuser-only. Store a hashed reset token for forgot-password flows.",
+        "inviteDirectTitle": "Create invite (direct reducer)",
+        "inviteDirectDescription": "Superuser-only. Prefer User Management invite for production onboarding."
+      }
     },
     "profile": {
       "personalInfo": "Personal Information",

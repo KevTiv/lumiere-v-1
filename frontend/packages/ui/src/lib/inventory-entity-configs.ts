@@ -43,6 +43,42 @@ const qualityCheckResultBadges = (t: TFunction) => ({
   },
 })
 
+const qualityAlertStateBadges = (t: TFunction) => ({
+  badgeVariants: {
+    draft: "secondary",
+    open: "outline",
+    in_progress: "default",
+    solved: "default",
+    cancelled: "destructive",
+  },
+  badgeLabels: {
+    draft: t("inventory.qualityAlerts.states.draft"),
+    open: t("inventory.qualityAlerts.states.open"),
+    in_progress: t("inventory.qualityAlerts.states.inProgress"),
+    solved: t("inventory.qualityAlerts.states.solved"),
+    cancelled: t("inventory.qualityAlerts.states.cancelled"),
+  },
+})
+
+const qualityAlertPriorityBadges = (t: TFunction) => ({
+  badgeVariants: { normal: "secondary", low: "outline", high: "default", critical: "destructive" },
+  badgeLabels: {
+    normal: t("inventory.forms.newQualityAlert.fields.priorities.normal"),
+    low: t("inventory.forms.newQualityAlert.fields.priorities.low"),
+    high: t("inventory.forms.newQualityAlert.fields.priorities.high"),
+    critical: t("inventory.forms.newQualityAlert.fields.priorities.critical"),
+  },
+})
+
+const serialStateBadges = (t: TFunction) => ({
+  badgeVariants: { available: "default", in_use: "outline", blocked: "destructive" },
+  badgeLabels: {
+    available: t("inventory.productionSerials.states.available"),
+    in_use: t("inventory.productionSerials.states.inUse"),
+    blocked: t("inventory.productionSerials.states.blocked"),
+  },
+})
+
 const locationTypeBadges = (t: TFunction) => ({
   badgeVariants: { internal: "default", customer: "outline", supplier: "outline", inventory: "secondary", transit: "secondary", view: "secondary" },
   badgeLabels: {
@@ -329,10 +365,48 @@ export const stockProductionSerialsTableConfig = (t: TFunction): EntityViewConfi
     columns: [
       { key: "name", label: t("inventory.productionSerials.columns.name"), width: "min-w-36" },
       { key: "productId", label: t("inventory.productionSerials.columns.productId"), width: "min-w-32" },
-      { key: "state", label: t("inventory.productionSerials.columns.state"), width: "min-w-24" },
+      { key: "state", label: t("inventory.productionSerials.columns.state"), type: "badge", ...serialStateBadges(t) },
+      { key: "isLocked", label: t("inventory.productionSerials.columns.isLocked"), type: "boolean" },
+      { key: "locationId", label: t("inventory.productionSerials.columns.locationId"), width: "min-w-24" },
       { key: "createDate", label: t("inventory.productionSerials.columns.createDate"), type: "date" },
     ],
     emptyMessage: t("inventory.productionSerials.emptyMessage"),
+  },
+})
+
+export const qualityAlertsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "quality-alerts-table",
+  title: t("inventory.qualityAlerts.title"),
+  description: t("inventory.qualityAlerts.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("inventory.qualityAlerts.searchPlaceholder"),
+    searchKeys: ["name", "title", "description"],
+    filters: [
+      {
+        key: "state",
+        label: t("inventory.qualityAlerts.filters.state.label"),
+        type: "select",
+        options: [
+          { value: "draft", label: t("inventory.qualityAlerts.states.draft") },
+          { value: "open", label: t("inventory.qualityAlerts.states.open") },
+          { value: "in_progress", label: t("inventory.qualityAlerts.states.inProgress") },
+          { value: "solved", label: t("inventory.qualityAlerts.states.solved") },
+          { value: "cancelled", label: t("inventory.qualityAlerts.states.cancelled") },
+        ],
+      },
+    ],
+    columns: [
+      { key: "title", label: t("inventory.qualityAlerts.columns.title"), width: "min-w-40" },
+      { key: "state", label: t("inventory.qualityAlerts.columns.state"), type: "badge", ...qualityAlertStateBadges(t) },
+      { key: "priority", label: t("inventory.qualityAlerts.columns.priority"), type: "badge", ...qualityAlertPriorityBadges(t) },
+      { key: "productId", label: t("inventory.qualityAlerts.columns.productId"), width: "min-w-28" },
+      { key: "teamId", label: t("inventory.qualityAlerts.columns.teamId"), width: "min-w-24" },
+      { key: "createDate", label: t("inventory.qualityAlerts.columns.createDate"), type: "date" },
+    ],
+    emptyMessage: t("inventory.qualityAlerts.emptyMessage"),
   },
 })
 
@@ -706,6 +780,7 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "production-lots-table": productionLotsTableConfig(t),
   "stock-production-serials-table": stockProductionSerialsTableConfig(t),
   "quality-checks-table": qualityChecksTableConfig(t),
+  "quality-alerts-table": qualityAlertsTableConfig(t),
   "cycle-counts-table": cycleCountsTableConfig(t),
   "picking-waves-table": pickingWavesTableConfig(t),
   "warehouse-tasks-table": warehouseTasksTableConfig(t),

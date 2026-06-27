@@ -926,6 +926,219 @@ export const newPaymentTermLineForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const editPaymentTermLineForm = (t: TFunction): FormConfig => ({
+  id: "edit-payment-term-line",
+  title: t("accounting.forms.editPaymentTermLine.title"),
+  description: t("accounting.forms.editPaymentTermLine.description"),
+  submitLabel: t("accounting.forms.editPaymentTermLine.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.editPaymentTermLine.sections.main"),
+      fields: [
+        {
+          id: "value",
+          name: "value",
+          type: "select",
+          label: t("accounting.forms.newPaymentTermLine.fields.value"),
+          width: "1/2",
+          options: [
+            { value: "Balance", label: t("accounting.forms.newPaymentTermLine.fields.valueBalance") },
+            { value: "Percent", label: t("accounting.forms.newPaymentTermLine.fields.valuePercent") },
+            { value: "Fixed", label: t("accounting.forms.newPaymentTermLine.fields.valueFixed") },
+          ],
+        },
+        {
+          id: "valueAmount",
+          name: "valueAmount",
+          type: "number",
+          label: t("accounting.forms.newPaymentTermLine.fields.valueAmount"),
+          width: "1/2",
+          step: 0.01,
+        },
+        {
+          id: "days",
+          name: "days",
+          type: "number",
+          label: t("accounting.forms.newPaymentTermLine.fields.days"),
+          width: "1/3",
+        },
+        {
+          id: "months",
+          name: "months",
+          type: "number",
+          label: t("accounting.forms.newPaymentTermLine.fields.months"),
+          width: "1/3",
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("accounting.forms.newPaymentTermLine.fields.sequence"),
+          width: "1/3",
+        },
+        {
+          id: "daysAfterEndOfMonth",
+          name: "daysAfterEndOfMonth",
+          type: "switch",
+          label: t("accounting.forms.newPaymentTermLine.fields.daysAfterEndOfMonth"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const newAccountJournalForm = (t: TFunction): FormConfig => ({
+  id: "new-account-journal",
+  title: t("accounting.forms.newAccountJournal.title"),
+  description: t("accounting.forms.newAccountJournal.description"),
+  submitLabel: t("accounting.forms.newAccountJournal.submitLabel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.newAccountJournal.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.newAccountJournal.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "code",
+          name: "code",
+          type: "text",
+          label: t("accounting.forms.newAccountJournal.fields.code"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "type",
+          name: "type",
+          type: "select",
+          label: t("accounting.forms.newAccountJournal.fields.type"),
+          required: true,
+          width: "1/2",
+          defaultValue: "Sale",
+          options: [
+            { value: "Sale", label: t("accounting.forms.newAccountJournal.fields.typeSale") },
+            { value: "Purchase", label: t("accounting.forms.newAccountJournal.fields.typePurchase") },
+            { value: "Bank", label: t("accounting.forms.newAccountJournal.fields.typeBank") },
+            { value: "Cash", label: t("accounting.forms.newAccountJournal.fields.typeCash") },
+            { value: "General", label: t("accounting.forms.newAccountJournal.fields.typeGeneral") },
+          ],
+        },
+        {
+          id: "active",
+          name: "active",
+          type: "checkbox",
+          label: t("accounting.forms.newAccountJournal.fields.active"),
+          defaultValue: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editAccountJournalForm = (t: TFunction): FormConfig => ({
+  id: "edit-account-journal",
+  title: t("accounting.forms.editAccountJournal.title"),
+  submitLabel: t("accounting.forms.editAccountJournal.submitLabel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.editAccountJournal.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.newAccountJournal.fields.name"),
+          width: "1/2",
+        },
+        {
+          id: "code",
+          name: "code",
+          type: "text",
+          label: t("accounting.forms.newAccountJournal.fields.code"),
+          width: "1/2",
+        },
+        {
+          id: "active",
+          name: "active",
+          type: "checkbox",
+          label: t("accounting.forms.newAccountJournal.fields.active"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const addAccountMoveLineForm = (t: TFunction): FormConfig => ({
+  id: "add-account-move-line",
+  title: t("accounting.forms.addAccountMoveLine.title"),
+  description: t("accounting.forms.addAccountMoveLine.description"),
+  submitLabel: t("accounting.forms.addAccountMoveLine.submitLabel"),
+  sections: [
+    {
+      id: "line",
+      title: t("accounting.forms.addAccountMoveLine.sections.line"),
+      fields: [
+        {
+          id: "moveId",
+          name: "moveId",
+          type: "select",
+          label: t("accounting.forms.addAccountMoveLine.fields.moveId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "accountId",
+          name: "accountId",
+          type: "select",
+          label: t("accounting.forms.addAccountMoveLine.fields.accountId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.addAccountMoveLine.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "debit",
+          name: "debit",
+          type: "number",
+          label: t("accounting.forms.addAccountMoveLine.fields.debit"),
+          width: "1/2",
+          defaultValue: 0,
+          step: 0.01,
+        },
+        {
+          id: "credit",
+          name: "credit",
+          type: "number",
+          label: t("accounting.forms.addAccountMoveLine.fields.credit"),
+          width: "1/2",
+          defaultValue: 0,
+          step: 0.01,
+        },
+      ],
+    },
+  ],
+})
+
 export const newCurrencyRateForm = (t: TFunction): FormConfig => ({
   id: "new-currency-rate",
   title: t("accounting.forms.newCurrencyRate.title"),

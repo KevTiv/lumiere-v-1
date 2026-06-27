@@ -323,6 +323,7 @@ import DeleteDocumentReducer from "./delete_document_reducer";
 import DeleteFinancialReportReducer from "./delete_financial_report_reducer";
 import DeleteFiscalYearReducer from "./delete_fiscal_year_reducer";
 import DeleteFormFieldReducer from "./delete_form_field_reducer";
+import DeleteImportMappingTemplateReducer from "./delete_import_mapping_template_reducer";
 import DeleteIntegrationReducer from "./delete_integration_reducer";
 import DeleteIntercompanyRuleReducer from "./delete_intercompany_rule_reducer";
 import DeleteIotDeviceReducer from "./delete_iot_device_reducer";
@@ -373,6 +374,7 @@ import ExplodeBomReducer from "./explode_bom_reducer";
 import ExportFinancialReportReducer from "./export_financial_report_reducer";
 import FailIotActionReducer from "./fail_iot_action_reducer";
 import FailQualityCheckReducer from "./fail_quality_check_reducer";
+import FinalizeImportAssistantJobReducer from "./finalize_import_assistant_job_reducer";
 import FinishManufacturingOrderReducer from "./finish_manufacturing_order_reducer";
 import FinishWorkorderReducer from "./finish_workorder_reducer";
 import GenerateFinancialReportReducer from "./generate_financial_report_reducer";
@@ -535,6 +537,7 @@ import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
+import SaveImportMappingTemplateReducer from "./save_import_mapping_template_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
 import SeedDevDataReducer from "./seed_dev_data_reducer";
@@ -829,6 +832,7 @@ import HrResourceRow from "./hr_resource_table";
 import HrSalaryRuleRow from "./hr_salary_rule_table";
 import ImportJobRow from "./import_job_table";
 import ImportJobErrorRow from "./import_job_error_table";
+import ImportMappingTemplateRow from "./import_mapping_template_table";
 import IntercompanyRuleRow from "./intercompany_rule_table";
 import IntercompanyTransactionRow from "./intercompany_transaction_table";
 import InventoryAdjustmentRow from "./inventory_adjustment_table";
@@ -2844,6 +2848,21 @@ const tablesSchema = __schema({
       { name: 'import_job_error_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ImportJobErrorRow),
+  import_mapping_template: __table({
+    name: 'import_mapping_template',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'import_template_by_org_table', algorithm: 'btree', columns: [
+        'organizationId',
+        'tableName',
+      ] },
+    ],
+    constraints: [
+      { name: 'import_mapping_template_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ImportMappingTemplateRow),
   intercompany_rule: __table({
     name: 'intercompany_rule',
     indexes: [
@@ -5522,6 +5541,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_financial_report", DeleteFinancialReportReducer),
   __reducerSchema("delete_fiscal_year", DeleteFiscalYearReducer),
   __reducerSchema("delete_form_field", DeleteFormFieldReducer),
+  __reducerSchema("delete_import_mapping_template", DeleteImportMappingTemplateReducer),
   __reducerSchema("delete_integration", DeleteIntegrationReducer),
   __reducerSchema("delete_intercompany_rule", DeleteIntercompanyRuleReducer),
   __reducerSchema("delete_iot_device", DeleteIotDeviceReducer),
@@ -5572,6 +5592,7 @@ const reducersSchema = __reducers(
   __reducerSchema("export_financial_report", ExportFinancialReportReducer),
   __reducerSchema("fail_iot_action", FailIotActionReducer),
   __reducerSchema("fail_quality_check", FailQualityCheckReducer),
+  __reducerSchema("finalize_import_assistant_job", FinalizeImportAssistantJobReducer),
   __reducerSchema("finish_manufacturing_order", FinishManufacturingOrderReducer),
   __reducerSchema("finish_workorder", FinishWorkorderReducer),
   __reducerSchema("generate_financial_report", GenerateFinancialReportReducer),
@@ -5734,6 +5755,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
+  __reducerSchema("save_import_mapping_template", SaveImportMappingTemplateReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
   __reducerSchema("seed_dev_data", SeedDevDataReducer),

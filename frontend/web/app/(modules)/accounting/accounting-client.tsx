@@ -26,14 +26,21 @@ import {
   editAnalyticDistributionModelForm,
   MissingOrganization,
   mergeSelectOptionsByFieldName,
+  mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   bankStatementsTableConfig,
   fixedAssetsTableConfig,
   accountPaymentsTableConfig,
   paymentTermsTableConfig,
   paymentTermLinesTableConfig,
+  accountJournalsTableConfig,
+  accountMoveLinesTableConfig,
   newAccountPaymentForm,
   newPaymentTermLineForm,
+  editPaymentTermLineForm,
+  newAccountJournalForm,
+  editAccountJournalForm,
+  addAccountMoveLineForm,
   newCurrencyRateForm,
   registerPaymentInvoicesForm,
   intercompanyRulesTableConfig,
@@ -100,10 +107,17 @@ import {
 } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
+import type {
+  AddAccountMoveLineParams,
+  CreateAccountJournalParams,
+  JournalType,
+  UpdateAccountJournalParams,
+} from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useAccountAccounts,
   useAccountMoves,
+  useAccountMoveLines,
   useAccountTaxes,
   useCrossoveredBudgets,
   useBudgetLines,
@@ -135,6 +149,10 @@ import {
   usePostAccountMove,
   usePostInvoice,
   useCancelAccountMove,
+  useAddAccountMoveLine,
+  useDeleteAccountMoveLine,
+  useCreateAccountJournal,
+  useUpdateAccountJournal,
   useCreateAnalyticAccount,
   useUpdateAnalyticAccount,
   useSetAnalyticAccountActive,
@@ -222,6 +240,7 @@ import {
   useUpdatePaymentTerm,
   useDeletePaymentTerm,
   useCreatePaymentTermLine,
+  useUpdatePaymentTermLine,
   useDeletePaymentTermLine,
   useCreateCurrencyRate,
   useSetAccountAssetActive,
@@ -254,6 +273,115 @@ function moveTypeTag(row: Record<string, unknown>): string {
   const v = row.moveType
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
+}
+
+function paymentTermValueTag(
+  raw: unknown,
+): { tag: "Balance" } | { tag: "Percent" } | { tag: "Fixed" } {
+  const s = String(raw ?? "Balance").trim()
+  if (s === "Percent") return { tag: "Percent" }
+  if (s === "Fixed") return { tag: "Fixed" }
+  return { tag: "Balance" }
+}
+
+function journalTypeTagFromForm(raw: unknown): JournalType {
+  const s = String(raw ?? "Sale").trim()
+  if (s === "Purchase") return { tag: "Purchase" }
+  if (s === "Bank") return { tag: "Bank" }
+  if (s === "Cash") return { tag: "Cash" }
+  if (s === "General") return { tag: "General" }
+  return { tag: "Sale" }
+}
+
+function toCreateAccountJournalParamsFromForm(
+  formData: Record<string, unknown>,
+  companyId: bigint,
+): CreateAccountJournalParams {
+  const name = String(formData.name ?? "").trim()
+  const code = String(formData.code ?? "").trim()
+  return {
+    companyId,
+    name,
+    code,
+    type: journalTypeTagFromForm(formData.type),
+    currencyId: undefined,
+    defaultAccountId: undefined,
+    suspenseAccountId: undefined,
+    lossAccountId: undefined,
+    profitAccountId: undefined,
+    bankAccountId: undefined,
+    paymentCreditAccountId: undefined,
+    paymentDebitAccountId: undefined,
+    invoiceReferenceType: undefined,
+    invoiceReferenceModel: undefined,
+    sequenceId: undefined,
+    refundSequenceId: undefined,
+    sequenceOverrideRegex: undefined,
+    secureSequenceId: undefined,
+    aliasName: undefined,
+    aliasDomain: undefined,
+    saleActivityTypeId: undefined,
+    saleActivityUserId: undefined,
+    saleActivityNote: undefined,
+    saleActivityDateDeadline: undefined,
+    restrictModeHashTable: false,
+    active: formData.active !== false,
+    atLeastOneInbound: false,
+    atLeastOneOutbound: false,
+    dedicatedPaymentMethodIds: [],
+    saleActivityDone: false,
+    metadata: undefined,
+  }
+}
+
+function toAddAccountMoveLineParamsFromForm(
+  formData: Record<string, unknown>,
+): { moveId: bigint; params: AddAccountMoveLineParams } | null {
+  const moveId = optionalBigIntU64(formData.moveId)
+  const accountId = optionalBigIntU64(formData.accountId)
+  const name = String(formData.name ?? "").trim()
+  if (!moveId || !accountId || !name) return null
+  const debit = Number(formData.debit ?? 0)
+  const credit = Number(formData.credit ?? 0)
+  return {
+    moveId,
+    params: {
+      accountId,
+      name,
+      debit: Number.isFinite(debit) ? debit : 0,
+      credit: Number.isFinite(credit) ? credit : 0,
+      sequence: 10,
+      quantity: 0,
+      priceUnit: 0,
+      discount: 0,
+      taxIds: [],
+      partnerId: undefined,
+      productId: undefined,
+      productUomId: undefined,
+      productCategoryId: undefined,
+      analyticAccountId: undefined,
+      analyticTagIds: [],
+      displayType: undefined,
+      isDownpayment: false,
+      excludeFromInvoiceTab: false,
+      blocked: false,
+      groupTaxId: undefined,
+      taxLineId: undefined,
+      taxGroupId: undefined,
+      taxRepartitionLineId: undefined,
+      taxAudit: undefined,
+      reconcileModelId: undefined,
+      paymentId: undefined,
+      statementLineId: undefined,
+      matchingNumber: undefined,
+      matchingLabel: undefined,
+      expectedPayDate: undefined,
+      expectedPayDateCurrencyId: undefined,
+      expectedPayDateAmount: 0,
+      expectedPayDateResidual: 0,
+      metadata: undefined,
+    },
+  }
 }
 
 function moveStateStr(row: Record<string, unknown>): string {
@@ -481,6 +609,8 @@ function AccountingClientLoaded({
   const [csvError, setCsvError] = useState<string | null>(null)
   const [registerPaymentForId, setRegisterPaymentForId] = useState<bigint | null>(null)
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
+  const [journalEdit, setJournalEdit] = useState<Record<string, unknown> | null>(null)
+  const [paymentTermLineEdit, setPaymentTermLineEdit] = useState<Record<string, unknown> | null>(null)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
@@ -491,6 +621,7 @@ function AccountingClientLoaded({
     enabled: organizationId > 0,
     initialData: initialMoves,
   })
+  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
   const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
   const { data: budgets = [] } = useCrossoveredBudgets(orgId, {
     enabled: organizationId > 0,
@@ -671,6 +802,69 @@ function AccountingClientLoaded({
     [t, paymentTermSelectOptions],
   )
 
+  const accountJournalCreateFormConfig = useMemo(() => newAccountJournalForm(t), [t])
+
+  const draftMoveSelectOptions = useMemo(() => {
+    const drafts = (allMoves as Record<string, unknown>[]).filter(
+      (m) => moveStateStr(m) === "Draft",
+    )
+    if (drafts.length === 0) {
+      return [{ value: "", label: t("accounting.forms.addAccountMoveLine.fields.noDraftMoves"), disabled: true }]
+    }
+    return drafts.map((m) => ({
+      value: String(m.id ?? ""),
+      label: String(m.name ?? m.ref ?? m.id ?? ""),
+    }))
+  }, [allMoves, t])
+
+  const accountSelectOptionsForMoveLine = useMemo(() => {
+    const rows = accounts as Record<string, unknown>[]
+    if (rows.length === 0) {
+      return [{ value: "", label: t("common.noData"), disabled: true }]
+    }
+    return rows.map((a) => ({
+      value: String(a.id ?? ""),
+      label: `${String(a.code ?? "")} — ${String(a.name ?? a.id ?? "")}`,
+    }))
+  }, [accounts, t])
+
+  const addMoveLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(addAccountMoveLineForm(t), {
+        moveId: draftMoveSelectOptions,
+        accountId: accountSelectOptionsForMoveLine,
+      }),
+    [t, draftMoveSelectOptions, accountSelectOptionsForMoveLine],
+  )
+
+  const journalEditFormConfig = useMemo(() => {
+    const base = editAccountJournalForm(t)
+    if (!journalEdit) return base
+    return mergeFieldDefaultValues(base, {
+      name: String(journalEdit.name ?? ""),
+      code: String(journalEdit.code ?? ""),
+      active: Boolean(journalEdit.active),
+    })
+  }, [journalEdit, t])
+
+  const paymentTermLineEditFormConfig = useMemo(() => {
+    const base = editPaymentTermLineForm(t)
+    if (!paymentTermLineEdit) return base
+    const valueRaw = paymentTermLineEdit.value
+    const valueTag =
+      valueRaw != null && typeof valueRaw === "object" && "tag" in valueRaw
+        ? String((valueRaw as { tag: string }).tag)
+        : String(valueRaw ?? "Balance")
+    return mergeFieldDefaultValues(base, {
+      value: valueTag,
+      valueAmount: Number(paymentTermLineEdit.valueAmount ?? 0),
+      days: Number(paymentTermLineEdit.days ?? 0),
+      months: Number(paymentTermLineEdit.months ?? 0),
+      sequence: Number(paymentTermLineEdit.sequence ?? 0),
+      daysAfterEndOfMonth: Boolean(paymentTermLineEdit.daysAfterEndOfMonth),
+    })
+  }, [paymentTermLineEdit, t])
+
   const currencyRateFormConfig = useMemo(() => newCurrencyRateForm(t), [t])
 
   const analyticAccountSelectOptions = useMemo(
@@ -725,6 +919,10 @@ function AccountingClientLoaded({
   const postMove = usePostAccountMove(organizationId)
   const postInvoice = usePostInvoice(organizationId)
   const cancelMove = useCancelAccountMove(organizationId)
+  const addAccountMoveLine = useAddAccountMoveLine(organizationId)
+  const deleteAccountMoveLine = useDeleteAccountMoveLine(organizationId)
+  const createAccountJournal = useCreateAccountJournal(organizationId)
+  const updateAccountJournal = useUpdateAccountJournal(organizationId)
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId)
   const refreshTaxDeadlineStatuses = useRefreshTaxDeadlineStatuses(organizationId)
   const scheduleTaxDeadlineUpdates = useScheduleTaxDeadlineUpdates(organizationId)
@@ -788,6 +986,7 @@ function AccountingClientLoaded({
   const updatePaymentTerm = useUpdatePaymentTerm(organizationId)
   const deletePaymentTerm = useDeletePaymentTerm(organizationId)
   const createPaymentTermLine = useCreatePaymentTermLine(organizationId)
+  const updatePaymentTermLine = useUpdatePaymentTermLine(organizationId)
   const deletePaymentTermLine = useDeletePaymentTermLine(organizationId)
   const createCurrencyRate = useCreateCurrencyRate(organizationId, operatingCompanyId)
   const setAccountAssetActive = useSetAccountAssetActive(organizationId, operatingCompanyId)
@@ -1399,6 +1598,15 @@ function AccountingClientLoaded({
         ...view,
         actions: [
           {
+            id: "ptl-edit",
+            label: t("accounting.entities.paymentTerms.actions.editLinesSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              const row = rows[0]
+              if (row) setPaymentTermLineEdit(row)
+            },
+          },
+          {
             id: "ptl-delete",
             label: t("accounting.entities.paymentTerms.actions.deleteLinesSelected"),
             requiresSelection: true,
@@ -1413,6 +1621,56 @@ function AccountingClientLoaded({
       },
     }
   }, [t, deletePaymentTermLine])
+
+  const accountJournalsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = accountJournalsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "journal-edit",
+            label: t("accounting.entities.journals.actions.editSelected"),
+            requiresSelection: true,
+            onClick: (rows) => {
+              const row = rows[0]
+              if (row) setJournalEdit(row)
+            },
+          },
+        ],
+      },
+    }
+  }, [t])
+
+  const accountMoveLinesEntityConfig = useMemo((): EntityViewConfig => {
+    const base = accountMoveLinesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "move-line-delete",
+            label: t("accounting.entities.moveLines.actions.deleteSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              for (const r of rows) {
+                void deleteAccountMoveLine.mutateAsync([
+                  organizationId,
+                  BigInt(String((r as Record<string, unknown>).id)),
+                  stdbParamsToJson({ companyId: operatingCompanyId }),
+                ])
+              }
+            },
+          },
+        ],
+      },
+    }
+  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId])
 
   // Helper to get intercompany rule active state
   const intercompanyRuleIsActive = useCallback((row: Record<string, unknown>): boolean => {
@@ -1814,6 +2072,21 @@ function AccountingClientLoaded({
     } else if (action === "createPaymentTermLine") {
       const p = toCreatePaymentTermLineParamsFromForm(formData)
       if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p))
+    } else if (action === "createAccountJournal") {
+      const params = toCreateAccountJournalParamsFromForm(formData, operatingCompanyId)
+      await createAccountJournal.mutateAsync([
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+    } else if (action === "addAccountMoveLine") {
+      const parsed = toAddAccountMoveLineParamsFromForm(formData)
+      if (parsed) {
+        await addAccountMoveLine.mutateAsync([
+          organizationId,
+          parsed.moveId,
+          stdbParamsToJson(parsed.params),
+        ])
+      }
     } else if (action === "createCurrencyRate") {
       const p = toCreateCurrencyRateParamsFromForm(formData)
       if (p) await createCurrencyRate.mutateAsync(createCurrencyRateParamsToJson(p))
@@ -2156,7 +2429,26 @@ function AccountingClientLoaded({
             }
           }
           return tab
-        }),
+        }).concat([
+          {
+            id: "account-journals",
+            label: t("accounting.tabs.journals"),
+            type: "entity" as const,
+            entityConfig: accountJournalsEntityConfig,
+            createForm: accountJournalCreateFormConfig,
+            createLabel: t("accounting.actions.newJournal"),
+            createAction: "createAccountJournal",
+          },
+          {
+            id: "move-lines",
+            label: t("accounting.tabs.moveLines"),
+            type: "entity" as const,
+            entityConfig: accountMoveLinesEntityConfig,
+            createForm: addMoveLineFormConfig,
+            createLabel: t("accounting.actions.addMoveLine"),
+            createAction: "addAccountMoveLine",
+          },
+        ]),
       } as ModuleConfig
     },
     [
@@ -2256,6 +2548,8 @@ function AccountingClientLoaded({
       payments: accountPayments as unknown as Record<string, unknown>[],
       "payment-terms": paymentTerms as unknown as Record<string, unknown>[],
       "payment-term-lines": paymentTermLines as unknown as Record<string, unknown>[],
+      "account-journals": journals as unknown as Record<string, unknown>[],
+      "move-lines": accountMoveLines as unknown as Record<string, unknown>[],
     }),
     [
       taxes,
@@ -2268,6 +2562,8 @@ function AccountingClientLoaded({
       accountPayments,
       paymentTerms,
       paymentTermLines,
+      journals,
+      accountMoveLines,
       fiscalYearsDisplay,
       accountPeriodsDisplay,
       intercompanyRules,
@@ -2286,6 +2582,10 @@ function AccountingClientLoaded({
     } else if (tabId === "account-periods") {
       const st = accountPeriodStateTag(row)
       if (st === "Draft" || st === "Open") setAccountPeriodEdit(row)
+    } else if (tabId === "payment-term-lines") {
+      setPaymentTermLineEdit(row)
+    } else if (tabId === "account-journals") {
+      setJournalEdit(row)
     }
   }, [])
 
@@ -2487,6 +2787,56 @@ function AccountingClientLoaded({
         }}
         config={accountPeriodEditFormConfig}
         onSubmit={onSubmitAccountPeriodEdit}
+      />
+
+      <FormModal
+        key={journalEdit ? `journal-${String(journalEdit.id)}` : "journal-closed"}
+        open={!!journalEdit}
+        onOpenChange={(open) => {
+          if (!open) setJournalEdit(null)
+        }}
+        config={journalEditFormConfig}
+        onSubmit={async (formData) => {
+          if (!journalEdit?.id) return
+          const params: Partial<UpdateAccountJournalParams> = {}
+          const name = optionalText(formData.name)
+          const code = optionalText(formData.code)
+          if (name) params.name = name
+          if (code) params.code = code
+          if (formData.active !== undefined) params.active = Boolean(formData.active)
+          if (Object.keys(params).length === 0) return
+          await updateAccountJournal.mutateAsync([
+            organizationId,
+            BigInt(String(journalEdit.id)),
+            stdbParamsToJson(params as UpdateAccountJournalParams),
+          ])
+          setJournalEdit(null)
+        }}
+      />
+
+      <FormModal
+        key={paymentTermLineEdit ? `ptl-${String(paymentTermLineEdit.id)}` : "ptl-closed"}
+        open={!!paymentTermLineEdit}
+        onOpenChange={(open) => {
+          if (!open) setPaymentTermLineEdit(null)
+        }}
+        config={paymentTermLineEditFormConfig}
+        onSubmit={async (formData) => {
+          if (!paymentTermLineEdit?.id) return
+          await updatePaymentTermLine.mutateAsync({
+            lineId: BigInt(String(paymentTermLineEdit.id)),
+            value: paymentTermValueTag(formData.value),
+            valueAmount: Number(formData.valueAmount ?? 0),
+            days: Math.trunc(Number(formData.days ?? 0)),
+            months: Math.trunc(Number(formData.months ?? 0)),
+            daysAfterEndOfMonth:
+              formData.daysAfterEndOfMonth === undefined
+                ? null
+                : Boolean(formData.daysAfterEndOfMonth),
+            sequence: Math.trunc(Number(formData.sequence ?? 0)),
+          })
+          setPaymentTermLineEdit(null)
+        }}
       />
 
       <FormModal

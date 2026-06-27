@@ -255,7 +255,10 @@ export function useCreatePricelistItem(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = salesBffPost("create_pricelist_item", [organizationId, params])
+      const { urlPath, init } = salesBffPost("create_pricelist_item", [
+        organizationId,
+        params,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist item')
     },

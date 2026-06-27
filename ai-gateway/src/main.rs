@@ -147,6 +147,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills/sync", post(routes::skills::post_sync))
         .route("/v1/forms/suggest", post(routes::forms::post_suggest))
         .route("/v1/forms/validate", post(routes::forms::post_validate))
+        .route("/v1/import/analyze", post(routes::import::post_analyze))
+        .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route("/v1/context/document", post(routes::context::post_document))

@@ -4,11 +4,15 @@ import { useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import {
   useAssignRole,
+  useAddOrgMember,
+  useAddUserToOrganization,
   useCreateUserInvite,
   useRemoveUserFromOrganization,
   useRevokeRole,
   useSettingsRoles,
   useSettingsUsers,
+  useUpdateOrgMemberDetails,
+  useUpdateOrgMemberRole,
   useUpdateUserOrganizationStatus,
   type SettingsUserRecord,
 } from "@lumiere/query-hooks/hooks/auth"
@@ -55,6 +59,13 @@ import {
 import type { Role } from "@/lib/rbac-types"
 import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
+import { FormModal } from "../forms/form-modal"
+import {
+  addOrgMemberForm,
+  addUserToOrganizationForm,
+  updateOrgMemberDetailsForm,
+  updateOrgMemberRoleForm,
+} from "../lib/settings-platform-form-configs"
 
 function identityHexForAssign(value: string): string {
   const normalized = value.trim().replace(/^0x/i, "").toLowerCase()
@@ -72,6 +83,10 @@ export function UserManagement() {
   const assignRole = useAssignRole(orgBigInt)
   const revokeRole = useRevokeRole(orgBigInt)
   const createInvite = useCreateUserInvite(orgBigInt)
+  const addOrgMember = useAddOrgMember(orgBigInt)
+  const addUserToOrganization = useAddUserToOrganization(orgBigInt)
+  const updateOrgMemberDetails = useUpdateOrgMemberDetails(orgBigInt)
+  const updateOrgMemberRole = useUpdateOrgMemberRole(orgBigInt)
   const removeUser = useRemoveUserFromOrganization(orgBigInt)
   const updateOrgStatus = useUpdateUserOrganizationStatus(orgBigInt)
   const { checkPermission } = useRBAC()
@@ -79,10 +94,15 @@ export function UserManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [memberModal, setMemberModal] = useState<"addByName" | "addById" | "updateDetails" | "updateRole" | null>(null)
+  const [memberError, setMemberError] = useState<string | null>(null)
 
   const canEdit = checkPermission("admin:users", "update").allowed
   const canDelete = checkPermission("admin:users", "delete").allowed
   const canCreate = checkPermission("admin:users", "create").allowed
+
+  const roleOptions = roles.map((role) => ({ value: role.id, label: role.name }))
+  const roleNameOptions = roles.map((role) => ({ value: role.name, label: role.name }))
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,6 +155,13 @@ export function UserManagement() {
     try {
       if (editingUser) {
         await syncUserRoles(editingUser, selectedRoles)
+        const department = String(formData.get("department") ?? "").trim()
+        if (editingUser.userOrgId && department !== (editingUser.department ?? "")) {
+          await updateOrgMemberDetails.mutateAsync({
+            userOrgId: editingUser.userOrgId,
+            params: { jobTitle: department || null, departmentId: null, employeeId: null },
+          })
+        }
       } else {
         if (!email) throw new Error("Email is required")
         if (selectedRoles.length === 0) throw new Error("At least one role is required")
@@ -210,6 +237,59 @@ export function UserManagement() {
           </Button>
         )}
       </div>
+
+      {canCreate && orgReady ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMemberError(null)
+              setMemberModal("addByName")
+            }}
+          >
+            {t("settings.adminOps.members.addExistingButton")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMemberError(null)
+              setMemberModal("addById")
+            }}
+          >
+            {t("settings.adminOps.members.addByRoleIdButton")}
+          </Button>
+          {canEdit ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMemberError(null)
+                  setMemberModal("updateDetails")
+                }}
+              >
+                {t("settings.adminOps.members.updateDetailsButton")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMemberError(null)
+                  setMemberModal("updateRole")
+                }}
+              >
+                {t("settings.adminOps.members.updateRoleButton")}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {!orgReady ? (
         <p className="text-sm text-muted-foreground">{t("settings.formConfig.noOrganization")}</p>
@@ -417,6 +497,63 @@ export function UserManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {memberModal ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMemberModal(null)
+              setMemberError(null)
+            }
+          }}
+          config={
+            memberModal === "addByName"
+              ? addOrgMemberForm(t, roleNameOptions)
+              : memberModal === "addById"
+                ? addUserToOrganizationForm(t, roleOptions)
+                : memberModal === "updateRole"
+                  ? updateOrgMemberRoleForm(t, roleNameOptions)
+                  : updateOrgMemberDetailsForm(t)
+          }
+          isPending={
+            addOrgMember.isPending ||
+            addUserToOrganization.isPending ||
+            updateOrgMemberDetails.isPending ||
+            updateOrgMemberRole.isPending
+          }
+          closeOnSubmit={false}
+          submitError={memberError}
+          onSubmit={async (data) => {
+            setMemberError(null)
+            try {
+              if (memberModal === "addByName") {
+                await addOrgMember.mutateAsync(data)
+              } else if (memberModal === "addById") {
+                await addUserToOrganization.mutateAsync(data)
+              } else if (memberModal === "updateRole") {
+                await updateOrgMemberRole.mutateAsync({
+                  userOrgId: data.userOrgId as string | number,
+                  roleName: String(data.roleName ?? ""),
+                })
+              } else {
+                await updateOrgMemberDetails.mutateAsync({
+                  userOrgId: data.userOrgId as string | number,
+                  params: {
+                    jobTitle: data.jobTitle ? String(data.jobTitle) : null,
+                    employeeId: data.employeeId ? String(data.employeeId) : null,
+                    departmentId: null,
+                  },
+                })
+              }
+              await refetch()
+              setMemberModal(null)
+            } catch (error) {
+              setMemberError(error instanceof Error ? error.message : String(error))
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

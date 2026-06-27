@@ -13,6 +13,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   projectsCsvImportForm,
+  ImportAssistantWizard,
 } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
@@ -799,7 +800,21 @@ function ProjectsClientLoaded({
           }}
         />
       ) : null}
-      {csvKind && csvFormConfig ? (
+      {csvKind === "task" ? (
+        <ImportAssistantWizard
+          key="task-assistant"
+          open
+          organizationId={organizationId}
+          onOpenChange={(open) => !open && setCsvKind(null)}
+          targetEntity="project_task"
+          title={t("projects.csvImport.taskTitle")}
+          isImportPending={csvImports.importTask.isPending}
+          onImport={async (csvData) => {
+            await csvImports.importTask.mutateAsync(csvData)
+          }}
+        />
+      ) : null}
+      {csvKind && csvKind !== "task" && csvFormConfig ? (
         <FormModal
           key={csvKind}
           open

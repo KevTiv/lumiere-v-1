@@ -770,6 +770,193 @@ export const newQualityAlertForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const assignQualityAlertForm = (t: TFunction): FormConfig => ({
+  id: "assign-quality-alert",
+  title: t("inventory.forms.assignQualityAlert.title"),
+  description: t("inventory.forms.assignQualityAlert.description"),
+  submitLabel: t("inventory.forms.assignQualityAlert.submitLabel"),
+  sections: [
+    {
+      id: "assign-main",
+      fields: [
+        {
+          id: "userIdentity",
+          name: "userIdentity",
+          type: "select",
+          label: t("inventory.forms.assignQualityAlert.fields.userIdentity"),
+          placeholder: t("inventory.forms.assignQualityAlert.fields.userPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+  ],
+})
+
+export const solveQualityAlertForm = (t: TFunction): FormConfig => ({
+  id: "solve-quality-alert",
+  title: t("inventory.forms.solveQualityAlert.title"),
+  description: t("inventory.forms.solveQualityAlert.description"),
+  submitLabel: t("inventory.forms.solveQualityAlert.submitLabel"),
+  sections: [
+    {
+      id: "solve-main",
+      fields: [
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("inventory.forms.solveQualityAlert.fields.description"),
+          placeholder: t("inventory.forms.solveQualityAlert.fields.descriptionPlaceholder"),
+          width: "full",
+          rows: 4,
+        },
+      ],
+    },
+  ],
+})
+
+export const blockSerialForm = (t: TFunction): FormConfig => ({
+  id: "block-serial",
+  title: t("inventory.forms.blockSerial.title"),
+  description: t("inventory.forms.blockSerial.description"),
+  submitLabel: t("inventory.forms.blockSerial.submitLabel"),
+  sections: [
+    {
+      id: "block-main",
+      fields: [
+        {
+          id: "reason",
+          name: "reason",
+          type: "text",
+          label: t("inventory.forms.blockSerial.fields.reason"),
+          placeholder: t("inventory.forms.blockSerial.fields.reasonPlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const serialDetailForm = (t: TFunction): FormConfig => ({
+  id: "serial-detail",
+  title: t("inventory.forms.serialDetail.title"),
+  description: t("inventory.forms.serialDetail.description"),
+  submitLabel: t("common.close"),
+  sections: [
+    {
+      id: "serial-main",
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("inventory.productionSerials.columns.name"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "text",
+          label: t("inventory.productionSerials.columns.productId"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "state",
+          name: "state",
+          type: "text",
+          label: t("inventory.productionSerials.columns.state"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "isLocked",
+          name: "isLocked",
+          type: "text",
+          label: t("inventory.productionSerials.columns.isLocked"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "locationId",
+          name: "locationId",
+          type: "text",
+          label: t("inventory.productionSerials.columns.locationId"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "note",
+          name: "note",
+          type: "textarea",
+          label: t("inventory.serialActions.notePrompt"),
+          disabled: true,
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const lotDetailForm = (t: TFunction): FormConfig => ({
+  id: "lot-detail",
+  title: t("inventory.forms.lotDetail.title"),
+  description: t("inventory.forms.lotDetail.description"),
+  submitLabel: t("common.close"),
+  sections: [
+    {
+      id: "lot-main",
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("inventory.productionLots.columns.name"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "text",
+          label: t("inventory.productionLots.columns.productId"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "ref",
+          name: "ref",
+          type: "text",
+          label: t("inventory.productionLots.columns.ref"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "expirationDate",
+          name: "expirationDate",
+          type: "text",
+          label: t("inventory.productionLots.columns.expirationDate"),
+          disabled: true,
+          width: "1/2",
+        },
+        {
+          id: "note",
+          name: "note",
+          type: "textarea",
+          label: t("inventory.lotActions.notePrompt"),
+          disabled: true,
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
 export const newQualityPointForm = (t: TFunction): FormConfig => ({
   id: "new-quality-point",
   title: t("inventory.forms.newQualityPoint.title"),
@@ -1780,6 +1967,11 @@ export const inventoryFormConfigs = (t: TFunction): Record<string, FormConfig> =
   "assign-user-picking": assignUserToPickingForm(t),
   "new-quality-check": newQualityCheckForm(t),
   "new-quality-alert": newQualityAlertForm(t),
+  "assign-quality-alert": assignQualityAlertForm(t),
+  "solve-quality-alert": solveQualityAlertForm(t),
+  "block-serial": blockSerialForm(t),
+  "serial-detail": serialDetailForm(t),
+  "lot-detail": lotDetailForm(t),
   "new-quality-point": newQualityPointForm(t),
   "new-quality-team": newQualityTeamForm(t),
   "new-barcode-rule": newBarcodeRuleForm(t),

@@ -3,10 +3,11 @@
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
+import { sanitizeImportSkillInputs } from '@lumiere/erp-shared/csv-import-safety'
+
 import {
   optionalPositiveInteger,
   parseJsonBody,
-  positiveInteger,
   proxyAiGateway,
   requireAiRouteContext,
   sanitizeRecord,
@@ -38,6 +39,17 @@ export async function POST(request: NextRequest) {
   }
 
   const inputs = sanitizeRecord(body.inputs) ?? {}
+
+  let safeInputs = inputs
+  if (skillKey === 'import_mapping') {
+    try {
+      safeInputs = sanitizeImportSkillInputs(inputs)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+  }
+
   const agentId = optionalPositiveInteger(body.agentId ?? body.agent_id)
   const teamMemberId = optionalPositiveInteger(body.teamMemberId ?? body.team_member_id)
   const overrides = sanitizeRecord(body.overrides)
@@ -53,7 +65,7 @@ export async function POST(request: NextRequest) {
     org_id: orgId,
     company_id: companyId,
     skill_key: skillKey,
-    inputs,
+    inputs: safeInputs,
     stdb_token: session.stdbToken,
     triggered_by_hex: session.identityHex,
     ...(agentId != null ? { agent_id: agentId } : {}),

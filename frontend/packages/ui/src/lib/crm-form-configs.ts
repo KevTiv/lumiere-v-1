@@ -517,6 +517,251 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newContactTagForm = (t: TFunction): FormConfig => ({
+  id: "new-contact-tag",
+  title: t("crm.forms.newContactTag.title"),
+  description: t("crm.forms.newContactTag.description"),
+  sections: [
+    {
+      id: "tag",
+      title: t("crm.forms.newContactTag.sections.tag"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("crm.forms.newContactTag.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "color",
+          name: "color",
+          type: "text",
+          label: t("crm.forms.newContactTag.fields.color"),
+          placeholder: t("crm.forms.newContactTag.fields.colorPlaceholder"),
+          width: "1/2",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("crm.forms.newContactTag.fields.description"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const newContactSegmentForm = (t: TFunction): FormConfig => ({
+  id: "new-contact-segment",
+  title: t("crm.forms.newContactSegment.title"),
+  description: t("crm.forms.newContactSegment.description"),
+  sections: [
+    {
+      id: "segment",
+      title: t("crm.forms.newContactSegment.sections.segment"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("crm.forms.newContactSegment.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "isDynamic",
+          name: "isDynamic",
+          type: "checkbox",
+          label: t("crm.forms.newContactSegment.fields.isDynamic"),
+          width: "1/2",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("crm.forms.newContactSegment.fields.isActive"),
+          defaultValue: true,
+          width: "1/2",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("crm.forms.newContactSegment.fields.description"),
+          width: "full",
+          rows: 2,
+        },
+        {
+          id: "domain",
+          name: "domain",
+          type: "text",
+          label: t("crm.forms.newContactSegment.fields.domain"),
+          placeholder: t("crm.forms.newContactSegment.fields.domainPlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editContactForm = (t: TFunction): FormConfig => ({
+  id: "edit-contact",
+  title: t("crm.forms.editContact.title"),
+  description: t("crm.forms.editContact.description"),
+  submitLabel: t("crm.forms.editContact.submit"),
+  sections: [
+    {
+      id: "core",
+      title: t("crm.forms.editContact.sections.core"),
+      fields: [
+        { id: "name", name: "name", type: "text", label: t("crm.forms.editContact.fields.name"), width: "full" },
+        { id: "email", name: "email", type: "text", label: t("crm.forms.editContact.fields.email"), width: "1/2" },
+        { id: "phone", name: "phone", type: "text", label: t("crm.forms.editContact.fields.phone"), width: "1/2" },
+        { id: "mobile", name: "mobile", type: "text", label: t("crm.forms.editContact.fields.mobile"), width: "1/2" },
+        {
+          id: "isCustomer",
+          name: "isCustomer",
+          type: "checkbox",
+          label: t("crm.forms.editContact.fields.isCustomer"),
+          width: "1/2",
+        },
+        {
+          id: "isVendor",
+          name: "isVendor",
+          type: "checkbox",
+          label: t("crm.forms.editContact.fields.isVendor"),
+          width: "1/2",
+        },
+        {
+          id: "isProspect",
+          name: "isProspect",
+          type: "checkbox",
+          label: t("crm.forms.editContact.fields.isProspect"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editContactAddressForm = (t: TFunction): FormConfig => ({
+  id: "edit-contact-address",
+  title: t("crm.forms.editContactAddress.title"),
+  submitLabel: t("crm.forms.editContactAddress.submit"),
+  sections: [
+    {
+      id: "address",
+      title: t("crm.forms.editContactAddress.sections.address"),
+      fields: [
+        { id: "street", name: "street", type: "text", label: t("crm.forms.editContactAddress.fields.street"), width: "full" },
+        { id: "street2", name: "street2", type: "text", label: t("crm.forms.editContactAddress.fields.street2"), width: "full" },
+        { id: "city", name: "city", type: "text", label: t("crm.forms.editContactAddress.fields.city"), width: "1/2" },
+        { id: "stateCode", name: "stateCode", type: "text", label: t("crm.forms.editContactAddress.fields.stateCode"), width: "1/2" },
+        { id: "zip", name: "zip", type: "text", label: t("crm.forms.editContactAddress.fields.zip"), width: "1/2" },
+        { id: "countryCode", name: "countryCode", type: "text", label: t("crm.forms.editContactAddress.fields.countryCode"), width: "1/2" },
+      ],
+    },
+  ],
+})
+
+export const editContactBusinessForm = (t: TFunction): FormConfig => ({
+  id: "edit-contact-business",
+  title: t("crm.forms.editContactBusiness.title"),
+  submitLabel: t("crm.forms.editContactBusiness.submit"),
+  sections: [
+    {
+      id: "business",
+      title: t("crm.forms.editContactBusiness.sections.business"),
+      fields: [
+        { id: "taxId", name: "taxId", type: "text", label: t("crm.forms.editContactBusiness.fields.taxId"), width: "1/2" },
+        { id: "industry", name: "industry", type: "text", label: t("crm.forms.editContactBusiness.fields.industry"), width: "1/2" },
+        { id: "companyRegistry", name: "companyRegistry", type: "text", label: t("crm.forms.editContactBusiness.fields.companyRegistry"), width: "1/2" },
+        { id: "employeesCount", name: "employeesCount", type: "number", label: t("crm.forms.editContactBusiness.fields.employeesCount"), width: "1/2" },
+        { id: "annualRevenue", name: "annualRevenue", type: "number", label: t("crm.forms.editContactBusiness.fields.annualRevenue"), width: "1/2" },
+      ],
+    },
+  ],
+})
+
+export const editContactDetailsForm = (t: TFunction): FormConfig => ({
+  id: "edit-contact-details",
+  title: t("crm.forms.editContactDetails.title"),
+  submitLabel: t("crm.forms.editContactDetails.submit"),
+  sections: [
+    {
+      id: "details",
+      title: t("crm.forms.editContactDetails.sections.details"),
+      fields: [
+        { id: "firstName", name: "firstName", type: "text", label: t("crm.forms.editContactDetails.fields.firstName"), width: "1/2" },
+        { id: "lastName", name: "lastName", type: "text", label: t("crm.forms.editContactDetails.fields.lastName"), width: "1/2" },
+        { id: "title", name: "title", type: "text", label: t("crm.forms.editContactDetails.fields.title"), width: "1/2" },
+        { id: "website", name: "website", type: "text", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
+        { id: "emailSecondary", name: "emailSecondary", type: "text", label: t("crm.forms.editContactDetails.fields.emailSecondary"), width: "1/2" },
+        { id: "fax", name: "fax", type: "text", label: t("crm.forms.editContactDetails.fields.fax"), width: "1/2" },
+        { id: "description", name: "description", type: "textarea", label: t("crm.forms.editContactDetails.fields.description"), width: "full", rows: 3 },
+      ],
+    },
+  ],
+})
+
+export const editLeadDetailsForm = (t: TFunction): FormConfig => ({
+  id: "edit-lead-details",
+  title: t("crm.forms.editLeadDetails.title"),
+  submitLabel: t("crm.forms.editLeadDetails.submit"),
+  sections: [
+    {
+      id: "details",
+      title: t("crm.forms.editLeadDetails.sections.details"),
+      fields: [
+        { id: "contactName", name: "contactName", type: "text", label: t("crm.forms.editLeadDetails.fields.contactName"), width: "full" },
+        { id: "title", name: "title", type: "text", label: t("crm.forms.editLeadDetails.fields.title"), width: "1/2" },
+        { id: "website", name: "website", type: "text", label: t("crm.forms.editLeadDetails.fields.website"), width: "1/2" },
+        { id: "industry", name: "industry", type: "text", label: t("crm.forms.editLeadDetails.fields.industry"), width: "1/2" },
+        { id: "referredBy", name: "referredBy", type: "text", label: t("crm.forms.editLeadDetails.fields.referredBy"), width: "1/2" },
+        { id: "description", name: "description", type: "textarea", label: t("crm.forms.editLeadDetails.fields.description"), width: "full", rows: 3 },
+      ],
+    },
+  ],
+})
+
+export const editLeadAddressForm = (t: TFunction): FormConfig => ({
+  id: "edit-lead-address",
+  title: t("crm.forms.editLeadAddress.title"),
+  submitLabel: t("crm.forms.editLeadAddress.submit"),
+  sections: [
+    {
+      id: "address",
+      title: t("crm.forms.editLeadAddress.sections.address"),
+      fields: [
+        { id: "street", name: "street", type: "text", label: t("crm.forms.editLeadAddress.fields.street"), width: "full" },
+        { id: "city", name: "city", type: "text", label: t("crm.forms.editLeadAddress.fields.city"), width: "1/2" },
+        { id: "zip", name: "zip", type: "text", label: t("crm.forms.editLeadAddress.fields.zip"), width: "1/2" },
+        { id: "countryCode", name: "countryCode", type: "text", label: t("crm.forms.editLeadAddress.fields.countryCode"), width: "1/2" },
+      ],
+    },
+  ],
+})
+
+export const editLeadRevenueForm = (t: TFunction): FormConfig => ({
+  id: "edit-lead-revenue",
+  title: t("crm.forms.editLeadRevenue.title"),
+  submitLabel: t("crm.forms.editLeadRevenue.submit"),
+  sections: [
+    {
+      id: "revenue",
+      title: t("crm.forms.editLeadRevenue.sections.revenue"),
+      fields: [
+        { id: "expectedRevenue", name: "expectedRevenue", type: "number", label: t("crm.forms.editLeadRevenue.fields.expectedRevenue"), width: "1/2" },
+        { id: "probability", name: "probability", type: "number", label: t("crm.forms.editLeadRevenue.fields.probability"), width: "1/2" },
+      ],
+    },
+  ],
+})
+
 export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-lead": newLeadForm(t),
   "new-opportunity": newOpportunityForm(t),
@@ -528,4 +773,13 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "convert-opportunity-order": convertOpportunityToOrderForm(t),
   "assign-tag-contact": assignTagToContactForm(t),
   "add-contact-segment": addContactToSegmentForm(t),
+  "new-contact-tag": newContactTagForm(t),
+  "new-contact-segment": newContactSegmentForm(t),
+  "edit-contact": editContactForm(t),
+  "edit-contact-address": editContactAddressForm(t),
+  "edit-contact-business": editContactBusinessForm(t),
+  "edit-contact-details": editContactDetailsForm(t),
+  "edit-lead-details": editLeadDetailsForm(t),
+  "edit-lead-address": editLeadAddressForm(t),
+  "edit-lead-revenue": editLeadRevenueForm(t),
 })

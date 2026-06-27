@@ -11,6 +11,9 @@ const INVENTORY_KEY_TAB_IDS = [
   "warehouses",
   "adjustments",
   "locations",
+  "location-tree",
+  "cycle-wizard",
+  "quality-alerts",
 ] as const
 
 async function openInventoryTab(page: Page, tabId: string) {
@@ -53,6 +56,15 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
     case "locations":
       await expect(page.getByTestId("module-create-inventory-locations")).toBeVisible()
       await expect(page.getByTestId("entity-table")).toBeVisible()
+      break
+    case "location-tree":
+      await expect(page.getByText("Location hierarchy")).toBeVisible()
+      break
+    case "cycle-wizard":
+      await expect(page.getByText("Cycle count")).toBeVisible()
+      break
+    case "quality-alerts":
+      await expect(page.getByText("Quality alerts")).toBeVisible()
       break
     default:
       break

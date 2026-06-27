@@ -9,6 +9,8 @@ const PURCHASING_TAB_IDS = [
   "requisitions",
   "vendors",
   "partner-banks",
+  "landed-costs",
+  "supplier-intakes",
 ] as const
 
 async function openPurchasingTab(page: Page, tabId: string) {
@@ -40,6 +42,14 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
       break
     case "partner-banks":
       await expect(page.getByTestId("module-create-purchasing-partner-banks")).toBeVisible()
+      await expect(page.getByTestId("entity-table")).toBeVisible()
+      break
+    case "landed-costs":
+      await expect(page.getByTestId("module-create-purchasing-landed-costs")).toBeVisible()
+      await expect(page.getByTestId("entity-table")).toBeVisible()
+      break
+    case "supplier-intakes":
+      await expect(page.getByTestId("module-create-purchasing-supplier-intakes")).toBeVisible()
       await expect(page.getByTestId("entity-table")).toBeVisible()
       break
     default:

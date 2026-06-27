@@ -2,7 +2,16 @@
  * Maps CRM edit / lifecycle form payloads to UpdateOpportunityParams.
  */
 
-import type { UpdateOpportunityParams } from "@lumiere/stdb/types"
+import type {
+  UpdateContactAddressParams,
+  UpdateContactBusinessParams,
+  UpdateContactDetailsParams,
+  UpdateContactParams,
+  UpdateLeadAddressParams,
+  UpdateLeadDetailsParams,
+  UpdateLeadRevenueParams,
+  UpdateOpportunityParams,
+} from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -94,4 +103,157 @@ export function toUpdateOpportunityParams(
   if (dateDeadline !== undefined) out.dateDeadline = dateDeadline
 
   return Object.keys(out).length > 0 ? out : null
+}
+
+function patchFromForm(
+  formData: Record<string, unknown>,
+  fields: string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of fields) {
+    if (!(key in formData)) continue
+    const raw = formData[key]
+    if (raw === "" || raw == null) continue
+    if (typeof raw === "boolean") {
+      out[key] = raw
+      continue
+    }
+    if (key === "employeesCount") {
+      const n = Number(raw)
+      if (Number.isFinite(n)) out[key] = Math.trunc(n)
+      continue
+    }
+    if (key === "expectedRevenue" || key === "probability" || key === "annualRevenue") {
+      const n = Number(raw)
+      if (Number.isFinite(n)) out[key] = n
+      continue
+    }
+    const s = optionalTrimmedString(raw)
+    if (s !== undefined) out[key] = s
+  }
+  return out
+}
+
+export function toUpdateContactParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateContactParams> | null {
+  const out = patchFromForm(formData, [
+    "name",
+    "email",
+    "phone",
+    "mobile",
+    "isCustomer",
+    "isVendor",
+    "isProspect",
+    "isPartner",
+  ]) as Partial<UpdateContactParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateContactAddressParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateContactAddressParams> | null {
+  const out = patchFromForm(formData, [
+    "street",
+    "street2",
+    "city",
+    "stateCode",
+    "zip",
+    "countryCode",
+  ]) as Partial<UpdateContactAddressParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateContactBusinessParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateContactBusinessParams> | null {
+  const out = patchFromForm(formData, [
+    "taxId",
+    "companyRegistry",
+    "industry",
+    "employeesCount",
+    "annualRevenue",
+  ]) as Partial<UpdateContactBusinessParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateContactDetailsParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateContactDetailsParams> | null {
+  const out = patchFromForm(formData, [
+    "firstName",
+    "lastName",
+    "title",
+    "emailSecondary",
+    "fax",
+    "website",
+    "description",
+    "color",
+  ]) as Partial<UpdateContactDetailsParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateLeadDetailsParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateLeadDetailsParams> | null {
+  const out = patchFromForm(formData, [
+    "contactName",
+    "title",
+    "website",
+    "industry",
+    "referredBy",
+    "description",
+  ]) as Partial<UpdateLeadDetailsParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateLeadAddressParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateLeadAddressParams> | null {
+  const out = patchFromForm(formData, [
+    "street",
+    "city",
+    "zip",
+    "countryCode",
+  ]) as Partial<UpdateLeadAddressParams>
+  return Object.keys(out).length > 0 ? out : null
+}
+
+export function toUpdateLeadRevenueParams(
+  formData: Record<string, unknown>,
+): Partial<UpdateLeadRevenueParams> | null {
+  const expectedRevenue = Number(formData.expectedRevenue ?? 0)
+  const probability = Number(formData.probability ?? 0)
+  if (!Number.isFinite(expectedRevenue) || !Number.isFinite(probability)) return null
+  return { expectedRevenue, probability }
+}
+
+export function toCreateContactTagParamsFromForm(
+  formData: Record<string, unknown>,
+): { name: string; color?: string; description?: string } | null {
+  const name = optionalTrimmedString(formData.name)
+  if (!name) return null
+  return {
+    name,
+    color: optionalTrimmedString(formData.color),
+    description: optionalTrimmedString(formData.description),
+  }
+}
+
+export function toCreateContactSegmentParamsFromForm(formData: Record<string, unknown>): {
+  name: string
+  isDynamic: boolean
+  isActive: boolean
+  description?: string
+  domain?: string
+} | null {
+  const name = optionalTrimmedString(formData.name)
+  if (!name) return null
+  return {
+    name,
+    isDynamic: Boolean(formData.isDynamic),
+    isActive: formData.isActive !== false,
+    description: optionalTrimmedString(formData.description),
+    domain: optionalTrimmedString(formData.domain),
+  }
 }

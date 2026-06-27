@@ -9,6 +9,7 @@ import {
   FormModal,
   newSaleOrderForm,
   newPricelistForm,
+  newPricelistItemForm,
   newPickingBatchForm,
   newLoyaltyCardForm,
   MissingOrganization,
@@ -18,6 +19,7 @@ import {
   pricelistItemsTableConfig,
   deliveriesTableConfig,
   csvImportForm,
+  ImportAssistantWizard,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
@@ -42,12 +44,19 @@ import { salesModuleConfig } from '@/lib/module-dashboard-configs';
 import { groupBy, groupByMonth } from '@/lib/utils';
 import { identityToHex } from '@/lib/helpdesk-display';
 import {
+  buildOrderIdMapFromSaleOrders,
+  SALE_ORDER_IMPORT_BUNDLE,
+  type SaleOrderLinkRow,
+} from '@lumiere/erp-shared/csv-import-bundles';
+import { fetchQueryList } from '@lumiere/query-hooks/http';
+import {
   useSaleOrders,
   useSaleOrderLines,
   usePricelists,
   usePickingBatches,
   useCreateSaleOrder,
   useCreatePricelist,
+  useCreatePricelistItem,
   useCreatePickingBatch,
   useConfirmSaleOrder,
   useCancelSaleOrder,
@@ -92,6 +101,8 @@ import {
   warehouseRowsToSelectOptions,
   loyaltyProgramRowsToSelectOptions,
 } from '@/lib/form-lookup';
+import { stdbParamsToJson } from '@/lib/stdb-params-json';
+import type { CreatePricelistItemParams } from '@lumiere/stdb/types';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -105,6 +116,54 @@ function deliveryBatchState(row: Record<string, unknown>): string {
   if (v != null && typeof v === 'object' && 'tag' in v)
     return String((v as { tag: string }).tag);
   return String(v ?? '');
+}
+
+function toCreatePricelistItemParams(
+  formData: Record<string, unknown>,
+): CreatePricelistItemParams | null {
+  const pricelistRaw = formData.pricelistId;
+  if (pricelistRaw == null || String(pricelistRaw).trim() === '') return null;
+  const pricelistId = BigInt(String(pricelistRaw));
+  const appliedOnRaw = String(formData.appliedOn ?? 'AllProducts');
+  const computeRaw = String(formData.computePrice ?? 'Fixed');
+  const appliedOn =
+    appliedOnRaw === 'Category'
+      ? { tag: 'Category' as const }
+      : appliedOnRaw === 'Product'
+        ? { tag: 'Product' as const }
+        : { tag: 'AllProducts' as const };
+  const computePrice =
+    computeRaw === 'Percentage'
+      ? { tag: 'Percentage' as const }
+      : computeRaw === 'Formula'
+        ? { tag: 'Formula' as const }
+        : { tag: 'Fixed' as const };
+  const productRaw = formData.productId;
+  const categRaw = formData.categId;
+  return {
+    pricelistId,
+    appliedOn,
+    computePrice,
+    productTmplId: undefined,
+    productId:
+      productRaw == null || String(productRaw).trim() === ''
+        ? undefined
+        : BigInt(String(productRaw)),
+    categId:
+      categRaw == null || String(categRaw).trim() === ''
+        ? undefined
+        : BigInt(String(categRaw)),
+    minQuantity: Number(formData.minQuantity ?? 1) || 0,
+    dateStart: undefined,
+    dateEnd: undefined,
+    fixedPrice: Number(formData.fixedPrice ?? 0) || 0,
+    percentPrice: Number(formData.percentPrice ?? 0) || 0,
+    priceDiscount: Number(formData.priceDiscount ?? 0) || 0,
+    priceSurcharge: 0,
+    priceMinMargin: 0,
+    priceMaxMargin: 0,
+    sequence: Math.max(0, Math.trunc(Number(formData.sequence ?? 10))),
+  };
 }
 
 interface SalesClientProps {
@@ -205,6 +264,7 @@ function SalesClientLoaded({
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
+  const createPricelistItem = useCreatePricelistItem(orgId);
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
   const confirmSaleOrder = useConfirmSaleOrder(orgId);
   const cancelSaleOrder = useCancelSaleOrder(orgId);
@@ -272,6 +332,14 @@ function SalesClientLoaded({
       { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
     ];
   }, [warehouses, t]);
+
+  const pricelistItemFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPricelistItemForm(t), {
+        pricelistId: pricelistFieldOptions,
+      }),
+    [t, pricelistFieldOptions],
+  );
 
   const salesRepLabelByIdentity = useMemo(() => {
     const map = new Map<string, string>();
@@ -714,7 +782,13 @@ function SalesClientLoaded({
             return { ...tab, entityConfig: pricelistsEntityConfig };
           }
           if (tab.id === 'pricelist-items' && tab.type === 'entity') {
-            return { ...tab, entityConfig: pricelistItemsEntityConfig };
+            return {
+              ...tab,
+              entityConfig: pricelistItemsEntityConfig,
+              createForm: pricelistItemFormConfig,
+              createLabel: t('sales.actions.newPricelistItem'),
+              createAction: 'createPricelistItem',
+            };
           }
           if (tab.id === 'deliveries' && tab.type === 'entity') {
             return {
@@ -736,6 +810,7 @@ function SalesClientLoaded({
       ordersEntityConfig,
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
+      pricelistItemFormConfig,
       deliveriesEntityConfig,
       loyaltyCardFormConfig,
       t,
@@ -798,6 +873,9 @@ function SalesClientLoaded({
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData);
       if (p) await createPricelist.mutateAsync(p);
+    } else if (action === 'createPricelistItem') {
+      const p = toCreatePricelistItemParams(formData);
+      if (p) await createPricelistItem.mutateAsync(stdbParamsToJson(p));
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParams(formData);
       if (p) await createPickingBatch.mutateAsync(p);
@@ -835,6 +913,7 @@ function SalesClientLoaded({
   const isFormMutationPending =
     createSaleOrder.isPending ||
     createPricelist.isPending ||
+    createPricelistItem.isPending ||
     createPickingBatch.isPending ||
     confirmSaleOrder.isPending ||
     cancelSaleOrder.isPending ||
@@ -881,7 +960,32 @@ function SalesClientLoaded({
           }
         }}
       />
-      {csvKind && csvFormConfig ? (
+      {csvKind === 'order' ? (
+        <ImportAssistantWizard
+          key="order-assistant"
+          open
+          organizationId={organizationId}
+          onOpenChange={(open) => !open && setCsvKind(null)}
+          targetEntity="sale_order"
+          importBundle={SALE_ORDER_IMPORT_BUNDLE}
+          title={t('sales.csvImport.ordersTitle')}
+          isImportPending={importSaleOrderCsv.isPending || importSaleOrderLineCsv.isPending}
+          onImport={async (csvData) => {
+            await importSaleOrderCsv.mutateAsync(csvData);
+          }}
+          onImportLines={async (lineCsv) => {
+            await importSaleOrderLineCsv.mutateAsync(lineCsv);
+          }}
+          resolveOrderIds={async (refs) => {
+            const orders = (await fetchQueryList(
+              '/api/query/sale-orders',
+              'Failed to fetch sale orders',
+            )) as SaleOrderLinkRow[];
+            return buildOrderIdMapFromSaleOrders(orders, refs);
+          }}
+        />
+      ) : null}
+      {csvKind && csvKind !== 'order' && csvFormConfig ? (
         <FormModal
           key={csvKind}
           open

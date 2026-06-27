@@ -274,10 +274,53 @@ export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Contact tags & segments ───────────────────────────────────────────────────
+export const contactTagsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "contact-tags-table",
+  title: t("crm.contactTags.title"),
+  description: t("crm.contactTags.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("crm.contactTags.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("crm.contactTags.columns.name"), width: "min-w-36" },
+      { key: "color", label: t("crm.contactTags.columns.color"), width: "min-w-24" },
+      { key: "description", label: t("crm.contactTags.columns.description"), width: "min-w-48" },
+    ],
+    emptyMessage: t("crm.contactTags.emptyMessage"),
+  },
+})
+
+export const contactSegmentsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "contact-segments-table",
+  title: t("crm.contactSegments.title"),
+  description: t("crm.contactSegments.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("crm.contactSegments.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("crm.contactSegments.columns.name"), width: "min-w-36" },
+      { key: "isDynamic", label: t("crm.contactSegments.columns.isDynamic"), type: "boolean", align: "center" },
+      { key: "isActive", label: t("crm.contactSegments.columns.isActive"), type: "boolean", align: "center" },
+      { key: "memberCount", label: t("crm.contactSegments.columns.memberCount"), type: "number", align: "right" },
+      { key: "description", label: t("crm.contactSegments.columns.description"), width: "min-w-48" },
+    ],
+    emptyMessage: t("crm.contactSegments.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const crmEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "leads-table": leadsTableConfig(t),
   "opportunities-table": opportunitiesTableConfig(t),
   "contacts-table": contactsTableConfig(t),
   "activities-table": activitiesTableConfig(t),
+  "contact-tags-table": contactTagsTableConfig(t),
+  "contact-segments-table": contactSegmentsTableConfig(t),
 })

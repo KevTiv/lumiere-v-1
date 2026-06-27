@@ -460,6 +460,392 @@ export const editPartnerBankForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+const splitMethodOptions = (t: TFunction) => [
+  { value: "Equal", label: t("purchasing.forms.landedCostLine.splitMethods.Equal") },
+  { value: "ByQuantity", label: t("purchasing.forms.landedCostLine.splitMethods.ByQuantity") },
+  { value: "ByCurrentCost", label: t("purchasing.forms.landedCostLine.splitMethods.ByCurrentCost") },
+  { value: "ByWeight", label: t("purchasing.forms.landedCostLine.splitMethods.ByWeight") },
+  { value: "ByVolume", label: t("purchasing.forms.landedCostLine.splitMethods.ByVolume") },
+]
+
+export const newLandedCostForm = (t: TFunction): FormConfig => ({
+  id: "new-landed-cost",
+  title: t("purchasing.forms.newLandedCost.title"),
+  description: t("purchasing.forms.newLandedCost.description"),
+  sections: [
+    {
+      id: "lc-main",
+      title: t("purchasing.forms.newLandedCost.sections.main"),
+      fields: [
+        {
+          id: "pickingId",
+          name: "pickingId",
+          type: "select",
+          label: t("purchasing.forms.newLandedCost.fields.pickingId"),
+          placeholder: t("purchasing.forms.newLandedCost.fields.pickingPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "targetMove",
+          name: "targetMove",
+          type: "select",
+          label: t("purchasing.forms.newLandedCost.fields.targetMove"),
+          required: true,
+          width: "1/2",
+          defaultValue: "receipt",
+          options: [
+            { value: "receipt", label: t("purchasing.forms.newLandedCost.targetMoves.receipt") },
+            { value: "posted", label: t("purchasing.forms.newLandedCost.targetMoves.posted") },
+          ],
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "number",
+          label: t("purchasing.forms.newLandedCost.fields.currencyId"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "amountTotal",
+          name: "amountTotal",
+          type: "number",
+          label: t("purchasing.forms.newLandedCost.fields.amountTotal"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "date",
+          name: "date",
+          type: "date",
+          label: t("purchasing.forms.newLandedCost.fields.date"),
+          width: "1/2",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("purchasing.forms.newLandedCost.fields.description"),
+          placeholder: t("purchasing.forms.newLandedCost.fields.descriptionPlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editLandedCostForm = (t: TFunction): FormConfig => ({
+  id: "edit-landed-cost",
+  title: t("purchasing.forms.editLandedCost.title"),
+  description: t("purchasing.forms.editLandedCost.description"),
+  sections: [
+    {
+      id: "elc-main",
+      title: t("purchasing.forms.editLandedCost.sections.main"),
+      fields: [
+        {
+          id: "landedCostId",
+          name: "landedCostId",
+          type: "select",
+          label: t("purchasing.forms.editLandedCost.fields.landedCostId"),
+          placeholder: t("purchasing.forms.editLandedCost.fields.landedCostPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "targetMove",
+          name: "targetMove",
+          type: "select",
+          label: t("purchasing.forms.editLandedCost.fields.targetMove"),
+          width: "1/2",
+          options: [
+            { value: "", label: t("purchasing.forms.editLandedCost.fields.noChange") },
+            { value: "receipt", label: t("purchasing.forms.newLandedCost.targetMoves.receipt") },
+            { value: "posted", label: t("purchasing.forms.newLandedCost.targetMoves.posted") },
+          ],
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "number",
+          label: t("purchasing.forms.editLandedCost.fields.currencyId"),
+          width: "1/2",
+        },
+        {
+          id: "amountTotal",
+          name: "amountTotal",
+          type: "number",
+          label: t("purchasing.forms.editLandedCost.fields.amountTotal"),
+          width: "1/2",
+        },
+        {
+          id: "date",
+          name: "date",
+          type: "date",
+          label: t("purchasing.forms.editLandedCost.fields.date"),
+          width: "1/2",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("purchasing.forms.editLandedCost.fields.description"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
+  id: "add-landed-cost-line",
+  title: t("purchasing.forms.landedCostLine.addTitle"),
+  description: t("purchasing.forms.landedCostLine.addDescription"),
+  sections: [
+    {
+      id: "lcl-header",
+      title: t("purchasing.forms.landedCostLine.sections.landedCost"),
+      fields: [
+        {
+          id: "landedCostId",
+          name: "landedCostId",
+          type: "select",
+          label: t("purchasing.forms.landedCostLine.fields.landedCostId"),
+          placeholder: t("purchasing.forms.landedCostLine.fields.landedCostPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "lcl-line",
+      title: t("purchasing.forms.landedCostLine.sections.line"),
+      fields: [
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("purchasing.forms.landedCostLine.fields.productId"),
+          placeholder: t("purchasing.forms.landedCostLine.fields.productPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "number",
+          label: t("purchasing.forms.landedCostLine.fields.currencyId"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("purchasing.forms.landedCostLine.fields.priceUnit"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "splitMethod",
+          name: "splitMethod",
+          type: "select",
+          label: t("purchasing.forms.landedCostLine.fields.splitMethod"),
+          required: true,
+          width: "1/2",
+          defaultValue: "Equal",
+          options: splitMethodOptions(t),
+        },
+      ],
+    },
+  ],
+})
+
+export const removeLandedCostLineForm = (t: TFunction): FormConfig => ({
+  id: "remove-landed-cost-line",
+  title: t("purchasing.forms.landedCostLine.removeTitle"),
+  description: t("purchasing.forms.landedCostLine.removeDescription"),
+  sections: [
+    {
+      id: "rlcl-line",
+      title: t("purchasing.forms.landedCostLine.sections.remove"),
+      fields: [
+        {
+          id: "lineId",
+          name: "lineId",
+          type: "number",
+          label: t("purchasing.forms.landedCostLine.fields.lineId"),
+          placeholder: t("purchasing.forms.landedCostLine.fields.lineIdPlaceholder"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const newSupplierIntakeForm = (t: TFunction): FormConfig => ({
+  id: "new-supplier-intake",
+  title: t("purchasing.forms.newSupplierIntake.title"),
+  description: t("purchasing.forms.newSupplierIntake.description"),
+  sections: [
+    {
+      id: "si-company",
+      title: t("purchasing.forms.newSupplierIntake.sections.company"),
+      fields: [
+        {
+          id: "companyName",
+          name: "companyName",
+          type: "text",
+          label: t("purchasing.forms.newSupplierIntake.fields.companyName"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "contactName",
+          name: "contactName",
+          type: "text",
+          label: t("purchasing.forms.newSupplierIntake.fields.contactName"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "email",
+          name: "email",
+          type: "email",
+          label: t("purchasing.forms.newSupplierIntake.fields.email"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "phone",
+          name: "phone",
+          type: "tel",
+          label: t("purchasing.forms.newSupplierIntake.fields.phone"),
+          width: "1/2",
+        },
+        {
+          id: "industry",
+          name: "industry",
+          type: "text",
+          label: t("purchasing.forms.newSupplierIntake.fields.industry"),
+          width: "1/2",
+        },
+        {
+          id: "website",
+          name: "website",
+          type: "url",
+          label: t("purchasing.forms.newSupplierIntake.fields.website"),
+          width: "1/2",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("purchasing.forms.newSupplierIntake.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const reviewSupplierIntakeForm = (t: TFunction): FormConfig => ({
+  id: "review-supplier-intake",
+  title: t("purchasing.forms.reviewSupplierIntake.title"),
+  description: t("purchasing.forms.reviewSupplierIntake.description"),
+  sections: [
+    {
+      id: "rsi-main",
+      title: t("purchasing.forms.reviewSupplierIntake.sections.main"),
+      fields: [
+        {
+          id: "intakeId",
+          name: "intakeId",
+          type: "select",
+          label: t("purchasing.forms.reviewSupplierIntake.fields.intakeId"),
+          placeholder: t("purchasing.forms.reviewSupplierIntake.fields.intakePlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "reviewerNotes",
+          name: "reviewerNotes",
+          type: "textarea",
+          label: t("purchasing.forms.reviewSupplierIntake.fields.reviewerNotes"),
+          placeholder: t("purchasing.forms.reviewSupplierIntake.fields.reviewerNotesPlaceholder"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editSupplierIntakeForm = (t: TFunction): FormConfig => ({
+  id: "edit-supplier-intake",
+  title: t("purchasing.forms.editSupplierIntake.title"),
+  description: t("purchasing.forms.editSupplierIntake.description"),
+  sections: [
+    {
+      id: "esi-main",
+      title: t("purchasing.forms.editSupplierIntake.sections.main"),
+      fields: [
+        {
+          id: "intakeId",
+          name: "intakeId",
+          type: "select",
+          label: t("purchasing.forms.editSupplierIntake.fields.intakeId"),
+          placeholder: t("purchasing.forms.editSupplierIntake.fields.intakePlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "companyName",
+          name: "companyName",
+          type: "text",
+          label: t("purchasing.forms.editSupplierIntake.fields.companyName"),
+          width: "1/2",
+        },
+        {
+          id: "contactName",
+          name: "contactName",
+          type: "text",
+          label: t("purchasing.forms.editSupplierIntake.fields.contactName"),
+          width: "1/2",
+        },
+        {
+          id: "email",
+          name: "email",
+          type: "email",
+          label: t("purchasing.forms.editSupplierIntake.fields.email"),
+          width: "1/2",
+        },
+        {
+          id: "phone",
+          name: "phone",
+          type: "tel",
+          label: t("purchasing.forms.editSupplierIntake.fields.phone"),
+          width: "1/2",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("purchasing.forms.editSupplierIntake.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
@@ -469,4 +855,11 @@ export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "edit-purchase-order-line": editPurchaseOrderLineForm(t),
   "new-partner-bank": newPartnerBankForm(t),
   "edit-partner-bank": editPartnerBankForm(t),
+  "new-landed-cost": newLandedCostForm(t),
+  "edit-landed-cost": editLandedCostForm(t),
+  "add-landed-cost-line": addLandedCostLineForm(t),
+  "remove-landed-cost-line": removeLandedCostLineForm(t),
+  "new-supplier-intake": newSupplierIntakeForm(t),
+  "review-supplier-intake": reviewSupplierIntakeForm(t),
+  "edit-supplier-intake": editSupplierIntakeForm(t),
 })

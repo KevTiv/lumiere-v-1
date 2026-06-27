@@ -424,6 +424,49 @@ export const reconciliationWidgetsTableConfig = (t: TFunction): EntityViewConfig
   },
 })
 
+// ── Account journals ──────────────────────────────────────────────────────────
+export const accountJournalsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "account-journals-table",
+  title: t("accounting.entities.journals.title"),
+  description: t("accounting.entities.journals.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.journals.searchPlaceholder"),
+    searchKeys: ["name", "code"],
+    columns: [
+      { key: "code", label: t("accounting.entities.journals.columns.code"), width: "min-w-20" },
+      { key: "name", label: t("accounting.entities.journals.columns.name"), width: "min-w-36" },
+      { key: "type", label: t("accounting.entities.journals.columns.type"), width: "min-w-24" },
+      { key: "active", label: t("accounting.entities.journals.columns.active"), type: "boolean", align: "center" },
+    ],
+    emptyMessage: t("accounting.entities.journals.emptyMessage"),
+  },
+})
+
+// ── Account move lines ────────────────────────────────────────────────────────
+export const accountMoveLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "account-move-lines-table",
+  title: t("accounting.entities.moveLines.title"),
+  description: t("accounting.entities.moveLines.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.moveLines.searchPlaceholder"),
+    searchKeys: ["name", "moveId", "accountId"],
+    columns: [
+      { key: "moveId", label: t("accounting.entities.moveLines.columns.moveId"), width: "min-w-20" },
+      { key: "accountId", label: t("accounting.entities.moveLines.columns.accountId"), width: "min-w-20" },
+      { key: "name", label: t("accounting.entities.moveLines.columns.name"), width: "min-w-40" },
+      { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), type: "currency", align: "right" },
+      { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), type: "currency", align: "right" },
+    ],
+    emptyMessage: t("accounting.entities.moveLines.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const accountingEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "bank-statements-table": bankStatementsTableConfig(t),
@@ -433,6 +476,8 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "account-payments-table": accountPaymentsTableConfig(t),
   "payment-terms-table": paymentTermsTableConfig(t),
   "payment-term-lines-table": paymentTermLinesTableConfig(t),
+  "account-journals-table": accountJournalsTableConfig(t),
+  "account-move-lines-table": accountMoveLinesTableConfig(t),
   "analytic-lines-table": analyticLinesTableConfig(t),
   "analytic-distribution-models-table": analyticDistributionModelsTableConfig(t),
   "reconciliation-widgets-table": reconciliationWidgetsTableConfig(t),

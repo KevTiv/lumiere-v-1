@@ -22,6 +22,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^3.10.0",
     "@lumiere/erp-session": "workspace:*",
+    "@lumiere/erp-shared": "workspace:*",
     "@lumiere/i18n": "workspace:*",
     "@lumiere/query-hooks": "workspace:*",
     "@lumiere/stdb": "workspace:*",

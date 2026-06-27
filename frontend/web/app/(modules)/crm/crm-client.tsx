@@ -12,6 +12,15 @@ import {
 } from "@/lib/crm-create-params"
 import {
   timestampToDateInputValue,
+  toCreateContactSegmentParamsFromForm,
+  toCreateContactTagParamsFromForm,
+  toUpdateContactAddressParams,
+  toUpdateContactBusinessParams,
+  toUpdateContactDetailsParams,
+  toUpdateContactParams,
+  toUpdateLeadAddressParams,
+  toUpdateLeadDetailsParams,
+  toUpdateLeadRevenueParams,
   toUpdateOpportunityParams,
   toUpdateOpportunityStageParams,
 } from "@/lib/crm-update-params"
@@ -28,12 +37,21 @@ import {
   useConvertOpportunityToSaleOrder,
   useCreateActivity,
   useCreateContact,
+  useCreateContactSegment,
+  useCreateContactTag,
   useCreateLead,
   useCreateOpportunity,
   useDeleteContact,
   useLeads,
   useOpportunities,
   useOpportunityStages,
+  useUpdateContact,
+  useUpdateContactAddress,
+  useUpdateContactBusiness,
+  useUpdateContactDetails,
+  useUpdateLeadAddress,
+  useUpdateLeadDetails,
+  useUpdateLeadRevenue,
   useUpdateOpportunity,
   useCrmCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/crm"
@@ -50,11 +68,22 @@ import {
   activitiesTableConfig,
   addContactToSegmentForm,
   assignTagToContactForm,
+  contactSegmentsTableConfig,
+  contactTagsTableConfig,
   convertLeadForm,
   convertOpportunityToOrderForm,
   changeOpportunityStageForm,
+  editContactAddressForm,
+  editContactBusinessForm,
+  editContactDetailsForm,
+  editContactForm,
+  editLeadAddressForm,
+  editLeadDetailsForm,
+  editLeadRevenueForm,
   editOpportunityForm,
   mergeFieldDefaultValues,
+  newContactSegmentForm,
+  newContactTagForm,
   mergeSelectOptionsByFieldName,
   mergeSelectOptionsForFields,
   newActivityForm,
@@ -64,7 +93,7 @@ import {
   contactsTableConfig,
   leadsTableConfig,
   opportunitiesTableConfig,
-  csvImportForm,
+  ImportAssistantWizard,
 } from "@lumiere/ui"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -88,6 +117,13 @@ type WorkflowModal =
   | { kind: "addSegment"; form: FormConfig; contactId: bigint }
   | { kind: "changeStage"; form: FormConfig; opportunityId: bigint; companyId: bigint }
   | { kind: "editOpportunity"; form: FormConfig; opportunityId: bigint; companyId: bigint }
+  | { kind: "editContact"; form: FormConfig; contactId: bigint }
+  | { kind: "editContactAddress"; form: FormConfig; contactId: bigint }
+  | { kind: "editContactBusiness"; form: FormConfig; contactId: bigint }
+  | { kind: "editContactDetails"; form: FormConfig; contactId: bigint }
+  | { kind: "editLeadDetails"; form: FormConfig; leadId: bigint }
+  | { kind: "editLeadAddress"; form: FormConfig; leadId: bigint }
+  | { kind: "editLeadRevenue"; form: FormConfig; leadId: bigint }
   | null
 
 function rowIdBigInt(row: Record<string, unknown>): bigint {
@@ -173,7 +209,6 @@ function CrmClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [chatterTarget, setChatterTarget] = useState<{
     resModel: string
     resId: bigint
@@ -291,20 +326,25 @@ function CrmClientLoaded({
   const assignTag = useAssignTagToContact(orgId)
   const addToSegment = useAddContactToSegment(orgId)
   const completeActivity = useCompleteActivity(orgId)
+  const createContactTag = useCreateContactTag(orgId)
+  const createContactSegment = useCreateContactSegment(orgId)
+  const updateContact = useUpdateContact(orgId)
+  const updateContactAddress = useUpdateContactAddress(orgId)
+  const updateContactBusiness = useUpdateContactBusiness(orgId)
+  const updateContactDetails = useUpdateContactDetails(orgId)
+  const updateLeadDetails = useUpdateLeadDetails(orgId)
+  const updateLeadAddress = useUpdateLeadAddress(orgId)
+  const updateLeadRevenue = useUpdateLeadRevenue(orgId)
   const csvImports = useCrmCsvImportMutations(orgId)
 
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
-
-  const csvFormConfig = useMemo(() => {
-    if (!csvKind) return null
+  const csvImportTitle = useMemo(() => {
+    if (!csvKind) return ""
     const titleKey: Record<CrmCsvImportKind, string> = {
       contact: "crm.csvImport.contactsTitle",
       lead: "crm.csvImport.leadsTitle",
       opportunity: "crm.csvImport.opportunitiesTitle",
     }
-    return csvImportForm(t, t(titleKey[csvKind]))
+    return t(titleKey[csvKind])
   }, [csvKind, t])
 
   const openConvertLeadModal = useCallback(
@@ -421,6 +461,120 @@ function CrmClientLoaded({
       })
     },
     [t, opportunityStageOptions, partnerSelectOptions, operatingCompanyId],
+  )
+
+  const openEditContactModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editContactForm(t), {
+        name: String(row.name ?? ""),
+        email: String(row.email ?? ""),
+        phone: String(row.phone ?? ""),
+        mobile: String(row.mobile ?? ""),
+        isCustomer: Boolean(row.isCustomer ?? row.is_customer),
+        isVendor: Boolean(row.isVendor ?? row.is_vendor),
+        isProspect: Boolean(row.isProspect ?? row.is_prospect),
+      })
+      setWorkflowModal({ kind: "editContact", contactId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditContactAddressModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editContactAddressForm(t), {
+        street: String(row.street ?? ""),
+        street2: String(row.street2 ?? row.street_2 ?? ""),
+        city: String(row.city ?? ""),
+        stateCode: String(row.stateCode ?? row.state_code ?? ""),
+        zip: String(row.zip ?? ""),
+        countryCode: String(row.countryCode ?? row.country_code ?? ""),
+      })
+      setWorkflowModal({ kind: "editContactAddress", contactId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditContactBusinessModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editContactBusinessForm(t), {
+        taxId: String(row.taxId ?? row.tax_id ?? ""),
+        companyRegistry: String(row.companyRegistry ?? row.company_registry ?? ""),
+        industry: String(row.industry ?? ""),
+        employeesCount: Number(row.employeesCount ?? row.employees_count ?? 0),
+        annualRevenue: Number(row.annualRevenue ?? row.annual_revenue ?? 0),
+      })
+      setWorkflowModal({ kind: "editContactBusiness", contactId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditContactDetailsModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editContactDetailsForm(t), {
+        firstName: String(row.firstName ?? row.first_name ?? ""),
+        lastName: String(row.lastName ?? row.last_name ?? ""),
+        title: String(row.title ?? ""),
+        emailSecondary: String(row.emailSecondary ?? row.email_secondary ?? ""),
+        fax: String(row.fax ?? ""),
+        website: String(row.website ?? ""),
+        description: row.description != null ? String(row.description) : "",
+      })
+      setWorkflowModal({ kind: "editContactDetails", contactId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditLeadDetailsModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editLeadDetailsForm(t), {
+        contactName: String(row.contactName ?? row.contact_name ?? ""),
+        title: String(row.title ?? ""),
+        website: String(row.website ?? ""),
+        industry: String(row.industry ?? ""),
+        referredBy: String(row.referredBy ?? row.referred_by ?? ""),
+        description: row.description != null ? String(row.description) : "",
+      })
+      setWorkflowModal({ kind: "editLeadDetails", leadId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditLeadAddressModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editLeadAddressForm(t), {
+        street: String(row.street ?? ""),
+        city: String(row.city ?? ""),
+        zip: String(row.zip ?? ""),
+        countryCode: String(row.countryCode ?? row.country_code ?? ""),
+      })
+      setWorkflowModal({ kind: "editLeadAddress", leadId: rowIdBigInt(row), form })
+    },
+    [t],
+  )
+
+  const openEditLeadRevenueModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      const form = mergeFieldDefaultValues(editLeadRevenueForm(t), {
+        expectedRevenue: Number(row.expectedRevenue ?? row.expected_revenue ?? 0),
+        probability: Number(row.probability ?? 0),
+      })
+      setWorkflowModal({ kind: "editLeadRevenue", leadId: rowIdBigInt(row), form })
+    },
+    [t],
   )
 
   const markOpportunityWon = useCallback(
@@ -563,6 +717,24 @@ function CrmClientLoaded({
             onClick: () => setCsvKind("lead"),
           },
           {
+            id: "edit-lead-details",
+            label: t("crm.actions.editLeadDetails"),
+            requiresSelection: true,
+            onClick: openEditLeadDetailsModal,
+          },
+          {
+            id: "edit-lead-address",
+            label: t("crm.actions.editLeadAddress"),
+            requiresSelection: true,
+            onClick: openEditLeadAddressModal,
+          },
+          {
+            id: "edit-lead-revenue",
+            label: t("crm.actions.editLeadRevenue"),
+            requiresSelection: true,
+            onClick: openEditLeadRevenueModal,
+          },
+          {
             id: "convert-lead",
             label: t("crm.actions.convertToCustomer"),
             requiresSelection: true,
@@ -644,6 +816,30 @@ function CrmClientLoaded({
             onClick: () => setCsvKind("contact"),
           },
           {
+            id: "edit-contact",
+            label: t("crm.actions.editContact"),
+            requiresSelection: true,
+            onClick: openEditContactModal,
+          },
+          {
+            id: "edit-contact-address",
+            label: t("crm.actions.editContactAddress"),
+            requiresSelection: true,
+            onClick: openEditContactAddressModal,
+          },
+          {
+            id: "edit-contact-business",
+            label: t("crm.actions.editContactBusiness"),
+            requiresSelection: true,
+            onClick: openEditContactBusinessModal,
+          },
+          {
+            id: "edit-contact-details",
+            label: t("crm.actions.editContactDetails"),
+            requiresSelection: true,
+            onClick: openEditContactDetailsModal,
+          },
+          {
             id: "assign-tag",
             label: t("crm.actions.assignTag"),
             requiresSelection: true,
@@ -714,6 +910,24 @@ function CrmClientLoaded({
       tabs: [
         ...coreTabs,
         {
+          id: "contact-tags",
+          label: t("crm.contactTags.tabLabel"),
+          type: "entity" as const,
+          entityConfig: contactTagsTableConfig(t),
+          createForm: newContactTagForm(t),
+          createLabel: t("crm.contactTags.createLabel"),
+          createAction: "createContactTag",
+        },
+        {
+          id: "contact-segments",
+          label: t("crm.contactSegments.tabLabel"),
+          type: "entity" as const,
+          entityConfig: contactSegmentsTableConfig(t),
+          createForm: newContactSegmentForm(t),
+          createLabel: t("crm.contactSegments.createLabel"),
+          createAction: "createContactSegment",
+        },
+        {
           id: "attribution",
           label: t("crm.attribution.tabLabel"),
           type: "custom" as const,
@@ -730,6 +944,13 @@ function CrmClientLoaded({
     openAddSegmentModal,
     openEditOpportunityModal,
     openChangeStageModal,
+    openEditContactModal,
+    openEditContactAddressModal,
+    openEditContactBusinessModal,
+    openEditContactDetailsModal,
+    openEditLeadDetailsModal,
+    openEditLeadAddressModal,
+    openEditLeadRevenueModal,
     markOpportunityWon,
     markOpportunityLost,
     opportunityStageOptions,
@@ -856,6 +1077,8 @@ function CrmClientLoaded({
       opportunities: enrichedOpportunities,
       contacts: contacts as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
+      "contact-tags": [] as Record<string, unknown>[],
+      "contact-segments": [] as Record<string, unknown>[],
     }),
     [leads, enrichedOpportunities, contacts, activities],
   )
@@ -880,6 +1103,12 @@ function CrmClientLoaded({
     } else if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
       if (p) await createActivity.mutateAsync(p)
+    } else if (action === "createContactTag") {
+      const p = toCreateContactTagParamsFromForm(formData)
+      if (p) await createContactTag.mutateAsync(p)
+    } else if (action === "createContactSegment") {
+      const p = toCreateContactSegmentParamsFromForm(formData)
+      if (p) await createContactSegment.mutateAsync(p)
     }
   }
 
@@ -893,6 +1122,15 @@ function CrmClientLoaded({
     updateOpportunity.isPending ||
     assignTag.isPending ||
     addToSegment.isPending ||
+    createContactTag.isPending ||
+    createContactSegment.isPending ||
+    updateContact.isPending ||
+    updateContactAddress.isPending ||
+    updateContactBusiness.isPending ||
+    updateContactDetails.isPending ||
+    updateLeadDetails.isPending ||
+    updateLeadAddress.isPending ||
+    updateLeadRevenue.isPending ||
     csvImports.importContact.isPending ||
     csvImports.importLead.isPending ||
     csvImports.importOpportunity.isPending
@@ -946,6 +1184,34 @@ function CrmClientLoaded({
           companyId: workflowModal.companyId,
           params: p,
         })
+      } else if (workflowModal.kind === "editContact") {
+        const p = toUpdateContactParams(formData)
+        if (!p) throw new Error(t("crm.forms.editContact.validation.noChanges"))
+        await updateContact.mutateAsync({ contactId: workflowModal.contactId, params: p })
+      } else if (workflowModal.kind === "editContactAddress") {
+        const p = toUpdateContactAddressParams(formData)
+        if (!p) throw new Error(t("crm.forms.editContactAddress.validation.noChanges"))
+        await updateContactAddress.mutateAsync({ contactId: workflowModal.contactId, params: p })
+      } else if (workflowModal.kind === "editContactBusiness") {
+        const p = toUpdateContactBusinessParams(formData)
+        if (!p) throw new Error(t("crm.forms.editContactBusiness.validation.noChanges"))
+        await updateContactBusiness.mutateAsync({ contactId: workflowModal.contactId, params: p })
+      } else if (workflowModal.kind === "editContactDetails") {
+        const p = toUpdateContactDetailsParams(formData)
+        if (!p) throw new Error(t("crm.forms.editContactDetails.validation.noChanges"))
+        await updateContactDetails.mutateAsync({ contactId: workflowModal.contactId, params: p })
+      } else if (workflowModal.kind === "editLeadDetails") {
+        const p = toUpdateLeadDetailsParams(formData)
+        if (!p) throw new Error(t("crm.forms.editLeadDetails.validation.noChanges"))
+        await updateLeadDetails.mutateAsync({ leadId: workflowModal.leadId, params: p })
+      } else if (workflowModal.kind === "editLeadAddress") {
+        const p = toUpdateLeadAddressParams(formData)
+        if (!p) throw new Error(t("crm.forms.editLeadAddress.validation.noChanges"))
+        await updateLeadAddress.mutateAsync({ leadId: workflowModal.leadId, params: p })
+      } else if (workflowModal.kind === "editLeadRevenue") {
+        const p = toUpdateLeadRevenueParams(formData)
+        if (!p) throw new Error(t("crm.forms.editLeadRevenue.validation.noChanges"))
+        await updateLeadRevenue.mutateAsync({ leadId: workflowModal.leadId, params: p })
       }
       setWorkflowModal(null)
     } catch (e) {
@@ -967,6 +1233,20 @@ function CrmClientLoaded({
               ? `cs-${workflowModal.opportunityId.toString()}`
               : workflowModal.kind === "editOpportunity"
                 ? `eo-${workflowModal.opportunityId.toString()}`
+                : workflowModal.kind === "editContact"
+                  ? `ec-${workflowModal.contactId.toString()}`
+                  : workflowModal.kind === "editContactAddress"
+                    ? `eca-${workflowModal.contactId.toString()}`
+                    : workflowModal.kind === "editContactBusiness"
+                      ? `ecb-${workflowModal.contactId.toString()}`
+                      : workflowModal.kind === "editContactDetails"
+                        ? `ecd-${workflowModal.contactId.toString()}`
+                        : workflowModal.kind === "editLeadDetails"
+                          ? `eld-${workflowModal.leadId.toString()}`
+                          : workflowModal.kind === "editLeadAddress"
+                            ? `ela-${workflowModal.leadId.toString()}`
+                            : workflowModal.kind === "editLeadRevenue"
+                              ? `elr-${workflowModal.leadId.toString()}`
                 : `as-${workflowModal.contactId.toString()}`
 
   return (
@@ -1022,32 +1302,23 @@ function CrmClientLoaded({
           return handleWorkflowSubmit(formData)
         }}
       />
-      {csvKind && csvFormConfig ? (
-        <FormModal
+      {csvKind ? (
+        <ImportAssistantWizard
           key={csvKind}
           open
-          onOpenChange={(o) => !o && setCsvKind(null)}
-          config={csvFormConfig}
-          isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "contact") await csvImports.importContact.mutateAsync(text)
-              else if (csvKind === "lead") await csvImports.importLead.mutateAsync(text)
-              else await csvImports.importOpportunity.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          organizationId={organizationId}
+          onOpenChange={(open) => !open && setCsvKind(null)}
+          targetEntity={csvKind}
+          title={csvImportTitle}
+          isImportPending={
+            csvImports.importContact.isPending ||
+            csvImports.importLead.isPending ||
+            csvImports.importOpportunity.isPending
+          }
+          onImport={async (csvData) => {
+            if (csvKind === "contact") await csvImports.importContact.mutateAsync(csvData)
+            else if (csvKind === "lead") await csvImports.importLead.mutateAsync(csvData)
+            else await csvImports.importOpportunity.mutateAsync(csvData)
           }}
         />
       ) : null}

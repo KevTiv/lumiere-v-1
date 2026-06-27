@@ -1,6 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useRBAC } from "@/lib/rbac-context"
+import { useErpSession } from "@lumiere/erp-session"
+import { hasValidOrganizationId } from "@/lib/org-scoped"
+import {
+  useCreateUserSession,
+  useLogAuditEvent,
+} from "@lumiere/query-hooks/hooks/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +34,8 @@ import { useTranslation } from "@lumiere/i18n"
 import type { AuditLogEntry } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { auditActionPillClass } from "@/lib/theme-colors"
+import { FormModal } from "../forms/form-modal"
+import { createUserSessionForm, logAuditEventForm } from "../lib/settings-platform-form-configs"
 
 // Mock audit log data
 const mockAuditLogs: AuditLogEntry[] = [
@@ -129,9 +138,19 @@ function actionPillClass(action: string): string {
 
 export function AuditLog() {
   const { t } = useTranslation()
+  const { organizationId } = useErpSession()
+  const orgReady = hasValidOrganizationId(organizationId)
+  const orgBigInt = orgReady ? BigInt(organizationId) : 0n
+  const logAuditEvent = useLogAuditEvent(orgBigInt)
+  const createUserSession = useCreateUserSession(orgBigInt)
+  const { checkPermission } = useRBAC()
+  const canManageAudit = checkPermission("admin:audit-log", "manage").allowed
+
   const [logs] = useState<AuditLogEntry[]>(mockAuditLogs)
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState<string>("all")
+  const [adminModal, setAdminModal] = useState<"log" | "session" | null>(null)
+  const [adminError, setAdminError] = useState<string | null>(null)
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
@@ -203,10 +222,38 @@ export function AuditLog() {
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" onClick={handleExport} className="gap-2">
-          <Download className="h-4 w-4" />
-          {t("settings.auditLog.exportCsv")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canManageAudit && orgReady ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setAdminError(null)
+                  setAdminModal("log")
+                }}
+              >
+                {t("settings.adminOps.audit.logEventButton")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setAdminError(null)
+                  setAdminModal("session")
+                }}
+              >
+                {t("settings.adminOps.sessions.createButton")}
+              </Button>
+            </>
+          ) : null}
+          <Button variant="outline" onClick={handleExport} className="gap-2">
+            <Download className="h-4 w-4" />
+            {t("settings.auditLog.exportCsv")}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -253,6 +300,66 @@ export function AuditLog() {
           </div>
         </CardContent>
       </Card>
+
+      {adminModal ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setAdminModal(null)
+              setAdminError(null)
+            }
+          }}
+          config={adminModal === "log" ? logAuditEventForm(t) : createUserSessionForm(t)}
+          isPending={logAuditEvent.isPending || createUserSession.isPending}
+          closeOnSubmit={false}
+          submitError={adminError}
+          onSubmit={async (data) => {
+            setAdminError(null)
+            try {
+              if (adminModal === "log") {
+                const changedRaw = String(data.changedFields ?? "")
+                const companyRaw = data.companyId
+                const companyId =
+                  companyRaw != null && String(companyRaw).trim() !== ""
+                    ? (typeof companyRaw === "object" ? null : companyRaw)
+                    : null
+                await logAuditEvent.mutateAsync({
+                  companyId: companyId as string | number | bigint | null,
+                  tableName: String(data.tableName ?? ""),
+                  recordId: data.recordId as string | number,
+                  action: String(data.action ?? ""),
+                  oldValues: data.oldValues ? String(data.oldValues) : null,
+                  newValues: data.newValues ? String(data.newValues) : null,
+                  changedFields: changedRaw
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                  sessionId: null,
+                  ipAddress: null,
+                  userAgent: null,
+                  metadata: null,
+                })
+              } else {
+                const expiresRaw = String(data.expiresAt ?? "").trim()
+                const millis = Date.parse(expiresRaw)
+                if (!Number.isFinite(millis)) throw new Error("expiresAt must be a valid date/time")
+                await createUserSession.mutateAsync({
+                  sessionToken: String(data.sessionToken ?? ""),
+                  ipAddress: data.ipAddress ? String(data.ipAddress) : null,
+                  userAgent: data.userAgent ? String(data.userAgent) : null,
+                  deviceInfo: null,
+                  expiresAtMicros: BigInt(millis) * 1000n,
+                  metadata: null,
+                })
+              }
+              setAdminModal(null)
+            } catch (error) {
+              setAdminError(error instanceof Error ? error.message : String(error))
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

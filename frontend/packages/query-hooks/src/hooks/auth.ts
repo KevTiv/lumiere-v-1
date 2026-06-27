@@ -8,7 +8,7 @@
  */
 
 
-import { authBffPost } from "@lumiere/stdb/commands"
+import { authBffPost, stdbBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -945,6 +945,249 @@ export function useUpdateWhatsappCredentials(organizationId: bigint) {
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update WhatsApp credentials')
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+// ── Mutations — Casbin & org membership (admin platform) ─────────────────────
+
+function optionalStringField(value: unknown): string | null {
+  const raw = String(value ?? "").trim()
+  return raw ? raw : null
+}
+
+function identityForReducer(value: string): string {
+  return identityHexForAssign(value)
+}
+
+function timestampFromDatetime(value: unknown): { microsSinceUnixEpoch: bigint } {
+  const raw = String(value ?? "").trim()
+  if (!raw) throw new Error("expiresAt is required")
+  const millis = Date.parse(raw)
+  if (!Number.isFinite(millis)) throw new Error("expiresAt must be a valid date/time")
+  return { microsSinceUnixEpoch: BigInt(millis) * 1000n }
+}
+
+export function useAddCasbinRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        ptype: String(formData.ptype ?? "p"),
+        v0: optionalStringField(formData.v0),
+        v1: optionalStringField(formData.v1),
+        v2: optionalStringField(formData.v2),
+        v3: optionalStringField(formData.v3),
+        v4: optionalStringField(formData.v4),
+        v5: optionalStringField(formData.v5),
+        metadata: optionalStringField(formData.metadata),
+      }
+      const { urlPath, init } = stdbBffPost("add_casbin_rule", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to add Casbin rule")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useRemoveCasbinRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string | number | bigint>({
+    mutationFn: async (ruleId) => {
+      const { urlPath, init } = stdbBffPost("remove_casbin_rule", [
+        organizationId,
+        toScalarU64(ruleId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to remove Casbin rule")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useAddOrgMember(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        roleName: String(formData.roleName ?? "").trim(),
+        companyId:
+          formData.companyId != null && String(formData.companyId).trim() !== ""
+            ? toScalarU64(formData.companyId as ScalarId)
+            : null,
+        jobTitle: optionalStringField(formData.jobTitle),
+        departmentId:
+          formData.departmentId != null && String(formData.departmentId).trim() !== ""
+            ? toScalarU64(formData.departmentId as ScalarId)
+            : null,
+        employeeId: optionalStringField(formData.employeeId),
+        isActive: formData.isActive !== false,
+        isDefault: Boolean(formData.isDefault),
+        metadata: optionalStringField(formData.metadata),
+      }
+      const { urlPath, init } = stdbBffPost("add_org_member", [
+        identityForReducer(String(formData.userIdentity ?? "")),
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to add organization member")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useAddUserToOrganization(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const params = {
+        roleId: toScalarU64(formData.roleId as ScalarId),
+        companyId:
+          formData.companyId != null && String(formData.companyId).trim() !== ""
+            ? toScalarU64(formData.companyId as ScalarId)
+            : null,
+        jobTitle: optionalStringField(formData.jobTitle),
+        departmentId:
+          formData.departmentId != null && String(formData.departmentId).trim() !== ""
+            ? toScalarU64(formData.departmentId as ScalarId)
+            : null,
+        employeeId: optionalStringField(formData.employeeId),
+        isActive: formData.isActive !== false,
+        isDefault: Boolean(formData.isDefault),
+        metadata: optionalStringField(formData.metadata),
+      }
+      const { urlPath, init } = stdbBffPost("add_user_to_organization", [
+        identityForReducer(String(formData.userIdentity ?? "")),
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to add user to organization")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useCreatePasswordResetToken(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { targetIdentity: string; tokenHash: string; expiresAt: unknown }
+  >({
+    mutationFn: async ({ targetIdentity, tokenHash, expiresAt }) => {
+      const { urlPath, init } = stdbBffPost("create_password_reset_token", [
+        identityForReducer(targetIdentity),
+        tokenHash,
+        timestampFromDatetime(expiresAt),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create password reset token")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+/** Direct reducer call for superuser onboarding (prefer `/api/auth/invite` in product UI). */
+export function useCreateUserInviteReducer(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      roleId: string | number | bigint
+      email: string
+      tokenHash: string
+      invitedBy: string
+      expiresAt: unknown
+    }
+  >({
+    mutationFn: async ({ roleId, email, tokenHash, invitedBy, expiresAt }) => {
+      const { urlPath, init } = stdbBffPost("create_user_invite", [
+        organizationId,
+        toScalarU64(roleId),
+        email.trim(),
+        tokenHash,
+        identityForReducer(invitedBy),
+        timestampFromDatetime(expiresAt),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create user invite")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useStoreUserCredential(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      newIdentity: string
+      email: string
+      passwordHash: string
+      stdbTokenEnc: string
+    }
+  >({
+    mutationFn: async ({ newIdentity, email, passwordHash, stdbTokenEnc }) => {
+      const { urlPath, init } = stdbBffPost("store_user_credential", [
+        identityForReducer(newIdentity),
+        email.trim(),
+        passwordHash,
+        stdbTokenEnc,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to store user credential")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
+export function useStoreSsoUserCredential(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      newIdentity: string
+      email: string
+      stdbTokenEnc: string
+      workosUserId: string
+      emailVerified: boolean
+    }
+  >({
+    mutationFn: async ({ newIdentity, email, stdbTokenEnc, workosUserId, emailVerified }) => {
+      const { urlPath, init } = stdbBffPost("store_sso_user_credential", [
+        identityForReducer(newIdentity),
+        email.trim(),
+        stdbTokenEnc,
+        workosUserId.trim(),
+        emailVerified,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to store SSO user credential")
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)

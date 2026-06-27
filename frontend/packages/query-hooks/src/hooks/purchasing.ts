@@ -81,16 +81,6 @@ async function parseCallErrorPo(r: Response): Promise<string> {
   }
 }
 
-async function postSubmitSupplierIntake(
-  organizationId: bigint,
-  params: Record<string, unknown>,
-): Promise<void> {
-  const { urlPath, init } = purchasingBffPost("submit_supplier_intake", [organizationId, stdbParamsToJson(params as object)])
-
-  const r = await apiFetch(urlPath, init)
-  if (!r.ok) throw new Error('Failed to submit supplier intake')
-}
-
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function usePurchaseOrders(
@@ -676,7 +666,14 @@ export function useCancelLandedCost(organizationId: bigint) {
 export function useCreateSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (params) => postSubmitSupplierIntake(organizationId, params),
+    mutationFn: async (params) => {
+      const { urlPath, init } = purchasingBffPost("submit_supplier_intake", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to submit supplier intake')
+    },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
   })
 }
@@ -715,7 +712,14 @@ export function useDeleteSupplierIntake(organizationId: bigint) {
 export function useSubmitSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (params) => postSubmitSupplierIntake(organizationId, params),
+    mutationFn: async (params) => {
+      const { urlPath, init } = purchasingBffPost("submit_supplier_intake", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to submit supplier intake')
+    },
     onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
   })
 }

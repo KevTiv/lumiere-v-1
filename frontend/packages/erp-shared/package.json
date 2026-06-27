@@ -24,10 +24,15 @@
     "./ai-source-links": "./src/ai-source-links.ts",
     "./ai-entity-snapshot-registry": "./src/ai-entity-snapshot-registry.ts",
     "./ai-entity-type-resolver": "./src/ai-entity-type-resolver.ts",
-    "./action-draft-links": "./src/action-draft-links.ts"
+    "./action-draft-links": "./src/action-draft-links.ts",
+    "./csv-import-safety": "./src/csv-import-safety.ts",
+    "./csv-import-transform": "./src/csv-import-transform.ts",
+    "./csv-import-bundles": "./src/csv-import-bundles.ts",
+    "./csv-import-retry": "./src/csv-import-retry.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
@@ -35,6 +40,7 @@
   },
   "devDependencies": {
     "spacetimedb": "^2.0.3",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.0"
   }
 }

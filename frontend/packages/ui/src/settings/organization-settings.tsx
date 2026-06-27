@@ -24,7 +24,7 @@ import {
   useUpdateCompanyBusiness,
   useUpdateCompanyHierarchy,
 } from "@lumiere/query-hooks/hooks/organization-company"
-import { useUpdateOrganization, useUpsertOrganizationSettings } from "@lumiere/query-hooks/hooks/settings"
+import { useUpdateOrganization, useUpsertOrganizationSettings, useCreateCountry, useCreateCurrency } from "@lumiere/query-hooks/hooks/settings"
 import { useErpSession } from "@lumiere/erp-session"
 import { csvImportForm, FormModal } from "@lumiere/ui"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
@@ -41,6 +41,8 @@ import {
   organizationPrivacyRuleForm,
   withCompanyIdField,
 } from "../lib/organization-company-form-configs"
+import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
+import { useRBAC } from "@/lib/rbac-context"
 import { cn } from "@/lib/utils"
 
 type OrgMasterCsvKind =
@@ -72,6 +74,8 @@ export function OrganizationSettings() {
   const { organizationId } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
+  const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
+  const [referenceError, setReferenceError] = useState<string | null>(null)
 
   const orgReady = hasValidOrganizationId(organizationId)
   const orgId = orgReady ? organizationId : 0
@@ -92,6 +96,9 @@ export function OrganizationSettings() {
   const createDataClassificationRule = useCreateDataClassificationRule(orgId)
   const upsertOrganizationSettings = useUpsertOrganizationSettings(orgBigInt)
   const updateOrganization = useUpdateOrganization(orgBigInt)
+  const createCountry = useCreateCountry()
+  const createCurrency = useCreateCurrency()
+  const { checkPermission, isAdmin } = useRBAC()
 
   const [selectedCompanyId, setSelectedCompanyId] = useState("")
   const [privacyDcFormKey, setPrivacyDcFormKey] = useState(0)
@@ -272,6 +279,10 @@ export function OrganizationSettings() {
     }
     return csvImportForm(t, t(titleKey[csvKind]))
   }, [csvKind, t])
+
+  const countryFormConfig = useMemo(() => createCountryForm(t), [t])
+  const currencyFormConfig = useMemo(() => createCurrencyForm(t), [t])
+  const canManageReference = isAdmin() || checkPermission("admin:organization", "manage").allowed
 
   // Integration hooks
   const updateGoogleDriveCredentials = useUpdateGoogleDriveCredentials(orgBigInt)
@@ -858,6 +869,32 @@ export function OrganizationSettings() {
             <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currency")}>
               {t("settings.organization.csvImport.toolbarCurrencies")}
             </Button>
+            {canManageReference ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setReferenceError(null)
+                    setReferenceModal("country")
+                  }}
+                >
+                  {t("settings.adminOps.reference.createCountryButton")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setReferenceError(null)
+                    setReferenceModal("currency")
+                  }}
+                >
+                  {t("settings.adminOps.reference.createCurrencyButton")}
+                </Button>
+              </>
+            ) : null}
             <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currencyRate")}>
               {t("settings.organization.csvImport.toolbarCurrencyRates")}
             </Button>
@@ -1060,6 +1097,62 @@ export function OrganizationSettings() {
               setCsvKind(null)
             } catch (e) {
               setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+
+      {referenceModal ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setReferenceModal(null)
+              setReferenceError(null)
+            }
+          }}
+          config={referenceModal === "country" ? countryFormConfig : currencyFormConfig}
+          isPending={createCountry.isPending || createCurrency.isPending}
+          closeOnSubmit={false}
+          submitError={referenceError}
+          onSubmit={async (data) => {
+            setReferenceError(null)
+            try {
+              if (referenceModal === "country") {
+                await createCountry.mutateAsync({
+                  code: String(data.code ?? ""),
+                  params: {
+                    name: String(data.name ?? ""),
+                    iso3: String(data.iso3 ?? ""),
+                    numcode: Number(data.numcode ?? 0),
+                    phoneCode: String(data.phoneCode ?? ""),
+                    officialName: null,
+                    currencyCode: null,
+                    languageCodes: [],
+                    isActive: Boolean(data.isActive),
+                    metadata: null,
+                  },
+                })
+              } else {
+                await createCurrency.mutateAsync({
+                  code: String(data.code ?? ""),
+                  params: {
+                    name: String(data.name ?? ""),
+                    symbol: String(data.symbol ?? ""),
+                    decimalPlaces: Number(data.decimalPlaces ?? 2),
+                    roundingFactor: 0.01,
+                    position: String(data.position ?? "before"),
+                    active: Boolean(data.active),
+                    metadata: null,
+                  },
+                })
+              }
+              toast({
+                title: t("settings.adminOps.success"),
+              })
+              setReferenceModal(null)
+            } catch (e) {
+              setReferenceError(e instanceof Error ? e.message : String(e))
             }
           }}
         />

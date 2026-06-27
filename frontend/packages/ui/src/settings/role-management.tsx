@@ -5,7 +5,9 @@ import { useRBAC } from "@/lib/rbac-context"
 import { resourceGroups } from "@/lib/rbac-defaults"
 import {
   permissionsMapToStrings,
+  useAddCasbinRule,
   useCreateRole,
+  useRemoveCasbinRule,
   useSettingsRoles,
   useUpdateRole,
 } from "@lumiere/query-hooks/hooks/auth"
@@ -45,6 +47,8 @@ import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
+import { FormModal } from "../forms/form-modal"
+import { addCasbinRuleForm, removeCasbinRuleForm } from "../lib/settings-platform-form-configs"
 
 const roleColors = [
   { value: "blue", label: "Blue", class: roleSwatchClass.blue },
@@ -64,9 +68,13 @@ export function RoleManagement() {
   const roles = rolesData as Role[]
   const createRole = useCreateRole(orgBigInt)
   const updateRole = useUpdateRole(orgBigInt)
+  const addCasbinRule = useAddCasbinRule(orgBigInt)
+  const removeCasbinRule = useRemoveCasbinRule(orgBigInt)
   const { checkPermission } = useRBAC()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [casbinModal, setCasbinModal] = useState<"add" | "remove" | null>(null)
+  const [casbinError, setCasbinError] = useState<string | null>(null)
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
   const [isSaving, setIsSaving] = useState(false)
@@ -74,6 +82,7 @@ export function RoleManagement() {
   const canEdit = checkPermission("admin:roles", "update").allowed
   const canDelete = checkPermission("admin:roles", "delete").allowed
   const canCreate = checkPermission("admin:roles", "create").allowed
+  const canManagePolicies = checkPermission("admin:permissions", "manage").allowed
 
   const initializePermissions = (role: Role | null) => {
     const permMap = new Map<string, Set<Action>>()
@@ -310,6 +319,39 @@ export function RoleManagement() {
       </div>
       )}
 
+      {canManagePolicies && orgReady ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("settings.adminOps.casbin.cardTitle")}</CardTitle>
+            <CardDescription>{t("settings.adminOps.casbin.cardDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCasbinError(null)
+                setCasbinModal("add")
+              }}
+            >
+              {t("settings.adminOps.casbin.addButton")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCasbinError(null)
+                setCasbinModal("remove")
+              }}
+            >
+              {t("settings.adminOps.casbin.removeButton")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -437,6 +479,38 @@ export function RoleManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {casbinModal ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setCasbinModal(null)
+              setCasbinError(null)
+            }
+          }}
+          config={casbinModal === "add" ? addCasbinRuleForm(t) : removeCasbinRuleForm(t)}
+          isPending={addCasbinRule.isPending || removeCasbinRule.isPending}
+          closeOnSubmit={false}
+          submitError={casbinError}
+          onSubmit={async (data) => {
+            setCasbinError(null)
+            try {
+              if (casbinModal === "add") {
+                await addCasbinRule.mutateAsync({
+                  ...data,
+                  v1: data.v1 ?? String(organizationId),
+                })
+              } else {
+                await removeCasbinRule.mutateAsync(data.ruleId as string | number)
+              }
+              setCasbinModal(null)
+            } catch (error) {
+              setCasbinError(error instanceof Error ? error.message : String(error))
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

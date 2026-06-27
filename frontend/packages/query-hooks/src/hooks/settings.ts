@@ -1,7 +1,7 @@
 "use client"
 
 
-import { settingsBffPost } from "@lumiere/stdb/commands"
+import { settingsBffPost, stdbBffPost } from "@lumiere/stdb/commands"
 import { apiFetch, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 /**
@@ -62,6 +62,36 @@ export function useCreateOrganization() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['organizations'] })
+    },
+  })
+}
+
+// ── Reference data (superuser) ───────────────────────────────────────────────
+
+export function useCreateCountry() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { code: string; params: Record<string, unknown> }>({
+    mutationFn: async ({ code, params }) => {
+      const { urlPath, init } = stdbBffPost('create_country', [code.trim(), stdbParamsToJson(params)])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create country')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['countries'] })
+    },
+  })
+}
+
+export function useCreateCurrency() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { code: string; params: Record<string, unknown> }>({
+    mutationFn: async ({ code, params }) => {
+      const { urlPath, init } = stdbBffPost('create_currency', [code.trim(), stdbParamsToJson(params)])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create currency')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['currencies'] })
     },
   })
 }

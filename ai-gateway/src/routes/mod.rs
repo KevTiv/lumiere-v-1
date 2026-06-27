@@ -3,6 +3,7 @@ pub mod context;
 pub mod embed;
 pub mod forms;
 pub mod health;
+pub mod import;
 pub mod kaggle;
 pub mod rag;
 pub mod search;

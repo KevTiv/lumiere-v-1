@@ -5420,6 +5420,12 @@ export const FieldWidth = __t.enum("FieldWidth", {
 });
 export type FieldWidth = __Infer<typeof FieldWidth>;
 
+export const FinalizeImportAssistantJobParams = __t.object("FinalizeImportAssistantJobParams", {
+  metadataJson: __t.string(),
+  templateId: __t.option(__t.u64()),
+});
+export type FinalizeImportAssistantJobParams = __Infer<typeof FinalizeImportAssistantJobParams>;
+
 export const FinancialReport = __t.object("FinancialReport", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -5954,6 +5960,20 @@ export const ImportJobError = __t.object("ImportJobError", {
   createDate: __t.timestamp(),
 });
 export type ImportJobError = __Infer<typeof ImportJobError>;
+
+export const ImportMappingTemplate = __t.object("ImportMappingTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  tableName: __t.string(),
+  name: __t.string(),
+  mappingJson: __t.string(),
+  useCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+});
+export type ImportMappingTemplate = __Infer<typeof ImportMappingTemplate>;
 
 // The tagged union or sum type for the algebraic type `InsightSeverity`.
 export const InsightSeverity = __t.enum("InsightSeverity", {
@@ -8799,6 +8819,13 @@ export const SaleState = __t.enum("SaleState", {
   Cancelled: __t.unit(),
 });
 export type SaleState = __Infer<typeof SaleState>;
+
+export const SaveImportMappingTemplateParams = __t.object("SaveImportMappingTemplateParams", {
+  name: __t.string(),
+  tableName: __t.string(),
+  mappingJson: __t.string(),
+});
+export type SaveImportMappingTemplateParams = __Infer<typeof SaveImportMappingTemplateParams>;
 
 export const ScheduledReport = __t.object("ScheduledReport", {
   id: __t.u64(),

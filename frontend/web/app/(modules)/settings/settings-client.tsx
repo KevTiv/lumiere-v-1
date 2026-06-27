@@ -23,10 +23,17 @@ import {
 } from "@lumiere/stdb/client-ui-bridge"
 import {
   useCreateAuditRule,
+  useCreatePasswordResetToken,
+  useCreateUserInviteReducer,
+  useCreateUserSession,
   useEndUserSession,
+  useLogAuditEvent,
   useRecordPrivacyConsent,
+  useStoreSsoUserCredential,
+  useStoreUserCredential,
   useUpdateAuditRule,
   useUpdateGoogleDriveCredentials,
+  useUpdateOrgMemberRole,
   useUpdateUserEmail,
   useUpdateUserPassword,
   useUpdateUserProfile,
@@ -78,6 +85,13 @@ type SettingsAction =
   | "deleteCompany"
   | "createDataClassification"
   | "createDataClassificationRule"
+  | "updateOrgMemberRole"
+  | "createPasswordResetToken"
+  | "createUserInviteDirect"
+  | "storeUserCredential"
+  | "storeSsoUserCredential"
+  | "createUserSession"
+  | "logAuditEvent"
 
 const syncDirectionOptions = [
   { value: "UploadOnly", label: "Upload only" },
@@ -585,6 +599,123 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       },
     ],
   },
+  updateOrgMemberRole: {
+    id: "settings-update-org-member-role",
+    title: "Update Org Member Role",
+    submitLabel: "Update role",
+    sections: [
+      {
+        id: "member",
+        fields: [
+          { id: "user-org-id", type: "number", name: "userOrgId", label: "User org membership ID", required: true, width: "1/2" },
+          { id: "role-name", type: "text", name: "roleName", label: "Role name", required: true, width: "1/2" },
+        ],
+      },
+    ],
+  },
+  createPasswordResetToken: {
+    id: "settings-create-password-reset-token",
+    title: "Create Password Reset Token",
+    description: "Superuser-only. Requires target identity hex and a server-produced token hash.",
+    submitLabel: "Create token",
+    sections: [
+      {
+        id: "reset",
+        fields: [
+          { id: "identity", type: "text", name: "targetIdentity", label: "Target identity", required: true, width: "full" },
+          { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
+          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "full" },
+        ],
+      },
+    ],
+  },
+  createUserInviteDirect: {
+    id: "settings-create-user-invite-direct",
+    title: "Create User Invite (direct reducer)",
+    description: "Superuser-only. Prefer User Management invite for production onboarding.",
+    submitLabel: "Create invite",
+    sections: [
+      {
+        id: "invite",
+        fields: [
+          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
+          { id: "role-id", type: "number", name: "roleId", label: "Role ID", required: true, width: "1/2" },
+          { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
+          { id: "invited-by", type: "text", name: "invitedBy", label: "Invited by identity", required: true, width: "1/2" },
+          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "1/2" },
+        ],
+      },
+    ],
+  },
+  storeUserCredential: {
+    id: "settings-store-user-credential",
+    title: "Store User Credential",
+    description: "Superuser-only. Provision password credentials after server-side identity creation.",
+    submitLabel: "Store credential",
+    sections: [
+      {
+        id: "credential",
+        fields: [
+          { id: "identity", type: "text", name: "newIdentity", label: "New identity", required: true, width: "full" },
+          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
+          { id: "hash", type: "textarea", name: "passwordHash", label: "Password hash", required: true, rows: 2, width: "full" },
+          { id: "token-enc", type: "textarea", name: "stdbTokenEnc", label: "Encrypted STDB token", required: true, rows: 2, width: "full" },
+        ],
+      },
+    ],
+  },
+  storeSsoUserCredential: {
+    id: "settings-store-sso-user-credential",
+    title: "Store SSO User Credential",
+    description: "Superuser-only. Link WorkOS SSO to a SpacetimeDB identity.",
+    submitLabel: "Store SSO credential",
+    sections: [
+      {
+        id: "credential",
+        fields: [
+          { id: "identity", type: "text", name: "newIdentity", label: "New identity", required: true, width: "full" },
+          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
+          { id: "workos", type: "text", name: "workosUserId", label: "WorkOS user ID", required: true, width: "1/2" },
+          { id: "token-enc", type: "textarea", name: "stdbTokenEnc", label: "Encrypted STDB token", required: true, rows: 2, width: "full" },
+          { id: "verified", type: "switch", name: "emailVerified", label: "Email verified", defaultValue: true, width: "1/2" },
+        ],
+      },
+    ],
+  },
+  createUserSession: {
+    id: "settings-create-user-session-advanced",
+    title: "Create User Session",
+    submitLabel: "Create session",
+    sections: [
+      {
+        id: "session",
+        fields: [
+          { id: "token", type: "text", name: "sessionToken", label: "Session token", required: true, width: "full" },
+          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "1/2" },
+          { id: "ip", type: "text", name: "ipAddress", label: "IP address", width: "1/2" },
+        ],
+      },
+    ],
+  },
+  logAuditEvent: {
+    id: "settings-log-audit-event-advanced",
+    title: "Log Audit Event",
+    submitLabel: "Log event",
+    sections: [
+      {
+        id: "event",
+        fields: [
+          { id: "table", type: "text", name: "tableName", label: "Table name", required: true, width: "1/2" },
+          { id: "record", type: "number", name: "recordId", label: "Record ID", required: true, width: "1/2" },
+          { id: "action", type: "text", name: "action", label: "Action", required: true, width: "1/2" },
+          { id: "company", type: "number", name: "companyId", label: "Company ID", width: "1/2" },
+          { id: "old", type: "textarea", name: "oldValues", label: "Old values JSON", rows: 2, width: "full" },
+          { id: "new", type: "textarea", name: "newValues", label: "New values JSON", rows: 2, width: "full" },
+          { id: "fields", type: "text", name: "changedFields", label: "Changed fields (CSV)", width: "full" },
+        ],
+      },
+    ],
+  },
 }
 
 function compactParams(formData: Record<string, unknown>, keys: string[]): Record<string, unknown> {
@@ -671,6 +802,13 @@ function SettingsLoaded({
   const deleteCompany = useDeleteCompany()
   const createDataClassification = useCreateDataClassification(organizationId)
   const createDataClassificationRule = useCreateDataClassificationRule(organizationId)
+  const updateOrgMemberRole = useUpdateOrgMemberRole(orgId)
+  const createPasswordResetToken = useCreatePasswordResetToken(orgId)
+  const createUserInviteDirect = useCreateUserInviteReducer(orgId)
+  const storeUserCredential = useStoreUserCredential(orgId)
+  const storeSsoUserCredential = useStoreSsoUserCredential(orgId)
+  const createUserSession = useCreateUserSession(orgId)
+  const logAuditEvent = useLogAuditEvent(orgId)
 
   const isPending =
     createAuditRule.isPending ||
@@ -689,7 +827,14 @@ function SettingsLoaded({
     updateCompanyHierarchy.isPending ||
     deleteCompany.isPending ||
     createDataClassification.isPending ||
-    createDataClassificationRule.isPending
+    createDataClassificationRule.isPending ||
+    updateOrgMemberRole.isPending ||
+    createPasswordResetToken.isPending ||
+    createUserInviteDirect.isPending ||
+    storeUserCredential.isPending ||
+    storeSsoUserCredential.isPending ||
+    createUserSession.isPending ||
+    logAuditEvent.isPending
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     if (!activeAction) return
@@ -905,6 +1050,70 @@ function SettingsLoaded({
         await createDataClassification.mutateAsync(compactParams(formData, ["name", "level", "description", "retentionDays", "encryptionRequired"]))
       } else if (activeAction === "createDataClassificationRule") {
         await createDataClassificationRule.mutateAsync(compactParams(formData, ["tableName", "columnName", "classificationId", "appliesTo"]))
+      } else if (activeAction === "updateOrgMemberRole") {
+        await updateOrgMemberRole.mutateAsync({
+          userOrgId: formData.userOrgId as string | number,
+          roleName: String(formData.roleName ?? ""),
+        })
+      } else if (activeAction === "createPasswordResetToken") {
+        await createPasswordResetToken.mutateAsync({
+          targetIdentity: String(formData.targetIdentity ?? ""),
+          tokenHash: String(formData.tokenHash ?? ""),
+          expiresAt: formData.expiresAt,
+        })
+      } else if (activeAction === "createUserInviteDirect") {
+        await createUserInviteDirect.mutateAsync({
+          email: String(formData.email ?? ""),
+          roleId: formData.roleId as string | number,
+          tokenHash: String(formData.tokenHash ?? ""),
+          invitedBy: String(formData.invitedBy ?? ""),
+          expiresAt: formData.expiresAt,
+        })
+      } else if (activeAction === "storeUserCredential") {
+        await storeUserCredential.mutateAsync({
+          newIdentity: String(formData.newIdentity ?? ""),
+          email: String(formData.email ?? ""),
+          passwordHash: String(formData.passwordHash ?? ""),
+          stdbTokenEnc: String(formData.stdbTokenEnc ?? ""),
+        })
+      } else if (activeAction === "storeSsoUserCredential") {
+        await storeSsoUserCredential.mutateAsync({
+          newIdentity: String(formData.newIdentity ?? ""),
+          email: String(formData.email ?? ""),
+          stdbTokenEnc: String(formData.stdbTokenEnc ?? ""),
+          workosUserId: String(formData.workosUserId ?? ""),
+          emailVerified: Boolean(formData.emailVerified),
+        })
+      } else if (activeAction === "createUserSession") {
+        const expiresTs = optionalTimestamp(formData.expiresAt)
+        if (!expiresTs) throw new Error("Expires at is required")
+        await createUserSession.mutateAsync({
+          sessionToken: String(formData.sessionToken ?? ""),
+          ipAddress: optionalText(formData.ipAddress),
+          userAgent: null,
+          deviceInfo: null,
+          expiresAtMicros: expiresTs.microsSinceUnixEpoch,
+          metadata: null,
+        })
+      } else if (activeAction === "logAuditEvent") {
+        const companyRaw = formData.companyId
+        const companyId =
+          companyRaw != null && String(companyRaw).trim() !== ""
+            ? (typeof companyRaw === "object" ? null : companyRaw)
+            : null
+        await logAuditEvent.mutateAsync({
+          companyId: companyId as string | number | bigint | null,
+          tableName: String(formData.tableName ?? ""),
+          recordId: formData.recordId as string | number,
+          action: String(formData.action ?? ""),
+          oldValues: optionalText(formData.oldValues),
+          newValues: optionalText(formData.newValues),
+          changedFields: csvList(formData.changedFields),
+          sessionId: null,
+          ipAddress: null,
+          userAgent: null,
+          metadata: null,
+        })
       }
       const completed = actions.find((action) => action.id === submittedAction)
       setSuccessMessage(`${completed?.title ?? "Settings action"} completed.`)
@@ -948,6 +1157,13 @@ function SettingsLoaded({
     { id: "deleteCompany", title: "Delete company", description: "Delete a company by ID." },
     { id: "createDataClassification", title: "Data classification", description: "Create a data privacy classification." },
     { id: "createDataClassificationRule", title: "Classification rule", description: "Map a classification to a table column." },
+    { id: "updateOrgMemberRole", title: "Org member role", description: "Set membership role by role display name." },
+    { id: "createPasswordResetToken", title: "Password reset token", description: "Superuser: store a hashed reset token." },
+    { id: "createUserInviteDirect", title: "Invite (direct reducer)", description: "Superuser: create invite row directly." },
+    { id: "storeUserCredential", title: "Store credential", description: "Superuser: provision password credentials." },
+    { id: "storeSsoUserCredential", title: "Store SSO credential", description: "Superuser: link WorkOS SSO identity." },
+    { id: "createUserSession", title: "Create session", description: "Record a user session row (admin/testing)." },
+    { id: "logAuditEvent", title: "Log audit event", description: "Insert a manual audit log entry." },
   ]
 
   return (

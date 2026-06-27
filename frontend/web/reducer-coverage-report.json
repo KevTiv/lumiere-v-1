@@ -1,19 +1,19 @@
 {
-  "totalRustReducers": 666,
-  "productRustReducers": 577,
-  "totalWebReducers": 635,
+  "totalRustReducers": 687,
+  "productRustReducers": 598,
+  "totalWebReducers": 654,
   "missingFromWeb": [
-    "add_casbin_rule",
-    "add_org_member",
-    "add_user_to_organization",
+    "append_ai_agent_run_step",
+    "assign_team_member_skill",
     "backfill_external_ids",
     "bootstrap_new_tenant",
+    "cancel_ai_agent_run",
     "claim_queue_job",
+    "complete_ai_agent_run",
     "complete_queue_job",
-    "create_country",
-    "create_currency",
-    "create_password_reset_token",
-    "create_user_invite",
+    "create_ai_agent_run",
+    "create_ai_skill",
+    "delete_lead",
     "delete_search_embedding",
     "dev_promote_caller_superuser",
     "enqueue_job",
@@ -25,28 +25,29 @@
     "migrate_all_organizations",
     "process_pending_scans",
     "register_queue_worker",
-    "remove_casbin_rule",
     "request_embedding_job",
+    "run_all_domain_tests",
     "seed_dev_data",
-    "store_sso_user_credential",
-    "store_user_credential",
+    "set_ai_skill_active",
+    "unassign_team_member_skill",
     "update_ai_chat_session_title",
     "update_tax_deadlines",
+    "upsert_ai_skill",
+    "upsert_ai_skill_config",
     "upsert_search_embedding",
     "worker_heartbeat"
   ],
   "coverageModel": "matrix-hook-ui",
   "matrixStatusSummary": {
-    "reachable-ui": 509,
-    "hook-only": 123,
-    "needs-triage": 10,
+    "reachable-ui": 554,
+    "hook-only": 97,
+    "backend-only": 17,
     "internal-intentional": 13,
-    "backend-only": 5,
     "api-only-intentional": 5,
     "command-only": 1
   },
   "matrixClassificationSummary": {
-    "user-facing": 553,
+    "user-facing": 574,
     "admin": 38,
     "internal/background": 11,
     "dev-only": 4,
@@ -434,8 +435,19 @@
         "deprecate_account_account",
         "create_invoice_from_sale_order",
         "create_bill_from_purchase_order",
+        "approve_ai_action_draft",
+        "reject_ai_action_draft",
+        "expire_ai_action_drafts",
         "append_ai_chat_message",
         "archive_ai_chat_session",
+        "upsert_ai_skill",
+        "set_ai_skill_active",
+        "upsert_ai_skill_config",
+        "assign_team_member_skill",
+        "unassign_team_member_skill",
+        "append_ai_agent_run_step",
+        "complete_ai_agent_run",
+        "cancel_ai_agent_run",
         "record_report_run",
         "update_metric_values",
         "post_message",
@@ -464,6 +476,7 @@
         "add_rule_to_nomenclature",
         "reserve_serial",
         "block_serial",
+        "run_all_domain_tests",
         "create_manufacturing_order",
         "send_purchase_order",
         "add_purchase_order_line",
@@ -475,6 +488,7 @@
         "add_purchase_order_line",
         "add_rule_to_nomenclature",
         "append_ai_chat_message",
+        "approve_ai_action_draft",
         "archive_ai_chat_session",
         "block_serial",
         "compute_so_totals",
@@ -487,6 +501,7 @@
         "delete_integration",
         "delete_whatsapp_business_account",
         "deprecate_account_account",
+        "expire_ai_action_drafts",
         "grant_permission",
         "post_message",
         "record_google_drive_sync",
@@ -494,6 +509,7 @@
         "record_report_run",
         "record_whatsapp_health_check",
         "record_whatsapp_message_sent",
+        "reject_ai_action_draft",
         "remove_article_member",
         "remove_purchase_order_line",
         "reserve_serial",
@@ -510,15 +526,35 @@
         "upsert_organization_settings"
       ],
       "missing": [
-        "backfill_external_ids"
+        "upsert_ai_skill",
+        "set_ai_skill_active",
+        "upsert_ai_skill_config",
+        "assign_team_member_skill",
+        "unassign_team_member_skill",
+        "append_ai_agent_run_step",
+        "complete_ai_agent_run",
+        "cancel_ai_agent_run",
+        "backfill_external_ids",
+        "run_all_domain_tests"
       ],
-      "coverage": 97,
+      "coverage": 80,
       "productReducers": [
         "deprecate_account_account",
         "create_invoice_from_sale_order",
         "create_bill_from_purchase_order",
+        "approve_ai_action_draft",
+        "reject_ai_action_draft",
+        "expire_ai_action_drafts",
         "append_ai_chat_message",
         "archive_ai_chat_session",
+        "upsert_ai_skill",
+        "set_ai_skill_active",
+        "upsert_ai_skill_config",
+        "assign_team_member_skill",
+        "unassign_team_member_skill",
+        "append_ai_agent_run_step",
+        "complete_ai_agent_run",
+        "cancel_ai_agent_run",
         "record_report_run",
         "update_metric_values",
         "post_message",
@@ -547,13 +583,14 @@
         "add_rule_to_nomenclature",
         "reserve_serial",
         "block_serial",
+        "run_all_domain_tests",
         "create_manufacturing_order",
         "send_purchase_order",
         "add_purchase_order_line",
         "remove_purchase_order_line",
         "compute_so_totals"
       ],
-      "productCoverage": 97
+      "productCoverage": 80
     },
     "reports": {
       "rust": [
@@ -670,6 +707,8 @@
     },
     "ai": {
       "rust": [
+        "create_ai_action_draft",
+        "update_ai_action_draft_params",
         "create_ai_agent",
         "update_ai_agent",
         "set_ai_agent_active",
@@ -682,9 +721,12 @@
         "upsert_search_embedding",
         "mark_embedding_synced",
         "delete_search_embedding",
-        "request_embedding_job"
+        "request_embedding_job",
+        "create_ai_skill",
+        "create_ai_agent_run"
       ],
       "web": [
+        "create_ai_action_draft",
         "create_ai_agent",
         "create_ai_chat_session",
         "create_ai_insight",
@@ -692,6 +734,7 @@
         "dismiss_insight",
         "record_ai_spend",
         "set_ai_agent_active",
+        "update_ai_action_draft_params",
         "update_ai_agent"
       ],
       "missing": [
@@ -699,10 +742,14 @@
         "upsert_search_embedding",
         "mark_embedding_synced",
         "delete_search_embedding",
-        "request_embedding_job"
+        "request_embedding_job",
+        "create_ai_skill",
+        "create_ai_agent_run"
       ],
-      "coverage": 62,
+      "coverage": 59,
       "productReducers": [
+        "create_ai_action_draft",
+        "update_ai_action_draft_params",
         "create_ai_agent",
         "update_ai_agent",
         "set_ai_agent_active",
@@ -711,9 +758,11 @@
         "create_ai_chat_session",
         "update_ai_chat_session_title",
         "create_ai_insight",
-        "dismiss_insight"
+        "dismiss_insight",
+        "create_ai_skill",
+        "create_ai_agent_run"
       ],
-      "productCoverage": 89
+      "productCoverage": 77
     },
     "documents": {
       "rust": [
@@ -826,16 +875,24 @@
         "assign_user_to_picking"
       ],
       "web": [
+        "add_casbin_rule",
+        "add_org_member",
+        "add_user_to_organization",
         "assign_role",
         "assign_user_to_picking",
         "create_audit_rule",
+        "create_password_reset_token",
         "create_role",
+        "create_user_invite",
         "create_user_session",
         "end_user_session",
         "log_audit_event",
         "record_privacy_consent",
+        "remove_casbin_rule",
         "remove_user_from_organization",
         "revoke_role",
+        "store_sso_user_credential",
+        "store_user_credential",
         "update_audit_rule",
         "update_google_drive_credentials",
         "update_org_member_details",
@@ -849,19 +906,11 @@
       ],
       "missing": [
         "dev_promote_caller_superuser",
-        "store_user_credential",
-        "store_sso_user_credential",
         "link_workos_user",
-        "create_user_invite",
         "mark_invite_accepted",
-        "create_password_reset_token",
-        "mark_reset_token_used",
-        "add_casbin_rule",
-        "remove_casbin_rule",
-        "add_user_to_organization",
-        "add_org_member"
+        "mark_reset_token_used"
       ],
-      "coverage": 63,
+      "coverage": 88,
       "productReducers": [
         "log_audit_event",
         "create_audit_rule",
@@ -889,7 +938,7 @@
         "update_whatsapp_credentials",
         "assign_user_to_picking"
       ],
-      "productCoverage": 80
+      "productCoverage": 96
     },
     "crm": {
       "rust": [
@@ -916,8 +965,10 @@
         "update_lead_details",
         "update_lead_address",
         "update_lead_revenue",
+        "delete_lead",
         "convert_lead_to_customer",
         "create_opportunity",
+        "update_opportunity",
         "convert_opportunity_to_sale_order",
         "create_contact_segment",
         "add_contact_to_segment"
@@ -948,12 +999,15 @@
         "update_lead_address",
         "update_lead_details",
         "update_lead_revenue",
+        "update_opportunity",
         "update_utm_campaign",
         "update_utm_medium",
         "update_utm_source"
       ],
-      "missing": [],
-      "coverage": 100,
+      "missing": [
+        "delete_lead"
+      ],
+      "coverage": 97,
       "productReducers": [
         "post_internal_note",
         "subscribe_to_record",
@@ -978,13 +1032,15 @@
         "update_lead_details",
         "update_lead_address",
         "update_lead_revenue",
+        "delete_lead",
         "convert_lead_to_customer",
         "create_opportunity",
+        "update_opportunity",
         "convert_opportunity_to_sale_order",
         "create_contact_segment",
         "add_contact_to_segment"
       ],
-      "productCoverage": 100
+      "productCoverage": 97
     },
     "bootstrap": {
       "rust": [
@@ -1017,6 +1073,8 @@
       ],
       "web": [
         "create_company",
+        "create_country",
+        "create_currency",
         "create_data_classification",
         "create_data_classification_rule",
         "delete_company",
@@ -1025,11 +1083,8 @@
         "update_company_business",
         "update_company_hierarchy"
       ],
-      "missing": [
-        "create_country",
-        "create_currency"
-      ],
-      "coverage": 80,
+      "missing": [],
+      "coverage": 100,
       "productReducers": [
         "create_company",
         "update_company",
@@ -1458,6 +1513,9 @@
         "import_hr_job_position_csv",
         "import_hr_employee_csv",
         "import_hr_contract_csv",
+        "save_import_mapping_template",
+        "delete_import_mapping_template",
+        "finalize_import_assistant_job",
         "import_lot_csv",
         "import_manufacturing_order_csv",
         "import_project_csv",
@@ -1472,6 +1530,8 @@
         "import_workflow_csv"
       ],
       "web": [
+        "delete_import_mapping_template",
+        "finalize_import_assistant_job",
         "import_account_csv",
         "import_account_move_csv",
         "import_account_move_line_csv",
@@ -1504,12 +1564,17 @@
         "import_subscription_plan_csv",
         "import_supplier_info_csv",
         "import_task_csv",
-        "import_workflow_csv"
+        "import_workflow_csv",
+        "save_import_mapping_template"
       ],
       "missing": [],
       "coverage": 100,
-      "productReducers": [],
-      "productCoverage": 0
+      "productReducers": [
+        "save_import_mapping_template",
+        "delete_import_mapping_template",
+        "finalize_import_assistant_job"
+      ],
+      "productCoverage": 100
     },
     "helpdesk": {
       "rust": [
@@ -2371,7 +2436,7 @@
     "useStdbReducer": 2,
     "useStdbReducerWithInvalidation": 2,
     "useStdbCallMutation": 1,
-    "callReducerLiteral": 3,
+    "callReducerLiteral": 4,
     "callReducersBatch": 1,
     "stdbBrowserCall": 36
   }

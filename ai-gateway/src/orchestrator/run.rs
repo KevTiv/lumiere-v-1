@@ -192,7 +192,8 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
                 since_micros: req.inputs.get("since_micros").and_then(|v| v.as_i64()),
                 until_micros: req.inputs.get("until_micros").and_then(|v| v.as_i64()),
                 allowed_modules: string_list_from_input(&req.inputs, "resources")
-                    .or_else(|| string_list_from_input(&req.inputs, "allowed_modules")),
+                    .or_else(|| string_list_from_input(&req.inputs, "allowed_modules"))
+                    .unwrap_or_default(),
                 activity_query: req
                     .inputs
                     .get("activity_query")
@@ -722,8 +723,27 @@ fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
         .map(str::trim)
         .filter(|s| !s.is_empty())?;
 
-    let headers = string_list_from_input(inputs, "header")
-        .or_else(|| string_list_from_input(inputs, "headers"))?;
+    let (headers, sample_rows) = if let Some(csv_text) = inputs
+        .get("csv_text")
+        .or_else(|| inputs.get("csvText"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        match crate::skills::parse_csv_text(csv_text) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                return Some(json!({ "error": message }));
+            }
+        }
+    } else {
+        let headers = string_list_from_input(inputs, "header")
+            .or_else(|| string_list_from_input(inputs, "headers"))?;
+        let sample_rows = string_matrix_from_input(inputs, "sample_rows")
+            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
+            .unwrap_or_default();
+        (headers, sample_rows)
+    };
 
     if inputs.get("mapping").is_some() || inputs.get("mappingJson").is_some() {
         let mapping_value = inputs
@@ -731,13 +751,13 @@ fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
             .cloned()
             .or_else(|| inputs.get("mappingJson").cloned())?;
         let mapping = mapping_value.as_object()?.clone();
-        let sample_rows = string_matrix_from_input(inputs, "sample_rows")
+        let preview_rows_data = string_matrix_from_input(inputs, "sample_rows")
             .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
-            .unwrap_or_default();
+            .unwrap_or(sample_rows);
         let preview = preview_import_mapping(ImportPreviewRequest {
             target_entity: target_entity.to_string(),
             headers: headers.clone(),
-            rows: sample_rows,
+            rows: preview_rows_data,
             mapping: mapping.into_iter().collect(),
             max_rows: inputs.get("max_rows").and_then(|v| v.as_u64()).map(|v| v as usize),
         })
@@ -754,10 +774,13 @@ fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
     let analyze = analyze_import_mapping(ImportAnalyzeRequest {
         target_entity: target_entity.to_string(),
         headers,
-        sample_rows: string_matrix_from_input(inputs, "sample_rows")
-            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
-            .unwrap_or_default(),
+        sample_rows,
         prior_mappings: prior_mappings.into_iter().collect(),
+        bundle_key: inputs
+            .get("bundle_key")
+            .or_else(|| inputs.get("bundleKey"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
     })
     .ok()?;
     Some(json!(analyze))

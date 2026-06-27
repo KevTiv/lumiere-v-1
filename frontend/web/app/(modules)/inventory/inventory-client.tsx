@@ -18,6 +18,12 @@ import {
   newQualityCheckForm,
   newQualityPointForm,
   newQualityTeamForm,
+  newQualityAlertForm,
+  assignQualityAlertForm,
+  solveQualityAlertForm,
+  blockSerialForm,
+  serialDetailForm,
+  lotDetailForm,
   newTraceabilityRecordForm,
   newReplenishmentRuleForm,
   newPickingWaveForm,
@@ -29,6 +35,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   csvImportForm,
+  ImportAssistantWizard,
   Button,
 } from "@lumiere/ui"
 import type { EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
@@ -117,6 +124,7 @@ import {
   useRemoveRuleFromNomenclature,
   useCreateAdjustmentReason,
   useUseSerial,
+  useBlockSerial,
   useCreateStockProductionLot,
   useCreateStockProductionSerial,
   useCreateTraceabilityRecord,
@@ -300,7 +308,7 @@ import {
 } from "@/lib/inventory-ext-params"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
-import { CycleCountWizard } from "./cycle-count-wizard"
+import { CycleCountWizard, LocationHierarchyPanel, QualityAlertsPanel } from "./cycle-count-wizard"
 import { AiResultPanel } from "@/lib/ai-result-panel"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 
@@ -368,6 +376,15 @@ function InventoryClientLoaded({
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null)
   const [editQualityCheckId, setEditQualityCheckId] = useState<ScalarId | null>(null)
   const [editQualityAlertId, setEditQualityAlertId] = useState<ScalarId | null>(null)
+  const [assignQualityAlertId, setAssignQualityAlertId] = useState<ScalarId | null>(null)
+  const [solveQualityAlertId, setSolveQualityAlertId] = useState<ScalarId | null>(null)
+  const [selectedSerialRow, setSelectedSerialRow] = useState<Record<string, unknown> | null>(null)
+  const [selectedLotRow, setSelectedLotRow] = useState<Record<string, unknown> | null>(null)
+  const [blockSerialId, setBlockSerialId] = useState<ScalarId | null>(null)
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined)
+  const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | "">("")
+  const [stockLocationFilter, setStockLocationFilter] = useState<string | null>(null)
+  const [createQualityAlertOpen, setCreateQualityAlertOpen] = useState(false)
   const [editReplenishmentRuleId, setEditReplenishmentRuleId] = useState<ScalarId | null>(null)
   const [editPickingWaveId, setEditPickingWaveId] = useState<ScalarId | null>(null)
   const [editProductCategoryId, setEditProductCategoryId] = useState<ScalarId | null>(null)
@@ -615,6 +632,71 @@ function InventoryClientLoaded({
     [t, assignUserFieldOptions],
   )
 
+  const assignQualityAlertFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(assignQualityAlertForm(t), {
+        userIdentity: assignUserFieldOptions,
+      }),
+    [t, assignUserFieldOptions],
+  )
+
+  const qualityAlertCreateFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newQualityAlertForm(t), {
+        productId: productRowsToSelectOptions(products),
+        teamId: [] as { value: string; label: string }[],
+        pickingId: transfers.map((tr) => ({
+          value: String(tr.id ?? ""),
+          label: String(tr.name ?? tr.origin ?? tr.id ?? ""),
+        })),
+      }),
+    [t, products, transfers],
+  )
+
+  const serialDetailModalConfig = useMemo((): FormConfig => {
+    const base = serialDetailForm(t)
+    if (!selectedSerialRow) return base
+    return {
+      ...base,
+      sections: base.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const value =
+            field.name === "isLocked"
+              ? selectedSerialRow.isLocked
+                ? "Yes"
+                : "No"
+              : selectedSerialRow[field.name] != null
+                ? String(selectedSerialRow[field.name])
+                : field.defaultValue != null
+                  ? String(field.defaultValue)
+                  : undefined
+          return { ...field, defaultValue: value }
+        }),
+      })),
+    } as FormConfig
+  }, [t, selectedSerialRow])
+
+  const lotDetailModalConfig = useMemo((): FormConfig => {
+    const base = lotDetailForm(t)
+    if (!selectedLotRow) return base
+    return {
+      ...base,
+      sections: base.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const value =
+            selectedLotRow[field.name] != null
+              ? String(selectedLotRow[field.name])
+              : field.defaultValue != null
+                ? String(field.defaultValue)
+                : undefined
+          return { ...field, defaultValue: value }
+        }),
+      })),
+    } as FormConfig
+  }, [t, selectedLotRow])
+
   const editProductModalConfig = useMemo(() => {
     if (!editProductRow) return editProductForm(t)
     return withDefaultsFromRow(editProductForm(t), editProductRow)
@@ -658,6 +740,7 @@ function InventoryClientLoaded({
   const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(orgId, operatingCompanyId)
   const createAdjustmentReason = useCreateAdjustmentReason(orgId, operatingCompanyId)
   const useSerial = useUseSerial(orgId, operatingCompanyId)
+  const blockSerial = useBlockSerial(orgId, operatingCompanyId)
   const createStockProductionLot = useCreateStockProductionLot(orgId, operatingCompanyId)
   const createStockProductionSerial = useCreateStockProductionSerial(orgId, operatingCompanyId)
   const createTraceabilityRecord = useCreateTraceabilityRecord(orgId, operatingCompanyId)
@@ -1040,9 +1123,54 @@ function InventoryClientLoaded({
       id: "cycle-wizard",
       label: t("inventory.cycleCountWizard.tabLabel"),
       type: "custom" as const,
-      customContent: <CycleCountWizard organizationId={organizationId} locations={locations} />,
+      customContent: (
+        <CycleCountWizard
+          organizationId={organizationId}
+          locations={locations}
+          cycleCounts={cycleCounts}
+          products={products}
+          uoms={uoms}
+          initialCycleCountId={wizardCycleCountId}
+        />
+      ),
     }),
-    [t, organizationId, locations],
+    [t, organizationId, locations, cycleCounts, products, uoms, wizardCycleCountId],
+  )
+
+  const locationHierarchyTab = useMemo(
+    () => ({
+      id: "location-tree",
+      label: t("inventory.locationTree.tabLabel"),
+      type: "custom" as const,
+      customContent: (
+        <LocationHierarchyPanel
+          locations={locations}
+          quants={stockQuants}
+          onViewQuants={(locationId) => {
+            setStockLocationFilter(locationId)
+            setActiveTab("stock")
+          }}
+        />
+      ),
+    }),
+    [t, locations, stockQuants],
+  )
+
+  const qualityAlertsTab = useMemo(
+    () => ({
+      id: "quality-alerts",
+      label: t("inventory.qualityAlerts.tabLabel"),
+      type: "custom" as const,
+      customContent: (
+        <QualityAlertsPanel
+          organizationId={organizationId}
+          operatingCompanyId={operatingCompanyId}
+          onAssignAlert={(id) => setAssignQualityAlertId(id)}
+          onSolveAlert={(id) => setSolveQualityAlertId(id)}
+        />
+      ),
+    }),
+    [organizationId, operatingCompanyId],
   )
 
   const config = useMemo(() => {
@@ -1964,6 +2092,32 @@ function InventoryClientLoaded({
           },
         }
       }
+      if (tab.id === "cycle-counts") {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: "open-cycle-wizard",
+                  label: t("inventory.cycleCountWizard.openWizard"),
+                  icon: ClipboardList,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined
+                    if (id != null) {
+                      setWizardCycleCountId(id)
+                      setActiveTab("cycle-wizard")
+                    }
+                  },
+                },
+              ],
+            },
+          },
+        }
+      }
       // Quality checks actions
       if (tab.id === "quality") {
         return {
@@ -1978,6 +2132,20 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                {
+                  id: "quality-alerts-tab",
+                  label: t("inventory.qualityAlerts.tabLabel"),
+                  icon: AlertTriangle,
+                  requiresSelection: false,
+                  onClick: () => setActiveTab("quality-alerts"),
+                },
+                {
+                  id: "create-quality-alert",
+                  label: t("inventory.forms.newQualityAlert.title"),
+                  icon: Plus,
+                  requiresSelection: false,
+                  onClick: () => setCreateQualityAlertOpen(true),
+                },
                 {
                   id: "pass-check",
                   label: t("inventory.qualityActions.pass"),
@@ -2031,33 +2199,6 @@ function InventoryClientLoaded({
                     const deviceId = Number(dev)
                     if (!Number.isFinite(deviceId)) return
                     void linkDeviceToQualityCheck.mutateAsync({ deviceId, checkId })
-                  },
-                },
-                {
-                  id: "open-alert-prompt",
-                  label: t("inventory.qualityActions.openAlertById"),
-                  requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === "undefined") return
-                    const raw = window.prompt(t("inventory.qualityActions.alertIdPrompt"))
-                    if (raw == null || raw.trim() === "") return
-                    const alertId = Number(raw)
-                    if (!Number.isFinite(alertId)) return
-                    void openQualityAlert.mutateAsync(alertId)
-                  },
-                },
-                {
-                  id: "solve-alert-prompt",
-                  label: t("inventory.qualityActions.solveAlertById"),
-                  requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === "undefined") return
-                    const raw = window.prompt(t("inventory.qualityActions.alertIdPrompt"))
-                    if (raw == null || raw.trim() === "") return
-                    const alertId = Number(raw)
-                    if (!Number.isFinite(alertId)) return
-                    const desc = window.prompt(t("inventory.qualityActions.solveDescriptionPrompt"))
-                    void solveQualityAlert.mutateAsync({ alertId, description: desc ?? null })
                   },
                 },
                 {
@@ -2669,6 +2810,7 @@ function InventoryClientLoaded({
           if (tab.id === "serials") return withTransferActions(tab)
           if (tab.id === "adjustments") return withTransferActions(tab)
           if (tab.id === "locations") return withTransferActions(tab)
+          if (tab.id === "cycle-counts") return withTransferActions(tab)
           if (tab.id === "quality") return withTransferActions(tab)
           if (tab.id === "replenishment") return withTransferActions(tab)
           if (tab.id === "picking-waves") return withTransferActions(tab)
@@ -2684,6 +2826,8 @@ function InventoryClientLoaded({
           return tab
         }),
         cycleCountWizardTab,
+        locationHierarchyTab,
+        qualityAlertsTab,
         warehouse3DTab,
       ],
     } as ModuleConfig
@@ -2691,6 +2835,8 @@ function InventoryClientLoaded({
     moduleConfig,
     liveSections,
     cycleCountWizardTab,
+    locationHierarchyTab,
+    qualityAlertsTab,
     warehouse3DTab,
     productFormConfig,
     warehouseFormConfig,
@@ -2799,10 +2945,15 @@ function InventoryClientLoaded({
     setCsvKind,
   ])
 
+  const filteredStockQuants = useMemo(() => {
+    if (!stockLocationFilter) return stockQuants
+    return stockQuants.filter((q) => String(q.locationId ?? "") === stockLocationFilter)
+  }, [stockQuants, stockLocationFilter])
+
   const data = useMemo(
     () => ({
       products: products as unknown as Record<string, unknown>[],
-      stock: stockQuants as unknown as Record<string, unknown>[],
+      stock: filteredStockQuants as unknown as Record<string, unknown>[],
       transfers: transfers as unknown as Record<string, unknown>[],
       warehouses: warehouses as unknown as Record<string, unknown>[],
       adjustments: adjustments as unknown as Record<string, unknown>[],
@@ -2828,6 +2979,8 @@ function InventoryClientLoaded({
     [
       products,
       stockQuants,
+      filteredStockQuants,
+      stockLocationFilter,
       transfers,
       warehouses,
       adjustments,
@@ -3068,6 +3221,7 @@ function InventoryClientLoaded({
       removeRuleFromNomenclature,
       createAdjustmentReason,
       useSerial,
+      blockSerial,
       createStockProductionLot,
       createStockProductionSerial,
       createTraceabilityRecord,
@@ -3140,6 +3294,116 @@ function InventoryClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        activeTab={activeTab}
+        onActiveTabChange={(tab) => {
+          setActiveTab(tab)
+          if (tab !== "stock") setStockLocationFilter(null)
+        }}
+        onRowClick={(tabId, row) => {
+          if (tabId === "serials") setSelectedSerialRow(row)
+          if (tabId === "lots") setSelectedLotRow(row)
+        }}
+      />
+      {stockLocationFilter ? (
+        <div className="mx-4 mb-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+          <span>
+            {t("inventory.locationTree.filteredStock", { locationId: stockLocationFilter })}
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setStockLocationFilter(null)}>
+            {t("common.close")}
+          </Button>
+        </div>
+      ) : null}
+      <FormModal
+        open={selectedSerialRow !== null}
+        onOpenChange={(open) => !open && setSelectedSerialRow(null)}
+        config={serialDetailModalConfig}
+        isPending={isFormMutationPending}
+        onSubmit={() => setSelectedSerialRow(null)}
+        formLeadingActions={
+          selectedSerialRow && !selectedSerialRow.isLocked ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                const id = selectedSerialRow.id as ScalarId
+                setBlockSerialId(id)
+              }}
+            >
+              {t("inventory.serialActions.block")}
+            </Button>
+          ) : null
+        }
+      />
+      <FormModal
+        open={selectedLotRow !== null}
+        onOpenChange={(open) => !open && setSelectedLotRow(null)}
+        config={lotDetailModalConfig}
+        isPending={isFormMutationPending}
+        onSubmit={() => setSelectedLotRow(null)}
+      />
+      <FormModal
+        key={blockSerialId != null ? `block-serial-${String(blockSerialId)}` : "block-serial-closed"}
+        open={blockSerialId !== null}
+        onOpenChange={(open) => !open && setBlockSerialId(null)}
+        config={blockSerialForm(t)}
+        isPending={isFormMutationPending}
+        onSubmit={async (fd) => {
+          if (blockSerialId == null) return
+          await blockSerial.mutateAsync({
+            serialId: blockSerialId,
+            reason:
+              fd.reason != null && String(fd.reason).trim() !== ""
+                ? String(fd.reason).trim()
+                : null,
+          })
+          setBlockSerialId(null)
+          setSelectedSerialRow(null)
+        }}
+      />
+      <FormModal
+        open={createQualityAlertOpen}
+        onOpenChange={setCreateQualityAlertOpen}
+        config={qualityAlertCreateFormConfig}
+        isPending={isFormMutationPending}
+        onSubmit={async (fd) => {
+          await handleFormSubmit("quality-alerts", "createQualityAlert", fd)
+          setCreateQualityAlertOpen(false)
+          setActiveTab("quality-alerts")
+        }}
+      />
+      <FormModal
+        key={assignQualityAlertId != null ? `assign-alert-${String(assignQualityAlertId)}` : "assign-alert-closed"}
+        open={assignQualityAlertId !== null}
+        onOpenChange={(open) => !open && setAssignQualityAlertId(null)}
+        config={assignQualityAlertFormConfig}
+        isPending={isFormMutationPending}
+        onSubmit={async (fd) => {
+          if (assignQualityAlertId == null) return
+          const raw = fd.userIdentity
+          const hex = raw != null && String(raw).trim() !== "" ? String(raw).trim() : null
+          await assignQualityAlert.mutateAsync({ alertId: assignQualityAlertId, userId: hex })
+          setAssignQualityAlertId(null)
+        }}
+      />
+      <FormModal
+        key={solveQualityAlertId != null ? `solve-alert-${String(solveQualityAlertId)}` : "solve-alert-closed"}
+        open={solveQualityAlertId !== null}
+        onOpenChange={(open) => !open && setSolveQualityAlertId(null)}
+        config={solveQualityAlertForm(t)}
+        isPending={isFormMutationPending}
+        onSubmit={async (fd) => {
+          if (solveQualityAlertId == null) return
+          await solveQualityAlert.mutateAsync({
+            alertId: solveQualityAlertId,
+            description:
+              fd.description != null && String(fd.description).trim() !== ""
+                ? String(fd.description).trim()
+                : null,
+          })
+          setSolveQualityAlertId(null)
+        }}
       />
       {productPriceSearchResult ? (
         <div className="mt-4 px-4">
@@ -3382,7 +3646,30 @@ function InventoryClientLoaded({
           setPackagingProductId(null)
         }}
       />
-      {csvKind && csvFormConfig ? (
+      {csvKind === "product" ? (
+        <ImportAssistantWizard
+          key="product-assistant"
+          open
+          organizationId={organizationId}
+          onOpenChange={(open) => !open && setCsvKind(null)}
+          targetEntity="product"
+          title={t("inventory.csvImport.productsTitle")}
+          isImportPending={csvImports.importProduct.isPending}
+          onImport={async (csvData) => {
+            const pl = pricelists.find(
+              (p) => p.currencyId != null && String(p.currencyId).trim() !== "",
+            )
+            if (pl == null || pl.currencyId == null) {
+              throw new Error(t("inventory.csvImport.noPricelistCurrency"))
+            }
+            await csvImports.importProduct.mutateAsync({
+              csvData,
+              currencyId: Number(pl.currencyId),
+            })
+          }}
+        />
+      ) : null}
+      {csvKind && csvKind !== "product" && csvFormConfig ? (
         <FormModal
           key={csvKind}
           open

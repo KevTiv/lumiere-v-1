@@ -450,6 +450,33 @@ pub async fn execute_resource_query(
             });
             return Ok(out);
         }
+        "import-jobs" => {
+            let sql = format!(
+                "SELECT id, organization_id, table_name, file_name, total_rows, imported_rows, error_rows, status, started_at, completed_at, create_uid, create_date, metadata FROM import_job WHERE organization_id = {organization_id} ORDER BY id DESC LIMIT 100"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "import-job-errors" => {
+            let sql = format!(
+                "SELECT e.id, e.job_id, e.row_number, e.field_name, e.raw_value, e.error_message, e.create_date FROM import_job_error e INNER JOIN import_job j ON e.job_id = j.id WHERE j.organization_id = {organization_id} ORDER BY e.id DESC LIMIT 500"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "import-mapping-templates" => {
+            let sql = format!(
+                "SELECT id, organization_id, table_name, name, mapping_json, use_count, create_uid, create_date, write_uid, write_date FROM import_mapping_template WHERE organization_id = {organization_id} ORDER BY use_count DESC, id DESC LIMIT 200"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
         _ => {}
     }
 

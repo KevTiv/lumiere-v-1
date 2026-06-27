@@ -141,6 +141,117 @@ export const newPricelistForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newPricelistItemForm = (t: TFunction): FormConfig => ({
+  id: "new-pricelist-item",
+  title: t("sales.forms.newPricelistItem.title"),
+  description: t("sales.forms.newPricelistItem.description"),
+  sections: [
+    {
+      id: "pli-scope",
+      title: t("sales.forms.newPricelistItem.sections.scope"),
+      fields: [
+        {
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("sales.forms.newPricelistItem.fields.pricelistId"),
+          required: true,
+          width: "full",
+          options: [],
+        },
+        {
+          id: "appliedOn",
+          name: "appliedOn",
+          type: "select",
+          label: t("sales.forms.newPricelistItem.fields.appliedOn"),
+          required: true,
+          width: "1/2",
+          defaultValue: "AllProducts",
+          options: [
+            { value: "AllProducts", label: t("sales.forms.newPricelistItem.fields.appliedOnAll") },
+            { value: "Category", label: t("sales.forms.newPricelistItem.fields.appliedOnCategory") },
+            { value: "Product", label: t("sales.forms.newPricelistItem.fields.appliedOnProduct") },
+          ],
+        },
+        {
+          id: "computePrice",
+          name: "computePrice",
+          type: "select",
+          label: t("sales.forms.newPricelistItem.fields.computePrice"),
+          required: true,
+          width: "1/2",
+          defaultValue: "Fixed",
+          options: [
+            { value: "Fixed", label: t("sales.forms.newPricelistItem.fields.computeFixed") },
+            { value: "Percentage", label: t("sales.forms.newPricelistItem.fields.computePercentage") },
+            { value: "Formula", label: t("sales.forms.newPricelistItem.fields.computeFormula") },
+          ],
+        },
+        {
+          id: "productId",
+          name: "productId",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.productId"),
+          width: "1/3",
+        },
+        {
+          id: "categId",
+          name: "categId",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.categId"),
+          width: "1/3",
+        },
+        {
+          id: "minQuantity",
+          name: "minQuantity",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.minQuantity"),
+          width: "1/3",
+          defaultValue: 1,
+        },
+      ],
+    },
+    {
+      id: "pli-pricing",
+      title: t("sales.forms.newPricelistItem.sections.pricing"),
+      fields: [
+        {
+          id: "fixedPrice",
+          name: "fixedPrice",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.fixedPrice"),
+          width: "1/2",
+          defaultValue: 0,
+        },
+        {
+          id: "percentPrice",
+          name: "percentPrice",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.percentPrice"),
+          width: "1/2",
+          defaultValue: 0,
+        },
+        {
+          id: "priceDiscount",
+          name: "priceDiscount",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.priceDiscount"),
+          width: "1/3",
+          defaultValue: 0,
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("sales.forms.newPricelistItem.fields.sequence"),
+          width: "1/3",
+          defaultValue: 10,
+        },
+      ],
+    },
+  ],
+})
+
 export const newPickingBatchForm = (t: TFunction): FormConfig => ({
   id: "new-picking-batch",
   title: t("sales.forms.newPickingBatch.title"),
@@ -744,6 +855,7 @@ export const newLoyaltyCardForm = (t: TFunction): FormConfig => ({
 export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-sale-order": newSaleOrderForm(t),
   "new-pricelist": newPricelistForm(t),
+  "new-pricelist-item": newPricelistItemForm(t),
   "new-picking-batch": newPickingBatchForm(t),
   "new-delivery-price-rule": newDeliveryPriceRuleForm(t),
   "new-delivery-carrier": newDeliveryCarrierForm(t),
