@@ -253,23 +253,28 @@ pub fn write_audit_log(
 /// let po_ref = next_doc_number(ctx, "PO");  // "PO-0001"
 /// ```
 pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
-    let seq = ctx
+    let doc_type_key = doc_type.to_string();
+    let number = if let Some(seq) = ctx
         .db
         .document_sequence()
         .doc_type()
-        .find(&doc_type.to_string())
-        .unwrap_or(DocumentSequence {
-            doc_type: doc_type.to_string(),
-            next_number: 1,
+        .find(&doc_type_key)
+    {
+        ctx.db
+            .document_sequence()
+            .doc_type()
+            .update(DocumentSequence {
+                next_number: seq.next_number + 1,
+                ..seq
+            });
+        seq.next_number
+    } else {
+        ctx.db.document_sequence().insert(DocumentSequence {
+            doc_type: doc_type_key,
+            next_number: 2,
         });
-    let number = seq.next_number;
-    ctx.db
-        .document_sequence()
-        .doc_type()
-        .update(DocumentSequence {
-            next_number: number + 1,
-            ..seq
-        });
+        1
+    };
     format!("{}-{:04}", doc_type, number)
 }
 

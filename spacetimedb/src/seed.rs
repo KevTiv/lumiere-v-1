@@ -6619,6 +6619,18 @@ Prioritize high-severity findings and cite related records."#,
         doc_type: "INV".to_string(),
         next_number: 1001,
     });
+    ctx.db.document_sequence().insert(DocumentSequence {
+        doc_type: "BILL".to_string(),
+        next_number: 1001,
+    });
+    ctx.db.document_sequence().insert(DocumentSequence {
+        doc_type: "JRNL".to_string(),
+        next_number: 1001,
+    });
+    ctx.db.document_sequence().insert(DocumentSequence {
+        doc_type: "PAY".to_string(),
+        next_number: 1001,
+    });
 
     let uom_box = ctx.db.uom().insert(UOM {
         id: 0,
