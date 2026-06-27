@@ -19,6 +19,7 @@
     "submit": "Submit",
     "create": "Create",
     "notes": "Notes",
+    "metadata": "Metadata",
     "saving": "Saving…",
     "reset": "Reset",
     "yes": "Yes",
@@ -919,7 +920,11 @@
         "postCode": "Code",
         "postDescription": "Description",
         "accountIdsHint": "Account IDs (comma-separated)",
-        "active": "Active"
+        "active": "Active",
+        "editBudget": "Edit budget",
+        "lineFormTitle": "Budget line",
+        "lineFormDescription": "Add or edit a budget line for this analytic account.",
+        "newLine": "New line"
       }
     },
     "consolidation": {
@@ -1881,7 +1886,8 @@
           "accountId": "Account",
           "name": "Label",
           "debit": "Debit",
-          "credit": "Credit"
+          "credit": "Credit",
+          "noDraftMoves": "No draft journal entries — create a journal entry first."
         }
       },
       "newCurrencyRate": {
@@ -2550,6 +2556,9 @@
           "isCustomer": "Customer",
           "isVendor": "Vendor",
           "isProspect": "Prospect"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editContactAddress": {
@@ -2565,6 +2574,9 @@
           "stateCode": "State / province",
           "zip": "ZIP / postal code",
           "countryCode": "Country code"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editContactBusiness": {
@@ -2579,6 +2591,9 @@
           "companyRegistry": "Company registry",
           "employeesCount": "Employees",
           "annualRevenue": "Annual revenue"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editContactDetails": {
@@ -2595,6 +2610,9 @@
           "emailSecondary": "Secondary email",
           "fax": "Fax",
           "description": "Notes"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editLeadDetails": {
@@ -2610,6 +2628,9 @@
           "industry": "Industry",
           "referredBy": "Referred by",
           "description": "Notes"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editLeadAddress": {
@@ -2623,6 +2644,9 @@
           "city": "City",
           "zip": "ZIP / postal code",
           "countryCode": "Country code"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       },
       "editLeadRevenue": {
@@ -2634,6 +2658,9 @@
         "fields": {
           "expectedRevenue": "Expected revenue",
           "probability": "Win probability %"
+        },
+        "validation": {
+          "noChanges": "Update at least one field before saving."
         }
       }
     }
@@ -3449,7 +3476,38 @@
     "lotActions": {
       "editNote": "Edit note…",
       "notePrompt": "Lot note",
-      "confirmDelete": "Delete this lot? Quants may still reference it."
+      "confirmDelete": "Delete this lot? Quants may still reference it.",
+      "create": "New lot",
+      "namePrompt": "Lot number",
+      "productIdPrompt": "Product ID"
+    },
+    "locationActions": {
+      "namePrompt": "Location name",
+      "barcodePrompt": "Barcode (optional)"
+    },
+    "stockInventoryActions": {
+      "create": "New inventory count",
+      "addLine": "Add count line",
+      "setState": "Set inventory state…",
+      "namePrompt": "Reference / label",
+      "inventoryIdPrompt": "Inventory count ID",
+      "productIdPrompt": "Product ID",
+      "uomIdPrompt": "Unit of measure ID",
+      "locationIdPrompt": "Location ID",
+      "productQtyPrompt": "Counted quantity",
+      "statePrompt": "New state"
+    },
+    "uomActions": {
+      "createCategory": "New UOM category",
+      "categoryNamePrompt": "Category name",
+      "createUom": "New unit of measure",
+      "categoryIdPrompt": "Category ID",
+      "uomNamePrompt": "UOM name",
+      "symbolPrompt": "Symbol",
+      "createConversion": "New UOM conversion",
+      "fromUomIdPrompt": "From UOM ID",
+      "toUomIdPrompt": "To UOM ID",
+      "factorPrompt": "Conversion factor"
     },
     "serialActions": {
       "create": "New serial",
@@ -3581,7 +3639,11 @@
       },
       "actions": {
         "removeRule": "Remove rule from selected…",
-        "ruleIdPrompt": "Rule ID to remove from this nomenclature"
+        "ruleIdPrompt": "Rule ID to remove from this nomenclature",
+        "create": "New nomenclature",
+        "namePrompt": "Nomenclature name",
+        "addRule": "Add rule to nomenclature…",
+        "confirmDelete": "Delete this nomenclature?"
       }
     },
     "traceabilityRecords": {
@@ -3789,7 +3851,16 @@
       "updateSupplierLineById": "Update supplier line (by ID)…",
       "supplierLineIdPrompt": "Supplier info row ID",
       "updatePackagingById": "Update packaging (by ID)…",
-      "packagingIdPrompt": "Packaging row ID"
+      "packagingIdPrompt": "Packaging row ID",
+      "updatePricing": "Update pricing…",
+      "standardPricePrompt": "Standard cost",
+      "listPricePrompt": "Sales price",
+      "updateInventoryData": "Update inventory quantities…",
+      "qtyAvailablePrompt": "Quantity on hand",
+      "virtualAvailablePrompt": "Forecast quantity",
+      "updateVariantById": "Update variant (by ID)…",
+      "variantIdPrompt": "Variant ID",
+      "variantNamePrompt": "Variant name"
     },
     "warehouseActions": {
       "confirmDelete": "Delete this warehouse?",
@@ -3801,7 +3872,16 @@
     "stockMoveActions": {
       "done": "Mark done",
       "cancel": "Cancel move",
-      "quantityDonePrompt": "Quantity done"
+      "quantityDonePrompt": "Quantity done",
+      "create": "New stock move",
+      "confirm": "Confirm move",
+      "assign": "Assign move",
+      "namePrompt": "Reference / label",
+      "productIdPrompt": "Product ID",
+      "locationIdPrompt": "Source location ID",
+      "locationDestIdPrompt": "Destination location ID",
+      "uomIdPrompt": "Unit of measure ID",
+      "quantityPrompt": "Quantity"
     },
     "transferActions": {
       "confirm": "Confirm",
@@ -3842,7 +3922,14 @@
       "addTeamMember": "Add member to team (by IDs)…",
       "removeTeamMember": "Remove member from team (by IDs)…",
       "teamIdPrompt": "Quality team ID",
-      "memberIdentityPrompt": "Member identity (hex)"
+      "memberIdentityPrompt": "Member identity (hex)",
+      "updatePoint": "Update quality point (by ID)…",
+      "pointIdPrompt": "Quality point ID",
+      "pointNamePrompt": "Point name",
+      "testTypePrompt": "Test type",
+      "updateTeam": "Update quality team (by ID)…",
+      "teamNamePrompt": "Team name",
+      "teamEmailPrompt": "Team email"
     },
     "replenishmentActions": {
       "trigger": "Trigger now",
@@ -3868,7 +3955,10 @@
       "confirmDelete": "Delete this stock rule?"
     },
     "barcodeActions": {
-      "confirmDelete": "Delete this barcode rule?"
+      "confirmDelete": "Delete this barcode rule?",
+      "setWhatsappQualityScore": "Set WhatsApp quality score…",
+      "whatsappAccountIdPrompt": "WhatsApp account ID",
+      "whatsappQualityScorePrompt": "Quality score (0–100)"
     },
     "taskActions": {
       "start": "Start task",

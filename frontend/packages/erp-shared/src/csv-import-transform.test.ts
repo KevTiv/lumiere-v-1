@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildCanonicalCsv, escapeCsvField } from "./csv-import-transform.ts"
+import { buildCanonicalCsv, escapeCsvField } from "./csv-import-transform"
 
 test("escapeCsvField quotes commas", () => {
   assert.equal(escapeCsvField("hello, world"), '"hello, world"')

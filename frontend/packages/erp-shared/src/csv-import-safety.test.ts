@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { isFormulaInjection, scanCsvMatrix } from "./csv-import-safety.ts"
+import { isFormulaInjection, scanCsvMatrix } from "./csv-import-safety"
 
 test("detects spreadsheet formula injection", () => {
   assert.equal(isFormulaInjection("=1+1"), true)
