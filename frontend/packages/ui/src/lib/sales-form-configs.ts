@@ -852,11 +852,46 @@ export const newLoyaltyCardForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
+  id: "create-invoice-from-sale-order",
+  title: t("sales.forms.createInvoiceFromOrder.title"),
+  description: t("sales.forms.createInvoiceFromOrder.description"),
+  submitLabel: t("sales.forms.createInvoiceFromOrder.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "accounting",
+      title: t("sales.forms.createInvoiceFromOrder.sections.accounting"),
+      fields: [
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("sales.forms.createInvoiceFromOrder.fields.journalId"),
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "defaultIncomeAccountId",
+          name: "defaultIncomeAccountId",
+          type: "select",
+          label: t("sales.forms.createInvoiceFromOrder.fields.defaultIncomeAccountId"),
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+      ],
+    },
+  ],
+})
+
 export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-sale-order": newSaleOrderForm(t),
   "new-pricelist": newPricelistForm(t),
   "new-pricelist-item": newPricelistItemForm(t),
   "new-picking-batch": newPickingBatchForm(t),
+  "create-invoice-from-sale-order": createInvoiceFromSaleOrderForm(t),
   "new-delivery-price-rule": newDeliveryPriceRuleForm(t),
   "new-delivery-carrier": newDeliveryCarrierForm(t),
   "new-shipping-method": newShippingMethodForm(t),

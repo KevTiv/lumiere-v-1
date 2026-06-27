@@ -26,6 +26,8 @@ import {
   analyticsMetricsTableConfig,
   trialBalancesTableConfig,
   scheduledReportsTableConfig,
+  dashboardsTableConfig,
+  dashboardWidgetsTableConfig,
   csvImportForm,
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
@@ -56,6 +58,8 @@ import {
   useAddWidgetToDashboard,
   useUpdateWidgetLayout,
   useShareDashboard,
+  useDashboards,
+  useDashboardWidgets,
 } from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import {
@@ -89,12 +93,16 @@ import {
 } from "lucide-react"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 
+export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
+
 interface ReportsClientProps {
   initialReports?: Record<string, unknown>[]
   initialBalances?: Record<string, unknown>[]
   initialReportTemplates?: Record<string, unknown>[]
   initialScheduledReports?: Record<string, unknown>[]
   initialAnalyticsMetrics?: Record<string, unknown>[]
+  initialDashboards?: Record<string, unknown>[]
+  initialDashboardWidgets?: Record<string, unknown>[]
   organizationId?: number
 }
 
@@ -208,6 +216,8 @@ function ReportsClientLoaded({
   initialReportTemplates,
   initialScheduledReports,
   initialAnalyticsMetrics,
+  initialDashboards,
+  initialDashboardWidgets,
   organizationId,
 }: ReportsClientLoadedProps) {
   const { t } = useTranslation()
@@ -235,6 +245,8 @@ function ReportsClientLoaded({
   const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null)
   const [shareDashboardOpen, setShareDashboardOpen] = useState(false)
   const [shareDashboardId, setShareDashboardId] = useState<string | null>(null)
+  const [updateLayoutOpen, setUpdateLayoutOpen] = useState(false)
+  const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
   const [reportExplainError, setReportExplainError] = useState<string | null>(null)
   const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
@@ -247,6 +259,8 @@ function ReportsClientLoaded({
   const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
   const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
+  const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
+  const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
 
   const reports = useMemo(
     () =>
@@ -293,6 +307,25 @@ function ReportsClientLoaded({
         label: `${String(row.name ?? row.id)} (id ${String(row.id)})`,
       })),
     [reportTemplates],
+  )
+
+  const widgetSelectOptions = useMemo(
+    () =>
+      dashboardWidgets.map((row) => ({
+        value: String(row.id ?? ""),
+        label: `${String(row.name ?? row.id)} (id ${String(row.id)})`,
+      })),
+    [dashboardWidgets],
+  )
+
+  const addWidgetFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(addWidgetToDashboardForm(t), {
+        widgetId: widgetSelectOptions.length > 0
+          ? widgetSelectOptions
+          : [{ value: "", label: t("reports.forms.addWidgetToDashboard.fields.widgetId"), disabled: true }],
+      }),
+    [t, widgetSelectOptions],
   )
 
   const scheduledReportFormConfig = useMemo(
@@ -571,6 +604,68 @@ function ReportsClientLoaded({
     }
   }, [t, selectedReportId])
 
+  const dashboardsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = dashboardsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "add-widget",
+            label: t("reports.actions.addWidget"),
+            icon: Plus,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setSelectedDashboardId(String(first.id))
+              setAddWidgetOpen(true)
+            },
+          },
+          {
+            id: "share-dashboard",
+            label: t("reports.actions.shareDashboard"),
+            icon: Share2,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setShareDashboardId(String(first.id))
+              setShareDashboardOpen(true)
+            },
+          },
+        ],
+      },
+    }
+  }, [t])
+
+  const dashboardWidgetsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = dashboardWidgetsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          {
+            id: "update-layout",
+            label: t("reports.actions.updateLayout"),
+            icon: Grid3X3,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setUpdateLayoutWidgetId(String(first.id))
+              setUpdateLayoutOpen(true)
+            },
+          },
+        ],
+      },
+    }
+  }, [t])
+
   const liveSections = useMemo(() => {
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
@@ -679,6 +774,8 @@ function ReportsClientLoaded({
             createForm: scheduledReportFormConfig,
           }
         }
+        if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig }
+        if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig }
         return tab
       }),
     }),
@@ -691,6 +788,8 @@ function ReportsClientLoaded({
       reportTemplatesEntityConfig,
       analyticsMetricsEntityConfig,
       scheduledReportsEntityConfig,
+      dashboardsEntityConfig,
+      dashboardWidgetsEntityConfig,
       scheduledReportFormConfig, t
     ],
   )
@@ -702,8 +801,10 @@ function ReportsClientLoaded({
       "report-templates": reportTemplates as unknown as Record<string, unknown>[],
       "scheduled-reports": scheduledReports as unknown as Record<string, unknown>[],
       "analytics-metrics": analyticsMetrics as unknown as Record<string, unknown>[],
+      dashboards: dashboards as unknown as Record<string, unknown>[],
+      "dashboard-widgets": dashboardWidgets as unknown as Record<string, unknown>[],
     }),
-    [reports, filteredTrialBalances, reportTemplates, scheduledReports, analyticsMetrics],
+    [reports, filteredTrialBalances, reportTemplates, scheduledReports, analyticsMetrics, dashboards, dashboardWidgets],
   )
 
   const handleFormSubmit = async (
@@ -1043,7 +1144,7 @@ function ReportsClientLoaded({
             setSelectedDashboardId(null)
           }
         }}
-        config={addWidgetToDashboardForm(t)}
+        config={addWidgetFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (selectedDashboardId == null) return
@@ -1063,6 +1164,32 @@ function ReportsClientLoaded({
           })
           setAddWidgetOpen(false)
           setSelectedDashboardId(null)
+        }}
+      />
+
+      <FormModal
+        open={updateLayoutOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUpdateLayoutOpen(false)
+            setUpdateLayoutWidgetId(null)
+          }
+        }}
+        config={updateWidgetLayoutForm(t)}
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
+          if (updateLayoutWidgetId == null) return
+          await updateWidgetLayout.mutateAsync({
+            widgetId: updateLayoutWidgetId,
+            layout: {
+              x: Number(formData.x ?? 0),
+              y: Number(formData.y ?? 0),
+              width: formData.width ?? "4",
+              height: Number(formData.height ?? 200),
+            },
+          })
+          setUpdateLayoutOpen(false)
+          setUpdateLayoutWidgetId(null)
         }}
       />
 

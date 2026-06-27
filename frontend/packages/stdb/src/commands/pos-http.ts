@@ -44,14 +44,14 @@ export function posBffPost(
 
 const POS_HINT_OVERRIDES: Partial<Record<PosBffReducerKey, readonly string[]>> =
   {
-    activate_pos_config: ["pos-terminals"],
-    close_pos_session: ["pos-terminals"],
-    compute_pos_session_totals: ["pos-terminals"],
-    create_pos_config: ["pos-terminals"],
+    activate_pos_config: ["pos-terminals", "pos-configs"],
+    close_pos_session: ["pos-terminals", "pos-sessions"],
+    compute_pos_session_totals: ["pos-terminals", "pos-sessions"],
+    create_pos_config: ["pos-terminals", "pos-configs"],
     create_pos_order: ["pos-terminals"],
     create_pos_terminal: ["pos-terminals"],
-    deactivate_pos_config: ["pos-terminals"],
-    open_pos_session: ["pos-terminals"],
+    deactivate_pos_config: ["pos-terminals", "pos-configs"],
+    open_pos_session: ["pos-terminals", "pos-sessions", "pos-configs"],
     update_pos_terminal: ["pos-terminals"],
   };
 

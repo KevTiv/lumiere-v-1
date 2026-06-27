@@ -150,6 +150,20 @@ function SubscriptionsClientLoaded({
   const importPlanCsv = useImportSubscriptionPlanCsv(orgId, orgId)
   const importSubscriptionCsv = useImportSubscriptionCsv(orgId, orgId)
 
+  const isFormMutationPending =
+    createSubscription.isPending ||
+    createPlan.isPending ||
+    activateSubscription.isPending ||
+    closeSubscription.isPending ||
+    generateInvoice.isPending ||
+    createDeferredSchedule.isPending ||
+    recognizeDeferred.isPending ||
+    createRecognitionRule.isPending ||
+    activateRule.isPending ||
+    deactivateRule.isPending ||
+    importPlanCsv.isPending ||
+    importSubscriptionCsv.isPending
+
   const saleOrderOptions = useMemo(() => {
     const fromApi = saleOrderRowsToSelectOptions(saleOrders)
     if (fromApi.length > 0) return fromApi
@@ -550,7 +564,7 @@ function SubscriptionsClientLoaded({
 
   return (
     <>
-      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} />
+      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

@@ -1,13 +1,35 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newProposalForm, MissingOrganization } from "@lumiere/ui"
-import type { FormConfig } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newProposalForm,
+  editProposalForm,
+  proposalsTableConfig,
+  MissingOrganization,
+  mergeFieldDefaultValues,
+} from "@lumiere/ui"
+import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
-import { useProposals, useCreateProposal } from "@lumiere/query-hooks/hooks/proposals"
+import { proposalPrimaryLabel } from "@lumiere/stdb/read-models"
+import {
+  useProposals,
+  useCreateProposal,
+  useUpdateProposal,
+  useUpdateProposalStatus,
+} from "@lumiere/query-hooks/hooks/proposals"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  Archive,
+  Award,
+  Eye,
+  Pencil,
+  Send,
+  ThumbsDown,
+} from "lucide-react"
 
 interface ProposalsClientProps {
   initialProposals?: Record<string, unknown>[]
@@ -16,6 +38,66 @@ interface ProposalsClientProps {
 
 type ProposalsClientLoadedProps = Omit<ProposalsClientProps, "organizationId"> & {
   organizationId: number
+}
+
+const BUILTIN_PROPOSAL_TEMPLATES: Record<string, unknown>[] = [
+  {
+    id: "tpl-commercial",
+    name: "Commercial Proposal",
+    category: "Commercial",
+    sectionCount: 5,
+    description: "Executive summary, scope, timeline, pricing, and terms",
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "tpl-tender",
+    name: "Tender Response",
+    category: "Tender",
+    sectionCount: 7,
+    description: "Compliance matrix, methodology, team, and bid pricing",
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "tpl-grant",
+    name: "Grant Application",
+    category: "Grant",
+    sectionCount: 6,
+    description: "Need statement, outcomes, budget, and evaluation criteria",
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  },
+]
+
+function normalizeProposalStatus(raw: unknown): string {
+  const s = String(raw ?? "")
+  if (s.includes("Draft") || s === "draft") return "Draft"
+  if (s.includes("Review") || s === "review") return "Review"
+  if (s.includes("Submitted") || s === "submitted") return "Submitted"
+  if (s.includes("Awarded") || s === "awarded") return "Awarded"
+  if (s.includes("Rejected") || s === "rejected") return "Rejected"
+  if (s.includes("Archived") || s === "archived") return "Archived"
+  return s || "Draft"
+}
+
+function proposalFieldValue(row: Record<string, unknown>, fieldName: string): unknown {
+  switch (fieldName) {
+    case "title":
+      return row.title ?? ""
+    case "clientName":
+      return row.clientName ?? row.client_name ?? ""
+    case "value":
+      return row.value ?? 0
+    case "deadline":
+      if (row.deadline == null) return ""
+      if (typeof row.deadline === "string") return row.deadline.split("T")[0]
+      return new Date(Number(row.deadline) / 1000).toISOString().split("T")[0]
+    case "description":
+      return row.description ?? ""
+    default:
+      return ""
+  }
 }
 
 export function ProposalsClient(props: ProposalsClientProps) {
@@ -31,21 +113,128 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const moduleConfig = useMemo(() => proposalsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null)
+  const [activeTab, setActiveTab] = useState<string>("dashboard")
+
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
   const createProposal = useCreateProposal()
+  const updateProposal = useUpdateProposal()
+  const updateProposalStatus = useUpdateProposalStatus()
+
+  const isPending =
+    createProposal.isPending || updateProposal.isPending || updateProposalStatus.isPending
 
   const activeCount = proposals.filter((p) => {
-    const s = String(p.status ?? "")
-    return s === "Draft" || s === "Review" || s === "Submitted" || s === "draft" || s === "review" || s === "submitted"
+    const s = normalizeProposalStatus(p.status)
+    return s === "Draft" || s === "Review" || s === "Submitted"
   }).length
-  const awardedCount = proposals.filter((p) => String(p.status ?? "") === "Awarded" || String(p.status ?? "") === "awarded").length
-  const submittedCount = proposals.filter((p) => String(p.status ?? "") === "Submitted" || String(p.status ?? "") === "submitted").length
+  const awardedCount = proposals.filter((p) => normalizeProposalStatus(p.status) === "Awarded").length
+  const submittedCount = proposals.filter((p) => normalizeProposalStatus(p.status) === "Submitted").length
   const pipelineValue = proposals
     .filter((p) => {
-      const s = String(p.status ?? "")
-      return s !== "Rejected" && s !== "Archived" && s !== "rejected" && s !== "archived"
+      const s = normalizeProposalStatus(p.status)
+      return s !== "Rejected" && s !== "Archived"
     })
     .reduce((sum, p) => sum + Number(p.value ?? 0), 0)
+
+  const setStatus = useCallback(
+    async (proposalId: string | number | bigint, status: string) => {
+      await updateProposalStatus.mutateAsync({ proposalId, status })
+    },
+    [updateProposalStatus],
+  )
+
+  const proposalRowActions = useMemo((): EntityAction[] => {
+    return [
+      {
+        id: "edit-proposal",
+        label: t("proposals.actions.edit"),
+        icon: Pencil,
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (row) setEditRow(row)
+        },
+      },
+      {
+        id: "submit-review",
+        label: t("proposals.actions.submitForReview"),
+        icon: Eye,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id || normalizeProposalStatus(row.status) !== "Draft") return
+          void setStatus(row.id as string | number, "Review")
+        },
+      },
+      {
+        id: "submit-proposal",
+        label: t("proposals.actions.submit"),
+        icon: Send,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id || normalizeProposalStatus(row.status) !== "Review") return
+          void setStatus(row.id as string | number, "Submitted")
+        },
+      },
+      {
+        id: "award-proposal",
+        label: t("proposals.actions.award"),
+        icon: Award,
+        variant: "default",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id || normalizeProposalStatus(row.status) !== "Submitted") return
+          void setStatus(row.id as string | number, "Awarded")
+        },
+      },
+      {
+        id: "reject-proposal",
+        label: t("proposals.actions.reject"),
+        icon: ThumbsDown,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id) return
+          const s = normalizeProposalStatus(row.status)
+          if (s === "Rejected" || s === "Archived") return
+          void setStatus(row.id as string | number, "Rejected")
+        },
+      },
+      {
+        id: "archive-proposal",
+        label: t("proposals.actions.archive"),
+        icon: Archive,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id) return
+          const s = normalizeProposalStatus(row.status)
+          if (s === "Archived") return
+          if (s !== "Awarded" && s !== "Rejected") return
+          void setStatus(row.id as string | number, "Archived")
+        },
+      },
+    ]
+  }, [t, setStatus])
+
+  const editFormConfig = useMemo((): FormConfig | null => {
+    if (!editRow) return null
+    const base = editProposalForm(t)
+    const defaults: Record<string, unknown> = {}
+    for (const section of base.sections) {
+      for (const field of section.fields) {
+        defaults[field.name] = proposalFieldValue(editRow, field.name)
+      }
+    }
+    return mergeFieldDefaultValues(base, defaults)
+  }, [editRow, t])
 
   const liveSections = useMemo(() => {
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
@@ -74,13 +263,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             new_proposal: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
-            use_template: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
+            use_template: () => setActiveTab("templates"),
             import_rfp: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
             review_pending: () => {
-              const pending = proposals.find((p) => {
-                const s = String(p.status ?? "")
-                return s === "Review" || s === "review"
-              })
+              const pending = proposals.find((p) => normalizeProposalStatus(p.status) === "Review")
               if (pending) router.push(`/proposals/${pending.id}`)
             },
           }
@@ -98,19 +284,29 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   }, [activeCount, submittedCount, awardedCount, pipelineValue, proposals, router, moduleConfig, t])
 
   const config = useMemo(
-    () => ({
+    (): ModuleConfig => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
-      ),
+      tabs: moduleConfig.tabs.map((tab) => {
+        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+        if (tab.id === "proposals" && tab.type === "entity") {
+          return {
+            ...tab,
+            entityConfig: proposalsTableConfig(t, {
+              formatProposalDisplayName: proposalPrimaryLabel,
+              actions: proposalRowActions,
+            }),
+          }
+        }
+        return tab
+      }),
     }),
-    [liveSections, moduleConfig],
+    [liveSections, moduleConfig, proposalRowActions, t],
   )
 
   const data = useMemo(
     () => ({
       proposals: proposals as unknown as Record<string, unknown>[],
-      templates: [] as Record<string, unknown>[],
+      templates: BUILTIN_PROPOSAL_TEMPLATES,
     }),
     [proposals],
   )
@@ -132,11 +328,22 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
         description: formData.description != null ? String(formData.description) : undefined,
       })
-      // API returns only `{ ok: true }`; workspace route uses synthetic id until list refetches.
       const newId = `new-${Date.now()}`
       router.push(
         `/proposals/${newId}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
       )
+      return
+    }
+    if (action === "updateProposal" && editRow?.id != null) {
+      await updateProposal.mutateAsync({
+        proposalId: editRow.id as string | number,
+        title: String(formData.title ?? "").trim(),
+        clientName: String(formData.clientName ?? "").trim(),
+        value: Number(formData.value ?? 0),
+        deadline: formData.deadline ? String(formData.deadline) : null,
+        description: formData.description != null ? String(formData.description) : null,
+      })
+      setEditRow(null)
     }
   }
 
@@ -150,6 +357,9 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       <ModuleView
         config={config}
         data={data}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        isPending={isPending}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
       />
@@ -157,10 +367,20 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newProposalForm(t)}
+        isPending={isPending}
         onSubmit={async (formData) => {
           if (quickActionForm) await handleFormSubmit("dashboard", quickActionForm.action, formData)
         }}
       />
+      {editFormConfig ? (
+        <FormModal
+          open
+          onOpenChange={(open) => !open && setEditRow(null)}
+          config={editFormConfig}
+          isPending={isPending}
+          onSubmit={async (formData) => handleFormSubmit("proposals", "updateProposal", formData)}
+        />
+      ) : null}
     </>
   )
 }

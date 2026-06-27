@@ -280,6 +280,72 @@ export const jobPositionsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Leave Types ───────────────────────────────────────────────────────────────
+export const leaveTypesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "leave-types-table",
+  title: t("hr.leaveTypes.title"),
+  description: t("hr.leaveTypes.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.leaveTypes.searchPlaceholder"),
+    searchKeys: ["name", "code"],
+    columns: [
+      { key: "name", label: t("hr.leaveTypes.columns.name"), width: "min-w-36" },
+      { key: "code", label: t("hr.leaveTypes.columns.code"), width: "min-w-24" },
+      { key: "allocationType", label: t("hr.leaveTypes.columns.allocationType"), width: "min-w-32" },
+      { key: "maxLeaves", label: t("hr.leaveTypes.columns.maxLeaves"), type: "number", align: "right" },
+      { key: "isActive", label: t("hr.leaveTypes.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("hr.leaveTypes.emptyMessage"),
+  },
+})
+
+// ── Payroll Structures ────────────────────────────────────────────────────────
+export const payrollStructuresTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "payroll-structures-table",
+  title: t("hr.payrollStructures.title"),
+  description: t("hr.payrollStructures.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.payrollStructures.searchPlaceholder"),
+    searchKeys: ["name", "type"],
+    columns: [
+      { key: "name", label: t("hr.payrollStructures.columns.name"), width: "min-w-48" },
+      { key: "type", label: t("hr.payrollStructures.columns.type"), width: "min-w-32" },
+      { key: "isActive", label: t("hr.payrollStructures.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("hr.payrollStructures.emptyMessage"),
+  },
+})
+
+// ── Salary Rules ──────────────────────────────────────────────────────────────
+export const salaryRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "salary-rules-table",
+  title: t("hr.salaryRules.title"),
+  description: t("hr.salaryRules.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.salaryRules.searchPlaceholder"),
+    searchKeys: ["name", "code", "category"],
+    columns: [
+      { key: "name", label: t("hr.salaryRules.columns.name"), width: "min-w-40" },
+      { key: "code", label: t("hr.salaryRules.columns.code"), width: "min-w-24" },
+      { key: "structureId", label: t("hr.salaryRules.columns.structureId"), width: "min-w-32" },
+      { key: "category", label: t("hr.salaryRules.columns.category"), width: "min-w-28" },
+      { key: "amountType", label: t("hr.salaryRules.columns.amountType"), width: "min-w-28" },
+      { key: "sequence", label: t("hr.salaryRules.columns.sequence"), type: "number", align: "right" },
+      { key: "isActive", label: t("hr.salaryRules.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("hr.salaryRules.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "employees-table": employeesTableConfig(t),
@@ -288,4 +354,7 @@ export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> 
   "contracts-table": contractsTableConfig(t),
   "payslips-table": payslipsTableConfig(t),
   "job-positions-table": jobPositionsTableConfig(t),
+  "leave-types-table": leaveTypesTableConfig(t),
+  "payroll-structures-table": payrollStructuresTableConfig(t),
+  "salary-rules-table": salaryRulesTableConfig(t),
 })

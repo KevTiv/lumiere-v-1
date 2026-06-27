@@ -1809,6 +1809,32 @@ export function serverQueryKnowledgeArticles(
   )
 }
 
+export function serverQueryKnowledgeCategories(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'knowledge-categories',
+      'kb_category',
+      organizationId,
+      fq(opts),
+      '',
+    ),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryDocumentFolders(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('document-folders', 'doc_folder', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
 // EXPENSES — organization_id scoped
 
 export function serverQueryExpenses(
@@ -2052,6 +2078,30 @@ export function serverQueryAnalyticsMetrics(
 ) {
   return stdbSql(
     selectOrgScopedSql('analytics-metrics', 'analytics_metric', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
+}
+
+export function serverQueryDashboards(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('dashboards', 'dashboard', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
+}
+
+export function serverQueryDashboardWidgets(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('dashboard-widgets', 'dashboard_widget', organizationId, fq(opts), ''),
     httpOpts(opts),
   ).then(rows =>
     sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
@@ -2308,6 +2358,39 @@ export function serverQueryPosTerminals(
 ) {
   return stdbSql(
     selectOrgScopedSql('pos-terminals', 'pos_terminal', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryPosConfigs(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const list = companyIds.map(String).join(', ')
+  const colPart = resolveHttpSqlColumns('pos-configs', fq(opts)).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM pos_config WHERE company_id IN (${list}) ORDER BY name ASC`,
+    httpOpts(opts),
+  )
+}
+
+export async function serverQueryPosSessions(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  const configs = await serverQueryPosConfigs(organizationId, opts)
+  const configIds: string[] = []
+  for (const row of configs) {
+    const id = row.id
+    if (id != null && String(id).trim() !== '') configIds.push(String(id))
+  }
+  if (configIds.length === 0) return []
+  const list = configIds.join(', ')
+  const colPart = resolveHttpSqlColumns('pos-sessions', fq(opts)).join(', ')
+  return stdbSql(
+    `SELECT ${colPart} FROM pos_session WHERE config_id IN (${list}) ORDER BY start_at DESC`,
     httpOpts(opts),
   )
 }

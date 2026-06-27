@@ -55,6 +55,31 @@ export function useKnowledgeArticles(
   })
 }
 
+export function useKnowledgeCategories(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['knowledge-categories', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/knowledge-categories', 'Failed to fetch knowledge categories'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentFolders(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-folders', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/document-folders', 'Failed to fetch document folders'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useAiDocumentProcessingJobs(
   organizationId: bigint,
   initialData?: QueryRows,
@@ -218,7 +243,8 @@ export function useCreateDocumentFolder(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document folder')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['document-folders', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -237,8 +263,11 @@ export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bi
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge article')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -264,8 +293,11 @@ export function useUpdateKnowledgeArticle(organizationId: bigint, companyId?: bi
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge article')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -280,8 +312,11 @@ export function useDeleteKnowledgeArticle(organizationId: bigint, _companyId?: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge article')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -296,8 +331,11 @@ export function useLockKnowledgeArticle(organizationId: bigint, _companyId?: big
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock knowledge article')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -312,8 +350,11 @@ export function useUnlockKnowledgeArticle(organizationId: bigint, _companyId?: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock knowledge article')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -339,8 +380,11 @@ export function useSetArticlePublished(organizationId: bigint, companyId?: bigin
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update article publication state')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -362,8 +406,11 @@ export function useAddArticleMember(organizationId: bigint, _companyId?: bigint)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add article member')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -385,8 +432,11 @@ export function useRemoveArticleMember(organizationId: bigint, _companyId?: bigi
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove article member')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -405,8 +455,11 @@ export function useCreateKnowledgeCategory(organizationId: bigint, companyId?: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge category')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -432,8 +485,11 @@ export function useUpdateKnowledgeCategory(organizationId: bigint, companyId?: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge category')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 
@@ -448,8 +504,11 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge category')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['knowledge-articles', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
+      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+    },
   })
 }
 

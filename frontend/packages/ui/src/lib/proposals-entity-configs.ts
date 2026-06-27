@@ -9,9 +9,10 @@ export type ProposalsTableConfigOptions = {
 
 export const proposalsTableConfig = (
   t: TFunction,
-  options?: ProposalsTableConfigOptions,
+  options?: ProposalsTableConfigOptions & { actions?: import("./entity-view-types").EntityAction[] },
 ): EntityViewConfig => {
   const formatName = options?.formatProposalDisplayName
+  const actions = options?.actions
 
   const titleColumn = {
     key: "title",
@@ -121,6 +122,7 @@ export const proposalsTableConfig = (
         },
       ],
       emptyMessage: t("proposals.proposals.emptyMessage"),
+      ...(actions?.length ? { actions, rowSelectionToggleOnClick: true } : {}),
     },
   }
 }

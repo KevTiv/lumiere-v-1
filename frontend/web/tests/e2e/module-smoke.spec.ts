@@ -80,6 +80,8 @@ test.describe("ERP module smoke", () => {
     await page.getByTestId("module-tab-crm-leads").click()
     await expect(page.getByTestId("entity-action-convert-lead")).toBeVisible()
     await expect(page.getByTestId("entity-action-convert-lead")).toBeDisabled()
+    await expect(page.getByTestId("entity-action-delete-lead")).toBeVisible()
+    await expect(page.getByTestId("entity-action-delete-lead")).toBeDisabled()
 
     await gotoModule(page, "/helpdesk", "helpdesk")
     await expect(page.getByTestId("quick-action-new_ticket")).toBeVisible()

@@ -19,6 +19,7 @@ export function MapLayerLegend({ layers, visibleLayers, onToggle, className }: M
           <button
             key={layer.id}
             type="button"
+            data-testid={`map-layer-${layer.id}`}
             onClick={() => onToggle(layer.id)}
             className={cn(
               "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all",

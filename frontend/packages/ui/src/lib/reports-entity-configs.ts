@@ -141,6 +141,48 @@ export const analyticsMetricsTableConfig = (t: TFunction): EntityViewConfig => (
   },
 })
 
+export const dashboardsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "dashboards-table",
+  title: t("reports.dashboards.title"),
+  description: t("reports.dashboards.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.dashboards.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("reports.dashboards.columns.name"), width: "min-w-48" },
+      { key: "description", label: t("reports.dashboards.columns.description"), width: "min-w-48" },
+      { key: "isDefault", label: t("reports.dashboards.columns.isDefault"), type: "boolean" },
+      { key: "isShared", label: t("reports.dashboards.columns.isShared"), type: "boolean" },
+      { key: "createDate", label: t("reports.dashboards.columns.createDate"), type: "date" },
+    ],
+    emptyMessage: t("reports.dashboards.emptyMessage"),
+  },
+})
+
+export const dashboardWidgetsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "dashboard-widgets-table",
+  title: t("reports.dashboardWidgets.title"),
+  description: t("reports.dashboardWidgets.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.dashboardWidgets.searchPlaceholder"),
+    searchKeys: ["name", "model"],
+    columns: [
+      { key: "name", label: t("reports.dashboardWidgets.columns.name"), width: "min-w-40" },
+      { key: "model", label: t("reports.dashboardWidgets.columns.model"), width: "min-w-36" },
+      { key: "width", label: t("reports.dashboardWidgets.columns.width"), type: "number", align: "right" },
+      { key: "height", label: t("reports.dashboardWidgets.columns.height"), type: "number", align: "right" },
+      { key: "isActive", label: t("reports.dashboardWidgets.columns.isActive"), type: "boolean" },
+    ],
+    emptyMessage: t("reports.dashboardWidgets.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const reportsEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "financial-reports-table": financialReportsTableConfig(t),
@@ -148,4 +190,6 @@ export const reportsEntityConfigs = (t: TFunction): Record<string, EntityViewCon
   "report-templates-table": reportTemplatesTableConfig(t),
   "scheduled-reports-table": scheduledReportsTableConfig(t),
   "analytics-metrics-table": analyticsMetricsTableConfig(t),
+  "dashboards-table": dashboardsTableConfig(t),
+  "dashboard-widgets-table": dashboardWidgetsTableConfig(t),
 })

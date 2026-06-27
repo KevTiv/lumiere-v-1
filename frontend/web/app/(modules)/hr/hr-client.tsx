@@ -11,6 +11,9 @@ import {
   newPayslipForm,
   newJobPositionForm,
   newDepartmentForm,
+  newLeaveTypeForm,
+  newPayrollStructureForm,
+  newSalaryRuleForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   hrCsvImportForm,
@@ -27,12 +30,16 @@ import {
   useJobPositions,
   useLeaveTypes,
   usePayrollStructures,
+  useSalaryRules,
   useCreateEmployee,
   useCreateLeaveRequest,
   useCreateContract,
   useCreatePayslip,
   useCreateJobPosition,
   useCreateDepartment,
+  useCreateLeaveType,
+  useCreatePayrollStructure,
+  useCreateSalaryRule,
   useArchiveEmployee,
   useApproveLeave,
   useRefuseLeave,
@@ -44,6 +51,7 @@ import {
   useCancelPayslip,
   useHrCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/hr"
+import { OrgChartPanel } from "./hr-panels"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
@@ -62,6 +70,8 @@ import {
   leaveTypeRowsToSelectOptions,
   payrollStructureRowsToSelectOptions,
 } from "@/lib/form-lookup"
+
+export { HR_UI_REDUCERS } from "@/lib/hr-ui-reducers"
 
 type HrRowAction =
   | { action: "archiveEmployee"; rows: Record<string, unknown>[]; form: FormConfig }
@@ -162,6 +172,7 @@ function HrClientLoaded({
   const { data: jobPositions = [] } = useJobPositions(orgId)
   const { data: leaveTypes = [] } = useLeaveTypes(orgId)
   const { data: payrollStructures = [] } = usePayrollStructures(orgId)
+  const { data: salaryRules = [] } = useSalaryRules(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
 
   const createEmployee = useCreateEmployee(orgId, operatingCompanyId)
@@ -170,6 +181,9 @@ function HrClientLoaded({
   const createPayslip = useCreatePayslip(orgId, operatingCompanyId)
   const createJobPosition = useCreateJobPosition(orgId, operatingCompanyId)
   const createDepartment = useCreateDepartment(orgId, operatingCompanyId)
+  const createLeaveType = useCreateLeaveType(orgId, operatingCompanyId)
+  const createPayrollStructure = useCreatePayrollStructure(orgId, operatingCompanyId)
+  const createSalaryRule = useCreateSalaryRule(orgId, operatingCompanyId)
   const archiveEmployee = useArchiveEmployee(orgId, operatingCompanyId)
   const approveLeave = useApproveLeave(orgId)
   const refuseLeave = useRefuseLeave(orgId)
@@ -296,6 +310,34 @@ function HrClientLoaded({
     [t, payrollStructureFieldOptions],
   )
 
+  const salaryRuleFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newSalaryRuleForm(t), {
+        structureId: payrollStructureFieldOptions,
+      }),
+    [t, payrollStructureFieldOptions],
+  )
+
+  const recruitmentPositions = useMemo(
+    () => jobPositions.filter((j) => String(j.state ?? "") === "recruit"),
+    [jobPositions],
+  )
+
+  const orgChartTab = useMemo(
+    () => ({
+      id: "org-chart",
+      label: "Org Chart",
+      type: "custom" as const,
+      customContent: (
+        <OrgChartPanel
+          departments={departments as Record<string, unknown>[]}
+          employees={employees as Record<string, unknown>[]}
+        />
+      ),
+    }),
+    [departments, employees],
+  )
+
   const liveSections = useMemo(() => {
     const activeEmployees = employees.filter((e) => e.isActive)
     const pendingLeaves = leaves.filter((l) => String(l.state) === "Confirm").length
@@ -413,7 +455,9 @@ function HrClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
+        tabs: [
+          orgChartTab,
+          ...moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
           if (tab.id === "employees" && tab.entityConfig) {
             return {
@@ -585,17 +629,73 @@ function HrClientLoaded({
               ]),
             }
           }
+          if (tab.id === "recruitment" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: mergeSelectOptionsForFields(newJobPositionForm(t), {
+                departmentId: departmentFieldOptions,
+              }),
+              entityConfig: {
+                ...tab.entityConfig,
+                title: t("hr.recruitment.title"),
+                description: t("hr.recruitment.description"),
+              },
+            }
+          }
+          if (tab.id === "leave-types" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: newLeaveTypeForm(t),
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-leave-type",
+                  label: t("hr.toolbar.importLeaveTypeCsv"),
+                  onClick: () => setCsvKind("leave_type"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "payroll-structures" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: newPayrollStructureForm(t),
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-payroll-structure",
+                  label: t("hr.toolbar.importPayrollStructureCsv"),
+                  onClick: () => setCsvKind("payroll_structure"),
+                },
+              ]),
+            }
+          }
+          if (tab.id === "salary-rules" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: salaryRuleFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "csv-salary-rule",
+                  label: t("hr.toolbar.importSalaryRuleCsv"),
+                  onClick: () => setCsvKind("salary_rule"),
+                },
+              ]),
+            }
+          }
           return tab
         }),
+        ],
       }) as ModuleConfig,
     [
       moduleConfig,
+      orgChartTab,
       liveSections,
       employeeFormConfig,
       leaveFormConfig,
       contractFormConfig,
       payslipFormConfig,
       jobFormConfig,
+      salaryRuleFormConfig,
+      departmentFieldOptions,
       t,
       approveLeave,
       refuseLeave,
@@ -615,8 +715,12 @@ function HrClientLoaded({
       contracts: contracts as unknown as Record<string, unknown>[],
       payslips: payslips as unknown as Record<string, unknown>[],
       "job-positions": jobPositions as unknown as Record<string, unknown>[],
+      recruitment: recruitmentPositions as unknown as Record<string, unknown>[],
+      "leave-types": leaveTypes as unknown as Record<string, unknown>[],
+      "payroll-structures": payrollStructures as unknown as Record<string, unknown>[],
+      "salary-rules": salaryRules as unknown as Record<string, unknown>[],
     }),
-    [employees, departments, leaves, contracts, payslips, jobPositions]
+    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, payrollStructures, salaryRules]
   )
 
   const handleFormSubmit = async (
@@ -653,6 +757,38 @@ function HrClientLoaded({
       await createJobPosition.mutateAsync(toCreateJobPositionParams(formData))
     } else if (action === "createDepartment") {
       await createDepartment.mutateAsync(toCreateDepartmentParams(formData))
+    } else if (action === "createLeaveType") {
+      await createLeaveType.mutateAsync({
+        name: String(formData.name ?? ""),
+        allocationType: String(formData.allocationType ?? "fixed"),
+        maxLeaves: Number(formData.maxLeaves ?? 0),
+        code: formData.code != null && String(formData.code).trim() !== "" ? String(formData.code) : undefined,
+        color: undefined,
+        validityStart: undefined,
+        validityStop: undefined,
+        isActive: formData.isActive !== false,
+      })
+    } else if (action === "createPayrollStructure") {
+      await createPayrollStructure.mutateAsync({
+        name: String(formData.name ?? ""),
+        type: String(formData.type ?? "regular"),
+        isActive: formData.isActive !== false,
+      })
+    } else if (action === "createSalaryRule") {
+      const structureRaw = formData.structureId
+      if (structureRaw === "" || structureRaw == null) return
+      await createSalaryRule.mutateAsync({
+        name: String(formData.name ?? ""),
+        code: String(formData.code ?? ""),
+        structureId: BigInt(String(structureRaw)),
+        category: String(formData.category ?? ""),
+        conditionType: String(formData.conditionType ?? "none"),
+        amountType: String(formData.amountType ?? "fixed"),
+        amountFix: Number(formData.amountFix ?? 0),
+        amountPercentage: Number(formData.amountPercentage ?? 0),
+        sequence: Number(formData.sequence ?? 10),
+        isActive: formData.isActive !== false,
+      })
     }
   }
 
@@ -663,6 +799,9 @@ function HrClientLoaded({
     createPayslip.isPending ||
     createJobPosition.isPending ||
     createDepartment.isPending ||
+    createLeaveType.isPending ||
+    createPayrollStructure.isPending ||
+    createSalaryRule.isPending ||
     archiveEmployee.isPending ||
     approveLeave.isPending ||
     refuseLeave.isPending ||

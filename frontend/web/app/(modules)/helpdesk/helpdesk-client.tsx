@@ -14,7 +14,7 @@ import {
   mergeSelectOptionsForFields,
   helpdeskTicketDetailForm,
 } from "@lumiere/ui"
-import type { FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { FormConfig, ModuleConfig, EntityAction, EntityTableConfig, EntityViewConfig } from "@lumiere/ui"
 import { helpdeskModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   useHelpdeskTickets,
@@ -47,6 +47,7 @@ import {
 import { helpdeskEnumTag, identityToHex, normalizeHelpdeskTicketRow } from "@/lib/helpdesk-display"
 import { useOrgUsers } from "@lumiere/query-hooks/hooks/inventory"
 import { HelpdeskTicketDialog } from "./helpdesk-ticket-dialog"
+import { XCircle, RotateCcw, Pencil } from "lucide-react"
 
 interface HelpdeskClientProps {
   initialTickets?: Record<string, unknown>[]
@@ -224,6 +225,68 @@ function HelpdeskClientLoaded({
     })
   }, [selectedTicket, t, stageFieldOptions, priorityOptions, agentSelectOptions])
 
+  const ticketRowActions = useMemo((): EntityAction[] => {
+    return [
+      {
+        id: "edit-ticket",
+        label: t("helpdesk.actions.editTicket"),
+        icon: Pencil,
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row) return
+          setSelectedTicket(row)
+          setTicketDialogOpen(true)
+        },
+      },
+      {
+        id: "close-ticket",
+        label: t("helpdesk.forms.ticketDetail.closeTicket"),
+        icon: XCircle,
+        requiresSelection: true,
+        onClick: async (rows) => {
+          const row = rows[0]
+          if (!row?.id) return
+          if (helpdeskEnumTag(row.state) === "Closed") return
+          await closeTicket.mutateAsync({ ticketId: Number(row.id) })
+        },
+      },
+      {
+        id: "reopen-ticket",
+        label: t("helpdesk.forms.ticketDetail.reopenTicket"),
+        icon: RotateCcw,
+        requiresSelection: true,
+        onClick: async (rows) => {
+          const row = rows[0]
+          if (!row?.id) return
+          const st = helpdeskEnumTag(row.state)
+          if (st !== "Closed" && st !== "Cancelled") return
+          await reopenTicket.mutateAsync({ ticketId: Number(row.id) })
+        },
+      },
+    ]
+  }, [t, closeTicket, reopenTicket])
+
+  const ticketsEntityConfig = useMemo((): EntityViewConfig => {
+    const tab = moduleConfig.tabs.find((x) => x.id === "tickets")
+    const base = tab?.entityConfig
+    if (!base || base.view.mode !== "table") {
+      return {
+        id: "helpdesk-tickets-table",
+        title: t("helpdesk.tickets.title"),
+        view: { mode: "table", rowKey: "id", columns: [], actions: ticketRowActions },
+      }
+    }
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: ticketRowActions,
+      },
+    }
+  }, [moduleConfig.tabs, t, ticketRowActions])
+
   const liveSections = useMemo(() => {
     const active = tickets.filter((tk) => {
       const s = String(tk.state)
@@ -279,14 +342,14 @@ function HelpdeskClientLoaded({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "tickets") return { ...tab, createForm: ticketFormConfig }
+          if (tab.id === "tickets") return { ...tab, createForm: ticketFormConfig, entityConfig: ticketsEntityConfig }
           if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }
           if (tab.id === "stages") return { ...tab, createForm: stageFormConfig }
           if (tab.id === "slas") return { ...tab, createForm: slaFormConfig }
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, ticketFormConfig, teamFormConfig, stageFormConfig, slaFormConfig],
+    [liveSections, moduleConfig, ticketFormConfig, teamFormConfig, stageFormConfig, slaFormConfig, ticketsEntityConfig],
   )
 
   const data = useMemo(

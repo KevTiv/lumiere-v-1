@@ -6,6 +6,8 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
  */
 export const REPORTS_WORKSPACE_RESOURCE_KEYS = [
   "analytics-metrics",
+  "dashboards",
+  "dashboard-widgets",
   "financial-reports",
   "report-templates",
   "scheduled-reports",

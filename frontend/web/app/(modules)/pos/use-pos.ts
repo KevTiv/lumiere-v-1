@@ -18,6 +18,8 @@ import {
   useCreatePosTerminal,
   useDeactivatePosConfig,
   useOpenPosSession,
+  usePosConfigs,
+  usePosSessions,
   usePosTerminals,
   useUpdatePosTerminal,
 } from "@lumiere/query-hooks/hooks/pos"
@@ -40,6 +42,8 @@ export interface UsePOSReturn {
   total: number
   categories: string[]
   terminals: Record<string, unknown>[]
+  configs: Record<string, unknown>[]
+  sessions: Record<string, unknown>[]
   posLifecycleError: string | null
   isPosLifecyclePending: boolean
   setSearch: (v: string) => void
@@ -109,7 +113,9 @@ export function usePOS(
   organizationId: bigint,
   companyId: bigint,
   initialProducts?: Record<string, unknown>[],
-  initialTerminals?: Record<string, unknown>[]
+  initialTerminals?: Record<string, unknown>[],
+  initialConfigs?: Record<string, unknown>[],
+  initialSessions?: Record<string, unknown>[],
 ): UsePOSReturn {
   const [cart, setCart] = useState<POSCartItem[]>([])
   const [search, setSearch] = useState("")
@@ -124,6 +130,8 @@ export function usePOS(
 
   const { data: productRows = [] } = useProducts(organizationId, initialProducts)
   const { data: terminals = [] } = usePosTerminals(organizationId, initialTerminals)
+  const { data: configs = [] } = usePosConfigs(organizationId, initialConfigs)
+  const { data: sessions = [] } = usePosSessions(organizationId, initialSessions)
   const createPosOrder = useCreatePosOrder(organizationId)
   const createPosTerminal = useCreatePosTerminal(organizationId)
   const updatePosTerminal = useUpdatePosTerminal(organizationId)
@@ -274,7 +282,10 @@ export function usePOS(
   const updatePrimaryTerminal = useCallback(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
-        const terminalId = firstTerminal?.id
+        const terminalId =
+          data.terminalId != null && String(data.terminalId).trim() !== ""
+            ? data.terminalId
+            : firstTerminal?.id
         if (terminalId == null) throw new Error("Create or select a POS terminal first")
         await updatePosTerminal.mutateAsync({
           terminalId: String(terminalId),
@@ -408,6 +419,8 @@ export function usePOS(
     total,
     categories,
     terminals: terminals as Record<string, unknown>[],
+    configs: configs as Record<string, unknown>[],
+    sessions: sessions as Record<string, unknown>[],
     posLifecycleError,
     isPosLifecyclePending,
     setSearch,

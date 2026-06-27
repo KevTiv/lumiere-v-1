@@ -449,6 +449,46 @@ export function locationOptionsFromQuantsAndTransfers(
   return [...map.entries()].map(([value, label]) => ({ value, label }))
 }
 
+export function posTerminalRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.locationLabel ?? row.id),
+  }))
+}
+
+export function posConfigRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.id),
+  }))
+}
+
+export function posSessionRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const state = row.state != null ? String(row.state) : ""
+    const name = String(row.name ?? `Session ${row.id}`)
+    return {
+      value: String(row.id),
+      label: state ? `${name} (${state})` : name,
+    }
+  })
+}
+
+export function fleetVehicleRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id),
+    label: String(row.name ?? row.licensePlate ?? row.id),
+  }))
+}
+
 /** Draft expense reports only; optionally filter to the same employee as the expense line. */
 export function expenseSheetRowsToDraftSelectOptions(
   rows: Record<string, unknown>[],

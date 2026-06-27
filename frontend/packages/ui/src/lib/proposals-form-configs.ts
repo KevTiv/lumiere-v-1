@@ -73,6 +73,59 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const editProposalForm = (t: TFunction): FormConfig => ({
+  id: "edit-proposal",
+  title: t("proposals.forms.editProposal.title"),
+  description: t("proposals.forms.editProposal.description"),
+  sections: [
+    {
+      id: "proposal-basics",
+      title: t("proposals.forms.newProposal.sections.proposalDetails"),
+      fields: [
+        {
+          id: "title",
+          name: "title",
+          type: "text",
+          label: t("proposals.forms.newProposal.fields.title"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "clientName",
+          name: "clientName",
+          type: "text",
+          label: t("proposals.forms.newProposal.fields.clientName"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "value",
+          name: "value",
+          type: "number",
+          label: t("proposals.forms.newProposal.fields.value"),
+          width: "1/2",
+        },
+        {
+          id: "deadline",
+          name: "deadline",
+          type: "date",
+          label: t("proposals.forms.newProposal.fields.deadline"),
+          width: "1/2",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("proposals.forms.newProposal.fields.description"),
+          width: "full",
+          rows: 3,
+        },
+      ],
+    },
+  ],
+})
+
 export const proposalsFormConfigs = (t: TFunction) => ({
   [newProposalForm(t).id]: newProposalForm(t),
+  [editProposalForm(t).id]: editProposalForm(t),
 })

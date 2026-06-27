@@ -1,6 +1,14 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import {
+  chooseFirstOption,
+  expectNoAppError,
+  fillField,
+  gotoModule,
+  signIn,
+  smokeName,
+  submitForm,
+} from "./helpers"
 
 const INVENTORY_KEY_TAB_IDS = [
   "dashboard",
@@ -62,6 +70,10 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
       break
     case "cycle-wizard":
       await expect(page.getByText("Cycle count")).toBeVisible()
+      await expect(page.getByLabel(/^location$/i)).toBeVisible()
+      await expect(page.getByLabel(/plan name/i)).toBeVisible()
+      await expect(page.getByRole("button", { name: /create plan/i })).toBeVisible()
+      await expect(page.getByRole("button", { name: /^1\. plan$/i })).toBeVisible()
       break
     case "quality-alerts":
       await expect(page.getByText("Quality alerts")).toBeVisible()
@@ -102,6 +114,35 @@ test.describe("Inventory module e2e", () => {
     await openInventoryTab(page, "products")
 
     await expect(page.getByText("Lumiere Dev Laptop")).toBeVisible()
+    await expectNoAppError(page)
+  })
+
+  test("cycle wizard shows first-step plan controls", async ({ page }) => {
+    await gotoModule(page, "/inventory", "inventory")
+    await openInventoryTab(page, "cycle-wizard")
+
+    await expect(page.getByLabel(/^location$/i)).toBeVisible()
+    await expect(page.getByLabel(/plan name/i)).toBeVisible()
+    await expect(page.getByLabel(/count by/i)).toBeVisible()
+    await expect(page.getByLabel(/frequency/i)).toBeVisible()
+    await expect(page.getByRole("button", { name: /create plan/i })).toBeDisabled()
+    await expectNoAppError(page)
+  })
+
+  test("creates quality alert with minimal fields", async ({ page }) => {
+    const title = smokeName("quality-alert")
+    await gotoModule(page, "/inventory", "inventory")
+    await openInventoryTab(page, "quality")
+
+    await page.getByTestId("entity-action-create-quality-alert").click()
+    await expect(page.getByTestId("form-modal-new-quality-alert")).toBeVisible()
+
+    await fillField(page, "name", title)
+    await chooseFirstOption(page, "teamId")
+    await submitForm(page, "new-quality-alert")
+
+    await openInventoryTab(page, "quality-alerts")
+    await expect(page.getByText(title)).toBeVisible()
     await expectNoAppError(page)
   })
 })

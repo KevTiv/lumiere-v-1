@@ -1,6 +1,8 @@
 import { getStdbSession } from "@/lib/api-session"
 import {
   serverQueryAnalyticsMetrics,
+  serverQueryDashboards,
+  serverQueryDashboardWidgets,
   serverQueryFinancialReports,
   serverQueryReportTemplates,
   serverQueryScheduledReports,
@@ -15,13 +17,15 @@ export default async function ReportsPage() {
   }
   const { organizationId, opts } = session
 
-  const [reports, balances, templates, scheduled, metrics] = await Promise.all([
+  const [reports, balances, templates, scheduled, metrics, dashboards, widgets] = await Promise.all([
     serverQueryFinancialReports(organizationId, opts),
     serverQueryTrialBalances(organizationId, opts),
     serverQueryReportTemplates(organizationId, opts),
     serverQueryScheduledReports(organizationId, opts),
     serverQueryAnalyticsMetrics(organizationId, opts),
-  ]).catch(() => [[], [], [], [], []])
+    serverQueryDashboards(organizationId, opts),
+    serverQueryDashboardWidgets(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], [], []])
 
   return (
     <ReportsClient
@@ -30,6 +34,8 @@ export default async function ReportsPage() {
       initialReportTemplates={templates as Record<string, unknown>[]}
       initialScheduledReports={scheduled as Record<string, unknown>[]}
       initialAnalyticsMetrics={metrics as Record<string, unknown>[]}
+      initialDashboards={dashboards as Record<string, unknown>[]}
+      initialDashboardWidgets={widgets as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

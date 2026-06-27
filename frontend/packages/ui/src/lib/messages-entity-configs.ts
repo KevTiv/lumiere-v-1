@@ -47,7 +47,28 @@ export const mailMessagesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const mailFollowersTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "mail-followers-table",
+  title: t("messages.followers.title"),
+  description: t("messages.followers.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("messages.followers.searchPlaceholder"),
+    searchKeys: ["resModel", "resId"],
+    columns: [
+      { key: "resModel", label: t("messages.followers.columns.resModel"), width: "min-w-32" },
+      { key: "resId", label: t("messages.followers.columns.resId"), type: "number", align: "right" },
+      { key: "subtypes", label: t("messages.followers.columns.subtypes"), width: "min-w-48" },
+      { key: "partnerId", label: t("messages.followers.columns.partnerId"), width: "min-w-40" },
+    ],
+    emptyMessage: t("messages.followers.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const messagesEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "mail-messages-table": mailMessagesTableConfig(t),
+  "mail-followers-table": mailFollowersTableConfig(t),
 })

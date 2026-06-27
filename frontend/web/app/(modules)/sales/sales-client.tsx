@@ -12,12 +12,16 @@ import {
   newPricelistItemForm,
   newPickingBatchForm,
   newLoyaltyCardForm,
+  createInvoiceFromSaleOrderForm,
+  InvoiceListView,
   MissingOrganization,
   mergeSelectOptionsForFields,
   saleOrdersTableConfig,
   pricelistsTableConfig,
   pricelistItemsTableConfig,
   deliveriesTableConfig,
+  salesFulfillmentTableConfig,
+  salesReturnsTableConfig,
   csvImportForm,
   ImportAssistantWizard,
 } from '@lumiere/ui';
@@ -91,6 +95,20 @@ import {
   useCreateLoyaltyProgram,
   useCreateLoyaltyCard,
 } from '@lumiere/query-hooks/hooks/sales';
+import {
+  useAccountMoves,
+  useAccountJournals,
+  useAccountAccounts,
+  useComputeInvoiceTotals,
+  type AccountMove,
+} from '@lumiere/query-hooks/hooks/accounting';
+import {
+  useStockPickings,
+  useConfirmStockPicking,
+  useAssignStockPicking,
+  useValidateStockPicking,
+  useCancelStockPicking,
+} from '@lumiere/query-hooks/hooks/inventory';
 import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
@@ -100,6 +118,8 @@ import {
   pricelistRowsToSelectOptions,
   warehouseRowsToSelectOptions,
   loyaltyProgramRowsToSelectOptions,
+  accountJournalRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import { stdbParamsToJson } from '@/lib/stdb-params-json';
 import type { CreatePricelistItemParams } from '@lumiere/stdb/types';
@@ -116,6 +136,28 @@ function deliveryBatchState(row: Record<string, unknown>): string {
   if (v != null && typeof v === 'object' && 'tag' in v)
     return String((v as { tag: string }).tag);
   return String(v ?? '');
+}
+
+function moveTypeTag(row: Record<string, unknown>): string {
+  const v = row.moveType ?? row.move_type;
+  if (v != null && typeof v === 'object' && 'tag' in v)
+    return String((v as { tag: string }).tag);
+  return String(v ?? '');
+}
+
+function pickingIsReturn(row: Record<string, unknown>): boolean {
+  return row.isReturn === true || row.is_return === true;
+}
+
+function pickingIsFulfillment(row: Record<string, unknown>): boolean {
+  if (pickingIsReturn(row)) return false;
+  if (row.saleId != null || row.sale_id != null) return true;
+  const code = String(row.pickingCode ?? row.picking_code ?? '').toLowerCase();
+  return code === 'outgoing';
+}
+
+function pickingStateStr(row: Record<string, unknown>): string {
+  return String(row.state ?? '').toLowerCase();
 }
 
 function toCreatePricelistItemParams(
@@ -180,6 +222,8 @@ interface SalesClientProps {
   initialLoyaltyCards?: Record<string, unknown>[];
   initialContacts?: Record<string, unknown>[];
   initialWarehouses?: Record<string, unknown>[];
+  initialAccountMoves?: Record<string, unknown>[];
+  initialStockPickings?: Record<string, unknown>[];
   organizationId?: number;
 }
 
@@ -210,6 +254,8 @@ function SalesClientLoaded({
   initialLoyaltyCards,
   initialContacts,
   initialWarehouses,
+  initialAccountMoves,
+  initialStockPickings,
   organizationId,
 }: SalesClientLoadedProps) {
   const { t } = useTranslation();
@@ -222,6 +268,8 @@ function SalesClientLoaded({
   } | null>(null);
   const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
+  const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
 
   const { data: orders = [] } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
@@ -261,6 +309,10 @@ function SalesClientLoaded({
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: users = [] } = useUsers(orgId);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
+  const { data: accountMoves = [] } = useAccountMoves(orgId, { initialData: initialAccountMoves });
+  const { data: accountJournals = [] } = useAccountJournals(orgId);
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
@@ -293,6 +345,11 @@ function SalesClientLoaded({
   const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
+  const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
+  const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId);
+  const assignPicking = useAssignStockPicking(orgId, operatingCompanyId);
+  const validatePicking = useValidateStockPicking(orgId, operatingCompanyId);
+  const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId);
 
   useEffect(() => {
     if (csvKind) setCsvError(null);
@@ -384,6 +441,131 @@ function SalesClientLoaded({
     [t, loyaltyProgramFieldOptions],
   );
 
+  const salesInvoices = useMemo(
+    () =>
+      (accountMoves as Record<string, unknown>[]).filter(
+        (m) => moveTypeTag(m) === 'OutInvoice',
+      ),
+    [accountMoves],
+  );
+
+  const fulfillmentPickings = useMemo(
+    () =>
+      (stockPickings as Record<string, unknown>[]).filter((p) =>
+        pickingIsFulfillment(p),
+      ),
+    [stockPickings],
+  );
+
+  const returnPickings = useMemo(
+    () =>
+      (stockPickings as Record<string, unknown>[]).filter((p) =>
+        pickingIsReturn(p),
+      ),
+    [stockPickings],
+  );
+
+  const journalFieldOptions = useMemo(() => {
+    const fromApi = accountJournalRowsToSelectOptions(
+      accountJournals as Record<string, unknown>[],
+    );
+    if (fromApi.length > 0) return fromApi;
+    return [
+      { value: '', label: t('sales.forms.createInvoiceFromOrder.noJournals'), disabled: true },
+    ];
+  }, [accountJournals, t]);
+
+  const incomeAccountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(
+      accountAccounts as Record<string, unknown>[],
+    );
+    if (fromApi.length > 0) return fromApi;
+    return [
+      { value: '', label: t('sales.forms.createInvoiceFromOrder.noAccounts'), disabled: true },
+    ];
+  }, [accountAccounts, t]);
+
+  const createInvoiceFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(createInvoiceFromSaleOrderForm(t), {
+        journalId: journalFieldOptions,
+        defaultIncomeAccountId: incomeAccountFieldOptions,
+      }),
+    [t, journalFieldOptions, incomeAccountFieldOptions],
+  );
+
+  const pickingActions = useMemo(
+    (): EntityTableConfig['actions'] => [
+      {
+        id: 'confirm-picking',
+        label: t('inventory.transferActions.confirm'),
+        requiresSelection: true,
+        onClick: (rows) => {
+          const id = rows[0]?.id;
+          if (id != null && pickingStateStr(rows[0] as Record<string, unknown>) === 'draft') {
+            void confirmPicking.mutateAsync(id as string | number | bigint);
+          }
+        },
+      },
+      {
+        id: 'assign-picking',
+        label: t('inventory.transferActions.assign'),
+        requiresSelection: true,
+        onClick: (rows) => {
+          const id = rows[0]?.id;
+          if (id != null) void assignPicking.mutateAsync(id as string | number | bigint);
+        },
+      },
+      {
+        id: 'validate-picking',
+        label: t('inventory.transferActions.validate'),
+        requiresSelection: true,
+        onClick: (rows) => {
+          const id = rows[0]?.id;
+          if (id != null) void validatePicking.mutateAsync(id as string | number | bigint);
+        },
+      },
+      {
+        id: 'cancel-picking',
+        label: t('inventory.transferActions.cancel'),
+        requiresSelection: true,
+        variant: 'destructive',
+        onClick: (rows) => {
+          const id = rows[0]?.id;
+          const st = pickingStateStr(rows[0] as Record<string, unknown>);
+          if (id != null && st !== 'done') {
+            void cancelPicking.mutateAsync(id as string | number | bigint);
+          }
+        },
+      },
+    ],
+    [t, confirmPicking, assignPicking, validatePicking, cancelPicking],
+  );
+
+  const fulfillmentEntityConfig = useMemo((): EntityViewConfig => {
+    const base = salesFulfillmentTableConfig(t);
+    const view = base.view as EntityTableConfig;
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: pickingActions,
+      },
+    };
+  }, [t, pickingActions]);
+
+  const returnsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = salesReturnsTableConfig(t);
+    const view = base.view as EntityTableConfig;
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: pickingActions,
+      },
+    };
+  }, [t, pickingActions]);
+
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
@@ -443,10 +625,52 @@ function SalesClientLoaded({
               }
             },
           },
+          {
+            id: 'create-invoice',
+            label: t('sales.actions.createInvoice'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const st = saleOrderState(rows[0] as Record<string, unknown>);
+              if (st !== 'Sale' && st !== 'Done') return;
+              const id = rows[0]?.id;
+              if (id == null) return;
+              setInvoiceOrderError(null);
+              setInvoiceOrderId(BigInt(String(id)));
+            },
+          },
+          {
+            id: 'lock-orders',
+            label: t('sales.actions.lockOrders'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void lockSaleOrder.mutateAsync(r.id as string | number | bigint);
+              }
+            },
+          },
+          {
+            id: 'unlock-orders',
+            label: t('sales.actions.unlockOrders'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                void unlockSaleOrder.mutateAsync(r.id as string | number | bigint);
+              }
+            },
+          },
         ],
       },
     };
-  }, [t, confirmSaleOrder, cancelSaleOrder, computeSoTotals, setCsvKind]);
+  }, [
+    t,
+    confirmSaleOrder,
+    cancelSaleOrder,
+    computeSoTotals,
+    lockSaleOrder,
+    unlockSaleOrder,
+    setCsvKind,
+  ]);
 
   const pricelistsEntityConfig = useMemo((): EntityViewConfig => {
     const base = pricelistsTableConfig(t);
@@ -797,6 +1021,28 @@ function SalesClientLoaded({
               createForm: pickingBatchFormConfig,
             };
           }
+          if (tab.id === 'fulfillment' && tab.type === 'entity') {
+            return { ...tab, entityConfig: fulfillmentEntityConfig };
+          }
+          if (tab.id === 'returns' && tab.type === 'entity') {
+            return { ...tab, entityConfig: returnsEntityConfig };
+          }
+          if (tab.id === 'invoices') {
+            return {
+              ...tab,
+              type: 'custom' as const,
+              customContent: (
+                <InvoiceListView
+                  invoices={salesInvoices as unknown as AccountMove[]}
+                  onRecalculateTotals={(inv) =>
+                    void computeInvoiceTotals.mutateAsync(
+                      inv.id as string | number | bigint,
+                    )
+                  }
+                />
+              ),
+            };
+          }
           if (tab.id === 'loyalty-cards' && tab.type === 'entity') {
             return { ...tab, createForm: loyaltyCardFormConfig };
           }
@@ -812,6 +1058,10 @@ function SalesClientLoaded({
       pricelistItemsEntityConfig,
       pricelistItemFormConfig,
       deliveriesEntityConfig,
+      fulfillmentEntityConfig,
+      returnsEntityConfig,
+      salesInvoices,
+      computeInvoiceTotals,
       loyaltyCardFormConfig,
       t,
       setCsvKind,
@@ -831,6 +1081,8 @@ function SalesClientLoaded({
       pricelists: pricelists as unknown as Record<string, unknown>[],
       'pricelist-items': pricelistItems as unknown as Record<string, unknown>[],
       deliveries: deliveries as unknown as Record<string, unknown>[],
+      fulfillment: fulfillmentPickings as unknown as Record<string, unknown>[],
+      returns: returnPickings as unknown as Record<string, unknown>[],
       'delivery-price-rules': deliveryPriceRules as unknown as Record<
         string,
         unknown
@@ -850,6 +1102,8 @@ function SalesClientLoaded({
       pricelists,
       pricelistItems,
       deliveries,
+      fulfillmentPickings,
+      returnPickings,
       deliveryPriceRules,
       deliveryCarriers,
       shippingMethods,
@@ -938,7 +1192,12 @@ function SalesClientLoaded({
     createLoyaltyProgram.isPending ||
     createLoyaltyCard.isPending ||
     importSaleOrderCsv.isPending ||
-    importSaleOrderLineCsv.isPending;
+    importSaleOrderLineCsv.isPending ||
+    computeInvoiceTotals.isPending ||
+    confirmPicking.isPending ||
+    assignPicking.isPending ||
+    validatePicking.isPending ||
+    cancelPicking.isPending;
 
   return (
     <>
@@ -1012,6 +1271,46 @@ function SalesClientLoaded({
               setCsvKind(null);
             } catch (e) {
               setCsvError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
+      {invoiceOrderId != null ? (
+        <FormModal
+          key={`invoice-order-${invoiceOrderId.toString()}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setInvoiceOrderId(null);
+              setInvoiceOrderError(null);
+            }
+          }}
+          config={createInvoiceFormConfig}
+          closeOnSubmit={false}
+          submitError={invoiceOrderError}
+          isPending={createInvoiceFromSaleOrder.isPending}
+          onSubmit={async (formData) => {
+            setInvoiceOrderError(null);
+            const journalId = formData.journalId;
+            const defaultIncomeAccountId = formData.defaultIncomeAccountId;
+            if (
+              journalId == null ||
+              String(journalId).trim() === '' ||
+              defaultIncomeAccountId == null ||
+              String(defaultIncomeAccountId).trim() === ''
+            ) {
+              setInvoiceOrderError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await createInvoiceFromSaleOrder.mutateAsync({
+                orderId: invoiceOrderId,
+                journalId: BigInt(String(journalId)),
+                defaultIncomeAccountId: BigInt(String(defaultIncomeAccountId)),
+              });
+              setInvoiceOrderId(null);
+            } catch (e) {
+              setInvoiceOrderError(e instanceof Error ? e.message : String(e));
             }
           }}
         />

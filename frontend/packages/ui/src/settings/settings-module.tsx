@@ -166,6 +166,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
                         <button
                           key={section.id}
                           type="button"
+                          data-testid={`settings-section-${section.id}`}
                           className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
                           onClick={() => setActiveSection(section.id)}
                         >

@@ -393,6 +393,203 @@ export const newDepartmentForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newLeaveTypeForm = (t: TFunction): FormConfig => ({
+  id: "new-leave-type",
+  title: t("hr.forms.newLeaveType.title"),
+  description: t("hr.forms.newLeaveType.description"),
+  sections: [
+    {
+      id: "leave-type-details",
+      title: t("hr.forms.newLeaveType.sections.details"),
+      fields: [
+        {
+          id: "lt-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newLeaveType.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "lt-code",
+          type: "text",
+          name: "code",
+          label: t("hr.forms.newLeaveType.fields.code"),
+          width: "1/2",
+        },
+        {
+          id: "lt-allocation",
+          type: "select",
+          name: "allocationType",
+          label: t("hr.forms.newLeaveType.fields.allocationType"),
+          required: true,
+          width: "1/2",
+          options: [
+            { value: "fixed", label: t("hr.forms.newLeaveType.fields.options.fixed") },
+            { value: "accrual", label: t("hr.forms.newLeaveType.fields.options.accrual") },
+          ],
+        },
+        {
+          id: "lt-max",
+          type: "number",
+          name: "maxLeaves",
+          label: t("hr.forms.newLeaveType.fields.maxLeaves"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "lt-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.newLeaveType.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newPayrollStructureForm = (t: TFunction): FormConfig => ({
+  id: "new-payroll-structure",
+  title: t("hr.forms.newPayrollStructure.title"),
+  description: t("hr.forms.newPayrollStructure.description"),
+  sections: [
+    {
+      id: "struct-details",
+      title: t("hr.forms.newPayrollStructure.sections.details"),
+      fields: [
+        {
+          id: "struct-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newPayrollStructure.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "struct-type",
+          type: "select",
+          name: "type",
+          label: t("hr.forms.newPayrollStructure.fields.type"),
+          required: true,
+          width: "1/2",
+          options: [
+            { value: "regular", label: t("hr.forms.newPayrollStructure.fields.options.regular") },
+            { value: "bonus", label: t("hr.forms.newPayrollStructure.fields.options.bonus") },
+          ],
+        },
+        {
+          id: "struct-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.newPayrollStructure.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newSalaryRuleForm = (t: TFunction): FormConfig => ({
+  id: "new-salary-rule",
+  title: t("hr.forms.newSalaryRule.title"),
+  description: t("hr.forms.newSalaryRule.description"),
+  sections: [
+    {
+      id: "rule-details",
+      title: t("hr.forms.newSalaryRule.sections.details"),
+      fields: [
+        {
+          id: "rule-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newSalaryRule.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "rule-code",
+          type: "text",
+          name: "code",
+          label: t("hr.forms.newSalaryRule.fields.code"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "rule-structure",
+          type: "select",
+          name: "structureId",
+          label: t("hr.forms.newSalaryRule.fields.structureId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "rule-category",
+          type: "text",
+          name: "category",
+          label: t("hr.forms.newSalaryRule.fields.category"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "rule-condition",
+          type: "select",
+          name: "conditionType",
+          label: t("hr.forms.newSalaryRule.fields.conditionType"),
+          required: true,
+          width: "1/3",
+          options: [
+            { value: "none", label: t("hr.forms.newSalaryRule.fields.options.none") },
+            { value: "range", label: t("hr.forms.newSalaryRule.fields.options.range") },
+          ],
+        },
+        {
+          id: "rule-amount-type",
+          type: "select",
+          name: "amountType",
+          label: t("hr.forms.newSalaryRule.fields.amountType"),
+          required: true,
+          width: "1/3",
+          options: [
+            { value: "fixed", label: t("hr.forms.newSalaryRule.fields.options.fixed") },
+            { value: "percent", label: t("hr.forms.newSalaryRule.fields.options.percent") },
+          ],
+        },
+        {
+          id: "rule-sequence",
+          type: "number",
+          name: "sequence",
+          label: t("hr.forms.newSalaryRule.fields.sequence"),
+          required: true,
+          width: "1/3",
+        },
+        {
+          id: "rule-amount-fix",
+          type: "number",
+          name: "amountFix",
+          label: t("hr.forms.newSalaryRule.fields.amountFix"),
+          width: "1/2",
+        },
+        {
+          id: "rule-amount-pct",
+          type: "number",
+          name: "amountPercentage",
+          label: t("hr.forms.newSalaryRule.fields.amountPercentage"),
+          width: "1/2",
+        },
+        {
+          id: "rule-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.newSalaryRule.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const hrFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-employee": newEmployeeForm(t),
   "new-leave-request": newLeaveRequestForm(t),
@@ -400,4 +597,7 @@ export const hrFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-payslip": newPayslipForm(t),
   "new-job-position": newJobPositionForm(t),
   "new-department": newDepartmentForm(t),
+  "new-leave-type": newLeaveTypeForm(t),
+  "new-payroll-structure": newPayrollStructureForm(t),
+  "new-salary-rule": newSalaryRuleForm(t),
 })

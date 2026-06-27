@@ -1240,7 +1240,8 @@
         "actions": {
           "postSelected": "Post selected",
           "cancelSelected": "Cancel selected",
-          "linkInvoices": "Link to invoices…"
+          "linkInvoices": "Link to invoices…",
+          "reconcileMoves": "Reconcile moves…"
         }
       },
       "paymentTerms": {
@@ -1909,6 +1910,18 @@
           "isBill": "These are vendor bills (AP)"
         }
       },
+      "reconcilePaymentInvoice": {
+        "title": "Reconcile payment with invoice",
+        "description": "Match a posted payment journal entry to a posted customer invoice move.",
+        "submitLabel": "Reconcile",
+        "sections": {
+          "main": "Posted moves"
+        },
+        "fields": {
+          "paymentMoveId": "Payment move ID",
+          "invoiceMoveId": "Invoice move ID"
+        }
+      },
       "analyticAccount": {
         "createTitle": "New analytic account",
         "createDescription": "Cost center or analytic dimension for project / department tracking.",
@@ -2268,6 +2281,8 @@
       "convertOppNeedsPartner": "Set a customer (partner) on the opportunity before converting to a sale order.",
       "deleteContact": "Archive contact",
       "deleteContactConfirm": "Archive this contact? It will be hidden from default lists.",
+      "deleteLead": "Delete lead",
+      "deleteLeadConfirm": "Delete this lead permanently?",
       "assignTag": "Assign tag",
       "addToSegment": "Add to segment",
       "markComplete": "Mark complete",
@@ -2985,6 +3000,56 @@
         "open": "Open"
       }
     },
+    "leaveTypes": {
+      "title": "Leave Types",
+      "description": "Time-off categories and allocation rules",
+      "searchPlaceholder": "Search leave types…",
+      "emptyMessage": "No leave types found.",
+      "columns": {
+        "name": "Name",
+        "code": "Code",
+        "allocationType": "Allocation",
+        "maxLeaves": "Max Days",
+        "isActive": "Active"
+      }
+    },
+    "payrollStructures": {
+      "title": "Payroll Structures",
+      "description": "Salary structure templates for payslip generation",
+      "searchPlaceholder": "Search payroll structures…",
+      "emptyMessage": "No payroll structures found.",
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "isActive": "Active"
+      }
+    },
+    "salaryRules": {
+      "title": "Salary Rules",
+      "description": "Computation rules within payroll structures",
+      "searchPlaceholder": "Search salary rules…",
+      "emptyMessage": "No salary rules found.",
+      "columns": {
+        "name": "Name",
+        "code": "Code",
+        "structureId": "Structure",
+        "category": "Category",
+        "amountType": "Amount Type",
+        "sequence": "Seq.",
+        "isActive": "Active"
+      }
+    },
+    "orgChart": {
+      "title": "Organization Chart",
+      "description": "Department hierarchy and reporting lines",
+      "emptyMessage": "No departments found. Add departments to build the org chart.",
+      "employees": "employees",
+      "manager": "Manager"
+    },
+    "recruitment": {
+      "title": "Recruitment Pipeline",
+      "description": "Open positions actively recruiting"
+    },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
       "submit": "Import",
@@ -3132,6 +3197,53 @@
           "managerPlaceholder": "Select manager (optional)",
           "note": "Notes",
           "notePlaceholder": "Additional information..."
+        }
+      },
+      "newLeaveType": {
+        "title": "New Leave Type",
+        "description": "Define a time-off category",
+        "sections": { "details": "Leave Type Details" },
+        "fields": {
+          "name": "Name",
+          "code": "Code",
+          "allocationType": "Allocation Type",
+          "maxLeaves": "Max Days",
+          "isActive": "Active",
+          "options": { "fixed": "Fixed allocation", "accrual": "Accrual" }
+        }
+      },
+      "newPayrollStructure": {
+        "title": "New Payroll Structure",
+        "description": "Create a salary structure template",
+        "sections": { "details": "Structure Details" },
+        "fields": {
+          "name": "Name",
+          "type": "Type",
+          "isActive": "Active",
+          "options": { "regular": "Regular pay", "bonus": "Bonus" }
+        }
+      },
+      "newSalaryRule": {
+        "title": "New Salary Rule",
+        "description": "Add a computation rule to a payroll structure",
+        "sections": { "details": "Rule Details" },
+        "fields": {
+          "name": "Name",
+          "code": "Code",
+          "structureId": "Payroll Structure",
+          "category": "Category",
+          "conditionType": "Condition",
+          "amountType": "Amount Type",
+          "sequence": "Sequence",
+          "amountFix": "Fixed Amount",
+          "amountPercentage": "Percentage",
+          "isActive": "Active",
+          "options": {
+            "none": "Always apply",
+            "range": "Range",
+            "fixed": "Fixed",
+            "percent": "Percentage"
+          }
         }
       }
     }
@@ -4507,7 +4619,9 @@
       "amountTotal": "Total amount",
       "state": "Status",
       "addLine": "Add line",
-      "removeLine": "Remove line"
+      "removeLine": "Remove line",
+      "lines": "Lines",
+      "noLines": "No lines yet."
     },
     "forms": {
       "newPartnerBank": {
@@ -4885,7 +4999,22 @@
         "Cancel": "Cancelled"
       }
     },
+    "fulfillment": {
+      "title": "Order fulfillment",
+      "description": "Outgoing stock pickings linked to sales orders",
+      "searchPlaceholder": "Search by reference or origin…",
+      "emptyMessage": "No fulfillment pickings found."
+    },
+    "returns": {
+      "title": "Returns / RMA",
+      "description": "Customer return pickings and reverse logistics",
+      "searchPlaceholder": "Search returns…",
+      "emptyMessage": "No return pickings found."
+    },
     "tabs": {
+      "invoices": "Invoices",
+      "fulfillment": "Fulfillment",
+      "returns": "Returns / RMA",
       "deliveryPriceRules": "Shipping price rules",
       "createDeliveryPriceRule": "New price rule",
       "deliveryCarriers": "Carriers",
@@ -5185,12 +5314,29 @@
           "partnerId": "Partner ID (optional)"
         },
         "noPrograms": "Create a loyalty program first"
+      },
+      "createInvoiceFromOrder": {
+        "title": "Create invoice from order",
+        "description": "Generate a customer invoice for the selected confirmed sale order.",
+        "submitLabel": "Create invoice",
+        "sections": {
+          "accounting": "Accounting"
+        },
+        "fields": {
+          "journalId": "Sales journal",
+          "defaultIncomeAccountId": "Default income account"
+        },
+        "noJournals": "No sales journals — create one in Accounting",
+        "noAccounts": "No GL accounts — create chart of accounts first"
       }
     },
     "actions": {
       "confirmSelected": "Confirm",
       "cancelOrders": "Cancel orders",
       "recalculateTotals": "Recalculate totals",
+      "createInvoice": "Create invoice…",
+      "lockOrders": "Lock",
+      "unlockOrders": "Unlock",
       "newPricelistItem": "New rule",
       "togglePricelistActive": "Toggle active",
       "deletePricelists": "Delete",
@@ -5629,6 +5775,29 @@
         "amount": "Amount"
       }
     },
+    "gantt": {
+      "title": "Gantt View",
+      "description": "Task timeline by project and deadline",
+      "emptyMessage": "No tasks with deadlines to display.",
+      "columns": {
+        "task": "Task",
+        "project": "Project",
+        "deadline": "Deadline",
+        "status": "Status",
+        "progress": "Progress"
+      }
+    },
+    "resourceAllocation": {
+      "title": "Resource Allocation",
+      "description": "Hours logged per employee across projects",
+      "emptyMessage": "No timesheet data yet.",
+      "columns": {
+        "employee": "Employee",
+        "hours": "Hours Logged",
+        "projects": "Projects",
+        "tasks": "Tasks"
+      }
+    },
     "forms": {
       "newProject": {
         "title": "New Project",
@@ -5756,6 +5925,7 @@
   },
   "calendar": {
     "confirmDelete": "Are you sure you want to delete this event?",
+    "activitiesTab": "Activities",
     "dashboard": {
       "totalEvents": "Total Events",
       "confirmed": "Confirmed",
@@ -5898,6 +6068,33 @@
         }
       }
     },
+    "knowledgeCategories": {
+      "title": "Knowledge categories",
+      "description": "Organize articles into categories",
+      "searchPlaceholder": "Search categories…",
+      "emptyMessage": "No categories found.",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "articleCount": "Articles",
+        "sequence": "Sequence",
+        "createDate": "Created"
+      }
+    },
+    "folders": {
+      "title": "Document folders",
+      "description": "Browse and manage folder hierarchy",
+      "searchPlaceholder": "Search folders…",
+      "emptyMessage": "No folders found.",
+      "columns": {
+        "name": "Name",
+        "parentPath": "Path",
+        "documentCount": "Documents",
+        "isFavorite": "Favorite",
+        "isHidden": "Hidden",
+        "createDate": "Created"
+      }
+    },
     "toolbar": {
       "importCategoryCsv": "Import categories (CSV)",
       "importArticleCsv": "Import articles (CSV)"
@@ -5908,7 +6105,11 @@
     },
     "tabs": {
       "processing": "Processing jobs",
-      "insights": "AI insights"
+      "insights": "AI insights",
+      "categories": "Categories",
+      "folders": "Folders",
+      "newCategory": "New category",
+      "newFolder": "New folder"
     },
     "processing": {
       "title": "Document processing jobs",
@@ -6049,6 +6250,34 @@
           "categoryIdHint": "Optional knowledge category row id"
         }
       },
+      "newCategory": {
+        "title": "New category",
+        "description": "Create a knowledge base category",
+        "sections": {
+          "category": "Category"
+        },
+        "fields": {
+          "name": "Name",
+          "description": "Description",
+          "parentId": "Parent category ID",
+          "sequence": "Sequence"
+        }
+      },
+      "newFolder": {
+        "title": "New folder",
+        "description": "Create a document folder",
+        "sections": {
+          "folder": "Folder"
+        },
+        "fields": {
+          "name": "Name",
+          "description": "Description",
+          "parentId": "Parent folder ID",
+          "sequence": "Sequence",
+          "isFavorite": "Favorite",
+          "isHidden": "Hidden"
+        }
+      },
       "newProcessingJob": {
         "title": "New document processing job",
         "description": "Queues work for the AI document pipeline (status starts as pending).",
@@ -6103,7 +6332,8 @@
   },
   "helpdesk": {
     "actions": {
-      "importTicketsCsv": "Import tickets (CSV)"
+      "importTicketsCsv": "Import tickets (CSV)",
+      "editTicket": "Edit ticket"
     },
     "tabs": {
       "teams": "Teams",
@@ -6743,7 +6973,10 @@
       "postReport": "Post",
       "confirmApprove": "Approve this expense report?",
       "confirmRefuse": "Refuse this expense report? The report stays in the system but will not be reimbursed.",
-      "noActions": "No actions available for this status."
+      "noActions": "No actions available for this status.",
+      "noDraftSheets": "Select draft expense reports to submit.",
+      "noSubmittedSheets": "Select submitted reports to approve or refuse.",
+      "noApprovedSheets": "Select approved reports to post."
     },
     "forms": {
       "newExpense": {
@@ -7013,6 +7246,7 @@
       "signalLabel": "Signal name",
       "signalPlaceholder": "e.g. approve",
       "sendSignal": "Send signal",
+      "completeInstance": "Complete instance",
       "cancelInstance": "Stop instance",
       "workitems": "Work items",
       "markException": "Mark exception",
@@ -7074,6 +7308,14 @@
         "createdAt": "Created"
       }
     },
+    "actions": {
+      "edit": "Edit proposal",
+      "submitForReview": "Submit for review",
+      "submit": "Submit",
+      "award": "Award",
+      "reject": "Reject",
+      "archive": "Archive"
+    },
     "forms": {
       "newProposal": {
         "title": "New Proposal",
@@ -7100,6 +7342,10 @@
             "tender": "Tender"
           }
         }
+      },
+      "editProposal": {
+        "title": "Edit Proposal",
+        "description": "Update proposal details"
       }
     }
   },
@@ -7141,6 +7387,18 @@
         "user_notification": "User notification"
       }
     },
+    "followers": {
+      "title": "Followers",
+      "description": "Record subscriptions for chatter notifications",
+      "searchPlaceholder": "Search followers…",
+      "emptyMessage": "No followers found.",
+      "columns": {
+        "resModel": "Model",
+        "resId": "Record ID",
+        "subtypes": "Subtypes",
+        "partnerId": "Partner"
+      }
+    },
     "forms": {
       "newMessage": {
         "title": "New Message",
@@ -7164,6 +7422,26 @@
             "email": "Email",
             "notification": "Notification"
           }
+        }
+      },
+      "subscribe": {
+        "title": "Subscribe to Record",
+        "description": "Follow a record to receive chatter notifications",
+        "submit": "Subscribe",
+        "fields": {
+          "resModel": "Related model",
+          "resId": "Record ID",
+          "subtypes": "Subtypes (CSV)",
+          "subtypesPlaceholder": "mail.mt_comment,mail.mt_note"
+        }
+      },
+      "unsubscribe": {
+        "title": "Unsubscribe from Record",
+        "description": "Stop following a record",
+        "submit": "Unsubscribe",
+        "fields": {
+          "resModel": "Related model",
+          "resId": "Record ID"
         }
       }
     }
@@ -7214,6 +7492,82 @@
       "charge": "Charge {{amount}}",
       "reprintReceipt": "Reprint Last Receipt ({{number}})",
       "discountApplied": "Discount applied: {{pct}}% off"
+    },
+    "admin": {
+      "module": {
+        "title": "Point of Sale",
+        "description": "Checkout register and terminal administration"
+      },
+      "tabs": {
+        "register": "Register",
+        "admin": "Admin"
+      },
+      "terminals": {
+        "title": "POS Terminals",
+        "description": "Registered checkout terminals",
+        "searchPlaceholder": "Search terminals…",
+        "emptyMessage": "No terminals yet.",
+        "columns": {
+          "name": "Name",
+          "location": "Location",
+          "status": "Status",
+          "dailyRevenue": "Daily revenue",
+          "openOrders": "Open orders"
+        }
+      },
+      "configs": {
+        "title": "POS Configs",
+        "description": "Point-of-sale configuration profiles",
+        "searchPlaceholder": "Search configs…",
+        "emptyMessage": "No configs yet.",
+        "columns": {
+          "name": "Name",
+          "isActive": "Active",
+          "companyId": "Company"
+        }
+      },
+      "sessions": {
+        "title": "POS Sessions",
+        "description": "Open and closed register sessions",
+        "searchPlaceholder": "Search sessions…",
+        "emptyMessage": "No sessions yet.",
+        "columns": {
+          "name": "Session",
+          "configId": "Config",
+          "state": "State",
+          "orderCount": "Orders"
+        }
+      },
+      "forms": {
+        "fields": {
+          "name": "Name",
+          "locationLabel": "Location label",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "terminal": "Terminal",
+          "status": "Status",
+          "dailyRevenue": "Daily revenue",
+          "openOrders": "Open orders",
+          "config": "Config",
+          "session": "Session",
+          "openingBalance": "Opening balance",
+          "closingBalance": "Closing balance",
+          "activeByDefault": "Active by default"
+        },
+        "createTerminal": { "title": "Create POS Terminal", "submit": "Create terminal" },
+        "updateTerminal": {
+          "title": "Update POS Terminal",
+          "description": "Update status and metrics for a terminal.",
+          "submit": "Update terminal"
+        },
+        "createConfig": { "title": "Create POS Config", "submit": "Create config" },
+        "activateConfig": { "title": "Activate POS Config", "submit": "Activate" },
+        "deactivateConfig": { "title": "Deactivate POS Config", "submit": "Deactivate" },
+        "openSession": { "title": "Open POS Session", "submit": "Open session" },
+        "computeTotals": { "title": "Compute Session Totals", "submit": "Compute totals" },
+        "closeSession": { "title": "Close POS Session", "submit": "Close session" }
+      },
+      "operations": "Operations"
     }
   },
   "aiChat": {
@@ -7260,7 +7614,14 @@
     "openPOS": "Open POS",
     "warehouseFallback": "Warehouse {{id}}",
     "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
-    "demoDataHint": "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates."
+    "demoDataHint": "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates.",
+    "fleet": {
+      "title": "Fleet vehicles",
+      "empty": "No vehicles yet.",
+      "create": "Create vehicle",
+      "updatePosition": "Update position",
+      "selectVehicle": "Select vehicle"
+    }
   },
   "tasks": {
     "page": {
@@ -7304,18 +7665,23 @@
       "keyMetrics": "Key Metrics",
       "sections": {
         "attention": "Needs Attention",
-        "pipeline": "Open Pipeline"
+        "pipeline": "Open Pipeline",
+        "trends": "Trends"
       },
       "stats": {
         "openSalesOrders": "Open Sales Orders",
+        "openPurchaseOrders": "Open Purchase Orders",
         "accountsReceivable": "Accounts Receivable",
         "accountsPayable": "Accounts Payable",
         "lowStockAlerts": "Low Stock Alerts",
         "openTasks": "Open Project Tasks",
+        "activeProjects": "Active Projects",
         "pendingAiDrafts": "Pending AI Drafts"
       },
       "actions": {
         "sales": "Sales",
+        "accounting": "Accounting",
+        "crm": "CRM",
         "inventory": "Inventory",
         "aiDrafts": "AI Approvals",
         "projects": "Projects"
@@ -7323,8 +7689,11 @@
       "widgets": {
         "upcomingTasks": "Upcoming Task Deadlines",
         "lowStock": "Low / Zero Stock",
-        "openPurchaseOrders": "Open Purchase Orders"
+        "openPurchaseOrders": "Open Purchase Orders",
+        "salesTrend": "Confirmed Sales (6 mo)",
+        "pipelineMix": "Open Pipeline"
       },
+      "overdue": "Overdue",
       "tables": {
         "task": "Task",
         "project": "Project",
@@ -8066,7 +8435,9 @@
       "trialBalance": "Trial balance",
       "reportTemplates": "Report templates",
       "scheduledReports": "Scheduled",
-      "analyticsMetrics": "Metrics"
+      "analyticsMetrics": "Metrics",
+      "dashboards": "Dashboards",
+      "dashboardWidgets": "Widgets"
     },
     "createButton": {
       "generateReport": "Generate report",
@@ -8163,6 +8534,32 @@
         "model": "Model",
         "aggregation": "Aggregation",
         "currentValue": "Current",
+        "isActive": "Active"
+      }
+    },
+    "dashboards": {
+      "title": "Dashboards",
+      "description": "Custom analytics dashboards",
+      "searchPlaceholder": "Search dashboards…",
+      "emptyMessage": "No dashboards yet.",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "isDefault": "Default",
+        "isShared": "Shared",
+        "createDate": "Created"
+      }
+    },
+    "dashboardWidgets": {
+      "title": "Dashboard widgets",
+      "description": "Reusable widgets for dashboards",
+      "searchPlaceholder": "Search widgets…",
+      "emptyMessage": "No widgets yet.",
+      "columns": {
+        "name": "Name",
+        "model": "Model",
+        "width": "Width",
+        "height": "Height",
         "isActive": "Active"
       }
     },

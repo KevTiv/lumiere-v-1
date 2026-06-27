@@ -63,6 +63,7 @@ const ADD_PURCHASE_ORDER_LINE_DEFAULTS: Record<string, unknown> = {
 function invalidateLandedAndPo(qc: QueryClient, organizationId: bigint) {
   const k = rqBigIntKey(organizationId)
   void qc.invalidateQueries({ queryKey: ['landed-costs', k] })
+  void qc.invalidateQueries({ queryKey: ['landed-cost-lines', k] })
   void qc.invalidateQueries({ queryKey: ['purchase-orders', k] })
 }
 
@@ -123,6 +124,15 @@ export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) 
   return useQuery<QueryRows>({
     queryKey: ['landed-costs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-costs', 'Failed to fetch landed costs'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useLandedCostLines(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['landed-cost-lines', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/landed-cost-lines', 'Failed to fetch landed cost lines'),
     staleTime: 30_000,
     initialData,
   })

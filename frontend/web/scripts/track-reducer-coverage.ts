@@ -588,6 +588,8 @@ function extractUiCallers(hooks: Map<string, Set<string>>): Map<string, Set<stri
   const files = [
     ...globSync('**/*.ts', { cwd: path.join(WEB_SRC, 'app'), absolute: true }),
     ...globSync('**/*.tsx', { cwd: path.join(WEB_SRC, 'app'), absolute: true }),
+    ...globSync('**/*.ts', { cwd: path.join(WEB_SRC, 'lib'), absolute: true }),
+    ...globSync('**/*.tsx', { cwd: path.join(WEB_SRC, 'lib'), absolute: true }),
     ...globSync('**/*.ts', { cwd: UI_SRC, absolute: true }),
     ...globSync('**/*.tsx', { cwd: UI_SRC, absolute: true }),
   ]

@@ -60,6 +60,7 @@ import {
   useContacts,
   // Landed costs
   useLandedCosts,
+  useLandedCostLines,
   useCreateLandedCost,
   useUpdateLandedCost,
   useDeleteLandedCost,
@@ -272,6 +273,7 @@ function PurchasingClientLoaded({
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
   const { data: stockPickings = [] } = useStockPickings(orgId)
   const { data: landedCosts = [] } = useLandedCosts(orgId)
+  const { data: landedCostLines = [] } = useLandedCostLines(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
@@ -536,7 +538,16 @@ function PurchasingClientLoaded({
     [t, draftLandedCostOptions, productFieldOptions, defaultCurrencyId],
   )
 
-  const removeLandedCostLineFormConfig = useMemo(() => removeLandedCostLineForm(t), [t])
+  const removeLandedCostLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(removeLandedCostLineForm(t), {
+        lineId: landedCostLines.map((line) => ({
+          value: String(line.id ?? ""),
+          label: `#${String(line.id ?? "")} · LC ${String(line.landedCostId ?? "")} · ${Number(line.priceUnit ?? 0).toLocaleString()}`,
+        })),
+      }),
+    [t, landedCostLines],
+  )
 
   const supplierIntakeFormConfig = useMemo(() => newSupplierIntakeForm(t), [t])
 
@@ -1535,17 +1546,36 @@ function PurchasingClientLoaded({
 
   const openLandedCostLineForm = useCallback(
     (action: "addLandedCostLine" | "removeLandedCostLine", landedCostId?: string) => {
-      const base =
-        action === "addLandedCostLine" ? addLandedCostLineFormConfig : removeLandedCostLineFormConfig
-      const form =
-        landedCostId != null && action === "addLandedCostLine"
-          ? mergeFieldDefaultValues(base, { landedCostId })
-          : base
+      if (action === "addLandedCostLine") {
+        const form =
+          landedCostId != null
+            ? mergeFieldDefaultValues(addLandedCostLineFormConfig, { landedCostId })
+            : addLandedCostLineFormConfig
+        setLandedCostDetailRow(null)
+        setQuickActionForm({ form, action })
+        return
+      }
+      const linesForCost =
+        landedCostId != null
+          ? landedCostLines.filter((line) => String(line.landedCostId ?? "") === landedCostId)
+          : landedCostLines
+      const form = mergeSelectOptionsForFields(removeLandedCostLineForm(t), {
+        lineId: linesForCost.map((line) => ({
+          value: String(line.id ?? ""),
+          label: `#${String(line.id ?? "")} · ${Number(line.priceUnit ?? 0).toLocaleString()}`,
+        })),
+      })
       setLandedCostDetailRow(null)
       setQuickActionForm({ form, action })
     },
-    [addLandedCostLineFormConfig, removeLandedCostLineFormConfig],
+    [addLandedCostLineFormConfig, landedCostLines, removeLandedCostLineForm, t],
   )
+
+  const landedCostDetailLines = useMemo(() => {
+    if (landedCostDetailRow == null) return []
+    const costId = String(landedCostDetailRow.id ?? "")
+    return landedCostLines.filter((line) => String(line.landedCostId ?? "") === costId)
+  }, [landedCostDetailRow, landedCostLines])
 
   return (
     <>
@@ -1614,6 +1644,21 @@ function PurchasingClientLoaded({
                 {t("purchasing.landedCostDetail.amountTotal")}:{" "}
                 {Number(landedCostDetailRow.amountTotal ?? 0).toLocaleString()}
               </p>
+              {landedCostDetailLines.length > 0 ? (
+                <div className="space-y-1 pt-2">
+                  <p className="font-medium">{t("purchasing.landedCostDetail.lines")}</p>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto text-muted-foreground">
+                    {landedCostDetailLines.map((line) => (
+                      <li key={String(line.id ?? "")}>
+                        #{String(line.id ?? "")} · product {String(line.productId ?? "—")} ·{" "}
+                        {Number(line.priceUnit ?? 0).toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">{t("purchasing.landedCostDetail.noLines")}</p>
+              )}
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">

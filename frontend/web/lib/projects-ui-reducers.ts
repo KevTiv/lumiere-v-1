@@ -1,0 +1,20 @@
+/** Coverage tracker: projects reducers reachable via forms, row actions, and CSV imports. */
+export const PROJECTS_UI_REDUCERS = [
+  "assign_task_users",
+  "bill_timesheets",
+  "create_project",
+  "create_task",
+  "import_project_csv",
+  "import_task_csv",
+  "import_timesheet_csv",
+  "log_timesheet",
+  "set_project_active",
+  "set_task_parent",
+  "start_timesheet_timer",
+  "stop_timesheet_timer",
+  "toggle_project_favorite",
+  "update_project",
+  "update_task",
+  "update_task_state",
+  "validate_timesheets",
+] as const

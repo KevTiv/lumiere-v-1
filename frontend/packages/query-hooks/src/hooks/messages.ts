@@ -62,5 +62,78 @@ export function usePostMessage(organizationId: bigint) {
   })
 }
 
+export function useMailFollowers(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['mail-followers', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/mail-followers', 'Failed to fetch followers'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useSubscribeToRecord(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { resModel: string; resId: bigint | number | string; subtypes: string[] }
+  >({
+    mutationFn: async ({ resModel, resId, subtypes }) => {
+      const { urlPath, init } = messagesBffPost("subscribe_to_record", [
+        organizationId,
+        resModel,
+        toScalarU64(resId),
+        subtypes,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to subscribe to record')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-followers', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useUnsubscribeFromRecord(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { resModel: string; resId: bigint | number | string }>({
+    mutationFn: async ({ resModel, resId }) => {
+      const { urlPath, init } = messagesBffPost("unsubscribe_from_record", [
+        organizationId,
+        resModel,
+        toScalarU64(resId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to unsubscribe from record')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-followers', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function usePostInternalNote(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { model: string; resId: bigint | number | string; body: string }
+  >({
+    mutationFn: async ({ model, resId, body }) => {
+      const { urlPath, init } = messagesBffPost("post_internal_note", [
+        organizationId,
+        model,
+        toScalarU64(resId),
+        body,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to post internal note')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type { PostMessageParams } from "@lumiere/stdb/types"

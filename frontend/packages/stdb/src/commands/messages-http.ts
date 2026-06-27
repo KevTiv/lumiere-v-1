@@ -6,7 +6,12 @@ import type { ReducerCommandContractMeta } from "./types";
  * Messages mutations via Next.js BFF `POST /api/call/:reducer`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` messages hooks.
  */
-export const MESSAGES_BFF_REDUCERS = ["post_message"] as const;
+export const MESSAGES_BFF_REDUCERS = [
+  "post_message",
+  "post_internal_note",
+  "subscribe_to_record",
+  "unsubscribe_from_record",
+] as const;
 
 export type MessagesBffReducerKey = (typeof MESSAGES_BFF_REDUCERS)[number];
 
@@ -38,6 +43,9 @@ export const MESSAGES_COMMAND_SUBSCRIPTION_HINTS: Record<
   readonly string[]
 > = {
   post_message: ["mail-messages"],
+  post_internal_note: ["mail-messages"],
+  subscribe_to_record: ["mail-followers"],
+  unsubscribe_from_record: ["mail-followers"],
 };
 
 export function messagesCommandContract(

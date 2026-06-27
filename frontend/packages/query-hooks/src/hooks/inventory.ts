@@ -97,6 +97,7 @@ function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organ
   void qc.invalidateQueries({ queryKey: ['stock-production-lots', orgKey] })
   void qc.invalidateQueries({ queryKey: ['warehouses', orgKey] })
   void qc.invalidateQueries({ queryKey: ['quality-checks', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['quality-alerts', orgKey] })
   void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] })
   void qc.invalidateQueries({ queryKey: ['warehouse-3d', orgKey] })
@@ -234,6 +235,18 @@ export function useQualityChecks(
   return useQuery<QueryRows>({
     queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useQualityAlerts(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['quality-alerts', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/quality-alerts', 'Failed to fetch quality alerts'),
     staleTime: 30_000,
     initialData,
   })

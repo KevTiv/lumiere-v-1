@@ -1,5 +1,10 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryProducts, serverQueryPosTerminals } from "@lumiere/stdb/server"
+import {
+  serverQueryProducts,
+  serverQueryPosTerminals,
+  serverQueryPosConfigs,
+  serverQueryPosSessions,
+} from "@lumiere/stdb/server"
 import { PosClient } from "./pos-client"
 
 export default async function PosPage() {
@@ -9,15 +14,19 @@ export default async function PosPage() {
   }
   const { organizationId, opts } = session
 
-  const [products, terminals] = await Promise.all([
+  const [products, terminals, configs, sessions] = await Promise.all([
     serverQueryProducts(organizationId, opts),
     serverQueryPosTerminals(organizationId, opts),
-  ]).catch(() => [[], []])
+    serverQueryPosConfigs(organizationId, opts),
+    serverQueryPosSessions(organizationId, opts),
+  ]).catch(() => [[], [], [], []])
 
   return (
     <PosClient
       initialProducts={products as Record<string, unknown>[]}
       initialTerminals={terminals as Record<string, unknown>[]}
+      initialConfigs={configs as Record<string, unknown>[]}
+      initialSessions={sessions as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

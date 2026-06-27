@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, openEntityCreate, signIn } from "./helpers"
 
 const PURCHASING_TAB_IDS = [
   "dashboard",
@@ -88,6 +88,28 @@ test.describe("Purchasing module e2e", () => {
     await openPurchasingTab(page, "orders")
 
     await expect(page.getByText("PO/2024/0001")).toBeVisible()
+    await expectNoAppError(page)
+  })
+
+  test("landed costs create modal opens and cancel", async ({ page }) => {
+    await openEntityCreate(page, "/purchasing", "purchasing", "landed-costs", "new-landed-cost")
+
+    await page
+      .getByTestId("form-modal-new-landed-cost")
+      .getByRole("button", { name: /^cancel$/i })
+      .click()
+    await expect(page.getByTestId("form-modal-new-landed-cost")).toBeHidden()
+    await expectNoAppError(page)
+  })
+
+  test("supplier intakes create modal opens and cancel", async ({ page }) => {
+    await openEntityCreate(page, "/purchasing", "purchasing", "supplier-intakes", "new-supplier-intake")
+
+    await page
+      .getByTestId("form-modal-new-supplier-intake")
+      .getByRole("button", { name: /^cancel$/i })
+      .click()
+    await expect(page.getByTestId("form-modal-new-supplier-intake")).toBeHidden()
     await expectNoAppError(page)
   })
 })

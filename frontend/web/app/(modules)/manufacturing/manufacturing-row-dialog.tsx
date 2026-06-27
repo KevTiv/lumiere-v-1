@@ -138,22 +138,24 @@ export function ManufacturingRowDialog({
   if (!formConfig || !tabId) return null
 
   return (
-    <FormModal
-      key={`${tabId}-${id}-${open}`}
-      open={open}
-      onOpenChange={onOpenChange}
-      config={formConfig}
-      closeOnSubmit={false}
-      submitError={submitError}
-      onSubmit={async (data) => {
-        setSubmitError(null)
-        try {
-          await submitManufacturingRowAction(tabId, data, mutations)
-          onOpenChange(false)
-        } catch (e) {
-          setSubmitError(e instanceof Error ? e.message : String(e))
-        }
-      }}
-    />
+    <div data-testid="manufacturing-row-dialog">
+      <FormModal
+        key={`${tabId}-${id}-${open}`}
+        open={open}
+        onOpenChange={onOpenChange}
+        config={formConfig}
+        closeOnSubmit={false}
+        submitError={submitError}
+        onSubmit={async (data) => {
+          setSubmitError(null)
+          try {
+            await submitManufacturingRowAction(tabId, data, mutations)
+            onOpenChange(false)
+          } catch (e) {
+            setSubmitError(e instanceof Error ? e.message : String(e))
+          }
+        }}
+      />
+    </div>
   )
 }

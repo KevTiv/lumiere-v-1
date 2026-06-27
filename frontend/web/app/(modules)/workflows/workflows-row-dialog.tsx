@@ -271,6 +271,14 @@ export function WorkflowsRowDialog({
                   </Button>
                   <Button
                     type="button"
+                    variant="secondary"
+                    className="ml-2"
+                    onClick={() => mutations.signalWorkflow.mutate({ instanceId: id, signal: "complete" })}
+                  >
+                    {t("workflows.rowDialog.completeInstance")}
+                  </Button>
+                  <Button
+                    type="button"
                     variant="destructive"
                     className="ml-2"
                     onClick={() => mutations.cancelWorkflowInstance.mutate(id)}

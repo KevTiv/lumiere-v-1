@@ -107,6 +107,30 @@ export function useContacts(
   })
 }
 
+export function useContactTags(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['contact-tags', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/contact-tags', 'Failed to fetch contact tags'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useContactSegments(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['contact-segments', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/contact-segments', 'Failed to fetch contact segments'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useActivities(
   organizationId: bigint,
   initialData?: QueryRows,
@@ -365,7 +389,10 @@ export function useCreateContactTag(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact tag')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['contact-tags', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -381,7 +408,10 @@ export function useCreateContactSegment(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact segment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['contact-segments', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -420,6 +450,21 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
       void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] })
       void qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
     },
+  })
+}
+
+export function useDeleteLead(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (leadId) => {
+      const { urlPath, init } = crmBffPost("delete_lead", [
+        organizationId,
+        toScalarU64(leadId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to delete lead")
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads", rqBigIntKey(organizationId)] }),
   })
 }
 

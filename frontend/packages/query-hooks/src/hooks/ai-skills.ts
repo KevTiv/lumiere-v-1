@@ -1,8 +1,16 @@
 "use client"
 
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch } from "../http"
+import { aiSkillsBffPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type {
+  AssignTeamMemberSkillParams,
+  CreateAiSkillParams,
+  UpsertAiSkillParams,
+} from "@lumiere/stdb/types"
+
+import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
 
 export type AiSkillListItem = {
   id: number
@@ -133,6 +141,131 @@ export function useSyncAiSkills() {
       const r = await apiFetch("/api/ai/skills/sync", { method: "POST" })
       if (!r.ok) throw new Error(await parseAiError(r))
       return (await r.json()) as { synced: string[]; skills_dir: string }
+    },
+  })
+}
+
+function aiSkillsQueryKey(organizationId: number) {
+  return ["ai-skills-stdb", String(organizationId)] as const
+}
+
+function aiTeamMemberSkillsQueryKey(organizationId: number) {
+  return ["ai-team-member-skills", String(organizationId)] as const
+}
+
+export function useAiTeamMembers(organizationId: bigint, enabled = true) {
+  return useQuery<QueryRows>({
+    queryKey: ["ai-team-members", rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList("/api/query/ai-team-members", "Failed to fetch AI team members"),
+    staleTime: 30_000,
+    enabled: enabled && organizationId > 0n,
+  })
+}
+
+export function useAiTeamMemberSkills(organizationId: bigint, enabled = true) {
+  return useQuery<QueryRows>({
+    queryKey: aiTeamMemberSkillsQueryKey(Number(organizationId)),
+    queryFn: () =>
+      fetchQueryList("/api/query/ai-team-member-skills", "Failed to fetch team member skills"),
+    staleTime: 30_000,
+    enabled: enabled && organizationId > 0n,
+  })
+}
+
+async function parseCallError(r: Response): Promise<string> {
+  const j = (await r.json().catch(() => ({}))) as { error?: string }
+  return j.error ?? `Request failed (${r.status})`
+}
+
+export function useCreateAiSkill(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateAiSkillParams) => {
+      const { urlPath, init } = aiSkillsBffPost("create_ai_skill", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
+      void qc.invalidateQueries({ queryKey: ["ai-skills"] })
+    },
+  })
+}
+
+export function useUpsertAiSkill(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: UpsertAiSkillParams) => {
+      const { urlPath, init } = aiSkillsBffPost("upsert_ai_skill", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
+      void qc.invalidateQueries({ queryKey: ["ai-skills"] })
+    },
+  })
+}
+
+export function useSetAiSkillActive(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { skillId: number; active: boolean }) => {
+      const { urlPath, init } = aiSkillsBffPost("set_ai_skill_active", [
+        organizationId,
+        args.skillId,
+        args.active,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
+      void qc.invalidateQueries({ queryKey: ["ai-skills"] })
+    },
+  })
+}
+
+export function useAssignTeamMemberSkill(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: AssignTeamMemberSkillParams) => {
+      const { urlPath, init } = aiSkillsBffPost("assign_team_member_skill", [
+        organizationId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: aiTeamMemberSkillsQueryKey(organizationId),
+      })
+    },
+  })
+}
+
+export function useUnassignTeamMemberSkill(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (teamMemberSkillId: number) => {
+      const { urlPath, init } = aiSkillsBffPost("unassign_team_member_skill", [
+        organizationId,
+        teamMemberSkillId,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: aiTeamMemberSkillsQueryKey(organizationId),
+      })
     },
   })
 }

@@ -13,6 +13,7 @@ interface ActionItem {
   label: string
   onClick: () => void
   variant?: "default" | "outline" | "destructive" | "secondary" | "ghost" | "link"
+  testId?: string
 }
 
 type TimeRangeValue = "today" | "7d" | "30d" | "90d" | "ytd"
@@ -56,7 +57,12 @@ export function DashboardHeader({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {actions?.map((action) => (
-          <Button key={action.label} variant={action.variant ?? "default"} onClick={action.onClick}>
+          <Button
+            key={action.label}
+            variant={action.variant ?? "default"}
+            onClick={action.onClick}
+            data-testid={action.testId}
+          >
             {action.label}
           </Button>
         ))}

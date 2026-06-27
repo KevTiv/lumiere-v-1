@@ -43,6 +43,7 @@ import {
   addAccountMoveLineForm,
   newCurrencyRateForm,
   registerPaymentInvoicesForm,
+  reconcilePaymentInvoiceForm,
   intercompanyRulesTableConfig,
   intercompanyTransactionsTableConfig,
   Dialog,
@@ -609,6 +610,8 @@ function AccountingClientLoaded({
   const [csvError, setCsvError] = useState<string | null>(null)
   const [registerPaymentForId, setRegisterPaymentForId] = useState<bigint | null>(null)
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
+  const [reconcilePaymentOpen, setReconcilePaymentOpen] = useState(false)
+  const [reconcilePaymentError, setReconcilePaymentError] = useState<string | null>(null)
   const [journalEdit, setJournalEdit] = useState<Record<string, unknown> | null>(null)
   const [paymentTermLineEdit, setPaymentTermLineEdit] = useState<Record<string, unknown> | null>(null)
 
@@ -1524,6 +1527,14 @@ function AccountingClientLoaded({
               if (paymentStateTag(r) !== "Paid") return
               setRegisterPaymentError(null)
               setRegisterPaymentForId(BigInt(String(r.id)))
+            },
+          },
+          {
+            id: "pay-reconcile-moves",
+            label: t("accounting.entities.payments.actions.reconcileMoves"),
+            onClick: () => {
+              setReconcilePaymentError(null)
+              setReconcilePaymentOpen(true)
             },
           },
         ],
@@ -2629,6 +2640,42 @@ function AccountingClientLoaded({
               setRegisterPaymentError(e instanceof Error ? e.message : String(e))
             }
           }}
+          isPending={registerPaymentOnInvoice.isPending}
+        />
+      ) : null}
+
+      {reconcilePaymentOpen ? (
+        <FormModal
+          key="reconcile-payment-invoice"
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setReconcilePaymentOpen(false)
+              setReconcilePaymentError(null)
+            }
+          }}
+          config={reconcilePaymentInvoiceForm(t)}
+          closeOnSubmit={false}
+          submitError={reconcilePaymentError}
+          onSubmit={async (fd) => {
+            setReconcilePaymentError(null)
+            const paymentMoveId = optionalBigIntU64(fd.paymentMoveId)
+            const invoiceMoveId = optionalBigIntU64(fd.invoiceMoveId)
+            if (!paymentMoveId || !invoiceMoveId) {
+              setReconcilePaymentError(t("common.validation.required"))
+              return
+            }
+            try {
+              await reconcilePaymentWithInvoice.mutateAsync({
+                paymentMoveId,
+                invoiceMoveId,
+              })
+              setReconcilePaymentOpen(false)
+            } catch (e) {
+              setReconcilePaymentError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+          isPending={reconcilePaymentWithInvoice.isPending}
         />
       ) : null}
 

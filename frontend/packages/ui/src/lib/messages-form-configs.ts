@@ -72,3 +72,73 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
 export const messagesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-mail-message": newMailMessageForm(t),
 })
+
+export const subscribeToRecordForm = (t: TFunction): FormConfig => ({
+  id: "subscribe-to-record",
+  title: t("messages.forms.subscribe.title"),
+  description: t("messages.forms.subscribe.description"),
+  submitLabel: t("messages.forms.subscribe.submit"),
+  sections: [
+    {
+      id: "follower",
+      fields: [
+        {
+          id: "resModel",
+          name: "resModel",
+          type: "text",
+          label: t("messages.forms.subscribe.fields.resModel"),
+          placeholder: t("messages.forms.newMessage.fields.modelPlaceholder"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "resId",
+          name: "resId",
+          type: "number",
+          label: t("messages.forms.subscribe.fields.resId"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "subtypes",
+          name: "subtypes",
+          type: "text",
+          label: t("messages.forms.subscribe.fields.subtypes"),
+          placeholder: t("messages.forms.subscribe.fields.subtypesPlaceholder"),
+          defaultValue: "mail.mt_comment,mail.mt_note",
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const unsubscribeFromRecordForm = (t: TFunction): FormConfig => ({
+  id: "unsubscribe-from-record",
+  title: t("messages.forms.unsubscribe.title"),
+  description: t("messages.forms.unsubscribe.description"),
+  submitLabel: t("messages.forms.unsubscribe.submit"),
+  sections: [
+    {
+      id: "follower",
+      fields: [
+        {
+          id: "resModel",
+          name: "resModel",
+          type: "text",
+          label: t("messages.forms.unsubscribe.fields.resModel"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "resId",
+          name: "resId",
+          type: "number",
+          label: t("messages.forms.unsubscribe.fields.resId"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})

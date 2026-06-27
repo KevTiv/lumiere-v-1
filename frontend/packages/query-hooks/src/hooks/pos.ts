@@ -34,10 +34,37 @@ export function usePosTerminals(
   })
 }
 
+export function usePosConfigs(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['pos-configs', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/pos-configs', 'Failed to fetch POS configs'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function usePosSessions(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['pos-sessions', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/pos-sessions', 'Failed to fetch POS sessions'),
+    staleTime: 15_000,
+    initialData,
+  })
+}
+
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidatePosQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['pos-terminals', rqBigIntKey(organizationId)] })
+  const key = rqBigIntKey(organizationId)
+  void qc.invalidateQueries({ queryKey: ['pos-terminals', key] })
+  void qc.invalidateQueries({ queryKey: ['pos-configs', key] })
+  void qc.invalidateQueries({ queryKey: ['pos-sessions', key] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────

@@ -33,6 +33,8 @@ import {
   useAssignTagToContact,
   useCompleteActivity,
   useContacts,
+  useContactSegments,
+  useContactTags,
   useConvertLeadToCustomer,
   useConvertOpportunityToSaleOrder,
   useCreateActivity,
@@ -42,6 +44,7 @@ import {
   useCreateLead,
   useCreateOpportunity,
   useDeleteContact,
+  useDeleteLead,
   useLeads,
   useOpportunities,
   useOpportunityStages,
@@ -98,6 +101,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+
+export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
 interface CrmClientProps {
   initialLeads?: Record<string, unknown>[]
@@ -218,6 +223,8 @@ function CrmClientLoaded({
   const { data: leads = [] } = useLeads(orgId, initialLeads)
   const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
+  const { data: contactTags = [] } = useContactTags(orgId)
+  const { data: contactSegments = [] } = useContactSegments(orgId)
   const { data: activities = [] } = useActivities(orgId)
   const { data: opportunityStages = [] } = useOpportunityStages(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
@@ -323,6 +330,7 @@ function CrmClientLoaded({
   const convertLead = useConvertLeadToCustomer(orgId)
   const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)
   const deleteContact = useDeleteContact(orgId)
+  const deleteLead = useDeleteLead(orgId)
   const assignTag = useAssignTagToContact(orgId)
   const addToSegment = useAddContactToSegment(orgId)
   const completeActivity = useCompleteActivity(orgId)
@@ -740,6 +748,18 @@ function CrmClientLoaded({
             requiresSelection: true,
             onClick: openConvertLeadModal,
           },
+          {
+            id: "delete-lead",
+            label: t("crm.actions.deleteLead"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              const row = rows[0]
+              if (!row) return
+              if (!window.confirm(t("crm.actions.deleteLeadConfirm"))) return
+              deleteLead.mutate(rowIdBigInt(row))
+            },
+          },
         ],
       },
     }
@@ -1077,10 +1097,10 @@ function CrmClientLoaded({
       opportunities: enrichedOpportunities,
       contacts: contacts as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
-      "contact-tags": [] as Record<string, unknown>[],
-      "contact-segments": [] as Record<string, unknown>[],
+      "contact-tags": contactTags as unknown as Record<string, unknown>[],
+      "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, contacts, activities],
+    [leads, enrichedOpportunities, contacts, activities, contactTags, contactSegments],
   )
 
   const handleFormSubmit = async (

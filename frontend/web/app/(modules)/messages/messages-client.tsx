@@ -2,20 +2,41 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, FormModal, newMailMessageForm, MissingOrganization } from "@lumiere/ui"
+import {
+  ModuleView,
+  FormModal,
+  newMailMessageForm,
+  subscribeToRecordForm,
+  unsubscribeFromRecordForm,
+  MissingOrganization,
+} from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
-import { useMailMessages, usePostMessage } from "@lumiere/query-hooks/hooks/messages"
+import {
+  useMailFollowers,
+  useMailMessages,
+  usePostMessage,
+  useSubscribeToRecord,
+  useUnsubscribeFromRecord,
+} from "@lumiere/query-hooks/hooks/messages"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface MessagesClientProps {
   initialMessages?: Record<string, unknown>[]
+  initialFollowers?: Record<string, unknown>[]
   organizationId?: number
 }
 
 type MessagesClientLoadedProps = Omit<MessagesClientProps, "organizationId"> & {
   organizationId: number
+}
+
+function csvList(value: unknown): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 export function MessagesClient(props: MessagesClientProps) {
@@ -25,13 +46,16 @@ export function MessagesClient(props: MessagesClientProps) {
   return <MessagesClientLoaded {...props} organizationId={props.organizationId} />
 }
 
-function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClientLoadedProps) {
+function MessagesClientLoaded({ initialMessages, initialFollowers, organizationId }: MessagesClientLoadedProps) {
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const { data: messages = [] } = useMailMessages(orgId, initialMessages)
+  const { data: followers = [] } = useMailFollowers(orgId, initialFollowers)
   const postMessage = usePostMessage(orgId)
+  const subscribeToRecord = useSubscribeToRecord(orgId)
+  const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId)
 
   const liveSections = useMemo(() => {
     const emails = messages.filter((m) => String(m.messageType) === "email").length
@@ -62,6 +86,10 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             new_message: () => setQuickActionForm({ form: newMailMessageForm(t), action: "createMessage" }),
+            subscribe_record: () =>
+              setQuickActionForm({ form: subscribeToRecordForm(t), action: "subscribeToRecord" }),
+            unsubscribe_record: () =>
+              setQuickActionForm({ form: unsubscribeFromRecordForm(t), action: "unsubscribeFromRecord" }),
           }
           return {
             ...w,
@@ -89,8 +117,9 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
   const data = useMemo(
     () => ({
       messages: messages as unknown as Record<string, unknown>[],
+      followers: followers as unknown as Record<string, unknown>[],
     }),
-    [messages],
+    [messages, followers],
   )
 
   const handleFormSubmit = async (
@@ -114,10 +143,38 @@ function MessagesClientLoaded({ initialMessages, organizationId }: MessagesClien
         parentId: optionalBigIntU64(formData.parentId) ?? null,
         attachmentIds: [],
       })
+      return
+    }
+
+    if (action === "subscribeToRecord") {
+      const resModel = String(formData.resModel ?? "").trim()
+      const resRaw = formData.resId
+      if (!resModel || resRaw === "" || resRaw == null) return
+      const resNum = Number(resRaw)
+      if (!Number.isFinite(resNum) || resNum <= 0) return
+      await subscribeToRecord.mutateAsync({
+        resModel,
+        resId: BigInt(Math.floor(resNum)),
+        subtypes: csvList(formData.subtypes),
+      })
+      return
+    }
+
+    if (action === "unsubscribeFromRecord") {
+      const resModel = String(formData.resModel ?? "").trim()
+      const resRaw = formData.resId
+      if (!resModel || resRaw === "" || resRaw == null) return
+      const resNum = Number(resRaw)
+      if (!Number.isFinite(resNum) || resNum <= 0) return
+      await unsubscribeFromRecord.mutateAsync({
+        resModel,
+        resId: BigInt(Math.floor(resNum)),
+      })
     }
   }
 
-  const isFormMutationPending = postMessage.isPending
+  const isFormMutationPending =
+    postMessage.isPending || subscribeToRecord.isPending || unsubscribeFromRecord.isPending
 
   return (
     <>

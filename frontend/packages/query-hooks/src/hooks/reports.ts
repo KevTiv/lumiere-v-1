@@ -87,6 +87,24 @@ export function useAnalyticsMetrics(
   })
 }
 
+export function useDashboards(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['dashboards', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/dashboards', 'Failed to fetch dashboards'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDashboardWidgets(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['dashboard-widgets', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/dashboard-widgets', 'Failed to fetch dashboard widgets'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 function invalidateReportsModule(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
@@ -98,6 +116,8 @@ function invalidateReportsModule(
     qc.invalidateQueries({ queryKey: ['report-templates', k] }),
     qc.invalidateQueries({ queryKey: ['scheduled-reports', k] }),
     qc.invalidateQueries({ queryKey: ['analytics-metrics', k] }),
+    qc.invalidateQueries({ queryKey: ['dashboards', k] }),
+    qc.invalidateQueries({ queryKey: ['dashboard-widgets', k] }),
   ])
 }
 

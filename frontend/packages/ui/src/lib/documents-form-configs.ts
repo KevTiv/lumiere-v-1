@@ -151,6 +151,110 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newKnowledgeCategoryForm = (t: TFunction): FormConfig => ({
+  id: "new-knowledge-category",
+  title: t("documents.forms.newCategory.title"),
+  description: t("documents.forms.newCategory.description"),
+  sections: [
+    {
+      id: "category-info",
+      title: t("documents.forms.newCategory.sections.category"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("documents.forms.newCategory.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("documents.forms.newCategory.fields.description"),
+          rows: 2,
+          width: "full",
+        },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "text",
+          label: t("documents.forms.newCategory.fields.parentId"),
+          width: "1/2",
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("documents.forms.newCategory.fields.sequence"),
+          defaultValue: 10,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
+  id: "new-document-folder",
+  title: t("documents.forms.newFolder.title"),
+  description: t("documents.forms.newFolder.description"),
+  sections: [
+    {
+      id: "folder-info",
+      title: t("documents.forms.newFolder.sections.folder"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("documents.forms.newFolder.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("documents.forms.newFolder.fields.description"),
+          rows: 2,
+          width: "full",
+        },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "text",
+          label: t("documents.forms.newFolder.fields.parentId"),
+          width: "1/2",
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("documents.forms.newFolder.fields.sequence"),
+          defaultValue: 10,
+          width: "1/2",
+        },
+        {
+          id: "isFavorite",
+          name: "isFavorite",
+          type: "checkbox",
+          label: t("documents.forms.newFolder.fields.isFavorite"),
+          width: "1/2",
+        },
+        {
+          id: "isHidden",
+          name: "isHidden",
+          type: "checkbox",
+          label: t("documents.forms.newFolder.fields.isHidden"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
   id: "new-document-processing-job",
   title: t("documents.forms.newProcessingJob.title"),
@@ -295,6 +399,8 @@ export const acknowledgeDocumentInsightForm = (t: TFunction): FormConfig => ({
 export const documentsFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-document": newDocumentForm(t),
   "new-knowledge-article": newKnowledgeArticleForm(t),
+  "new-knowledge-category": newKnowledgeCategoryForm(t),
+  "new-document-folder": newDocumentFolderForm(t),
   "new-document-processing-job": newDocumentProcessingJobForm(t),
   "complete-document-processing-job": completeDocumentProcessingJobForm(t),
   "acknowledge-document-insight": acknowledgeDocumentInsightForm(t),

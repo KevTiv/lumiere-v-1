@@ -19,6 +19,8 @@ import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useDocuments,
   useKnowledgeArticles,
+  useKnowledgeCategories,
+  useDocumentFolders,
   useCreateDocument,
   useUpdateDocument,
   useDeleteDocument,
@@ -26,6 +28,8 @@ import {
   useUnlockDocument,
   useRecordDocumentView,
   useCreateKnowledgeArticle,
+  useCreateKnowledgeCategory,
+  useCreateDocumentFolder,
   useDocumentsCsvImportMutations,
   useAiDocumentProcessingJobs,
   useAiInsightsForOrg,
@@ -40,6 +44,8 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
 import { useRunAiSkill } from "@lumiere/query-hooks/hooks/ai-skills"
+
+export { DOCUMENTS_UI_REDUCERS } from "@/lib/documents-ui-reducers"
 
 type DocumentRowAction =
   | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
@@ -151,6 +157,8 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
 interface DocumentsClientProps {
   initialDocuments?: Record<string, unknown>[]
   initialArticles?: Record<string, unknown>[]
+  initialCategories?: Record<string, unknown>[]
+  initialFolders?: Record<string, unknown>[]
   initialProcessingJobs?: Record<string, unknown>[]
   initialAiInsights?: Record<string, unknown>[]
   organizationId?: number
@@ -195,6 +203,8 @@ export function DocumentsClient(props: DocumentsClientProps) {
 function DocumentsClientLoaded({
   initialDocuments,
   initialArticles,
+  initialCategories,
+  initialFolders,
   initialProcessingJobs,
   initialAiInsights,
   organizationId,
@@ -220,6 +230,8 @@ function DocumentsClientLoaded({
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
+  const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories as QueryRows | undefined)
+  const { data: folders = [] } = useDocumentFolders(orgId, initialFolders as QueryRows | undefined)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
@@ -229,6 +241,8 @@ function DocumentsClientLoaded({
   const unlockDocument = useUnlockDocument(orgId)
   const recordDocumentView = useRecordDocumentView(orgId)
   const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, operatingCompanyId)
+  const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
+  const createDocumentFolder = useCreateDocumentFolder(orgId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
@@ -287,6 +301,7 @@ function DocumentsClientLoaded({
           const handlers: Record<string, () => void> = {
             upload_document: () => setQuickActionForm({ form: newDocumentForm(t), action: "uploadDocument" }),
             new_article: () => setQuickActionForm({ form: newKnowledgeArticleForm(t), action: "createArticle" }),
+            create_article: () => setQuickActionForm({ form: newKnowledgeArticleForm(t), action: "createArticle" }),
           }
           return {
             ...w,
@@ -415,6 +430,18 @@ function DocumentsClientLoaded({
             ]),
           }
         }
+        if (tab.id === "knowledge-categories" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: addCsvToolbar(tab.entityConfig, [
+              {
+                id: "csv-kb-category-tab",
+                label: t("documents.toolbar.importCategoryCsv"),
+                onClick: (_rows) => setCsvKind("knowledge_category"),
+              },
+            ]),
+          }
+        }
         if (tab.id === "document-processing" && tab.entityConfig) {
           return {
             ...tab,
@@ -520,10 +547,12 @@ function DocumentsClientLoaded({
     () => ({
       documents: documents as unknown as Record<string, unknown>[],
       "knowledge-base": articles as unknown as Record<string, unknown>[],
+      "knowledge-categories": categories as unknown as Record<string, unknown>[],
+      "document-folders": folders as unknown as Record<string, unknown>[],
       "document-processing": processingJobs as unknown as Record<string, unknown>[],
       "document-insights": aiInsights as unknown as Record<string, unknown>[],
     }),
-    [documents, articles, processingJobs, aiInsights],
+    [documents, articles, categories, folders, processingJobs, aiInsights],
   )
 
   const handleFormSubmit = async (
@@ -556,6 +585,41 @@ function DocumentsClientLoaded({
         websiteUrl: undefined,
         metadata: undefined,
       } as unknown as CreateKnowledgeArticleParams)
+    } else if (action === "createKnowledgeCategory") {
+      const seqRaw = formData.sequence
+      const sequence =
+        seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+      await createKnowledgeCategory.mutateAsync({
+        name: String(formData.name ?? "").trim(),
+        description:
+          formData.description != null && String(formData.description).trim() !== ""
+            ? String(formData.description).trim()
+            : undefined,
+        parentId: optionalBigIntU64(formData.parentId),
+        sequence,
+        color: undefined,
+        metadata: undefined,
+      })
+    } else if (action === "createDocumentFolder") {
+      const seqRaw = formData.sequence
+      const sequence =
+        seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+      await createDocumentFolder.mutateAsync({
+        companyId: operatingCompanyId,
+        name: String(formData.name ?? "").trim(),
+        description:
+          formData.description != null && String(formData.description).trim() !== ""
+            ? String(formData.description).trim()
+            : undefined,
+        parentId: optionalBigIntU64(formData.parentId),
+        isAccessRestricted: false,
+        isHidden: Boolean(formData.isHidden),
+        isReadonly: false,
+        isFavorite: Boolean(formData.isFavorite),
+        sequence,
+        storageId: undefined,
+        metadata: undefined,
+      })
     } else if (action === "createDocumentProcessingJob") {
       await createProcessingJob.mutateAsync({
         documentType: formData.documentType,
@@ -575,6 +639,8 @@ function DocumentsClientLoaded({
     unlockDocument.isPending ||
     recordDocumentView.isPending ||
     createKnowledgeArticle.isPending ||
+    createKnowledgeCategory.isPending ||
+    createDocumentFolder.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
     approveProcessingJob.isPending ||

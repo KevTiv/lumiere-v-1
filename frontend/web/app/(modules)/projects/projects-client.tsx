@@ -57,7 +57,11 @@ import {
   taskRowsToSelectOptions,
   taskStagePairOptionsFromTasks,
   employeeRowsToSelectOptions,
+  userRowsToSelectOptions,
 } from "@/lib/form-lookup"
+import { ProjectGanttPanel, ResourceAllocationPanel } from "./projects-panels"
+
+export { PROJECTS_UI_REDUCERS } from "@/lib/projects-ui-reducers"
 
 interface ProjectsClientProps {
   initialProjects?: Record<string, unknown>[]
@@ -120,10 +124,14 @@ const taskStateForm: FormConfig = {
   ],
 }
 
-const assignUsersForm: FormConfig = {
+const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): FormConfig => ({
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
+  description:
+    userOptions.length > 0
+      ? `Available users: ${userOptions.map((o) => `${o.label} (${o.value})`).slice(0, 5).join(", ")}${userOptions.length > 5 ? "…" : ""}`
+      : undefined,
   sections: [
     {
       id: "users",
@@ -140,7 +148,7 @@ const assignUsersForm: FormConfig = {
       ],
     },
   ],
-}
+})
 
 const billTimesheetsForm: FormConfig = {
   id: "projects-bill-timesheets",
@@ -295,6 +303,47 @@ function ProjectsClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
   }, [employees, t])
+
+  const userFieldOptions = useMemo(() => {
+    const fromApi = userRowsToSelectOptions(users as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: "No users available", disabled: true }]
+  }, [users, t])
+
+  const assignUsersFormConfig = useMemo(
+    () => assignUsersForm(userFieldOptions),
+    [userFieldOptions],
+  )
+
+  const ganttTab = useMemo(
+    () => ({
+      id: "gantt",
+      label: t("projects.gantt.title"),
+      type: "custom" as const,
+      customContent: (
+        <ProjectGanttPanel
+          projects={projects as Record<string, unknown>[]}
+          tasks={tasks as Record<string, unknown>[]}
+        />
+      ),
+    }),
+    [projects, tasks, t],
+  )
+
+  const resourceTab = useMemo(
+    () => ({
+      id: "resource-allocation",
+      label: t("projects.resourceAllocation.title"),
+      type: "custom" as const,
+      customContent: (
+        <ResourceAllocationPanel
+          employees={employees as Record<string, unknown>[]}
+          timesheets={timesheets as Record<string, unknown>[]}
+        />
+      ),
+    }),
+    [employees, timesheets, t],
+  )
 
   const taskStageFieldOptions = useMemo(() => {
     const optional = { value: "", label: "—" }
@@ -508,7 +557,8 @@ function ProjectsClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
+        tabs: [
+          ...moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
           if (tab.id === "projects" && tab.entityConfig) {
             return {
@@ -581,7 +631,7 @@ function ProjectsClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "assignUsers", rows, form: assignUsersForm })
+                    setLifecycleModal({ type: "assignUsers", rows, form: assignUsersFormConfig })
                   },
                 },
               ]),
@@ -627,9 +677,14 @@ function ProjectsClientLoaded({
           }
           return tab
         }),
+          ganttTab,
+          resourceTab,
+        ],
       }) as ModuleConfig,
     [
       moduleConfig,
+      ganttTab,
+      resourceTab,
       liveSections,
       projectFormConfig,
       taskFormConfig,
@@ -639,6 +694,7 @@ function ProjectsClientLoaded({
       toggleFavorite,
       setProjectActive,
       taskParentFormConfig,
+      assignUsersFormConfig,
       stopTimer,
       validateTimesheets,
       operatingCompanyId,
@@ -834,7 +890,6 @@ function ProjectsClientLoaded({
             try {
               const text = await file.text()
               if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
-              else if (csvKind === "task") await csvImports.importTask.mutateAsync(text)
               else await csvImports.importTimesheet.mutateAsync(text)
               setCsvKind(null)
             } catch (e) {

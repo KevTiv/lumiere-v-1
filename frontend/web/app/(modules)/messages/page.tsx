@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryMailMessages } from "@lumiere/stdb/server"
+import { serverQueryMailFollowers, serverQueryMailMessages } from "@lumiere/stdb/server"
 import { MessagesClient } from "./messages-client"
 
 export default async function MessagesPage() {
@@ -9,13 +9,15 @@ export default async function MessagesPage() {
   }
   const { organizationId, opts } = session
 
-  const [messages] = await Promise.all([
+  const [messages, followers] = await Promise.all([
     serverQueryMailMessages(organizationId, opts),
-  ]).catch(() => [[]])
+    serverQueryMailFollowers(organizationId, opts),
+  ]).catch(() => [[], []])
 
   return (
     <MessagesClient
       initialMessages={messages as Record<string, unknown>[]}
+      initialFollowers={followers as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

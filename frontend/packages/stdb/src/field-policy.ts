@@ -36,14 +36,19 @@ import type {
   CalendarEvent,
   CasbinRule,
   Contact,
+  ContactSegment,
+  ContactTag,
   CrossoveredBudget,
   CrossoveredBudgetLines,
   BudgetPost,
+  Dashboard,
+  DashboardWidget,
   DeliveryCarrier,
   DeliveryPriceRule,
   DeferredRevenueLine,
   DeferredRevenueSchedule,
   Document,
+  DocumentFolder,
   FleetVehicle,
   FormConfig,
   FormConfigField,
@@ -76,6 +81,7 @@ import type {
   IoTThreshold,
   InventoryAdjustment,
   KnowledgeArticle,
+  KnowledgeArticleCategory,
   Lead,
   MailFollower,
   MailMessage,
@@ -87,9 +93,11 @@ import type {
   MrpWorkorder,
   Opportunity,
   OpportunityStage,
+  PosConfig,
   PosLoyaltyCard,
   PosLoyaltyProgram,
   PosPaymentMethod,
+  PosSession,
   PosTerminal,
   Product,
   ProductCategory,
@@ -139,6 +147,7 @@ import type {
   ScheduledReport,
   InventoryValuation,
   PickingWave,
+  QualityAlert,
   QualityCheck,
   ReplenishmentRule,
   StockCycleCount,
@@ -150,6 +159,7 @@ import type {
   SerialLotTraceability,
   ShippingMethod,
   StockLandedCost,
+  StockLandedCostLines,
   StockRoute,
   StockRule,
   StockTraceabilityReport,
@@ -177,7 +187,9 @@ import type {
   AiAgent,
   AiDocumentProcessingJob,
   AiInsight,
+  AiSkill,
   AiTeamMember,
+  AiTeamMemberSkill,
 } from './generated/types'
 
 import { sqlFieldNames } from './sql-field-names'
@@ -228,6 +240,8 @@ export type QueryResourceKey =
   | 'opportunities'
   | 'opportunity-stages'
   | 'contacts'
+  | 'contact-tags'
+  | 'contact-segments'
   | 'activities'
   | 'projects'
   | 'tasks'
@@ -244,6 +258,7 @@ export type QueryResourceKey =
   | 'stock-production-lots'
   | 'stock-production-serials'
   | 'quality-checks'
+  | 'quality-alerts'
   | 'warehouse-3d-zones'
   | 'stock-cycle-counts'
   | 'stock-inventories'
@@ -263,6 +278,7 @@ export type QueryResourceKey =
   | 'purchase-requisitions'
   | 'shipping-methods'
   | 'landed-costs'
+  | 'landed-cost-lines'
   | 'supplier-intakes'
   | 'mrp-productions'
   | 'mrp-boms'
@@ -285,8 +301,12 @@ export type QueryResourceKey =
   | 'report-templates'
   | 'scheduled-reports'
   | 'analytics-metrics'
+  | 'dashboards'
+  | 'dashboard-widgets'
   | 'documents'
+  | 'document-folders'
   | 'knowledge-articles'
+  | 'knowledge-categories'
   | 'helpdesk-tickets'
   | 'helpdesk-teams'
   | 'helpdesk-stages'
@@ -322,6 +342,8 @@ export type QueryResourceKey =
   | 'utm-sources'
   | 'fleet-vehicles'
   | 'pos-terminals'
+  | 'pos-configs'
+  | 'pos-sessions'
   | 'roles'
   | 'user-roles'
   | 'user-profile'
@@ -336,7 +358,9 @@ export type QueryResourceKey =
   | 'iot-thresholds'
   | 'iot-pairing-tokens'
   | 'ai-agents'
+  | 'ai-skills'
   | 'ai-team-members'
+  | 'ai-team-member-skills'
   | 'ai-insights'
   | 'ai-document-processing-jobs'
   | 'fiscal-years'
@@ -677,6 +701,14 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   contacts: orgEntry<Contact>('contact', ['contacts', 'contact'], [
     'name', 'email', 'phone', 'parentId', 'companyId',
   ]),
+  'contact-tags': orgEntry<ContactTag>('contact_tag', ['contact-tags', 'contact_tag'], [
+    'name', 'color', 'description',
+  ]),
+  'contact-segments': orgEntry<ContactSegment>(
+    'contact_segment',
+    ['contact-segments', 'contact_segment'],
+    ['name', 'description', 'domain', 'isDynamic', 'isActive', 'memberCount', 'color'],
+  ),
   activities: orgEntry<Activity>('activity', ['activities', 'activity'], [
     'summary', 'activityType', 'state', 'dateDeadline', 'assignedTo', 'isDone',
   ]),
@@ -731,6 +763,9 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   ),
   'quality-checks': orgEntry<QualityCheck>('quality_check', ['quality-checks', 'quality_check'], [
     'name', 'qualityState', 'companyId', 'productId',
+  ]),
+  'quality-alerts': orgEntry<QualityAlert>('quality_alert', ['quality-alerts', 'quality_alert'], [
+    'name', 'title', 'description', 'priority', 'state', 'productId', 'teamId', 'companyId',
   ]),
   'warehouse-3d-zones': orgEntry<Warehouse3DZone>(
     'warehouse_3d_zone',
@@ -812,6 +847,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'landed-costs': orgEntry<StockLandedCost>('stock_landed_cost', ['landed-costs', 'stock_landed_cost'], [
     'state', 'companyId', 'amountTotal', 'currencyId', 'description', 'date',
   ]),
+  'landed-cost-lines': orgEntry<StockLandedCostLines>(
+    'stock_landed_cost_lines',
+    ['landed-cost-lines', 'stock_landed_cost_lines'],
+    ['landedCostId', 'productId', 'priceUnit', 'splitMethod', 'currencyId'],
+  ),
   'supplier-intakes': orgEntry<SupplierIntakeRequest>(
     'supplier_intake_request',
     ['supplier-intakes', 'supplier_intake_request'],
@@ -894,11 +934,33 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['analytics-metrics', 'analytics_metric'],
     ['name', 'category', 'metricType', 'isActive'],
   ),
+  dashboards: orgEntry<Dashboard>('dashboard', ['dashboards', 'dashboard'], [
+    'name',
+    'isShared',
+    'isDefault',
+    'companyId',
+  ]),
+  'dashboard-widgets': orgEntry<DashboardWidget>(
+    'dashboard_widget',
+    ['dashboard-widgets', 'dashboard_widget'],
+    ['name', 'model', 'widgetType', 'isActive', 'companyId'],
+  ),
   documents: orgEntry<Document>('document', ['documents', 'document'], ['name', 'companyId']),
+  'document-folders': orgEntry<DocumentFolder>('doc_folder', ['document-folders', 'doc_folder'], [
+    'name',
+    'parentId',
+    'documentCount',
+    'companyId',
+  ]),
   'knowledge-articles': orgEntry<KnowledgeArticle>(
     'knowledge_article',
     ['knowledge-articles', 'knowledge_article'],
     ['name', 'isPublished'],
+  ),
+  'knowledge-categories': orgEntry<KnowledgeArticleCategory>(
+    'kb_category',
+    ['knowledge-categories', 'kb_category'],
+    ['name', 'articleCount', 'parentId', 'sequence'],
   ),
   'helpdesk-tickets': orgEntry<HelpdeskTicket>('helpdesk_ticket', ['helpdesk-tickets', 'helpdesk_ticket'], [
     'name', 'partnerId', 'stageId',
@@ -1045,6 +1107,18 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'pos-terminals': orgEntry<PosTerminal>('pos_terminal', ['pos-terminals', 'pos_terminal'], [
     'name', 'locationLabel', 'status', 'latitude', 'longitude', 'dailyRevenue', 'openOrders', 'companyId',
   ]),
+  'pos-configs': entry<PosConfig>(
+    'pos_config',
+    ['pos-configs', 'pos_config'],
+    ['name', 'isActive', 'companyId', 'warehouseId', 'journalId', 'pricelistId', 'modulePosLoyalty'],
+    ['id'],
+  ),
+  'pos-sessions': entry<PosSession>(
+    'pos_session',
+    ['pos-sessions', 'pos_session'],
+    ['name', 'configId', 'state', 'startAt', 'stopAt', 'orderCount', 'cashRegisterBalanceStart', 'cashRegisterBalanceEndReal'],
+    ['id'],
+  ),
   roles: orgEntry<Role>('role', ['roles', 'role'], ['name', 'description', 'isActive', 'isSystem']),
   'user-roles': entry<UserRoleAssignment>(
     'user_role_assignment',
@@ -1112,6 +1186,16 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'monthlyBudget',
     'costPer1KTokens',
   ]),
+  'ai-skills': orgEntry<AiSkill>('ai_skill', ['ai-skills', 'ai_skill'], [
+    'skillKey',
+    'name',
+    'description',
+    'category',
+    'isActive',
+    'isSystem',
+    'defaultMaxSteps',
+    'defaultMaxToolCalls',
+  ]),
   'ai-team-members': orgEntry<AiTeamMember>('ai_team_member', ['ai-team-members', 'ai_team_member'], [
     'name',
     'role',
@@ -1119,6 +1203,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'isActive',
     'responseStyle',
   ]),
+  'ai-team-member-skills': orgEntry<AiTeamMemberSkill>(
+    'ai_team_member_skill',
+    ['ai-team-member-skills', 'ai_team_member_skill'],
+    ['teamMemberId', 'skillId', 'isDefault', 'moduleHint'],
+  ),
   'ai-insights': entry<AiInsight>(
     'ai_insight',
     ['ai-insights', 'ai_insight'],

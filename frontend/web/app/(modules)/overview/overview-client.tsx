@@ -13,6 +13,7 @@ import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { usePurchaseOrders } from "@lumiere/query-hooks/hooks/purchasing"
 import { useTasks, useProjects } from "@lumiere/query-hooks/hooks/projects"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
@@ -25,6 +26,7 @@ interface OverviewClientProps {
   initialTasks?: Record<string, unknown>[]
   initialProjects?: Record<string, unknown>[]
   initialPurchaseOrders?: Record<string, unknown>[]
+  initialContacts?: Record<string, unknown>[]
 }
 
 function matchesCompany(row: Record<string, unknown>, companyId: number | null): boolean {
@@ -48,6 +50,34 @@ function isOpenPurchaseOrder(row: Record<string, unknown>): boolean {
   return state !== "Done" && state !== "Cancelled" && state !== "Cancel"
 }
 
+function isConfirmedSaleOrder(row: Record<string, unknown>): boolean {
+  const state = enumTag(row.state)
+  return state === "Sale" || state === "Done"
+}
+
+function orderTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.dateOrder ?? row.createDate ?? row.writeDate
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
+}
+
+function lastSixMonthLabels(): string[] {
+  const labels: string[] = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i -= 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    labels.push(d.toLocaleDateString(undefined, { month: "short" }))
+  }
+  return labels
+}
+
+function monthBucketKey(ms: number): string {
+  const d = new Date(ms)
+  return d.toLocaleDateString(undefined, { month: "short" })
+}
+
 export function OverviewClient(props: OverviewClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -64,6 +94,7 @@ function OverviewClientLoaded({
   initialTasks,
   initialProjects,
   initialPurchaseOrders,
+  initialContacts,
 }: OverviewClientProps & { organizationId: number }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -77,10 +108,22 @@ function OverviewClientLoaded({
   const { data: tasks = [] } = useTasks(orgId, initialTasks)
   const { data: projects = [] } = useProjects(orgId, initialProjects)
   const { data: purchaseOrders = [] } = usePurchaseOrders(orgId, initialPurchaseOrders)
+  const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { count: pendingAiDrafts = 0 } = useAiActionDraftInboxCount(
     organizationId,
     operatingCompanyId != null && operatingCompanyId > 0,
   )
+
+  const contactNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const row of contacts) {
+      const id = Number(row.id)
+      if (!Number.isFinite(id)) continue
+      const name = String(row.name ?? row.displayName ?? row.email ?? "").trim()
+      map.set(id, name || `#${id}`)
+    }
+    return map
+  }, [contacts])
 
   const scopedOrders = useMemo(
     () => orders.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
@@ -98,6 +141,10 @@ function OverviewClientLoaded({
     () => tasks.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
     [tasks, operatingCompanyId],
   )
+  const scopedProjects = useMemo(
+    () => projects.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    [projects, operatingCompanyId],
+  )
   const scopedPurchaseOrders = useMemo(
     () =>
       purchaseOrders.filter((row) =>
@@ -106,8 +153,28 @@ function OverviewClientLoaded({
     [purchaseOrders, operatingCompanyId],
   )
 
+  const salesTrendValues = useMemo(() => {
+    const monthLabels = lastSixMonthLabels()
+    const buckets = new Map<string, number>()
+    for (const label of monthLabels) buckets.set(label, 0)
+    for (const order of scopedOrders) {
+      if (!isConfirmedSaleOrder(order as Record<string, unknown>)) continue
+      const ms = orderTimestampMs(order as Record<string, unknown>)
+      if (ms <= 0) continue
+      const key = monthBucketKey(ms)
+      if (!buckets.has(key)) continue
+      buckets.set(key, (buckets.get(key) ?? 0) + Number(order.amountTotal ?? 0))
+    }
+    return monthLabels.map((month) => ({
+      month,
+      revenue: Math.round(buckets.get(month) ?? 0),
+    }))
+  }, [scopedOrders])
+
   const liveSections = useMemo(() => {
     const openSalesOrders = scopedOrders.filter(isOpenSaleOrder).length
+    const openPurchaseOrderCount = scopedPurchaseOrders.filter(isOpenPurchaseOrder).length
+    const activeProjects = scopedProjects.filter((p) => p.active !== false).length
 
     const invoices = scopedMoves.filter(
       (m) => moveTypeTagFromRow(m as Record<string, unknown>) === "OutInvoice",
@@ -120,6 +187,13 @@ function OverviewClientLoaded({
 
     const lowStockCount = scopedQuants.filter((q) => Number(q.availableQuantity ?? 0) <= 0).length
     const openTasks = scopedTasks.filter((task) => !task.isClosed).length
+
+    const pipelineMix = [
+      { label: t("overview.dashboard.stats.openSalesOrders"), count: openSalesOrders },
+      { label: t("overview.dashboard.stats.openPurchaseOrders"), count: openPurchaseOrderCount },
+      { label: t("overview.dashboard.stats.openTasks"), count: openTasks },
+      { label: t("overview.dashboard.stats.pendingAiDrafts"), count: pendingAiDrafts },
+    ]
 
     const baseConfig = overviewDashboard(t)
 
@@ -135,6 +209,11 @@ function OverviewClientLoaded({
                   label: t("overview.dashboard.stats.openSalesOrders"),
                   value: String(openSalesOrders),
                   icon: "ShoppingCart",
+                },
+                {
+                  label: t("overview.dashboard.stats.openPurchaseOrders"),
+                  value: String(openPurchaseOrderCount),
+                  icon: "Truck",
                 },
                 {
                   label: t("overview.dashboard.stats.accountsReceivable"),
@@ -157,6 +236,11 @@ function OverviewClientLoaded({
                   icon: "CheckSquare",
                 },
                 {
+                  label: t("overview.dashboard.stats.activeProjects"),
+                  value: String(activeProjects),
+                  icon: "FolderKanban",
+                },
+                {
                   label: t("overview.dashboard.stats.pendingAiDrafts"),
                   value: String(pendingAiDrafts),
                   icon: "Bell",
@@ -168,6 +252,8 @@ function OverviewClientLoaded({
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             sales: () => router.push("/sales"),
+            accounting: () => router.push("/accounting"),
+            crm: () => router.push("/crm"),
             inventory: () => router.push("/inventory"),
             ai_drafts: () => router.push("/ai-action-drafts"),
             projects: () => router.push("/projects"),
@@ -180,6 +266,24 @@ function OverviewClientLoaded({
             },
           }
         }
+        if (w.id === "overview-sales-trend") {
+          return {
+            ...w,
+            data: {
+              ...(w.data as Record<string, unknown>),
+              values: salesTrendValues,
+            },
+          }
+        }
+        if (w.id === "overview-pipeline-mix") {
+          return {
+            ...w,
+            data: {
+              ...(w.data as Record<string, unknown>),
+              values: pipelineMix,
+            },
+          }
+        }
         if (w.id === "overview-upcoming-tasks") {
           const nowMs = Date.now()
           const rows = scopedTasks
@@ -188,7 +292,8 @@ function OverviewClientLoaded({
             .slice(0, 6)
             .map((task) => {
               const deadlineMs = Number(task.dateDeadline ?? 0) / 1000
-              const project = projects.find((p) => p.id === task.projectId)
+              const project = scopedProjects.find((p) => p.id === task.projectId)
+              const overdue = deadlineMs < nowMs
               return {
                 task: String(task.name ?? ""),
                 project: String(project?.name ?? "—"),
@@ -196,8 +301,9 @@ function OverviewClientLoaded({
                   month: "short",
                   day: "numeric",
                 }),
-                status: taskStateLabel(task as Record<string, unknown>),
-                overdue: deadlineMs < nowMs,
+                status: overdue
+                  ? `${taskStateLabel(task as Record<string, unknown>)} · ${t("overview.dashboard.overdue")}`
+                  : taskStateLabel(task as Record<string, unknown>),
               }
             })
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
@@ -220,12 +326,18 @@ function OverviewClientLoaded({
           const rows = scopedPurchaseOrders
             .filter(isOpenPurchaseOrder)
             .slice(0, 8)
-            .map((po) => ({
-              reference: String(po.name ?? po.origin ?? `#${po.id}`),
-              vendor: String(po.partnerId ?? "—"),
-              amount: `$${Math.round(Number(po.amountTotal ?? 0)).toLocaleString()}`,
-              status: enumTag(po.state) || "Open",
-            }))
+            .map((po) => {
+              const partnerId = Number(po.partnerId ?? 0)
+              const vendor =
+                contactNameById.get(partnerId) ??
+                (partnerId > 0 ? `#${partnerId}` : "—")
+              return {
+                reference: String(po.name ?? po.origin ?? `#${po.id}`),
+                vendor,
+                amount: `$${Math.round(Number(po.amountTotal ?? 0)).toLocaleString()}`,
+                status: enumTag(po.state) || "Open",
+              }
+            })
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
         }
         return w
@@ -236,10 +348,12 @@ function OverviewClientLoaded({
     scopedMoves,
     scopedQuants,
     scopedTasks,
+    scopedProjects,
     scopedPurchaseOrders,
-    projects,
     products,
     pendingAiDrafts,
+    salesTrendValues,
+    contactNameById,
     t,
     router,
   ])
@@ -247,7 +361,11 @@ function OverviewClientLoaded({
   return (
     <div className="space-y-6">
       <DashboardHeader title={t("overview.page.title")} description={t("overview.page.description")} />
-      <DashboardGrid sections={liveSections} />
+      <DashboardGrid
+        sections={liveSections}
+        testId="overview-dashboard"
+        widgetTestIdPrefix="overview-widget"
+      />
     </div>
   )
 }

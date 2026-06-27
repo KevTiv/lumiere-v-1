@@ -1,11 +1,13 @@
 "use client"
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
+import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
+import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
 import type { CreateCalendarEventParams, UpdateCalendarEventParams } from "@lumiere/query-hooks/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
-import { FormModal, ModuleView, newCalendarEventForm, MissingOrganization } from "@lumiere/ui"
+import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOrganization } from "@lumiere/ui"
 import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -48,9 +50,11 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const { data: events = [] } = useCalendarEvents(orgId, initialEvents)
+  const { data: activities = [] } = useActivities(orgId)
   const createCalendarEvent = useCreateCalendarEvent(orgId)
   const updateCalendarEvent = useUpdateCalendarEvent(orgId)
   const deleteCalendarEvent = useDeleteCalendarEvent(orgId)
+  const createActivity = useCreateActivity(orgId)
 
   const liveSections = useMemo(() => {
     const confirmed = events?.filter((e) => String(e.state) === "confirmed").length
@@ -97,6 +101,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       ...moduleConfig,
       tabs: moduleConfig.tabs.map((tab) => {
         if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+        if (tab.id === "events") {
+          return {
+            ...tab,
+            createForm: newCalendarEventForm(t),
+          }
+        }
+        if (tab.id === "activities") {
+          return {
+            ...tab,
+            label: t("calendar.activitiesTab"),
+            createForm: newActivityForm(t),
+          }
+        }
         if (tab.id === "calendar") {
           const uiEvents: UICalendarEvent[] = events.map((e) => ({
             id: String(e.id),
@@ -169,15 +186,21 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const data = useMemo(
     () => ({
       events: events as unknown as Record<string, unknown>[],
+      activities: activities as unknown as Record<string, unknown>[],
     }),
-    [events],
+    [events, activities],
   )
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (action === "createActivity") {
+      const p = toCreateActivityParams(formData)
+      if (p) await createActivity.mutateAsync(p)
+      return
+    }
     if (action === "createEvent") {
       const title = String(formData.name ?? "").trim()
       if (!title) return
@@ -221,12 +244,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     }
   }
 
+  const isPending =
+    createCalendarEvent.isPending ||
+    updateCalendarEvent.isPending ||
+    deleteCalendarEvent.isPending ||
+    createActivity.isPending
+
   return (
     <>
       <ModuleView
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        isPending={isPending}
       />
 
       <FormModal
@@ -234,9 +264,10 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newCalendarEventForm(t)}
-        onSubmit={(formData) => {
+        isPending={isPending}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}

@@ -7,6 +7,8 @@ import {
   FormModal,
   MapLayerLegend,
   MissingOrganization,
+  mergeSelectOptionsForFields,
+  mergeFieldDefaultValues,
   type FormConfig,
 } from "@lumiere/ui"
 import { defaultMapLayers } from "@lumiere/ui/lib/map-pin-configs"
@@ -17,6 +19,7 @@ import {
   useCreateFleetVehicle,
   useUpdateVehiclePosition,
 } from "@lumiere/query-hooks/hooks/fleet"
+import { fleetVehicleRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
@@ -53,41 +56,61 @@ const STAT_ICONS: Record<string, React.ComponentType<{ className?: string; style
 
 type FleetMapAction = "createVehicle" | "updatePosition"
 
-const fleetMapForms: Record<FleetMapAction, FormConfig> = {
-  createVehicle: {
-    id: "fleet-create-vehicle",
-    title: "Create Fleet Vehicle",
-    submitLabel: "Create vehicle",
-    sections: [
-      {
-        id: "vehicle",
-        fields: [
-          { id: "vehicle-name", type: "text", name: "name", label: "Name", required: true },
-          { id: "vehicle-type", type: "text", name: "vehicleType", label: "Vehicle type", required: true },
-          { id: "license-plate", type: "text", name: "licensePlate", label: "License plate", width: "1/2" },
-          { id: "driver-name", type: "text", name: "driverName", label: "Driver name", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updatePosition: {
-    id: "fleet-update-primary-position",
-    title: "Update Primary Vehicle Position",
-    description: "Updates the first vehicle in the current fleet list.",
-    submitLabel: "Update position",
-    sections: [
-      {
-        id: "position",
-        fields: [
-          { id: "vehicle-lat", type: "number", name: "latitude", label: "Latitude", required: true, width: "1/2" },
-          { id: "vehicle-lng", type: "number", name: "longitude", label: "Longitude", required: true, width: "1/2" },
-          { id: "vehicle-speed", type: "number", name: "speedKmh", label: "Speed km/h", width: "1/3" },
-          { id: "vehicle-heading", type: "number", name: "heading", label: "Heading", width: "1/3" },
-          { id: "vehicle-status", type: "text", name: "status", label: "Status", required: true, width: "1/3" },
-        ],
-      },
-    ],
-  },
+const fleetMapFormIds = {
+  createVehicle: "fleet-create-vehicle",
+  updatePosition: "fleet-update-position",
+} as const
+
+function fleetMapForms(t: (key: string) => string): Record<FleetMapAction, FormConfig> {
+  return {
+    createVehicle: {
+      id: fleetMapFormIds.createVehicle,
+      title: t("map.fleet.create"),
+      submitLabel: t("map.fleet.create"),
+      sections: [
+        {
+          id: "vehicle",
+          fields: [
+            { id: "vehicle-name", type: "text", name: "name", label: "Name", required: true },
+            { id: "vehicle-type", type: "text", name: "vehicleType", label: "Vehicle type", required: true },
+            { id: "license-plate", type: "text", name: "licensePlate", label: "License plate", width: "1/2" },
+            { id: "driver-name", type: "text", name: "driverName", label: "Driver name", width: "1/2" },
+          ],
+        },
+      ],
+    },
+    updatePosition: {
+      id: fleetMapFormIds.updatePosition,
+      title: t("map.fleet.updatePosition"),
+      submitLabel: t("map.fleet.updatePosition"),
+      sections: [
+        {
+          id: "vehicle-select",
+          fields: [
+            {
+              id: "vehicle-id",
+              type: "select",
+              name: "vehicleId",
+              label: t("map.fleet.selectVehicle"),
+              required: true,
+              width: "full",
+              options: [],
+            },
+          ],
+        },
+        {
+          id: "position",
+          fields: [
+            { id: "vehicle-lat", type: "number", name: "latitude", label: "Latitude", required: true, width: "1/2" },
+            { id: "vehicle-lng", type: "number", name: "longitude", label: "Longitude", required: true, width: "1/2" },
+            { id: "vehicle-speed", type: "number", name: "speedKmh", label: "Speed km/h", width: "1/3" },
+            { id: "vehicle-heading", type: "number", name: "heading", label: "Heading", width: "1/3" },
+            { id: "vehicle-status", type: "text", name: "status", label: "Status", required: true, width: "1/3" },
+          ],
+        },
+      ],
+    },
+  }
 }
 
 interface MapClientProps {
@@ -113,9 +136,40 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const createFleetVehicle = useCreateFleetVehicle(orgId)
   const updateVehiclePosition = useUpdateVehiclePosition(orgId)
   const [fleetAction, setFleetAction] = useState<FleetMapAction | null>(null)
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
   const [vehicleError, setVehicleError] = useState<string | null>(null)
 
-  // Build live pins from SpacetimeDB data; fall back to demo if empty
+  const vehicleOptions = useMemo(() => {
+    const fromApi = fleetVehicleRowsToSelectOptions(vehicles as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("map.fleet.empty"), disabled: true }]
+  }, [vehicles, t])
+
+  const fleetFormConfig = useMemo(() => {
+    if (!fleetAction) return null
+    const base = fleetMapForms(t)[fleetAction]
+    if (fleetAction === "updatePosition") {
+      let config = mergeSelectOptionsForFields(base, { vehicleId: vehicleOptions })
+      if (selectedVehicleId) {
+        config = mergeFieldDefaultValues(config, { vehicleId: selectedVehicleId })
+      }
+      return config
+    }
+    return base
+  }, [fleetAction, t, vehicleOptions, selectedVehicleId])
+
+  const demoPinsByLayer = useMemo(() => {
+    const grouped = Object.fromEntries(defaultMapLayers.map((l) => [l.id, [] as MapPinData[]])) as Record<
+      string,
+      MapPinData[]
+    >
+    for (const pin of DEMO_PINS) {
+      grouped[pin.layerId]?.push(pin)
+    }
+    return grouped
+  }, [])
+
+  // Build live pins per layer; fall back to demo pins only for empty layers
   const livePins: MapPinData[] = useMemo(() => {
     const vehiclePins: MapPinData[] = vehicles
       .filter((v) => v.latitude != null && v.longitude != null)
@@ -170,9 +224,15 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
       }
     })
 
-    const allLive = [...vehiclePins, ...posPins, ...warehousePins]
-    return allLive.length > 0 ? allLive : DEMO_PINS
-  }, [t, vehicles, posTerminals, warehouseGeos])
+    const layerPins = (layerId: string, live: MapPinData[]) =>
+      live.length > 0 ? live : (demoPinsByLayer[layerId] ?? [])
+
+    return [
+      ...layerPins("vehicle", vehiclePins),
+      ...layerPins("pos", posPins),
+      ...layerPins("warehouse", warehousePins),
+    ]
+  }, [t, vehicles, posTerminals, warehouseGeos, demoPinsByLayer])
 
   const toggleLayer = (id: string) =>
     setVisibleLayers((prev) => {
@@ -205,7 +265,6 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   )
 
   const isLiveData = vehicles.length > 0 || posTerminals.length > 0 || warehouseGeos.length > 0
-  const primaryVehicle = vehicles[0] as Record<string, unknown> | undefined
   const isFleetPending = createFleetVehicle.isPending || updateVehiclePosition.isPending
 
   const handleCreateFleetVehicle = async (data: Record<string, unknown>) => {
@@ -227,8 +286,10 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const handleUpdateVehiclePosition = async (data: Record<string, unknown>) => {
     setVehicleError(null)
     try {
-      const vehicleId = primaryVehicle?.id
-      if (vehicleId == null) throw new Error("Create a fleet vehicle first")
+      const vehicleId = data.vehicleId ?? selectedVehicleId
+      if (vehicleId == null || String(vehicleId).trim() === "") {
+        throw new Error(t("map.fleet.selectVehicle"))
+      }
       await updateVehiclePosition.mutateAsync({
         vehicleId: String(vehicleId),
         latitude: Number(data.latitude) || 0,
@@ -267,7 +328,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
       {/* Body */}
       <div className="flex min-h-0 flex-1">
         {/* Map */}
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1" data-testid="map-view">
           <MapView
             pins={livePins}
             layers={defaultMapLayers}
@@ -286,7 +347,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
 
           <div className="space-y-2 rounded-lg border border-border p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Fleet actions
+              {t("map.fleet.title")}
             </p>
             <button
               type="button"
@@ -294,16 +355,38 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
               disabled={isFleetPending}
               onClick={() => setFleetAction("createVehicle")}
             >
-              Create vehicle
+              {t("map.fleet.create")}
             </button>
             <button
               type="button"
               className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
-              disabled={isFleetPending}
+              disabled={isFleetPending || vehicles.length === 0}
               onClick={() => setFleetAction("updatePosition")}
             >
-              Update primary position
+              {t("map.fleet.updatePosition")}
             </button>
+            <div className="max-h-40 space-y-1 overflow-y-auto pt-1">
+              {vehicles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("map.fleet.empty")}</p>
+              ) : (
+                (vehicles as Record<string, unknown>[]).map((vehicle) => (
+                  <button
+                    key={String(vehicle.id)}
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                    onClick={() => {
+                      setSelectedVehicleId(String(vehicle.id))
+                      setFleetAction("updatePosition")
+                    }}
+                  >
+                    <span className="truncate font-medium">{String(vehicle.name ?? vehicle.id)}</span>
+                    <span className="ml-2 shrink-0 text-muted-foreground">
+                      {String(vehicle.status ?? "idle")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
             {vehicleError ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
                 {vehicleError}
@@ -373,11 +456,11 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           </div>
         </aside>
       </div>
-      {fleetAction ? (
+      {fleetAction && fleetFormConfig ? (
         <FormModal
           open
           onOpenChange={(open) => !open && setFleetAction(null)}
-          config={fleetMapForms[fleetAction]}
+          config={fleetFormConfig}
           isPending={isFleetPending}
           submitError={vehicleError}
           onSubmit={handleFleetSubmit}

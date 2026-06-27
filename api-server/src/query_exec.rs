@@ -349,6 +349,72 @@ pub async fn execute_resource_query(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
+        "pos-configs" => {
+            let ids = company_ids_for_organization(client, organization_id, fa).await?;
+            if ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let col = resolve_http_sql_columns("pos-configs", fa).map_err(ApiError::Internal)?;
+            let list = ids
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT {} FROM pos_config WHERE company_id IN ({list}) ORDER BY name ASC",
+                col.join(", ")
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "pos-sessions" => {
+            let ids = company_ids_for_organization(client, organization_id, fa).await?;
+            if ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let list = ids
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let config_rows = client
+                .query_sql(&format!(
+                    "SELECT id FROM pos_config WHERE company_id IN ({list})"
+                ))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let mut config_ids: Vec<u64> = Vec::new();
+            for r in config_rows {
+                if let Some(id) = r.get("id").and_then(|v| v.as_u64()).or_else(|| {
+                    r.get("id")
+                        .and_then(|x| x.as_str())
+                        .and_then(|s| s.parse().ok())
+                }) {
+                    if id > 0 {
+                        config_ids.push(id);
+                    }
+                }
+            }
+            if config_ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let col = resolve_http_sql_columns("pos-sessions", fa).map_err(ApiError::Internal)?;
+            let clist = config_ids
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT {} FROM pos_session WHERE config_id IN ({clist}) ORDER BY start_at DESC",
+                col.join(", ")
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
         "ai-insights" => {
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             let col = resolve_http_sql_columns("ai-insights", fa).map_err(ApiError::Internal)?;
@@ -492,6 +558,10 @@ pub async fn execute_resource_query(
         "pricelist-items" => " ORDER BY pricelist_id ASC, sequence ASC",
         "pos-loyalty-programs" => " ORDER BY id DESC",
         "landed-costs" => " ORDER BY id DESC",
+        "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
+        "contact-tags" => " ORDER BY name ASC",
+        "contact-segments" => " ORDER BY name ASC",
+        "quality-alerts" => " ORDER BY id DESC",
         "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
         "mrp-routing-workcenters" => " ORDER BY workcenter_id ASC, sequence ASC",
         "calendar-events" => " ORDER BY start ASC",

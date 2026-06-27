@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityViewConfig, EntityTableConfig } from "./entity-view-types"
+import { transfersTableConfig } from "./inventory-entity-configs"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const saleStateBadges = (t: TFunction) => ({
@@ -388,6 +389,39 @@ export const posLoyaltyCardsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Order fulfillment (stock pickings) & returns ───────────────────────────────
+export const salesFulfillmentTableConfig = (t: TFunction): EntityViewConfig => {
+  const base = transfersTableConfig(t)
+  const view = base.view as EntityTableConfig
+  return {
+    ...base,
+    id: "sales-fulfillment-table",
+    title: t("sales.fulfillment.title"),
+    description: t("sales.fulfillment.description"),
+    view: {
+      ...view,
+      searchPlaceholder: t("sales.fulfillment.searchPlaceholder"),
+      emptyMessage: t("sales.fulfillment.emptyMessage"),
+    },
+  }
+}
+
+export const salesReturnsTableConfig = (t: TFunction): EntityViewConfig => {
+  const base = transfersTableConfig(t)
+  const view = base.view as EntityTableConfig
+  return {
+    ...base,
+    id: "sales-returns-table",
+    title: t("sales.returns.title"),
+    description: t("sales.returns.description"),
+    view: {
+      ...view,
+      searchPlaceholder: t("sales.returns.searchPlaceholder"),
+      emptyMessage: t("sales.returns.emptyMessage"),
+    },
+  }
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "sale-orders-table": saleOrdersTableConfig(t),
@@ -395,6 +429,8 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
   "pricelists-table": pricelistsTableConfig(t),
   "pricelist-items-table": pricelistItemsTableConfig(t),
   "deliveries-table": deliveriesTableConfig(t),
+  "sales-fulfillment-table": salesFulfillmentTableConfig(t),
+  "sales-returns-table": salesReturnsTableConfig(t),
   "delivery-price-rules-table": deliveryPriceRulesTableConfig(t),
   "delivery-carriers-table": deliveryCarriersTableConfig(t),
   "shipping-methods-table": shippingMethodsTableConfig(t),

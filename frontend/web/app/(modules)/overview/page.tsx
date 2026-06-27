@@ -7,6 +7,7 @@ import {
   serverQueryTasks,
   serverQueryProjects,
   serverQueryPurchaseOrders,
+  serverQueryContacts,
 } from "@lumiere/stdb/server"
 import { OverviewClient } from "./overview-client"
 
@@ -17,7 +18,7 @@ export default async function OverviewPage() {
   }
   const { organizationId, opts } = session
 
-  const [orders, moves, stockQuants, products, tasks, projects, purchaseOrders] =
+  const [orders, moves, stockQuants, products, tasks, projects, purchaseOrders, contacts] =
     await Promise.all([
       serverQuerySaleOrders(organizationId, opts),
       serverQueryAccountMoves(organizationId, undefined, opts),
@@ -26,7 +27,8 @@ export default async function OverviewPage() {
       serverQueryTasks(organizationId, opts),
       serverQueryProjects(organizationId, opts),
       serverQueryPurchaseOrders(organizationId, opts),
-    ]).catch(() => [[], [], [], [], [], [], []])
+      serverQueryContacts(organizationId, opts),
+    ]).catch(() => [[], [], [], [], [], [], [], []])
 
   return (
     <OverviewClient
@@ -38,6 +40,7 @@ export default async function OverviewPage() {
       initialTasks={tasks as Record<string, unknown>[]}
       initialProjects={projects as Record<string, unknown>[]}
       initialPurchaseOrders={purchaseOrders as Record<string, unknown>[]}
+      initialContacts={contacts as Record<string, unknown>[]}
     />
   )
 }

@@ -21,9 +21,10 @@ import { QuickActionsWidget } from "./widgets/quick-actions-widget"
 interface WidgetRendererProps {
   widget: DashboardWidget
   widthClass: string
+  testId?: string
 }
 
-export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRendererProps) {
   const useCard = widget.useCard !== false
 
   const renderContent = () => {
@@ -69,7 +70,7 @@ export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererPr
 
   if (!useCard) {
     return (
-      <div className={widthClass}>
+      <div className={widthClass} data-testid={testId}>
         {widget.title && (
           <h3 className="mb-3 text-sm font-medium text-muted-foreground">{widget.title}</h3>
         )}
@@ -79,7 +80,7 @@ export function DashboardWidgetRenderer({ widget, widthClass }: WidgetRendererPr
   }
 
   return (
-    <div className={widthClass}>
+    <div className={widthClass} data-testid={testId}>
       <Card className="h-full">
         <CardHeader className="pb-1">
           <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>

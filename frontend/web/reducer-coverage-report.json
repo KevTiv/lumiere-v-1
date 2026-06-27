@@ -1,10 +1,9 @@
 {
   "totalRustReducers": 687,
   "productRustReducers": 598,
-  "totalWebReducers": 654,
+  "totalWebReducers": 660,
   "missingFromWeb": [
     "append_ai_agent_run_step",
-    "assign_team_member_skill",
     "backfill_external_ids",
     "bootstrap_new_tenant",
     "cancel_ai_agent_run",
@@ -12,8 +11,6 @@
     "complete_ai_agent_run",
     "complete_queue_job",
     "create_ai_agent_run",
-    "create_ai_skill",
-    "delete_lead",
     "delete_search_embedding",
     "dev_promote_caller_superuser",
     "enqueue_job",
@@ -28,23 +25,19 @@
     "request_embedding_job",
     "run_all_domain_tests",
     "seed_dev_data",
-    "set_ai_skill_active",
-    "unassign_team_member_skill",
     "update_ai_chat_session_title",
     "update_tax_deadlines",
-    "upsert_ai_skill",
     "upsert_ai_skill_config",
     "upsert_search_embedding",
     "worker_heartbeat"
   ],
   "coverageModel": "matrix-hook-ui",
   "matrixStatusSummary": {
-    "reachable-ui": 554,
-    "hook-only": 97,
-    "backend-only": 17,
+    "reachable-ui": 657,
+    "backend-only": 10,
     "internal-intentional": 13,
     "api-only-intentional": 5,
-    "command-only": 1
+    "command-only": 2
   },
   "matrixClassificationSummary": {
     "user-facing": 574,
@@ -490,6 +483,7 @@
         "append_ai_chat_message",
         "approve_ai_action_draft",
         "archive_ai_chat_session",
+        "assign_team_member_skill",
         "block_serial",
         "compute_so_totals",
         "create_bill_from_purchase_order",
@@ -515,29 +509,28 @@
         "reserve_serial",
         "revoke_permission",
         "send_purchase_order",
+        "set_ai_skill_active",
         "set_article_published",
         "set_whatsapp_primary_account",
+        "unassign_team_member_skill",
         "update_google_drive_connection",
         "update_integration_status",
         "update_metric_values",
         "update_organization",
         "update_whatsapp_business_account",
         "update_whatsapp_verification_status",
+        "upsert_ai_skill",
         "upsert_organization_settings"
       ],
       "missing": [
-        "upsert_ai_skill",
-        "set_ai_skill_active",
         "upsert_ai_skill_config",
-        "assign_team_member_skill",
-        "unassign_team_member_skill",
         "append_ai_agent_run_step",
         "complete_ai_agent_run",
         "cancel_ai_agent_run",
         "backfill_external_ids",
         "run_all_domain_tests"
       ],
-      "coverage": 80,
+      "coverage": 88,
       "productReducers": [
         "deprecate_account_account",
         "create_invoice_from_sale_order",
@@ -590,7 +583,7 @@
         "remove_purchase_order_line",
         "compute_so_totals"
       ],
-      "productCoverage": 80
+      "productCoverage": 88
     },
     "reports": {
       "rust": [
@@ -730,6 +723,7 @@
         "create_ai_agent",
         "create_ai_chat_session",
         "create_ai_insight",
+        "create_ai_skill",
         "create_ai_team_member",
         "dismiss_insight",
         "record_ai_spend",
@@ -743,10 +737,9 @@
         "mark_embedding_synced",
         "delete_search_embedding",
         "request_embedding_job",
-        "create_ai_skill",
         "create_ai_agent_run"
       ],
-      "coverage": 59,
+      "coverage": 65,
       "productReducers": [
         "create_ai_action_draft",
         "update_ai_action_draft_params",
@@ -762,7 +755,7 @@
         "create_ai_skill",
         "create_ai_agent_run"
       ],
-      "productCoverage": 77
+      "productCoverage": 85
     },
     "documents": {
       "rust": [
@@ -989,6 +982,7 @@
         "create_utm_medium",
         "create_utm_source",
         "delete_contact",
+        "delete_lead",
         "post_internal_note",
         "subscribe_to_record",
         "unsubscribe_from_record",
@@ -1004,10 +998,8 @@
         "update_utm_medium",
         "update_utm_source"
       ],
-      "missing": [
-        "delete_lead"
-      ],
-      "coverage": 97,
+      "missing": [],
+      "coverage": 100,
       "productReducers": [
         "post_internal_note",
         "subscribe_to_record",
@@ -1040,7 +1032,7 @@
         "create_contact_segment",
         "add_contact_to_segment"
       ],
-      "productCoverage": 97
+      "productCoverage": 100
     },
     "bootstrap": {
       "rust": [

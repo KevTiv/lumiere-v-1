@@ -1,0 +1,23 @@
+/** Coverage tracker: reports / analytics reducers reachable from module UI. */
+export const REPORTS_UI_REDUCERS = [
+  "add_widget_to_dashboard",
+  "archive_financial_report",
+  "create_analytics_metric",
+  "create_dashboard",
+  "create_dashboard_widget",
+  "create_financial_report",
+  "create_report_template",
+  "create_scheduled_report",
+  "create_trial_balance_entry",
+  "delete_financial_report",
+  "export_financial_report",
+  "generate_financial_report",
+  "import_analytics_metric_csv",
+  "import_report_template_csv",
+  "record_report_run",
+  "share_dashboard",
+  "update_financial_report",
+  "update_metric_values",
+  "update_report_template",
+  "update_widget_layout",
+] as const

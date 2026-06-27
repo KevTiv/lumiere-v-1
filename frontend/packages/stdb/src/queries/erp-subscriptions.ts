@@ -94,8 +94,12 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "report-templates",
   "scheduled-reports",
   "analytics-metrics",
+  "dashboards",
+  "dashboard-widgets",
   "documents",
+  "document-folders",
   "knowledge-articles",
+  "knowledge-categories",
   "helpdesk-tickets",
   "helpdesk-teams",
   "helpdesk-stages",
@@ -111,6 +115,16 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "workflow-transitions",
   "workflow-workitems",
   "proposals",
+  "proposal-sections",
+  "proposal-line-items",
+  "proposal-versions",
+  "proposal-source-docs",
+  "proposal-presence",
+  "proposal-comments",
+  "fleet-vehicles",
+  "pos-terminals",
+  "pos-configs",
+  "pos-sessions",
   "calendar-events",
   "mail-messages",
   "expenses",
@@ -334,8 +348,13 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("scheduled-reports", "scheduled_report", id, fa, ""),
   "analytics-metrics": (id, fa) =>
     selectOrgScopedSql("analytics-metrics", "analytics_metric", id, fa, ""),
+  dashboards: (id, fa) => selectOrgScopedSql("dashboards", "dashboard", id, fa, ""),
+  "dashboard-widgets": (id, fa) =>
+    selectOrgScopedSql("dashboard-widgets", "dashboard_widget", id, fa, ""),
   documents: (id, fa) =>
     selectOrgScopedSql("documents", "document", id, fa, ""),
+  "document-folders": (id, fa) =>
+    selectOrgScopedSql("document-folders", "doc_folder", id, fa, ""),
   "knowledge-articles": (id, fa) =>
     selectOrgScopedSql(
       "knowledge-articles",
@@ -344,6 +363,8 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "knowledge-categories": (id, fa) =>
+    selectOrgScopedSql("knowledge-categories", "kb_category", id, fa, ""),
   "helpdesk-tickets": (id, fa) =>
     selectOrgScopedSql("helpdesk-tickets", "helpdesk_ticket", id, fa, ""),
   "helpdesk-teams": (id, fa) =>
@@ -426,6 +447,22 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       " ORDER BY instance_id ASC, id ASC",
     ),
   proposals: (id, fa) => selectOrgScopedSql("proposals", "proposal", id, fa, ""),
+  "proposal-sections": (id, fa) =>
+    selectOrgScopedSql("proposal-sections", "proposal_section", id, fa, "", " ORDER BY sequence ASC"),
+  "proposal-line-items": (id, fa) =>
+    selectOrgScopedSql("proposal-line-items", "proposal_line_item", id, fa, ""),
+  "proposal-versions": (id, fa) =>
+    selectOrgScopedSql("proposal-versions", "proposal_version", id, fa, "", " ORDER BY version_number DESC"),
+  "proposal-source-docs": (id, fa) =>
+    selectOrgScopedSql("proposal-source-docs", "proposal_source_doc", id, fa, ""),
+  "proposal-presence": (id, fa) =>
+    selectOrgScopedSql("proposal-presence", "proposal_presence", id, fa, ""),
+  "proposal-comments": (id, fa) =>
+    selectOrgScopedSql("proposal-comments", "proposal_comment", id, fa, "", " ORDER BY id DESC"),
+  "fleet-vehicles": (id, fa) =>
+    selectOrgScopedSql("fleet-vehicles", "fleet_vehicle", id, fa, "", " ORDER BY name ASC"),
+  "pos-terminals": (id, fa) =>
+    selectOrgScopedSql("pos-terminals", "pos_terminal", id, fa, "", " ORDER BY name ASC"),
   "calendar-events": (id, fa) =>
     selectOrgScopedSql(
       "calendar-events",
@@ -490,6 +527,16 @@ function subscriptionSqlForCompanyScopedResource(
     ]
   }
   if (resource === "depreciation-lines") {
+    return null
+  }
+  if (resource === "pos-configs") {
+    if (!ids?.length) return null
+    const list = ids.join(", ")
+    const c = resolveHttpSqlColumns("pos-configs", fa).join(", ")
+    return [`SELECT ${c} FROM pos_config WHERE company_id IN (${list}) ORDER BY name ASC`]
+  }
+  if (resource === "pos-sessions") {
+    // Child of pos_config — no SQL subqueries; use HTTP `serverQueryPosSessions` instead.
     return null
   }
   return undefined
@@ -560,6 +607,8 @@ const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
   "depreciation-lines",
   "intercompany-rules",
   "intercompany-transactions",
+  "pos-configs",
+  "pos-sessions",
 ] as const
 
 /** Keys for org-scoped ERP tables ({@link ERP_ORG_SQL} plus company-scoped resources). */

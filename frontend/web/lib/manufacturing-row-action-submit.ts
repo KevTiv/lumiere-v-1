@@ -1,5 +1,35 @@
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
 
+/** Coverage tracker: manufacturing reducers reachable via row actions + create/import forms. */
+export const MANUFACTURING_UI_REDUCERS = [
+  "block_workcenter",
+  "cancel_manufacturing_order",
+  "check_mo_availability",
+  "compute_bom_cost",
+  "confirm_manufacturing_order",
+  "consume_mo_materials",
+  "create_bom",
+  "create_manufacturing_order",
+  "create_routing_workcenter",
+  "create_workcenter",
+  "delete_bom",
+  "explode_bom",
+  "finish_manufacturing_order",
+  "finish_workorder",
+  "import_bom_csv",
+  "import_bom_line_csv",
+  "import_manufacturing_order_csv",
+  "import_workcenter_csv",
+  "link_device_to_workcenter",
+  "log_workcenter_productivity",
+  "produce_manufacturing_order",
+  "start_manufacturing_order",
+  "start_workorder",
+  "unblock_workcenter",
+  "update_bom",
+  "update_workcenter",
+] as const
+
 function num(v: unknown, fallback = 0): number {
   if (v === "" || v === null || v === undefined) return fallback
   const n = Number(v)

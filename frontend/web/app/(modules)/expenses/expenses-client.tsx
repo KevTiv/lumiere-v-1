@@ -117,6 +117,7 @@ function ExpensesClientLoaded({
   >(null)
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
+  const [toolbarError, setToolbarError] = useState<string | null>(null)
 
   const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
   const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
@@ -148,7 +149,13 @@ function ExpensesClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{ id: string; label: string; onClick: () => void }>,
+    actions: Array<{
+      id: string
+      label: string
+      requiresSelection?: boolean
+      variant?: "default" | "destructive"
+      onClick: (selectedRows: Record<string, unknown>[]) => void
+    }>,
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -158,6 +165,23 @@ function ExpensesClientLoaded({
         rowSelectionToggleOnClick: false,
         actions,
       },
+    }
+  }
+
+  const runSheetAction = async (
+    rows: Record<string, unknown>[],
+    label: string,
+    fn: (row: Record<string, unknown>) => Promise<unknown>,
+  ) => {
+    setToolbarError(null)
+    if (rows.length === 0) {
+      setToolbarError(`Select at least one ${label}.`)
+      return
+    }
+    try {
+      for (const row of rows) await fn(row)
+    } catch (e) {
+      setToolbarError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -279,13 +303,83 @@ function ExpensesClientLoaded({
                   label: t("expenses.csvImport.toolbarSheets"),
                   onClick: () => setCsvKind("sheet"),
                 },
+                {
+                  id: "submit-sheets",
+                  label: t("expenses.workflow.submitReport"),
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const draft = rows.filter((r) => rowState(r) === "Draft")
+                    if (draft.length === 0) {
+                      setToolbarError(t("expenses.workflow.noDraftSheets"))
+                      return
+                    }
+                    void runSheetAction(draft, "report", (row) => {
+                      const total = sumExpenseAmountsForSheet(expenses as Record<string, unknown>[], rowId(row))
+                      const fallback = Number(row.totalAmount ?? row.total_amount ?? 0)
+                      return submitExpenseSheet.mutateAsync({
+                        sheetId: rowId(row),
+                        params: { totalAmount: total > 0 ? total : fallback },
+                      })
+                    })
+                  },
+                },
+                {
+                  id: "approve-sheets",
+                  label: t("expenses.workflow.approveReport"),
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const submitted = rows.filter((r) => rowState(r) === "Submitted")
+                    if (submitted.length === 0) {
+                      setToolbarError(t("expenses.workflow.noSubmittedSheets"))
+                      return
+                    }
+                    void runSheetAction(submitted, "report", (row) =>
+                      approveExpenseSheet.mutateAsync(rowId(row)),
+                    )
+                  },
+                },
+                {
+                  id: "refuse-sheets",
+                  label: t("expenses.workflow.refuseReport"),
+                  requiresSelection: true,
+                  variant: "destructive",
+                  onClick: (rows) => {
+                    const submitted = rows.filter((r) => rowState(r) === "Submitted")
+                    if (submitted.length === 0) {
+                      setToolbarError(t("expenses.workflow.noSubmittedSheets"))
+                      return
+                    }
+                    void runSheetAction(submitted, "report", (row) =>
+                      refuseExpenseSheet.mutateAsync(rowId(row)),
+                    )
+                  },
+                },
+                {
+                  id: "post-sheets",
+                  label: t("expenses.workflow.postReport"),
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const approved = rows.filter((r) => rowState(r) === "Approved")
+                    if (approved.length === 0) {
+                      setToolbarError(t("expenses.workflow.noApprovedSheets"))
+                      return
+                    }
+                    const today = new Date()
+                    void runSheetAction(approved, "report", (row) =>
+                      postExpenseSheet.mutateAsync({
+                        sheetId: rowId(row),
+                        accountingDate: today,
+                      }),
+                    )
+                  },
+                },
               ]),
             }
           }
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, t],
+    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, expenses, t, submitExpenseSheet, approveExpenseSheet, refuseExpenseSheet, postExpenseSheet],
   )
 
   const data = useMemo(
@@ -436,6 +530,11 @@ function ExpensesClientLoaded({
 
   return (
     <>
+      {toolbarError ? (
+        <p className="text-sm text-destructive mb-2" role="alert">
+          {toolbarError}
+        </p>
+      ) : null}
       <ModuleView
         config={config}
         data={data}

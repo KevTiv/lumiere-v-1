@@ -164,7 +164,13 @@ export function useCreateProposal() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create proposal')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -195,7 +201,13 @@ export function useUpdateProposal() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -210,7 +222,13 @@ export function useUpdateProposalStatus() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal status')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -240,7 +258,13 @@ export function useAddProposalLineItem() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal line item')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -264,7 +288,13 @@ export function useUpdateProposalLineItem() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal line item')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -276,7 +306,13 @@ export function useDeleteProposalLineItem() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal line item')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -288,7 +324,13 @@ export function useDeleteProposalSection() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal section')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -308,7 +350,13 @@ export function useSaveProposalVersion() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to save proposal version')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -332,7 +380,13 @@ export function useAddProposalSourceDoc() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal source document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -344,7 +398,13 @@ export function useDeleteProposalSourceDoc() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete proposal source document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -391,7 +451,13 @@ export function useReorderProposalLineItems() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reorder proposal line items')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -411,7 +477,13 @@ export function useUpdateProposalPresence() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update proposal presence')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -423,7 +495,13 @@ export function useClearProposalPresence() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to clear proposal presence')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -447,7 +525,13 @@ export function useAddProposalComment() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add proposal comment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 
@@ -459,7 +543,13 @@ export function useResolveProposalComment() {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to resolve proposal comment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposals'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
+      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+    },
   })
 }
 

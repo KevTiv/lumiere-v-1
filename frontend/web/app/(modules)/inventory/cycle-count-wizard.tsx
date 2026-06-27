@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useQuery } from "@tanstack/react-query"
 import { Button, EntityView, cn } from "@lumiere/ui"
 import { Input } from "@lumiere/ui"
 import { Label } from "@lumiere/ui"
@@ -14,10 +13,10 @@ import {
   useValidateCycleCount,
   usePostCycleCountAdjustments,
   useOpenQualityAlert,
+  useQualityAlerts,
   useSolveQualityAlert,
   useCancelQualityAlert,
 } from "@lumiere/query-hooks/hooks/inventory"
-import { fetchQueryListAllowEmpty, rqBigIntKey } from "@lumiere/query-hooks/http"
 import type { QueryRows } from "@/lib/query-fetch"
 import { ChevronRight, MapPin, Package } from "lucide-react"
 
@@ -563,11 +562,7 @@ export function QualityAlertsPanel({
   const solveAlert = useSolveQualityAlert(orgId)
   const cancelAlert = useCancelQualityAlert(orgId, operatingCompanyId)
 
-  const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ["quality-alerts", rqBigIntKey(orgId)],
-    queryFn: () => fetchQueryListAllowEmpty("/api/query/quality-alerts"),
-    staleTime: 30_000,
-  })
+  const { data: alerts = [], isLoading } = useQualityAlerts(orgId)
 
   const tableConfig = useMemo(() => {
     const base = qualityAlertsTableConfig(t)

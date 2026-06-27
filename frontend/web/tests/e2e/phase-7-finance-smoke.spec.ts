@@ -1,0 +1,52 @@
+import { expect, test } from "@playwright/test"
+
+import {
+  assertModuleTabs,
+  expectNoAppError,
+  gotoModule,
+  openAccountingTab,
+  openTabAndCancelCreate,
+  signIn,
+} from "./helpers"
+
+const SALES_FINANCE_TAB_IDS = ["fulfillment", "returns", "invoices"] as const
+
+test.describe("ERP phase-7 finance smoke @phase-7", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page)
+  })
+
+  test("sales fulfillment, returns, and invoices tabs render without errors", async ({ page }) => {
+    await gotoModule(page, "/sales", "sales")
+
+    await assertModuleTabs(page, "sales", SALES_FINANCE_TAB_IDS, async (tabPage, tabId) => {
+      switch (tabId) {
+        case "fulfillment":
+        case "returns":
+          await expect(tabPage.getByTestId("entity-table")).toBeVisible()
+          break
+        case "invoices":
+          break
+        default:
+          break
+      }
+    })
+  })
+
+  /**
+   * Requires `seed_dev_data` from `make e2e-smoke`, which seeds customer invoice
+   * INV/2024/00001 linked to sale order SO/2024/0001 (see sales-invoice-flow.spec.ts).
+   */
+  test("seeded customer invoice appears on Sales Invoices tab", async ({ page }) => {
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-invoices").click()
+
+    await expect(page.getByText("INV/2024/00001")).toBeVisible()
+    await expectNoAppError(page)
+  })
+
+  test("reconciliation widget create modal opens and cancels", async ({ page }) => {
+    await gotoModule(page, "/accounting", "accounting")
+    await openTabAndCancelCreate(page, "accounting", "reconciliation-widgets", "new-reconciliation-widget")
+  })
+})

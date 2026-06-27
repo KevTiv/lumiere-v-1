@@ -5,6 +5,7 @@ import {
   proposalsTableConfig,
   proposalTemplatesTableConfig,
   newProposalForm,
+  posTerminalsAdminTableConfig,
 } from "@lumiere/ui"
 import {
   buildAccountsTableConfig,
@@ -44,6 +45,8 @@ import {
   pricelistsTableConfig,
   pricelistItemsTableConfig,
   deliveriesTableConfig,
+  salesFulfillmentTableConfig,
+  salesReturnsTableConfig,
   deliveryPriceRulesTableConfig,
   deliveryCarriersTableConfig,
   shippingMethodsTableConfig,
@@ -134,12 +137,22 @@ import {
   newPayslipForm,
   jobPositionsTableConfig,
   newJobPositionForm,
+  leaveTypesTableConfig,
+  payrollStructuresTableConfig,
+  salaryRulesTableConfig,
+  newLeaveTypeForm,
+  newPayrollStructureForm,
+  newSalaryRuleForm,
   documentsTableConfig,
   knowledgeArticlesTableConfig,
+  knowledgeCategoriesTableConfig,
+  documentFoldersTableConfig,
   documentProcessingJobsTableConfig,
   documentAiInsightsTableConfig,
   newDocumentForm,
   newKnowledgeArticleForm,
+  newKnowledgeCategoryForm,
+  newDocumentFolderForm,
   newDocumentProcessingJobForm,
   calendarEventsTableConfig,
   newCalendarEventForm,
@@ -148,10 +161,14 @@ import {
   reportTemplatesTableConfig,
   scheduledReportsTableConfig,
   analyticsMetricsTableConfig,
+  dashboardsTableConfig,
+  dashboardWidgetsTableConfig,
   newFinancialReportForm,
   newReportTemplateForm,
   newScheduledReportForm,
   newAnalyticsMetricForm,
+  newDashboardForm,
+  newDashboardWidgetForm,
   subscriptionsTableConfig,
   subscriptionPlansTableConfig,
   deferredRevenueSchedulesTableConfig,
@@ -177,7 +194,10 @@ import {
   workflowInstancesTableConfig,
   newWorkflowForm,
   mailMessagesTableConfig,
+  mailFollowersTableConfig,
   newMailMessageForm,
+  subscribeToRecordForm,
+  unsubscribeFromRecordForm,
   iotPairingTokensTableConfig,
   iotHubsTableConfig,
   iotDevicesTableConfig,
@@ -605,6 +625,23 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newPickingBatchForm(t),
       createLabel: t("sales.forms.newPickingBatch.createButton"),
       createAction: "createPickingBatch",
+    },
+    {
+      id: "fulfillment",
+      label: t("sales.tabs.fulfillment"),
+      type: "entity",
+      entityConfig: salesFulfillmentTableConfig(t),
+    },
+    {
+      id: "returns",
+      label: t("sales.tabs.returns"),
+      type: "entity",
+      entityConfig: salesReturnsTableConfig(t),
+    },
+    {
+      id: "invoices",
+      label: t("sales.tabs.invoices"),
+      type: "custom" as const,
     },
     {
       id: "delivery-price-rules",
@@ -1408,6 +1445,42 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createLabel: "New Position",
       createAction: "createJobPosition",
     },
+    {
+      id: "recruitment",
+      label: "Recruitment",
+      type: "entity",
+      entityConfig: jobPositionsTableConfig(t),
+      createForm: newJobPositionForm(t),
+      createLabel: "New Position",
+      createAction: "createJobPosition",
+    },
+    {
+      id: "leave-types",
+      label: "Leave Types",
+      type: "entity",
+      entityConfig: leaveTypesTableConfig(t),
+      createForm: newLeaveTypeForm(t),
+      createLabel: "New Leave Type",
+      createAction: "createLeaveType",
+    },
+    {
+      id: "payroll-structures",
+      label: "Payroll Structures",
+      type: "entity",
+      entityConfig: payrollStructuresTableConfig(t),
+      createForm: newPayrollStructureForm(t),
+      createLabel: "New Structure",
+      createAction: "createPayrollStructure",
+    },
+    {
+      id: "salary-rules",
+      label: "Salary Rules",
+      type: "entity",
+      entityConfig: salaryRulesTableConfig(t),
+      createForm: newSalaryRuleForm(t),
+      createLabel: "New Rule",
+      createAction: "createSalaryRule",
+    },
   ],
 })
 
@@ -1595,9 +1668,11 @@ export const overviewDashboard = (t: TFunction): DashboardConfig => ({
           width: "full",
           useCard: false,
           data: {
-            columns: 4,
+            columns: 6,
             actions: [
               { id: "sales", label: t("overview.dashboard.actions.sales"), icon: "trending", color: "blue" },
+              { id: "accounting", label: t("overview.dashboard.actions.accounting"), icon: "dollar", color: "indigo" },
+              { id: "crm", label: t("overview.dashboard.actions.crm"), icon: "users", color: "orange" },
               { id: "inventory", label: t("overview.dashboard.actions.inventory"), icon: "package", color: "green" },
               { id: "ai_drafts", label: t("overview.dashboard.actions.aiDrafts"), icon: "bell", color: "purple" },
               { id: "projects", label: t("overview.dashboard.actions.projects"), icon: "file", color: "teal" },
@@ -1617,12 +1692,44 @@ export const overviewDashboard = (t: TFunction): DashboardConfig => ({
           data: {
             stats: [
               { label: t("overview.dashboard.stats.openSalesOrders"), value: "—", icon: "ShoppingCart" },
+              { label: t("overview.dashboard.stats.openPurchaseOrders"), value: "—", icon: "Truck" },
               { label: t("overview.dashboard.stats.accountsReceivable"), value: "—", icon: "TrendingUp" },
               { label: t("overview.dashboard.stats.accountsPayable"), value: "—", icon: "TrendingDown" },
               { label: t("overview.dashboard.stats.lowStockAlerts"), value: "—", icon: "AlertTriangle" },
               { label: t("overview.dashboard.stats.openTasks"), value: "—", icon: "CheckSquare" },
+              { label: t("overview.dashboard.stats.activeProjects"), value: "—", icon: "FolderKanban" },
               { label: t("overview.dashboard.stats.pendingAiDrafts"), value: "—", icon: "Bell" },
             ],
+          },
+        },
+      ],
+    },
+    {
+      id: "overview-trends",
+      title: t("overview.dashboard.sections.trends"),
+      widgets: [
+        {
+          id: "overview-sales-trend",
+          type: "area-chart",
+          title: t("overview.dashboard.widgets.salesTrend"),
+          width: "2/3",
+          data: {
+            xAxisKey: "month",
+            series: [
+              { name: "revenue", color: "hsl(var(--chart-1))" },
+            ],
+            values: [],
+          },
+        },
+        {
+          id: "overview-pipeline-mix",
+          type: "bar-chart",
+          title: t("overview.dashboard.widgets.pipelineMix"),
+          width: "1/3",
+          data: {
+            categoryKey: "label",
+            series: [{ name: "count", color: "hsl(var(--chart-2))" }],
+            values: [],
           },
         },
       ],
@@ -1826,6 +1933,8 @@ export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
   ],
 })
+
+// Custom tabs (gantt, resource allocation) are injected in projects-client.tsx
 
 // ─── IoT ──────────────────────────────────────────────────────────────────────
 
@@ -2066,6 +2175,24 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
       createAction: "createArticle",
     },
     {
+      id: "knowledge-categories",
+      label: t("documents.tabs.categories"),
+      type: "entity",
+      entityConfig: knowledgeCategoriesTableConfig(t),
+      createForm: newKnowledgeCategoryForm(t),
+      createLabel: t("documents.tabs.newCategory"),
+      createAction: "createKnowledgeCategory",
+    },
+    {
+      id: "document-folders",
+      label: t("documents.tabs.folders"),
+      type: "entity",
+      entityConfig: documentFoldersTableConfig(t),
+      createForm: newDocumentFolderForm(t),
+      createLabel: t("documents.tabs.newFolder"),
+      createAction: "createDocumentFolder",
+    },
+    {
       id: "document-processing",
       label: t("documents.tabs.processing"),
       type: "entity",
@@ -2148,6 +2275,15 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newCalendarEventForm(t),
       createLabel: "New Event",
       createAction: "createEvent",
+    },
+    {
+      id: "activities",
+      label: "Activities",
+      type: "entity",
+      entityConfig: activitiesTableConfig(t),
+      createForm: newActivityForm(t),
+      createLabel: "New Activity",
+      createAction: "createActivity",
     },
   ],
 })
@@ -2282,6 +2418,24 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newAnalyticsMetricForm(t),
       createLabel: t("reports.createButton.newMetric"),
       createAction: "createAnalyticsMetric",
+    },
+    {
+      id: "dashboards",
+      label: t("reports.tabs.dashboards"),
+      type: "entity",
+      entityConfig: dashboardsTableConfig(t),
+      createForm: newDashboardForm(t),
+      createLabel: t("reports.actions.newDashboard"),
+      createAction: "createDashboard",
+    },
+    {
+      id: "dashboard-widgets",
+      label: t("reports.tabs.dashboardWidgets"),
+      type: "entity",
+      entityConfig: dashboardWidgetsTableConfig(t),
+      createForm: newDashboardWidgetForm(t),
+      createLabel: t("reports.actions.newWidget"),
+      createAction: "createDashboardWidget",
     },
   ],
 })
@@ -2654,6 +2808,8 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
                 columns: undefined,
                 actions: [
                   { id: "new_message", label: "New Message", icon: "plus", color: "blue" },
+                  { id: "subscribe_record", label: "Subscribe to record", icon: "users", color: "green" },
+                  { id: "unsubscribe_record", label: "Unsubscribe", icon: "refresh", color: "orange" },
                 ],
               },
             },
@@ -2688,6 +2844,15 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newMailMessageForm(t),
       createLabel: "New Message",
       createAction: "createMessage",
+    },
+    {
+      id: "followers",
+      label: "Followers",
+      type: "entity",
+      entityConfig: mailFollowersTableConfig(t),
+      createForm: subscribeToRecordForm(t),
+      createLabel: "Subscribe",
+      createAction: "subscribeToRecord",
     },
   ],
 })
@@ -2762,6 +2927,28 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
       label: "Templates",
       type: "entity",
       entityConfig: proposalTemplatesTableConfig(t),
+    },
+  ],
+})
+
+// ─── POS ──────────────────────────────────────────────────────────────────────
+
+export const posModuleConfig = (t: TFunction): ModuleConfig => ({
+  id: "pos",
+  title: t("pos.admin.module.title"),
+  description: t("pos.admin.module.description"),
+  defaultTab: "register",
+  tabs: [
+    {
+      id: "register",
+      label: t("pos.admin.tabs.register"),
+      type: "custom",
+    },
+    {
+      id: "admin",
+      label: t("pos.admin.tabs.admin"),
+      type: "entity",
+      entityConfig: posTerminalsAdminTableConfig(t),
     },
   ],
 })

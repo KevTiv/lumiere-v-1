@@ -85,6 +85,49 @@ export const knowledgeArticlesTableConfig = (t: TFunction): EntityViewConfig => 
   },
 })
 
+export const knowledgeCategoriesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "knowledge-categories-table",
+  title: t("documents.knowledgeCategories.title"),
+  description: t("documents.knowledgeCategories.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("documents.knowledgeCategories.searchPlaceholder"),
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: t("documents.knowledgeCategories.columns.name"), width: "min-w-48" },
+      { key: "description", label: t("documents.knowledgeCategories.columns.description"), width: "min-w-48" },
+      { key: "articleCount", label: t("documents.knowledgeCategories.columns.articleCount"), type: "number", align: "right" },
+      { key: "sequence", label: t("documents.knowledgeCategories.columns.sequence"), type: "number", align: "right" },
+      { key: "createDate", label: t("documents.knowledgeCategories.columns.createDate"), type: "date" },
+    ],
+    emptyMessage: t("documents.knowledgeCategories.emptyMessage"),
+  },
+})
+
+export const documentFoldersTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "document-folders-table",
+  title: t("documents.folders.title"),
+  description: t("documents.folders.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("documents.folders.searchPlaceholder"),
+    searchKeys: ["name", "description", "parentPath"],
+    columns: [
+      { key: "name", label: t("documents.folders.columns.name"), width: "min-w-48" },
+      { key: "parentPath", label: t("documents.folders.columns.parentPath"), width: "min-w-36" },
+      { key: "documentCount", label: t("documents.folders.columns.documentCount"), type: "number", align: "right" },
+      { key: "isFavorite", label: t("documents.folders.columns.isFavorite"), type: "boolean" },
+      { key: "isHidden", label: t("documents.folders.columns.isHidden"), type: "boolean" },
+      { key: "createDate", label: t("documents.folders.columns.createDate"), type: "date" },
+    ],
+    emptyMessage: t("documents.folders.emptyMessage"),
+  },
+})
+
 export const documentProcessingJobsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "document-processing-jobs-table",
   title: t("documents.processing.title"),
@@ -183,6 +226,8 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
 export const documentsEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "documents-table": documentsTableConfig(t),
   "knowledge-articles-table": knowledgeArticlesTableConfig(t),
+  "knowledge-categories-table": knowledgeCategoriesTableConfig(t),
+  "document-folders-table": documentFoldersTableConfig(t),
   "document-processing-jobs-table": documentProcessingJobsTableConfig(t),
   "document-ai-insights-table": documentAiInsightsTableConfig(t),
 })

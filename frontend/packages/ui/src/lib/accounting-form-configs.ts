@@ -1223,6 +1223,38 @@ export const registerPaymentInvoicesForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const reconcilePaymentInvoiceForm = (t: TFunction): FormConfig => ({
+  id: "reconcile-payment-invoice",
+  title: t("accounting.forms.reconcilePaymentInvoice.title"),
+  description: t("accounting.forms.reconcilePaymentInvoice.description"),
+  submitLabel: t("accounting.forms.reconcilePaymentInvoice.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.reconcilePaymentInvoice.sections.main"),
+      fields: [
+        {
+          id: "paymentMoveId",
+          name: "paymentMoveId",
+          type: "number",
+          label: t("accounting.forms.reconcilePaymentInvoice.fields.paymentMoveId"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "invoiceMoveId",
+          name: "invoiceMoveId",
+          type: "number",
+          label: t("accounting.forms.reconcilePaymentInvoice.fields.invoiceMoveId"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const newAnalyticAccountForm = (t: TFunction): FormConfig => ({
   id: "new-analytic-account",
   title: t("accounting.forms.analyticAccount.createTitle"),

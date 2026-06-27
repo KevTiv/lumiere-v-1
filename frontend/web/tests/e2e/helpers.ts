@@ -60,6 +60,45 @@ export async function openAccountingTab(page: Page, tabId: string) {
   await page.getByTestId(`module-tab-accounting-${tabId}`).click()
 }
 
+/** Click each module tab in order, assert no app error, optionally run per-tab checks. */
+export async function assertModuleTabs(
+  page: Page,
+  moduleId: string,
+  tabIds: readonly string[],
+  assertTab?: (page: Page, tabId: string) => Promise<void>,
+) {
+  for (const tabId of tabIds) {
+    await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    await expectNoAppError(page)
+    if (assertTab) {
+      await assertTab(page, tabId)
+    }
+  }
+}
+
+export async function openSettingsSection(page: Page, sectionId: string) {
+  await page.goto("/settings")
+  await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
+  await expectAuthenticatedShell(page)
+  await page.getByTestId(`settings-section-${sectionId}`).click()
+  await expectNoAppError(page)
+}
+
+/** Open a tab's create modal, cancel, and expect the form dialog to close. */
+export async function openTabAndCancelCreate(
+  page: Page,
+  moduleId: string,
+  tabId: string,
+  formId: string,
+) {
+  await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+  await page.getByTestId(`module-create-${moduleId}-${tabId}`).click()
+  await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
+  await page.getByTestId(`form-modal-${formId}`).getByRole("button", { name: /^cancel$/i }).click()
+  await expect(page.getByTestId(`form-modal-${formId}`)).toBeHidden()
+  await expectNoAppError(page)
+}
+
 export async function fillField(page: Page, name: string, value: string) {
   await page.getByTestId(`form-field-${name}`).fill(value)
 }

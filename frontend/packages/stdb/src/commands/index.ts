@@ -186,6 +186,14 @@ export {
   type AiAgentsBffReducerKey,
 } from "./ai-agents-http";
 export {
+  AI_SKILLS_BFF_REDUCERS,
+  AI_SKILLS_COMMAND_SUBSCRIPTION_HINTS,
+  aiSkillsBffCallUrl,
+  aiSkillsBffPost,
+  aiSkillsCommandContract,
+  type AiSkillsBffReducerKey,
+} from "./ai-skills-http";
+export {
   AI_CHAT_BFF_REDUCERS,
   AI_CHAT_COMMAND_SUBSCRIPTION_HINTS,
   aiChatBffCallUrl,

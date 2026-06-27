@@ -1,125 +1,44 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { POSPage } from "@lumiere/ui/pos/pos-page"
-import { FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
+import {
+  DashboardHeader,
+  EntityView,
+  FormModal,
+  MissingOrganization,
+  mergeSelectOptionsForFields,
+  posFormConfigs,
+  posConfigsAdminTableConfig,
+  posSessionsAdminTableConfig,
+  posTerminalsAdminTableConfig,
+  type FormConfig,
+} from "@lumiere/ui"
+import type { PosFormAction } from "@lumiere/ui"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
+import { Button } from "@lumiere/ui/components/button"
+import { posModuleConfig } from "@/lib/module-dashboard-configs"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  posConfigRowsToSelectOptions,
+  posSessionRowsToSelectOptions,
+  posTerminalRowsToSelectOptions,
+} from "@/lib/form-lookup"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
-import { useState } from "react"
 
 interface PosClientProps {
   initialProducts?: Record<string, unknown>[]
   initialTerminals?: Record<string, unknown>[]
+  initialConfigs?: Record<string, unknown>[]
+  initialSessions?: Record<string, unknown>[]
   organizationId?: number
 }
 
 type PosClientLoadedProps = Omit<PosClientProps, "organizationId"> & {
   organizationId: number
-}
-
-type PosAction =
-  | "createTerminal"
-  | "updateTerminal"
-  | "createConfig"
-  | "activateConfig"
-  | "deactivateConfig"
-  | "openSession"
-  | "computeTotals"
-  | "closeSession"
-
-const posActionForms: Record<PosAction, FormConfig> = {
-  createTerminal: {
-    id: "pos-create-terminal",
-    title: "Create POS Terminal",
-    submitLabel: "Create terminal",
-    sections: [
-      {
-        id: "terminal",
-        fields: [
-          { id: "terminal-name", type: "text", name: "name", label: "Name", required: true },
-          { id: "terminal-location", type: "text", name: "locationLabel", label: "Location label" },
-          { id: "terminal-lat", type: "number", name: "latitude", label: "Latitude", width: "1/2" },
-          { id: "terminal-lng", type: "number", name: "longitude", label: "Longitude", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updateTerminal: {
-    id: "pos-update-terminal",
-    title: "Update Primary POS Terminal",
-    description: "Updates the first terminal in the current terminal list.",
-    submitLabel: "Update terminal",
-    sections: [
-      {
-        id: "terminal-status",
-        fields: [
-          { id: "terminal-status-value", type: "text", name: "status", label: "Status", required: true },
-          { id: "terminal-revenue", type: "number", name: "dailyRevenue", label: "Daily revenue", width: "1/2" },
-          { id: "terminal-open-orders", type: "number", name: "openOrders", label: "Open orders", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  createConfig: {
-    id: "pos-create-config",
-    title: "Create POS Config",
-    submitLabel: "Create config",
-    sections: [
-      {
-        id: "config",
-        fields: [
-          { id: "config-name", type: "text", name: "name", label: "Name", required: true },
-          { id: "config-active", type: "switch", name: "isActive", label: "Active by default", defaultValue: true },
-        ],
-      },
-    ],
-  },
-  activateConfig: {
-    id: "pos-activate-config",
-    title: "Activate POS Config",
-    submitLabel: "Activate",
-    sections: [{ id: "config", fields: [{ id: "config-id", type: "number", name: "configId", label: "Config ID", required: true }] }],
-  },
-  deactivateConfig: {
-    id: "pos-deactivate-config",
-    title: "Deactivate POS Config",
-    submitLabel: "Deactivate",
-    sections: [{ id: "config", fields: [{ id: "config-id", type: "number", name: "configId", label: "Config ID", required: true }] }],
-  },
-  openSession: {
-    id: "pos-open-session",
-    title: "Open POS Session",
-    submitLabel: "Open session",
-    sections: [
-      {
-        id: "session",
-        fields: [
-          { id: "config-id", type: "number", name: "configId", label: "Config ID", required: true, width: "1/2" },
-          { id: "opening-balance", type: "number", name: "openingBalance", label: "Opening balance", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  computeTotals: {
-    id: "pos-compute-session-totals",
-    title: "Compute POS Session Totals",
-    submitLabel: "Compute totals",
-    sections: [{ id: "session", fields: [{ id: "session-id", type: "number", name: "sessionId", label: "Session ID", required: true }] }],
-  },
-  closeSession: {
-    id: "pos-close-session",
-    title: "Close POS Session",
-    submitLabel: "Close session",
-    sections: [
-      {
-        id: "session",
-        fields: [
-          { id: "session-id", type: "number", name: "sessionId", label: "Session ID", required: true, width: "1/2" },
-          { id: "closing-balance", type: "number", name: "closingBalance", label: "Closing balance", width: "1/2" },
-        ],
-      },
-    ],
-  },
 }
 
 export function PosClient(props: PosClientProps) {
@@ -134,16 +53,60 @@ function PosClientLoaded({
   organizationId,
   initialProducts,
   initialTerminals,
+  initialConfigs,
+  initialSessions,
 }: PosClientLoadedProps) {
+  const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const [posAction, setPosAction] = useState<PosAction | null>(null)
+  const moduleConfig = useMemo(() => posModuleConfig(t), [t])
+  const [activeTab, setActiveTab] = useState("register")
+  const [posAction, setPosAction] = useState<PosFormAction | null>(null)
+
   const pos = usePOS(
     orgId,
     operatingCompanyId,
     initialProducts,
-    initialTerminals
+    initialTerminals,
+    initialConfigs,
+    initialSessions,
   )
+
+  const { data: loyaltyPrograms = [] } = usePosLoyaltyPrograms(orgId)
+
+  const terminalOptions = useMemo(() => {
+    const fromApi = posTerminalRowsToSelectOptions(pos.terminals)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("pos.admin.terminals.emptyMessage"), disabled: true }]
+  }, [pos.terminals, t])
+
+  const configOptions = useMemo(() => {
+    const fromApi = posConfigRowsToSelectOptions(pos.configs)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("pos.admin.configs.emptyMessage"), disabled: true }]
+  }, [pos.configs, t])
+
+  const sessionOptions = useMemo(() => {
+    const fromApi = posSessionRowsToSelectOptions(pos.sessions)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("pos.admin.sessions.emptyMessage"), disabled: true }]
+  }, [pos.sessions, t])
+
+  const posActionForm = useMemo((): FormConfig | null => {
+    if (!posAction) return null
+    const base = posFormConfigs(t)[posAction]
+    if (posAction === "updateTerminal") {
+      return mergeSelectOptionsForFields(base, { terminalId: terminalOptions })
+    }
+    if (posAction === "activateConfig" || posAction === "deactivateConfig" || posAction === "openSession") {
+      return mergeSelectOptionsForFields(base, { configId: configOptions })
+    }
+    if (posAction === "computeTotals" || posAction === "closeSession") {
+      return mergeSelectOptionsForFields(base, { sessionId: sessionOptions })
+    }
+    return base
+  }, [posAction, t, terminalOptions, configOptions, sessionOptions])
+
   const handlePosActionSubmit = async (data: Record<string, unknown>) => {
     if (posAction === "createTerminal") await pos.createTerminal(data)
     else if (posAction === "updateTerminal") await pos.updatePrimaryTerminal(data)
@@ -156,19 +119,80 @@ function PosClientLoaded({
     setPosAction(null)
   }
 
+  const adminActions: PosFormAction[] = [
+    "createTerminal",
+    "updateTerminal",
+    "createConfig",
+    "activateConfig",
+    "deactivateConfig",
+    "openSession",
+    "computeTotals",
+    "closeSession",
+  ]
+
   return (
-    <>
-      <POSPage {...pos} onOpenPosAction={(action) => setPosAction(action as PosAction)} />
-      {posAction ? (
+    <div className="flex h-full flex-col gap-4">
+      <DashboardHeader title={moduleConfig.title} description={moduleConfig.description} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
+        <TabsList>
+          {moduleConfig.tabs.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id} data-testid={`pos-tab-${tab.id}`}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="register" className="mt-4 min-h-0 flex-1">
+          <POSPage {...pos} onOpenPosAction={(action) => setPosAction(action as PosFormAction)} />
+        </TabsContent>
+
+        <TabsContent value="admin" className="mt-4 space-y-6 overflow-y-auto">
+          <div className="rounded-lg border border-border p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("pos.admin.operations")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {adminActions.map((action) => (
+                <Button
+                  key={action}
+                  size="sm"
+                  variant="outline"
+                  disabled={pos.isPosLifecyclePending}
+                  onClick={() => setPosAction(action)}
+                >
+                  {posFormConfigs(t)[action].title}
+                </Button>
+              ))}
+            </div>
+            {loyaltyPrograms.length > 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {loyaltyPrograms.length} loyalty program(s) available — manage under Sales → Loyalty.
+              </p>
+            ) : null}
+            {pos.posLifecycleError ? (
+              <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                {pos.posLifecycleError}
+              </p>
+            ) : null}
+          </div>
+
+          <EntityView config={posTerminalsAdminTableConfig(t)} data={pos.terminals} />
+          <EntityView config={posConfigsAdminTableConfig(t)} data={pos.configs} />
+          <EntityView config={posSessionsAdminTableConfig(t)} data={pos.sessions} />
+        </TabsContent>
+      </Tabs>
+
+      {posAction && posActionForm ? (
         <FormModal
           open
           onOpenChange={(open) => !open && setPosAction(null)}
-          config={posActionForms[posAction]}
+          config={posActionForm}
           isPending={pos.isPosLifecyclePending}
           submitError={pos.posLifecycleError}
           onSubmit={handlePosActionSubmit}
         />
       ) : null}
-    </>
+    </div>
   )
 }

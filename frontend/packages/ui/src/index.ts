@@ -98,6 +98,8 @@ export * from "./lib/messages-entity-configs";
 export * from "./lib/messages-form-configs";
 export * from "./lib/proposals-entity-configs";
 export * from "./lib/proposals-form-configs";
+export * from "./lib/pos-form-configs";
+export * from "./lib/pos-entity-configs";
 export * from "./lib/proposal-workspace-types";
 export * from "./lib/auth-form-configs";
 export * from "./lib/iot-entity-configs";
