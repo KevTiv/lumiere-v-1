@@ -62,27 +62,19 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Obtain local SpacetimeDB token
+      - name: Start local SpacetimeDB
         run: |
           spacetime start > /tmp/spacetime.log 2>&1 &
           for i in $(seq 1 90); do
             if curl -fsS "${STDB_HOST}/v1/identity" -X POST >/dev/null 2>&1; then
               echo "SpacetimeDB ready after ${i}s"
-              break
+              exit 0
             fi
             sleep 1
-            if [ "$i" = "90" ]; then
-              echo "SpacetimeDB did not become ready:"
-              tail -100 /tmp/spacetime.log || true
-              exit 1
-            fi
           done
-          TOKEN="$(E2E_STDB_HOST="${STDB_HOST}" node scripts/e2e-local-stdb-token.mjs)"
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to obtain local SpacetimeDB token"
-            exit 1
-          fi
-          echo "STDB_SERVER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "SpacetimeDB did not become ready:"
+          tail -100 /tmp/spacetime.log || true
+          exit 1
 
       - name: Run make e2e-smoke
         env:

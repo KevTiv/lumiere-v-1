@@ -138,6 +138,8 @@ e2e-smoke:
 		else \
 			echo "[e2e] Local SpacetimeDB is already reachable at $$E2E_STDB_HOST."; \
 		fi; \
+		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
+		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		echo "[e2e] Publishing local database $(DB)..."; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
@@ -151,10 +153,10 @@ e2e-smoke:
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 		fi; \
-		echo "[e2e] Obtaining local SpacetimeDB token..."; \
-		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
+		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
+		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
-			echo "[e2e] Failed to obtain local SpacetimeDB token from $$E2E_STDB_HOST/v1/identity"; \
+			echo "[e2e] Failed to obtain local SpacetimeDB owner token (see messages above)"; \
 			exit 1; \
 		fi; \
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
