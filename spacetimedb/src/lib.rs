@@ -106,11 +106,11 @@ pub mod core_tests;
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 use crate::proposals::proposals::proposal_presence;
 
-/// Run core, accounting, inventory, sales, and CRM domain test suites in one call.
+/// Run accounting, inventory, sales, and CRM domain test suites in one call.
+/// Core tests run separately via `run_all_core_tests` (e2e-smoke Makefile).
 /// `spacetime call <db> run_all_domain_tests`
 #[spacetimedb::reducer]
 pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
-    core_tests::run_all_core_tests(ctx).map_err(|e| format!("core: {e}"))?;
     accounting_tests::run_all_accounting_tests(ctx)
         .map_err(|e| format!("accounting: {e}"))?;
     inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;

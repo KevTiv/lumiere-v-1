@@ -553,11 +553,20 @@ pub fn ensure_test_superuser(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 fn unique_suffix(ctx: &ReducerContext) -> u64 {
-    ctx.timestamp
+    use spacetimedb::rand::Rng;
+
+    let micros = ctx
+        .timestamp
         .to_duration_since_unix_epoch()
         .unwrap_or_default()
-        .as_micros() as u64
-        % 1_000_000_000
+        .as_micros() as u64;
+    // Timestamp alone collides when several harness seeds run in one reducer
+    // invocation (domain suites). Mix org count + deterministic rng for uniqueness.
+    let seq = ctx.db.organization().iter().count() as u64;
+    let nonce = ctx.rng().gen::<u32>() as u64;
+    (micros
+        .wrapping_add(seq.wrapping_mul(1_000_003))
+        .wrapping_add(nonce)) % 1_000_000_000
 }
 
 fn seed_account_type(
