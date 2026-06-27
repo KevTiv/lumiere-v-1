@@ -303,6 +303,7 @@ pub mod field_option_type;
 pub mod field_type_type;
 pub mod field_validation_type;
 pub mod field_width_type;
+pub mod finalize_import_assistant_job_params_type;
 pub mod financial_report_type;
 pub mod fiscal_year_state_type;
 pub mod fleet_vehicle_type;
@@ -332,6 +333,7 @@ pub mod hr_resource_type;
 pub mod hr_salary_rule_type;
 pub mod import_job_type;
 pub mod import_job_error_type;
+pub mod import_mapping_template_type;
 pub mod insight_severity_type;
 pub mod instance_state_type;
 pub mod intake_state_type;
@@ -467,6 +469,7 @@ pub mod sale_order_type;
 pub mod sale_order_line_type;
 pub mod sale_order_option_type;
 pub mod sale_state_type;
+pub mod save_import_mapping_template_params_type;
 pub mod scheduled_report_type;
 pub mod search_embedding_type;
 pub mod section_status_type;
@@ -885,6 +888,7 @@ pub mod create_role_reducer;
 pub mod create_routing_workcenter_reducer;
 pub mod create_salary_rule_reducer;
 pub mod create_sale_order_reducer;
+pub mod create_sale_order_line_reducer;
 pub mod create_scheduled_report_reducer;
 pub mod create_shipping_method_reducer;
 pub mod create_stock_inventory_reducer;
@@ -942,6 +946,7 @@ pub mod delete_document_reducer;
 pub mod delete_financial_report_reducer;
 pub mod delete_fiscal_year_reducer;
 pub mod delete_form_field_reducer;
+pub mod delete_import_mapping_template_reducer;
 pub mod delete_integration_reducer;
 pub mod delete_intercompany_rule_reducer;
 pub mod delete_iot_device_reducer;
@@ -992,6 +997,7 @@ pub mod explode_bom_reducer;
 pub mod export_financial_report_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_quality_check_reducer;
+pub mod finalize_import_assistant_job_reducer;
 pub mod finish_manufacturing_order_reducer;
 pub mod finish_workorder_reducer;
 pub mod generate_financial_report_reducer;
@@ -1149,11 +1155,13 @@ pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod run_all_accounting_tests_reducer;
+pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_traceability_report_reducer;
+pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
 pub mod seed_dev_data_reducer;
@@ -1192,7 +1200,37 @@ pub mod submit_purchase_requisition_reducer;
 pub mod submit_supplier_intake_reducer;
 pub mod subscribe_to_record_reducer;
 pub mod sync_hub_devices_reducer;
+pub mod test_audit_authorization_reducer;
+pub mod test_audit_log_data_integrity_reducer;
+pub mod test_audit_logging_reducer;
+pub mod test_audit_rule_edge_cases_reducer;
+pub mod test_casbin_rule_patterns_reducer;
+pub mod test_classification_level_validation_reducer;
+pub mod test_classification_rule_edge_cases_reducer;
+pub mod test_country_data_integrity_reducer;
+pub mod test_currency_data_integrity_reducer;
+pub mod test_currency_rate_edge_cases_reducer;
+pub mod test_data_protection_settings_reducer;
 pub mod test_iot_device_reducer;
+pub mod test_onboarding_rbac_membership_flows_reducer;
+pub mod test_organization_isolation_reducer;
+pub mod test_organization_lifecycle_reducer;
+pub mod test_organization_settings_edge_cases_reducer;
+pub mod test_permission_system_reducer;
+pub mod test_permissions_error_cases_reducer;
+pub mod test_privacy_consent_edge_cases_reducer;
+pub mod test_privacy_system_reducer;
+pub mod test_queue_job_edge_cases_reducer;
+pub mod test_queue_system_reducer;
+pub mod test_reference_data_reducer;
+pub mod test_role_hierarchy_reducer;
+pub mod test_role_update_edge_cases_reducer;
+pub mod test_uom_edge_cases_reducer;
+pub mod test_user_management_reducer;
+pub mod test_user_organization_membership_reducer;
+pub mod test_user_profile_edge_cases_reducer;
+pub mod test_user_session_edge_cases_reducer;
+pub mod test_worker_edge_cases_reducer;
 pub mod toggle_project_favorite_reducer;
 pub mod unassign_team_member_skill_reducer;
 pub mod unblock_workcenter_reducer;
@@ -1444,6 +1482,7 @@ pub mod hr_resource_table;
 pub mod hr_salary_rule_table;
 pub mod import_job_table;
 pub mod import_job_error_table;
+pub mod import_mapping_template_table;
 pub mod intercompany_rule_table;
 pub mod intercompany_transaction_table;
 pub mod inventory_adjustment_table;
@@ -1872,6 +1911,7 @@ pub use field_option_type::FieldOption;
 pub use field_type_type::FieldType;
 pub use field_validation_type::FieldValidation;
 pub use field_width_type::FieldWidth;
+pub use finalize_import_assistant_job_params_type::FinalizeImportAssistantJobParams;
 pub use financial_report_type::FinancialReport;
 pub use fiscal_year_state_type::FiscalYearState;
 pub use fleet_vehicle_type::FleetVehicle;
@@ -1901,6 +1941,7 @@ pub use hr_resource_type::HrResource;
 pub use hr_salary_rule_type::HrSalaryRule;
 pub use import_job_type::ImportJob;
 pub use import_job_error_type::ImportJobError;
+pub use import_mapping_template_type::ImportMappingTemplate;
 pub use insight_severity_type::InsightSeverity;
 pub use instance_state_type::InstanceState;
 pub use intake_state_type::IntakeState;
@@ -2036,6 +2077,7 @@ pub use sale_order_type::SaleOrder;
 pub use sale_order_line_type::SaleOrderLine;
 pub use sale_order_option_type::SaleOrderOption;
 pub use sale_state_type::SaleState;
+pub use save_import_mapping_template_params_type::SaveImportMappingTemplateParams;
 pub use scheduled_report_type::ScheduledReport;
 pub use search_embedding_type::SearchEmbedding;
 pub use section_status_type::SectionStatus;
@@ -2326,6 +2368,7 @@ pub use hr_resource_table::*;
 pub use hr_salary_rule_table::*;
 pub use import_job_table::*;
 pub use import_job_error_table::*;
+pub use import_mapping_template_table::*;
 pub use intercompany_rule_table::*;
 pub use intercompany_transaction_table::*;
 pub use inventory_adjustment_table::*;
@@ -2693,6 +2736,7 @@ pub use create_role_reducer::create_role;
 pub use create_routing_workcenter_reducer::create_routing_workcenter;
 pub use create_salary_rule_reducer::create_salary_rule;
 pub use create_sale_order_reducer::create_sale_order;
+pub use create_sale_order_line_reducer::create_sale_order_line;
 pub use create_scheduled_report_reducer::create_scheduled_report;
 pub use create_shipping_method_reducer::create_shipping_method;
 pub use create_stock_inventory_reducer::create_stock_inventory;
@@ -2750,6 +2794,7 @@ pub use delete_document_reducer::delete_document;
 pub use delete_financial_report_reducer::delete_financial_report;
 pub use delete_fiscal_year_reducer::delete_fiscal_year;
 pub use delete_form_field_reducer::delete_form_field;
+pub use delete_import_mapping_template_reducer::delete_import_mapping_template;
 pub use delete_integration_reducer::delete_integration;
 pub use delete_intercompany_rule_reducer::delete_intercompany_rule;
 pub use delete_iot_device_reducer::delete_iot_device;
@@ -2800,6 +2845,7 @@ pub use explode_bom_reducer::explode_bom;
 pub use export_financial_report_reducer::export_financial_report;
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_quality_check_reducer::fail_quality_check;
+pub use finalize_import_assistant_job_reducer::finalize_import_assistant_job;
 pub use finish_manufacturing_order_reducer::finish_manufacturing_order;
 pub use finish_workorder_reducer::finish_workorder;
 pub use generate_financial_report_reducer::generate_financial_report;
@@ -2957,11 +3003,13 @@ pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use run_all_accounting_tests_reducer::run_all_accounting_tests;
+pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_traceability_report_reducer::run_traceability_report;
+pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
 pub use seed_dev_data_reducer::seed_dev_data;
@@ -3000,7 +3048,37 @@ pub use submit_purchase_requisition_reducer::submit_purchase_requisition;
 pub use submit_supplier_intake_reducer::submit_supplier_intake;
 pub use subscribe_to_record_reducer::subscribe_to_record;
 pub use sync_hub_devices_reducer::sync_hub_devices;
+pub use test_audit_authorization_reducer::test_audit_authorization;
+pub use test_audit_log_data_integrity_reducer::test_audit_log_data_integrity;
+pub use test_audit_logging_reducer::test_audit_logging;
+pub use test_audit_rule_edge_cases_reducer::test_audit_rule_edge_cases;
+pub use test_casbin_rule_patterns_reducer::test_casbin_rule_patterns;
+pub use test_classification_level_validation_reducer::test_classification_level_validation;
+pub use test_classification_rule_edge_cases_reducer::test_classification_rule_edge_cases;
+pub use test_country_data_integrity_reducer::test_country_data_integrity;
+pub use test_currency_data_integrity_reducer::test_currency_data_integrity;
+pub use test_currency_rate_edge_cases_reducer::test_currency_rate_edge_cases;
+pub use test_data_protection_settings_reducer::test_data_protection_settings;
 pub use test_iot_device_reducer::test_iot_device;
+pub use test_onboarding_rbac_membership_flows_reducer::test_onboarding_rbac_membership_flows;
+pub use test_organization_isolation_reducer::test_organization_isolation;
+pub use test_organization_lifecycle_reducer::test_organization_lifecycle;
+pub use test_organization_settings_edge_cases_reducer::test_organization_settings_edge_cases;
+pub use test_permission_system_reducer::test_permission_system;
+pub use test_permissions_error_cases_reducer::test_permissions_error_cases;
+pub use test_privacy_consent_edge_cases_reducer::test_privacy_consent_edge_cases;
+pub use test_privacy_system_reducer::test_privacy_system;
+pub use test_queue_job_edge_cases_reducer::test_queue_job_edge_cases;
+pub use test_queue_system_reducer::test_queue_system;
+pub use test_reference_data_reducer::test_reference_data;
+pub use test_role_hierarchy_reducer::test_role_hierarchy;
+pub use test_role_update_edge_cases_reducer::test_role_update_edge_cases;
+pub use test_uom_edge_cases_reducer::test_uom_edge_cases;
+pub use test_user_management_reducer::test_user_management;
+pub use test_user_organization_membership_reducer::test_user_organization_membership;
+pub use test_user_profile_edge_cases_reducer::test_user_profile_edge_cases;
+pub use test_user_session_edge_cases_reducer::test_user_session_edge_cases;
+pub use test_worker_edge_cases_reducer::test_worker_edge_cases;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
 pub use unassign_team_member_skill_reducer::unassign_team_member_skill;
 pub use unblock_workcenter_reducer::unblock_workcenter;
@@ -4262,6 +4340,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateSaleOrderParams,
 }    ,
+    CreateSaleOrderLine {
+        organization_id: u64,
+        order_id: u64,
+        params: CreateSaleOrderLineParams,
+}    ,
     CreateScheduledReport {
         organization_id: u64,
         company_id: Option::<u64>,
@@ -4515,6 +4598,10 @@ pub enum Reducer {
         configuration_id: u64,
         field_id: String,
 }    ,
+    DeleteImportMappingTemplate {
+        organization_id: u64,
+        template_id: u64,
+}    ,
     DeleteIntegration {
         organization_id: u64,
         integration_id: u64,
@@ -4727,6 +4814,11 @@ pub enum Reducer {
         note: Option::<String>,
         picture_fail: Option::<String>,
         failure_location_id: Option::<u64>,
+}    ,
+    FinalizeImportAssistantJob {
+        organization_id: u64,
+        job_id: u64,
+        params: FinalizeImportAssistantJobParams,
 }    ,
     FinishManufacturingOrder {
         organization_id: u64,
@@ -5440,6 +5532,7 @@ pub enum Reducer {
         assignment_id: u64,
 }    ,
     RunAllAccountingTests ,
+    RunAllCoreTests ,
     RunAllCrmTests ,
     RunAllDomainTests ,
     RunAllInventoryTests ,
@@ -5447,6 +5540,11 @@ pub enum Reducer {
     RunTraceabilityReport {
         organization_id: u64,
         report_id: u64,
+}    ,
+    SaveImportMappingTemplate {
+        organization_id: u64,
+        template_id: Option::<u64>,
+        params: SaveImportMappingTemplateParams,
 }    ,
     SaveProposalVersion {
         proposal_id: u64,
@@ -5630,10 +5728,40 @@ pub enum Reducer {
         hub_id: u64,
         detected: Vec::<DeviceSyncEntry>,
 }    ,
+    TestAuditAuthorization ,
+    TestAuditLogDataIntegrity ,
+    TestAuditLogging ,
+    TestAuditRuleEdgeCases ,
+    TestCasbinRulePatterns ,
+    TestClassificationLevelValidation ,
+    TestClassificationRuleEdgeCases ,
+    TestCountryDataIntegrity ,
+    TestCurrencyDataIntegrity ,
+    TestCurrencyRateEdgeCases ,
+    TestDataProtectionSettings ,
     TestIotDevice {
         organization_id: u64,
         device_id: u64,
 }    ,
+    TestOnboardingRbacMembershipFlows ,
+    TestOrganizationIsolation ,
+    TestOrganizationLifecycle ,
+    TestOrganizationSettingsEdgeCases ,
+    TestPermissionSystem ,
+    TestPermissionsErrorCases ,
+    TestPrivacyConsentEdgeCases ,
+    TestPrivacySystem ,
+    TestQueueJobEdgeCases ,
+    TestQueueSystem ,
+    TestReferenceData ,
+    TestRoleHierarchy ,
+    TestRoleUpdateEdgeCases ,
+    TestUomEdgeCases ,
+    TestUserManagement ,
+    TestUserOrganizationMembership ,
+    TestUserProfileEdgeCases ,
+    TestUserSessionEdgeCases ,
+    TestWorkerEdgeCases ,
     ToggleProjectFavorite {
         organization_id: u64,
         project_id: u64,
@@ -6644,6 +6772,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateRoutingWorkcenter { .. } => "create_routing_workcenter",
             Reducer::CreateSalaryRule { .. } => "create_salary_rule",
             Reducer::CreateSaleOrder { .. } => "create_sale_order",
+            Reducer::CreateSaleOrderLine { .. } => "create_sale_order_line",
             Reducer::CreateScheduledReport { .. } => "create_scheduled_report",
             Reducer::CreateShippingMethod { .. } => "create_shipping_method",
             Reducer::CreateStockInventory { .. } => "create_stock_inventory",
@@ -6701,6 +6830,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteFinancialReport { .. } => "delete_financial_report",
             Reducer::DeleteFiscalYear { .. } => "delete_fiscal_year",
             Reducer::DeleteFormField { .. } => "delete_form_field",
+            Reducer::DeleteImportMappingTemplate { .. } => "delete_import_mapping_template",
             Reducer::DeleteIntegration { .. } => "delete_integration",
             Reducer::DeleteIntercompanyRule { .. } => "delete_intercompany_rule",
             Reducer::DeleteIotDevice { .. } => "delete_iot_device",
@@ -6751,6 +6881,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ExportFinancialReport { .. } => "export_financial_report",
             Reducer::FailIotAction { .. } => "fail_iot_action",
             Reducer::FailQualityCheck { .. } => "fail_quality_check",
+            Reducer::FinalizeImportAssistantJob { .. } => "finalize_import_assistant_job",
             Reducer::FinishManufacturingOrder { .. } => "finish_manufacturing_order",
             Reducer::FinishWorkorder { .. } => "finish_workorder",
             Reducer::GenerateFinancialReport { .. } => "generate_financial_report",
@@ -6908,11 +7039,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RunAllAccountingTests => "run_all_accounting_tests",
+            Reducer::RunAllCoreTests => "run_all_core_tests",
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
+            Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
             Reducer::SeedDevData => "seed_dev_data",
@@ -6951,7 +7084,37 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitSupplierIntake { .. } => "submit_supplier_intake",
             Reducer::SubscribeToRecord { .. } => "subscribe_to_record",
             Reducer::SyncHubDevices { .. } => "sync_hub_devices",
+            Reducer::TestAuditAuthorization => "test_audit_authorization",
+            Reducer::TestAuditLogDataIntegrity => "test_audit_log_data_integrity",
+            Reducer::TestAuditLogging => "test_audit_logging",
+            Reducer::TestAuditRuleEdgeCases => "test_audit_rule_edge_cases",
+            Reducer::TestCasbinRulePatterns => "test_casbin_rule_patterns",
+            Reducer::TestClassificationLevelValidation => "test_classification_level_validation",
+            Reducer::TestClassificationRuleEdgeCases => "test_classification_rule_edge_cases",
+            Reducer::TestCountryDataIntegrity => "test_country_data_integrity",
+            Reducer::TestCurrencyDataIntegrity => "test_currency_data_integrity",
+            Reducer::TestCurrencyRateEdgeCases => "test_currency_rate_edge_cases",
+            Reducer::TestDataProtectionSettings => "test_data_protection_settings",
             Reducer::TestIotDevice { .. } => "test_iot_device",
+            Reducer::TestOnboardingRbacMembershipFlows => "test_onboarding_rbac_membership_flows",
+            Reducer::TestOrganizationIsolation => "test_organization_isolation",
+            Reducer::TestOrganizationLifecycle => "test_organization_lifecycle",
+            Reducer::TestOrganizationSettingsEdgeCases => "test_organization_settings_edge_cases",
+            Reducer::TestPermissionSystem => "test_permission_system",
+            Reducer::TestPermissionsErrorCases => "test_permissions_error_cases",
+            Reducer::TestPrivacyConsentEdgeCases => "test_privacy_consent_edge_cases",
+            Reducer::TestPrivacySystem => "test_privacy_system",
+            Reducer::TestQueueJobEdgeCases => "test_queue_job_edge_cases",
+            Reducer::TestQueueSystem => "test_queue_system",
+            Reducer::TestReferenceData => "test_reference_data",
+            Reducer::TestRoleHierarchy => "test_role_hierarchy",
+            Reducer::TestRoleUpdateEdgeCases => "test_role_update_edge_cases",
+            Reducer::TestUomEdgeCases => "test_uom_edge_cases",
+            Reducer::TestUserManagement => "test_user_management",
+            Reducer::TestUserOrganizationMembership => "test_user_organization_membership",
+            Reducer::TestUserProfileEdgeCases => "test_user_profile_edge_cases",
+            Reducer::TestUserSessionEdgeCases => "test_user_session_edge_cases",
+            Reducer::TestWorkerEdgeCases => "test_worker_edge_cases",
             Reducer::ToggleProjectFavorite { .. } => "toggle_project_favorite",
             Reducer::UnassignTeamMemberSkill { .. } => "unassign_team_member_skill",
             Reducer::UnblockWorkcenter { .. } => "unblock_workcenter",
@@ -9084,6 +9247,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateSaleOrderLine{
+                organization_id,
+                order_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sale_order_line_reducer::CreateSaleOrderLineArgs {
+                organization_id: organization_id.clone(),
+                order_id: order_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateScheduledReport{
                 organization_id,
                 company_id,
@@ -9533,6 +9705,13 @@ Reducer::BillTimesheets{
                 configuration_id: configuration_id.clone(),
                 field_id: field_id.clone(),
 }),
+            Reducer::DeleteImportMappingTemplate{
+                organization_id,
+                template_id,
+}             => __sats::bsatn::to_vec(&delete_import_mapping_template_reducer::DeleteImportMappingTemplateArgs {
+                organization_id: organization_id.clone(),
+                template_id: template_id.clone(),
+}),
             Reducer::DeleteIntegration{
                 organization_id,
                 integration_id,
@@ -9910,6 +10089,15 @@ Reducer::ErrorIntercompanyTransaction{
                 note: note.clone(),
                 picture_fail: picture_fail.clone(),
                 failure_location_id: failure_location_id.clone(),
+}),
+            Reducer::FinalizeImportAssistantJob{
+                organization_id,
+                job_id,
+                params,
+}             => __sats::bsatn::to_vec(&finalize_import_assistant_job_reducer::FinalizeImportAssistantJobArgs {
+                organization_id: organization_id.clone(),
+                job_id: job_id.clone(),
+                params: params.clone(),
 }),
             Reducer::FinishManufacturingOrder{
                 organization_id,
@@ -11180,6 +11368,8 @@ Reducer::MoveStockQuant{
 }),
             Reducer::RunAllAccountingTests => __sats::bsatn::to_vec(&run_all_accounting_tests_reducer::RunAllAccountingTestsArgs {
                 }),
+Reducer::RunAllCoreTests => __sats::bsatn::to_vec(&run_all_core_tests_reducer::RunAllCoreTestsArgs {
+                }),
 Reducer::RunAllCrmTests => __sats::bsatn::to_vec(&run_all_crm_tests_reducer::RunAllCrmTestsArgs {
                 }),
 Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reducer::RunAllDomainTestsArgs {
@@ -11194,6 +11384,15 @@ Reducer::RunTraceabilityReport{
 }             => __sats::bsatn::to_vec(&run_traceability_report_reducer::RunTraceabilityReportArgs {
                 organization_id: organization_id.clone(),
                 report_id: report_id.clone(),
+}),
+            Reducer::SaveImportMappingTemplate{
+                organization_id,
+                template_id,
+                params,
+}             => __sats::bsatn::to_vec(&save_import_mapping_template_reducer::SaveImportMappingTemplateArgs {
+                organization_id: organization_id.clone(),
+                template_id: template_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SaveProposalVersion{
                 proposal_id,
@@ -11522,14 +11721,74 @@ Reducer::SeedOrganizationFormConfigs{
                 hub_id: hub_id.clone(),
                 detected: detected.clone(),
 }),
-            Reducer::TestIotDevice{
+            Reducer::TestAuditAuthorization => __sats::bsatn::to_vec(&test_audit_authorization_reducer::TestAuditAuthorizationArgs {
+                }),
+Reducer::TestAuditLogDataIntegrity => __sats::bsatn::to_vec(&test_audit_log_data_integrity_reducer::TestAuditLogDataIntegrityArgs {
+                }),
+Reducer::TestAuditLogging => __sats::bsatn::to_vec(&test_audit_logging_reducer::TestAuditLoggingArgs {
+                }),
+Reducer::TestAuditRuleEdgeCases => __sats::bsatn::to_vec(&test_audit_rule_edge_cases_reducer::TestAuditRuleEdgeCasesArgs {
+                }),
+Reducer::TestCasbinRulePatterns => __sats::bsatn::to_vec(&test_casbin_rule_patterns_reducer::TestCasbinRulePatternsArgs {
+                }),
+Reducer::TestClassificationLevelValidation => __sats::bsatn::to_vec(&test_classification_level_validation_reducer::TestClassificationLevelValidationArgs {
+                }),
+Reducer::TestClassificationRuleEdgeCases => __sats::bsatn::to_vec(&test_classification_rule_edge_cases_reducer::TestClassificationRuleEdgeCasesArgs {
+                }),
+Reducer::TestCountryDataIntegrity => __sats::bsatn::to_vec(&test_country_data_integrity_reducer::TestCountryDataIntegrityArgs {
+                }),
+Reducer::TestCurrencyDataIntegrity => __sats::bsatn::to_vec(&test_currency_data_integrity_reducer::TestCurrencyDataIntegrityArgs {
+                }),
+Reducer::TestCurrencyRateEdgeCases => __sats::bsatn::to_vec(&test_currency_rate_edge_cases_reducer::TestCurrencyRateEdgeCasesArgs {
+                }),
+Reducer::TestDataProtectionSettings => __sats::bsatn::to_vec(&test_data_protection_settings_reducer::TestDataProtectionSettingsArgs {
+                }),
+Reducer::TestIotDevice{
                 organization_id,
                 device_id,
 }             => __sats::bsatn::to_vec(&test_iot_device_reducer::TestIotDeviceArgs {
                 organization_id: organization_id.clone(),
                 device_id: device_id.clone(),
 }),
-            Reducer::ToggleProjectFavorite{
+            Reducer::TestOnboardingRbacMembershipFlows => __sats::bsatn::to_vec(&test_onboarding_rbac_membership_flows_reducer::TestOnboardingRbacMembershipFlowsArgs {
+                }),
+Reducer::TestOrganizationIsolation => __sats::bsatn::to_vec(&test_organization_isolation_reducer::TestOrganizationIsolationArgs {
+                }),
+Reducer::TestOrganizationLifecycle => __sats::bsatn::to_vec(&test_organization_lifecycle_reducer::TestOrganizationLifecycleArgs {
+                }),
+Reducer::TestOrganizationSettingsEdgeCases => __sats::bsatn::to_vec(&test_organization_settings_edge_cases_reducer::TestOrganizationSettingsEdgeCasesArgs {
+                }),
+Reducer::TestPermissionSystem => __sats::bsatn::to_vec(&test_permission_system_reducer::TestPermissionSystemArgs {
+                }),
+Reducer::TestPermissionsErrorCases => __sats::bsatn::to_vec(&test_permissions_error_cases_reducer::TestPermissionsErrorCasesArgs {
+                }),
+Reducer::TestPrivacyConsentEdgeCases => __sats::bsatn::to_vec(&test_privacy_consent_edge_cases_reducer::TestPrivacyConsentEdgeCasesArgs {
+                }),
+Reducer::TestPrivacySystem => __sats::bsatn::to_vec(&test_privacy_system_reducer::TestPrivacySystemArgs {
+                }),
+Reducer::TestQueueJobEdgeCases => __sats::bsatn::to_vec(&test_queue_job_edge_cases_reducer::TestQueueJobEdgeCasesArgs {
+                }),
+Reducer::TestQueueSystem => __sats::bsatn::to_vec(&test_queue_system_reducer::TestQueueSystemArgs {
+                }),
+Reducer::TestReferenceData => __sats::bsatn::to_vec(&test_reference_data_reducer::TestReferenceDataArgs {
+                }),
+Reducer::TestRoleHierarchy => __sats::bsatn::to_vec(&test_role_hierarchy_reducer::TestRoleHierarchyArgs {
+                }),
+Reducer::TestRoleUpdateEdgeCases => __sats::bsatn::to_vec(&test_role_update_edge_cases_reducer::TestRoleUpdateEdgeCasesArgs {
+                }),
+Reducer::TestUomEdgeCases => __sats::bsatn::to_vec(&test_uom_edge_cases_reducer::TestUomEdgeCasesArgs {
+                }),
+Reducer::TestUserManagement => __sats::bsatn::to_vec(&test_user_management_reducer::TestUserManagementArgs {
+                }),
+Reducer::TestUserOrganizationMembership => __sats::bsatn::to_vec(&test_user_organization_membership_reducer::TestUserOrganizationMembershipArgs {
+                }),
+Reducer::TestUserProfileEdgeCases => __sats::bsatn::to_vec(&test_user_profile_edge_cases_reducer::TestUserProfileEdgeCasesArgs {
+                }),
+Reducer::TestUserSessionEdgeCases => __sats::bsatn::to_vec(&test_user_session_edge_cases_reducer::TestUserSessionEdgeCasesArgs {
+                }),
+Reducer::TestWorkerEdgeCases => __sats::bsatn::to_vec(&test_worker_edge_cases_reducer::TestWorkerEdgeCasesArgs {
+                }),
+Reducer::ToggleProjectFavorite{
                 organization_id,
                 project_id,
 }             => __sats::bsatn::to_vec(&toggle_project_favorite_reducer::ToggleProjectFavoriteArgs {
@@ -13031,6 +13290,7 @@ pub struct DbUpdate {
     hr_salary_rule: __sdk::TableUpdate<HrSalaryRule>,
     import_job: __sdk::TableUpdate<ImportJob>,
     import_job_error: __sdk::TableUpdate<ImportJobError>,
+    import_mapping_template: __sdk::TableUpdate<ImportMappingTemplate>,
     intercompany_rule: __sdk::TableUpdate<IntercompanyRule>,
     intercompany_transaction: __sdk::TableUpdate<IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableUpdate<InventoryAdjustment>,
@@ -13280,6 +13540,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_salary_rule" => db_update.hr_salary_rule.append(hr_salary_rule_table::parse_table_update(table_update)?),
     "import_job" => db_update.import_job.append(import_job_table::parse_table_update(table_update)?),
     "import_job_error" => db_update.import_job_error.append(import_job_error_table::parse_table_update(table_update)?),
+    "import_mapping_template" => db_update.import_mapping_template.append(import_mapping_template_table::parse_table_update(table_update)?),
     "intercompany_rule" => db_update.intercompany_rule.append(intercompany_rule_table::parse_table_update(table_update)?),
     "intercompany_transaction" => db_update.intercompany_transaction.append(intercompany_transaction_table::parse_table_update(table_update)?),
     "inventory_adjustment" => db_update.inventory_adjustment.append(inventory_adjustment_table::parse_table_update(table_update)?),
@@ -13541,6 +13802,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_salary_rule = cache.apply_diff_to_table::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule).with_updates_by_pk(|row| &row.id);
         diff.import_job = cache.apply_diff_to_table::<ImportJob>("import_job", &self.import_job).with_updates_by_pk(|row| &row.id);
         diff.import_job_error = cache.apply_diff_to_table::<ImportJobError>("import_job_error", &self.import_job_error).with_updates_by_pk(|row| &row.id);
+        diff.import_mapping_template = cache.apply_diff_to_table::<ImportMappingTemplate>("import_mapping_template", &self.import_mapping_template).with_updates_by_pk(|row| &row.id);
         diff.intercompany_rule = cache.apply_diff_to_table::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule).with_updates_by_pk(|row| &row.id);
         diff.intercompany_transaction = cache.apply_diff_to_table::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction).with_updates_by_pk(|row| &row.id);
         diff.inventory_adjustment = cache.apply_diff_to_table::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment).with_updates_by_pk(|row| &row.id);
@@ -13787,6 +14049,7 @@ for table_rows in raw.tables {
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_mapping_template" => db_update.import_mapping_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14033,6 +14296,7 @@ for table_rows in raw.tables {
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_mapping_template" => db_update.import_mapping_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14281,6 +14545,7 @@ pub struct AppliedDiff<'r> {
     hr_salary_rule: __sdk::TableAppliedDiff<'r, HrSalaryRule>,
     import_job: __sdk::TableAppliedDiff<'r, ImportJob>,
     import_job_error: __sdk::TableAppliedDiff<'r, ImportJobError>,
+    import_mapping_template: __sdk::TableAppliedDiff<'r, ImportMappingTemplate>,
     intercompany_rule: __sdk::TableAppliedDiff<'r, IntercompanyRule>,
     intercompany_transaction: __sdk::TableAppliedDiff<'r, IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableAppliedDiff<'r, InventoryAdjustment>,
@@ -14530,6 +14795,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule, event);
         callbacks.invoke_table_row_callbacks::<ImportJob>("import_job", &self.import_job, event);
         callbacks.invoke_table_row_callbacks::<ImportJobError>("import_job_error", &self.import_job_error, event);
+        callbacks.invoke_table_row_callbacks::<ImportMappingTemplate>("import_mapping_template", &self.import_mapping_template, event);
         callbacks.invoke_table_row_callbacks::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule, event);
         callbacks.invoke_table_row_callbacks::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction, event);
         callbacks.invoke_table_row_callbacks::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment, event);
@@ -15410,6 +15676,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_salary_rule_table::register_table(client_cache);
         import_job_table::register_table(client_cache);
         import_job_error_table::register_table(client_cache);
+        import_mapping_template_table::register_table(client_cache);
         intercompany_rule_table::register_table(client_cache);
         intercompany_transaction_table::register_table(client_cache);
         inventory_adjustment_table::register_table(client_cache);
@@ -15651,6 +15918,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_salary_rule",
         "import_job",
         "import_job_error",
+        "import_mapping_template",
         "intercompany_rule",
         "intercompany_transaction",
         "inventory_adjustment",
