@@ -6,16 +6,11 @@ import {
   gotoModule,
   openAccountingTab,
   openTabAndCancelCreate,
-  signIn,
 } from "./helpers"
 
 const SALES_FINANCE_TAB_IDS = ["fulfillment", "returns", "invoices"] as const
 
 test.describe("ERP phase-7 finance smoke @phase-7", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("sales fulfillment, returns, and invoices tabs render without errors", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
 

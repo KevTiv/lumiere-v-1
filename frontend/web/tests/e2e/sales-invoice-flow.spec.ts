@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openAccountingTab, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, openAccountingTab } from "./helpers"
 
 /**
  * Smoke-level sales → invoice linkage checks.
@@ -12,11 +12,7 @@ import { expectNoAppError, gotoModule, openAccountingTab, signIn } from "./helpe
  * Does not exercise full order-to-invoice creation; that path needs journals,
  * partners, and products beyond what a minimal smoke create can guarantee.
  */
-test.describe("Sales and invoice flow e2e", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
+test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
   test("seeded sale order is visible on Sales Orders tab", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()

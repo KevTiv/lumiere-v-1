@@ -6,17 +6,12 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  signIn,
   smokeName,
   submitForm,
 } from "./helpers"
 
 test.describe("ERP module smoke", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
-  test("creates a CRM lead from the Leads tab", async ({ page }) => {
+  test("creates a CRM lead from the Leads tab", { tag: "@p0" }, async ({ page }) => {
     const contactName = smokeName("lead")
 
     await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
@@ -28,7 +23,7 @@ test.describe("ERP module smoke", () => {
     await expect(page.getByText(contactName)).toBeVisible()
   })
 
-  test("creates a Helpdesk team from the Teams tab", async ({ page }) => {
+  test("creates a Helpdesk team from the Teams tab", { tag: "@p0" }, async ({ page }) => {
     const teamName = smokeName("helpdesk-team")
 
     await openEntityCreate(page, "/helpdesk", "helpdesk", "teams", "new-helpdesk-team")

@@ -5,16 +5,11 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  signIn,
   smokeName,
   submitForm,
 } from "./helpers"
 
 test.describe("ERP phase-1 quote-to-cash gaps smoke @phase-1", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("CRM contact-tags tab renders", async ({ page }) => {
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-contact-tags").click()

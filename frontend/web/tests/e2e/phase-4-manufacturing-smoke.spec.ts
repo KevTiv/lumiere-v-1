@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openEntityCreate, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, openEntityCreate } from "./helpers"
 
 const MANUFACTURING_KEY_TAB_IDS = [
   "dashboard",
@@ -38,10 +38,6 @@ async function assertManufacturingTabRenders(page: Page, tabId: string) {
 }
 
 test.describe("Manufacturing module e2e @phase-4", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("renders manufacturing shell and key tabs without errors", async ({ page }) => {
     await gotoModule(page, "/manufacturing", "manufacturing")
 

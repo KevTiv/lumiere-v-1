@@ -5,7 +5,6 @@ import {
   expectNoAppError,
   fillField,
   gotoModule,
-  signIn,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -84,10 +83,6 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
 }
 
 test.describe("Inventory module e2e", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("renders inventory shell and key tabs without errors", async ({ page }) => {
     await gotoModule(page, "/inventory", "inventory")
 
@@ -108,7 +103,7 @@ test.describe("Inventory module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("seeded product appears on Products tab", async ({ page }) => {
+  test("seeded product appears on Products tab", { tag: "@p0" }, async ({ page }) => {
     // Requires `seed_dev_data` from `make e2e-smoke` (Lumiere Dev Laptop).
     await gotoModule(page, "/inventory", "inventory")
     await openInventoryTab(page, "products")

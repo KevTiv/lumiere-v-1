@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openEntityCreate, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, openEntityCreate } from "./helpers"
 
 const PURCHASING_TAB_IDS = [
   "dashboard",
@@ -58,10 +58,6 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
 }
 
 test.describe("Purchasing module e2e", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("renders purchasing shell and key tabs without errors", async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
 
@@ -82,7 +78,7 @@ test.describe("Purchasing module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("seeded purchase order appears on Purchase Orders tab", async ({ page }) => {
+  test("seeded purchase order appears on Purchase Orders tab", { tag: "@p0" }, async ({ page }) => {
     // Requires `seed_dev_data` from `make e2e-smoke` (PO/2024/0001).
     await gotoModule(page, "/purchasing", "purchasing")
     await openPurchasingTab(page, "orders")

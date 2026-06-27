@@ -9,7 +9,6 @@ import {
   isoDateTimeLocal,
   openAccountingTab,
   openEntityCreate,
-  signIn,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -109,11 +108,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
 }
 
 test.describe("Accounting module e2e", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
-  test("renders accounting shell and each tab without errors", async ({ page }) => {
+  test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     for (const tabId of ACCOUNTING_TAB_IDS) {
       await assertAccountingTabRenders(page, tabId)

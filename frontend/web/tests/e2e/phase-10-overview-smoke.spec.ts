@@ -1,12 +1,8 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import { expectNoAppError, gotoModule } from "./helpers"
 
 test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("overview dashboard renders KPI and chart widgets", async ({ page }) => {
     await gotoModule(page, "/overview")
     await expect(page.getByTestId("overview-dashboard")).toBeVisible()

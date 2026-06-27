@@ -7,7 +7,7 @@ import {
   signIn,
 } from "./helpers"
 
-test.describe("ERP auth and shell smoke", () => {
+test.describe("public access", { tag: "@unauthenticated" }, () => {
   test("root landing page is public", async ({ page }) => {
     await page.goto("/")
 
@@ -24,15 +24,29 @@ test.describe("ERP auth and shell smoke", () => {
     const url = new URL(page.url())
     expect(url.searchParams.get("callbackUrl")).toBe("/overview")
   })
+})
 
-  test("seeded user can sign in and see the authenticated shell", async ({ page }) => {
+test.describe("sign-in and sign-out", () => {
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  test("seeded user can sign in and see the authenticated shell", { tag: "@p0" }, async ({ page }) => {
     await signIn(page)
     await expectAuthenticatedShell(page)
   })
 
-  test("authenticated shell can open high-value module routes", async ({ page }) => {
+  test("sign out resets analytics identity and returns to sign-in", async ({ page }) => {
+    const resetProbe = await installPostHogResetProbe(page)
     await signIn(page)
 
+    await page.getByTestId("sidebar-sign-out").click()
+
+    await expect.poll(() => resetProbe.wasReset()).toBe(true)
+    await expect(page).toHaveURL(/\/sign-in(?:\?|$)/)
+  })
+})
+
+test.describe("authenticated shell", () => {
+  test("authenticated shell can open high-value module routes", { tag: "@p0" }, async ({ page }) => {
     await gotoModule(page, "/overview")
 
     const modules = [
@@ -50,15 +64,5 @@ test.describe("ERP auth and shell smoke", () => {
 
     await gotoModule(page, "/settings")
     await expect(page.getByRole("heading", { name: /settings/i })).toBeVisible()
-  })
-
-  test("sign out resets analytics identity and returns to sign-in", async ({ page }) => {
-    const resetProbe = await installPostHogResetProbe(page)
-    await signIn(page)
-
-    await page.getByTestId("sidebar-sign-out").click()
-
-    await expect.poll(() => resetProbe.wasReset()).toBe(true)
-    await expect(page).toHaveURL(/\/sign-in(?:\?|$)/)
   })
 })

@@ -3,8 +3,23 @@ name: E2E smoke
 # Full browser smoke requires local SpacetimeDB, api-server, and seeded fixtures.
 # Default CI (ci.yml) only validates Playwright tests compile via `playwright test --list`.
 on:
+  pull_request:
+    paths:
+      - "frontend/web/tests/e2e/**"
+      - "frontend/web/playwright.config.ts"
+      - "Makefile"
+      - "scripts/e2e*"
+      - "spacetimedb/**"
+      - "api-server/**"
   workflow_dispatch:
     inputs:
+      suite:
+        description: "Playwright suite (p0 = critical smoke, full = all tests)"
+        type: choice
+        options:
+          - p0
+          - full
+        default: p0
       clear_db:
         description: "Wipe local module data before publish (E2E_CLEAR_DB=1)"
         type: boolean
@@ -78,12 +93,14 @@ jobs:
 
       - name: Run make e2e-smoke
         env:
-          E2E_CLEAR_DB: ${{ github.event_name == 'schedule' && '1' || (github.event.inputs.clear_db && '1' || '0') }}
+          E2E_SUITE: ${{ github.event_name == 'schedule' && 'full' || (github.event_name == 'pull_request' && 'p0' || github.event.inputs.suite || 'p0') }}
+          E2E_CLEAR_DB: ${{ github.event_name == 'schedule' && '1' || (github.event_name == 'pull_request' && '0' || (github.event.inputs.clear_db && '1' || '0')) }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
         run: |
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
+          echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB}"
           make e2e-smoke
 
       - name: Upload Playwright report

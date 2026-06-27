@@ -1,12 +1,8 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import { expectNoAppError, gotoModule } from "./helpers"
 
 test.describe("Phase 8 AI and communications smoke", { tag: "@phase-8" }, () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("ai-skills page loads and create skill modal opens then cancels", async ({ page }) => {
     await page.goto("/ai-skills")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)

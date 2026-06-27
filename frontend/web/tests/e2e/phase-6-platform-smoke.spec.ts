@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { assertModuleTabs, expectNoAppError, gotoModule, signIn } from "./helpers"
+import { assertModuleTabs, expectNoAppError, gotoModule } from "./helpers"
 
 const DOCUMENTS_TAB_IDS = [
   "dashboard",
@@ -96,10 +96,6 @@ async function assertHelpdeskTab(page: Page, tabId: string) {
 }
 
 test.describe("Phase 6 platform smoke", { tag: "@phase-6" }, () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("documents module tab sweep including knowledge categories and folders", async ({ page }) => {
     await gotoModule(page, "/documents", "documents")
     await assertModuleTabs(page, "documents", DOCUMENTS_TAB_IDS, assertDocumentsTab)

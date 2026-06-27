@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openSettingsSection, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, openSettingsSection } from "./helpers"
 
 /** Polished settings sections from `settings-module.tsx` / `rbac-defaults.ts`. */
 const KEY_SETTINGS_SECTION_IDS = [
@@ -12,10 +12,6 @@ const KEY_SETTINGS_SECTION_IDS = [
 ] as const
 
 test.describe("ERP phase-0 settings smoke @phase-0", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("settings shell renders at /settings", async ({ page }) => {
     await gotoModule(page, "/settings")
 

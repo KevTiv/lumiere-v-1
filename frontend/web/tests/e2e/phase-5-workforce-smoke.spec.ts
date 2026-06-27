@@ -6,7 +6,6 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  signIn,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -28,10 +27,6 @@ async function openCalendarTab(page: Page, tabId: string) {
 }
 
 test.describe("Workforce modules e2e @phase-5", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test.describe("HR", () => {
     test("renders org chart, leave types, and payroll structures tabs", async ({ page }) => {
       await gotoModule(page, "/hr", "hr")

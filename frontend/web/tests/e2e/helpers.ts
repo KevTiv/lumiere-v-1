@@ -1,7 +1,14 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { expect, type Page } from "@playwright/test"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
+export const AUTH_STORAGE_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".auth/user.json",
+)
 
 export function smokeName(prefix: string) {
   return `smoke-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -15,7 +22,16 @@ export async function signIn(page: Page) {
   await page.goto("/sign-in")
 
   const email = page.getByLabel(/email/i)
-  await expect(email, "Email/password auth must be enabled for smoke tests").toBeVisible()
+  const emailVisible = await email
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (!emailVisible) {
+    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+    await expectNoAppError(page)
+    return
+  }
 
   await email.fill(TEST_EMAIL)
   await page.getByLabel(/password/i).fill(TEST_PASSWORD)

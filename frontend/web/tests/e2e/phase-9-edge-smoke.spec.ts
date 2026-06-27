@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import { expectNoAppError, gotoModule } from "./helpers"
 
 const PROPOSAL_ROW_ACTION_IDS = [
   "submit-proposal",
@@ -9,10 +9,6 @@ const PROPOSAL_ROW_ACTION_IDS = [
 ] as const
 
 test.describe("Phase 9 edge modules smoke", { tag: "@phase-9" }, () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page)
-  })
-
   test("proposals list row actions are visible without selection", async ({ page }) => {
     await gotoModule(page, "/proposals", "proposals")
     await page.getByTestId("module-tab-proposals-proposals").click()
