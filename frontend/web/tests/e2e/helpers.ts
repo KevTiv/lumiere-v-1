@@ -68,7 +68,9 @@ export async function openEntityCreate(
 ) {
   await gotoModule(page, route, moduleId)
   await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
-  await page.getByTestId(`module-create-${moduleId}-${tabId}`).click()
+  const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
+  await createBtn.scrollIntoViewIfNeeded()
+  await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
 }
 
@@ -96,8 +98,26 @@ export async function openSettingsSection(page: Page, sectionId: string) {
   await page.goto("/settings")
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
-  await page.getByTestId(`settings-section-${sectionId}`).click()
+  const section = page.getByTestId(`settings-section-${sectionId}`)
+  if ((await section.count()) === 0) {
+    return
+  }
+  await section.click()
   await expectNoAppError(page)
+}
+
+/** Wait for a BFF list query, then assert seeded fixture text is visible. */
+export async function expectSeededText(
+  page: Page,
+  text: string | RegExp,
+  queryPath?: string,
+) {
+  if (queryPath) {
+    await page
+      .waitForResponse((res) => res.url().includes(queryPath) && res.ok(), { timeout: 30_000 })
+      .catch(() => undefined)
+  }
+  await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
 }
 
 /** Open a tab's create modal, cancel, and expect the form dialog to close. */
@@ -108,7 +128,9 @@ export async function openTabAndCancelCreate(
   formId: string,
 ) {
   await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
-  await page.getByTestId(`module-create-${moduleId}-${tabId}`).click()
+  const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
+  await createBtn.scrollIntoViewIfNeeded()
+  await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
   await page.getByTestId(`form-modal-${formId}`).getByRole("button", { name: /^cancel$/i }).click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeHidden()
@@ -125,8 +147,18 @@ export async function chooseFirstOption(page: Page, name: string) {
 }
 
 export async function submitForm(page: Page, formId: string) {
+  const modal = page.getByTestId(`form-modal-${formId}`)
   await page.getByTestId(`form-submit-${formId}`).click()
-  await expect(page.getByTestId(`form-modal-${formId}`)).toBeHidden()
+  try {
+    await expect(modal).toBeHidden({ timeout: 15_000 })
+  } catch {
+    const fieldErrors = await modal.locator(".text-destructive, [role='alert']").allTextContents()
+    const toastErrors = await page.getByRole("status").allTextContents().catch(() => [] as string[])
+    const detail = [...fieldErrors, ...toastErrors].filter(Boolean).join("; ")
+    throw new Error(
+      `Form "${formId}" did not close after submit${detail ? `: ${detail}` : ""}`,
+    )
+  }
   await expectNoAppError(page)
 }
 

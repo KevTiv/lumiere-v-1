@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { stdbBffPost } from "@lumiere/stdb/commands"
 
-import { apiFetch } from "../http"
+import { apiFetch, coalesceQueryInitialData } from "../http"
 
 export function stdbQueryKey(resource: string, organizationId: bigint | number) {
   return ['stdb', resource, organizationId.toString()] as const
@@ -137,7 +137,7 @@ export function useStdbQuery(
     },
     staleTime: options?.staleTime ?? 30_000,
     enabled: options?.enabled,
-    initialData: options?.initialData,
+    initialData: coalesceQueryInitialData(options?.initialData),
   })
 }
 

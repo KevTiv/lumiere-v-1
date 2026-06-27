@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   assertModuleTabs,
   expectNoAppError,
+  expectSeededText,
   gotoModule,
   openAccountingTab,
   openTabAndCancelCreate,
@@ -36,7 +37,7 @@ test.describe("ERP phase-7 finance smoke @phase-7", () => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-invoices").click()
 
-    await expect(page.getByText("INV/2024/00001")).toBeVisible()
+    await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")
     await expectNoAppError(page)
   })
 

@@ -142,6 +142,41 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     Ok(())
 }
 
+/// Ensure a `UserProfile` exists for HTTP-provisioned identities (E2E seed, sign-up).
+/// `identity_connected` only runs on WebSocket connect; BFF-only users need this path.
+fn ensure_user_profile_for_identity(
+    ctx: &ReducerContext,
+    identity: Identity,
+    email: String,
+    email_verified: bool,
+) {
+    if ctx.db.user_profile().identity().find(identity).is_some() {
+        return;
+    }
+    ctx.db.user_profile().insert(UserProfile {
+        identity,
+        email,
+        email_verified,
+        name: String::new(),
+        first_name: None,
+        last_name: None,
+        avatar_url: None,
+        phone: None,
+        mobile: None,
+        timezone: "UTC".to_string(),
+        language: "en".to_string(),
+        signature: None,
+        notification_preferences: None,
+        ui_preferences: None,
+        is_active: true,
+        is_superuser: false,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        last_login: Some(ctx.timestamp),
+        metadata: None,
+    });
+}
+
 // ============================================================================
 // REDUCERS — admin-called (from Next.js server via HTTP admin API)
 // ============================================================================
@@ -177,6 +212,7 @@ pub fn store_user_credential(
         return Err("Identity already has credentials".to_string());
     }
 
+    let profile_email = email.clone();
     ctx.db.user_credential().insert(UserCredential {
         id: 0,
         email,
@@ -188,6 +224,8 @@ pub fn store_user_credential(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
+
+    ensure_user_profile_for_identity(ctx, new_identity, profile_email, false);
 
     Ok(())
 }
@@ -230,6 +268,7 @@ pub fn store_sso_user_credential(
         return Err("WorkOS user already linked".to_string());
     }
 
+    let profile_email = email.clone();
     ctx.db.user_credential().insert(UserCredential {
         id: 0,
         email,
@@ -241,6 +280,8 @@ pub fn store_sso_user_credential(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
+
+    ensure_user_profile_for_identity(ctx, new_identity, profile_email, email_verified);
 
     Ok(())
 }

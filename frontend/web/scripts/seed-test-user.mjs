@@ -252,6 +252,40 @@ async function resolveTargetOrg(host, moduleName, adminToken) {
   return Number(row.id)
 }
 
+async function resolveAdminRoleId(host, moduleName, adminToken, orgId) {
+  const rows = await queryStdb(
+    host,
+    moduleName,
+    adminToken,
+    `SELECT id, name FROM role WHERE organization_id = ${orgId}`,
+  )
+  const admin = rows.find((r) => String(r.name ?? '').toLowerCase() === 'admin')
+  if (!admin?.id) {
+    throw new Error(`admin role not found for org ${orgId}`)
+  }
+  return Number(admin.id)
+}
+
+async function ensureAdminRoleAssignment(host, moduleName, adminToken, identityForReducer, orgId) {
+  const roleId = await resolveAdminRoleId(host, moduleName, adminToken, orgId)
+  try {
+    await callStdbReducer(host, moduleName, adminToken, 'assign_role', [
+      identityForReducer,
+      roleId,
+      orgId,
+      { expires_at_micros: null, metadata: null },
+    ])
+    console.log(`[seed-test-user] assign_role OK (org_id=${orgId}, role_id=${roleId}).`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('already has this role')) {
+      console.log(`[seed-test-user] assign_role skipped (already assigned).`)
+      return
+    }
+    throw e
+  }
+}
+
 async function main() {
   loadEnvLocal()
 
@@ -304,11 +338,11 @@ async function main() {
       const msg = e instanceof Error ? e.message : String(e)
       if (msg.includes('Email already registered')) {
         console.log(
-          `[seed-test-user] ${TEST_EMAIL} already registered (private user_credential table); assuming prior seed succeeded.`,
+          `[seed-test-user] ${TEST_EMAIL} already registered (private user_credential table); continuing org/role setup.`,
         )
-        return
+      } else {
+        throw e
       }
-      throw e
     }
   }
 
@@ -335,11 +369,13 @@ async function main() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes('already an active member')) {
-      console.log(`[seed-test-user] User already in org ${orgId}; done.`)
+      console.log(`[seed-test-user] User already in org ${orgId}; continuing.`)
     } else {
       throw e
     }
   }
+
+  await ensureAdminRoleAssignment(host, moduleName, adminToken, identityForReducer, orgId)
 
   console.log(`[seed-test-user] Ready: sign in as ${TEST_EMAIL} with the seeded password.`)
 }

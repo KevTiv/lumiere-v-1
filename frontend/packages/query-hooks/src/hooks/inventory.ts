@@ -12,7 +12,7 @@ import { inventoryBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { buildWarehouse3DView } from "@lumiere/erp-shared/warehouse-3d-from-api"
 type ScalarId = bigint | number | string
 
@@ -120,7 +120,7 @@ export function useProducts(
     queryKey: ['products', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/products', 'Failed to fetch products'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -150,7 +150,7 @@ export function useUoms(
     queryKey: ['uoms', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/uoms', 'Failed to fetch units of measure'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -162,7 +162,7 @@ export function useStockQuants(
     queryKey: ['stock-quants', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -174,7 +174,7 @@ export function useStockPickings(
     queryKey: ['stock-pickings', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-pickings', 'Failed to fetch stock pickings'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -186,7 +186,7 @@ export function useWarehouses(
     queryKey: ['warehouses', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/warehouses', 'Failed to fetch warehouses'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -199,7 +199,7 @@ export function useInventoryAdjustments(
     queryFn: () =>
       fetchQueryList('/api/query/inventory-adjustments', 'Failed to fetch inventory adjustments'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -211,7 +211,7 @@ export function useStockLocations(
     queryKey: ['stock-locations', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-locations', 'Failed to fetch stock locations'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -224,7 +224,7 @@ export function useProductionLots(
     queryFn: () =>
       fetchQueryList('/api/query/stock-production-lots', 'Failed to fetch production lots'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -236,7 +236,7 @@ export function useQualityChecks(
     queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -248,7 +248,7 @@ export function useQualityAlerts(
     queryKey: ['quality-alerts', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-alerts', 'Failed to fetch quality alerts'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -300,7 +300,7 @@ export function useStockCycleCounts(organizationId: bigint, initialData?: QueryR
     queryFn: () =>
       fetchQueryList('/api/query/stock-cycle-counts', 'Failed to fetch cycle counts'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -310,7 +310,7 @@ export function useStockInventories(organizationId: bigint, initialData?: QueryR
     queryFn: () =>
       fetchQueryList('/api/query/stock-inventories', 'Failed to fetch stock inventories'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -319,7 +319,7 @@ export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
     queryKey: ['stock-moves', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -328,7 +328,7 @@ export function useStockRoutes(organizationId: bigint, initialData?: QueryRows) 
     queryKey: ['stock-routes', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-routes', 'Failed to fetch stock routes'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -337,7 +337,7 @@ export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
     queryKey: ['stock-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/stock-rules', 'Failed to fetch stock rules'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -346,7 +346,7 @@ export function usePickingWaves(organizationId: bigint, initialData?: QueryRows)
     queryKey: ['picking-waves', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/picking-waves', 'Failed to fetch picking waves'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -355,7 +355,7 @@ export function useWarehouseTasks(organizationId: bigint, initialData?: QueryRow
     queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/warehouse-tasks', 'Failed to fetch warehouse tasks'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -365,7 +365,7 @@ export function useReplenishmentRules(organizationId: bigint, initialData?: Quer
     queryFn: () =>
       fetchQueryList('/api/query/replenishment-rules', 'Failed to fetch replenishment rules'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -374,7 +374,7 @@ export function useBarcodeRules(organizationId: bigint, initialData?: QueryRows)
     queryKey: ['barcode-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/barcode-rules', 'Failed to fetch barcode rules'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -384,7 +384,7 @@ export function useAdjustmentReasons(organizationId: bigint, initialData?: Query
     queryFn: () =>
       fetchQueryList('/api/query/adjustment-reasons', 'Failed to fetch adjustment reasons'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -394,7 +394,7 @@ export function useBarcodeNomenclatures(organizationId: bigint, initialData?: Qu
     queryFn: () =>
       fetchQueryList('/api/query/barcode-nomenclatures', 'Failed to fetch barcode nomenclatures'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -404,7 +404,7 @@ export function useSerialLotTraceability(organizationId: bigint, initialData?: Q
     queryFn: () =>
       fetchQueryList('/api/query/serial-lot-traceability', 'Failed to fetch traceability rows'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -414,7 +414,7 @@ export function useStockTraceabilityReports(organizationId: bigint, initialData?
     queryFn: () =>
       fetchQueryList('/api/query/stock-traceability-reports', 'Failed to fetch traceability reports'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -424,7 +424,7 @@ export function useInventoryValuations(organizationId: bigint, initialData?: Que
     queryFn: () =>
       fetchQueryList('/api/query/inventory-valuations', 'Failed to fetch inventory valuations'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -434,7 +434,7 @@ export function useStockProductionSerials(organizationId: bigint, initialData?: 
     queryFn: () =>
       fetchQueryList('/api/query/stock-production-serials', 'Failed to fetch serial numbers'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 

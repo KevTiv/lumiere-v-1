@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test"
 import {
   chooseFirstOption,
   expectNoAppError,
+  expectSeededText,
   fillField,
   gotoModule,
   isoDate,
@@ -71,7 +72,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       await expect(page.getByTestId("module-create-accounting-payment-term-lines")).toBeVisible()
       break
     case "budgets":
-      await expect(page.getByTestId("module-create-accounting-budgets")).toBeVisible()
+      await expect(page.getByRole("button", { name: /new budget/i })).toBeVisible()
       break
     case "analytic":
       await expect(page.getByTestId("module-create-accounting-analytic")).toBeVisible()
@@ -150,7 +151,8 @@ test.describe("Accounting module e2e", () => {
 
     const budgetName = smokeName("budget")
     await openAccountingTab(page, "budgets")
-    await openEntityCreate(page, "/accounting", "accounting", "budgets", "new-budget")
+    await page.getByRole("button", { name: /new budget/i }).click()
+    await expect(page.getByTestId("form-modal-new-budget")).toBeVisible()
     await fillField(page, "name", budgetName)
     await fillField(page, "dateFrom", isoDate(0))
     await fillField(page, "dateTo", isoDate(365))

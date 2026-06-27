@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test"
 import {
   chooseFirstOption,
   expectNoAppError,
+  expectSeededText,
   fillField,
   gotoModule,
   smokeName,
@@ -68,7 +69,7 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
       await expect(page.getByText("Location hierarchy")).toBeVisible()
       break
     case "cycle-wizard":
-      await expect(page.getByText("Cycle count")).toBeVisible()
+      await expect(page.getByRole("heading", { name: /cycle count/i })).toBeVisible()
       await expect(page.getByLabel(/^location$/i)).toBeVisible()
       await expect(page.getByLabel(/plan name/i)).toBeVisible()
       await expect(page.getByRole("button", { name: /create plan/i })).toBeVisible()
@@ -108,7 +109,7 @@ test.describe("Inventory module e2e", () => {
     await gotoModule(page, "/inventory", "inventory")
     await openInventoryTab(page, "products")
 
-    await expect(page.getByText("Lumiere Dev Laptop")).toBeVisible()
+    await expectSeededText(page, "Lumiere Dev Laptop", "/api/query/products")
     await expectNoAppError(page)
   })
 

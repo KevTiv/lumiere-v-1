@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openAccountingTab } from "./helpers"
+import { expectNoAppError, expectSeededText, gotoModule, openAccountingTab } from "./helpers"
 
 /**
  * Smoke-level sales → invoice linkage checks.
@@ -17,7 +17,7 @@ test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
 
-    await expect(page.getByText("SO/2024/0001")).toBeVisible()
+    await expectSeededText(page, "SO/2024/0001", "/api/query/sale-orders")
     await expect(page.getByText("ACME-2024-001")).toBeVisible()
     await expectNoAppError(page)
   })
@@ -26,7 +26,7 @@ test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "invoices")
 
-    await expect(page.getByText("INV/2024/00001")).toBeVisible()
+    await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")
     await expect(page.getByText("Acme Corporation").first()).toBeVisible()
     await expect(page.getByRole("button", { name: /new invoice/i })).toBeVisible()
     await expectNoAppError(page)

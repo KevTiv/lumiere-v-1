@@ -11,7 +11,7 @@
 import { salesBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
@@ -39,7 +39,7 @@ export function useSaleOrders(
     queryKey: ['sale-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -51,7 +51,7 @@ export function useSaleOrderLines(
     queryKey: ['sale-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/sale-order-lines', 'Failed to fetch sale order lines'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -63,7 +63,7 @@ export function usePricelists(
     queryKey: ['pricelists', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pricelists', 'Failed to fetch pricelists'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -75,7 +75,7 @@ export function usePricelistItems(
     queryKey: ['pricelist-items', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pricelist-items', 'Failed to fetch pricelist items'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -87,7 +87,7 @@ export function usePickingBatches(
     queryKey: ['picking-batches', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/picking-batches', 'Failed to fetch picking batches'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -96,7 +96,7 @@ export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) 
     queryKey: ['delivery-carriers', rqBigIntKey(companyId)],
     queryFn: () => fetchQueryList('/api/query/delivery-carriers', 'Failed to fetch delivery carriers'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -106,7 +106,7 @@ export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows
     queryFn: () =>
       fetchQueryList('/api/query/delivery-price-rules', 'Failed to fetch delivery price rules'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -115,7 +115,7 @@ export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
     queryKey: ['shipping-methods', rqBigIntKey(companyId)],
     queryFn: () => fetchQueryList('/api/query/shipping-methods', 'Failed to fetch shipping methods'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -125,7 +125,7 @@ export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows)
     queryFn: () =>
       fetchQueryList('/api/query/pos-payment-methods', 'Failed to fetch POS payment methods'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -135,7 +135,7 @@ export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: Quer
     queryFn: () =>
       fetchQueryList('/api/query/pos-loyalty-programs', 'Failed to fetch loyalty programs'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -144,7 +144,7 @@ export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRo
     queryKey: ['pos-loyalty-cards', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pos-loyalty-cards', 'Failed to fetch loyalty cards'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 

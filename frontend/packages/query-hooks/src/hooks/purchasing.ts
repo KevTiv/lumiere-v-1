@@ -14,7 +14,7 @@
 
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -92,7 +92,7 @@ export function usePurchaseOrders(
     queryKey: ['purchase-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -104,7 +104,7 @@ export function usePurchaseOrderLines(
     queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-order-lines', 'Failed to fetch purchase order lines'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -116,7 +116,7 @@ export function usePurchaseRequisitions(
     queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-requisitions', 'Failed to fetch purchase requisitions'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -125,7 +125,7 @@ export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) 
     queryKey: ['landed-costs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-costs', 'Failed to fetch landed costs'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -134,7 +134,7 @@ export function useLandedCostLines(organizationId: bigint, initialData?: QueryRo
     queryKey: ['landed-cost-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-cost-lines', 'Failed to fetch landed cost lines'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -143,7 +143,7 @@ export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRo
     queryKey: ['supplier-intakes', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/supplier-intakes', 'Failed to fetch supplier intakes'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -152,7 +152,7 @@ export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows)
     queryKey: ['partner-banks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/partner-banks', 'Failed to fetch partner bank accounts'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 

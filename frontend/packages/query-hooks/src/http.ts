@@ -28,3 +28,15 @@ export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows>
 export function rqBigIntKey(id: bigint): string {
   return id.toString()
 }
+
+/**
+ * SSR pages often pass `[]` when RSC fetch fails or is empty. Treat that as "no seed"
+ * so React Query still runs the client fetch instead of serving stale empty data for 30s.
+ */
+export function coalesceQueryInitialData<T extends QueryRows>(
+  initialData?: T,
+): T | undefined {
+  if (initialData === undefined) return undefined
+  if (Array.isArray(initialData) && initialData.length === 0) return undefined
+  return initialData
+}

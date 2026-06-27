@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openEntityCreate } from "./helpers"
+import { expectNoAppError, expectSeededText, gotoModule, openEntityCreate } from "./helpers"
 
 const PURCHASING_TAB_IDS = [
   "dashboard",
@@ -83,7 +83,7 @@ test.describe("Purchasing module e2e", () => {
     await gotoModule(page, "/purchasing", "purchasing")
     await openPurchasingTab(page, "orders")
 
-    await expect(page.getByText("PO/2024/0001")).toBeVisible()
+    await expectSeededText(page, "PO/2024/0001", "/api/query/purchase-orders")
     await expectNoAppError(page)
   })
 
