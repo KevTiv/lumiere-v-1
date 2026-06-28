@@ -17,16 +17,34 @@ describe("stdbParamsToJson", () => {
   })
 
   it("wraps Option fields when structName is provided", () => {
-    assert.deepEqual(
-      stdbParamsToJson(
-        { contactName: "Ada", email: undefined, partnerId: 1n },
-        "CreateLeadParams",
-      ),
-      {
-        contact_name: { some: "Ada" },
-        partner_id: { some: 1 },
-      },
+    const out = stdbParamsToJson(
+      { contactName: "Ada", email: undefined, partnerId: 1n },
+      "CreateLeadParams",
     )
+    assert.deepEqual(out.contact_name, { some: "Ada" })
+    assert.deepEqual(out.partner_id, { some: 1 })
+    assert.deepEqual(out.email, { none: [] })
+    assert.deepEqual(out.phone, { none: [] })
+  })
+
+  it("emits explicit none for every missing Option field in a struct", () => {
+    const out = stdbParamsToJson(
+      {
+        name: "Smoke Lead",
+        priority: "Medium",
+        state: "new",
+        expectedRevenue: 1000,
+        probability: 0,
+        tagIds: [],
+        contactName: "Ada",
+        email: "ada@example.test",
+      },
+      "CreateLeadParams",
+    )
+    assert.deepEqual(out.phone, { none: [] })
+    assert.deepEqual(out.mobile, { none: [] })
+    assert.deepEqual(out.company_name, { none: [] })
+    assert.deepEqual(out.email, { some: "ada@example.test" })
   })
 
   it("encodes Option<u64> zero as none for struct fields", () => {
@@ -37,21 +55,17 @@ describe("stdbParamsToJson", () => {
   })
 
   it("encodeReducerCallArgs SATS-encodes the trailing params object", () => {
-    assert.deepEqual(
-      encodeReducerCallArgs("create_lead", [
-        1,
-        { name: "L", contactName: "L", email: "a@b.test", tagIds: [] },
-      ]),
-      [
-        1,
-        {
-          name: "L",
-          contact_name: { some: "L" },
-          email: { some: "a@b.test" },
-          tag_ids: [],
-        },
-      ],
-    )
+    const encoded = encodeReducerCallArgs("create_lead", [
+      1,
+      { name: "L", contactName: "L", email: "a@b.test", tagIds: [] },
+    ])
+    assert.equal(encoded[0], 1)
+    const params = encoded[1] as Record<string, unknown>
+    assert.equal(params.name, "L")
+    assert.deepEqual(params.contact_name, { some: "L" })
+    assert.deepEqual(params.email, { some: "a@b.test" })
+    assert.deepEqual(params.tag_ids, [])
+    assert.deepEqual(params.phone, { none: [] })
   })
 
   it("encodes timestamps for SpacetimeDB HTTP", () => {

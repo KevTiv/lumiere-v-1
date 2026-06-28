@@ -176,9 +176,21 @@ export function stdbParamsToJson(
   params: object,
   structName?: keyof OptionFieldMap & string,
 ): Record<string, unknown> {
-  const optionFields = structName ? new Set(OPTION_FIELDS[structName] ?? []) : undefined
+  const optionFieldList = structName ? (OPTION_FIELDS[structName] ?? []) : []
+  const optionFields = structName ? new Set(optionFieldList) : undefined
   const encoded = encodeValue(params, optionFields)
-  return (encoded ?? {}) as Record<string, unknown>
+  const out = { ...((encoded ?? {}) as Record<string, unknown>) }
+
+  // SpacetimeDB HTTP requires every Option field in the struct JSON body.
+  if (structName) {
+    for (const fieldSnake of optionFieldList) {
+      if (!(fieldSnake in out)) {
+        out[fieldSnake] = { none: [] }
+      }
+    }
+  }
+
+  return out
 }
 
 /** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */

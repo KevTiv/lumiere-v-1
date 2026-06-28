@@ -481,6 +481,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'currencyId',
     'invoiceDate',
     'invoiceDateDue',
+    'invoicePartnerDisplayName',
     'amountUntaxed',
     'amountTax',
     'amountTotal',

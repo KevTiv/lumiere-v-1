@@ -1,7 +1,13 @@
-/** Tag string for SpacetimeDB algebraic enums serialized as `{ tag: string }`. */
+/** Tag string for SpacetimeDB algebraic enums (tagged or unit-variant SATS JSON). */
 export function stbEnumTag(value: unknown): string {
-  if (value != null && typeof value === "object" && "tag" in value) {
-    return String((value as { tag: string }).tag)
+  if (value != null && typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>
+    if ("tag" in o) return String(o.tag)
+    const keys = Object.keys(o)
+    if (keys.length === 1 && Array.isArray(o[keys[0]!]) && (o[keys[0]!] as unknown[]).length === 0) {
+      const k = keys[0]!
+      return k.charAt(0).toUpperCase() + k.slice(1)
+    }
   }
   return String(value ?? "")
 }
