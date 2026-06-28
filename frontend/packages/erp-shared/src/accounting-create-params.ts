@@ -37,7 +37,7 @@ import {
   u64IdArrayFromForm,
 } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
-import { stdbParamsToJson } from "./stdb-params-json"
+import { encodeTaggedUnitEnum, stdbParamsToJson } from "./stdb-params-json"
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -293,9 +293,9 @@ function bigintToSafeJsonU64(b: bigint): number {
   return Number(b)
 }
 
-/** SATS sum type with unit variants: `{"Sale":[]}` etc. (matches SpacetimeDB HTTP / Rust serde for these enums). */
-function stdbTaggedUnitEnumToSumJson(v: { tag: string }): Record<string, unknown> {
-  return { [v.tag]: [] }
+/** SATS unit-variant sum JSON for SpacetimeDB HTTP (keys are camelCase, e.g. `{ "percent": [] }`). */
+function stdbTaggedUnitEnumToHttpSumJson(v: { tag: string }): Record<string, unknown> {
+  return encodeTaggedUnitEnum(v)
 }
 
 function u64BigintArrayToHttpJson(ids: readonly bigint[]): number[] {
@@ -320,9 +320,12 @@ export function createAccountTaxParamsToStdbHttpJson(
 
   return {
     name: params.name,
-    description: params.description ?? null,
-    type_tax_use: stdbTaggedUnitEnumToSumJson(typeTaxUse),
-    amount_type: stdbTaggedUnitEnumToSumJson(amountType),
+    description:
+      params.description === undefined
+        ? { none: [] }
+        : { some: params.description },
+    type_tax_use: stdbTaggedUnitEnumToHttpSumJson(typeTaxUse),
+    amount_type: stdbTaggedUnitEnumToHttpSumJson(amountType),
     amount: params.amount,
     active: params.active,
     price_include: params.priceInclude,
@@ -347,13 +350,6 @@ function stdbOptionSome<T>(value: T): { some: T; none?: never } {
 
 function stdbOptionNone(): { none: []; some?: never } {
   return { none: [] }
-}
-
-/** SATS unit-variant sum JSON for SpacetimeDB HTTP (keys are lowercase, e.g. `{"sale":[]}`). */
-function stdbTaggedUnitEnumToHttpSumJson(v: { tag: string }): Record<string, unknown> {
-  const t = v.tag
-  const key = t.charAt(0).toLowerCase() + t.slice(1)
-  return { [key]: [] }
 }
 
 function optionTaggedEnumToHttpJson(
@@ -539,18 +535,14 @@ export function toUpdateAccountGroupParams(
 }
 
 export function accountingParamsToJson(
-  params:
-    | CreateAccountAccountParams
-    | CreateAccountMoveParams
-    | CreateCrossoveredBudgetParams
-    | CreateFiscalYearParams
-    | CreateAccountPeriodParams,
+  params: object,
+  structName: string,
 ): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params, structName as Parameters<typeof stdbParamsToJson>[1])
 }
 
-export function analyticParamsToJson(params: object): Record<string, unknown> {
-  return stdbParamsToJson(params)
+export function analyticParamsToJson(params: object, structName: string): Record<string, unknown> {
+  return stdbParamsToJson(params, structName as Parameters<typeof stdbParamsToJson>[1])
 }
 
 export function toCreateAnalyticAccountParams(
@@ -982,7 +974,7 @@ export function toCreateCurrencyRateParamsFromForm(formData: Record<string, unkn
 }
 
 export function createCurrencyRateParamsToJson(params: CreateCurrencyRateParams): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params, "CreateCurrencyRateParams")
 }
 
 // ── Fiscal years ─────────────────────────────────────────────────────────────

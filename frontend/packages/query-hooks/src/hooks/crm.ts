@@ -164,7 +164,7 @@ export function useCreateLead(organizationId: bigint) {
       const merged = finalizeCreateLeadParams(params)
       const { urlPath, init } = crmBffPost("create_lead", [
         organizationId,
-        stdbParamsToJson(merged),
+        stdbParamsToJson(merged, "CreateLeadParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create lead')
@@ -240,7 +240,7 @@ export function useCreateContact(
       )
       const { urlPath, init } = crmBffPost("create_contact", [
         organizationId,
-        stdbParamsToJson(scoped as object),
+        stdbParamsToJson(scoped as object, "CreateContactParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact')
@@ -256,7 +256,7 @@ export function useCreateActivity(organizationId: bigint) {
       const merged = finalizeCreateActivityParams(params)
       const { urlPath, init } = crmBffPost("create_activity", [
         organizationId,
-        stdbParamsToJson(merged),
+        stdbParamsToJson(merged, "CreateActivityParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create activity')
@@ -384,7 +384,7 @@ export function useCreateContactTag(organizationId: bigint) {
       const merged = finalizeCreateContactTagParams(params)
       const { urlPath, init } = crmBffPost("create_contact_tag", [
         organizationId,
-        stdbParamsToJson(merged),
+        stdbParamsToJson(merged, "CreateContactTagParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact tag')
@@ -403,7 +403,7 @@ export function useCreateContactSegment(organizationId: bigint) {
       const merged = finalizeCreateContactSegmentParams(params)
       const { urlPath, init } = crmBffPost("create_contact_segment", [
         organizationId,
-        stdbParamsToJson(merged),
+        stdbParamsToJson(merged, "CreateContactSegmentParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact segment')

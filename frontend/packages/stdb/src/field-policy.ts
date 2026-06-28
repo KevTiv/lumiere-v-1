@@ -638,7 +638,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'pricelist-items': orgEntry<ProductPricelistItem>(
     'product_pricelist_item',
     ['pricelist-items', 'product_pricelist_item'],
-    ['pricelistId', 'sequence', 'appliedOn', 'computePrice', 'fixedPrice', 'productId', 'minQuantity'],
+    ['pricelistId', 'sequence', 'fixedPrice', 'productId', 'minQuantity'],
   ),
   'picking-batches': entry<StockPickingBatch>(
     'stock_picking_batch',
@@ -673,7 +673,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   'pos-loyalty-programs': orgEntry<PosLoyaltyProgram>(
     'pos_loyalty_program',
     ['pos-loyalty-programs', 'pos_loyalty_program'],
-    ['name', 'currencyId', 'programType', 'isActive'],
+    ['name', 'currencyId', 'isActive'],
   ),
   'pos-loyalty-cards': orgEntry<PosLoyaltyCard>(
     'pos_loyalty_card',
@@ -710,7 +710,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['name', 'description', 'domain', 'isDynamic', 'isActive', 'memberCount', 'color'],
   ),
   activities: orgEntry<Activity>('activity', ['activities', 'activity'], [
-    'summary', 'activityType', 'state', 'dateDeadline', 'assignedTo', 'isDone',
+    'summary', 'activityType', 'state', 'isDone',
   ]),
   projects: orgEntry<ProjectProject>('project_project', ['projects', 'project_project'], [
     'name', 'companyId', 'active',
@@ -845,7 +845,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['state', 'companyId', 'description'],
   ),
   'landed-costs': orgEntry<StockLandedCost>('stock_landed_cost', ['landed-costs', 'stock_landed_cost'], [
-    'state', 'companyId', 'amountTotal', 'currencyId', 'description', 'date',
+    'companyId', 'amountTotal', 'currencyId', 'description',
   ]),
   'landed-cost-lines': orgEntry<StockLandedCostLines>(
     'stock_landed_cost_lines',
@@ -1416,36 +1416,55 @@ export function resolveReadColumns(
  * Identity columns (user_id, assigned_to, created_by) cause "Unsupported" errors in SpacetimeDB HTTP SQL.
  */
 const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
-  // Activity table has Identity columns that cannot be queried via HTTP SQL
-  activities: new Set(['user_id', 'assigned_to', 'created_by']),
-  // Role.permissions is Vec<String>; HTTP SQL often rejects list-typed columns (parity with stdb-auth).
+  activities: new Set(['user_id', 'assigned_to', 'created_by', 'date_deadline', 'date_done']),
   roles: new Set(['permissions']),
+}
+
+/** Columns unsafe in SpacetimeDB HTTP SQL across most tables (audit, vecs, identity refs). */
+const GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS = new Set([
+  'metadata',
+  'create_uid',
+  'write_uid',
+  'create_date',
+  'write_date',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'message_follower_ids',
+  'message_ids',
+  'activity_ids',
+  'tag_ids',
+])
+
+function filterHttpSqlUnsafeColumns(
+  cols: readonly string[],
+  resourceKey?: QueryResourceKey,
+): string[] {
+  const resourceExcluded = resourceKey ? HTTP_SQL_EXCLUDED_COLUMNS[resourceKey] : undefined
+  return cols.filter((col) => {
+    if (GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS.has(col)) return false
+    if (resourceExcluded?.has(col)) return false
+    if (col.endsWith('_ids')) return false
+    return true
+  })
 }
 
 /**
  * Column list for SpacetimeDB HTTP SQL — never `*`. Uses Casbin/role restrictions when set;
- * otherwise all columns for the row type (from generated schema JSON).
- * Automatically filters out problematic columns (e.g., Identity columns) for specific resources.
+ * otherwise registry mandatory + defaultRestricted (full generated schema often includes
+ * Timestamp/Identity/Vec/enum columns that HTTP SQL rejects).
  */
 export function resolveHttpSqlColumns(
   resourceKey: QueryResourceKey,
   fieldAccess: FieldAccessContext | undefined,
 ): string[] {
   const restricted = resolveReadColumns(resourceKey, fieldAccess)
-  if (restricted !== null) return restricted
-  const rowType = (queryResourceRowType as Record<string, string>)[resourceKey]
-  const fromSchema = rowType
-    ? (stdbGeneratedSqlColumns as Record<string, string[]>)[rowType]
-    : undefined
-  if (fromSchema?.length) {
-    const excluded = HTTP_SQL_EXCLUDED_COLUMNS[resourceKey]
-    if (excluded) {
-      return assertSafeSqlIdentifiers(fromSchema.filter(col => !excluded.has(col)))
-    }
-    return assertSafeSqlIdentifiers(fromSchema)
-  }
   const reg = RESOURCE_REGISTRY[resourceKey]
-  return assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
+  const cols =
+    restricted !== null
+      ? restricted
+      : assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
+  return assertSafeSqlIdentifiers(filterHttpSqlUnsafeColumns(cols, resourceKey))
 }
 
 /** Explicit column list for a generated row `typeName` (PascalCase, e.g. `UserProfile`). */

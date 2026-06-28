@@ -969,12 +969,16 @@ export function serverQueryPricelistItems(
   )
 }
 
-export function serverQueryPickingBatches(
+export async function serverQueryPickingBatches(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,
 ) {
+  const companyIds = await companyIdsForOrganization(organizationId, opts)
+  if (companyIds.length === 0) return []
+  const colPart = resolveHttpSqlColumns('picking-batches', fq(opts)).join(', ')
+  const list = companyIds.map(String).join(', ')
   return stdbSql(
-    selectOrgScopedSql('picking-batches', 'stock_picking_batch', organizationId, fq(opts), ''),
+    `SELECT ${colPart} FROM stock_picking_batch WHERE company_id IN (${list})`,
     httpOpts(opts),
   )
 }

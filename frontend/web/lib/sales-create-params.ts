@@ -121,6 +121,9 @@ export function toCreatePricelistParams(
 export function salesParamsToJson(
   params: CreateSaleOrderParams | CreatePricelistParams,
 ): Record<string, unknown> {
+  if ("partnerId" in params) {
+    return stdbParamsToJson(params, "CreateSaleOrderParams")
+  }
   return stdbParamsToJson(params)
 }
 

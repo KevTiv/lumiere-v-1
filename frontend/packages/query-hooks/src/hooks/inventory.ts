@@ -1718,7 +1718,7 @@ export function useCreateProductCategory(organizationId: bigint, companyId?: big
     mutationFn: async (params) => {
       const base = companyId != null ? { companyId: Number(companyId) } : {}
       const merged = mergeReducerParams(base, params)
-      const { urlPath, init } = inventoryBffPost("create_product_category", [organizationId, stdbParamsToJson(merged as object)])
+      const { urlPath, init } = inventoryBffPost("create_product_category", [organizationId, stdbParamsToJson(merged as object, "CreateProductCategoryParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product category')
     },

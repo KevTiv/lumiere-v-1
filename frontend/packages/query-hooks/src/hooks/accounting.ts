@@ -3,7 +3,7 @@
 import { apiFetch } from "../http"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreatePaymentParams } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
@@ -1787,8 +1787,8 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
     mutationFn: async (params: Record<string, unknown>) => {
       const { urlPath, init } = accountingBffPost("create_currency_rate", [
           organizationId,
-          companyId === null ? null : companyId,
-          stdbParamsToJson(params as object),
+          encodeOptionalU64(companyId),
+          stdbParamsToJson(params as object, "CreateCurrencyRateParams"),
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))

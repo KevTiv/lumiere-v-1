@@ -1161,7 +1161,7 @@ function AccountingClientLoaded({
       )
       await updateAnalyticAccount.mutateAsync({
         accountId: id,
-        params: analyticParamsToJson(params),
+        params: analyticParamsToJson(params, "UpdateAnalyticAccountParams"),
       })
       if (nextActive !== prevActive) {
         await setAnalyticAccountActive.mutateAsync({ accountId: id, active: nextActive })
@@ -1182,7 +1182,7 @@ function AccountingClientLoaded({
       })
       await updateAnalyticLine.mutateAsync({
         lineId: id,
-        params: analyticParamsToJson(params),
+        params: analyticParamsToJson(params, "UpdateAnalyticLineParams"),
       })
       setAnalyticLineEdit(null)
     },
@@ -1204,7 +1204,7 @@ function AccountingClientLoaded({
       )
       await updateAnalyticDistributionModel.mutateAsync({
         modelId: id,
-        params: analyticParamsToJson(params),
+        params: analyticParamsToJson(params, "UpdateAnalyticDistributionModelParams"),
       })
       setAnalyticDistEdit(null)
     },
@@ -2043,7 +2043,7 @@ function AccountingClientLoaded({
       if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
     } else if (action === "createMove") {
       const p = toCreateJournalEntryMoveParams(formData)
-      if (p) await createMove.mutateAsync([organizationId, accountingParamsToJson(p)])
+      if (p) await createMove.mutateAsync([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
     } else if (action === "createTax") {
       await createTax.mutateAsync([
         organizationId,
@@ -2051,29 +2051,29 @@ function AccountingClientLoaded({
         createAccountTaxParamsToStdbHttpJson(toCreateAccountTaxParams(formData)),
       ])
     } else if (action === "createBudget") {
-      await createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData)))
+      await createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData), "CreateCrossoveredBudgetParams"))
     } else if (action === "createAnalyticAccount") {
       const fd = { ...formData }
       if (fd.currencyId === "" || fd.currencyId == null) {
         fd.currencyId = defaultCurrencyId.toString()
       }
       const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId, operatingCompanyId)
-      if (p) await createAnalyticAccount.mutateAsync(analyticParamsToJson(p))
+      if (p) await createAnalyticAccount.mutateAsync(analyticParamsToJson(p, "CreateAnalyticAccountParams"))
     } else if (action === "createAnalyticLine") {
       const p = toCreateAnalyticLineParams(formData, defaultCurrencyId)
-      if (p) await createAnalyticLine.mutateAsync(analyticParamsToJson(p))
+      if (p) await createAnalyticLine.mutateAsync(analyticParamsToJson(p, "CreateAnalyticLineParams"))
     } else if (action === "createAnalyticDistributionModel") {
       const p = toCreateAnalyticDistributionModelParams(formData, operatingCompanyId)
-      if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p))
+      if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p, "CreateAnalyticDistributionModelParams"))
     } else if (action === "createReconciliationWidget") {
       const p = toCreateAccountReconciliationWidgetParams(formData)
       if (p) await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
       const p = toCreateFiscalYearParams(formData)
-      if (p) await createFiscalYear.mutateAsync(accountingParamsToJson(p))
+      if (p) await createFiscalYear.mutateAsync(accountingParamsToJson(p, "CreateFiscalYearParams"))
     } else if (action === "createAccountPeriod") {
       const p = toCreateAccountPeriodParams(formData)
-      if (p) await createAccountPeriod.mutateAsync(accountingParamsToJson(p))
+      if (p) await createAccountPeriod.mutateAsync(accountingParamsToJson(p, "CreateAccountPeriodParams"))
     } else if (action === "createAccountPayment") {
       const p = toCreatePaymentParamsFromManualForm(formData, operatingCompanyId)
       if (p) await createAccountPayment.mutateAsync(p)
@@ -2100,7 +2100,7 @@ function AccountingClientLoaded({
       }
     } else if (action === "createCurrencyRate") {
       const p = toCreateCurrencyRateParamsFromForm(formData)
-      if (p) await createCurrencyRate.mutateAsync(createCurrencyRateParamsToJson(p))
+      if (p) await createCurrencyRate.mutateAsync(p)
     }
   }
 
@@ -2251,7 +2251,7 @@ function AccountingClientLoaded({
                     budgetLines={budgetLines as unknown as Record<string, unknown>[]}
                     budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
                     onCreateBudget={(params) =>
-                      createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params)))
+                      createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params), "CreateCrossoveredBudgetParams"))
                     }
                     onUpdateBudget={(budgetId, params) =>
                       updateBudget.mutateAsync([
@@ -2759,7 +2759,7 @@ function AccountingClientLoaded({
             jid,
             "Customer Invoice",
           )
-          createMove.mutate([organizationId, accountingParamsToJson(p)])
+          createMove.mutate([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
         }}
       />
 
@@ -2792,7 +2792,7 @@ function AccountingClientLoaded({
             jid,
             "Vendor Bill",
           )
-          createMove.mutate([organizationId, accountingParamsToJson(p)])
+          createMove.mutate([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
         }}
       />
 

@@ -52,11 +52,6 @@ static RESOURCE_REGISTRY: Lazy<HashMap<String, ResourceEntry>> = Lazy::new(|| {
         .expect("resource_registry.json")
 });
 
-static QUERY_RESOURCE_ROW_TYPE: Lazy<HashMap<String, String>> = Lazy::new(|| {
-    serde_json::from_str(include_str!("../assets/query-resource-row-type.json"))
-        .expect("query-resource-row-type.json")
-});
-
 static STDB_GENERATED_SQL_COLUMNS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
     serde_json::from_str(include_str!("../assets/stdb-generated-sql-columns.json"))
         .expect("stdb-generated-sql-columns.json")
@@ -66,18 +61,63 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     let mut m = HashMap::new();
     m.insert(
         "activities".to_string(),
-        ["user_id", "assigned_to", "created_by"]
-            .into_iter()
-            .map(String::from)
-            .collect(),
+        [
+            "user_id", "assigned_to", "created_by", "date_deadline", "date_done",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
     );
-    // `role.permissions` is `Vec<String>`; SpacetimeDB HTTP SQL often rejects list-typed columns.
     m.insert(
         "roles".to_string(),
         ["permissions"].into_iter().map(String::from).collect(),
     );
     m
 });
+
+static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
+    [
+        "metadata",
+        "create_uid",
+        "write_uid",
+        "create_date",
+        "write_date",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "message_follower_ids",
+        "message_ids",
+        "activity_ids",
+        "tag_ids",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+});
+
+fn filter_http_sql_unsafe_columns(
+    cols: &[String],
+    resource_key: Option<&str>,
+) -> Vec<String> {
+    let resource_excluded = resource_key.and_then(|k| HTTP_SQL_EXCLUDED_COLUMNS.get(k));
+    cols.iter()
+        .filter(|col| {
+            if GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS.contains(*col) {
+                return false;
+            }
+            if let Some(ex) = resource_excluded {
+                if ex.contains(*col) {
+                    return false;
+                }
+            }
+            if col.ends_with("_ids") {
+                return false;
+            }
+            true
+        })
+        .cloned()
+        .collect()
+}
 
 pub fn registry_get(key: &str) -> Option<&ResourceEntry> {
     RESOURCE_REGISTRY.get(key)
@@ -256,33 +296,17 @@ pub fn resolve_http_sql_columns(
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<String>, String> {
     let restricted = resolve_read_columns(resource_key, field_access)?;
-    if let Some(cols) = restricted {
-        return Ok(cols);
-    }
-    let row_type = QUERY_RESOURCE_ROW_TYPE.get(resource_key);
-    if let Some(tn) = row_type {
-        if let Some(from_schema) = STDB_GENERATED_SQL_COLUMNS.get(tn.as_str()) {
-            if !from_schema.is_empty() {
-                let excluded = HTTP_SQL_EXCLUDED_COLUMNS.get(resource_key);
-                let filtered: Vec<String> = if let Some(ex) = excluded {
-                    from_schema
-                        .iter()
-                        .filter(|c| !ex.contains(*c))
-                        .cloned()
-                        .collect()
-                } else {
-                    from_schema.clone()
-                };
-                return assert_safe_sql_identifiers(&filtered);
-            }
-        }
-    }
     let reg = RESOURCE_REGISTRY
         .get(resource_key)
         .ok_or_else(|| format!("unknown resource: {resource_key}"))?;
-    let mut cols = reg.mandatory.clone();
-    cols.extend_from_slice(&reg.default_restricted);
-    assert_safe_sql_identifiers(&unique_preserve_order(&cols))
+    let cols = if let Some(cols) = restricted {
+        cols
+    } else {
+        let mut merged = reg.mandatory.clone();
+        merged.extend_from_slice(&reg.default_restricted);
+        assert_safe_sql_identifiers(&unique_preserve_order(&merged))?
+    };
+    assert_safe_sql_identifiers(&filter_http_sql_unsafe_columns(&cols, Some(resource_key)))
 }
 
 pub fn select_org_scoped_sql(

@@ -1,6 +1,16 @@
 /**
- * JSON-safe serialization for SpacetimeDB reducer bodies (Timestamps, bigints).
+ * JSON-safe serialization for SpacetimeDB HTTP reducer bodies.
+ *
+ * SpacetimeDB HTTP expects snake_case keys, SATS sum JSON for Option/enum fields,
+ * and timestamps as `{ __timestamp_micros_since_unix_epoch__: ... }`.
  */
+
+import optionFieldsJson from "./stdb-http-option-fields.json"
+
+type OptionFieldMap = Record<string, readonly string[]>
+const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
+
+const STDB_TIMESTAMP_KEY = "__timestamp_micros_since_unix_epoch__"
 
 /** SpacetimeDB HTTP reducer params use Rust snake_case field names, not TS camelCase. */
 export function camelToSnakeIdentifier(s: string): string {
@@ -21,52 +31,147 @@ export function camelToSnakeIdentifier(s: string): string {
     .toLowerCase()
 }
 
-function snakeCaseKeys(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(snakeCaseKeys)
-  }
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {}
-    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      out[camelToSnakeIdentifier(key)] = snakeCaseKeys(nested)
-    }
-    return out
-  }
-  return value
+/** SATS unit-variant sum JSON for SpacetimeDB HTTP (e.g. `{ "percent": [] }`). */
+export function encodeTaggedUnitEnum(v: { tag: string }): Record<string, unknown> {
+  const key = v.tag.charAt(0).toLowerCase() + v.tag.slice(1)
+  return { [key]: [] }
 }
 
-/** Match `@lumiere/api-client` `stringifyReducerCallBody`: STDB HTTP expects JSON numbers for `u64`, not strings. */
+/** Match `@lumiere/api-client` `stringifyReducerCallBody`: STDB HTTP expects JSON numbers for `u64`. */
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER)
 
-function isStdbTimestampLike(v: unknown): v is { microsSinceUnixEpoch: bigint } {
+function isTimestampLike(v: unknown): boolean {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return false
+  const o = v as Record<string, unknown>
+  return STDB_TIMESTAMP_KEY in o || "microsSinceUnixEpoch" in o
+}
+
+function encodeTimestamp(v: unknown): Record<string, string | number> {
+  const o = v as Record<string, unknown>
+  const raw = o[STDB_TIMESTAMP_KEY] ?? o.microsSinceUnixEpoch
+  if (typeof raw === "bigint") {
+    if (raw > MAX_SAFE_BIGINT) {
+      return { [STDB_TIMESTAMP_KEY]: raw.toString() }
+    }
+    return { [STDB_TIMESTAMP_KEY]: Number(raw) }
+  }
+  if (typeof raw === "number") {
+    return { [STDB_TIMESTAMP_KEY]: raw }
+  }
+  if (typeof raw === "string") {
+    return { [STDB_TIMESTAMP_KEY]: raw }
+  }
+  throw new Error("stdbParamsToJson: invalid timestamp value")
+}
+
+function isTaggedEnum(v: unknown): v is { tag: string } {
   return (
-    typeof v === "object" &&
     v !== null &&
-    "microsSinceUnixEpoch" in v &&
-    typeof (v as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch === "bigint"
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    Object.keys(v as object).length === 1 &&
+    typeof (v as { tag?: unknown }).tag === "string"
   )
 }
 
-export function stdbParamsToJson(params: object): Record<string, unknown> {
-  const serialized = JSON.parse(
-    JSON.stringify(params, (_key, value: unknown) => {
-      if (isStdbTimestampLike(value)) {
-        return { microsSinceUnixEpoch: String(value.microsSinceUnixEpoch) }
-      }
-      if (typeof value === "bigint") {
-        if (value < 0n) {
-          throw new Error("stdbParamsToJson: negative bigint is not valid as u64 in JSON")
-        }
-        if (value > MAX_SAFE_BIGINT) {
-          throw new Error(
-            `stdbParamsToJson: bigint ${value} exceeds Number.MAX_SAFE_INTEGER; use a different encoding for this field`,
-          )
-        }
-        return Number(value)
-      }
-      return value
-    }),
-  ) as unknown
+function isSatsOption(v: unknown): boolean {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return false
+  const keys = Object.keys(v as object)
+  return keys.length === 1 && (keys[0] === "some" || keys[0] === "none")
+}
 
-  return snakeCaseKeys(serialized) as Record<string, unknown>
+function bigintToJson(v: bigint): number {
+  if (v < 0n) {
+    throw new Error("stdbParamsToJson: negative bigint is not valid as u64 in JSON")
+  }
+  if (v > MAX_SAFE_BIGINT) {
+    throw new Error(
+      `stdbParamsToJson: bigint ${v} exceeds Number.MAX_SAFE_INTEGER; use a different encoding for this field`,
+    )
+  }
+  return Number(v)
+}
+
+function encodeValue(
+  value: unknown,
+  optionFields: ReadonlySet<string> | undefined,
+  fieldKey?: string,
+): unknown {
+  if (value === undefined) return undefined
+
+  if (isTimestampLike(value)) {
+    return encodeTimestamp(value)
+  }
+
+  if (isTaggedEnum(value)) {
+    return encodeTaggedUnitEnum(value)
+  }
+
+  if (isSatsOption(value)) {
+    const obj = value as Record<string, unknown>
+    if ("none" in obj) return { none: [] }
+    return { some: encodeValue(obj.some, optionFields) }
+  }
+
+  if (value === null) {
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { none: [] }
+    }
+    return null
+  }
+
+  if (typeof value === "bigint") {
+    const n = bigintToJson(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: n }
+    }
+    return n
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => encodeValue(item, optionFields))
+  }
+
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      const snakeKey = camelToSnakeIdentifier(key)
+      const encoded = encodeValue(nested, optionFields, snakeKey)
+      if (encoded !== undefined) {
+        out[snakeKey] = encoded
+      }
+    }
+    return out
+  }
+
+  if (fieldKey && optionFields?.has(fieldKey)) {
+    return { some: value }
+  }
+
+  return value
+}
+
+/** SATS `Option<u64>` JSON for flat reducer args (not struct fields). */
+export function encodeOptionalU64(
+  value: bigint | number | null | undefined,
+): { none: [] } | { some: number } {
+  if (value === null || value === undefined) return { none: [] }
+  const n = typeof value === "bigint" ? bigintToJson(value) : value
+  if (n === 0) return { none: [] }
+  return { some: n }
+}
+
+/**
+ * Encode generated TS reducer param structs for `POST /api/call/:reducer`.
+ *
+ * @param structName - Generated params type name (e.g. `CreateLeadParams`) so
+ *   `Option<T>` fields are wrapped as `{ some: v }` / `{ none: [] }`.
+ */
+export function stdbParamsToJson(
+  params: object,
+  structName?: keyof OptionFieldMap & string,
+): Record<string, unknown> {
+  const optionFields = structName ? new Set(OPTION_FIELDS[structName] ?? []) : undefined
+  const encoded = encodeValue(params, optionFields)
+  return (encoded ?? {}) as Record<string, unknown>
 }

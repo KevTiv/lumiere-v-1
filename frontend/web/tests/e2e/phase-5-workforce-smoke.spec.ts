@@ -51,6 +51,7 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await openEntityCreate(page, "/hr", "hr", "leave-types", "new-leave-type")
 
       await fillField(page, "name", name)
+      await chooseFirstOption(page, "allocationType")
       await fillField(page, "maxLeaves", "10")
       await submitForm(page, "new-leave-type")
 
@@ -65,7 +66,7 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await gotoModule(page, "/projects", "projects")
 
       await openProjectsTab(page, "gantt")
-      await expect(page.getByText("Gantt View")).toBeVisible()
+      await expect(page.getByText("Gantt View").first()).toBeVisible()
       await expect(page.getByText("Task timeline by project and deadline")).toBeVisible()
       await expectNoAppError(page)
 

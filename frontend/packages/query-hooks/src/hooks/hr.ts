@@ -362,7 +362,7 @@ export function useCreateLeaveType(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = hrBffPost("create_leave_type", [
           organizationId,
           companyId,
-          stdbParamsToJson(params),
+          stdbParamsToJson(params, "CreateLeaveTypeParams"),
         ])
 
       const r = await apiFetch(urlPath, init)

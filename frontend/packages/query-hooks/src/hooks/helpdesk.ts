@@ -179,7 +179,7 @@ export function useCreateHelpdeskTeam(organizationId: bigint) {
       const finalized = finalizeCreateHelpdeskTeamParams(params)
       const { urlPath, init } = helpdeskBffPost("create_helpdesk_team", [
         organizationId,
-        stdbParamsToJson(finalized),
+        stdbParamsToJson(finalized, "CreateHelpdeskTeamParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create team')

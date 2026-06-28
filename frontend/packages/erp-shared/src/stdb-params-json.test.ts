@@ -1,13 +1,48 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { camelToSnakeIdentifier, stdbParamsToJson } from "./stdb-params-json.ts"
+import {
+  camelToSnakeIdentifier,
+  encodeTaggedUnitEnum,
+  stdbParamsToJson,
+} from "./stdb-params-json.ts"
 
 describe("stdbParamsToJson", () => {
   it("converts top-level camelCase keys to snake_case", () => {
     assert.deepEqual(
       stdbParamsToJson({ contactName: "Ada", partnerId: 1n }),
       { contact_name: "Ada", partner_id: 1 },
+    )
+  })
+
+  it("wraps Option fields when structName is provided", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        { contactName: "Ada", email: undefined, partnerId: 1n },
+        "CreateLeadParams",
+      ),
+      {
+        contact_name: { some: "Ada" },
+        partner_id: { some: 1 },
+      },
+    )
+  })
+
+  it("encodes timestamps for SpacetimeDB HTTP", () => {
+    assert.deepEqual(
+      stdbParamsToJson({
+        dateFrom: { microsSinceUnixEpoch: 1_700_000_000_000_000n },
+      }),
+      {
+        date_from: { __timestamp_micros_since_unix_epoch__: 1_700_000_000_000_000 },
+      },
+    )
+  })
+
+  it("encodes tagged unit enums as SATS sum JSON", () => {
+    assert.deepEqual(
+      stdbParamsToJson({ discountPolicy: { tag: "WithDiscount" } }),
+      { discount_policy: { withDiscount: [] } },
     )
   })
 
@@ -29,6 +64,13 @@ describe("stdbParamsToJson", () => {
       company_id: 7,
       active: false,
     })
+  })
+})
+
+describe("encodeTaggedUnitEnum", () => {
+  it("lowercases the first character of the tag", () => {
+    assert.deepEqual(encodeTaggedUnitEnum({ tag: "Percent" }), { percent: [] })
+    assert.deepEqual(encodeTaggedUnitEnum({ tag: "PythonCode" }), { pythonCode: [] })
   })
 })
 

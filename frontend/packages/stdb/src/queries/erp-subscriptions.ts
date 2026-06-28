@@ -249,8 +249,6 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "",
       " ORDER BY pricelist_id ASC, sequence ASC",
     ),
-  "picking-batches": (id, fa) =>
-    selectOrgScopedSql("picking-batches", "stock_picking_batch", id, fa, ""),
   leads: (id, fa) => selectOrgScopedSql("leads", "lead", id, fa, ""),
   opportunities: (id, fa) =>
     selectOrgScopedSql("opportunities", "opportunity", id, fa, ""),
@@ -535,6 +533,12 @@ function subscriptionSqlForCompanyScopedResource(
     const c = resolveHttpSqlColumns("pos-configs", fa).join(", ")
     return [`SELECT ${c} FROM pos_config WHERE company_id IN (${list}) ORDER BY name ASC`]
   }
+  if (resource === "picking-batches") {
+    if (!ids?.length) return null
+    const list = ids.join(", ")
+    const c = resolveHttpSqlColumns("picking-batches", fa).join(", ")
+    return [`SELECT ${c} FROM stock_picking_batch WHERE company_id IN (${list})`]
+  }
   if (resource === "pos-sessions") {
     // Child of pos_config — no SQL subqueries; use HTTP `serverQueryPosSessions` instead.
     return null
@@ -609,6 +613,7 @@ const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
   "intercompany-transactions",
   "pos-configs",
   "pos-sessions",
+  "picking-batches",
 ] as const
 
 /** Keys for org-scoped ERP tables ({@link ERP_ORG_SQL} plus company-scoped resources). */

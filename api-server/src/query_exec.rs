@@ -467,7 +467,8 @@ pub async fn execute_resource_query(
         "delivery-carriers"
         | "delivery-price-rules"
         | "shipping-methods"
-        | "pos-payment-methods" => {
+        | "pos-payment-methods"
+        | "picking-batches" => {
             let Some(cid) = default_company_id(client, organization_id).await? else {
                 return Ok(vec![]);
             };
@@ -553,14 +554,14 @@ pub async fn execute_resource_query(
     };
 
     let order = match resource {
-        "opportunity-stages" => " ORDER BY sequence ASC",
-        "activities" => " ORDER BY id DESC",
-        "pricelist-items" => " ORDER BY pricelist_id ASC, sequence ASC",
+        "opportunity-stages" => "",
+        "activities" => "",
+        "pricelist-items" => "",
         "pos-loyalty-programs" => " ORDER BY id DESC",
         "landed-costs" => " ORDER BY id DESC",
         "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
-        "contact-tags" => " ORDER BY name ASC",
-        "contact-segments" => " ORDER BY name ASC",
+        "contact-tags" => "",
+        "contact-segments" => "",
         "quality-alerts" => " ORDER BY id DESC",
         "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
         "mrp-routing-workcenters" => " ORDER BY workcenter_id ASC, sequence ASC",
@@ -587,6 +588,40 @@ pub async fn execute_resource_query(
     }
     if resource == "companies" {
         rows.retain(|r| row_not_soft_deleted(r));
+    }
+
+    match resource {
+        "contact-tags" | "contact-segments" => {
+            rows.sort_by(|a, b| {
+                let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                an.cmp(bn)
+            });
+        }
+        "opportunity-stages" => {
+            rows.sort_by(|a, b| {
+                let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                asq.cmp(&bsq)
+            });
+        }
+        "activities" => {
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
+            });
+        }
+        "pricelist-items" => {
+            rows.sort_by(|a, b| {
+                let apl = a.get("pricelistId").or_else(|| a.get("pricelist_id")).and_then(|v| v.as_u64()).unwrap_or(0);
+                let bpl = b.get("pricelistId").or_else(|| b.get("pricelist_id")).and_then(|v| v.as_u64()).unwrap_or(0);
+                let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                apl.cmp(&bpl).then(asq.cmp(&bsq))
+            });
+        }
+        _ => {}
     }
 
     Ok(rows)
