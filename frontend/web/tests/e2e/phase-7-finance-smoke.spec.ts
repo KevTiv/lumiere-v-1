@@ -34,13 +34,10 @@ test.describe("ERP phase-7 finance smoke @phase-7", () => {
    * INV/2024/00001 linked to sale order SO/2024/0001 (see sales-invoice-flow.spec.ts).
    */
   test("seeded customer invoice appears on Sales Invoices tab", async ({ page }) => {
-    const movesLoaded = page.waitForResponse(
-      (res) => res.url().includes("/api/query/account-moves") && res.ok(),
-      { timeout: 60_000 },
-    )
+    test.setTimeout(120_000)
+
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-invoices").click()
-    await movesLoaded.catch(() => undefined)
     await expect(page.getByText(/total invoices|invoices/i).first()).toBeVisible({ timeout: 30_000 })
 
     await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")

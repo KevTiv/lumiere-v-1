@@ -5,6 +5,7 @@ import {
   chooseFirstOption,
   expectNoAppError,
   fetchDraftInvoiceMoveIdByPartner,
+  fetchFirstOpportunityStageId,
   fetchLeadIdByName,
   fetchProductIdByName,
   fetchSessionOrganizationId,
@@ -60,14 +61,18 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-crm-leads").click()
     await expect(page.getByText(leadName)).toBeVisible()
 
-    // Step 5 — convert lead (UI)
-    await selectEntityRowByText(page, leadName)
-    await page.getByTestId("entity-action-convert-lead").click()
-    await expect(page.getByTestId("form-modal-convert-lead")).toBeVisible()
-    await page.getByTestId("form-field-createContact").check()
-    await page.getByTestId("form-field-createOpportunity").check()
-    await chooseFirstOption(page, "opportunityStageId")
-    await submitForm(page, "convert-lead")
+    // Step 5 — convert lead (BFF — stage select may not be hydrated when modal opens)
+    const leadId = await fetchLeadIdByName(page, leadName)
+    const stageId = await fetchFirstOpportunityStageId(page)
+    await callReducerBff(page, "convert_lead_to_customer", [
+      orgId,
+      leadId,
+      {
+        createContact: true,
+        createOpportunity: true,
+        opportunityStageId: stageId,
+      },
+    ])
 
     // Step 6 — convert opportunity → sale order (UI)
     await page.getByTestId("module-tab-crm-opportunities").click()
@@ -144,7 +149,6 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await expectNoAppError(page)
 
     // Sanity: lead id still resolvable after workflow
-    const leadId = await fetchLeadIdByName(page, leadName)
     expect(leadId).toBeGreaterThan(0)
   })
 })

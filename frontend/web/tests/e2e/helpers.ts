@@ -138,15 +138,6 @@ export async function expectSeededText(
     if (!sampleRow) {
       throw new Error(`${queryPath} has no row matching ${textNeedle}`)
     }
-
-    const responsePromise = page.waitForResponse(
-      (res) => res.url().includes(queryPath) && res.ok(),
-      { timeout: 30_000 },
-    )
-    await page.evaluate((path) => {
-      void fetch(path, { cache: "no-store" })
-    }, queryPath)
-    await responsePromise.catch(() => undefined)
   }
 
   try {
@@ -295,6 +286,23 @@ export async function fetchProductIdByName(page: Page, name: string): Promise<nu
   )
   if (row?.id == null) throw new Error(`product not found: ${name}`)
   return Number(row.id)
+}
+
+/** Lowest-sequence opportunity stage id from seed data. */
+export async function fetchFirstOpportunityStageId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/opportunity-stages")
+  if (!res.ok()) throw new Error(`opportunity-stages query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: number | string; sequence?: number | string }>
+  }
+  const rows = json.data ?? []
+  if (rows.length === 0) throw new Error("no opportunity stages in seed data")
+  const sorted = [...rows].sort(
+    (a, b) => Number(a.sequence ?? 0) - Number(b.sequence ?? 0),
+  )
+  const id = sorted[0]?.id
+  if (id == null) throw new Error("opportunity stage row missing id")
+  return Number(id)
 }
 
 /** Lead id whose name or contactName matches (BFF `/api/query/leads`). */
