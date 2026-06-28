@@ -5,7 +5,7 @@
  * and timestamps as `{ __timestamp_micros_since_unix_epoch__: ... }`.
  */
 
-import optionFieldsJson from "./stdb-http-option-fields.json"
+import optionFieldsJson from "./stdb-http-option-fields.json" with { type: "json" }
 
 type OptionFieldMap = Record<string, readonly string[]>
 const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
