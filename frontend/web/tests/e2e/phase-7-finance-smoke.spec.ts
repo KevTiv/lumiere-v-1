@@ -36,6 +36,7 @@ test.describe("ERP phase-7 finance smoke @phase-7", () => {
   test("seeded customer invoice appears on Sales Invoices tab", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-invoices").click()
+    await expect(page.getByText(/total invoices|invoices/i).first()).toBeVisible({ timeout: 30_000 })
 
     await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")
     await expectNoAppError(page)

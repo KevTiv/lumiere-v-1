@@ -149,6 +149,7 @@ import type {
   PickingWave,
   QualityAlert,
   QualityCheck,
+  QualityTeam,
   ReplenishmentRule,
   StockCycleCount,
   StockInventory,
@@ -259,6 +260,7 @@ export type QueryResourceKey =
   | 'stock-production-serials'
   | 'quality-checks'
   | 'quality-alerts'
+  | 'quality-teams'
   | 'warehouse-3d-zones'
   | 'stock-cycle-counts'
   | 'stock-inventories'
@@ -767,6 +769,9 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   ]),
   'quality-alerts': orgEntry<QualityAlert>('quality_alert', ['quality-alerts', 'quality_alert'], [
     'name', 'title', 'description', 'priority', 'state', 'productId', 'teamId', 'companyId',
+  ]),
+  'quality-teams': orgEntry<QualityTeam>('quality_team', ['quality-teams', 'quality_team'], [
+    'name', 'description', 'email', 'phone', 'isActive',
   ]),
   'warehouse-3d-zones': orgEntry<Warehouse3DZone>(
     'warehouse_3d_zone',

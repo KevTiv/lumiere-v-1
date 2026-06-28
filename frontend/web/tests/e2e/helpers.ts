@@ -114,17 +114,27 @@ export async function expectSeededText(
   text: string | RegExp,
   queryPath?: string,
 ) {
+  const textNeedle = typeof text === "string" ? text : text.source
+
   if (queryPath) {
-    const res = await page
+    const res = await page.request.get(queryPath)
+    if (!res.ok()) {
+      throw new Error(`${queryPath} failed: ${res.status()}`)
+    }
+    const json = (await res.json()) as { data?: unknown[] }
+    if (!Array.isArray(json.data) || json.data.length === 0) {
+      throw new Error(`${queryPath} returned no rows`)
+    }
+    const found = json.data.some((row) => JSON.stringify(row).includes(textNeedle))
+    if (!found) {
+      throw new Error(`${queryPath} has no row matching ${textNeedle}`)
+    }
+
+    await page
       .waitForResponse((res) => res.url().includes(queryPath) && res.ok(), { timeout: 30_000 })
       .catch(() => undefined)
-    if (res) {
-      const json = (await res.json()) as { data?: unknown[] }
-      if (!Array.isArray(json.data) || json.data.length === 0) {
-        throw new Error(`${queryPath} returned no rows`)
-      }
-    }
   }
+
   await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
 }
 
@@ -151,7 +161,9 @@ export async function fillField(page: Page, name: string, value: string) {
 
 export async function chooseFirstOption(page: Page, name: string) {
   await page.getByTestId(`form-field-${name}`).click()
-  await page.getByRole("option").first().click()
+  const option = page.getByRole("option").first()
+  await expect(option).toBeVisible({ timeout: 15_000 })
+  await option.click()
 }
 
 export async function submitForm(page: Page, formId: string) {

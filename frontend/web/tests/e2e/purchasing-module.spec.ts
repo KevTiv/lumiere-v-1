@@ -31,7 +31,7 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
       await expect(page.getByTestId("entity-table")).toBeVisible()
       break
     case "lines":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(page.getByRole("tabpanel", { name: "Order Lines" }).getByTestId("entity-table")).toBeVisible()
       break
     case "requisitions":
       await expect(page.getByTestId("module-create-purchasing-requisitions")).toBeVisible()

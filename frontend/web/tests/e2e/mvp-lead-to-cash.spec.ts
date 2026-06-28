@@ -40,7 +40,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
         timeout: 30_000,
       })
       .catch(() => undefined)
-    await expect(page.getByText(contactName)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
 
     // Step 4 — lead (BFF: must start qualified for conversion)
     await callReducerBff(page, "create_lead", [

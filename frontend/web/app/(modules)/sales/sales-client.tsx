@@ -122,6 +122,7 @@ import {
   accountAccountRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import { stdbParamsToJson } from '@/lib/stdb-params-json';
+import { enumTag } from '@/lib/accounting-post-draft';
 import type { CreatePricelistItemParams } from '@lumiere/stdb/types';
 
 function saleOrderState(row: Record<string, unknown>): string {
@@ -139,10 +140,7 @@ function deliveryBatchState(row: Record<string, unknown>): string {
 }
 
 function moveTypeTag(row: Record<string, unknown>): string {
-  const v = row.moveType ?? row.move_type;
-  if (v != null && typeof v === 'object' && 'tag' in v)
-    return String((v as { tag: string }).tag);
-  return String(v ?? '');
+  return enumTag(row.moveType ?? row.move_type)
 }
 
 function pickingIsReturn(row: Record<string, unknown>): boolean {

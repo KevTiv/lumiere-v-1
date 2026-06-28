@@ -32,10 +32,16 @@ function snakeToCamel(s: string): string {
   return s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 }
 
+function satsUnitEnumTag(key: string): string {
+  if (!key) return ''
+  return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
 /**
  * Unwrap SATS Option/Sum values:
  *   { some: v }  → v (recursively unwrapped)
  *   { none: [] } → undefined
+ *   { outInvoice: [] } → "OutInvoice" (unit-variant enum)
  *   anything else → returned as-is
  */
 function unwrapSats(v: unknown): unknown {
@@ -43,6 +49,10 @@ function unwrapSats(v: unknown): unknown {
     const obj = v as Record<string, unknown>
     if ('some' in obj) return unwrapSats(obj['some'])
     if ('none' in obj) return undefined
+    const keys = Object.keys(obj)
+    if (keys.length === 1 && Array.isArray(obj[keys[0]!]) && (obj[keys[0]!] as unknown[]).length === 0) {
+      return satsUnitEnumTag(keys[0]!)
+    }
   }
   return v
 }

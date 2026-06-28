@@ -52,6 +52,7 @@ import {
   useStockLocations,
   useProductionLots,
   useQualityChecks,
+  useQualityTeams,
   useStockCycleCounts,
   usePickingWaves,
   useWarehouseTasks,
@@ -410,6 +411,7 @@ function InventoryClientLoaded({
   const { data: lots = [] } = useProductionLots(orgId)
   const { data: serials = [] } = useStockProductionSerials(orgId, initialStockProductionSerials)
   const { data: qualityChecks = [] } = useQualityChecks(orgId)
+  const { data: qualityTeams = [] } = useQualityTeams(orgId)
   const { data: cycleCounts = [] } = useStockCycleCounts(orgId, initialStockCycleCounts)
   const { data: pickingWaves = [] } = usePickingWaves(orgId)
   const { data: warehouseTasks = [] } = useWarehouseTasks(orgId)
@@ -640,17 +642,26 @@ function InventoryClientLoaded({
     [t, assignUserFieldOptions],
   )
 
+  const qualityTeamOptions = useMemo(
+    () =>
+      qualityTeams.map((team) => ({
+        value: String((team as Record<string, unknown>).id ?? ""),
+        label: String((team as Record<string, unknown>).name ?? (team as Record<string, unknown>).id ?? ""),
+      })),
+    [qualityTeams],
+  )
+
   const qualityAlertCreateFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newQualityAlertForm(t), {
         productId: productRowsToSelectOptions(products),
-        teamId: [] as { value: string; label: string }[],
+        teamId: qualityTeamOptions,
         pickingId: transfers.map((tr) => ({
           value: String(tr.id ?? ""),
           label: String(tr.name ?? tr.origin ?? tr.id ?? ""),
         })),
       }),
-    [t, products, transfers],
+    [t, products, qualityTeamOptions, transfers],
   )
 
   const serialDetailModalConfig = useMemo((): FormConfig => {
@@ -2125,7 +2136,7 @@ function InventoryClientLoaded({
           createAction: "createQualityCheck",
           createForm: mergeSelectOptionsForFields(newQualityCheckForm(t), {
             productId: productRowsToSelectOptions(products),
-            teamId: [] as { value: string; label: string }[],
+            teamId: qualityTeamOptions,
           }),
           entityConfig: {
             ...tab.entityConfig,
@@ -2936,6 +2947,7 @@ function InventoryClientLoaded({
     promptOptionalNumber,
     // Data dependencies for form configs
     products,
+    qualityTeamOptions,
     warehouses,
     locations,
     productCategories,

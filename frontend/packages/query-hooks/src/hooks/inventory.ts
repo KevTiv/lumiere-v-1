@@ -252,6 +252,18 @@ export function useQualityAlerts(
   })
 }
 
+export function useQualityTeams(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['quality-teams', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/quality-teams', 'Failed to fetch quality teams'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
 export function useWarehouse3D(organizationId: bigint, _companyId: bigint, warehouseId: bigint) {
   const orgKey = rqBigIntKey(organizationId)
   const { data: zones3D = [] } = useQuery<QueryRows>({
