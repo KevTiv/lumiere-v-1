@@ -50,8 +50,14 @@ function unwrapSats(v: unknown): unknown {
     if ('some' in obj) return unwrapSats(obj['some'])
     if ('none' in obj) return undefined
     const keys = Object.keys(obj)
-    if (keys.length === 1 && Array.isArray(obj[keys[0]!]) && (obj[keys[0]!] as unknown[]).length === 0) {
-      return satsUnitEnumTag(keys[0]!)
+    if (keys.length === 1) {
+      const val = obj[keys[0]!]
+      if (Array.isArray(val) && val.length === 0) {
+        return satsUnitEnumTag(keys[0]!)
+      }
+      if (val != null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val as object).length === 0) {
+        return satsUnitEnumTag(keys[0]!)
+      }
     }
   }
   return v

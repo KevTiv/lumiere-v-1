@@ -2,21 +2,43 @@
  * Choose post_invoice vs post_account_move and resolve COGS / inventory GL for invoice posting.
  */
 
+function unitVariantTag(key: string): string {
+  if (!key) return ''
+  return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+const KNOWN_ENUM_TAGS: Record<string, string> = {
+  out_invoice: 'OutInvoice',
+  outInvoice: 'OutInvoice',
+  in_invoice: 'InInvoice',
+  inInvoice: 'InInvoice',
+  out_refund: 'OutRefund',
+  outRefund: 'OutRefund',
+  in_refund: 'InRefund',
+  inRefund: 'InRefund',
+}
+
 export function enumTag(v: unknown): string {
   if (v != null && typeof v === 'object' && !Array.isArray(v)) {
     const o = v as Record<string, unknown>
     if ('tag' in o) return String(o.tag)
     const keys = Object.keys(o)
-    if (keys.length === 1 && Array.isArray(o[keys[0]]) && (o[keys[0]] as unknown[]).length === 0) {
-      const k = keys[0]!
-      return k.charAt(0).toUpperCase() + k.slice(1)
+    if (keys.length === 1) {
+      const val = o[keys[0]!]
+      if (Array.isArray(val) && val.length === 0) {
+        return unitVariantTag(keys[0]!)
+      }
+      if (val != null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0) {
+        return unitVariantTag(keys[0]!)
+      }
     }
   }
-  return String(v ?? '')
+  const raw = String(v ?? '')
+  return KNOWN_ENUM_TAGS[raw] ?? raw
 }
 
 export function moveTypeTagFromRow(row: Record<string, unknown>): string {
-  return enumTag(row.moveType)
+  return enumTag(row.moveType ?? row.move_type)
 }
 
 /** Customer/vendor invoice and refund document types (matches SpacetimeDB MoveType). */

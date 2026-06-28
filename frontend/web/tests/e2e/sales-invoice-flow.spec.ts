@@ -23,8 +23,13 @@ test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
   })
 
   test("seeded customer invoice linked to sale order appears in Accounting Invoices", async ({ page }) => {
+    const movesLoaded = page.waitForResponse(
+      (res) => res.url().includes("/api/query/account-moves") && res.ok(),
+      { timeout: 60_000 },
+    )
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "invoices")
+    await movesLoaded.catch(() => undefined)
     await expect(page.getByRole("button", { name: /new invoice/i })).toBeVisible({ timeout: 30_000 })
 
     await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")

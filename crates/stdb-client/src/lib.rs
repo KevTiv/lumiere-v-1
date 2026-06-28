@@ -191,10 +191,12 @@ fn unwrap_sats(v: &Value) -> Value {
             if map.get("none").is_some() {
                 return Value::Null;
             }
-            // SATS unit-variant JSON: `{ "outInvoice": [] }` → `"OutInvoice"`
+            // SATS unit-variant JSON: `{ "outInvoice": [] }` or `{ "outInvoice": {} }` → `"OutInvoice"`
             if map.len() == 1 {
                 if let Some((key, val)) = map.iter().next() {
-                    if val.as_array().is_some_and(|a| a.is_empty()) {
+                    if val.as_array().is_some_and(|a| a.is_empty())
+                        || val.as_object().is_some_and(|o| o.is_empty())
+                    {
                         return Value::String(sats_unit_enum_tag(key));
                     }
                 }

@@ -108,6 +108,14 @@ export async function openSettingsSection(page: Page, sectionId: string) {
   await expectNoAppError(page)
 }
 
+/** Close dialog overlays opened by row clicks (e.g. CRM record chatter). */
+export async function dismissBlockingDialogs(page: Page) {
+  const overlay = page.locator('[data-slot="dialog-overlay"][data-open]')
+  if ((await overlay.count()) === 0) return
+  await page.keyboard.press("Escape")
+  await expect(overlay).toHaveCount(0, { timeout: 5_000 })
+}
+
 /** Wait for a BFF list query, then assert seeded fixture text is visible. */
 export async function expectSeededText(
   page: Page,
@@ -115,6 +123,7 @@ export async function expectSeededText(
   queryPath?: string,
 ) {
   const textNeedle = typeof text === "string" ? text : text.source
+  let sampleRow: unknown
 
   if (queryPath) {
     const res = await page.request.get(queryPath)
@@ -125,17 +134,32 @@ export async function expectSeededText(
     if (!Array.isArray(json.data) || json.data.length === 0) {
       throw new Error(`${queryPath} returned no rows`)
     }
-    const found = json.data.some((row) => JSON.stringify(row).includes(textNeedle))
-    if (!found) {
+    sampleRow = json.data.find((row) => JSON.stringify(row).includes(textNeedle))
+    if (!sampleRow) {
       throw new Error(`${queryPath} has no row matching ${textNeedle}`)
     }
 
-    await page
-      .waitForResponse((res) => res.url().includes(queryPath) && res.ok(), { timeout: 30_000 })
-      .catch(() => undefined)
+    const responsePromise = page.waitForResponse(
+      (res) => res.url().includes(queryPath) && res.ok(),
+      { timeout: 30_000 },
+    )
+    await page.evaluate((path) => {
+      void fetch(path, { cache: "no-store" })
+    }, queryPath)
+    await responsePromise.catch(() => undefined)
   }
 
-  await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
+  try {
+    await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
+  } catch (error) {
+    if (sampleRow !== undefined) {
+      throw new Error(
+        `${String(error)}; API row snapshot: ${JSON.stringify(sampleRow)}`,
+        { cause: error instanceof Error ? error : undefined },
+      )
+    }
+    throw error
+  }
 }
 
 /** Open a tab's create modal, cancel, and expect the form dialog to close. */
@@ -224,6 +248,7 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
   await expect(row).toHaveAttribute("data-state", "selected")
+  await dismissBlockingDialogs(page)
 }
 
 /** First organization id for the authenticated session (dev seed org). */

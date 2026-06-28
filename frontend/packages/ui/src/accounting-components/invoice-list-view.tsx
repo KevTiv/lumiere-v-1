@@ -77,9 +77,14 @@ function getMoveStatus(move: AccountMove): DisplayStatus {
   return "sent"
 }
 
-function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
-  if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch) / 1000
+function formatTimestamp(ts?: { microsSinceUnixEpoch?: bigint | number } | number | null): string {
+  if (ts == null) return "—"
+  const micros =
+    typeof ts === "number"
+      ? ts
+      : Number(ts.microsSinceUnixEpoch ?? 0)
+  if (!Number.isFinite(micros) || micros === 0) return "—"
+  const ms = micros / 1000
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
