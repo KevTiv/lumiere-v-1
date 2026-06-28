@@ -3,6 +3,8 @@ name: E2E smoke
 # Full browser smoke requires local SpacetimeDB, api-server, and seeded fixtures.
 # Default CI (ci.yml) only validates Playwright tests compile via `playwright test --list`.
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - "frontend/web/tests/e2e/**"
@@ -28,10 +30,6 @@ on:
     # Weekly Monday 08:00 UTC
     - cron: "0 8 * * 1"
 
-concurrency:
-  group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   STDB_MODULE: lumiere-v1-j1uo0
   STDB_HOST: http://127.0.0.1:3000
@@ -39,10 +37,53 @@ env:
   E2E_API_PORT: "8082"
 
 jobs:
+  plan:
+    name: Plan E2E matrix
+    runs-on: ubuntu-latest
+    outputs:
+      configs: ${{ steps.plan.outputs.configs }}
+    steps:
+      - id: plan
+        run: |
+          case "${{ github.event_name }}" in
+            push)
+              # Every main push: run both P0 and full with a clean module DB.
+              configs='[{"suite":"p0","clear_db":"1"},{"suite":"full","clear_db":"1"}]'
+              ;;
+            pull_request)
+              configs='[{"suite":"p0","clear_db":"0"}]'
+              ;;
+            schedule)
+              configs='[{"suite":"full","clear_db":"1"}]'
+              ;;
+            workflow_dispatch)
+              suite="${{ github.event.inputs.suite || 'p0' }}"
+              if [ "${{ github.event.inputs.clear_db }}" = "true" ]; then
+                clear_db="1"
+              else
+                clear_db="0"
+              fi
+              configs="[{\"suite\":\"${suite}\",\"clear_db\":\"${clear_db}\"}]"
+              ;;
+            *)
+              echo "Unsupported event: ${{ github.event_name }}" >&2
+              exit 1
+              ;;
+          esac
+          echo "configs=${configs}" >> "$GITHUB_OUTPUT"
+
   e2e-smoke:
-    name: Playwright smoke (full stack)
+    name: Playwright smoke (${{ matrix.config.suite }})
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    concurrency:
+      group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}-${{ matrix.config.suite }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJSON(needs.plan.outputs.configs) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -93,8 +134,8 @@ jobs:
 
       - name: Run make e2e-smoke
         env:
-          E2E_SUITE: ${{ github.event_name == 'schedule' && 'full' || (github.event_name == 'pull_request' && 'p0' || github.event.inputs.suite || 'p0') }}
-          E2E_CLEAR_DB: ${{ github.event_name == 'schedule' && '1' || (github.event_name == 'pull_request' && '0' || (github.event.inputs.clear_db && '1' || '0')) }}
+          E2E_SUITE: ${{ matrix.config.suite }}
+          E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
         run: |
@@ -107,7 +148,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.config.suite }}
           path: frontend/web/playwright-report/
           retention-days: 7
 
@@ -115,6 +156,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.config.suite }}
           path: .tmp/e2e/
           retention-days: 7
