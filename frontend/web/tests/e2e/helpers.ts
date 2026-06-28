@@ -242,6 +242,15 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   await dismissBlockingDialogs(page)
 }
 
+/** Click an entity table row by its `data-testid="entity-row-{id}"` key. */
+export async function selectEntityRowById(page: Page, id: number | string) {
+  const row = page.getByTestId(`entity-row-${id}`)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
+  await expect(row).toHaveAttribute("data-state", "selected")
+  await dismissBlockingDialogs(page)
+}
+
 /** First organization id for the authenticated session (dev seed org). */
 export async function fetchSessionOrganizationId(page: Page): Promise<number> {
   const res = await page.request.get("/api/query/user-organization")
@@ -348,6 +357,30 @@ export async function fetchFirstWarehouseId(page: Page): Promise<number> {
   const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
   const row = json.data?.[0]
   if (row?.id == null) throw new Error("no warehouses in seed data")
+  return Number(row.id)
+}
+
+/** Sale order id linked to a CRM opportunity (BFF `/api/query/sale-orders`). */
+export async function fetchSaleOrderIdByOpportunityId(
+  page: Page,
+  opportunityId: number,
+): Promise<number> {
+  const res = await page.request.get("/api/query/sale-orders")
+  if (!res.ok()) throw new Error(`sale-orders query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{
+      id?: number | string
+      opportunityId?: number | string
+      opportunity_id?: number | string
+    }>
+  }
+  const row = json.data?.find((order) => {
+    const linked = order.opportunityId ?? order.opportunity_id
+    return linked != null && Number(linked) === opportunityId
+  })
+  if (row?.id == null) {
+    throw new Error(`sale order not found for opportunity: ${opportunityId}`)
+  }
   return Number(row.id)
 }
 

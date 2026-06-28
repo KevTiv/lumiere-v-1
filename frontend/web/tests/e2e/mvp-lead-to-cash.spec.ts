@@ -12,11 +12,12 @@ import {
   fetchLeadIdByName,
   fetchOpportunityIdByName,
   fetchProductIdByName,
+  fetchSaleOrderIdByOpportunityId,
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
   openEntityCreate,
-  selectEntityRowByText,
+  selectEntityRowById,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -93,25 +94,13 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       [opportunityId, { pricelistId, warehouseId }],
       { withCompany: true },
     )
+    const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId)
 
     // Step 7 — add sale order line (BFF — no create form on order-lines tab)
-    await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
-    await page
-      .waitForResponse((res) => res.url().includes("/api/query/sale-orders") && res.ok(), {
-        timeout: 30_000,
-      })
-      .catch(() => undefined)
-    await selectEntityRowByText(page, leadName)
-    const orderRow = page.locator('[data-testid^="entity-row-"][data-state="selected"]')
-    const orderRowTestId = await orderRow.getAttribute("data-testid")
-    const orderId = orderRowTestId?.replace("entity-row-", "")
-    expect(orderId).toBeTruthy()
-
     const productId = await fetchProductIdByName(page, "Lumiere Dev Laptop")
     await callReducerBff(page, "create_sale_order_line", [
       orgId,
-      Number(orderId),
+      orderId,
       {
         productId,
         quantity: 1,
@@ -126,10 +115,10 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       },
     ])
 
-    // Step 8 — confirm sale order (UI)
-    await page.reload()
+    // Step 8 — confirm sale order (UI; rows show SO reference, not partner name)
+    await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
-    await selectEntityRowByText(page, leadName)
+    await selectEntityRowById(page, orderId)
     await page.getByTestId("entity-action-confirm-orders").click()
     await page
       .waitForResponse((res) => res.url().includes("/api/call/confirm_sales_order") && res.ok(), {
@@ -138,7 +127,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       .catch(() => undefined)
 
     // Step 10 — create invoice from sale order (UI)
-    await selectEntityRowByText(page, leadName)
+    await selectEntityRowById(page, orderId)
     await page.getByTestId("entity-action-create-invoice").click()
     await expect(page.getByTestId("form-modal-create-invoice-from-order")).toBeVisible()
     await chooseFirstOption(page, "journalId")
