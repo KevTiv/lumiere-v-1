@@ -69,6 +69,26 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.phone, { none: [] })
   })
 
+  it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
+    const encoded = encodeReducerCallArgs("convert_lead_to_customer", [
+      1,
+      42,
+      {
+        createContact: true,
+        createOpportunity: true,
+        opportunityStageId: 7,
+      },
+    ])
+    assert.equal(encoded[0], 1)
+    assert.equal(encoded[1], 42)
+    const params = encoded[2] as Record<string, unknown>
+    assert.equal(params.create_contact, true)
+    assert.equal(params.create_opportunity, true)
+    assert.deepEqual(params.opportunity_stage_id, { some: 7 })
+    assert.deepEqual(params.contact_type, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
   it("encodeReducerCallArgs SATS-encodes flat Option args for create_proposal", () => {
     const encoded = encodeReducerCallArgs("create_proposal", [
       1,

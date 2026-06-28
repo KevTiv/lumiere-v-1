@@ -37,29 +37,112 @@ function satsUnitEnumTag(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1)
 }
 
-/**
- * Unwrap SATS Option/Sum values:
- *   { some: v }  → v (recursively unwrapped)
- *   { none: [] } → undefined
- *   { outInvoice: [] } → "OutInvoice" (unit-variant enum)
- *   anything else → returned as-is
- */
-function unwrapSats(v: unknown): unknown {
-  if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-    const obj = v as Record<string, unknown>
-    if ('some' in obj) return unwrapSats(obj['some'])
-    if ('none' in obj) return undefined
-    const keys = Object.keys(obj)
-    if (keys.length === 1) {
-      const val = obj[keys[0]!]
-      if (Array.isArray(val) && val.length === 0) {
-        return satsUnitEnumTag(keys[0]!)
-      }
-      if (val != null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val as object).length === 0) {
-        return satsUnitEnumTag(keys[0]!)
-      }
+function variantNameFromElement(el: Record<string, unknown>): string | undefined {
+  const name = el['name'] as SatsName | undefined
+  if (name && 'some' in name) return name.some
+  return undefined
+}
+
+function isOptionSum(sum: { variants?: unknown[] }): boolean {
+  const variants = sum.variants
+  if (!Array.isArray(variants)) return false
+  let hasSome = false
+  let hasNone = false
+  for (const v of variants) {
+    const n = variantNameFromElement(v as Record<string, unknown>)
+    if (n === 'some') hasSome = true
+    if (n === 'none') hasNone = true
+  }
+  return hasSome && hasNone
+}
+
+function isTimestampProduct(atype: Record<string, unknown>): boolean {
+  const product = atype['Product'] as { elements?: SatsElement[] } | undefined
+  const elements = product?.elements
+  return (
+    Array.isArray(elements) &&
+    elements.length === 1 &&
+    elementName(elements[0]!) === '__timestamp_micros_since_unix_epoch__'
+  )
+}
+
+function isEmptyPayload(v: unknown): boolean {
+  if (v == null) return true
+  if (Array.isArray(v)) return v.length === 0
+  if (typeof v === 'object') return Object.keys(v as object).length === 0
+  return false
+}
+
+function isUnitProduct(atype: Record<string, unknown>): boolean {
+  const product = atype['Product'] as { elements?: unknown[] } | undefined
+  return Array.isArray(product?.elements) && product!.elements!.length === 0
+}
+
+function unwrapSatsObject(v: unknown): unknown | undefined {
+  if (v == null || typeof v !== 'object' || Array.isArray(v)) return undefined
+  const obj = v as Record<string, unknown>
+  if ('some' in obj) return unwrapSatsTyped(obj['some'], undefined)
+  if ('none' in obj) return undefined
+  const keys = Object.keys(obj)
+  if (keys.length === 1) {
+    const val = obj[keys[0]!]
+    if (Array.isArray(val) && val.length === 0) {
+      return satsUnitEnumTag(keys[0]!)
+    }
+    if (
+      val != null &&
+      typeof val === 'object' &&
+      !Array.isArray(val) &&
+      Object.keys(val as object).length === 0
+    ) {
+      return satsUnitEnumTag(keys[0]!)
     }
   }
+  return undefined
+}
+
+/**
+ * Unwrap SATS Option/Sum values using schema when available:
+ *   { some: v } / [0, v]  → v (recursively unwrapped)
+ *   { none: [] } / [1, []] → undefined (Option) or unit enum tag (Sum)
+ *   { outInvoice: [] } / [1, []] with enum schema → "OutInvoice"
+ */
+function unwrapSatsTyped(v: unknown, algebraicType: unknown): unknown {
+  const objectUnwrapped = unwrapSatsObject(v)
+  if (objectUnwrapped !== undefined) return objectUnwrapped
+
+  if (algebraicType != null && typeof algebraicType === 'object' && !Array.isArray(algebraicType)) {
+    const atype = algebraicType as Record<string, unknown>
+    const sum = atype['Sum'] as { variants?: Record<string, unknown>[] } | undefined
+    if (sum && Array.isArray(v) && v.length >= 2) {
+      const tag = v[0]
+      const payload = v[1]
+      if (typeof tag === 'number') {
+        if (isOptionSum(sum)) {
+          if (tag === 0) {
+            const inner = sum.variants?.[0]?.['algebraic_type']
+            return unwrapSatsTyped(payload, inner)
+          }
+          if (tag === 1) return undefined
+        } else if (Array.isArray(sum.variants)) {
+          const variant = sum.variants[tag]
+          if (variant) {
+            const name = variantNameFromElement(variant) ?? ''
+            const innerType = variant['algebraic_type'] as Record<string, unknown> | undefined
+            if (innerType && isUnitProduct(innerType) && isEmptyPayload(payload)) {
+              return satsUnitEnumTag(name)
+            }
+            if (innerType) return unwrapSatsTyped(payload, innerType)
+          }
+        }
+      }
+    }
+
+    if (isTimestampProduct(atype) && Array.isArray(v) && typeof v[0] === 'number') {
+      return { microsSinceUnixEpoch: v[0] }
+    }
+  }
+
   return v
 }
 
@@ -71,7 +154,7 @@ function parseRow(
   for (let i = 0; i < elements.length; i++) {
     const snake = elementName(elements[i])
     if (!snake) continue
-    obj[snakeToCamel(snake)] = unwrapSats(row[i])
+    obj[snakeToCamel(snake)] = unwrapSatsTyped(row[i], elements[i]!.algebraic_type)
   }
   return obj
 }
