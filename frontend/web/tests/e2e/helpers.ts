@@ -360,28 +360,82 @@ export async function fetchFirstWarehouseId(page: Page): Promise<number> {
   return Number(row.id)
 }
 
-/** Sale order id linked to a CRM opportunity (BFF `/api/query/sale-orders`). */
+/** Normalize id/scalar fields from BFF query rows (handles SATS `some` wrappers). */
+function scalarQueryId(value: unknown): number | null {
+  if (value == null) return null
+  if (typeof value === "number") return value
+  if (typeof value === "string" && value.trim() !== "") return Number(value)
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("some" in obj) return scalarQueryId(obj.some)
+    if ("none" in obj) return null
+  }
+  return null
+}
+
+function scalarQueryString(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "bigint") return String(value)
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("some" in obj) return scalarQueryString(obj.some)
+    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
+  }
+  return String(value)
+}
+
+/** Sale order id for a CRM opportunity (uses partner_id — opportunity_id is not in the sale-orders query projection). */
 export async function fetchSaleOrderIdByOpportunityId(
   page: Page,
   opportunityId: number,
 ): Promise<number> {
-  const res = await page.request.get("/api/query/sale-orders")
-  if (!res.ok()) throw new Error(`sale-orders query failed: ${res.status()}`)
-  const json = (await res.json()) as {
+  const oppRes = await page.request.get("/api/query/opportunities")
+  if (!oppRes.ok()) throw new Error(`opportunities query failed: ${oppRes.status()}`)
+  const oppJson = (await oppRes.json()) as {
     data?: Array<{
       id?: number | string
-      opportunityId?: number | string
-      opportunity_id?: number | string
+      partnerId?: unknown
+      partner_id?: unknown
     }>
   }
-  const row = json.data?.find((order) => {
-    const linked = order.opportunityId ?? order.opportunity_id
-    return linked != null && Number(linked) === opportunityId
-  })
-  if (row?.id == null) {
-    throw new Error(`sale order not found for opportunity: ${opportunityId}`)
+  const opportunity = oppJson.data?.find(
+    (row) => scalarQueryId(row.id) === opportunityId,
+  )
+  const partnerId = scalarQueryId(opportunity?.partnerId ?? opportunity?.partner_id)
+  if (partnerId == null) {
+    throw new Error(`opportunity ${opportunityId} has no partner_id in query projection`)
   }
-  return Number(row.id)
+
+  const soRes = await page.request.get("/api/query/sale-orders")
+  if (!soRes.ok()) throw new Error(`sale-orders query failed: ${soRes.status()}`)
+  const soJson = (await soRes.json()) as {
+    data?: Array<{
+      id?: number | string
+      partnerId?: unknown
+      partner_id?: unknown
+      state?: unknown
+    }>
+  }
+  const matches = (soJson.data ?? []).filter(
+    (order) => scalarQueryId(order.partnerId ?? order.partner_id) === partnerId,
+  )
+  if (matches.length === 0) {
+    throw new Error(`sale order not found for opportunity partner: ${partnerId}`)
+  }
+
+  const draftMatches = matches.filter(
+    (order) => scalarQueryString(order.state).toLowerCase() === "draft",
+  )
+  const pool = draftMatches.length > 0 ? draftMatches : matches
+  const newest = [...pool].sort(
+    (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+  )[0]
+  const orderId = scalarQueryId(newest?.id)
+  if (orderId == null) {
+    throw new Error(`sale order row missing id for opportunity: ${opportunityId}`)
+  }
+  return orderId
 }
 
 /** Draft customer invoice move id for a partner display name. */
