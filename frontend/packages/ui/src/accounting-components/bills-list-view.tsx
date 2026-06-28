@@ -47,7 +47,11 @@ import {
 import { cn } from "@/lib/utils"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
-import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
+import {
+  microsSinceEpochToDate,
+  moveStateIsDraft,
+  moveTypeIsInvoiceOrRefund,
+} from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 type BillStatus = "draft" | "pending" | "approved" | "partial" | "paid" | "overdue" | "cancelled"
@@ -69,8 +73,8 @@ function getBillStatus(move: AccountMove): BillStatus {
   if (state === "Draft") return "draft"
   if (paymentState === "Paid") return "paid"
   if (move.amountResidual > 0 && move.invoiceDateDue) {
-    const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
-    if (due < new Date()) return "overdue"
+    const due = microsSinceEpochToDate(move.invoiceDateDue)
+    if (due != null && due < new Date()) return "overdue"
   }
   if (paymentState === "InPayment") return "partial"
   return "pending"

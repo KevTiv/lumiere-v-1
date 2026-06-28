@@ -4,6 +4,7 @@ import {
   callReducerBff,
   chooseFirstOption,
   expectNoAppError,
+  expectSeededText,
   fetchDraftInvoiceMoveIdByPartner,
   fetchFirstOpportunityStageId,
   fetchLeadIdByName,
@@ -75,13 +76,12 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
 
     // Step 6 — convert opportunity → sale order (UI)
+    const opportunityName = `${leadName} - Opportunity`
+    await page.reload()
+    await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-opportunities").click()
-    await page
-      .waitForResponse((res) => res.url().includes("/api/query/opportunities") && res.ok(), {
-        timeout: 30_000,
-      })
-      .catch(() => undefined)
-    await selectEntityRowByText(page, leadName)
+    await expectSeededText(page, opportunityName, "/api/query/opportunities")
+    await selectEntityRowByText(page, opportunityName)
     await page.getByTestId("entity-action-convert-opp-order").click()
     await expect(page.getByTestId("form-modal-convert-opportunity-order")).toBeVisible()
     await chooseFirstOption(page, "pricelistId")

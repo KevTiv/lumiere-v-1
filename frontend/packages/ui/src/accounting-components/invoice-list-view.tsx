@@ -46,7 +46,11 @@ import {
 import { cn } from "@/lib/utils"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
-import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
+import {
+  microsSinceEpochToDate,
+  moveStateIsDraft,
+  moveTypeIsInvoiceOrRefund,
+} from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 // State display mapping
@@ -70,8 +74,8 @@ function getMoveStatus(move: AccountMove): DisplayStatus {
   if (paymentState === "Paid") return "paid"
   if (paymentState === "InPayment") return "partial"
   if (move.amountResidual > 0 && move.invoiceDateDue) {
-    const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
-    if (due < new Date()) return "overdue"
+    const due = microsSinceEpochToDate(move.invoiceDateDue)
+    if (due != null && due < new Date()) return "overdue"
   }
   if (paymentState === "Partial") return "partial"
   return "sent"

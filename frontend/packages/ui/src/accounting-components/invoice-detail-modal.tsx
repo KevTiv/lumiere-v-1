@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils"
 import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
-import { moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
+import { microsSinceEpochToDate, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
@@ -90,8 +90,8 @@ export function InvoiceDetailModal({
       return { label: t("accounting.states.paid"), cls: invoiceStatusBadgeClass.paid }
     }
     if (move.amountResidual > 0 && move.invoiceDateDue) {
-      const due = new Date(Number(move.invoiceDateDue.microsSinceUnixEpoch / 1000n))
-      if (due < new Date()) {
+      const due = microsSinceEpochToDate(move.invoiceDateDue)
+      if (due != null && due < new Date()) {
         return { label: t("accounting.states.overdue"), cls: invoiceStatusBadgeClass.overdue }
       }
     }
@@ -111,8 +111,8 @@ export function InvoiceDetailModal({
     Boolean(onRecordPayment) && isPosted && invoice.amountResidual > 0
 
   const getDaysUntilDue = () => {
-    if (!invoice.invoiceDateDue) return null
-    const due = new Date(Number(invoice.invoiceDateDue.microsSinceUnixEpoch / 1000n))
+    const due = microsSinceEpochToDate(invoice.invoiceDateDue)
+    if (due == null) return null
     return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   }
   const daysUntilDue = getDaysUntilDue()

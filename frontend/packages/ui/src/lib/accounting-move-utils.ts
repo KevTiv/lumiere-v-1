@@ -3,6 +3,18 @@ function unitVariantTag(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1)
 }
 
+/** Parse SpacetimeDB timestamp objects from HTTP SQL (micros may be number or bigint). */
+export function microsSinceEpochToDate(
+  ts?: { microsSinceUnixEpoch?: bigint | number | string | null } | null,
+): Date | null {
+  if (ts == null || typeof ts !== "object") return null
+  const raw = ts.microsSinceUnixEpoch
+  if (raw == null) return null
+  const micros = typeof raw === "bigint" ? raw : BigInt(String(raw))
+  if (micros === 0n) return null
+  return new Date(Number(micros / 1000n))
+}
+
 /** Tag string for SpacetimeDB algebraic enums (tagged or unit-variant SATS JSON). */
 export function stbEnumTag(value: unknown): string {
   if (value != null && typeof value === "object" && !Array.isArray(value)) {
