@@ -627,7 +627,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['id', 'originCompanyId', 'destinationCompanyId'] as readonly (keyof IntercompanyTransaction)[],
   ),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
-    'reference', 'state', 'partnerId', 'companyId', 'dateOrder',
+    'reference', 'clientOrderRef', 'state', 'partnerId', 'companyId', 'dateOrder',
   ]),
   'sale-order-lines': orgEntry<SaleOrderLine>('sale_order_line', ['sale-order-lines', 'sale_order_line'], [
     'name', 'orderId', 'productId', 'productUomQty', 'priceUnit',

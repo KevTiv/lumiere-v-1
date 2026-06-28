@@ -2,6 +2,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { expect, type Page } from "@playwright/test"
+import { stringifyReducerCallBody } from "@lumiere/api-client"
+import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
@@ -235,8 +237,9 @@ export async function callReducerBff(
   options?: { withCompany?: boolean },
 ) {
   const qs = options?.withCompany ? "?withCompany=true" : ""
+  const encodedArgs = encodeReducerCallArgs(reducer, args)
   const res = await page.request.post(`/api/call/${reducer}${qs}`, {
-    data: args,
+    data: JSON.parse(stringifyReducerCallBody(encodedArgs)),
     headers: { "Content-Type": "application/json" },
   })
   if (!res.ok()) {

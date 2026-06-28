@@ -167,7 +167,10 @@ export function useCreateLead(organizationId: bigint) {
         stdbParamsToJson(merged, "CreateLeadParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create lead')
+      if (!r.ok) {
+        const json = (await r.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error ?? "Failed to create lead")
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
   })
@@ -243,7 +246,10 @@ export function useCreateContact(
         stdbParamsToJson(scoped as object, "CreateContactParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create contact')
+      if (!r.ok) {
+        const json = (await r.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error ?? "Failed to create contact")
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
   })

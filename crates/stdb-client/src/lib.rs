@@ -174,6 +174,14 @@ fn element_name(el: &Value) -> String {
     String::new()
 }
 
+fn sats_unit_enum_tag(key: &str) -> String {
+    let mut chars = key.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
 fn unwrap_sats(v: &Value) -> Value {
     match v {
         Value::Object(map) => {
@@ -182,6 +190,14 @@ fn unwrap_sats(v: &Value) -> Value {
             }
             if map.get("none").is_some() {
                 return Value::Null;
+            }
+            // SATS unit-variant JSON: `{ "outInvoice": [] }` → `"OutInvoice"`
+            if map.len() == 1 {
+                if let Some((key, val)) = map.iter().next() {
+                    if val.as_array().is_some_and(|a| a.is_empty()) {
+                        return Value::String(sats_unit_enum_tag(key));
+                    }
+                }
             }
         }
         _ => {}

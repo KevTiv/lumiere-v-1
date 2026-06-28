@@ -121,11 +121,16 @@ function encodeValue(
   }
 
   if (typeof value === "bigint") {
-    const n = bigintToJson(value)
     if (fieldKey && optionFields?.has(fieldKey)) {
-      return { some: n }
+      if (value <= 0n) return { none: [] }
+      return { some: bigintToJson(value) }
     }
-    return n
+    return bigintToJson(value)
+  }
+
+  if (typeof value === "number" && fieldKey && optionFields?.has(fieldKey)) {
+    if (value <= 0) return { none: [] }
+    return { some: value }
   }
 
   if (Array.isArray(value)) {
@@ -174,4 +179,27 @@ export function stdbParamsToJson(
   const optionFields = structName ? new Set(OPTION_FIELDS[structName] ?? []) : undefined
   const encoded = encodeValue(params, optionFields)
   return (encoded ?? {}) as Record<string, unknown>
+}
+
+/** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */
+const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
+  create_lead: "CreateLeadParams",
+  create_contact: "CreateContactParams",
+  create_sale_order_line: "CreateSaleOrderLineParams",
+  post_account_move: undefined,
+}
+
+/**
+ * Encode the trailing params object in a reducer arg list for SpacetimeDB HTTP.
+ * Top-level org / id args are left unchanged.
+ */
+export function encodeReducerCallArgs(reducer: string, args: unknown[]): unknown[] {
+  const structName = REDUCER_PARAM_STRUCTS[reducer]
+  if (!structName || args.length === 0) return args
+  const lastIdx = args.length - 1
+  const last = args[lastIdx]
+  if (last === null || typeof last !== "object" || Array.isArray(last)) return args
+  const encoded = [...args]
+  encoded[lastIdx] = stdbParamsToJson(last as object, structName)
+  return encoded
 }

@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 
 import {
   camelToSnakeIdentifier,
+  encodeReducerCallArgs,
   encodeTaggedUnitEnum,
   stdbParamsToJson,
 } from "./stdb-params-json.ts"
@@ -25,6 +26,31 @@ describe("stdbParamsToJson", () => {
         contact_name: { some: "Ada" },
         partner_id: { some: 1 },
       },
+    )
+  })
+
+  it("encodes Option<u64> zero as none for struct fields", () => {
+    assert.deepEqual(
+      stdbParamsToJson({ companyId: 0n }, "CreateContactParams"),
+      { company_id: { none: [] } },
+    )
+  })
+
+  it("encodeReducerCallArgs SATS-encodes the trailing params object", () => {
+    assert.deepEqual(
+      encodeReducerCallArgs("create_lead", [
+        1,
+        { name: "L", contactName: "L", email: "a@b.test", tagIds: [] },
+      ]),
+      [
+        1,
+        {
+          name: "L",
+          contact_name: { some: "L" },
+          email: { some: "a@b.test" },
+          tag_ids: [],
+        },
+      ],
     )
   })
 

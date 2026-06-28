@@ -42,11 +42,17 @@ export const orgBigInts = organizationScopeBigInts
  *
  * The wire key remains `companyId` until SpacetimeDB reducer params are renamed.
  */
+function isValidOperatingCompanyId(id: bigint | number | undefined): id is bigint | number {
+  if (id === undefined) return false
+  if (typeof id === "bigint") return id > 0n
+  return Number.isFinite(id) && id > 0
+}
+
 export function withOrganizationScope(
   params: Record<string, unknown>,
   organizationScopeId?: bigint,
 ): Record<string, unknown> {
-  if (organizationScopeId === undefined) return params
+  if (!isValidOperatingCompanyId(organizationScopeId)) return params
   return { ...params, companyId: organizationScopeId }
 }
 

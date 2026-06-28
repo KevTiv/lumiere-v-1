@@ -264,6 +264,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
+  enumTag,
   isInvoiceLikeMoveType,
   resolveDefaultCogsInventoryAccountIds,
 } from "@/lib/accounting-post-draft"
@@ -271,9 +272,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 
 function moveTypeTag(row: Record<string, unknown>): string {
-  const v = row.moveType
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
+  return enumTag(row.moveType)
 }
 
 function paymentTermValueTag(

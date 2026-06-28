@@ -3,7 +3,15 @@
  */
 
 export function enumTag(v: unknown): string {
-  if (v != null && typeof v === 'object' && 'tag' in v) return String((v as { tag: string }).tag)
+  if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>
+    if ('tag' in o) return String(o.tag)
+    const keys = Object.keys(o)
+    if (keys.length === 1 && Array.isArray(o[keys[0]]) && (o[keys[0]] as unknown[]).length === 0) {
+      const k = keys[0]!
+      return k.charAt(0).toUpperCase() + k.slice(1)
+    }
+  }
   return String(v ?? '')
 }
 
