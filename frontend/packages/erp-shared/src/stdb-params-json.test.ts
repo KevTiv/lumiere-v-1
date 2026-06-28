@@ -6,7 +6,7 @@ import {
   encodeReducerCallArgs,
   encodeTaggedUnitEnum,
   stdbParamsToJson,
-} from "./stdb-params-json.ts"
+} from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
   it("converts top-level camelCase keys to snake_case", () => {
@@ -48,10 +48,9 @@ describe("stdbParamsToJson", () => {
   })
 
   it("encodes Option<u64> zero as none for struct fields", () => {
-    assert.deepEqual(
-      stdbParamsToJson({ companyId: 0n }, "CreateContactParams"),
-      { company_id: { none: [] } },
-    )
+    const out = stdbParamsToJson({ companyId: 0n }, "CreateContactParams")
+    assert.deepEqual(out.company_id, { none: [] })
+    assert.deepEqual(out.phone, { none: [] })
   })
 
   it("encodeReducerCallArgs SATS-encodes the trailing params object", () => {
