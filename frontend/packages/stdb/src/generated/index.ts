@@ -532,12 +532,22 @@ import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
+import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
+import RunAccountingPaymentReconcileTestReducer from "./run_accounting_payment_reconcile_test_reducer";
+import RunAccountingPostInvoiceTestReducer from "./run_accounting_post_invoice_test_reducer";
 import RunAllAccountingTestsReducer from "./run_all_accounting_tests_reducer";
 import RunAllCoreTestsReducer from "./run_all_core_tests_reducer";
 import RunAllCrmTestsReducer from "./run_all_crm_tests_reducer";
 import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
+import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
+import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
+import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
+import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
+import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
+import RunSalesOrderDeliveryTestReducer from "./run_sales_order_delivery_test_reducer";
+import RunSalesOrderInvoiceTestReducer from "./run_sales_order_invoice_test_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import SaveImportMappingTemplateReducer from "./save_import_mapping_template_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
@@ -5782,12 +5792,22 @@ const reducersSchema = __reducers(
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
+  __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
+  __reducerSchema("run_accounting_payment_reconcile_test", RunAccountingPaymentReconcileTestReducer),
+  __reducerSchema("run_accounting_post_invoice_test", RunAccountingPostInvoiceTestReducer),
   __reducerSchema("run_all_accounting_tests", RunAllAccountingTestsReducer),
   __reducerSchema("run_all_core_tests", RunAllCoreTestsReducer),
   __reducerSchema("run_all_crm_tests", RunAllCrmTestsReducer),
   __reducerSchema("run_all_domain_tests", RunAllDomainTestsReducer),
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
+  __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
+  __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
+  __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
+  __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
+  __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
+  __reducerSchema("run_sales_order_delivery_test", RunSalesOrderDeliveryTestReducer),
+  __reducerSchema("run_sales_order_invoice_test", RunSalesOrderInvoiceTestReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
   __reducerSchema("save_import_mapping_template", SaveImportMappingTemplateReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),

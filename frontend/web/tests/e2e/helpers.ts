@@ -113,9 +113,15 @@ export async function expectSeededText(
   queryPath?: string,
 ) {
   if (queryPath) {
-    await page
+    const res = await page
       .waitForResponse((res) => res.url().includes(queryPath) && res.ok(), { timeout: 30_000 })
       .catch(() => undefined)
+    if (res) {
+      const json = (await res.json()) as { data?: unknown[] }
+      if (!Array.isArray(json.data) || json.data.length === 0) {
+        throw new Error(`${queryPath} returned no rows`)
+      }
+    }
   }
   await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
 }
@@ -208,12 +214,15 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
 
 /** First organization id for the authenticated session (dev seed org). */
 export async function fetchSessionOrganizationId(page: Page): Promise<number> {
-  const res = await page.request.get("/api/query/organizations")
+  const res = await page.request.get("/api/query/user-organization")
   if (!res.ok()) {
-    throw new Error(`organizations query failed: ${res.status()}`)
+    throw new Error(`user-organization query failed: ${res.status()}`)
   }
-  const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
-  const id = json.data?.[0]?.id
+  const json = (await res.json()) as {
+    data?: Array<{ organizationId?: number | string; organization_id?: number | string }>
+  }
+  const row = json.data?.[0]
+  const id = row?.organizationId ?? row?.organization_id
   if (id == null) throw new Error("no organization in session")
   return Number(id)
 }

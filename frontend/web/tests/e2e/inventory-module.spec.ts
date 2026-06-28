@@ -76,7 +76,7 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
       await expect(page.getByRole("button", { name: /^1\. plan$/i })).toBeVisible()
       break
     case "quality-alerts":
-      await expect(page.getByText("Quality alerts")).toBeVisible()
+      await expect(page.getByText("Quality alerts").first()).toBeVisible()
       break
     default:
       break

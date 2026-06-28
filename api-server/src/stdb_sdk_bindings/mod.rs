@@ -1154,12 +1154,22 @@ pub mod retry_iot_action_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
+pub mod run_accounting_payment_cancel_test_reducer;
+pub mod run_accounting_payment_reconcile_test_reducer;
+pub mod run_accounting_post_invoice_test_reducer;
 pub mod run_all_accounting_tests_reducer;
 pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_crm_opportunity_convert_test_reducer;
+pub mod run_inventory_adjustment_test_reducer;
+pub mod run_inventory_product_category_test_reducer;
+pub mod run_inventory_stock_inventory_test_reducer;
+pub mod run_inventory_stock_quant_test_reducer;
+pub mod run_sales_order_delivery_test_reducer;
+pub mod run_sales_order_invoice_test_reducer;
 pub mod run_traceability_report_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
@@ -3002,12 +3012,22 @@ pub use retry_iot_action_reducer::retry_iot_action;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
+pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
+pub use run_accounting_payment_reconcile_test_reducer::run_accounting_payment_reconcile_test;
+pub use run_accounting_post_invoice_test_reducer::run_accounting_post_invoice_test;
 pub use run_all_accounting_tests_reducer::run_all_accounting_tests;
 pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
+pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
+pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
+pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
+pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
+pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
+pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
 pub use run_traceability_report_reducer::run_traceability_report;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
@@ -5531,12 +5551,22 @@ pub enum Reducer {
         organization_id: u64,
         assignment_id: u64,
 }    ,
+    RunAccountingPaymentCancelTest ,
+    RunAccountingPaymentReconcileTest ,
+    RunAccountingPostInvoiceTest ,
     RunAllAccountingTests ,
     RunAllCoreTests ,
     RunAllCrmTests ,
     RunAllDomainTests ,
     RunAllInventoryTests ,
     RunAllSalesTests ,
+    RunCrmOpportunityConvertTest ,
+    RunInventoryAdjustmentTest ,
+    RunInventoryProductCategoryTest ,
+    RunInventoryStockInventoryTest ,
+    RunInventoryStockQuantTest ,
+    RunSalesOrderDeliveryTest ,
+    RunSalesOrderInvoiceTest ,
     RunTraceabilityReport {
         organization_id: u64,
         report_id: u64,
@@ -7038,12 +7068,22 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
+            Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
+            Reducer::RunAccountingPaymentReconcileTest => "run_accounting_payment_reconcile_test",
+            Reducer::RunAccountingPostInvoiceTest => "run_accounting_post_invoice_test",
             Reducer::RunAllAccountingTests => "run_all_accounting_tests",
             Reducer::RunAllCoreTests => "run_all_core_tests",
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
+            Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
+            Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
+            Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
+            Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
+            Reducer::RunSalesOrderDeliveryTest => "run_sales_order_delivery_test",
+            Reducer::RunSalesOrderInvoiceTest => "run_sales_order_invoice_test",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
@@ -11366,7 +11406,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 assignment_id: assignment_id.clone(),
 }),
-            Reducer::RunAllAccountingTests => __sats::bsatn::to_vec(&run_all_accounting_tests_reducer::RunAllAccountingTestsArgs {
+            Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
+                }),
+Reducer::RunAccountingPaymentReconcileTest => __sats::bsatn::to_vec(&run_accounting_payment_reconcile_test_reducer::RunAccountingPaymentReconcileTestArgs {
+                }),
+Reducer::RunAccountingPostInvoiceTest => __sats::bsatn::to_vec(&run_accounting_post_invoice_test_reducer::RunAccountingPostInvoiceTestArgs {
+                }),
+Reducer::RunAllAccountingTests => __sats::bsatn::to_vec(&run_all_accounting_tests_reducer::RunAllAccountingTestsArgs {
                 }),
 Reducer::RunAllCoreTests => __sats::bsatn::to_vec(&run_all_core_tests_reducer::RunAllCoreTestsArgs {
                 }),
@@ -11377,6 +11423,20 @@ Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reduce
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
+                }),
+Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
+                }),
+Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adjustment_test_reducer::RunInventoryAdjustmentTestArgs {
+                }),
+Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
+                }),
+Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
+                }),
+Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
+                }),
+Reducer::RunSalesOrderDeliveryTest => __sats::bsatn::to_vec(&run_sales_order_delivery_test_reducer::RunSalesOrderDeliveryTestArgs {
+                }),
+Reducer::RunSalesOrderInvoiceTest => __sats::bsatn::to_vec(&run_sales_order_invoice_test_reducer::RunSalesOrderInvoiceTestArgs {
                 }),
 Reducer::RunTraceabilityReport{
                 organization_id,
