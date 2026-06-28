@@ -3,6 +3,8 @@ import { describe, it } from "node:test"
 
 import {
   camelToSnakeIdentifier,
+  encodeOptionalString,
+  encodeOptionalTimestamp,
   encodeReducerCallArgs,
   encodeTaggedUnitEnum,
   stdbParamsToJson,
@@ -65,6 +67,37 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.email, { some: "a@b.test" })
     assert.deepEqual(params.tag_ids, [])
     assert.deepEqual(params.phone, { none: [] })
+  })
+
+  it("encodeReducerCallArgs SATS-encodes flat Option args for create_proposal", () => {
+    const encoded = encodeReducerCallArgs("create_proposal", [
+      1,
+      "Title",
+      "Client",
+      5000,
+      null,
+      "",
+      null,
+    ])
+    assert.deepEqual(encoded[4], { none: [] })
+    assert.deepEqual(encoded[5], { none: [] })
+    assert.deepEqual(encoded[6], { none: [] })
+  })
+
+  it("encodeOptionalString treats empty string as none", () => {
+    assert.deepEqual(encodeOptionalString(""), { none: [] })
+    assert.deepEqual(encodeOptionalString("notes"), { some: "notes" })
+  })
+
+  it("encodeOptionalTimestamp encodes Date values for SpacetimeDB HTTP", () => {
+    const d = new Date("2026-01-15T12:00:00.000Z")
+    const encoded = encodeOptionalTimestamp(d)
+    assert.ok(encoded && typeof encoded === "object" && "some" in encoded)
+    const ts = (encoded as { some: Record<string, unknown> }).some
+    assert.equal(
+      ts.__timestamp_micros_since_unix_epoch__,
+      Number(BigInt(d.getTime()) * 1000n),
+    )
   })
 
   it("encodes timestamps for SpacetimeDB HTTP", () => {

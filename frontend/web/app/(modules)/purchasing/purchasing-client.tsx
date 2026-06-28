@@ -240,9 +240,13 @@ function PurchasingClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
+  const purchasingTabIds = useMemo(
+    () => [...moduleConfig.tabs.map((tab) => tab.id), "landed-costs", "supplier-intakes"],
+    [moduleConfig],
+  )
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
-    moduleConfig.tabs.map((t) => t.id),
+    purchasingTabIds,
   )
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,

@@ -562,7 +562,7 @@ pub async fn execute_resource_query(
         "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
         "contact-tags" => "",
         "contact-segments" => "",
-        "quality-alerts" => " ORDER BY id DESC",
+        "quality-alerts" => "",
         "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
         "mrp-routing-workcenters" => " ORDER BY workcenter_id ASC, sequence ASC",
         "calendar-events" => " ORDER BY start ASC",
@@ -619,6 +619,13 @@ pub async fn execute_resource_query(
                 let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
                 let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
                 apl.cmp(&bpl).then(asq.cmp(&bsq))
+            });
+        }
+        "quality-alerts" => {
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
             });
         }
         _ => {}

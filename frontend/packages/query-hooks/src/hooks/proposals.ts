@@ -11,7 +11,12 @@ import { proposalsBffPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  encodeOptionalString,
+  encodeOptionalTimestamp,
+  encodeOptionalU64,
+  stdbParamsToJson,
+} from "@lumiere/erp-shared/stdb-params-json"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -149,17 +154,22 @@ export function useCreateProposal() {
     documentFolderId?: bigint | number | string | null
   }>({
     mutationFn: async (params) => {
-      const deadline = params.deadline instanceof Date
-        ? params.deadline.toISOString()
-        : params.deadline ?? null
+      const deadline =
+        params.deadline instanceof Date
+          ? params.deadline
+          : params.deadline
+            ? new Date(String(params.deadline))
+            : null
       const { urlPath, init } = proposalsBffPost("create_proposal", [
           Number(params.organizationId),
           params.title,
           params.clientName,
           params.value,
-          deadline,
-          params.description ?? null,
-          params.documentFolderId != null ? Number(params.documentFolderId) : null,
+          encodeOptionalTimestamp(deadline),
+          encodeOptionalString(params.description),
+          encodeOptionalU64(
+            params.documentFolderId != null ? Number(params.documentFolderId) : null,
+          ),
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create proposal')

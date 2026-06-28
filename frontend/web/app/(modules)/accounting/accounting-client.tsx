@@ -272,7 +272,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 
 function moveTypeTag(row: Record<string, unknown>): string {
-  return enumTag(row.moveType)
+  return enumTag(row.moveType ?? row.move_type)
 }
 
 function paymentTermValueTag(

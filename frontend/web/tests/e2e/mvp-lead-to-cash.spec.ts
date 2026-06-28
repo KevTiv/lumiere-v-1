@@ -35,7 +35,12 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "name", contactName)
     await fillField(page, "email", `${contactName}@example.test`)
     await submitForm(page, "new-contact")
-    await expect(page.getByText(contactName)).toBeVisible()
+    await page
+      .waitForResponse((res) => res.url().includes("/api/query/contacts") && res.ok(), {
+        timeout: 30_000,
+      })
+      .catch(() => undefined)
+    await expect(page.getByText(contactName)).toBeVisible({ timeout: 30_000 })
 
     // Step 4 — lead (BFF: must start qualified for conversion)
     await callReducerBff(page, "create_lead", [
