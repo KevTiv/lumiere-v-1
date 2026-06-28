@@ -7,7 +7,10 @@ import {
   expectSeededText,
   fetchDraftInvoiceMoveIdByPartner,
   fetchFirstOpportunityStageId,
+  fetchFirstPricelistId,
+  fetchFirstWarehouseId,
   fetchLeadIdByName,
+  fetchOpportunityIdByName,
   fetchProductIdByName,
   fetchSessionOrganizationId,
   fillField,
@@ -75,18 +78,21 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       },
     ])
 
-    // Step 6 — convert opportunity → sale order (UI)
+    // Step 6 — convert opportunity → sale order (BFF — pricelist select may be empty on legacy DBs)
     const opportunityName = `${leadName} - Opportunity`
     await page.reload()
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-opportunities").click()
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
-    await selectEntityRowByText(page, opportunityName)
-    await page.getByTestId("entity-action-convert-opp-order").click()
-    await expect(page.getByTestId("form-modal-convert-opportunity-order")).toBeVisible()
-    await chooseFirstOption(page, "pricelistId")
-    await chooseFirstOption(page, "warehouseId")
-    await submitForm(page, "convert-opportunity-order")
+    const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
+    const pricelistId = await fetchFirstPricelistId(page)
+    const warehouseId = await fetchFirstWarehouseId(page)
+    await callReducerBff(
+      page,
+      "convert_opportunity_to_sale_order",
+      [opportunityId, { pricelistId, warehouseId }],
+      { withCompany: true },
+    )
 
     // Step 7 — add sale order line (BFF — no create form on order-lines tab)
     await gotoModule(page, "/sales", "sales")

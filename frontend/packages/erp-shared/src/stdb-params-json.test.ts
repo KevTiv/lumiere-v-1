@@ -89,6 +89,17 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.metadata, { none: [] })
   })
 
+  it("encodeReducerCallArgs snake_cases convert_opportunity_to_sale_order params", () => {
+    const encoded = encodeReducerCallArgs("convert_opportunity_to_sale_order", [
+      99,
+      { pricelistId: 3, warehouseId: 5 },
+    ])
+    assert.equal(encoded[0], 99)
+    const params = encoded[1] as Record<string, unknown>
+    assert.equal(params.pricelist_id, 3)
+    assert.equal(params.warehouse_id, 5)
+  })
+
   it("encodeReducerCallArgs SATS-encodes flat Option args for create_proposal", () => {
     const encoded = encodeReducerCallArgs("create_proposal", [
       1,

@@ -219,6 +219,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_lead: "CreateLeadParams",
   create_contact: "CreateContactParams",
   convert_lead_to_customer: "ConvertLeadParams",
+  convert_opportunity_to_sale_order: "ConvertOpportunityParams",
   create_sale_order_line: "CreateSaleOrderLineParams",
   post_account_move: undefined,
 }

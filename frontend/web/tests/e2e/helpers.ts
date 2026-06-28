@@ -319,6 +319,38 @@ export async function fetchLeadIdByName(page: Page, name: string): Promise<numbe
   return Number(row.id)
 }
 
+/** Opportunity id whose name matches (BFF `/api/query/opportunities`). */
+export async function fetchOpportunityIdByName(page: Page, name: string): Promise<number> {
+  const res = await page.request.get("/api/query/opportunities")
+  if (!res.ok()) throw new Error(`opportunities query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: number | string; name?: string }>
+  }
+  const row = json.data?.find((o) => o.name === name)
+  if (row?.id == null) throw new Error(`opportunity not found: ${name}`)
+  return Number(row.id)
+}
+
+/** First pricelist id from seed data, or `0` when none exist (legacy DBs). */
+export async function fetchFirstPricelistId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/pricelists")
+  if (!res.ok()) throw new Error(`pricelists query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
+  const row = json.data?.[0]
+  if (row?.id == null) return 0
+  return Number(row.id)
+}
+
+/** First warehouse id from seed data. */
+export async function fetchFirstWarehouseId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/warehouses")
+  if (!res.ok()) throw new Error(`warehouses query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
+  const row = json.data?.[0]
+  if (row?.id == null) throw new Error("no warehouses in seed data")
+  return Number(row.id)
+}
+
 /** Draft customer invoice move id for a partner display name. */
 export async function fetchDraftInvoiceMoveIdByPartner(
   page: Page,

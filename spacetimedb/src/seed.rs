@@ -76,7 +76,9 @@ use crate::sales::pos_transactions::{
     pos_loyalty_card, pos_order, pos_order_line, pos_payment, pos_session, PosLoyaltyCard,
     PosOrder, PosOrderLine, PosPayment, PosSession,
 };
+use crate::sales::pricelists::{product_pricelist, ProductPricelist};
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrder, SaleOrderLine};
+use crate::types::DiscountPolicy;
 
 // ── Purchasing ────────────────────────────────────────────────────────────────
 use crate::purchasing::landed_costs::{
@@ -1350,6 +1352,17 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
+    // ── 3.3b Default Pricelist ────────────────────────────────────────────────
+    let default_pricelist = ctx.db.product_pricelist().insert(ProductPricelist {
+        id: 0,
+        organization_id: org_id,
+        name: "Default Pricelist".to_string(),
+        currency_id: 1,
+        discount_policy: DiscountPolicy::WithDiscount,
+        is_active: true,
+        created_at: ctx.timestamp,
+    });
+
     // ── 3.4 Stock Locations ───────────────────────────────────────────────────
     let loc_stock = ctx.db.stock_location().insert(StockLocation {
         id: 0,
@@ -1446,7 +1459,6 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // =========================================================================
 
     // ── 4.1 Sale Orders ───────────────────────────────────────────────────────
-    // pricelist_id: u64 (required, non-optional) — no pricelist seeded, use 0
     // warehouse_id: u64 — use actual seeded warehouse
     let so1 = ctx.db.sale_order().insert(SaleOrder {
         id: 0,
@@ -1464,7 +1476,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         partner_id: contact_acme.id,
         partner_invoice_id: contact_acme.id,
         partner_shipping_id: contact_acme.id,
-        pricelist_id: 0, // placeholder — no pricelist seeded
+        pricelist_id: default_pricelist.id,
         currency_id: 1,  // placeholder
         payment_term_id: None,
         fiscal_position_id: None,
