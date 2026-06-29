@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -21,6 +22,7 @@ import {
   useUpdateProposal,
   useUpdateProposalStatus,
 } from "@lumiere/query-hooks/hooks/proposals"
+import { fetchQueryList, rqBigIntKey } from "@lumiere/query-hooks/http"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   Archive,
@@ -109,6 +111,7 @@ export function ProposalsClient(props: ProposalsClientProps) {
 
 function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsClientLoadedProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => proposalsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
@@ -319,6 +322,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     if (action === "createProposal") {
       const title = String(formData.title ?? "").trim()
       if (!title) return
+      const descriptionRaw = formData.description != null ? String(formData.description).trim() : ""
       await createProposal.mutateAsync({
         organizationId: orgId,
         title,
@@ -326,9 +330,16 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         type: String(formData.type ?? ""),
         value: Number(formData.value ?? 0),
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
-        description: formData.description != null ? String(formData.description) : undefined,
+        description: descriptionRaw || undefined,
       })
-      const newId = `new-${Date.now()}`
+      const rows = await queryClient.fetchQuery({
+        queryKey: ["proposals", rqBigIntKey(orgId)],
+        queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
+      })
+      const created = [...rows]
+        .filter((row) => String(row.title ?? "") === title)
+        .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0]
+      const newId = created?.id != null ? String(created.id) : `new-${Date.now()}`
       router.push(
         `/proposals/${newId}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
       )

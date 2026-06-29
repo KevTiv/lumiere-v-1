@@ -592,7 +592,7 @@ export function ProposalWorkspace({
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
-          <h1 className="text-sm font-medium text-foreground truncate">{proposalTitle}</h1>
+          <h1 data-testid="proposal-workspace-title" className="text-sm font-medium text-foreground truncate">{proposalTitle}</h1>
 
           <div className="ml-auto flex items-center gap-2">
             <PresenceBar

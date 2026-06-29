@@ -64,9 +64,15 @@ test.describe("ERP module smoke", () => {
     await chooseFirstOption(page, "type")
     await fillField(page, "value", "5000")
     await page.getByTestId("form-submit-new-proposal").click()
+    await page.waitForResponse(
+      (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
+      { timeout: 30_000 },
+    )
 
     await expect(page).toHaveURL(/\/proposals\/[^/]+/, { timeout: 30_000 })
-    await expect(page.getByRole("heading", { name: proposalTitle })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId("proposal-workspace-title")).toHaveText(proposalTitle, {
+      timeout: 30_000,
+    })
     await expectNoAppError(page)
   })
 

@@ -162,6 +162,12 @@ describe("stdbParamsToJson", () => {
     )
   })
 
+  it("emits explicit none for CreatePaymentTermParams option fields", () => {
+    const out = stdbParamsToJson({ name: "Net 30" }, "CreatePaymentTermParams")
+    assert.equal(out.name, "Net 30")
+    assert.deepEqual(out.note, { none: [] })
+  })
+
   it("leaves already snake_case keys unchanged", () => {
     assert.deepEqual(stdbParamsToJson({ company_id: 7, active: false }), {
       company_id: 7,

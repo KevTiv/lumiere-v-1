@@ -237,11 +237,10 @@ export async function installPostHogResetProbe(page: Page) {
 export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   const row = page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.click()
-  // The selected visual state is expressed via Tailwind classes (bg-primary/10, ring-primary/40),
-  // not a `data-state`/`aria-selected` attribute. Selection is proven by the downstream
-  // `waitForResponse` / mutation applying the row context. Asserting data-state here has always
-  // been incorrect and only passed previously due to timing luck.
+  if ((await row.getAttribute("data-state")) !== "selected") {
+    await row.click()
+    await expect(row).toHaveAttribute("data-state", "selected", { timeout: 10_000 })
+  }
   await dismissBlockingDialogs(page)
 }
 
@@ -249,10 +248,18 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
 export async function selectEntityRowById(page: Page, id: number | string) {
   const row = page.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.click()
-  // See selectEntityRowByText: the table highlights via Tailwind classes, not a `data-state`
-  // attribute. Selection is proven by the downstream `waitForResponse` / mutation.
+  // Entity tables default to toggle-on-click selection. Re-clicking an already-selected row
+  // deselects it — wait for STDB-driven re-renders, then only click when not selected.
+  if ((await row.getAttribute("data-state")) !== "selected") {
+    await row.click()
+    await expect(row).toHaveAttribute("data-state", "selected", { timeout: 10_000 })
+  }
   await dismissBlockingDialogs(page)
+}
+
+/** Wait until a selection-gated entity action is enabled (proves row context is applied). */
+export async function waitForEntityActionEnabled(page: Page, actionTestId: string) {
+  await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
 }
 
 /** First organization id for the authenticated session (dev seed org). */

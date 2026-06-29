@@ -20,6 +20,7 @@ import {
   selectEntityRowById,
   smokeName,
   submitForm,
+  waitForEntityActionEnabled,
 } from "./helpers"
 
 /**
@@ -119,15 +120,17 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
     await selectEntityRowById(page, orderId)
+    await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     await page.getByTestId("entity-action-confirm-orders").click()
-    await page
-      .waitForResponse((res) => res.url().includes("/api/call/confirm_sales_order") && res.ok(), {
-        timeout: 30_000,
-      })
-      .catch(() => undefined)
+    const confirmRes = await page.waitForResponse(
+      (res) => res.url().includes("/api/call/confirm_sales_order") && res.ok(),
+      { timeout: 30_000 },
+    )
+    expect(confirmRes.ok()).toBe(true)
 
     // Step 10 — create invoice from sale order (UI)
     await selectEntityRowById(page, orderId)
+    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
     await page.getByTestId("entity-action-create-invoice").click()
     await expect(page.getByTestId("form-modal-create-invoice-from-order")).toBeVisible()
     await chooseFirstOption(page, "journalId")

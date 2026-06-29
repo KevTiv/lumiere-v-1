@@ -2068,6 +2068,9 @@ function AccountingClientLoaded({
       const p = toCreateAccountReconciliationWidgetParams(formData)
       if (p) await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
+      if (operatingCompanyId <= 0n) {
+        throw new Error("No operating company is available for this organization")
+      }
       const p = toCreateFiscalYearParams(formData)
       if (p) await createFiscalYear.mutateAsync(accountingParamsToJson(p, "CreateFiscalYearParams"))
     } else if (action === "createAccountPeriod") {
@@ -2078,10 +2081,10 @@ function AccountingClientLoaded({
       if (p) await createAccountPayment.mutateAsync(p)
     } else if (action === "createPaymentTerm") {
       const p = toCreatePaymentTermParamsFromForm(formData)
-      if (p) await createPaymentTerm.mutateAsync(stdbParamsToJson(p))
+      if (p) await createPaymentTerm.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermParams"))
     } else if (action === "createPaymentTermLine") {
       const p = toCreatePaymentTermLineParamsFromForm(formData)
-      if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p))
+      if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermLineParams"))
     } else if (action === "createAccountJournal") {
       const params = toCreateAccountJournalParamsFromForm(formData, operatingCompanyId)
       await createAccountJournal.mutateAsync([

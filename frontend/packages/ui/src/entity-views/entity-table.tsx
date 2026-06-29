@@ -136,6 +136,9 @@ export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className
 
   const toggleRow = (key: string) => {
     setSelectedKeys((prev) => {
+      // Keep the sole selected row selected — re-clicking must not clear selection
+      // for action toolbars (avoids race with subscription-driven re-renders in E2E and prod).
+      if (prev.size === 1 && prev.has(key)) return prev
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
       return next
