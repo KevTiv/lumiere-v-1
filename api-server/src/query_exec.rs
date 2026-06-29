@@ -81,15 +81,10 @@ async fn company_ids_for_organization(
 }
 
 pub async fn default_company_id(client: &StdbClient, org_id: u64) -> Result<Option<u64>, ApiError> {
-    let sql = format!("SELECT id FROM company WHERE organization_id = {org_id} LIMIT 1");
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows.first().and_then(|r| r.get("id")).and_then(|v| {
-        v.as_u64()
-            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-    }))
+    Ok(company_ids_for_organization(client, org_id, None)
+        .await?
+        .into_iter()
+        .next())
 }
 
 pub async fn execute_resource_query(
@@ -533,18 +528,22 @@ pub async fn execute_resource_query(
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
         "fiscal-years" | "account-periods" => {
-            let Some(cid) = default_company_id(client, organization_id).await? else {
+            let company_ids = company_ids_for_organization(client, organization_id, fa).await?;
+            if company_ids.is_empty() {
                 return Ok(vec![]);
-            };
+            }
             let reg = registry_get(resource)
                 .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
-            let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
-                .map_err(ApiError::Internal)?;
-            let rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            let mut out: Vec<Value> = rows.into_iter().collect();
+            let mut out: Vec<Value> = Vec::new();
+            for cid in company_ids {
+                let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
+                    .map_err(ApiError::Internal)?;
+                let rows = client
+                    .query_sql(&sql)
+                    .await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
+                out.extend(rows);
+            }
             out.sort_by(|a, b| {
                 let da = a
                     .get("dateFrom")

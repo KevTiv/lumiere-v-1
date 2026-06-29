@@ -192,7 +192,7 @@ test.describe("Accounting module e2e", () => {
     await fillField(page, "dateTo", isoDateTimeLocal(fyYear, 12, 31, 23, 59))
     await chooseFirstOption(page, "fiscalYearType")
     await submitForm(page, "new-fiscal-year")
-    await expect(page.getByText(fyName).first()).toBeVisible({ timeout: 30_000 })
+    await expectSeededText(page, fyName, "/api/query/fiscal-years")
 
     const periodName = smokeName("period")
     const periodCode = smokeName("p").slice(0, 10)

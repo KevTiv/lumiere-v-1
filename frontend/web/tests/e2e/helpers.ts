@@ -175,8 +175,13 @@ export async function fillField(page: Page, name: string, value: string) {
 }
 
 export async function chooseFirstOption(page: Page, name: string) {
+  await chooseFirstEnabledOption(page, name)
+}
+
+/** Pick the first non-disabled select option (skips empty placeholders). */
+export async function chooseFirstEnabledOption(page: Page, name: string) {
   await page.getByTestId(`form-field-${name}`).click()
-  const option = page.getByRole("option").first()
+  const option = page.getByRole("option", { disabled: false }).first()
   await expect(option).toBeVisible({ timeout: 15_000 })
   await option.click()
 }
@@ -447,6 +452,36 @@ export async function fetchSaleOrderIdByOpportunityId(
     throw new Error(`sale order row missing id for opportunity: ${opportunityId}`)
   }
   return orderId
+}
+
+/** Poll until confirmed sale order lines expose qty_to_invoice > 0 (post-confirm reducer sync). */
+export async function waitForSaleOrderBillableLines(page: Page, orderId: number) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/sale-order-lines")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          orderId?: unknown
+          order_id?: unknown
+          qtyToInvoice?: unknown
+          qty_to_invoice?: unknown
+          displayType?: unknown
+          display_type?: unknown
+        }>
+      }
+      const billable = (json.data ?? []).some((line) => {
+        const lineOrderId = scalarQueryId(line.orderId ?? line.order_id)
+        if (lineOrderId !== orderId) return false
+        if (line.displayType != null || line.display_type != null) return false
+        const qty = Number(line.qtyToInvoice ?? line.qty_to_invoice ?? 0)
+        return qty > 0
+      })
+      if (billable) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`sale order ${orderId} has no billable lines after confirm`)
 }
 
 /** Draft customer invoice move id for a partner display name. */

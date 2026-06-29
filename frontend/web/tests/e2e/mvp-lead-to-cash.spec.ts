@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 
 import {
   callReducerBff,
+  chooseFirstEnabledOption,
   chooseFirstOption,
   expectNoAppError,
   expectSeededText,
@@ -21,6 +22,7 @@ import {
   smokeName,
   submitForm,
   waitForEntityActionEnabled,
+  waitForSaleOrderBillableLines,
 } from "./helpers"
 
 /**
@@ -127,15 +129,24 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       { timeout: 30_000 },
     )
     expect(confirmRes.ok()).toBe(true)
+    await waitForSaleOrderBillableLines(page, orderId)
 
     // Step 10 — create invoice from sale order (UI)
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-create-invoice")
     await page.getByTestId("entity-action-create-invoice").click()
     await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
-    await chooseFirstOption(page, "journalId")
-    await chooseFirstOption(page, "defaultIncomeAccountId")
-    await submitForm(page, "create-invoice-from-sale-order")
+    await chooseFirstEnabledOption(page, "journalId")
+    await chooseFirstEnabledOption(page, "defaultIncomeAccountId")
+    const [invoiceRes] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "create-invoice-from-sale-order"),
+    ])
+    expect(invoiceRes.ok()).toBe(true)
 
     // Step 11 — post invoice (BFF — invoices tab uses custom list, not entity-table)
     const moveId = await fetchDraftInvoiceMoveIdByPartner(page, leadName)

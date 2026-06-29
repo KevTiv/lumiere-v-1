@@ -332,13 +332,20 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
         description: descriptionRaw || undefined,
       })
-      const rows = await queryClient.fetchQuery({
-        queryKey: ["proposals", rqBigIntKey(orgId)],
-        queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
-      })
-      const created = [...rows]
-        .filter((row) => String(row.title ?? "") === title)
-        .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0]
+
+      let created: Record<string, unknown> | undefined
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const rows = await queryClient.fetchQuery({
+          queryKey: ["proposals", rqBigIntKey(orgId)],
+          queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
+        })
+        created = [...rows]
+          .filter((row) => String(row.title ?? "") === title)
+          .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0]
+        if (created?.id != null) break
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      }
+
       const newId = created?.id != null ? String(created.id) : `new-${Date.now()}`
       router.push(
         `/proposals/${newId}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
