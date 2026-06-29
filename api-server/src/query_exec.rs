@@ -1,5 +1,7 @@
 //! Execute `/v1/query/:resource` SQL aligned with `frontend/packages/stdb/src/server.ts`.
 
+use std::collections::HashSet;
+
 use serde_json::Value;
 
 use crate::error::ApiError;
@@ -151,17 +153,10 @@ pub async fn execute_resource_query(
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
         "ai-action-drafts-inbox" => {
-            let company_ids = company_ids_for_organization(client, organization_id, fa).await?;
-            if company_ids.is_empty() {
-                return Ok(vec![]);
-            }
-            let company_filter = company_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+            // `ai_action_draft` has `organization_id`; `company_id IN (...)` is redundant and
+            // SpacetimeDB SQL does not support `IN` clauses. Scope by org only.
             let sql = format!(
-                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND company_id IN ({company_filter}) AND status = 'pending' ORDER BY id DESC"
+                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND status = 'pending' ORDER BY id DESC"
             );
             return client
                 .query_sql(&sql)
@@ -241,228 +236,284 @@ pub async fn execute_resource_query(
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
         "account-assets" | "fixed-assets" => {
+            // `account_asset` has no `organization_id`; SpacetimeDB SQL does not support
+            // `IN (...)`. Fetch all rows and filter by `company_id` in Rust.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             if ids.is_empty() {
                 return Ok(vec![]);
             }
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col = resolve_http_sql_columns("account-assets", fa).map_err(ApiError::Internal)?;
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "SELECT {} FROM account_asset WHERE company_id IN ({list})",
-                col.join(", ")
-            );
-            return client
+            let sql = format!("SELECT {} FROM account_asset", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
-        }
-        "depreciation-lines" => {
-            let ids = company_ids_for_organization(client, organization_id, fa).await?;
-            if ids.is_empty() {
-                return Ok(vec![]);
-            }
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let id_rows = client
-                .query_sql(&format!(
-                    "SELECT id FROM account_asset WHERE company_id IN ({list})"
-                ))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
-            let mut asset_ids: Vec<u64> = Vec::new();
-            for r in id_rows {
-                if let Some(id) = r.get("id").and_then(|v| v.as_u64()).or_else(|| {
-                    r.get("id")
-                        .and_then(|x| x.as_str())
-                        .and_then(|s| s.parse().ok())
-                }) {
-                    if id > 0 {
-                        asset_ids.push(id);
-                    }
-                }
-            }
-            if asset_ids.is_empty() {
+            rows.retain(|r| {
+                r.get("companyId")
+                    .or_else(|| r.get("company_id"))
+                    .and_then(|v| v.as_u64())
+                    .is_some_and(|cid| company_set.contains(&cid))
+            });
+            return Ok(rows);
+        }
+        "depreciation-lines" => {
+            // Two-level scoping: company -> asset -> depreciation_line. SpacetimeDB SQL does
+            // not support `IN (...)`, so resolve both levels in Rust.
+            let ids = company_ids_for_organization(client, organization_id, fa).await?;
+            if ids.is_empty() {
                 return Ok(vec![]);
             }
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
+
+            let asset_rows = client
+                .query_sql("SELECT id, company_id FROM account_asset")
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let company_in_set = |r: &Value| -> bool {
+                r.get("companyId")
+                    .or_else(|| r.get("company_id"))
+                    .and_then(|v| v.as_u64())
+                    .is_some_and(|cid| company_set.contains(&cid))
+            };
+            let asset_set: HashSet<u64> = asset_rows
+                .iter()
+                .filter(|r| company_in_set(r))
+                .filter_map(|r| {
+                    r.get("id").and_then(|v| v.as_u64()).or_else(|| {
+                        r.get("id")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                })
+                .filter(|id| *id > 0)
+                .collect();
+            if asset_set.is_empty() {
+                return Ok(vec![]);
+            }
+
             let col =
                 resolve_http_sql_columns("depreciation-lines", fa).map_err(ApiError::Internal)?;
-            let alist = asset_ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
             let sql = format!(
-                "SELECT {} FROM account_asset_depreciation_line WHERE asset_id IN ({alist})",
+                "SELECT {} FROM account_asset_depreciation_line",
                 col.join(", ")
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                r.get("assetId")
+                    .or_else(|| r.get("asset_id"))
+                    .and_then(|v| v.as_u64())
+                    .is_some_and(|id| asset_set.contains(&id))
+            });
+            return Ok(rows);
         }
         "intercompany-rules" => {
+            // No `organization_id`; SpacetimeDB SQL does not support `IN (...)`. Fetch all
+            // rows and filter by `source_company_id`/`destination_company_id` in Rust.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             if ids.is_empty() {
                 return Ok(vec![]);
             }
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col =
                 resolve_http_sql_columns("intercompany-rules", fa).map_err(ApiError::Internal)?;
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "SELECT {} FROM intercompany_rule WHERE source_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY sequence ASC",
-                col.join(", ")
-            );
-            return client
+            let sql = format!("SELECT {} FROM intercompany_rule", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                let src = r
+                    .get("sourceCompanyId")
+                    .or_else(|| r.get("source_company_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let dst = r
+                    .get("destinationCompanyId")
+                    .or_else(|| r.get("destination_company_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                company_set.contains(&src) || company_set.contains(&dst)
+            });
+            rows.sort_by(|a, b| {
+                let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                asq.cmp(&bsq)
+            });
+            return Ok(rows);
         }
         "intercompany-transactions" => {
+            // No `organization_id`; SpacetimeDB SQL does not support `IN (...)`. Fetch all
+            // rows and filter by `origin_company_id`/`destination_company_id` in Rust.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             if ids.is_empty() {
                 return Ok(vec![]);
             }
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col = resolve_http_sql_columns("intercompany-transactions", fa)
                 .map_err(ApiError::Internal)?;
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "SELECT {} FROM intercompany_transaction WHERE origin_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY id DESC",
-                col.join(", ")
-            );
-            return client
+            let sql = format!("SELECT {} FROM intercompany_transaction", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                let origin = r
+                    .get("originCompanyId")
+                    .or_else(|| r.get("origin_company_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let dst = r
+                    .get("destinationCompanyId")
+                    .or_else(|| r.get("destination_company_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                company_set.contains(&origin) || company_set.contains(&dst)
+            });
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
+            });
+            return Ok(rows);
         }
         "pos-configs" => {
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             if ids.is_empty() {
                 return Ok(vec![]);
             }
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col = resolve_http_sql_columns("pos-configs", fa).map_err(ApiError::Internal)?;
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "SELECT {} FROM pos_config WHERE company_id IN ({list}) ORDER BY name ASC",
-                col.join(", ")
-            );
-            return client
+            let sql = format!("SELECT {} FROM pos_config", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                r.get("companyId")
+                    .or_else(|| r.get("company_id"))
+                    .and_then(|v| v.as_u64())
+                    .is_some_and(|cid| company_set.contains(&cid))
+            });
+            rows.sort_by(|a, b| {
+                let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                an.cmp(bn)
+            });
+            return Ok(rows);
         }
         "pos-sessions" => {
+            // Two-level scoping: company -> pos_config -> pos_session. SpacetimeDB SQL does
+            // not support `IN (...)`, so resolve both levels in Rust.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
             if ids.is_empty() {
                 return Ok(vec![]);
             }
-            let list = ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
+
             let config_rows = client
-                .query_sql(&format!(
-                    "SELECT id FROM pos_config WHERE company_id IN ({list})"
-                ))
+                .query_sql("SELECT id, company_id FROM pos_config")
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
-            let mut config_ids: Vec<u64> = Vec::new();
-            for r in config_rows {
-                if let Some(id) = r.get("id").and_then(|v| v.as_u64()).or_else(|| {
-                    r.get("id")
-                        .and_then(|x| x.as_str())
-                        .and_then(|s| s.parse().ok())
-                }) {
-                    if id > 0 {
-                        config_ids.push(id);
-                    }
-                }
-            }
-            if config_ids.is_empty() {
+            let config_set: HashSet<u64> = config_rows
+                .iter()
+                .filter(|r| {
+                    r.get("companyId")
+                        .or_else(|| r.get("company_id"))
+                        .and_then(|v| v.as_u64())
+                        .is_some_and(|cid| company_set.contains(&cid))
+                })
+                .filter_map(|r| {
+                    r.get("id").and_then(|v| v.as_u64()).or_else(|| {
+                        r.get("id")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                })
+                .filter(|id| *id > 0)
+                .collect();
+            if config_set.is_empty() {
                 return Ok(vec![]);
             }
+
             let col = resolve_http_sql_columns("pos-sessions", fa).map_err(ApiError::Internal)?;
-            let clist = config_ids
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "SELECT {} FROM pos_session WHERE config_id IN ({clist}) ORDER BY start_at DESC",
-                col.join(", ")
-            );
-            return client
+            let sql = format!("SELECT {} FROM pos_session", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                r.get("configId")
+                    .or_else(|| r.get("config_id"))
+                    .and_then(|v| v.as_u64())
+                    .is_some_and(|id| config_set.contains(&id))
+            });
+            rows.sort_by(|a, b| {
+                let asa = a
+                    .get("startAt")
+                    .and_then(|v| v.as_f64())
+                    .or_else(|| {
+                        a.get("startAt")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                    .unwrap_or(0.0);
+                let bsa = b
+                    .get("startAt")
+                    .and_then(|v| v.as_f64())
+                    .or_else(|| {
+                        b.get("startAt")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                    .unwrap_or(0.0);
+                bsa.partial_cmp(&asa).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            return Ok(rows);
         }
         "ai-insights" => {
+            // No `organization_id`; SpacetimeDB SQL does not support `IN (...)`. Fetch all
+            // rows and keep rows with NULL/missing `company_id` (org-level insights) plus
+            // those matching the org's company IDs.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col = resolve_http_sql_columns("ai-insights", fa).map_err(ApiError::Internal)?;
-            let sql = if ids.is_empty() {
-                format!(
-                    "SELECT {} FROM ai_insight WHERE company_id IS NULL",
-                    col.join(", ")
-                )
-            } else {
-                let list = ids
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!(
-                    "SELECT {} FROM ai_insight WHERE company_id IN ({list}) OR company_id IS NULL",
-                    col.join(", ")
-                )
-            };
-            return client
+            let sql = format!("SELECT {} FROM ai_insight", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(
+                |r| match r.get("companyId").or_else(|| r.get("company_id")) {
+                    None | Some(Value::Null) => true,
+                    Some(v) => v.as_u64().is_some_and(|cid| company_set.contains(&cid)),
+                },
+            );
+            return Ok(rows);
         }
         "ai-document-processing-jobs" => {
+            // No `organization_id`; SpacetimeDB SQL does not support `IN (...)`. Fetch all
+            // rows and keep rows with NULL/missing `company_id` (org-level jobs) plus those
+            // matching the org's company IDs.
             let ids = company_ids_for_organization(client, organization_id, fa).await?;
+            let company_set: HashSet<u64> = ids.iter().copied().collect();
             let col = resolve_http_sql_columns("ai-document-processing-jobs", fa)
                 .map_err(ApiError::Internal)?;
-            let sql = if ids.is_empty() {
-                format!(
-                    "SELECT {} FROM ai_document_processing_job WHERE company_id IS NULL",
-                    col.join(", ")
-                )
-            } else {
-                let list = ids
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!(
-                    "SELECT {} FROM ai_document_processing_job WHERE company_id IN ({list}) OR company_id IS NULL",
-                    col.join(", ")
-                )
-            };
-            return client
+            let sql = format!("SELECT {} FROM ai_document_processing_job", col.join(", "));
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(
+                |r| match r.get("companyId").or_else(|| r.get("company_id")) {
+                    None | Some(Value::Null) => true,
+                    Some(v) => v.as_u64().is_some_and(|cid| company_set.contains(&cid)),
+                },
+            );
+            return Ok(rows);
         }
         "delivery-carriers"
         | "delivery-price-rules"
@@ -614,8 +665,16 @@ pub async fn execute_resource_query(
         }
         "pricelist-items" => {
             rows.sort_by(|a, b| {
-                let apl = a.get("pricelistId").or_else(|| a.get("pricelist_id")).and_then(|v| v.as_u64()).unwrap_or(0);
-                let bpl = b.get("pricelistId").or_else(|| b.get("pricelist_id")).and_then(|v| v.as_u64()).unwrap_or(0);
+                let apl = a
+                    .get("pricelistId")
+                    .or_else(|| a.get("pricelist_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let bpl = b
+                    .get("pricelistId")
+                    .or_else(|| b.get("pricelist_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
                 let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
                 apl.cmp(&bpl).then(asq.cmp(&bsq))
