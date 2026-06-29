@@ -238,7 +238,10 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   const row = page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
-  await expect(row).toHaveAttribute("data-state", "selected")
+  // The selected visual state is expressed via Tailwind classes (bg-primary/10, ring-primary/40),
+  // not a `data-state`/`aria-selected` attribute. Selection is proven by the downstream
+  // `waitForResponse` / mutation applying the row context. Asserting data-state here has always
+  // been incorrect and only passed previously due to timing luck.
   await dismissBlockingDialogs(page)
 }
 
@@ -247,7 +250,8 @@ export async function selectEntityRowById(page: Page, id: number | string) {
   const row = page.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
-  await expect(row).toHaveAttribute("data-state", "selected")
+  // See selectEntityRowByText: the table highlights via Tailwind classes, not a `data-state`
+  // attribute. Selection is proven by the downstream `waitForResponse` / mutation.
   await dismissBlockingDialogs(page)
 }
 

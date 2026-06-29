@@ -256,7 +256,10 @@ function useAccountingCallMutation(
 }
 
 function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = organizationId
+  // `stdbQueryKey` (hooks/stdb.ts) stringifies the organization id, so the invalidation key
+  // must match that shape or React Query will not match the cached query and the new row never
+  // refetches (this was the root cause of the budget-create E2E failure).
+  const k = String(organizationId)
   void qc.invalidateQueries({ queryKey: ["stdb", "budgets", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "budget-lines", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "budget-posts", k] })
@@ -425,10 +428,10 @@ export function useUpdateAccountAccountType(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { typeId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_account_account_type", [
-          organizationId,
-          args.typeId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        args.typeId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -453,10 +456,10 @@ export function useUpdateAccountGroup(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { groupId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_account_group", [
-          organizationId,
-          args.groupId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        args.groupId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -729,11 +732,11 @@ export function useUpdateFiscalYear(organizationId: number, companyId: bigint) {
   return useMutation({
     mutationFn: async (args: { fiscalYearId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_fiscal_year", [
-          organizationId,
-          companyId,
-          args.fiscalYearId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.fiscalYearId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -795,11 +798,11 @@ export function useUpdateAccountPeriod(organizationId: number, companyId: bigint
   return useMutation({
     mutationFn: async (args: { periodId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_account_period", [
-          organizationId,
-          companyId,
-          args.periodId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.periodId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1203,10 +1206,10 @@ export function useMatchEliminationEntries(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { entryId: bigint; matchedEntryId: bigint }) => {
       const { urlPath, init } = accountingBffPost("match_elimination_entries", [
-          organizationId,
-          args.entryId,
-          args.matchedEntryId,
-        ])
+        organizationId,
+        args.entryId,
+        args.matchedEntryId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1319,11 +1322,11 @@ export function useSetAccountAssetActive(organizationId: number, companyId: bigi
   return useMutation({
     mutationFn: async (args: { assetId: bigint; active: boolean }) => {
       const { urlPath, init } = accountingBffPost("set_asset_active", [
-          organizationId,
-          companyId,
-          args.assetId,
-          args.active,
-        ])
+        organizationId,
+        companyId,
+        args.assetId,
+        args.active,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1389,11 +1392,11 @@ export function useCreateIntercompanyRule(organizationId: number) {
       params: Record<string, unknown>
     }) => {
       const { urlPath, init } = accountingBffPost("create_intercompany_rule", [
-          organizationId,
-          args.sourceCompanyId,
-          args.destinationCompanyId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        args.sourceCompanyId,
+        args.destinationCompanyId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1406,11 +1409,11 @@ export function useUpdateIntercompanyRule(organizationId: number, companyId: big
   return useMutation({
     mutationFn: async (args: { ruleId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_intercompany_rule", [
-          organizationId,
-          companyId,
-          args.ruleId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.ruleId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1435,11 +1438,11 @@ export function useSetIntercompanyRuleActive(organizationId: number, companyId: 
   return useMutation({
     mutationFn: async (args: { ruleId: bigint; isActive: boolean }) => {
       const { urlPath, init } = accountingBffPost("set_intercompany_rule_active", [
-          organizationId,
-          companyId,
-          args.ruleId,
-          args.isActive,
-        ])
+        organizationId,
+        companyId,
+        args.ruleId,
+        args.isActive,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1453,10 +1456,10 @@ export function useCreateIntercompanyTransaction(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { originCompanyId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("create_intercompany_transaction", [
-          organizationId,
-          args.originCompanyId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        args.originCompanyId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1483,11 +1486,11 @@ export function useProcessIntercompanyTransaction(organizationId: number, compan
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("process_intercompany_transaction", [
-          organizationId,
-          companyId,
-          args.transactionId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.transactionId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1512,11 +1515,11 @@ export function useErrorIntercompanyTransaction(organizationId: number, companyI
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; errorMessage: string }) => {
       const { urlPath, init } = accountingBffPost("error_intercompany_transaction", [
-          organizationId,
-          companyId,
-          args.transactionId,
-          { errorMessage: args.errorMessage },
-        ])
+        organizationId,
+        companyId,
+        args.transactionId,
+        { errorMessage: args.errorMessage },
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1529,11 +1532,11 @@ export function useCancelIntercompanyTransaction(organizationId: number, company
   return useMutation({
     mutationFn: async (args: { transactionId: bigint; reason: string }) => {
       const { urlPath, init } = accountingBffPost("cancel_intercompany_transaction", [
-          organizationId,
-          companyId,
-          args.transactionId,
-          { reason: args.reason },
-        ])
+        organizationId,
+        companyId,
+        args.transactionId,
+        { reason: args.reason },
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1591,10 +1594,10 @@ export function useReconcilePaymentWithInvoice(organizationId: number, companyId
   return useMutation({
     mutationFn: async (args: { paymentMoveId: bigint; invoiceMoveId: bigint }) => {
       const { urlPath, init } = accountingBffPost("reconcile_payment_with_invoice", [
-          organizationId,
-          args.paymentMoveId,
-          args.invoiceMoveId,
-        ])
+        organizationId,
+        args.paymentMoveId,
+        args.invoiceMoveId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1661,11 +1664,11 @@ export function useRegisterPaymentOnInvoice(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { paymentId: bigint; invoiceIds: bigint[]; isBill: boolean }) => {
       const { urlPath, init } = accountingBffPost("register_payment_on_invoice", [
-          organizationId,
-          args.paymentId,
-          args.invoiceIds,
-          args.isBill,
-        ])
+        organizationId,
+        args.paymentId,
+        args.invoiceIds,
+        args.isBill,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1697,12 +1700,12 @@ export function useUpdatePaymentTerm(organizationId: number) {
       isActive: boolean | null
     }) => {
       const { urlPath, init } = accountingBffPost("update_payment_term", [
-          organizationId,
-          args.termId,
-          args.name,
-          args.note,
-          args.isActive,
-        ])
+        organizationId,
+        args.termId,
+        args.name,
+        args.note,
+        args.isActive,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1750,15 +1753,15 @@ export function useUpdatePaymentTermLine(organizationId: number) {
       sequence: number | null
     }) => {
       const { urlPath, init } = accountingBffPost("update_payment_term_line", [
-          organizationId,
-          args.lineId,
-          args.value,
-          args.valueAmount,
-          args.days,
-          args.months,
-          args.daysAfterEndOfMonth,
-          args.sequence,
-        ])
+        organizationId,
+        args.lineId,
+        args.value,
+        args.valueAmount,
+        args.days,
+        args.months,
+        args.daysAfterEndOfMonth,
+        args.sequence,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1786,10 +1789,10 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const { urlPath, init } = accountingBffPost("create_currency_rate", [
-          organizationId,
-          encodeOptionalU64(companyId),
-          stdbParamsToJson(params as object, "CreateCurrencyRateParams"),
-        ])
+        organizationId,
+        encodeOptionalU64(companyId),
+        stdbParamsToJson(params as object, "CreateCurrencyRateParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1852,11 +1855,11 @@ export function useUpdateAccountTaxGroup(organizationId: number, companyId: bigi
   return useMutation({
     mutationFn: async (args: { groupId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_account_tax_group", [
-          organizationId,
-          companyId,
-          args.groupId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.groupId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1913,11 +1916,11 @@ export function useUpdateTaxSchedule(organizationId: number, companyId: bigint) 
   return useMutation({
     mutationFn: async (args: { scheduleId: bigint; params: Record<string, unknown> }) => {
       const { urlPath, init } = accountingBffPost("update_tax_schedule", [
-          organizationId,
-          companyId,
-          args.scheduleId,
-          stdbParamsToJson(args.params as object),
-        ])
+        organizationId,
+        companyId,
+        args.scheduleId,
+        stdbParamsToJson(args.params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

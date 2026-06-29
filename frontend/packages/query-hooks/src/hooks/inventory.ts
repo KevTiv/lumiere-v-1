@@ -574,13 +574,13 @@ export function useAssignUserToPicking(organizationId: bigint, companyId: bigint
   >({
     mutationFn: async ({ pickingId, params }) => {
       const { urlPath, init } = inventoryBffPost("assign_user_to_picking", [
-          organizationId,
-          toScalarU64(pickingId),
-          stdbParamsToJson({
-            company_id: companyId,
-            user_id: params.userId && params.userId.length > 0 ? params.userId : null,
-          } as object),
-        ])
+        organizationId,
+        toScalarU64(pickingId),
+        stdbParamsToJson({
+          company_id: companyId,
+          user_id: params.userId && params.userId.length > 0 ? params.userId : null,
+        } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign user to picking')
     },
@@ -632,14 +632,14 @@ export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
   >({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("move_stock_quant", [
-          organizationId,
-          toScalarU64(params.quantId),
-          stdbParamsToJson({
-            company_id: companyId,
-            dest_location_id: toScalarU64(params.targetLocationId),
-            quantity: params.quantity,
-          } as object),
-        ])
+        organizationId,
+        toScalarU64(params.quantId),
+        stdbParamsToJson({
+          company_id: companyId,
+          dest_location_id: toScalarU64(params.targetLocationId),
+          quantity: params.quantity,
+        } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to move stock item')
     },
@@ -669,10 +669,10 @@ export function useValidateStockPicking(organizationId: bigint, companyId: bigin
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const { urlPath, init } = inventoryBffPost("validate_stock_picking", [
-          organizationId,
-          toScalarU64(pickingId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(pickingId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate stock picking')
     },
@@ -685,10 +685,10 @@ export function useReserveStockQuant(organizationId: bigint, companyId: bigint) 
   return useMutation<void, Error, { quantId: ScalarId; reserveQty: number }>({
     mutationFn: async ({ quantId, reserveQty }) => {
       const { urlPath, init } = inventoryBffPost("reserve_stock_quant", [
-          organizationId,
-          toScalarU64(quantId),
-          stdbParamsToJson({ company_id: companyId, reserve_qty: reserveQty } as object),
-        ])
+        organizationId,
+        toScalarU64(quantId),
+        stdbParamsToJson({ company_id: companyId, reserve_qty: reserveQty } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reserve stock')
     },
@@ -701,10 +701,10 @@ export function useUnreserveStockQuant(organizationId: bigint, companyId: bigint
   return useMutation<void, Error, { quantId: ScalarId; unreserveQty: number }>({
     mutationFn: async ({ quantId, unreserveQty }) => {
       const { urlPath, init } = inventoryBffPost("unreserve_stock_quant", [
-          organizationId,
-          toScalarU64(quantId),
-          stdbParamsToJson({ company_id: companyId, unreserve_qty: unreserveQty } as object),
-        ])
+        organizationId,
+        toScalarU64(quantId),
+        stdbParamsToJson({ company_id: companyId, unreserve_qty: unreserveQty } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unreserve stock')
     },
@@ -842,10 +842,10 @@ export function useConfirmStockMove(organizationId: bigint, companyId: bigint) {
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const { urlPath, init } = inventoryBffPost("confirm_stock_move", [
-          organizationId,
-          toScalarU64(moveId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(moveId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock move')
     },
@@ -858,10 +858,10 @@ export function useAssignStockMove(organizationId: bigint, companyId: bigint) {
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const { urlPath, init } = inventoryBffPost("assign_stock_move", [
-          organizationId,
-          toScalarU64(moveId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(moveId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock move')
     },
@@ -874,10 +874,10 @@ export function useDoneStockMove(organizationId: bigint, companyId: bigint) {
   return useMutation<void, Error, { moveId: ScalarId; quantityDone: number }>({
     mutationFn: async ({ moveId, quantityDone }) => {
       const { urlPath, init } = inventoryBffPost("done_stock_move", [
-          organizationId,
-          toScalarU64(moveId),
-          stdbParamsToJson({ company_id: companyId, quantity_done: quantityDone } as object),
-        ])
+        organizationId,
+        toScalarU64(moveId),
+        stdbParamsToJson({ company_id: companyId, quantity_done: quantityDone } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete stock move')
     },
@@ -890,10 +890,10 @@ export function useCancelStockMove(organizationId: bigint, companyId: bigint) {
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (moveId) => {
       const { urlPath, init } = inventoryBffPost("cancel_stock_move", [
-          organizationId,
-          toScalarU64(moveId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(moveId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock move')
     },
@@ -906,10 +906,10 @@ export function useConfirmStockPicking(organizationId: bigint, companyId: bigint
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const { urlPath, init } = inventoryBffPost("confirm_stock_picking", [
-          organizationId,
-          toScalarU64(pickingId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(pickingId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock picking')
     },
@@ -922,10 +922,10 @@ export function useAssignStockPicking(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const { urlPath, init } = inventoryBffPost("assign_stock_picking", [
-          organizationId,
-          toScalarU64(pickingId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(pickingId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock picking')
     },
@@ -938,10 +938,10 @@ export function useCancelStockPicking(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (pickingId) => {
       const { urlPath, init } = inventoryBffPost("cancel_stock_picking", [
-          organizationId,
-          toScalarU64(pickingId),
-          stdbParamsToJson({ company_id: companyId } as object),
-        ])
+        organizationId,
+        toScalarU64(pickingId),
+        stdbParamsToJson({ company_id: companyId } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock picking')
     },
@@ -1040,10 +1040,10 @@ export function useCreateQualityCheck(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_quality_check", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality check')
     },
@@ -1089,13 +1089,13 @@ export function usePassQualityCheck(organizationId: bigint, companyId: bigint) {
   >({
     mutationFn: async ({ checkId, measure, note, picture }) => {
       const { urlPath, init } = inventoryBffPost("pass_quality_check", [
-          organizationId,
-          companyId,
-          toScalarU64(checkId),
-          measure ?? null,
-          note ?? null,
-          picture ?? null,
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(checkId),
+        measure ?? null,
+        note ?? null,
+        picture ?? null,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to pass quality check')
     },
@@ -1118,14 +1118,14 @@ export function useFailQualityCheck(organizationId: bigint, companyId: bigint) {
   >({
     mutationFn: async ({ checkId, qtyFailed, note, pictureFail, failureLocationId }) => {
       const { urlPath, init } = inventoryBffPost("fail_quality_check", [
-          organizationId,
-          companyId,
-          toScalarU64(checkId),
-          qtyFailed,
-          note ?? null,
-          pictureFail ?? null,
-          failureLocationId != null ? toScalarU64(failureLocationId) : null,
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(checkId),
+        qtyFailed,
+        note ?? null,
+        pictureFail ?? null,
+        failureLocationId != null ? toScalarU64(failureLocationId) : null,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to fail quality check')
     },
@@ -1138,11 +1138,11 @@ export function useCreateQualityAlert(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, { teamId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ teamId, params }) => {
       const { urlPath, init } = inventoryBffPost("create_quality_alert", [
-          organizationId,
-          companyId,
-          toScalarU64(teamId),
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(teamId),
+        stdbParamsToJson(params as object, "CreateQualityAlertParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality alert')
     },
@@ -1179,11 +1179,11 @@ export function useAssignQualityAlert(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, { alertId: ScalarId; userId: string | null }>({
     mutationFn: async ({ alertId, userId }) => {
       const { urlPath, init } = inventoryBffPost("assign_quality_alert", [
-          organizationId,
-          companyId,
-          toScalarU64(alertId),
-          userId,
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(alertId),
+        userId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign quality alert')
     },
@@ -1196,11 +1196,11 @@ export function useCancelQualityAlert(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, { alertId: ScalarId; description?: string | null }>({
     mutationFn: async ({ alertId, description }) => {
       const { urlPath, init } = inventoryBffPost("cancel_quality_alert", [
-          organizationId,
-          companyId,
-          toScalarU64(alertId),
-          description ?? null,
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(alertId),
+        description ?? null,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel quality alert')
     },
@@ -1213,10 +1213,10 @@ export function useCreateQualityPoint(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_quality_point", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality point')
     },
@@ -1229,11 +1229,11 @@ export function useUpdateQualityPoint(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, { pointId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ pointId, params }) => {
       const { urlPath, init } = inventoryBffPost("update_quality_point", [
-          organizationId,
-          companyId,
-          toScalarU64(pointId),
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        toScalarU64(pointId),
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quality point')
     },
@@ -1522,10 +1522,10 @@ export function useCreateUomConversion(organizationId: bigint, _companyId?: bigi
   return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ categoryId, params }) => {
       const { urlPath, init } = inventoryBffPost("create_uom_conversion", [
-          organizationId,
-          toScalarU64(categoryId),
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        toScalarU64(categoryId),
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM conversion')
     },
@@ -1540,10 +1540,10 @@ export function useCreateReplenishmentRule(organizationId: bigint, companyId: bi
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_replenishment_rule", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create replenishment rule')
     },
@@ -1597,10 +1597,10 @@ export function useCreatePickingWave(organizationId: bigint, companyId: bigint) 
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_picking_wave", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create picking wave')
     },
@@ -1843,10 +1843,10 @@ export function useCreateWarehouseTask(organizationId: bigint, companyId: bigint
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_warehouse_task", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params as object),
-        ])
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create warehouse task')
     },
@@ -1983,13 +1983,13 @@ export function useCreateQualityAlertReason(organizationId: bigint) {
   return useMutation<void, Error, { name: string; description?: string | null; metadata?: string | null }>({
     mutationFn: async (params) => {
       const { urlPath, init } = inventoryBffPost("create_quality_alert_reason", [
-          organizationId,
-          {
-            name: params.name,
-            description: params.description ?? null,
-            metadata: params.metadata ?? null,
-          },
-        ])
+        organizationId,
+        {
+          name: params.name,
+          description: params.description ?? null,
+          metadata: params.metadata ?? null,
+        },
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality alert reason')
     },
@@ -2095,10 +2095,10 @@ export function useUpdateStockQuantQuantity(organizationId: bigint, companyId: b
   return useMutation<void, Error, { quantId: ScalarId; quantity: number }>({
     mutationFn: async ({ quantId, quantity }) => {
       const { urlPath, init } = inventoryBffPost("update_stock_quant_quantity", [
-          organizationId,
-          toScalarU64(quantId),
-          stdbParamsToJson({ company_id: companyId, quantity } as object),
-        ])
+        organizationId,
+        toScalarU64(quantId),
+        stdbParamsToJson({ company_id: companyId, quantity } as object),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quant quantity')
     },
@@ -2305,15 +2305,15 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
   >({
     mutationFn: async (p) => {
       const { urlPath, init } = inventoryBffPost("upsert_warehouse_geo", [
-          organizationId,
-          toScalarU64(p.warehouseId),
-          p.latitude,
-          p.longitude,
-          p.address ?? null,
-          p.city ?? null,
-          p.countryCode ?? null,
-          p.managerName ?? null,
-        ])
+        organizationId,
+        toScalarU64(p.warehouseId),
+        p.latitude,
+        p.longitude,
+        p.address ?? null,
+        p.city ?? null,
+        p.countryCode ?? null,
+        p.managerName ?? null,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to save warehouse geo')
     },
@@ -2376,10 +2376,10 @@ export function useImportProductCsv(organizationId: bigint) {
   return useMutation({
     mutationFn: async (args: { csvData: string; currencyId: number }) => {
       const { urlPath, init } = inventoryBffPost("import_product_csv", [
-          organizationId,
-          args.currencyId,
-          args.csvData,
-        ])
+        organizationId,
+        args.currencyId,
+        args.csvData,
+      ])
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorInv(res))
     },

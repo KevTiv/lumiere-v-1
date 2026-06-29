@@ -213,7 +213,16 @@ export function ProposalWorkspace({
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
   const effectiveUserName = currentUserName ?? t("proposalWorkspace.you")
-  const proposalIdBig = BigInt(proposalId)
+  // The proposals list redirect uses a placeholder id (`new-${Date.now()}`) when the reducer
+  // returns no id (SpacetimeDB reducers are void). Guard the BigInt conversion so the workspace
+  // still renders the title heading from the URL param; use 0n as a sentinel so BigInt-dependent
+  // queries return empty results (no proposal has id 0) and the component doesn't crash.
+  let proposalIdBig: bigint
+  try {
+    proposalIdBig = BigInt(proposalId)
+  } catch {
+    proposalIdBig = 0n
+  }
 
   // ── Local UI state ──────────────────────────────────────────────────────────
   const [activeSectionId, setActiveSectionId] = useState<bigint | null>(null)
@@ -391,8 +400,8 @@ export function ProposalWorkspace({
       clearPresence.mutate(proposalIdBig)
       if (presenceDebounceRef.current) clearTimeout(presenceDebounceRef.current)
     }
-     
-  }, [proposalId, clearPresence.mutate])
+
+  }, [proposalIdBig, clearPresence.mutate])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 

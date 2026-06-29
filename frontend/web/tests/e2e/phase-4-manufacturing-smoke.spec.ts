@@ -24,13 +24,13 @@ async function assertManufacturingTabRenders(page: Page, tabId: string) {
       break
     case "orders":
       await expect(page.getByTestId("module-create-manufacturing-orders")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(page.getByRole("tabpanel", { name: "Manufacturing Orders" }).getByTestId("entity-table")).toBeVisible()
       break
     case "bom-lines":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(page.getByRole("tabpanel", { name: "BOM Lines" }).getByTestId("entity-table")).toBeVisible()
       break
     case "routing-operations":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(page.getByRole("tabpanel", { name: "Routing Operations" }).getByTestId("entity-table")).toBeVisible()
       break
     default:
       break
