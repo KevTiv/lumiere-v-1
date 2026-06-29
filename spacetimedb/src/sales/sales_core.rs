@@ -690,6 +690,29 @@ pub fn confirm_sales_order(
         ..order
     });
 
+    // Invoice-on-order: confirmed lines become billable (delivery-based qty is set on picking validate).
+    for line in ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order_id)
+    {
+        if line.display_type.is_some() {
+            continue;
+        }
+        let qty_to_invoice = (line.product_uom_qty - line.qty_invoiced).max(0.0);
+        if qty_to_invoice <= 0.0 {
+            continue;
+        }
+        ctx.db.sale_order_line().id().update(SaleOrderLine {
+            qty_to_invoice,
+            invoice_status: LineInvoiceStatus::ToInvoice,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..line
+        });
+    }
+
     // Increment customer_rank on the partner contact
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
         ctx.db.contact().id().update(crate::crm::contacts::Contact {

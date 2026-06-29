@@ -12,7 +12,7 @@ use crate::inventory::stock::{
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
     confirm_sales_order, create_sale_order, sale_order, sale_order_line, CreateSaleOrderLineParams,
-    CreateSaleOrderParams, SaleOrderLine,
+    CreateSaleOrderParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, InvoiceStatus, JournalType, LineInvoiceStatus, MoveType, SaleState};
@@ -143,19 +143,35 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         ));
     }
 
-    // SO lines start with qty_to_invoice=0 until delivery/invoicing policy is wired;
-    // unblock invoice-from-SO reducer for harness coverage.
-    for line in ctx
+    let lines: Vec<_> = ctx
         .db
         .sale_order_line()
         .order_line_by_order()
         .filter(&order.id)
-    {
-        ctx.db.sale_order_line().id().update(SaleOrderLine {
-            qty_to_invoice: line.product_uom_qty - line.qty_invoiced,
-            invoice_status: LineInvoiceStatus::ToInvoice,
-            ..line
-        });
+        .collect();
+    if lines.is_empty() {
+        return Err("Expected at least one sale order line".to_string());
+    }
+    for line in &lines {
+        if line.display_type.is_some() {
+            continue;
+        }
+        let expected = (line.product_uom_qty - line.qty_invoiced).max(0.0);
+        if expected <= 0.0 {
+            continue;
+        }
+        if line.qty_to_invoice != expected {
+            return Err(format!(
+                "Expected qty_to_invoice {} after confirm, got {}",
+                expected, line.qty_to_invoice
+            ));
+        }
+        if line.invoice_status != LineInvoiceStatus::ToInvoice {
+            return Err(format!(
+                "Expected line ToInvoice after confirm, got {:?}",
+                line.invoice_status
+            ));
+        }
     }
 
     let revenue_id = *fixture

@@ -465,7 +465,7 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
           u64(defaultIncomeAccountId),
         ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create invoice from sale order')
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
     onSuccess: () => {
       const orgKey = rqBigIntKey(organizationId)
