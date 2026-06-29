@@ -132,10 +132,10 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-create-invoice")
     await page.getByTestId("entity-action-create-invoice").click()
-    await expect(page.getByTestId("form-modal-create-invoice-from-order")).toBeVisible()
+    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
     await chooseFirstOption(page, "journalId")
     await chooseFirstOption(page, "defaultIncomeAccountId")
-    await submitForm(page, "create-invoice-from-order")
+    await submitForm(page, "create-invoice-from-sale-order")
 
     // Step 11 — post invoice (BFF — invoices tab uses custom list, not entity-table)
     const moveId = await fetchDraftInvoiceMoveIdByPartner(page, leadName)

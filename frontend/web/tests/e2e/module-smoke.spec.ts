@@ -63,11 +63,14 @@ test.describe("ERP module smoke", () => {
     await fillField(page, "clientName", "Smoke Client")
     await chooseFirstOption(page, "type")
     await fillField(page, "value", "5000")
-    await page.getByTestId("form-submit-new-proposal").click()
-    await page.waitForResponse(
-      (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
-      { timeout: 30_000 },
-    )
+    const [createProposalRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      page.getByTestId("form-submit-new-proposal").click(),
+    ])
+    expect(createProposalRes.ok()).toBe(true)
 
     await expect(page).toHaveURL(/\/proposals\/[^/]+/, { timeout: 30_000 })
     await expect(page.getByTestId("proposal-workspace-title")).toHaveText(proposalTitle, {

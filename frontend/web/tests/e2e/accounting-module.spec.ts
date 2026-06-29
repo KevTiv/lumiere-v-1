@@ -183,13 +183,13 @@ test.describe("Accounting module e2e", () => {
     await gotoModule(page, "/accounting", "accounting")
 
     const fyName = smokeName("FY")
+    // Unique calendar year per run so CI retries cannot hit `create_fiscal_year` overlap.
+    const fyYear = 2100 + Math.floor(Date.now() % 80)
     await openAccountingTab(page, "fiscal-years")
     await openEntityCreate(page, "/accounting", "accounting", "fiscal-years", "new-fiscal-year")
     await fillField(page, "name", fyName)
-    // Use far-future 2101 (not 2099, which is seeded by `seed_dev_data` and would collide with
-    // `create_fiscal_year`'s overlap check via the `fiscal_year_by_company` index).
-    await fillField(page, "dateFrom", isoDateTimeLocal(2101, 1, 1, 0, 0))
-    await fillField(page, "dateTo", isoDateTimeLocal(2101, 12, 31, 23, 59))
+    await fillField(page, "dateFrom", isoDateTimeLocal(fyYear, 1, 1, 0, 0))
+    await fillField(page, "dateTo", isoDateTimeLocal(fyYear, 12, 31, 23, 59))
     await chooseFirstOption(page, "fiscalYearType")
     await submitForm(page, "new-fiscal-year")
     await expect(page.getByText(fyName).first()).toBeVisible({ timeout: 30_000 })
@@ -202,8 +202,8 @@ test.describe("Accounting module e2e", () => {
     await fillField(page, "code", periodCode)
     await page.getByTestId("form-field-fiscalYearId").click()
     await page.getByRole("option", { name: fyName }).click()
-    await fillField(page, "dateFrom", isoDateTimeLocal(2101, 1, 1, 0, 0))
-    await fillField(page, "dateTo", isoDateTimeLocal(2101, 3, 31, 23, 59))
+    await fillField(page, "dateFrom", isoDateTimeLocal(fyYear, 1, 1, 0, 0))
+    await fillField(page, "dateTo", isoDateTimeLocal(fyYear, 3, 31, 23, 59))
     await submitForm(page, "new-account-period")
     await expect(page.getByText(periodName).first()).toBeVisible()
     await expectNoAppError(page)
