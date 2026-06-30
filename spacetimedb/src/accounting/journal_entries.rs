@@ -11,6 +11,7 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::core::organization::{company, company_id_from_scope};
+use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
@@ -1590,6 +1591,13 @@ pub fn create_invoice_from_sale_order(
         .find(&order.company_id)
         .ok_or("Company not found")?;
 
+    let partner_display_name = ctx
+        .db
+        .contact()
+        .id()
+        .find(&order.partner_invoice_id)
+        .map(|c| c.display_name.clone());
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -1603,7 +1611,7 @@ pub fn create_invoice_from_sale_order(
         invoice_date_due: None,
         invoice_payment_term_id: order.payment_term_id,
         invoice_origin: Some(format!("SO{}", sale_order_id)),
-        invoice_partner_display_name: None,
+        invoice_partner_display_name: partner_display_name,
         invoice_cash_rounding_id: None,
         payment_reference: None,
         partner_shipping_id: Some(order.partner_shipping_id),
@@ -1887,6 +1895,13 @@ pub fn create_bill_from_purchase_order(
         .find(&po.company_id)
         .ok_or("Company not found")?;
 
+    let partner_display_name = ctx
+        .db
+        .contact()
+        .id()
+        .find(&po.partner_id)
+        .map(|c| c.display_name.clone());
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -1900,7 +1915,7 @@ pub fn create_bill_from_purchase_order(
         invoice_date_due: None,
         invoice_payment_term_id: po.payment_term_id,
         invoice_origin: Some(format!("PO{}", purchase_order_id)),
-        invoice_partner_display_name: None,
+        invoice_partner_display_name: partner_display_name,
         invoice_cash_rounding_id: None,
         payment_reference: None,
         partner_shipping_id: None,
