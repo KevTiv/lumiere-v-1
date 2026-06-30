@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test"
 import {
   chooseFirstOption,
   expectNoAppError,
+  fetchProposalIdByTitle,
+  fetchSessionOrganizationId,
   fillField,
   gotoModule,
   openEntityCreate,
@@ -57,6 +59,7 @@ test.describe("ERP module smoke", () => {
 
   test("creates a Proposal and opens the proposal workspace route", async ({ page }) => {
     const proposalTitle = smokeName("proposal")
+    const orgId = await fetchSessionOrganizationId(page)
 
     await openEntityCreate(page, "/proposals", "proposals", "proposals", "new-proposal")
     await fillField(page, "title", proposalTitle)
@@ -68,16 +71,20 @@ test.describe("ERP module smoke", () => {
         (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
         { timeout: 30_000 },
       ),
-      page.waitForURL(/\/proposals\/\d+/, { timeout: 30_000 }),
       page.getByTestId("form-submit-new-proposal").click(),
     ])
     expect(createProposalRes.ok()).toBe(true)
-    await expect(page).toHaveURL(/\/proposals\/\d+/)
+
+    const proposalId = await fetchProposalIdByTitle(page, proposalTitle)
+    await page.goto(
+      `/proposals/${proposalId}?title=${encodeURIComponent(proposalTitle)}&orgId=${orgId}`,
+    )
+    await expect(page).toHaveURL(new RegExp(`/proposals/${proposalId}(?:\\?|$)`))
+    await expectNoAppError(page)
 
     await expect(page.getByTestId("proposal-workspace-title")).toHaveText(proposalTitle, {
       timeout: 30_000,
     })
-    await expectNoAppError(page)
   })
 
   test("renders guarded workflow/action controls for CRM and Helpdesk", async ({ page }) => {

@@ -567,6 +567,27 @@ export async function waitForSaleOrderBillableLines(page: Page, orderId: number)
   throw new Error(`sale order ${orderId} has no billable lines after confirm`)
 }
 
+/** Poll until a proposal row with the given title appears in the BFF query. */
+export async function fetchProposalIdByTitle(page: Page, title: string): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/proposals")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; title?: string }>
+      }
+      const matches = (json.data ?? []).filter((row) => String(row.title ?? "") === title)
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`proposal not found in query: ${title}`)
+}
+
 /** Draft customer invoice move id for a partner display name. */
 export async function fetchDraftInvoiceMoveIdByPartner(
   page: Page,
