@@ -630,10 +630,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['id', 'originCompanyId', 'destinationCompanyId'] as readonly (keyof IntercompanyTransaction)[],
   ),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
-    'reference', 'clientOrderRef', 'state', 'partnerId', 'companyId', 'dateOrder',
+    'reference', 'clientOrderRef', 'state', 'partnerId', 'companyId', 'dateOrder', 'opportunityId',
   ]),
   'sale-order-lines': orgEntry<SaleOrderLine>('sale_order_line', ['sale-order-lines', 'sale_order_line'], [
-    'name', 'orderId', 'productId', 'productUomQty', 'priceUnit',
+    'name', 'orderId', 'productId', 'productUomQty', 'priceUnit', 'qtyToInvoice', 'qtyInvoiced',
+    'displayType', 'invoiceStatus',
   ]),
   pricelists: orgEntry<ProductPricelist>('product_pricelist', ['pricelists', 'product_pricelist'], [
     'name', 'currencyId', 'isActive',

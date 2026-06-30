@@ -401,11 +401,35 @@ function scalarQueryString(value: unknown): string {
   return String(value)
 }
 
-/** Sale order id for a CRM opportunity (uses partner_id — opportunity_id is not in the sale-orders query projection). */
+/** Sale order id linked to a CRM opportunity (prefers opportunity_id in sale-orders query). */
 export async function fetchSaleOrderIdByOpportunityId(
   page: Page,
   opportunityId: number,
 ): Promise<number> {
+  const soRes = await page.request.get("/api/query/sale-orders")
+  if (!soRes.ok()) throw new Error(`sale-orders query failed: ${soRes.status()}`)
+  const soJson = (await soRes.json()) as {
+    data?: Array<{
+      id?: number | string
+      partnerId?: unknown
+      partner_id?: unknown
+      opportunityId?: unknown
+      opportunity_id?: unknown
+      state?: unknown
+    }>
+  }
+
+  const byOpportunity = (soJson.data ?? []).filter(
+    (order) => scalarQueryId(order.opportunityId ?? order.opportunity_id) === opportunityId,
+  )
+  if (byOpportunity.length > 0) {
+    const newest = [...byOpportunity].sort(
+      (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+    )[0]
+    const orderId = scalarQueryId(newest?.id)
+    if (orderId != null) return orderId
+  }
+
   const oppRes = await page.request.get("/api/query/opportunities")
   if (!oppRes.ok()) throw new Error(`opportunities query failed: ${oppRes.status()}`)
   const oppJson = (await oppRes.json()) as {
@@ -423,16 +447,6 @@ export async function fetchSaleOrderIdByOpportunityId(
     throw new Error(`opportunity ${opportunityId} has no partner_id in query projection`)
   }
 
-  const soRes = await page.request.get("/api/query/sale-orders")
-  if (!soRes.ok()) throw new Error(`sale-orders query failed: ${soRes.status()}`)
-  const soJson = (await soRes.json()) as {
-    data?: Array<{
-      id?: number | string
-      partnerId?: unknown
-      partner_id?: unknown
-      state?: unknown
-    }>
-  }
   const matches = (soJson.data ?? []).filter(
     (order) => scalarQueryId(order.partnerId ?? order.partner_id) === partnerId,
   )
@@ -454,9 +468,62 @@ export async function fetchSaleOrderIdByOpportunityId(
   return orderId
 }
 
+/** Poll until a sale order line exists for the order with a product quantity > 0. */
+export async function waitForSaleOrderLineExists(page: Page, orderId: number) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/sale-order-lines")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          orderId?: unknown
+          order_id?: unknown
+          productId?: unknown
+          product_id?: unknown
+          productUomQty?: unknown
+          product_uom_qty?: unknown
+          displayType?: unknown
+          display_type?: unknown
+        }>
+      }
+      const hasLine = (json.data ?? []).some((line) => {
+        const lineOrderId = scalarQueryId(line.orderId ?? line.order_id)
+        if (lineOrderId !== orderId) return false
+        if (line.displayType != null || line.display_type != null) return false
+        const productId = scalarQueryId(line.productId ?? line.product_id)
+        const qty = Number(line.productUomQty ?? line.product_uom_qty ?? 0)
+        return productId != null && qty > 0
+      })
+      if (hasLine) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`sale order ${orderId} has no product line in query`)
+}
+
+/** Poll until sale order state reflects confirmation (Sale / sale). */
+export async function waitForSaleOrderConfirmed(page: Page, orderId: number) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/sale-orders")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; state?: unknown }>
+      }
+      const order = (json.data ?? []).find((row) => scalarQueryId(row.id) === orderId)
+      const state = scalarQueryString(order?.state).toLowerCase()
+      if (state === "sale" || state.includes("sale")) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`sale order ${orderId} was not confirmed`)
+}
+
 /** Poll until confirmed sale order lines expose qty_to_invoice > 0 (post-confirm reducer sync). */
 export async function waitForSaleOrderBillableLines(page: Page, orderId: number) {
   const deadline = Date.now() + 30_000
+  let sawLine = false
+  let projectionMissingQty = false
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/sale-order-lines")
     if (res.ok()) {
@@ -470,9 +537,17 @@ export async function waitForSaleOrderBillableLines(page: Page, orderId: number)
           display_type?: unknown
         }>
       }
-      const billable = (json.data ?? []).some((line) => {
-        const lineOrderId = scalarQueryId(line.orderId ?? line.order_id)
-        if (lineOrderId !== orderId) return false
+      const orderLines = (json.data ?? []).filter(
+        (line) => scalarQueryId(line.orderId ?? line.order_id) === orderId,
+      )
+      if (orderLines.length > 0) {
+        sawLine = true
+        const hasQtyField = orderLines.some(
+          (line) => line.qtyToInvoice != null || line.qty_to_invoice != null,
+        )
+        if (!hasQtyField) projectionMissingQty = true
+      }
+      const billable = orderLines.some((line) => {
         if (line.displayType != null || line.display_type != null) return false
         const qty = Number(line.qtyToInvoice ?? line.qty_to_invoice ?? 0)
         return qty > 0
@@ -480,6 +555,14 @@ export async function waitForSaleOrderBillableLines(page: Page, orderId: number)
       if (billable) return
     }
     await page.waitForTimeout(250)
+  }
+  if (projectionMissingQty) {
+    throw new Error(
+      `sale order ${orderId} lines are missing qtyToInvoice in /api/query/sale-order-lines projection`,
+    )
+  }
+  if (!sawLine) {
+    throw new Error(`sale order ${orderId} has no lines in query after confirm`)
   }
   throw new Error(`sale order ${orderId} has no billable lines after confirm`)
 }

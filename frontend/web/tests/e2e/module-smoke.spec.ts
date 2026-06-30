@@ -68,10 +68,11 @@ test.describe("ERP module smoke", () => {
         (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
         { timeout: 30_000 },
       ),
-      page.waitForURL(/\/proposals\/[^/]+/, { timeout: 30_000 }),
+      page.waitForURL(/\/proposals\/\d+/, { timeout: 30_000 }),
       page.getByTestId("form-submit-new-proposal").click(),
     ])
     expect(createProposalRes.ok()).toBe(true)
+    await expect(page).toHaveURL(/\/proposals\/\d+/)
 
     await expect(page.getByTestId("proposal-workspace-title")).toHaveText(proposalTitle, {
       timeout: 30_000,

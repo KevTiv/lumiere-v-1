@@ -334,7 +334,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       })
 
       let created: Record<string, unknown> | undefined
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
         const rows = await queryClient.fetchQuery({
           queryKey: ["proposals", rqBigIntKey(orgId)],
           queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
@@ -346,9 +346,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         await new Promise((resolve) => setTimeout(resolve, 250))
       }
 
-      const newId = created?.id != null ? String(created.id) : `new-${Date.now()}`
+      if (created?.id == null) {
+        throw new Error(`Proposal "${title}" was created but did not appear in the proposals query`)
+      }
+
       router.push(
-        `/proposals/${newId}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
+        `/proposals/${String(created.id)}?title=${encodeURIComponent(title)}&orgId=${organizationId}`,
       )
       return
     }

@@ -705,13 +705,11 @@ function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryClient>, o
 }
 
 function invalidateFiscalYearQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "fiscal-years", k] })
+  invalidateStdbQueryResources(qc, organizationId, ["fiscal-years"])
 }
 
 function invalidateAccountPeriodQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-periods", k] })
+  invalidateStdbQueryResources(qc, organizationId, ["account-periods"])
 }
 
 /** Create fiscal year — args `[organizationId, companyId, params]`. */

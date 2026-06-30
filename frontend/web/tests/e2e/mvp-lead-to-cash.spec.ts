@@ -23,6 +23,8 @@ import {
   submitForm,
   waitForEntityActionEnabled,
   waitForSaleOrderBillableLines,
+  waitForSaleOrderConfirmed,
+  waitForSaleOrderLineExists,
 } from "./helpers"
 
 /**
@@ -118,17 +120,24 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       },
     ])
 
+    await waitForSaleOrderLineExists(page, orderId)
+
     // Step 8 — confirm sale order (UI; rows show SO reference, not partner name)
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
-    await page.getByTestId("entity-action-confirm-orders").click()
-    const confirmRes = await page.waitForResponse(
-      (res) => res.url().includes("/api/call/confirm_sales_order") && res.ok(),
+    const confirmResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/confirm_sales_order"),
       { timeout: 30_000 },
     )
-    expect(confirmRes.ok()).toBe(true)
+    await page.getByTestId("entity-action-confirm-orders").click()
+    const confirmRes = await confirmResPromise
+    if (!confirmRes.ok()) {
+      const body = await confirmRes.text().catch(() => "")
+      throw new Error(`confirm_sales_order failed (${confirmRes.status()}): ${body}`)
+    }
+    await waitForSaleOrderConfirmed(page, orderId)
     await waitForSaleOrderBillableLines(page, orderId)
 
     // Step 10 — create invoice from sale order (UI)
