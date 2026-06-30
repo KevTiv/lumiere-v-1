@@ -593,23 +593,28 @@ export async function fetchDraftInvoiceMoveIdByPartner(
   page: Page,
   partnerName: string,
 ): Promise<number> {
-  const res = await page.request.get("/api/query/account-moves")
-  if (!res.ok()) throw new Error(`account-moves query failed: ${res.status()}`)
-  const json = (await res.json()) as {
-    data?: Array<{
-      id?: number | string
-      state?: string
-      moveType?: string
-      invoicePartnerDisplayName?: string
-      partnerName?: string
-    }>
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-moves")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: number | string
+          state?: string
+          moveType?: string
+          invoicePartnerDisplayName?: string
+          partnerName?: string
+        }>
+      }
+      const row = json.data?.find((m) => {
+        const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
+        const isOutInvoice = (m.moveType ?? "").toLowerCase().includes("out")
+        const isDraft = (m.state ?? "").toLowerCase() === "draft"
+        return isOutInvoice && isDraft && partner.includes(partnerName)
+      })
+      if (row?.id != null) return Number(row.id)
+    }
+    await page.waitForTimeout(250)
   }
-  const row = json.data?.find((m) => {
-    const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
-    const isOutInvoice = (m.moveType ?? "").toLowerCase().includes("out")
-    const isDraft = (m.state ?? "").toLowerCase() === "draft"
-    return isOutInvoice && isDraft && partner.includes(partnerName)
-  })
-  if (row?.id == null) throw new Error(`draft invoice not found for partner: ${partnerName}`)
-  return Number(row.id)
+  throw new Error(`draft invoice not found for partner: ${partnerName}`)
 }

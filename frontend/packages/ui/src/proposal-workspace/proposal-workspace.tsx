@@ -269,15 +269,33 @@ export function ProposalWorkspace({
   const { data: comments = [] } = useProposalComments(organizationId, proposalIdBig)
   const { data: products = [] } = useProducts(organizationId)
 
-  // Filter to this proposal
-  const proposalSections = sections
-    .filter((s) => String((s as { proposalId?: unknown }).proposalId) === proposalId)
-    .sort((a, b) => ((a as { sequence?: number }).sequence ?? 0) - ((b as { sequence?: number }).sequence ?? 0))
+  // Filter to this proposal (memoized so effect/callback deps stay referentially
+  // stable across renders — otherwise fresh arrays each render trigger setState
+  // loops, e.g. React error #185 "Maximum update depth exceeded").
+  const proposalSections = useMemo(
+    () =>
+      sections
+        .filter((s) => String((s as { proposalId?: unknown }).proposalId) === proposalId)
+        .sort((a, b) => ((a as { sequence?: number }).sequence ?? 0) - ((b as { sequence?: number }).sequence ?? 0)),
+    [sections, proposalId],
+  )
 
-  const proposalSourceDocs = sourceDocs.filter((d) => String((d as { proposalId?: unknown }).proposalId) === proposalId)
-  const proposalVersions = versions.filter((v) => String((v as { proposalId?: unknown }).proposalId) === proposalId)
-  const proposalComments = comments.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId)
-  const proposalPresence = presenceRows.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId)
+  const proposalSourceDocs = useMemo(
+    () => sourceDocs.filter((d) => String((d as { proposalId?: unknown }).proposalId) === proposalId),
+    [sourceDocs, proposalId],
+  )
+  const proposalVersions = useMemo(
+    () => versions.filter((v) => String((v as { proposalId?: unknown }).proposalId) === proposalId),
+    [versions, proposalId],
+  )
+  const proposalComments = useMemo(
+    () => comments.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId),
+    [comments, proposalId],
+  )
+  const proposalPresence = useMemo(
+    () => presenceRows.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId),
+    [presenceRows, proposalId],
+  )
 
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
 
