@@ -23,6 +23,9 @@ import { AIPanel } from "./ai-panel"
 import { VersionHistoryBar, SaveVersionButton } from "./version-history-bar"
 import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
+
+/** Stable fallback when query hooks return undefined — inline `= []` creates a new ref each render. */
+const EMPTY_QUERY_ROWS: Record<string, unknown>[] = []
 import { rowNumber, rowString } from "./row-field-utils"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -261,40 +264,47 @@ export function ProposalWorkspace({
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
-  const { data: sections = [] } = useProposalSections(organizationId)
-  const { data: sourceDocs = [] } = useProposalSourceDocs(organizationId)
-  const { data: versions = [] } = useProposalVersions(organizationId)
-  const { data: lineItems = [] } = useProposalLineItems(organizationId, proposalIdBig)
-  const { data: presenceRows = [] } = useProposalPresence(organizationId, proposalIdBig)
-  const { data: comments = [] } = useProposalComments(organizationId, proposalIdBig)
-  const { data: products = [] } = useProducts(organizationId)
+  const { data: sections } = useProposalSections(organizationId)
+  const { data: sourceDocs } = useProposalSourceDocs(organizationId)
+  const { data: versions } = useProposalVersions(organizationId)
+  const { data: lineItems } = useProposalLineItems(organizationId, proposalIdBig)
+  const { data: presenceRows } = useProposalPresence(organizationId, proposalIdBig)
+  const { data: comments } = useProposalComments(organizationId, proposalIdBig)
+  const { data: products } = useProducts(organizationId)
+  const sectionsList = sections ?? EMPTY_QUERY_ROWS
+  const sourceDocsList = sourceDocs ?? EMPTY_QUERY_ROWS
+  const versionsList = versions ?? EMPTY_QUERY_ROWS
+  const presenceList = presenceRows ?? EMPTY_QUERY_ROWS
+  const commentsList = comments ?? EMPTY_QUERY_ROWS
+  const productsList = products ?? EMPTY_QUERY_ROWS
+  const lineItemsList = lineItems ?? EMPTY_QUERY_ROWS
 
   // Filter to this proposal (memoized so effect/callback deps stay referentially
   // stable across renders — otherwise fresh arrays each render trigger setState
   // loops, e.g. React error #185 "Maximum update depth exceeded").
   const proposalSections = useMemo(
     () =>
-      sections
+      sectionsList
         .filter((s) => String((s as { proposalId?: unknown }).proposalId) === proposalId)
         .sort((a, b) => ((a as { sequence?: number }).sequence ?? 0) - ((b as { sequence?: number }).sequence ?? 0)),
-    [sections, proposalId],
+    [sectionsList, proposalId],
   )
 
   const proposalSourceDocs = useMemo(
-    () => sourceDocs.filter((d) => String((d as { proposalId?: unknown }).proposalId) === proposalId),
-    [sourceDocs, proposalId],
+    () => sourceDocsList.filter((d) => String((d as { proposalId?: unknown }).proposalId) === proposalId),
+    [sourceDocsList, proposalId],
   )
   const proposalVersions = useMemo(
-    () => versions.filter((v) => String((v as { proposalId?: unknown }).proposalId) === proposalId),
-    [versions, proposalId],
+    () => versionsList.filter((v) => String((v as { proposalId?: unknown }).proposalId) === proposalId),
+    [versionsList, proposalId],
   )
   const proposalComments = useMemo(
-    () => comments.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId),
-    [comments, proposalId],
+    () => commentsList.filter((c) => String((c as { proposalId?: unknown }).proposalId) === proposalId),
+    [commentsList, proposalId],
   )
   const proposalPresence = useMemo(
-    () => presenceRows.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId),
-    [presenceRows, proposalId],
+    () => presenceList.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId),
+    [presenceList, proposalId],
   )
 
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
@@ -310,7 +320,7 @@ export function ProposalWorkspace({
 
   const effectiveActiveSectionId = (activeSection as { id?: bigint } | null)?.id ?? null
 
-  const activeSectionLineItems = lineItems.filter(
+  const activeSectionLineItems = lineItemsList.filter(
     (item) => effectiveActiveSectionId && String((item as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
@@ -335,7 +345,7 @@ export function ProposalWorkspace({
   }, [proposalPresence])
 
   // Total proposal value from all line items
-  const totalValue = lineItems.reduce((sum: number, item) => {
+  const totalValue = lineItemsList.reduce((sum: number, item) => {
     const quantity = (item as { quantity?: number }).quantity ?? 1
     const priceUnit = (item as { priceUnit?: number }).priceUnit ?? 0
     const discount = (item as { discount?: number }).discount ?? 0
@@ -684,7 +694,7 @@ export function ProposalWorkspace({
               section={activeSection as unknown as TenderSection | null}
               lineItems={activeSectionLineItems as unknown as { id: string; productName: string; quantity: number; priceUnit: number; discount: number; subtotal: number }[]}
               comments={activeSectionComments as unknown as { id: string; authorName: string; content: string; isResolved: boolean; parentId: string | null }[]}
-              products={products as unknown as { id: string; name: string; listPrice: number }[]}
+              products={productsList as unknown as { id: string; name: string; listPrice: number }[]}
               isSaving={isSaving}
               onSaveContent={handleSaveContent}
               onSaveTitle={handleSaveTitle}

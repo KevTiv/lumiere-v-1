@@ -1611,7 +1611,7 @@ pub fn create_invoice_from_sale_order(
         invoice_date_due: None,
         invoice_payment_term_id: order.payment_term_id,
         invoice_origin: Some(format!("SO{}", sale_order_id)),
-        invoice_partner_display_name: partner_display_name,
+        invoice_partner_display_name: partner_display_name.clone(),
         invoice_cash_rounding_id: None,
         payment_reference: None,
         partner_shipping_id: Some(order.partner_shipping_id),
@@ -1656,6 +1656,7 @@ pub fn create_invoice_from_sale_order(
 
     let mut amount_untaxed = 0.0f64;
     let mut amount_tax = 0.0f64;
+    let invoice_line_count = invoiceable_lines.len();
 
     for (seq, line) in invoiceable_lines.into_iter().enumerate() {
         // Capture all fields needed for the AccountMoveLine insert before the spread
@@ -1691,19 +1692,19 @@ pub fn create_invoice_from_sale_order(
             price_subtotal: subtotal,
             price_total: total,
             discount: line_discount,
-            balance: subtotal,
+            balance: -subtotal,
             currency_id: order.currency_id,
-            amount_currency: subtotal,
+            amount_currency: -subtotal,
             amount_residual: subtotal,
             amount_residual_currency: subtotal,
-            debit: subtotal,
-            credit: 0.0,
-            debit_currency: subtotal,
-            credit_currency: 0.0,
+            debit: 0.0,
+            credit: subtotal,
+            debit_currency: 0.0,
+            credit_currency: subtotal,
             tax_base_amount: 0.0,
             account_id: default_income_account_id,
-            account_internal_type: None,
-            account_internal_group: None,
+            account_internal_type: Some("other".to_string()),
+            account_internal_group: Some("income".to_string()),
             account_root_id: None,
             group_tax_id: None,
             tax_line_id: None,
@@ -1759,6 +1760,81 @@ pub fn create_invoice_from_sale_order(
     }
 
     let amount_total = amount_untaxed + amount_tax;
+
+    let receivable_account_id = journal
+        .default_account_id
+        .ok_or("Sales journal has no default receivable account".to_string())?;
+
+    ctx.db.account_move_line().insert(AccountMoveLine {
+        id: 0,
+        organization_id: move_record.organization_id,
+        move_id: move_record.id,
+        move_name: Some(move_record.name.clone()),
+        date: ctx.timestamp,
+        ref_: order.client_order_ref.clone(),
+        parent_state: AccountMoveState::Draft,
+        journal_id,
+        company_id: order.company_id,
+        company_currency_id: company.currency_id,
+        sequence: invoice_line_count as u32,
+        name: partner_display_name
+            .clone()
+            .unwrap_or_else(|| "Accounts Receivable".to_string()),
+        quantity: 1.0,
+        price_unit: amount_total,
+        price: amount_total,
+        price_subtotal: amount_total,
+        price_total: amount_total,
+        discount: 0.0,
+        balance: amount_total,
+        currency_id: order.currency_id,
+        amount_currency: amount_total,
+        amount_residual: amount_total,
+        amount_residual_currency: amount_total,
+        debit: amount_total,
+        credit: 0.0,
+        debit_currency: amount_total,
+        credit_currency: 0.0,
+        tax_base_amount: 0.0,
+        account_id: receivable_account_id,
+        account_internal_type: Some("receivable".to_string()),
+        account_internal_group: Some("asset".to_string()),
+        account_root_id: None,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_ids: vec![],
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        partner_id: Some(order.partner_invoice_id),
+        commercial_partner_id: Some(order.partner_invoice_id),
+        reconcile_model_id: None,
+        payment_id: None,
+        statement_line_id: None,
+        currency_id_field: Some(order.currency_id),
+        blocked: false,
+        matching_number: None,
+        matching_label: None,
+        is_matching: false,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: true,
+        analytic_account_id: None,
+        analytic_tag_ids: vec![],
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        cogs_amount: 0.0,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
 
     // Update AccountMove totals
     ctx.db.account_move().id().update(AccountMove {
