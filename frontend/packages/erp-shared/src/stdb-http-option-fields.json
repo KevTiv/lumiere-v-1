@@ -4520,7 +4520,8 @@
   "UpdateTicketParams": [
     "name",
     "description",
-    "stage_id"
+    "stage_id",
+    "priority"
   ],
   "UpdateUserProfileParams": [
     "name",

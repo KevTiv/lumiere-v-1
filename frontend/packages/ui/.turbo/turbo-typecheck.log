@@ -2,3 +2,4 @@
 > @lumiere/ui@0.0.0 typecheck /Users/kevintivert/codebox/lumiere-v-1/frontend/packages/ui
 > tsc --noEmit
 
+ ELIFECYCLE  Command failed.

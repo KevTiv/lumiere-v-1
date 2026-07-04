@@ -679,7 +679,7 @@ pub async fn execute_resource_query(
     if resource == "activities" {
         rows.retain(|r| row_not_soft_deleted(r));
     }
-    if resource == "companies" {
+    if resource == "companies" || resource == "leads" || resource == "product-categories" {
         rows.retain(|r| row_not_soft_deleted(r));
     }
 

@@ -96,6 +96,8 @@ const CREATE_STOCK_LOCATION_DEFAULTS: Record<string, unknown> = {
 
 function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
   const orgKey = rqBigIntKey(organizationId)
+  void qc.invalidateQueries({ queryKey: ['products', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['product-categories', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-locations', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-pickings', orgKey] })

@@ -227,7 +227,7 @@ export async function chooseFirstOption(page: Page, name: string) {
 /** Pick the first non-disabled select option (skips empty placeholders). */
 export async function chooseFirstEnabledOption(page: Page, name: string) {
   await page.getByTestId(`form-field-${name}`).click()
-  const listbox = page.locator('[role="listbox"]')
+  const listbox = page.locator('[role="listbox"]:visible')
   await expect
     .poll(async () => listbox.getByRole("option", { disabled: false }).count(), {
       timeout: 30_000,
@@ -305,11 +305,20 @@ export async function fetchVendorBillJournalLabel(page: Page): Promise<string> {
 }
 
 function poStateTag(row: Record<string, unknown>): string {
-  const v = row.state
-  if (v != null && typeof v === "object" && "tag" in v) {
-    return String((v as { tag: string }).tag)
-  }
-  return String(v ?? "")
+  return scalarQueryString(row.state)
+}
+
+function moveTypeTag(value: unknown): string {
+  return scalarQueryString(value).toLowerCase()
+}
+
+function isVendorBillMoveType(value: unknown): boolean {
+  const t = moveTypeTag(value)
+  return t.includes("in") && !t.includes("out")
+}
+
+function isCustomerInvoiceMoveType(value: unknown): boolean {
+  return moveTypeTag(value).includes("out")
 }
 
 /** Newest purchase order id for a vendor partner id. */
@@ -356,7 +365,7 @@ export async function waitForPurchaseOrderState(
   throw new Error(`purchase order ${orderId} did not reach state ${state}`)
 }
 
-/** Draft vendor bill move id for a partner display name. */
+/** Draft vendor bill move id for a partner display name (newest match). */
 export async function fetchDraftVendorBillMoveIdByPartner(
   page: Page,
   partnerName: string,
@@ -368,21 +377,27 @@ export async function fetchDraftVendorBillMoveIdByPartner(
       const json = (await res.json()) as {
         data?: Array<{
           id?: number | string
-          state?: string
-          moveType?: string
-          move_type?: string
+          state?: unknown
+          moveType?: unknown
+          move_type?: unknown
           invoicePartnerDisplayName?: string
           partnerName?: string
         }>
       }
-      const row = json.data?.find((m) => {
-        const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
-        const moveType = String(m.moveType ?? m.move_type ?? "").toLowerCase()
-        const isInInvoice = moveType.includes("in")
-        const isDraft = (m.state ?? "").toLowerCase() === "draft"
-        return isInInvoice && isDraft && partner.includes(partnerName)
+      const matches = (json.data ?? []).filter((m) => {
+        const partner = String(m.invoicePartnerDisplayName ?? m.partnerName ?? "")
+        const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
+        return (
+          isVendorBillMoveType(m.moveType ?? m.move_type) &&
+          isDraft &&
+          partner.includes(partnerName)
+        )
       })
-      if (row?.id != null) return Number(row.id)
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
@@ -440,7 +455,7 @@ export async function chooseSelectOptionByLabel(
   options?: { optionTimeoutMs?: number },
 ) {
   await page.getByTestId(`form-field-${name}`).click()
-  const listbox = page.locator('[role="listbox"]')
+  const listbox = page.locator('[role="listbox"]:visible')
   await expect(listbox).toBeVisible({ timeout: 15_000 })
   const option = listbox.getByRole("option", { name: label })
   await expect(option).toBeVisible({ timeout: options?.optionTimeoutMs ?? 15_000 })
@@ -501,7 +516,7 @@ export async function installPostHogResetProbe(page: Page) {
 
 /** Click the entity table row whose text includes `text`. Enables selection actions. */
 export async function selectEntityRowByText(page: Page, text: string | RegExp) {
-  const row = page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: text }).first()
+  const row = activeTabEntityTable(page).locator("tbody tr").filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
   if ((await row.getAttribute("data-state")) !== "selected") {
     await row.click()
@@ -512,8 +527,18 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
 
 /** Click an entity table row by its `data-testid="entity-row-{id}"` key. */
 export async function selectEntityRowById(page: Page, id: number | string) {
-  const row = page.getByTestId(`entity-row-${id}`)
+  const table = activeTabEntityTable(page)
+  const row = table.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
+
+  // Selection toggles per row — clear other selections so single-select actions fire.
+  const otherSelected = table.locator('tbody tr[data-state="selected"]').filter({
+    hasNot: table.getByTestId(`entity-row-${id}`),
+  })
+  for (let i = 0; i < (await otherSelected.count()); i += 1) {
+    await otherSelected.first().click()
+  }
+
   // Entity tables default to toggle-on-click selection. Re-clicking an already-selected row
   // deselects it — wait for STDB-driven re-renders, then only click when not selected.
   if ((await row.getAttribute("data-state")) !== "selected") {
@@ -526,6 +551,25 @@ export async function selectEntityRowById(page: Page, id: number | string) {
 /** Wait until a selection-gated entity action is enabled (proves row context is applied). */
 export async function waitForEntityActionEnabled(page: Page, actionTestId: string) {
   await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
+}
+
+/** Click a toolbar action and wait for the matching reducer HTTP call. */
+export async function clickEntityActionAndWaitForReducer(
+  page: Page,
+  actionTestId: string,
+  reducerName: string,
+  options?: { timeoutMs?: number },
+) {
+  await waitForEntityActionEnabled(page, actionTestId)
+  const timeout = options?.timeoutMs ?? 30_000
+  const [res] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes(`/api/call/${reducerName}`) && r.ok(),
+      { timeout },
+    ),
+    page.getByTestId(actionTestId).click(),
+  ])
+  expect(res.ok()).toBe(true)
 }
 
 /** First organization id for the authenticated session (dev seed org). */
@@ -658,6 +702,22 @@ function scalarQueryString(value: unknown): string {
     const obj = value as Record<string, unknown>
     if ("some" in obj) return scalarQueryString(obj.some)
     if ("tag" in obj && typeof obj.tag === "string") return obj.tag
+    const keys = Object.keys(obj)
+    if (keys.length === 1) {
+      const key = keys[0]
+      const payload = obj[key]
+      if (Array.isArray(payload) && payload.length === 0) {
+        return key.charAt(0).toUpperCase() + key.slice(1)
+      }
+      if (
+        payload !== null &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        Object.keys(payload as object).length === 0
+      ) {
+        return key.charAt(0).toUpperCase() + key.slice(1)
+      }
+    }
   }
   return String(value)
 }
@@ -1181,13 +1241,20 @@ export async function fetchDraftInvoiceMoveIdByPartner(
           partnerName?: string
         }>
       }
-      const row = json.data?.find((m) => {
-        const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
-        const isOutInvoice = (m.moveType ?? "").toLowerCase().includes("out")
-        const isDraft = (m.state ?? "").toLowerCase() === "draft"
-        return isOutInvoice && isDraft && partner.includes(partnerName)
+      const matches = (json.data ?? []).filter((m) => {
+        const partner = String(m.invoicePartnerDisplayName ?? m.partnerName ?? "")
+        const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
+        return (
+          isCustomerInvoiceMoveType(m.moveType) &&
+          isDraft &&
+          partner.includes(partnerName)
+        )
       })
-      if (row?.id != null) return Number(row.id)
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
@@ -1273,7 +1340,11 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
 
   await gotoModule(page, "/accounting", "accounting")
   await page.getByTestId("module-tab-accounting-invoices").click()
-  await page.getByRole("row").filter({ hasText: partnerName }).first().click()
+  await activeTabEntityTable(page)
+    .locator("tbody tr")
+    .filter({ hasText: partnerName })
+    .first()
+    .click()
   await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
 
   const [postRes] = await Promise.all([
@@ -1294,7 +1365,11 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 
   await gotoModule(page, "/accounting", "accounting")
   await page.getByTestId("module-tab-accounting-bills").click()
-  await page.getByRole("row").filter({ hasText: vendorName }).first().click()
+  await activeTabEntityTable(page)
+    .locator("tbody tr")
+    .filter({ hasText: vendorName })
+    .first()
+    .click()
   await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
 
   const [postRes] = await Promise.all([

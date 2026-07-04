@@ -1077,7 +1077,7 @@ export function serverQueryLeads(
   return stdbSql(
     selectOrgScopedSql('leads', 'lead', organizationId, fq(opts), ''),
     httpOpts(opts),
-  )
+  ).then(rows => (rows as Record<string, unknown>[]).filter(rowNotSoftDeleted))
 }
 
 export async function serverQueryLeadById(

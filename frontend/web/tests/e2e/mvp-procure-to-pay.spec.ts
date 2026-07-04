@@ -4,6 +4,7 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   assertMoveLinesBalanced,
+  clickEntityActionAndWaitForReducer,
   expectNoAppError,
   fetchAccountSelectLabelByInternalType,
   fetchDraftVendorBillMoveIdByPartner,
@@ -62,8 +63,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await page.getByTestId("entity-action-pol-add-form").click()
     await expect(page.getByTestId("form-modal-add-purchase-order-line")).toBeVisible()
     await chooseSelectOptionByLabel(page, "orderId", orderLabel)
-    await page.getByTestId("form-field-productId").click()
-    await page.getByRole("option", { name: "Lumiere Dev Laptop" }).click()
+    await chooseSelectOptionByLabel(page, "productId", "Lumiere Dev Laptop")
     await chooseFirstEnabledOption(page, "uomId")
     await fillField(page, "quantity", "2")
     await fillField(page, "priceUnit", "500")
@@ -79,15 +79,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     // Step 3 — confirm purchase order (UI)
     await page.getByTestId("module-tab-purchasing-orders").click()
     await selectEntityRowById(page, orderId)
-    await waitForEntityActionEnabled(page, "entity-action-po-confirm")
-    const [confirmRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/api/call/confirm_purchase_order") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      page.getByTestId("entity-action-po-confirm").click(),
-    ])
-    expect(confirmRes.ok()).toBe(true)
+    await clickEntityActionAndWaitForReducer(page, "entity-action-po-confirm", "confirm_purchase_order")
     await waitForPurchaseOrderState(page, orderId, "Purchase")
 
     // Receive goods (UI — bill reducer requires qty_received > qty_invoiced)
@@ -115,7 +107,9 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-po-create-bill")
     await page.getByTestId("entity-action-po-create-bill").click()
-    await expect(page.getByTestId("form-modal-create-bill-from-purchase-order")).toBeVisible()
+    await expect(page.getByTestId("form-modal-create-bill-from-purchase-order")).toBeVisible({
+      timeout: 15_000,
+    })
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
     await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)

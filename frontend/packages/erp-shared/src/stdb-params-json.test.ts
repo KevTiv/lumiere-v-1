@@ -155,6 +155,17 @@ describe("stdbParamsToJson", () => {
     )
   })
 
+  it("encodeReducerCallArgs SATS-encodes update_sale_order params", () => {
+    const encoded = encodeReducerCallArgs("update_sale_order", [
+      42,
+      { clientOrderRef: "SO-UPDATED" },
+    ])
+    assert.equal(encoded[0], 42)
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.client_order_ref, { some: "SO-UPDATED" })
+    assert.deepEqual(params.note, { none: [] })
+  })
+
   it("encodes tagged unit enums as SATS sum JSON", () => {
     assert.deepEqual(
       stdbParamsToJson({ discountPolicy: { tag: "WithDiscount" } }),
@@ -179,6 +190,17 @@ describe("stdbParamsToJson", () => {
     const out = stdbParamsToJson({ name: "Net 30" }, "CreatePaymentTermParams")
     assert.equal(out.name, "Net 30")
     assert.deepEqual(out.note, { none: [] })
+  })
+
+  it("wraps Option<TicketPriority> on UpdateTicketParams", () => {
+    const out = stdbParamsToJson(
+      { name: "Updated", priority: { tag: "High" } },
+      "UpdateTicketParams",
+    )
+    assert.deepEqual(out.name, { some: "Updated" })
+    assert.deepEqual(out.priority, { some: { high: [] } })
+    assert.deepEqual(out.description, { none: [] })
+    assert.deepEqual(out.stage_id, { none: [] })
   })
 
   it("leaves already snake_case keys unchanged", () => {

@@ -5,7 +5,7 @@ import {
   toUpdateContactParams,
   toUpdateLeadDetailsParams,
   toUpdateOpportunityStageParams,
-} from "./crm-update-params.ts"
+} from "./crm-update-params"
 
 describe("toUpdateContactParams", () => {
   it("returns null for an empty form", () => {

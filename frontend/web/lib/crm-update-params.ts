@@ -6,7 +6,7 @@ import type {
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
-  UpdateContactParams,
+  UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
@@ -136,7 +136,7 @@ function patchFromForm(
 
 export function toUpdateContactParams(
   formData: Record<string, unknown>,
-): Partial<UpdateContactParams> | null {
+): Partial<UpdateContactCoreParams> | null {
   const out = patchFromForm(formData, [
     "name",
     "email",
@@ -146,7 +146,7 @@ export function toUpdateContactParams(
     "isVendor",
     "isProspect",
     "isPartner",
-  ]) as Partial<UpdateContactParams>
+  ]) as Partial<UpdateContactCoreParams>
   return Object.keys(out).length > 0 ? out : null
 }
 

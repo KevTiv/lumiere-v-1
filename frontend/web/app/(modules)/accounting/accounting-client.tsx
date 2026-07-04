@@ -668,7 +668,6 @@ function AccountingClientLoaded({
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
     staleTime: 0,
-    refetchOnMount: "always",
   })
   const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
     enabled: organizationId > 0,

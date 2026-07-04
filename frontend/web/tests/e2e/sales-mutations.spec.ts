@@ -1,8 +1,8 @@
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { expect, test } from "@playwright/test"
 
 import {
   callReducerBff,
+  chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
   fillField,
@@ -12,6 +12,8 @@ import {
   submitForm,
   waitForBffQueryMinRows,
 } from "./helpers"
+
+const CUSTOMER_NAME = "Acme Corporation"
 
 function queryString(value: unknown): string {
   if (value == null) return ""
@@ -43,9 +45,9 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
     await waitForBffQueryMinRows(page, "/api/query/warehouses")
     await page.getByTestId("module-create-sales-orders").click()
     await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
-    await chooseSelectOptionByLabel(page, "partnerId", /Acme Corporation/i)
-    await chooseSelectOptionByLabel(page, "pricelistId", /.+/i)
-    await chooseSelectOptionByLabel(page, "warehouseId", /.+/i)
+    await chooseSelectOptionByLabel(page, "partnerId", CUSTOMER_NAME)
+    await chooseFirstEnabledOption(page, "pricelistId")
+    await chooseFirstEnabledOption(page, "warehouseId")
     await fillField(page, "clientOrderRef", initialRef)
 
     const [createOrderRes] = await Promise.all([
@@ -86,10 +88,7 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
     await callReducerBff(
       page,
       "update_sale_order",
-      [
-        orderId,
-        stdbParamsToJson({ clientOrderRef: updatedRef }, "UpdateSaleOrderParams"),
-      ],
+      [orderId, { clientOrderRef: updatedRef }],
       { withCompany: true },
     )
 

@@ -722,7 +722,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'allowOutPayment',
   ]),
   leads: orgEntry<Lead>('lead', ['leads', 'lead'], [
-    'name', 'contactName', 'email', 'phone', 'state', 'probability',
+    'name', 'contactName', 'email', 'phone', 'state', 'probability', 'deletedAt',
   ]),
   opportunities: orgEntry<Opportunity>('opportunity', ['opportunities', 'opportunity'], [
     'name', 'partnerId', 'stageId', 'probability', 'companyId',
@@ -764,7 +764,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'name', 'displayName', 'code', 'defaultCode', 'active', 'categId', 'listPrice', 'publicPrice', 'type', 'barcode',
   ]),
   'product-categories': orgEntry<ProductCategory>('product_category', ['product-categories', 'product_category'], [
-    'name', 'parentId', 'companyId',
+    'name', 'parentId', 'companyId', 'deletedAt',
   ]),
   uoms: orgEntry<Uom>('uom', ['uoms', 'uom'], ['name', 'categoryId', 'symbol']),
   'stock-quants': orgEntry<StockQuant>('stock_quant', ['stock-quants', 'stock_quant'], [

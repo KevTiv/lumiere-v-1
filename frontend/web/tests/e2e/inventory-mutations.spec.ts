@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test"
 
 import {
   chooseFirstOption,
-  chooseSelectOptionByLabel,
   expectNoAppError,
   expectRecordSoftDeleted,
   fillField,
@@ -64,6 +63,22 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
       submitForm(page, "edit-product"),
     ])
     expect(updateProductRes.ok()).toBe(true)
+
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get("/api/query/products")
+          if (!res.ok()) return ""
+          const json = (await res.json()) as { data?: Array<{ name?: string }> }
+          const row = (json.data ?? []).find((product) =>
+            String(product.name ?? "").includes(updatedName),
+          )
+          return row?.name ?? ""
+        },
+        { timeout: 30_000 },
+      )
+      .toContain(updatedName)
+
     await expect(page.getByText(updatedName).first()).toBeVisible({ timeout: 30_000 })
     await expectNoAppError(page)
   })

@@ -4,15 +4,17 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
-  fetchOpportunityIdByName,
   fillField,
   gotoModule,
   openEntityCreate,
   selectEntityRowByText,
   smokeName,
   submitForm,
+  waitForBffQueryMinRows,
   waitForEntityActionEnabled,
 } from "./helpers"
+
+const PROPOSAL_STAGE_LABEL = /Proposal \/ Price Quote/i
 
 test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
   test("changes opportunity stage before conversion", async ({ page }) => {
@@ -28,6 +30,7 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
 
     await openEntityCreate(page, "/crm", "crm", "opportunities", "new-opportunity")
+    await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
     await fillField(page, "name", oppName)
     await fillField(page, "expectedRevenue", "1500")
     await chooseFirstEnabledOption(page, "stageId")
@@ -40,13 +43,29 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     ])
     expect(createOppRes.ok()).toBe(true)
 
+    const readStageId = async (): Promise<number | null> => {
+      const res = await page.request.get("/api/query/opportunities")
+      if (!res.ok()) return null
+      const json = (await res.json()) as {
+        data?: Array<{ name?: string; stageId?: number | string; stage_id?: number | string }>
+      }
+      const row = (json.data ?? []).find((o) => o.name === oppName)
+      if (!row) return null
+      const raw = row.stageId ?? row.stage_id
+      return raw == null ? null : Number(raw)
+    }
+
+    await expect.poll(readStageId, { timeout: 30_000 }).toBeGreaterThan(0)
+    const initialStageId = await readStageId()
+    if (initialStageId == null) throw new Error(`opportunity not found after create: ${oppName}`)
+
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-opportunities").click()
     await selectEntityRowByText(page, oppName)
     await waitForEntityActionEnabled(page, "entity-action-change-stage")
     await page.getByTestId("entity-action-change-stage").click()
     await expect(page.getByTestId("form-modal-change-opportunity-stage")).toBeVisible()
-    await chooseSelectOptionByLabel(page, "stageId", /won|negotiation|proposal/i)
+    await chooseSelectOptionByLabel(page, "stageId", PROPOSAL_STAGE_LABEL)
     const [stageRes] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes("/api/call/update_opportunity") && res.ok(),
@@ -56,8 +75,8 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     ])
     expect(stageRes.ok()).toBe(true)
 
-    const opportunityId = await fetchOpportunityIdByName(page, oppName)
-    expect(opportunityId).toBeTruthy()
+    await expect.poll(readStageId, { timeout: 30_000 }).not.toBe(initialStageId)
+
     await expectNoAppError(page)
   })
 })

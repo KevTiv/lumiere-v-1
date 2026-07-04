@@ -45,7 +45,7 @@ test.describe("Accounting update mutations", { tag: ["@p0", "@phase-3"] }, () =>
     await expect
       .poll(
         async () => {
-          const res = await page.request.get("/api/query/payment-terms")
+          const res = await page.request.get("/api/query/account-payment-terms")
           if (!res.ok()) return null
           const json = (await res.json()) as {
             data?: Array<{ id?: unknown; name?: string; isActive?: boolean; is_active?: boolean }>

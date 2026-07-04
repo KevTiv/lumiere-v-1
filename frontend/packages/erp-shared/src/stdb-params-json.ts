@@ -104,7 +104,11 @@ function encodeValue(
   }
 
   if (isTaggedEnum(value)) {
-    return encodeTaggedUnitEnum(value)
+    const encoded = encodeTaggedUnitEnum(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: encoded }
+    }
+    return encoded
   }
 
   if (isSatsOption(value)) {
@@ -232,6 +236,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_sale_order_line: "CreateSaleOrderLineParams",
   create_invoice_from_sale_order: "CreateInvoiceFromSaleOrderParams",
   create_bill_from_purchase_order: "CreateBillFromPurchaseOrderParams",
+  update_sale_order: "UpdateSaleOrderParams",
   create_ai_action_draft: "CreateAiActionDraftParams",
   update_ai_action_draft_params: "UpdateAiActionDraftParamsParams",
   post_account_move: undefined,

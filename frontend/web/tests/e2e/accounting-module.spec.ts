@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  activeTabEntityTable,
   chooseFirstOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -61,7 +62,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "taxes":
       await expect(page.getByTestId("module-create-accounting-taxes")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "payments":
       await expect(page.getByTestId("module-create-accounting-payments")).toBeVisible()
@@ -86,7 +87,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "bank-statements":
     case "fixed-assets":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "reconciliation-widgets":
       await expect(page.getByTestId("module-create-accounting-reconciliation-widgets")).toBeVisible()
@@ -102,7 +103,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "intercompany-rules":
     case "intercompany-transactions":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
       break
