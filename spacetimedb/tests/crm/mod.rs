@@ -15,5 +15,7 @@ pub fn run_all_crm_tests(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_crm_opportunity_convert_test(ctx: &ReducerContext) -> Result<(), String> {
     opportunity_lifecycle_test::test_convert_opportunity_to_sale_order(ctx)
-        .map_err(|e| format!("convert_opportunity_to_sale_order: {e}"))
+        .map_err(|e| format!("convert_opportunity_to_sale_order: {e}"))?;
+    opportunity_lifecycle_test::test_create_opportunity_line_on_unscoped_opportunity(ctx)
+        .map_err(|e| format!("create_opportunity_line_on_unscoped_opportunity: {e}"))
 }

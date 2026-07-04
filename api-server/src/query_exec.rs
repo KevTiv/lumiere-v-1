@@ -15,6 +15,21 @@ fn row_not_soft_deleted(r: &Value) -> bool {
     r.get("deletedAt").map(|v| v.is_null()).unwrap_or(true)
 }
 
+fn row_id_u64(row: &Value) -> u64 {
+    row.get("id")
+        .and_then(|v| v.as_u64())
+        .or_else(|| {
+            row.get("id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+        })
+        .unwrap_or(0)
+}
+
+fn sort_rows_by_id_desc(rows: &mut [Value]) {
+    rows.sort_by(|a, b| row_id_u64(b).cmp(&row_id_u64(a)));
+}
+
 async fn company_ids_for_organization(
     client: &StdbClient,
     org_id: u64,
@@ -140,23 +155,28 @@ pub async fn execute_resource_query(
         "ai-action-drafts" => {
             let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
             let sql = format!(
-                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND proposed_by = {id} ORDER BY id DESC"
+                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND proposed_by = {id}"
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
         }
         "ai-action-drafts-inbox" => {
             // `ai_action_draft` has `organization_id`; `company_id IN (...)` is redundant and
             // SpacetimeDB SQL does not support `IN` clauses. Scope by org only.
+            // HTTP SQL also rejects `ORDER BY id DESC` on this table — sort in Rust.
             let sql = format!(
-                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND status = 'pending' ORDER BY id DESC"
+                "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND status = 'pending'"
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
         }
         "consolidation-accounts" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
@@ -596,21 +616,26 @@ pub async fn execute_resource_query(
         }
         "audit-log" => {
             let sql = format!(
-                "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id} ORDER BY id DESC LIMIT 500"
+                "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id}"
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            rows.truncate(500);
+            return Ok(rows);
         }
         "audit-rules" => {
             let sql = format!(
-                "SELECT id, organization_id, table_name, log_reads, log_writes, log_deletes, log_logins, is_active FROM audit_rule WHERE organization_id = {organization_id} ORDER BY id DESC"
+                "SELECT id, organization_id, table_name, log_reads, log_writes, log_deletes, log_logins, is_active FROM audit_rule WHERE organization_id = {organization_id}"
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
         }
         _ => {}
     }

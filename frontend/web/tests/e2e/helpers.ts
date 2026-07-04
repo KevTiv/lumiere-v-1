@@ -101,9 +101,7 @@ export async function openSettingsSection(page: Page, sectionId: string) {
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
   const section = page.getByTestId(`settings-section-${sectionId}`)
-  if ((await section.count()) === 0) {
-    return
-  }
+  await expect(section).toBeVisible({ timeout: 30_000 })
   await section.click()
   await expectNoAppError(page)
 }
@@ -1302,16 +1300,27 @@ export async function createAiActionDraftTask(
     { withCompany: true },
   )
 
-  const res = await page.request.get("/api/query/ai-action-drafts-inbox")
-  if (!res.ok()) throw new Error(`ai-action-drafts-inbox query failed: ${res.status()}`)
-  const json = (await res.json()) as {
-    data?: Array<{ id?: number | string; summary?: string; status?: string }>
-  }
-  const row = (json.data ?? []).find(
-    (draft) => draft.summary?.includes(taskName) && (draft.status ?? "pending") === "pending",
-  )
-  if (row?.id == null) throw new Error(`pending draft not found for task ${taskName}`)
-  return Number(row.id)
+  let draftId = 0
+  await expect
+    .poll(async () => {
+      const res = await page.request.get("/api/query/ai-action-drafts-inbox")
+      if (!res.ok()) {
+        const body = await res.text()
+        throw new Error(`ai-action-drafts-inbox query failed: ${res.status()} ${body}`)
+      }
+      const json = (await res.json()) as {
+        data?: Array<{ id?: number | string; summary?: string; status?: string }>
+      }
+      const row = (json.data ?? []).find(
+        (draft) => draft.summary?.includes(taskName) && (draft.status ?? "pending") === "pending",
+      )
+      if (row?.id == null) return 0
+      draftId = Number(row.id)
+      return draftId
+    }, { timeout: 30_000 })
+    .toBeGreaterThan(0)
+
+  return draftId
 }
 
 /** Returns true when ai-gateway health endpoint responds OK. */

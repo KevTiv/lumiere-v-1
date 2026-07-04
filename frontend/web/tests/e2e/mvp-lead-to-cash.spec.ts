@@ -98,6 +98,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const opportunityName = `${leadName} - Opportunity`
     await page.reload()
     await gotoModule(page, "/crm", "crm")
+    await page.getByTestId("module-tab-crm-opportunities").click()
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 

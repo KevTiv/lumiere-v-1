@@ -6,8 +6,8 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::opportunities::{
     convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opportunity,
-    opp_stage, ConvertOpportunityParams, CreateOpportunityLineParams, CreateOpportunityParams,
-    OpportunityStage,
+    opportunity_line, opp_stage, ConvertOpportunityParams, CreateOpportunityLineParams,
+    CreateOpportunityParams, OpportunityStage,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::sale_order;
@@ -165,6 +165,111 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
     });
     if !has_so {
         return Err("Expected sale order linked to opportunity after convert".to_string());
+    }
+
+    Ok(())
+}
+
+/// Mirrors lead conversion: opportunity exists at org scope without company_id until first line.
+pub fn test_create_opportunity_line_on_unscoped_opportunity(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let stage = ctx.db.opp_stage().insert(OpportunityStage {
+        id: 0,
+        organization_id: org_id,
+        name: "Harness Unscoped Stage".to_string(),
+        sequence: 1,
+        probability: 10.0,
+        requirements: None,
+        fold: false,
+        is_won: false,
+        team_id: None,
+        is_active: true,
+        metadata: Some(r#"{"harness":true}"#.to_string()),
+    });
+
+    let opp = ctx.db.opportunity().insert(crate::crm::opportunities::Opportunity {
+        id: 0,
+        organization_id: org_id,
+        lead_id: None,
+        name: "Harness Lead-Converted Opp".to_string(),
+        expected_revenue: 1_000.0,
+        probability: 10.0,
+        stage_id: stage.id,
+        priority: "medium".to_string(),
+        color: None,
+        partner_id: Some(fixture.partner_id),
+        contact_id: Some(fixture.partner_id),
+        campaign_id: None,
+        medium_id: None,
+        source_id: None,
+        user_id: None,
+        team_id: None,
+        company_currency_id: Some(1),
+        company_id: None,
+        date_open: Some(ctx.timestamp),
+        date_closed: None,
+        date_deadline: None,
+        date_last_stage_update: Some(ctx.timestamp),
+        day_open: None,
+        day_close: None,
+        is_won: false,
+        is_lost: false,
+        lost_reason_id: None,
+        description: None,
+        tag_ids: vec![],
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        deleted_at: None,
+        metadata: Some(r#"{"test":"unscoped_opp_line"}"#.to_string()),
+    });
+
+    create_opportunity_line(
+        ctx,
+        org_id,
+        company_id,
+        opp.id,
+        CreateOpportunityLineParams {
+            product_id: fixture.product_id,
+            name: Some("Unscoped opp line".to_string()),
+            quantity: 2.0,
+            uom_id: 1,
+            price_unit: 50.0,
+            discount: 0.0,
+            tax_ids: vec![],
+            sequence: 1,
+            metadata: None,
+        },
+    )?;
+
+    let updated = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opp.id)
+        .ok_or("Opportunity not found after line create")?;
+
+    if updated.company_id != Some(company_id) {
+        return Err(format!(
+            "Expected company_id Some({company_id}), got {:?}",
+            updated.company_id
+        ));
+    }
+
+    let line_count = ctx
+        .db
+        .opportunity_line()
+        .iter()
+        .filter(|l| l.opportunity_id == opp.id)
+        .count();
+    if line_count != 1 {
+        return Err(format!("Expected 1 opportunity line, got {line_count}"));
     }
 
     Ok(())

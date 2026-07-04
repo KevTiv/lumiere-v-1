@@ -262,7 +262,7 @@ pub fn create_lead(
             company_id: None,
             table_name: "lead",
             record_id: lead.id,
-            action: "create",
+            action: "CREATE",
             old_values: None,
             new_values: Some(
                 serde_json::json!({ "name": params.name, "email": params.email }).to_string(),
@@ -355,7 +355,7 @@ pub fn update_lead_revenue(
             company_id: None,
             table_name: "lead",
             record_id: lead_id,
-            action: "update",
+            action: "UPDATE",
             old_values: Some(
                 serde_json::json!({ "expected_revenue": old_revenue }).to_string(),
             ),
@@ -392,7 +392,7 @@ pub fn delete_lead(ctx: &ReducerContext, organization_id: u64, lead_id: u64) -> 
             company_id: None,
             table_name: "lead",
             record_id: lead_id,
-            action: "delete",
+            action: "DELETE",
             old_values: Some(
                 serde_json::json!({ "deleted_at": old_deleted_at.map(|ts| format!("{:?}", ts)) })
                     .to_string(),
@@ -544,7 +544,7 @@ pub fn convert_lead_to_customer(
             company_id: None,
             table_name: "lead",
             record_id: lead_id,
-            action: "convert",
+            action: "CONVERT",
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
             new_values: Some(r#"{"state":"converted"}"#.to_string()),
             changed_fields: vec!["state".to_string()],

@@ -191,6 +191,20 @@ pub struct OpportunityLine {
 // REDUCERS: OPPORTUNITY MANAGEMENT
 // ══════════════════════════════════════════════════════════════════════════════
 
+/// Lead-converted opportunities may have `company_id: None` until a company-scoped write.
+fn resolve_opportunity_company_id(
+    opp: &Opportunity,
+    company_id: u64,
+) -> Result<u64, String> {
+    match opp.company_id {
+        Some(cid) if cid != company_id => {
+            Err("Record does not belong to this company".to_string())
+        }
+        Some(cid) => Ok(cid),
+        None => Ok(company_id),
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn create_opportunity(
     ctx: &ReducerContext,
@@ -256,7 +270,7 @@ pub fn create_opportunity(
             company_id: Some(operating_company_id),
             table_name: "opportunity",
             record_id: opp.id,
-            action: "create",
+            action: "CREATE",
             old_values: None,
             new_values: Some(
                 serde_json::json!({ "name": params.name, "expected_revenue": params.expected_revenue })
@@ -291,9 +305,15 @@ pub fn update_opportunity(
         return Err("Opportunity does not belong to this organization".to_string());
     }
 
-    if opp.company_id != Some(company_id) {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
+    let opp = if opp.company_id.is_none() {
+        Opportunity {
+            company_id: Some(opp_company_id),
+            ..opp
+        }
+    } else {
+        opp
+    };
 
     let mut name = opp.name.clone();
     let mut expected_revenue = opp.expected_revenue;
@@ -485,12 +505,18 @@ pub fn create_opportunity_line(
         return Err("Opportunity does not belong to this organization".to_string());
     }
 
-    if opp.company_id != Some(company_id) {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
     if opp.is_won || opp.is_lost {
         return Err("Cannot add lines to a closed opportunity".to_string());
+    }
+
+    if opp.company_id.is_none() {
+        ctx.db.opportunity().id().update(Opportunity {
+            company_id: Some(opp_company_id),
+            updated_at: ctx.timestamp,
+            ..opp
+        });
     }
 
     let product = ctx
@@ -535,7 +561,7 @@ pub fn create_opportunity_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(opp_company_id),
             table_name: "opportunity_line",
             record_id: line.id,
             action: "CREATE",
