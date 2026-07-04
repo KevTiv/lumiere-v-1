@@ -1,11 +1,15 @@
-/// Inventory quant lifecycle via picking flows.
+/// Inventory / procurement receipt and delivery domain tests.
+///
+/// Note: `receive_po_line` updates PO line `qty_received` and order `receipt_status` — it does
+/// not post stock quants (no incoming picking validate in that path). Quant changes are covered
+/// by `stock_test::test_stock_quant_create` via `update_stock_quant_quantity`.
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::CompanyScopeParams;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_picking, stock_quant, validate_stock_picking,
+    assign_stock_picking, confirm_stock_picking, stock_picking, validate_stock_picking,
 };
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, confirm_purchase_order, create_purchase_order, purchase_order,
@@ -19,32 +23,11 @@ use crate::sales::sales_core::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::DiscountPolicy;
 
-fn quant_qty_at_location(
-    ctx: &ReducerContext,
-    org_id: u64,
-    product_id: u64,
-    location_id: u64,
-) -> f64 {
-    ctx.db
-        .stock_quant()
-        .iter()
-        .filter(|q| {
-            q.organization_id == org_id
-                && q.product_id == product_id
-                && q.location_id == location_id
-        })
-        .map(|q| q.quantity)
-        .sum()
-}
-
 pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let location_id = fixture.warehouse_id;
-
-    let before = quant_qty_at_location(ctx, org_id, fixture.product_id, location_id);
 
     create_contact(
         ctx,
@@ -173,12 +156,34 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         .next()
         .ok_or("PO line not found")?;
 
-    receive_po_line(ctx, org_id, line.id, line.product_qty)?;
+    let qty_to_receive = line.product_qty;
+    receive_po_line(ctx, org_id, line.id, qty_to_receive)?;
 
-    let after = quant_qty_at_location(ctx, org_id, fixture.product_id, location_id);
-    if after <= before {
+    let updated_line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line.id)
+        .ok_or("PO line not found after receive")?;
+
+    if (updated_line.qty_received - qty_to_receive).abs() > 0.001 {
         return Err(format!(
-            "Expected quant to increase after receipt (before={before}, after={after})"
+            "Expected qty_received {qty_to_receive}, got {}",
+            updated_line.qty_received
+        ));
+    }
+
+    let updated_order = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Purchase order not found after receive")?;
+
+    if updated_order.receipt_status != "full" {
+        return Err(format!(
+            "Expected receipt_status full after full receive, got {}",
+            updated_order.receipt_status
         ));
     }
 

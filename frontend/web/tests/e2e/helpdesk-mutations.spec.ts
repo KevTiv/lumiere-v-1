@@ -5,10 +5,11 @@ import {
   chooseSelectOptionByLabel,
   expectNoAppError,
   fillField,
-  openEntityCreate,
+  gotoModule,
   selectEntityRowByText,
   smokeName,
   submitForm,
+  waitForBffQueryMinRows,
   waitForEntityActionEnabled,
 } from "./helpers"
 
@@ -19,7 +20,12 @@ test.describe("Helpdesk update mutations", { tag: "@phase-6" }, () => {
     const ticketName = smokeName("mut-ticket")
     const updatedName = `${ticketName}-updated`
 
-    await openEntityCreate(page, "/helpdesk", "helpdesk", "tickets", "new-helpdesk-ticket")
+    await gotoModule(page, "/helpdesk", "helpdesk")
+    await page.getByTestId("module-tab-helpdesk-tickets").click()
+    await waitForBffQueryMinRows(page, "/api/query/helpdesk-teams")
+    await waitForBffQueryMinRows(page, "/api/query/helpdesk-stages")
+    await page.getByTestId("module-create-helpdesk-tickets").click()
+    await expect(page.getByTestId("form-modal-new-helpdesk-ticket")).toBeVisible()
     await fillField(page, "name", ticketName)
     await chooseFirstEnabledOption(page, "teamId")
     await chooseFirstEnabledOption(page, "stageId")

@@ -176,6 +176,14 @@ export function encodeOptionalString(
   return { some: s }
 }
 
+/** SATS `Option<bool>` JSON for flat reducer args (not struct fields). */
+export function encodeOptionalBool(
+  value: boolean | null | undefined,
+): { none: [] } | { some: boolean } {
+  if (value === null || value === undefined) return { none: [] }
+  return { some: value }
+}
+
 /** SATS `Option<Timestamp>` JSON for flat reducer args (not struct fields). */
 export function encodeOptionalTimestamp(
   value: Date | string | null | undefined,
@@ -232,22 +240,36 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
 /** Flat `Option<T>` arg indices for reducers without a trailing params struct. */
 const FLAT_OPTION_ARG_INDICES: Partial<Record<string, readonly number[]>> = {
   create_proposal: [4, 5, 6],
+  update_payment_term: [2, 3, 4],
 }
 
 function encodeFlatOptionalArg(value: unknown, argIndex: number, reducer: string): unknown {
-  if (reducer !== "create_proposal") return value
-  switch (argIndex) {
-    case 4:
-      return encodeOptionalTimestamp(
-        value instanceof Date ? value : (value as string | null | undefined),
-      )
-    case 5:
-      return encodeOptionalString(value as string | null | undefined)
-    case 6:
-      return encodeOptionalU64(value as number | null | undefined)
-    default:
-      return value
+  if (reducer === "create_proposal") {
+    switch (argIndex) {
+      case 4:
+        return encodeOptionalTimestamp(
+          value instanceof Date ? value : (value as string | null | undefined),
+        )
+      case 5:
+        return encodeOptionalString(value as string | null | undefined)
+      case 6:
+        return encodeOptionalU64(value as number | null | undefined)
+      default:
+        return value
+    }
   }
+  if (reducer === "update_payment_term") {
+    switch (argIndex) {
+      case 2:
+      case 3:
+        return encodeOptionalString(value as string | null | undefined)
+      case 4:
+        return encodeOptionalBool(value as boolean | null | undefined)
+      default:
+        return value
+    }
+  }
+  return value
 }
 
 /**
@@ -257,7 +279,9 @@ function encodeFlatOptionalArg(value: unknown, argIndex: number, reducer: string
 export function encodeReducerCallArgs(reducer: string, args: unknown[]): unknown[] {
   const flatOptionIndices = FLAT_OPTION_ARG_INDICES[reducer]
   if (flatOptionIndices?.length) {
-    return args.map((arg, index) => encodeFlatOptionalArg(arg, index, reducer))
+    return args.map((arg, index) =>
+      flatOptionIndices.includes(index) ? encodeFlatOptionalArg(arg, index, reducer) : arg,
+    )
   }
 
   const structName = REDUCER_PARAM_STRUCTS[reducer]

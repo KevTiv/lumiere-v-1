@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { assertModuleTabs, expectNoAppError, gotoModule } from "./helpers"
+import { assertModuleTabs, activeTabEntityTable, expectNoAppError, gotoModule } from "./helpers"
 
 const DOCUMENTS_TAB_IDS = [
   "dashboard",
@@ -30,7 +30,7 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       break
     case "documents":
       await expect(page.getByTestId("module-create-documents-documents")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "knowledge-base":
       await expect(page.getByTestId("module-create-documents-knowledge-base")).toBeVisible()
@@ -42,15 +42,15 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       break
     case "document-folders":
       await expect(page.getByTestId("module-create-documents-document-folders")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "document-processing":
       await expect(page.getByTestId("module-create-documents-document-processing")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "document-insights":
       await expect(page.getByTestId("entity-action-generate-insights")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
       break
@@ -61,11 +61,11 @@ async function assertSubscriptionsTab(page: Page, tabId: string) {
   switch (tabId) {
     case "deferred-schedules":
       await expect(page.getByTestId("module-create-subscriptions-deferred-schedules")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "deferred-lines":
       await expect(page.getByTestId("entity-action-recognize-line")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
       break

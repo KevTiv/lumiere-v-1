@@ -158,7 +158,7 @@ export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateSaleOrderParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object)
+      const json = stdbParamsToJson(params as object, "CreateSaleOrderParams")
       const { urlPath, init } = salesBffPost("create_sale_order", [organizationId, withCompanyScope(json, companyId)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create sale order')
@@ -364,7 +364,7 @@ export function useUpdateSaleOrder(organizationId: bigint, companyId: bigint) {
           organizationId,
           companyId,
           toScalarU64(orderId),
-          stdbParamsToJson(finalizeUpdateSaleOrderParams(params)),
+          stdbParamsToJson(finalizeUpdateSaleOrderParams(params), "UpdateSaleOrderParams"),
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update sale order')

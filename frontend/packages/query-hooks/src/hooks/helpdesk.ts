@@ -95,7 +95,7 @@ export function useCreateTicket(organizationId: bigint) {
       const finalized = finalizeCreateTicketParams(params)
       const { urlPath, init } = helpdeskBffPost("create_ticket", [
         organizationId,
-        stdbParamsToJson(finalized),
+        stdbParamsToJson(finalized, "CreateTicketParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create helpdesk ticket')
@@ -115,7 +115,7 @@ export function useUpdateTicket(organizationId: bigint) {
       const { urlPath, init } = helpdeskBffPost("update_ticket", [
         organizationId,
         toScalarU64(ticketId),
-        stdbParamsToJson(finalizeUpdateTicketParams(params)),
+        stdbParamsToJson(finalizeUpdateTicketParams(params), "UpdateTicketParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update ticket')

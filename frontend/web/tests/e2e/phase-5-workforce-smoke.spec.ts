@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   chooseFirstOption,
+  activeTabEntityTable,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -37,12 +38,12 @@ test.describe("Workforce modules e2e @phase-5", () => {
 
       await openHrTab(page, "leave-types")
       await expect(page.getByTestId("module-create-hr-leave-types")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       await expectNoAppError(page)
 
       await openHrTab(page, "payroll-structures")
       await expect(page.getByTestId("module-create-hr-payroll-structures")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       await expectNoAppError(page)
     })
 
@@ -71,7 +72,7 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await expectNoAppError(page)
 
       await openProjectsTab(page, "resources")
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+    await expect(activeTabEntityTable(page)).toBeVisible()
       await expectNoAppError(page)
     })
   })
@@ -98,7 +99,7 @@ test.describe("Workforce modules e2e @phase-5", () => {
 
       await openCalendarTab(page, "activities")
       await expect(page.getByTestId("module-create-calendar-activities")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+    await expect(activeTabEntityTable(page)).toBeVisible()
       await expectNoAppError(page)
     })
   })

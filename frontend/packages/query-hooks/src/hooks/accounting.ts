@@ -3,7 +3,7 @@
 import { apiFetch } from "../http"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
-import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
+import { stdbParamsToJson, encodeOptionalU64, encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreatePaymentParams } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
@@ -1697,13 +1697,16 @@ export function useUpdatePaymentTerm(organizationId: number) {
       note: string | null
       isActive: boolean | null
     }) => {
-      const { urlPath, init } = accountingBffPost("update_payment_term", [
-        organizationId,
-        args.termId,
-        args.name,
-        args.note,
-        args.isActive,
-      ])
+      const { urlPath, init } = accountingBffPost(
+        "update_payment_term",
+        encodeReducerCallArgs("update_payment_term", [
+          organizationId,
+          args.termId,
+          args.name,
+          args.note,
+          args.isActive,
+        ]),
+      )
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

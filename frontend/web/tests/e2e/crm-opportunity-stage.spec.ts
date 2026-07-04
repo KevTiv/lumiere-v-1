@@ -31,7 +31,6 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     await fillField(page, "name", oppName)
     await fillField(page, "expectedRevenue", "1500")
     await chooseFirstEnabledOption(page, "stageId")
-    await chooseFirstEnabledOption(page, "partnerId")
     const [createOppRes] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes("/api/call/create_opportunity") && res.ok(),

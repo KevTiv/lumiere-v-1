@@ -115,6 +115,19 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(encoded[6], { none: [] })
   })
 
+  it("encodeReducerCallArgs SATS-encodes flat Option args for update_payment_term", () => {
+    const encoded = encodeReducerCallArgs("update_payment_term", [
+      1,
+      42,
+      null,
+      null,
+      false,
+    ])
+    assert.deepEqual(encoded[2], { none: [] })
+    assert.deepEqual(encoded[3], { none: [] })
+    assert.deepEqual(encoded[4], { some: false })
+  })
+
   it("encodeOptionalString treats empty string as none", () => {
     assert.deepEqual(encodeOptionalString(""), { none: [] })
     assert.deepEqual(encodeOptionalString("notes"), { some: "notes" })

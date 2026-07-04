@@ -3,13 +3,14 @@ import { expect, test } from "@playwright/test"
 
 import {
   callReducerBff,
-  chooseFirstOption,
+  chooseSelectOptionByLabel,
   expectNoAppError,
   fillField,
-  openEntityCreate,
+  gotoModule,
   scalarQueryId,
   smokeName,
   submitForm,
+  waitForBffQueryMinRows,
 } from "./helpers"
 
 function queryString(value: unknown): string {
@@ -35,10 +36,16 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
     const initialRef = smokeName("so-ref")
     const updatedRef = `${initialRef}-updated`
 
-    await openEntityCreate(page, "/sales", "sales", "orders", "new-sale-order")
-    await chooseFirstOption(page, "partnerId")
-    await chooseFirstOption(page, "pricelistId")
-    await chooseFirstOption(page, "warehouseId")
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await waitForBffQueryMinRows(page, "/api/query/contacts")
+    await waitForBffQueryMinRows(page, "/api/query/pricelists")
+    await waitForBffQueryMinRows(page, "/api/query/warehouses")
+    await page.getByTestId("module-create-sales-orders").click()
+    await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
+    await chooseSelectOptionByLabel(page, "partnerId", /Acme Corporation/i)
+    await chooseSelectOptionByLabel(page, "pricelistId", /.+/i)
+    await chooseSelectOptionByLabel(page, "warehouseId", /.+/i)
     await fillField(page, "clientOrderRef", initialRef)
 
     const [createOrderRes] = await Promise.all([

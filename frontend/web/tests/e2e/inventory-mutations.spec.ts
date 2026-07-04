@@ -2,12 +2,16 @@ import { expect, test } from "@playwright/test"
 
 import {
   chooseFirstOption,
+  chooseSelectOptionByLabel,
   expectNoAppError,
+  expectRecordSoftDeleted,
   fillField,
   openEntityCreate,
+  gotoModule,
   selectEntityRowByText,
   smokeName,
   submitForm,
+  waitForBffQueryMinRows,
   waitForEntityActionEnabled,
 } from "./helpers"
 
@@ -22,7 +26,13 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     const productName = smokeName("mut-product")
     const updatedName = `${productName}-updated`
 
-    await openEntityCreate(page, "/inventory", "inventory", "products", "new-product")
+    await gotoModule(page, "/inventory", "inventory")
+    await page.getByTestId("module-tab-inventory-products").click()
+    await waitForBffQueryMinRows(page, "/api/query/product-categories")
+    await waitForBffQueryMinRows(page, "/api/query/uoms")
+    await waitForBffQueryMinRows(page, "/api/query/pricelists")
+    await page.getByTestId("module-create-inventory-products").click()
+    await expect(page.getByTestId("form-modal-new-product")).toBeVisible()
     await fillField(page, "name", productName)
     await chooseFirstOption(page, "type")
     await chooseFirstOption(page, "categId")
@@ -87,9 +97,9 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     ])
     expect(deleteCategoryRes.ok()).toBe(true)
 
-    await expect(
-      page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: categoryName }),
-    ).toHaveCount(0, { timeout: 30_000 })
+    await expectRecordSoftDeleted(page, "/api/query/product-categories", (row) =>
+      String(row.name ?? "").includes(categoryName),
+    )
     await expectNoAppError(page)
   })
 })

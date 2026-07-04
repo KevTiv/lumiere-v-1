@@ -470,7 +470,7 @@ export function useCreateProduct(
         mergeReducerParams(CREATE_PRODUCT_DEFAULTS, productDefaults),
         params,
       )
-      const { urlPath, init } = inventoryBffPost("create_product", [organizationId, stdbParamsToJson(merged as object)])
+      const { urlPath, init } = inventoryBffPost("create_product", [organizationId, stdbParamsToJson(merged as object, "CreateProductParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product')
     },
@@ -482,7 +482,7 @@ export function useUpdateProduct(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Partial<UpdateProductParams> }>({
     mutationFn: async ({ productId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_product", [organizationId, toScalarU64(productId), stdbParamsToJson(finalizeUpdateProductParams(params))])
+      const { urlPath, init } = inventoryBffPost("update_product", [organizationId, toScalarU64(productId), stdbParamsToJson(finalizeUpdateProductParams(params), "UpdateProductParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product')
     },

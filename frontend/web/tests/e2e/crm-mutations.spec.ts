@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 
 import {
   expectNoAppError,
+  expectRecordSoftDeleted,
   fillField,
   openEntityCreate,
   selectEntityRowByText,
@@ -70,9 +71,9 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     ])
     expect(deleteLeadRes.ok()).toBe(true)
 
-    await expect(
-      page.locator('[data-testid="entity-table"] tbody tr').filter({ hasText: leadName }),
-    ).toHaveCount(0, { timeout: 30_000 })
+    await expectRecordSoftDeleted(page, "/api/query/leads", (row) =>
+      String(row.contactName ?? row.contact_name ?? row.name ?? "").includes(leadName),
+    )
     await expectNoAppError(page)
   })
 })

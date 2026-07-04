@@ -96,6 +96,52 @@ export async function assertModuleTabs(
   }
 }
 
+/** Entity table scoped to the visible tab panel (avoids strict-mode collisions). */
+export function activeTabEntityTable(page: Page) {
+  return page.locator('[role="tabpanel"]:visible [data-testid="entity-table"]').first()
+}
+
+/** Poll a BFF list query until at least `minRows` are returned. */
+export async function waitForBffQueryMinRows(
+  page: Page,
+  queryPath: string,
+  minRows = 1,
+  timeoutMs = 30_000,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get(queryPath)
+        if (!res.ok()) return 0
+        const json = (await res.json()) as { data?: unknown[] }
+        return Array.isArray(json.data) ? json.data.length : 0
+      },
+      { timeout: timeoutMs },
+    )
+    .toBeGreaterThanOrEqual(minRows)
+}
+
+/** Assert a row was soft-deleted (`deleted_at` / `deletedAt` set) via BFF query. */
+export async function expectRecordSoftDeleted(
+  page: Page,
+  queryPath: string,
+  match: (row: Record<string, unknown>) => boolean,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get(queryPath)
+        if (!res.ok()) return false
+        const json = (await res.json()) as { data?: Record<string, unknown>[] }
+        const row = (json.data ?? []).find(match)
+        if (!row) return true
+        return row.deletedAt != null || row.deleted_at != null
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+}
+
 export async function openSettingsSection(page: Page, sectionId: string) {
   await page.goto("/settings")
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
