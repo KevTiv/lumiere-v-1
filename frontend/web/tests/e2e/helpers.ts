@@ -1234,3 +1234,108 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
   await waitForMovePosted(page, moveId)
   return moveId
 }
+
+/** Poll `/api/query/audit-log` until a row matches table (and optional action). */
+export async function waitForAuditLogEntry(
+  page: Page,
+  tableName: string,
+  action?: string,
+): Promise<Record<string, unknown>> {
+  let lastCount = 0
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/audit-log")
+        if (!res.ok()) {
+          throw new Error(`audit-log query failed: ${res.status()}`)
+        }
+        const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+        const rows = json.data ?? []
+        lastCount = rows.length
+        return rows.find((row) => {
+          const table = String(row.tableName ?? row.table_name ?? "")
+          const rowAction = String(row.action ?? "")
+          return table === tableName && (action == null || rowAction === action)
+        })
+      },
+      { timeout: 45_000 },
+    )
+    .toBeTruthy()
+
+  const res = await page.request.get("/api/query/audit-log")
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  const row = (json.data ?? []).find((entry) => {
+    const table = String(entry.tableName ?? entry.table_name ?? "")
+    const rowAction = String(entry.action ?? "")
+    return table === tableName && (action == null || rowAction === action)
+  })
+  if (!row) {
+    throw new Error(
+      `audit log row missing for ${tableName}${action ? `/${action}` : ""} (rows=${lastCount})`,
+    )
+  }
+  return row
+}
+
+/** Create a pending AI action draft (create_task) via BFF. */
+export async function createAiActionDraftTask(
+  page: Page,
+  taskName: string,
+): Promise<number> {
+  await callReducerBff(
+    page,
+    "create_ai_action_draft",
+    [
+      {
+        reducer_name: "create_task",
+        params_json: JSON.stringify({ name: taskName, company_id: 0 }),
+        summary: `Create task ${taskName}`,
+        confidence: 0.95,
+        elevated: false,
+        warnings_json: null,
+        source_query: "e2e",
+        ui_context_json: null,
+        expires_at: null,
+        metadata: null,
+      },
+    ],
+    { withCompany: true },
+  )
+
+  const res = await page.request.get("/api/query/ai-action-drafts-inbox")
+  if (!res.ok()) throw new Error(`ai-action-drafts-inbox query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: number | string; summary?: string; status?: string }>
+  }
+  const row = (json.data ?? []).find(
+    (draft) => draft.summary?.includes(taskName) && (draft.status ?? "pending") === "pending",
+  )
+  if (row?.id == null) throw new Error(`pending draft not found for task ${taskName}`)
+  return Number(row.id)
+}
+
+/** Returns true when ai-gateway health endpoint responds OK. */
+export async function isAiGatewayAvailable(page: Page): Promise<boolean> {
+  const res = await page.request.get("/api/ai/health")
+  if (!res.ok()) return false
+  const json = (await res.json().catch(() => ({}))) as { ok?: boolean; status?: string }
+  return json.ok === true || json.status === "ok"
+}
+
+/** Open ERP assistant from sidebar and wait for panel. */
+export async function openErpAiChat(page: Page) {
+  await page.getByTestId("sidebar-open-ai-chat").click()
+  await expect(page.getByTestId("erp-ai-chat-panel")).toBeVisible({ timeout: 10_000 })
+}
+
+/** Assert overview KPI stat cards show live values (not placeholder em dash). */
+export async function expectOverviewDashboardLive(page: Page) {
+  await page.goto("/overview")
+  await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
+  await expect(page.getByTestId("overview-dashboard")).toBeVisible()
+  await expect(page.getByTestId("overview-widget-overview-stat-cards")).toBeVisible()
+  await expect(page.getByTestId("overview-stat-open-sales-orders")).not.toHaveText("—")
+  await expect(page.getByTestId("overview-stat-accounts-receivable")).toBeVisible()
+  await expectNoAppError(page)
+}
+

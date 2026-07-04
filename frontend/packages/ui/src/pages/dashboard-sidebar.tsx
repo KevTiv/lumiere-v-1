@@ -300,6 +300,7 @@ export function DashboardSidebar({
             onClick={onOpenAIChat}
             title="Open AI Assistant"
             aria-label="Open AI Assistant"
+            data-testid="sidebar-open-ai-chat"
             className={cn(
               "flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-sm transition-colors",
               "text-sidebar-foreground hover:bg-sidebar-accent/70",

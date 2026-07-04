@@ -713,6 +713,7 @@ export function AIChatPanel({
                 {messages.map((message) => (
                   <div
                     key={message.id}
+                    data-testid={`erp-ai-chat-message-${message.role}`}
                     className={cn(
                       "flex gap-2",
                       message.role === "user" ? "flex-row-reverse" : ""
@@ -932,6 +933,7 @@ export function AIChatPanel({
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
+                  data-testid="erp-ai-chat-input"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -946,6 +948,7 @@ export function AIChatPanel({
                 />
                 <Button
                   size="icon"
+                  data-testid="erp-ai-chat-send"
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
                   className="absolute right-1.5 bottom-1.5 h-6 w-6 rounded-md"
@@ -1005,7 +1008,10 @@ export function AIChatPanel({
   // ----- Docked mode: right sidebar rail -----
   if (docked) {
     return (
-      <aside className="h-screen w-[24vw] min-w-[320px] shrink-0 flex flex-col bg-sidebar border-l border-sidebar-border relative overflow-hidden">
+      <aside
+        data-testid="erp-ai-chat-panel"
+        className="h-screen w-[24vw] min-w-[320px] shrink-0 flex flex-col bg-sidebar border-l border-sidebar-border relative overflow-hidden"
+      >
         {chatContent}
       </aside>
     )
@@ -1015,6 +1021,7 @@ export function AIChatPanel({
   return (
     <div
       ref={panelRef}
+      data-testid="erp-ai-chat-panel"
       className={cn(
         "fixed bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden",
         "transition-shadow duration-200",

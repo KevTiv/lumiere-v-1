@@ -30,11 +30,11 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 | 10 | Create invoice from SO | `create_invoice_from_sale_order` | `/sales` → `create-invoice` action + modal | `proven` — `mvp-lead-to-cash.spec.ts` | Workflow QA |
 | 11 | Post account move | `post_account_move` / `post_invoice` | `/accounting` → Invoices → detail modal → Post | `proven` — `mvp-lead-to-cash.spec.ts` | Accounting |
 | 12 | Register payment | `create_payment` → `post_payment` → `register_payment_on_invoice` | `/accounting` → Payments | `proven` — `mvp-lead-to-cash.spec.ts` (UI create → post → register) | Accounting |
-| 13 | Dashboard / report updates | query resources | `/overview`, module dashboards | `manual` — seeded cards in module specs | Frontend |
-| 14 | AI business insight | ai-gateway RAG | modules-shell chat, `/api/ai/rag` | `manual` | AI Harness |
-| 15 | AI action draft | `create_ai_action_draft` | `/api/ai/actions/draft`, ai-action-drafts module | `manual` — planned `mvp-ai-action-draft.spec.ts` | AI Harness |
-| 16 | Approve/reject draft | `approve_ai_action_draft`, `reject_ai_action_draft` | `/ai-action-drafts` | `manual` | AI Harness |
-| 17 | Audit trail | `audit_log` table (via `write_audit_log_v2`) | Settings / audit views | `manual` | Security |
+| 13 | Dashboard / report updates | query resources | `/overview`, module dashboards | `proven` — `mvp-lead-to-cash.spec.ts` (live overview KPI widgets) | Frontend |
+| 14 | AI business insight | ai-gateway RAG | modules-shell chat, `/api/ai/rag` | `proven` — `mvp-ai-rag.spec.ts` (skips if gateway down) | AI Harness |
+| 15 | AI action draft | `create_ai_action_draft` | `/api/call/create_ai_action_draft`, `/ai-action-drafts` | `proven` — `mvp-ai-action-draft.spec.ts` | AI Harness |
+| 16 | Approve/reject draft | `approve_ai_action_draft`, `reject_ai_action_draft` | `/ai-action-drafts` | `proven` — `mvp-ai-action-draft.spec.ts` | AI Harness |
+| 17 | Audit trail | `audit_log` table (via `write_audit_log_v2`) | Settings → Audit, `/api/query/audit-log` | `proven` — `mvp-lead-to-cash.spec.ts` (query + Settings UI) | Security |
 
 ## Known gaps (explicit)
 

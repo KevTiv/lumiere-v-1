@@ -227,10 +227,7 @@ export function useExpireAiActionDrafts(organizationId: number, companyId: numbe
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { urlPath, init } = aiActionDraftsBffPost("expire_ai_action_drafts", [
-        organizationId,
-        companyId,
-      ])
+      const { urlPath, init } = aiActionDraftsBffPost("expire_ai_action_drafts", [])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -249,8 +246,6 @@ export function useCreateAiActionDraft(organizationId: number, companyId: number
       uiContextJson?: string | null
     }) => {
       const { urlPath, init } = aiActionDraftsBffPost("create_ai_action_draft", [
-        organizationId,
-        companyId,
         stdbParamsToJson({
           reducer_name: args.gateway.reducer_name,
           params_json: JSON.stringify(args.gateway.params_json),
@@ -265,7 +260,7 @@ export function useCreateAiActionDraft(organizationId: number, companyId: number
           ui_context_json: args.uiContextJson ?? null,
           expires_at: null,
           metadata: null,
-        }),
+        }, "CreateAiActionDraftParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -281,12 +276,7 @@ export function useApproveAiActionDraft(organizationId: number, companyId: numbe
   return useMutation({
     mutationFn: async (args: number | { draftId: number; companyId?: number }) => {
       const draftId = typeof args === "number" ? args : args.draftId
-      const scopedCompanyId = typeof args === "number" ? companyId : (args.companyId ?? companyId)
-      const { urlPath, init } = aiActionDraftsBffPost("approve_ai_action_draft", [
-        organizationId,
-        scopedCompanyId,
-        draftId,
-      ])
+      const { urlPath, init } = aiActionDraftsBffPost("approve_ai_action_draft", [draftId])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -305,10 +295,7 @@ export function useRejectAiActionDraft(organizationId: number, companyId: number
       reason?: string
       companyId?: number
     }) => {
-      const scopedCompanyId = args.companyId ?? companyId
       const { urlPath, init } = aiActionDraftsBffPost("reject_ai_action_draft", [
-        organizationId,
-        scopedCompanyId,
         args.draftId,
         args.reason?.trim() || "Rejected by user",
       ])
@@ -330,15 +317,12 @@ export function useUpdateAiActionDraftParams(organizationId: number, companyId: 
       summary?: string
       companyId?: number
     }) => {
-      const scopedCompanyId = args.companyId ?? companyId
       const { urlPath, init } = aiActionDraftsBffPost("update_ai_action_draft_params", [
-        organizationId,
-        scopedCompanyId,
         args.draftId,
         stdbParamsToJson({
           params_json: args.paramsJson,
           summary: args.summary ?? null,
-        }),
+        }, "UpdateAiActionDraftParamsParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))

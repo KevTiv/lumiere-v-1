@@ -594,6 +594,24 @@ pub async fn execute_resource_query(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
+        "audit-log" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id} ORDER BY id DESC LIMIT 500"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "audit-rules" => {
+            let sql = format!(
+                "SELECT id, organization_id, table_name, log_reads, log_writes, log_deletes, log_logins, is_active FROM audit_rule WHERE organization_id = {organization_id} ORDER BY id DESC"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
         _ => {}
     }
 

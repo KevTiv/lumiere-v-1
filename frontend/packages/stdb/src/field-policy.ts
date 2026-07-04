@@ -24,6 +24,8 @@ import type {
   AccountAnalyticDistributionModel,
   AccountAnalyticLine,
   AccountAsset,
+  AuditLog,
+  AuditRule,
   AccountBankStatement,
   AccountBankStatementLine,
   AccountAssetDepreciationLine,
@@ -215,6 +217,8 @@ export type QueryResourceKey =
   | 'analytic-accounts'
   | 'analytic-lines'
   | 'analytic-distribution-models'
+  | 'audit-log'
+  | 'audit-rules'
   | 'bank-statements'
   | 'bank-statement-lines'
   | 'bank-match-candidates'
@@ -558,6 +562,28 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['analytic-distribution-models', 'account_analytic_distribution_model'],
     ['name', 'companyId', 'analyticDistribution', 'isActive'],
   ),
+  'audit-log': orgEntry<AuditLog>('audit_log', ['audit-log', 'audit_log'], [
+    'companyId',
+    'tableName',
+    'recordId',
+    'action',
+    'oldValues',
+    'newValues',
+    'changedFields',
+    'userIdentity',
+    'sessionId',
+    'ipAddress',
+    'userAgent',
+    'timestamp',
+  ]),
+  'audit-rules': orgEntry<AuditRule>('audit_rule', ['audit-rules', 'audit_rule'], [
+    'tableName',
+    'logReads',
+    'logWrites',
+    'logDeletes',
+    'logLogins',
+    'isActive',
+  ]),
   'bank-statements': orgEntry<AccountBankStatement>('account_bank_statement', ['bank-statements', 'account_bank_statement'], [
     'name', 'reference', 'date', 'balanceStart', 'balanceEnd', 'state', 'journalId', 'companyId',
   ]),

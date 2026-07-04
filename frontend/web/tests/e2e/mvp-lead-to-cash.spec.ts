@@ -5,6 +5,7 @@ import {
   chooseSelectOptionByLabel,
   assertMoveLinesBalanced,
   expectNoAppError,
+  expectOverviewDashboardLive,
   expectSeededText,
   fetchAccountSelectLabelByInternalType,
   fetchDraftInvoiceMoveIdByPartner,
@@ -19,6 +20,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
+  openSettingsSection,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -31,12 +33,13 @@ import {
   waitForSaleOrderLineQtyDelivered,
   waitForPaymentPosted,
   waitForSaleOrderLineExists,
+  waitForAuditLogEntry,
 } from "./helpers"
 
 /**
  * Golden-path lead → cash workflow (creates data; see docs/MVP_WORKFLOW_CONTRACT.md).
  *
- * Steps 3–12 use the product UI (CRM lead create/convert, sales, accounting).
+ * Steps 3–12, 13, and 17 use the product UI (CRM lead create/convert, sales, accounting, overview, audit).
  */
 test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
   test("creates CRM lead through payment registration", async ({ page }) => {
@@ -283,6 +286,19 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(registerRes.ok()).toBe(true)
     await expectNoAppError(page)
+
+    // Step 13 — dashboard / report updates (live KPI widgets)
+    await expectOverviewDashboardLive(page)
+
+    // Step 17 — audit trail (query + Settings UI)
+    await waitForAuditLogEntry(page, "lead", "CREATE")
+    await waitForAuditLogEntry(page, "sale_order", "CREATE")
+    await openSettingsSection(page, "audit")
+    await expect(page.getByTestId("audit-log-panel")).toBeVisible()
+    await expect(page.getByTestId("audit-log-list")).toBeVisible()
+    await expect(page.locator("[data-testid^='audit-log-entry-']").first()).toBeVisible({
+      timeout: 15_000,
+    })
 
     // Sanity: lead id still resolvable after workflow
     expect(leadId).toBeGreaterThan(0)

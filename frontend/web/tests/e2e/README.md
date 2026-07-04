@@ -20,8 +20,10 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `auth-shell.spec.ts` | Public landing, auth redirect, sign-in, shell navigation, sign-out |
 | `module-smoke.spec.ts` | Cross-module minimal creates (CRM, Helpdesk, Inventory, Sales, Proposals) |
 | `accounting-module.spec.ts` | All accounting tabs, creates, quick actions, CSV import guard |
-| `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–12; full UI) |
+| `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–13, 17; full UI) |
 | `mvp-procure-to-pay.spec.ts` | PO create → line → confirm → receive → bill modal → post (@p0) |
+| `mvp-ai-action-draft.spec.ts` | AI action draft create → approve/reject (steps 15–16, @p0) |
+| `mvp-ai-rag.spec.ts` | ERP Assistant RAG insight (step 14, @p0; skips if gateway unavailable) |
 | `purchasing-module.spec.ts` | `/purchasing` shell, dashboard/orders/lines/requisitions/vendors/partner-banks tabs, seeded `PO/2024/0001` |
 | `inventory-module.spec.ts` | `/inventory` shell, key stock/product tabs, seeded `Lumiere Dev Laptop` |
 | `sales-invoice-flow.spec.ts` | Seeded `SO/2024/0001` on Sales, linked `INV/2024/00001` on Accounting Invoices, sale-order quick action |
@@ -37,11 +39,15 @@ make e2e-smoke
 MVP golden-path gates (from repo root):
 
 ```bash
-# Wave 2 — lead-to-cash (steps 3–12)
+# Wave 2 — lead-to-cash (steps 3–13, 17)
 E2E_CLEAR_DB=1 make e2e-single
 
 # Wave 3 — procure-to-pay
 E2E_CLEAR_DB=1 make e2e-p2p
+
+# AI draft + RAG (steps 14–16)
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-action-draft.spec.ts E2E_GREP=
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts E2E_GREP=
 
 # Both paths on a fresh DB
 E2E_CLEAR_DB=1 make e2e-mvp-golden

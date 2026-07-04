@@ -41,10 +41,12 @@ export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] })
         const Icon = stat.icon ? iconMap[stat.icon] : null
         const isPositive = stat.change && stat.change > 0
         const isNegative = stat.change && stat.change < 0
+        const statTestId = stat.testId ?? `stat-${index}`
 
         return (
           <div
             key={index}
+            data-testid={statTestId}
             className="p-4 rounded-xl bg-secondary/50 border border-border/50"
           >
             <div className="flex items-center justify-between mb-2">

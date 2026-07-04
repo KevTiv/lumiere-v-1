@@ -69,7 +69,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="module-view-ai-action-drafts">
       <DashboardHeader
         title="AI Action Approvals"
         description="Review pending AI-proposed ERP mutations before they execute. Elevated drafts require a different approver than the proposer."

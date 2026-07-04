@@ -102,6 +102,7 @@ export function AiActionDraftCard({
 
   return (
     <div
+      data-testid={`ai-action-draft-card-${draft.draftId}`}
       className={cn(
         "rounded-lg border text-xs",
         draft.elevated ? "border-warning/40 bg-warning/5" : "border-border bg-muted/30",
@@ -264,6 +265,7 @@ export function AiActionDraftCard({
             <Button
               size="sm"
               className="h-7 text-[10px] gap-1"
+              data-testid="ai-action-draft-approve"
               disabled={busy != null || !canApprove}
               onClick={() => void handleApprove()}
             >
@@ -280,6 +282,7 @@ export function AiActionDraftCard({
               size="sm"
               variant="outline"
               className="h-7 text-[10px] gap-1"
+              data-testid="ai-action-draft-reject"
               disabled={busy != null}
               onClick={() => void handleReject()}
             >

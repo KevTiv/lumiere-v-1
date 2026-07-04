@@ -92,6 +92,7 @@ export interface StatCardsWidget extends BaseWidget {
       value: string | number
       change?: number
       icon?: string
+      testId?: string
     }>
   }
 }
