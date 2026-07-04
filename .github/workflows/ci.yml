@@ -32,6 +32,12 @@ jobs:
       - name: Workspace members (api-server, ai-gateway)
         run: cargo check -p api-server -p ai-gateway
 
+      - name: api-server unit tests
+        run: cargo test -p api-server reducer_allowlist
+
+      - name: ai-gateway unit tests
+        run: cargo test -p ai-gateway health_returns
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -56,6 +62,18 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Unit tests (erp-shared)
+        run: pnpm --dir packages/erp-shared test
+
+      - name: Unit tests (query-hooks params)
+        run: pnpm --dir packages/query-hooks test
+
+      - name: Unit tests (ui)
+        run: pnpm --dir packages/ui test
+
+      - name: Unit tests (web BFF helpers)
+        run: pnpm --dir web test:unit
 
   playwright-compile:
     name: Playwright (compile smoke)
