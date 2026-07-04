@@ -195,6 +195,7 @@ pub mod create_leave_request_params_type;
 pub mod create_leave_type_params_type;
 pub mod create_loyalty_program_params_type;
 pub mod create_mrp_production_params_type;
+pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
 pub mod create_organization_params_type;
 pub mod create_partner_bank_params_type;
@@ -853,6 +854,7 @@ pub mod create_loyalty_card_reducer;
 pub mod create_loyalty_program_reducer;
 pub mod create_manufacturing_order_reducer;
 pub mod create_opportunity_reducer;
+pub mod create_opportunity_line_reducer;
 pub mod create_organization_reducer;
 pub mod create_partner_bank_reducer;
 pub mod create_password_reset_token_reducer;
@@ -1816,6 +1818,7 @@ pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
 pub use create_mrp_production_params_type::CreateMrpProductionParams;
+pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
 pub use create_organization_params_type::CreateOrganizationParams;
 pub use create_partner_bank_params_type::CreatePartnerBankParams;
@@ -2714,6 +2717,7 @@ pub use create_loyalty_card_reducer::create_loyalty_card;
 pub use create_loyalty_program_reducer::create_loyalty_program;
 pub use create_manufacturing_order_reducer::create_manufacturing_order;
 pub use create_opportunity_reducer::create_opportunity;
+pub use create_opportunity_line_reducer::create_opportunity_line;
 pub use create_organization_reducer::create_organization;
 pub use create_partner_bank_reducer::create_partner_bank;
 pub use create_password_reset_token_reducer::create_password_reset_token;
@@ -4193,6 +4197,12 @@ pub enum Reducer {
     CreateOpportunity {
         organization_id: u64,
         params: CreateOpportunityParams,
+}    ,
+    CreateOpportunityLine {
+        organization_id: u64,
+        company_id: u64,
+        opportunity_id: u64,
+        params: CreateOpportunityLineParams,
 }    ,
     CreateOrganization {
         params: CreateOrganizationParams,
@@ -6769,6 +6779,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateLoyaltyProgram { .. } => "create_loyalty_program",
             Reducer::CreateManufacturingOrder { .. } => "create_manufacturing_order",
             Reducer::CreateOpportunity { .. } => "create_opportunity",
+            Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
             Reducer::CreateOrganization { .. } => "create_organization",
             Reducer::CreatePartnerBank { .. } => "create_partner_bank",
             Reducer::CreatePasswordResetToken { .. } => "create_password_reset_token",
@@ -8983,6 +8994,17 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_opportunity_reducer::CreateOpportunityArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateOpportunityLine{
+                organization_id,
+                company_id,
+                opportunity_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_opportunity_line_reducer::CreateOpportunityLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                opportunity_id: opportunity_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateOrganization{

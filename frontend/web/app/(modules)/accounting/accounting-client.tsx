@@ -1843,6 +1843,15 @@ function AccountingClientLoaded({
         const resolved = resolveDefaultCogsInventoryAccountIds(
           accounts as readonly Record<string, unknown>[],
         )
+        const needsCogsAccounts = mt === "OutInvoice" || mt === "OutRefund"
+        if (needsCogsAccounts && resolved == null) {
+          toast({
+            variant: "destructive",
+            title: t("accounting.invoices.invoiceActions.postDraft"),
+            description: t("accounting.invoices.postMissingCogsAccounts"),
+          })
+          return
+        }
         const cogsId = resolved?.cogsAccountId ?? 0
         const invId = resolved?.inventoryAccountId ?? 0
         postInvoice.mutate([organizationId, id, cogsId, invId])
@@ -1850,7 +1859,7 @@ function AccountingClientLoaded({
         postMove.mutate([organizationId, id])
       }
     },
-    [postMove, postInvoice, organizationId, accounts],
+    [postMove, postInvoice, organizationId, accounts, toast, t],
   )
 
   // ── Derived data ────────────────────────────────────────────────────────────

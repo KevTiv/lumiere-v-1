@@ -9,6 +9,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::crm::contacts::{contact, Contact};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
 use crate::sales::sales_core::{
     create_sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
@@ -60,6 +61,20 @@ pub struct CreateOpportunityParams {
 pub struct ConvertOpportunityParams {
     pub pricelist_id: u64,
     pub warehouse_id: u64,
+}
+
+/// Params for adding a product line to an open opportunity.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateOpportunityLineParams {
+    pub product_id: u64,
+    pub name: Option<String>,
+    pub quantity: f64,
+    pub uom_id: u64,
+    pub price_unit: f64,
+    pub discount: f64,
+    pub tax_ids: Vec<u64>,
+    pub sequence: i32,
+    pub metadata: Option<String>,
 }
 
 /// Params for updating an opportunity.
@@ -432,6 +447,114 @@ pub fn update_opportunity(
             old_values: None,
             new_values: None,
             changed_fields,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn create_opportunity_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    opportunity_id: u64,
+    params: CreateOpportunityLineParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity", "write")?;
+
+    if params.quantity <= 0.0 {
+        return Err("Quantity must be greater than zero".to_string());
+    }
+    if params.price_unit < 0.0 {
+        return Err("Unit price cannot be negative".to_string());
+    }
+    if params.discount < 0.0 || params.discount > 100.0 {
+        return Err("Discount must be between 0 and 100".to_string());
+    }
+
+    let opp = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opportunity_id)
+        .ok_or("Opportunity not found")?;
+
+    if opp.organization_id != organization_id {
+        return Err("Opportunity does not belong to this organization".to_string());
+    }
+
+    if opp.company_id != Some(company_id) {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    if opp.is_won || opp.is_lost {
+        return Err("Cannot add lines to a closed opportunity".to_string());
+    }
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or("Product not found")?;
+
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
+
+    let discount_amount = params.price_unit * params.quantity * (params.discount / 100.0);
+    let price_subtotal = params.price_unit * params.quantity - discount_amount;
+
+    let line_name = params.name.unwrap_or_else(|| {
+        product
+            .display_name
+            .clone()
+            .unwrap_or_else(|| product.name.clone())
+    });
+
+    let line = ctx.db.opportunity_line().insert(OpportunityLine {
+        id: 0,
+        organization_id,
+        opportunity_id,
+        product_id: Some(params.product_id),
+        name: line_name,
+        quantity: params.quantity,
+        uom_id: Some(params.uom_id),
+        price_unit: params.price_unit,
+        price_subtotal,
+        discount: params.discount,
+        tax_ids: params.tax_ids.clone(),
+        sequence: params.sequence,
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "opportunity_line",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "opportunity_id": opportunity_id,
+                    "product_id": params.product_id,
+                    "quantity": params.quantity,
+                    "price_unit": params.price_unit,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "opportunity_id".to_string(),
+                "product_id".to_string(),
+                "quantity".to_string(),
+                "price_unit".to_string(),
+            ],
             metadata: None,
         },
     );

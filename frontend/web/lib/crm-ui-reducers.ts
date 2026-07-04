@@ -11,6 +11,7 @@ export const CRM_UI_REDUCERS = [
   "create_contact_tag",
   "create_lead",
   "create_opportunity",
+  "create_opportunity_line",
   "delete_contact",
   "delete_lead",
   "import_contact_csv",

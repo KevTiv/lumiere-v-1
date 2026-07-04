@@ -119,6 +119,24 @@ export function uomRowsToSelectOptions(
     })
 }
 
+/** Open CRM opportunities (not won/lost) for line-item forms. */
+export function openOpportunityRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows
+    .filter(
+      (r) =>
+        r.isWon !== true &&
+        r.isWon !== 1 &&
+        r.isLost !== true &&
+        r.isLost !== 1,
+    )
+    .map((row) => ({
+      value: String(row.id),
+      label: String(row.name ?? row.id),
+    }))
+}
+
 /** Purchase orders — optional filter to draft-only (for adding lines). */
 export function purchaseOrderRowsToSelectOptions(
   rows: Record<string, unknown>[],

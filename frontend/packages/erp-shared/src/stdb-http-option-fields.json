@@ -1409,6 +1409,10 @@
     "description",
     "metadata"
   ],
+  "CreateOpportunityLineParams": [
+    "name",
+    "metadata"
+  ],
   "CreateOrganizationParams": [
     "description",
     "logo_url",

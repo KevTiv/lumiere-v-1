@@ -315,6 +315,29 @@ export const contactSegmentsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Opportunity lines ─────────────────────────────────────────────────────────
+export const opportunityLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "opportunity-lines-table",
+  title: t("crm.opportunityLines.title"),
+  description: t("crm.opportunityLines.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("crm.opportunityLines.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "opportunityId", label: t("crm.opportunityLines.columns.opportunityId"), width: "min-w-20" },
+      { key: "name", label: t("crm.opportunityLines.columns.name"), width: "min-w-48" },
+      { key: "quantity", label: t("crm.opportunityLines.columns.quantity"), type: "number", align: "right" },
+      { key: "priceUnit", label: t("crm.opportunityLines.columns.priceUnit"), type: "currency", align: "right" },
+      { key: "priceSubtotal", label: t("crm.opportunityLines.columns.priceSubtotal"), type: "currency", align: "right" },
+      { key: "discount", label: t("crm.opportunityLines.columns.discount"), type: "percent", align: "right" },
+    ],
+    emptyMessage: t("crm.opportunityLines.emptyMessage"),
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const crmEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "leads-table": leadsTableConfig(t),
@@ -323,4 +346,5 @@ export const crmEntityConfigs = (t: TFunction): Record<string, EntityViewConfig>
   "activities-table": activitiesTableConfig(t),
   "contact-tags-table": contactTagsTableConfig(t),
   "contact-segments-table": contactSegmentsTableConfig(t),
+  "opportunity-lines-table": opportunityLinesTableConfig(t),
 })

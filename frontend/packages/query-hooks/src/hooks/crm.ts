@@ -20,6 +20,7 @@ import type {
   CreateContactTagParams,
   CreateContactParams,
   CreateLeadParams,
+  CreateOpportunityLineParams,
   CreateOpportunityParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
@@ -77,6 +78,19 @@ export function useOpportunities(
   return useQuery<QueryRows>({
     queryKey: ['opportunities', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/opportunities', 'Failed to fetch opportunities'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useOpportunityLines(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['opportunity-lines', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/opportunity-lines', 'Failed to fetch opportunity lines'),
     staleTime: 30_000,
     initialData,
   })
@@ -459,6 +473,28 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
   })
 }
 
+export function useCreateOpportunityLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { opportunityId: ScalarId; params: CreateOpportunityLineParams }
+  >({
+    mutationFn: async ({ opportunityId, params }) => {
+      const { urlPath, init } = crmBffPost("create_opportunity_line", [
+        toScalarU64(opportunityId),
+        stdbParamsToJson(params as object, "CreateOpportunityLineParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create opportunity line')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['opportunity-lines', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
 export function useDeleteLead(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
@@ -604,6 +640,7 @@ export type {
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateLeadParams,
+  CreateOpportunityLineParams,
   CreateOpportunityParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,

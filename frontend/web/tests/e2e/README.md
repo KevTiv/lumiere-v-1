@@ -20,12 +20,11 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `auth-shell.spec.ts` | Public landing, auth redirect, sign-in, shell navigation, sign-out |
 | `module-smoke.spec.ts` | Cross-module minimal creates (CRM, Helpdesk, Inventory, Sales, Proposals) |
 | `accounting-module.spec.ts` | All accounting tabs, creates, quick actions, CSV import guard |
-| `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–12; BFF for qualified lead, convert, post invoice) |
+| `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–12; full UI) |
 | `mvp-procure-to-pay.spec.ts` | PO create → line → confirm → receive → bill modal → post (@p0) |
 | `purchasing-module.spec.ts` | `/purchasing` shell, dashboard/orders/lines/requisitions/vendors/partner-banks tabs, seeded `PO/2024/0001` |
 | `inventory-module.spec.ts` | `/inventory` shell, key stock/product tabs, seeded `Lumiere Dev Laptop` |
 | `sales-invoice-flow.spec.ts` | Seeded `SO/2024/0001` on Sales, linked `INV/2024/00001` on Accounting Invoices, sale-order quick action |
-| `mvp-lead-to-cash.spec.ts` | **MVP golden path** — contact → lead → convert → SO → line (BFF) → confirm → invoice → post (@p0) |
 
 ## Local Setup
 
@@ -56,7 +55,11 @@ To force a clean database and full fixture re-seed (same as old behavior), set:
 
 ```bash
 E2E_CLEAR_DB=1 make e2e-smoke
+# P0 only (includes both MVP golden specs):
+E2E_CLEAR_DB=1 E2E_SUITE=p0 make e2e-smoke
 ```
+
+Smoke Playwright runs use `E2E_WORKERS=1` by default (serial) so tests share one api-server reliably.
 
 The seeded login is:
 

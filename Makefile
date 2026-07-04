@@ -232,7 +232,7 @@ e2e-smoke-setup:
 	'
 
 e2e-smoke-test:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -293,10 +293,10 @@ e2e-smoke-test:
 				exit 1; \
 			fi; \
 		done; \
-		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite)..."; \
+		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
-		E2E_PNPM_SCRIPT="test:e2e"; \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -308,7 +308,8 @@ e2e-smoke-test:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm run "$$E2E_PNPM_SCRIPT"; \
+		E2E_WORKERS="$$E2E_WORKERS" \
+		pnpm exec playwright test "$${PW_ARGS[@]}"; \
 		echo "[e2e] Smoke tests passed."; \
 	'
 
@@ -463,7 +464,7 @@ e2e-playwright-only:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -610,10 +611,10 @@ e2e-smoke:
 				exit 1; \
 			fi; \
 		done; \
-		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite)..."; \
+		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
-		E2E_PNPM_SCRIPT="test:e2e"; \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -625,7 +626,8 @@ e2e-smoke:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm run "$$E2E_PNPM_SCRIPT"; \
+		E2E_WORKERS="$$E2E_WORKERS" \
+		pnpm exec playwright test "$${PW_ARGS[@]}"; \
 		echo "[e2e] Smoke tests passed."; \
 	'
 

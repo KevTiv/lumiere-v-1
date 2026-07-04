@@ -811,6 +811,114 @@ export const editLeadRevenueForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
+export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
+  id: "add-opportunity-line",
+  title: t("crm.forms.addOpportunityLine.title"),
+  description: t("crm.forms.addOpportunityLine.description"),
+  sections: [
+    {
+      id: "ol-opportunity",
+      title: t("crm.forms.addOpportunityLine.sections.opportunity"),
+      fields: [
+        {
+          id: "opportunityId",
+          name: "opportunityId",
+          type: "select",
+          label: t("crm.forms.addOpportunityLine.fields.opportunityId"),
+          placeholder: t("crm.forms.addOpportunityLine.fields.opportunityPlaceholder"),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "ol-product",
+      title: t("crm.forms.addOpportunityLine.sections.product"),
+      fields: [
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("crm.forms.addOpportunityLine.fields.productId"),
+          placeholder: t("crm.forms.addOpportunityLine.fields.productPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("crm.forms.addOpportunityLine.fields.uomId"),
+          placeholder: t("crm.forms.addOpportunityLine.fields.uomPlaceholder"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "number",
+          label: t("crm.forms.addOpportunityLine.fields.quantity"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("crm.forms.addOpportunityLine.fields.priceUnit"),
+          required: true,
+          width: "1/2",
+        },
+      ],
+    },
+    {
+      id: "ol-details",
+      title: t("crm.forms.addOpportunityLine.sections.details"),
+      fields: [
+        {
+          id: "discount",
+          name: "discount",
+          type: "number",
+          label: t("crm.forms.addOpportunityLine.fields.discount"),
+          width: "1/3",
+          defaultValue: 0,
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("crm.forms.addOpportunityLine.fields.sequence"),
+          width: "1/3",
+          defaultValue: 10,
+        },
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("crm.forms.addOpportunityLine.fields.name"),
+          placeholder: t("crm.forms.addOpportunityLine.fields.namePlaceholder"),
+          width: "full",
+        },
+        {
+          id: "taxIds",
+          name: "taxIds",
+          type: "textarea",
+          label: t("crm.forms.addOpportunityLine.fields.taxIds"),
+          placeholder: t("crm.forms.addOpportunityLine.fields.taxIdsPlaceholder"),
+          description: t("crm.forms.addOpportunityLine.fields.taxIdsHint"),
+          width: "full",
+          rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
 export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-lead": newLeadForm(t),
   "new-opportunity": newOpportunityForm(t),
@@ -831,4 +939,5 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "edit-lead-details": editLeadDetailsForm(t),
   "edit-lead-address": editLeadAddressForm(t),
   "edit-lead-revenue": editLeadRevenueForm(t),
+  "add-opportunity-line": addOpportunityLineForm(t),
 })

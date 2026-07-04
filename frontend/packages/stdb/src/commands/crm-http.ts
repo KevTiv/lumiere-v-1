@@ -23,6 +23,7 @@ export const CRM_BFF_REDUCERS = [
   "create_contact_segment",
   "convert_lead_to_customer",
   "convert_opportunity_to_sale_order",
+  "create_opportunity_line",
   "delete_contact",
   "delete_lead",
   "assign_tag_to_contact",
@@ -37,6 +38,7 @@ export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
 
 const WITH_COMPANY_QUERY = new Set<CrmBffReducerKey>([
   "convert_opportunity_to_sale_order",
+  "create_opportunity_line",
 ]);
 
 /** Same-origin path used by `apiFetch` in the web app. */
@@ -80,6 +82,7 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
   create_contact_segment: ["contacts"],
   convert_lead_to_customer: ["leads", "contacts", "opportunities"],
   convert_opportunity_to_sale_order: ["opportunities", "sale-orders"],
+  create_opportunity_line: ["opportunity-lines", "opportunities"],
   delete_contact: ["contacts"],
   delete_lead: ["leads"],
   assign_tag_to_contact: ["contacts"],

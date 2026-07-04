@@ -220,6 +220,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_contact: "CreateContactParams",
   convert_lead_to_customer: "ConvertLeadParams",
   convert_opportunity_to_sale_order: "ConvertOpportunityParams",
+  create_opportunity_line: "CreateOpportunityLineParams",
   create_sale_order_line: "CreateSaleOrderLineParams",
   create_invoice_from_sale_order: "CreateInvoiceFromSaleOrderParams",
   create_bill_from_purchase_order: "CreateBillFromPurchaseOrderParams",

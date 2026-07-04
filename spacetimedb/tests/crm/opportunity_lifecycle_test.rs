@@ -5,8 +5,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::opportunities::{
-    convert_opportunity_to_sale_order, create_opportunity, opportunity, opportunity_line,
-    opp_stage, ConvertOpportunityParams, CreateOpportunityParams, OpportunityLine,
+    convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opportunity,
+    opp_stage, ConvertOpportunityParams, CreateOpportunityLineParams, CreateOpportunityParams,
     OpportunityStage,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
@@ -108,22 +108,23 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         .find(|o| o.organization_id == org_id && o.name == "Harness Enterprise Deal")
         .ok_or("Opportunity not found after create")?;
 
-    ctx.db.opportunity_line().insert(OpportunityLine {
-        id: 0,
-        organization_id: org_id,
-        opportunity_id: opp.id,
-        product_id: Some(fixture.product_id),
-        name: "Harness line".to_string(),
-        quantity: 1.0,
-        uom_id: Some(1),
-        price_unit: 100.0,
-        price_subtotal: 100.0,
-        discount: 0.0,
-        tax_ids: vec![],
-        sequence: 1,
-        created_at: ctx.timestamp,
-        metadata: None,
-    });
+    create_opportunity_line(
+        ctx,
+        org_id,
+        company_id,
+        opp.id,
+        CreateOpportunityLineParams {
+            product_id: fixture.product_id,
+            name: Some("Harness line".to_string()),
+            quantity: 1.0,
+            uom_id: 1,
+            price_unit: 100.0,
+            discount: 0.0,
+            tax_ids: vec![],
+            sequence: 1,
+            metadata: None,
+        },
+    )?;
 
     convert_opportunity_to_sale_order(
         ctx,

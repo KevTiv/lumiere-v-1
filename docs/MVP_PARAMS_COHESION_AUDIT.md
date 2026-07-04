@@ -82,7 +82,7 @@ Status as of branch with `create_bill_from_purchase_order` params refactor.
 | 8 | `confirm_sales_order` | N/A (action) | ✅ state transition only | ✅ entity action | N/A | N/A flat args | proven | **Pass** | — |
 | 9 | `assign_stock_picking` / `validate_stock_picking` | N/A | ✅ | ✅ sales/inventory actions | N/A | N/A | manual | **Pass** | Full assign→validate E2E still open |
 | 10 | `create_invoice_from_sale_order` | ✅ nested lines | ✅ template + derived | ✅ modal | ✅ `toCreateInvoiceFromSaleOrderParams` | ✅ nested `"AddAccountMoveLineParams"` | proven | **Pass** | Reference impl |
-| 11 | `post_account_move` / `post_invoice` | N/A flat / partial | ✅ | ✅ invoice/bill detail modal Post | ⚠️ `postInvoice` resolves COGS/inventory from chart; falls back `0` | flat args | proven (UI post in E2E) | **Pass*** | *Verify COGS/inventory accounts in seed* |
+| 11 | `post_account_move` / `post_invoice` | N/A flat / partial | ✅ | ✅ invoice/bill detail modal Post | ✅ OutInvoice aborts post when COGS/inventory GL missing | flat args | proven (UI post in E2E) | **Pass** | Seed includes COGS + inventory valuation accounts |
 | 12 | `create_payment` → `post_payment` → `register_payment_on_invoice` | ✅ `CreatePaymentParams` | ✅ | ✅ `new-account-payment` + `registerPaymentInvoicesForm` | ✅ `toCreatePaymentParamsFromManualForm` | ✅ `"CreatePaymentParams"` | proven | **Pass** | Golden E2E: UI create → post → register |
 
 ### Phase A summary
@@ -116,7 +116,7 @@ Investigate in tier order. **Status = not yet audited** unless noted.
 | Tier | Module | Forms (fields≈) | Mappers≈ | Risk | Priority actions |
 |------|--------|----------------:|---------:|------|------------------|
 | 1 | **Accounting** | 287 | 27+ | Low–medium | Spot-check `bill_timesheets`, `create_payment`, workflow reducers |
-| 1 | **CRM** | 125 | 4 + merge | Low | Fix convert hook struct names; opportunity lines UI |
+| 1 | **CRM** | 125 | 4 + merge | Low | Fix convert hook struct names; ~~opportunity lines UI~~ (Wave 4) |
 | 1 | **Sales** | 119 | 4 + logistics | Medium | **SO line form** (P0); delivery actions |
 | 1 | **Inventory** | 241 | 12 ext | Medium | Compare inline client vs `inventory-ext-params` |
 | 2 | **Purchasing** | 117+ | 1 + inline | Medium | PO create mapper; bill **done** |
@@ -152,7 +152,7 @@ These reducers are in `REDUCER_PARAM_STRUCTS` but hooks omit the struct name tod
 | One-click bill loop with `new Date()` | Old PO create-bill action | **Fixed** → modal |
 | E2E BFF for UI gaps | `post_account_move` | **Fixed** — UI post in lead-to-cash + procure-to-pay |
 | Inline `handleFormSubmit` payloads | `createPurchaseOrder`, manufacturing, documents | **Open** — Phase B/C |
-| `postInvoice` COGS/inventory `?? 0` | `accounting-client.tsx` `postDraft` | **Open** — fails silently if chart incomplete |
+| `postInvoice` COGS/inventory `?? 0` | `accounting-client.tsx` `postDraft` | **Fixed** — OutInvoice/OutRefund toast + abort when chart lacks COGS/inventory |
 
 ---
 

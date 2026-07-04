@@ -22,8 +22,9 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 | 3 | Create contact | `create_contact` | `/crm` → Contacts tab, `new-contact` | `proven` — `mvp-lead-to-cash.spec.ts` | Frontend |
 | 4 | Create lead | `create_lead` | `/crm` → Leads, `new-lead` (state = Qualified) | `proven` — `mvp-lead-to-cash.spec.ts` | Workflow QA |
 | 5 | Convert lead → customer/opportunity | `convert_lead_to_customer` | `/crm` → Leads, `convert-lead` action | `proven` — `mvp-lead-to-cash.spec.ts` (UI) | Workflow QA |
+| 5a | Add opportunity line | `create_opportunity_line` | `/crm` → Opportunity Lines, `add-opportunity-line` | `proven` — `mvp-lead-to-cash.spec.ts` (UI; line copied to SO on convert) | Workflow QA |
 | 6 | Convert opportunity → sale order | `convert_opportunity_to_sale_order` | `/crm` → Opportunities, `convert-opp-order` | `proven` — `mvp-lead-to-cash.spec.ts` (UI) | Workflow QA |
-| 7 | Add sale order line | `create_sale_order_line` | `/sales` → Order lines tab, `add-sale-order-line` | `proven` — `mvp-lead-to-cash.spec.ts` | Workflow QA |
+| 7 | Add sale order line | `create_sale_order_line` | `/sales` → Order lines tab, `add-sale-order-line` | `manual` — golden path uses opp lines (step 5a); SO line UI still available | Workflow QA |
 | 8 | Confirm sale order | `confirm_sales_order` | `/sales` → Orders, `confirm-orders` | `proven` — `mvp-lead-to-cash.spec.ts` | Workflow QA |
 | 9 | Assign/validate delivery | `confirm_stock_picking`, `assign_stock_picking`, `validate_stock_picking` | `/sales` → Fulfillment tab | `proven` — `mvp-lead-to-cash.spec.ts` (confirm → assign → validate) | Workflow QA |
 | 10 | Create invoice from SO | `create_invoice_from_sale_order` | `/sales` → `create-invoice` action + modal | `proven` — `mvp-lead-to-cash.spec.ts` | Workflow QA |
@@ -37,7 +38,7 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 
 ## Known gaps (explicit)
 
-1. **Opportunity lines UI** — convert SO pulls lines from `opportunity_line`; no UI to add lines pre-convert.
+1. ~~**Opportunity lines UI**~~ — **Done (Wave 4):** CRM **Opportunity Lines** tab + `create_opportunity_line` reducer; convert SO copies lines from `opportunity_line`.
 2. **Procure-to-pay** — complete: `mvp-procure-to-pay.spec.ts` (full UI path including receive and post bill).
 
 ## Secondary path: procure-to-pay
@@ -52,10 +53,10 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 
 ## Exit criteria (MVP)
 
-- [ ] `mvp-lead-to-cash.spec.ts` passes on `E2E_CLEAR_DB=1 make e2e-smoke`
-- [ ] `run_all_domain_tests` passes in e2e-smoke setup
-- [ ] Reducer allowlist `strict` in production
-- [ ] Cross-org query/call rejected at api-server
+- [x] `mvp-lead-to-cash.spec.ts` passes on `E2E_CLEAR_DB=1 make e2e-smoke` (P0 suite; default `E2E_WORKERS=1`)
+- [x] `run_all_domain_tests` passes in e2e-smoke setup
+- [x] Reducer allowlist `strict` in production (`api-server/src/reducer_allowlist.rs`; default when `runtime_is_production()`)
+- [x] Cross-org query/call rejected at api-server (`get_query` org override check; `post_call` first-arg org mismatch)
 - [ ] All rows above have owner; no `missing` wiring for steps 1–12
 
 ## Related

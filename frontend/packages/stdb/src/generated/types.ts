@@ -3382,6 +3382,19 @@ export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams",
 });
 export type CreateMrpProductionParams = __Infer<typeof CreateMrpProductionParams>;
 
+export const CreateOpportunityLineParams = __t.object("CreateOpportunityLineParams", {
+  productId: __t.u64(),
+  name: __t.option(__t.string()),
+  quantity: __t.f64(),
+  uomId: __t.u64(),
+  priceUnit: __t.f64(),
+  discount: __t.f64(),
+  taxIds: __t.array(__t.u64()),
+  sequence: __t.i32(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateOpportunityLineParams = __Infer<typeof CreateOpportunityLineParams>;
+
 export const CreateOpportunityParams = __t.object("CreateOpportunityParams", {
   name: __t.string(),
   expectedRevenue: __t.f64(),

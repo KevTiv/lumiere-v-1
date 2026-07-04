@@ -64,6 +64,7 @@ import {
   newLoyaltyCardForm,
   leadsTableConfig,
   opportunitiesTableConfig,
+  opportunityLinesTableConfig,
   contactsTableConfig,
   newLeadForm,
   newOpportunityForm,
@@ -825,6 +826,12 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newOpportunityForm(t),
       createLabel: "New Opportunity",
       createAction: "createOpportunity",
+    },
+    {
+      id: "opportunity-lines",
+      label: t("crm.opportunityLines.tabLabel"),
+      type: "entity",
+      entityConfig: opportunityLinesTableConfig(t),
     },
     {
       id: "contacts",

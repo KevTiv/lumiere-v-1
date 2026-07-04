@@ -748,7 +748,8 @@
         "recordPayment": "Record Payment",
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals"
-      }
+      },
+      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -2236,6 +2237,21 @@
         "High": "High"
       }
     },
+    "opportunityLines": {
+      "tabLabel": "Opportunity Lines",
+      "title": "Opportunity Lines",
+      "description": "Products and quantities attached to pipeline opportunities",
+      "searchPlaceholder": "Search by product or description…",
+      "emptyMessage": "No opportunity lines found.",
+      "columns": {
+        "opportunityId": "Opportunity",
+        "name": "Product / Description",
+        "quantity": "Qty",
+        "priceUnit": "Unit Price",
+        "priceSubtotal": "Subtotal",
+        "discount": "Disc %"
+      }
+    },
     "contacts": {
       "title": "Contacts",
       "description": "Customers, vendors, and partners",
@@ -2283,6 +2299,7 @@
     "actions": {
       "convertToCustomer": "Convert to customer",
       "convertToSaleOrder": "Convert to sale order",
+      "newOpportunityLine": "New line",
       "convertLeadQualifiedOnly": "Only leads in Qualified status can be converted.",
       "convertOppNeedsPartner": "Set a customer (partner) on the opportunity before converting to a sale order.",
       "deleteContact": "Archive contact",
@@ -2492,6 +2509,35 @@
         },
         "validation": {
           "pricelistWarehouse": "Select both a pricelist and a warehouse."
+        }
+      },
+      "addOpportunityLine": {
+        "title": "Add opportunity line",
+        "description": "Add a product line to an open pipeline opportunity.",
+        "sections": {
+          "opportunity": "Opportunity",
+          "product": "Product & pricing",
+          "details": "Line details"
+        },
+        "fields": {
+          "opportunityId": "Open opportunity",
+          "opportunityPlaceholder": "Select an opportunity…",
+          "productId": "Product",
+          "productPlaceholder": "Select product…",
+          "uomId": "Unit of measure",
+          "uomPlaceholder": "Select UoM…",
+          "quantity": "Quantity",
+          "priceUnit": "Unit price",
+          "discount": "Discount %",
+          "sequence": "Sequence",
+          "name": "Description",
+          "namePlaceholder": "Optional line description…",
+          "taxIds": "Tax IDs",
+          "taxIdsPlaceholder": "e.g. 1, 2",
+          "taxIdsHint": "Comma-separated tax record IDs (optional)"
+        },
+        "validation": {
+          "requiredFields": "Select an opportunity, product, UoM, quantity, and unit price."
         }
       },
       "assignTag": {

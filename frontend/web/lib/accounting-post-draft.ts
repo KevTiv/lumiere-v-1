@@ -52,14 +52,18 @@ export function isInvoiceLikeMoveType(mt: string): boolean {
 }
 
 function accountGroupTag(a: Record<string, unknown>): string | undefined {
-  const g = a.internalGroup
-  if (g != null && typeof g === 'object' && 'tag' in g) return String((g as { tag: string }).tag)
-  return undefined
+  const tag = enumTag(a.internalGroup ?? a.internal_group)
+  return tag || undefined
+}
+
+function isBankAccountRow(a: Record<string, unknown>): boolean {
+  const v = a.isBankAccount ?? a.is_bank_account
+  return v === true || v === 1
 }
 
 /**
  * Picks default COGS (Expense) and inventory (non-bank Asset) accounts for `post_invoice`.
- * Returns null if the chart does not expose suitable rows (caller may still use 0,0 when no COGS applies).
+ * Returns null if the chart does not expose suitable rows (OutInvoice UI aborts post when null).
  */
 export function resolveDefaultCogsInventoryAccountIds(
   accounts: readonly Record<string, unknown>[],
@@ -67,7 +71,7 @@ export function resolveDefaultCogsInventoryAccountIds(
   const active = accounts.filter((a) => a.deprecated !== true && a.deprecated !== 1)
   const expenses = active.filter((a) => accountGroupTag(a) === 'Expense')
   const assets = active.filter(
-    (a) => accountGroupTag(a) === 'Asset' && a.isBankAccount !== true && a.isBankAccount !== 1,
+    (a) => accountGroupTag(a) === 'Asset' && !isBankAccountRow(a),
   )
 
   const byNameCode = (a: Record<string, unknown>) =>

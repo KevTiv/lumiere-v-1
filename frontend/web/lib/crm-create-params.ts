@@ -190,3 +190,58 @@ export function toConvertOpportunityParams(formData: Record<string, unknown>): C
   if (pricelistId === null || warehouseId === null) return null
   return { pricelistId, warehouseId }
 }
+
+function requiredBigIntU64(v: unknown): bigint | null {
+  return parseU64Field(v)
+}
+
+function parseTaxIdList(raw: unknown): bigint[] {
+  if (raw == null || String(raw).trim() === "") return []
+  return String(raw)
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((p) => BigInt(p))
+}
+
+export function toCreateOpportunityLineParams(
+  formData: Record<string, unknown>,
+): import("@lumiere/stdb/types").CreateOpportunityLineParams | null {
+  const productId = requiredBigIntU64(formData.productId)
+  const uomId = requiredBigIntU64(formData.uomId)
+  const quantity = Number(formData.quantity)
+  const priceUnit = Number(formData.priceUnit)
+  if (
+    productId == null ||
+    uomId == null ||
+    !Number.isFinite(quantity) ||
+    quantity <= 0 ||
+    !Number.isFinite(priceUnit) ||
+    priceUnit < 0
+  ) {
+    return null
+  }
+
+  const discountRaw = formData.discount
+  const discount =
+    discountRaw === "" || discountRaw == null ? 0 : Number(discountRaw)
+  if (!Number.isFinite(discount) || discount < 0 || discount > 100) return null
+
+  const sequenceRaw = formData.sequence
+  const sequence =
+    sequenceRaw === "" || sequenceRaw == null
+      ? 10
+      : Math.trunc(Number(sequenceRaw))
+
+  return {
+    productId,
+    name: optionalTrimmedString(formData.name),
+    quantity,
+    uomId,
+    priceUnit,
+    discount,
+    taxIds: parseTaxIdList(formData.taxIds),
+    sequence,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}

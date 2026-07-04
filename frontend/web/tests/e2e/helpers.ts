@@ -751,6 +751,35 @@ export async function waitForSaleOrderDraftInQuery(page: Page, orderId: number) 
     .toBe(true)
 }
 
+/** Poll until an opportunity line exists for the opportunity with a product quantity > 0. */
+export async function waitForOpportunityLineExists(page: Page, opportunityId: number) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/opportunity-lines")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          opportunityId?: unknown
+          opportunity_id?: unknown
+          productId?: unknown
+          product_id?: unknown
+          quantity?: unknown
+        }>
+      }
+      const hasLine = (json.data ?? []).some((line) => {
+        const lineOppId = scalarQueryId(line.opportunityId ?? line.opportunity_id)
+        if (lineOppId !== opportunityId) return false
+        const productId = scalarQueryId(line.productId ?? line.product_id)
+        const qty = Number(line.quantity ?? 0)
+        return productId != null && qty > 0
+      })
+      if (hasLine) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`opportunity ${opportunityId} has no product line in query`)
+}
+
 /** Poll until a sale order line exists for the order with a product quantity > 0. */
 export async function waitForSaleOrderLineExists(page: Page, orderId: number) {
   const deadline = Date.now() + 30_000

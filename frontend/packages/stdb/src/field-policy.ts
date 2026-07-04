@@ -92,6 +92,7 @@ import type {
   MrpWorkcenter,
   MrpWorkorder,
   Opportunity,
+  OpportunityLine,
   OpportunityStage,
   PosConfig,
   PosLoyaltyCard,
@@ -239,6 +240,7 @@ export type QueryResourceKey =
   | 'pos-payment-methods'
   | 'leads'
   | 'opportunities'
+  | 'opportunity-lines'
   | 'opportunity-stages'
   | 'contacts'
   | 'contact-tags'
@@ -699,6 +701,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   opportunities: orgEntry<Opportunity>('opportunity', ['opportunities', 'opportunity'], [
     'name', 'partnerId', 'stageId', 'probability', 'companyId',
   ]),
+  'opportunity-lines': orgEntry<OpportunityLine>(
+    'opportunity_line',
+    ['opportunity-lines', 'opportunity_line'],
+    ['opportunityId', 'productId', 'name', 'quantity', 'uomId', 'priceUnit', 'priceSubtotal', 'discount'],
+  ),
   'opportunity-stages': orgEntry<OpportunityStage>(
     'opp_stage',
     ['opportunity-stages', 'opp_stage'],

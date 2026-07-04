@@ -229,6 +229,7 @@ import CreateLoyaltyCardReducer from "./create_loyalty_card_reducer";
 import CreateLoyaltyProgramReducer from "./create_loyalty_program_reducer";
 import CreateManufacturingOrderReducer from "./create_manufacturing_order_reducer";
 import CreateOpportunityReducer from "./create_opportunity_reducer";
+import CreateOpportunityLineReducer from "./create_opportunity_line_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
 import CreatePartnerBankReducer from "./create_partner_bank_reducer";
 import CreatePasswordResetTokenReducer from "./create_password_reset_token_reducer";
@@ -5490,6 +5491,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_loyalty_program", CreateLoyaltyProgramReducer),
   __reducerSchema("create_manufacturing_order", CreateManufacturingOrderReducer),
   __reducerSchema("create_opportunity", CreateOpportunityReducer),
+  __reducerSchema("create_opportunity_line", CreateOpportunityLineReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
   __reducerSchema("create_partner_bank", CreatePartnerBankReducer),
   __reducerSchema("create_password_reset_token", CreatePasswordResetTokenReducer),

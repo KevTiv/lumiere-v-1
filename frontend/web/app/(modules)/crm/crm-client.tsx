@@ -8,8 +8,14 @@ import {
   toCreateActivityParams,
   toCreateContactParams,
   toCreateLeadParams,
+  toCreateOpportunityLineParams,
   toCreateOpportunityParams,
 } from "@/lib/crm-create-params"
+import {
+  openOpportunityRowsToSelectOptions,
+  productRowsToSelectOptions,
+  uomRowsToSelectOptions,
+} from "@/lib/form-lookup"
 import {
   timestampToDateInputValue,
   toCreateContactSegmentParamsFromForm,
@@ -43,10 +49,12 @@ import {
   useCreateContactTag,
   useCreateLead,
   useCreateOpportunity,
+  useCreateOpportunityLine,
   useDeleteContact,
   useDeleteLead,
   useLeads,
   useOpportunities,
+  useOpportunityLines,
   useOpportunityStages,
   useUpdateContact,
   useUpdateContactAddress,
@@ -59,7 +67,7 @@ import {
   useCrmCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
+import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   DEFAULT_KANBAN_COLUMN_COLORS,
@@ -70,6 +78,7 @@ import {
   MissingOrganization,
   activitiesTableConfig,
   addContactToSegmentForm,
+  addOpportunityLineForm,
   assignTagToContactForm,
   contactSegmentsTableConfig,
   contactTagsTableConfig,
@@ -222,6 +231,7 @@ function CrmClientLoaded({
 
   const { data: leads = [] } = useLeads(orgId, initialLeads)
   const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
+  const { data: opportunityLines = [] } = useOpportunityLines(orgId)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: contactTags = [] } = useContactTags(orgId)
   const { data: contactSegments = [] } = useContactSegments(orgId)
@@ -229,6 +239,8 @@ function CrmClientLoaded({
   const { data: opportunityStages = [] } = useOpportunityStages(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: warehouses = [] } = useWarehouses(orgId)
+  const { data: products = [] } = useProducts(orgId)
+  const { data: uoms = [] } = useUoms(orgId)
 
   const opportunityStageOptions = useMemo(
     () =>
@@ -322,8 +334,45 @@ function CrmClientLoaded({
     [warehouses],
   )
 
+  const openOpportunityOptions = useMemo(() => {
+    const fromApi = openOpportunityRowsToSelectOptions(
+      opportunities as Record<string, unknown>[],
+    )
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("crm.forms.addOpportunityLine.fields.opportunityPlaceholder"),
+        disabled: true,
+      },
+    ]
+  }, [opportunities, t])
+
+  const productFieldOptions = useMemo(() => {
+    const fromApi = productRowsToSelectOptions(products as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
+  }, [products, t])
+
+  const uomFieldOptions = useMemo(() => {
+    const fromApi = uomRowsToSelectOptions(uoms as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
+  }, [uoms, t])
+
+  const addOpportunityLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(addOpportunityLineForm(t), {
+        opportunityId: openOpportunityOptions,
+        productId: productFieldOptions,
+        uomId: uomFieldOptions,
+      }),
+    [t, openOpportunityOptions, productFieldOptions, uomFieldOptions],
+  )
+
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
+  const createOpportunityLine = useCreateOpportunityLine(orgId)
   const updateOpportunity = useUpdateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
   const createContact = useCreateContact(orgId, { companyId: operatingCompanyId ?? undefined })
   const createActivity = useCreateActivity(orgId)
@@ -953,6 +1002,14 @@ function CrmClientLoaded({
           createLabel: t("crm.opportunities.board.newOpportunity"),
         }
       }
+      if (tab.id === "opportunity-lines" && tab.type === "entity" && tab.entityConfig) {
+        return {
+          ...tab,
+          createForm: addOpportunityLineFormConfig,
+          createLabel: t("crm.actions.newOpportunityLine"),
+          createAction: "createOpportunityLine",
+        }
+      }
       if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
       if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
       return tab
@@ -1007,6 +1064,7 @@ function CrmClientLoaded({
     markOpportunityWon,
     markOpportunityLost,
     opportunityStageOptions,
+    addOpportunityLineFormConfig,
   ])
 
   // Live KPI overrides
@@ -1128,12 +1186,13 @@ function CrmClientLoaded({
     () => ({
       leads: leads as unknown as Record<string, unknown>[],
       opportunities: enrichedOpportunities,
+      "opportunity-lines": opportunityLines as unknown as Record<string, unknown>[],
       contacts: contacts as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
       "contact-tags": contactTags as unknown as Record<string, unknown>[],
       "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, contacts, activities, contactTags, contactSegments],
+    [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactSegments],
   )
 
   const handleFormSubmit = async (
@@ -1162,12 +1221,27 @@ function CrmClientLoaded({
     } else if (action === "createContactSegment") {
       const p = toCreateContactSegmentParamsFromForm(formData)
       if (p) await createContactSegment.mutateAsync(p)
+    } else if (action === "createOpportunityLine") {
+      const opportunityId = formData.opportunityId
+      const params = toCreateOpportunityLineParams(formData)
+      if (
+        opportunityId == null ||
+        String(opportunityId).trim() === "" ||
+        params == null
+      ) {
+        throw new Error(t("crm.forms.addOpportunityLine.validation.requiredFields"))
+      }
+      await createOpportunityLine.mutateAsync({
+        opportunityId: String(opportunityId),
+        params,
+      })
     }
   }
 
   const isFormMutationPending =
     createLead.isPending ||
     createOpportunity.isPending ||
+    createOpportunityLine.isPending ||
     createContact.isPending ||
     createActivity.isPending ||
     convertLead.isPending ||
