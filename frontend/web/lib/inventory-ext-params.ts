@@ -25,6 +25,7 @@ export type InventoryCreateProductPayload = Record<string, unknown> & {
   purchaseOk: boolean
   displayName: string | undefined
   pricelistId: number | undefined
+  description: string | undefined
 }
 
 export type InventoryCreateStockPickingPayload = Record<string, unknown> & {
@@ -34,6 +35,7 @@ export type InventoryCreateStockPickingPayload = Record<string, unknown> & {
   locationDestId: number
   scheduledDate: Date | undefined
   origin: string | undefined
+  note: string | undefined
 }
 
 export type InventoryCreateAdjustmentPayload = Record<string, unknown> & {
@@ -158,6 +160,7 @@ export function toCreateProductParamsFromForm(
     purchaseOk: formData.purchaseOk == null ? true : Boolean(formData.purchaseOk),
     displayName: formData.name ? String(formData.name) : undefined,
     pricelistId: formData.pricelistId != null ? Number(formData.pricelistId) : undefined,
+    description: optionalTrimmedString(formData.description),
   }
 }
 
@@ -185,6 +188,7 @@ export function toCreateStockPickingParamsFromForm(
     locationDestId: Number(locTo),
     scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
     origin: originStr.trim() !== "" ? originStr : undefined,
+    note: optionalTrimmedString(formData.note),
   }
 }
 

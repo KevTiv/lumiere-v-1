@@ -119,7 +119,7 @@ export function InvoiceDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="invoice-detail-modal">
         <DialogHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div>
@@ -162,6 +162,7 @@ export function InvoiceDetailModal({
                 type="button"
                 size="sm"
                 className="gap-2"
+                data-testid="invoice-detail-post-draft"
                 disabled={postDraftPending}
                 onClick={() => onPostDraft()}
               >

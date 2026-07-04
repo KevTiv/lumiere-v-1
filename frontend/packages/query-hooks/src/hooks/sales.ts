@@ -22,6 +22,7 @@ import type {
   CreatePickingBatchParams,
   CreatePricelistParams,
   CreateSaleOrderParams,
+  CreateSaleOrderLineParams,
   CreateShippingMethodParams,
 } from "@lumiere/stdb/types"
 
@@ -175,6 +176,8 @@ export function useConfirmSaleOrder(organizationId: bigint) {
       qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
       qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] })
       qc.invalidateQueries({ queryKey: ['picking-batches', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['stock-pickings', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['stock-moves', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -401,12 +404,12 @@ export function useUnlockSaleOrder(organizationId: bigint) {
 
 export function useCreateSaleOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { orderId: bigint | number | string; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { orderId: bigint | number | string; params: CreateSaleOrderLineParams }>({
     mutationFn: async ({ orderId, params }) => {
       const { urlPath, init } = salesBffPost("create_sale_order_line", [
           organizationId,
           toScalarU64(orderId),
-          stdbParamsToJson(params as object),
+          stdbParamsToJson(params as object, "CreateSaleOrderLineParams"),
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create sale order line')
@@ -452,17 +455,28 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
     Error,
     {
       orderId: bigint | number | string
-      journalId: bigint | number | string
-      defaultIncomeAccountId: bigint | number | string
+      params: import('@lumiere/stdb/types').CreateInvoiceFromSaleOrderParams
     }
   >({
-    mutationFn: async ({ orderId, journalId, defaultIncomeAccountId }) => {
+    mutationFn: async ({ orderId, params }) => {
       const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
+      const encodedParams = stdbParamsToJson(
+        {
+          journalId: params.journalId,
+          defaultIncomeAccountId: params.defaultIncomeAccountId,
+          receivableLine: stdbParamsToJson(
+            params.receivableLine as object,
+            "AddAccountMoveLineParams",
+          ),
+          incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
+          metadata: params.metadata,
+        } as object,
+        "CreateInvoiceFromSaleOrderParams",
+      )
       const { urlPath, init } = salesBffPost("create_invoice_from_sale_order", [
           organizationId,
           u64(orderId),
-          u64(journalId),
-          u64(defaultIncomeAccountId),
+          encodedParams,
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))

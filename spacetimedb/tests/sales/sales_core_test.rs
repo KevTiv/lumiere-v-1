@@ -2,12 +2,14 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{account_journal, create_account_journal, CreateAccountJournalParams};
-use crate::accounting::journal_entries::{account_move, create_invoice_from_sale_order};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, create_invoice_from_sale_order, AddAccountMoveLineParams,
+    CreateInvoiceFromSaleOrderParams,
+};
 use crate::core::organization::CompanyScopeParams;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
-    stock_picking, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
+    assign_stock_picking, confirm_stock_picking, stock_picking, validate_stock_picking,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
@@ -179,6 +181,11 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         .get(chart_keys::REVENUE)
         .ok_or("Harness missing revenue account")?;
 
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing receivable account")?;
+
     let journal_code = format!("SO{}", company_id);
     let journal_id = if let Some(j) = ctx
         .db
@@ -233,7 +240,88 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             .ok_or("SO sales journal not found after create")?
     };
 
-    create_invoice_from_sale_order(ctx, org_id, order.id, journal_id, revenue_id)?;
+    create_invoice_from_sale_order(
+        ctx,
+        org_id,
+        order.id,
+        CreateInvoiceFromSaleOrderParams {
+            journal_id,
+            default_income_account_id: revenue_id,
+            receivable_line: AddAccountMoveLineParams {
+                account_id: ar_id,
+                name: "Accounts Receivable".to_string(),
+                debit: 0.0,
+                credit: 0.0,
+                sequence: 0,
+                quantity: 0.0,
+                price_unit: 0.0,
+                discount: 0.0,
+                tax_ids: vec![],
+                partner_id: Some(fixture.partner_id),
+                product_id: None,
+                product_uom_id: None,
+                product_category_id: None,
+                analytic_account_id: None,
+                analytic_tag_ids: vec![],
+                display_type: None,
+                is_downpayment: false,
+                exclude_from_invoice_tab: true,
+                blocked: false,
+                group_tax_id: None,
+                tax_line_id: None,
+                tax_group_id: None,
+                tax_repartition_line_id: None,
+                tax_audit: None,
+                reconcile_model_id: None,
+                payment_id: None,
+                statement_line_id: None,
+                matching_number: None,
+                matching_label: None,
+                expected_pay_date: None,
+                expected_pay_date_currency_id: None,
+                expected_pay_date_amount: 0.0,
+                expected_pay_date_residual: 0.0,
+                metadata: None,
+            },
+            income_line: AddAccountMoveLineParams {
+                account_id: revenue_id,
+                name: String::new(),
+                debit: 0.0,
+                credit: 0.0,
+                sequence: 0,
+                quantity: 0.0,
+                price_unit: 0.0,
+                discount: 0.0,
+                tax_ids: vec![],
+                partner_id: None,
+                product_id: None,
+                product_uom_id: None,
+                product_category_id: None,
+                analytic_account_id: None,
+                analytic_tag_ids: vec![],
+                display_type: None,
+                is_downpayment: false,
+                exclude_from_invoice_tab: false,
+                blocked: false,
+                group_tax_id: None,
+                tax_line_id: None,
+                tax_group_id: None,
+                tax_repartition_line_id: None,
+                tax_audit: None,
+                reconcile_model_id: None,
+                payment_id: None,
+                statement_line_id: None,
+                matching_number: None,
+                matching_label: None,
+                expected_pay_date: None,
+                expected_pay_date_currency_id: None,
+                expected_pay_date_amount: 0.0,
+                expected_pay_date_residual: 0.0,
+                metadata: None,
+            },
+            metadata: None,
+        },
+    )?;
 
     let invoiced_order = ctx
         .db
@@ -265,14 +353,33 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         return Err("Invoice not linked back to sale order".to_string());
     }
 
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_move_id)
+        .collect();
+
+    if lines.is_empty() {
+        return Err("Draft invoice has no move lines".to_string());
+    }
+
+    let total_debit: f64 = lines.iter().map(|l| l.debit).sum();
+    let total_credit: f64 = lines.iter().map(|l| l.credit).sum();
+
+    if (total_debit - total_credit).abs() >= 0.01 {
+        return Err(format!(
+            "Draft invoice move lines not balanced: debit={total_debit} credit={total_credit}"
+        ));
+    }
+
     Ok(())
 }
 
 /// Delivery path smoke test.
 ///
-/// `confirm_sales_order` does not auto-create pickings yet; we manually wire
-/// picking → move → confirm → assign → validate to assert done state and
-/// qty_delivered propagation on the SO line.
+/// `confirm_sales_order` auto-creates outgoing pickings; we confirm → assign → validate
+/// and assert done state plus qty_delivered propagation on the SO line.
 pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
@@ -400,144 +507,16 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         .next()
         .ok_or("Sale order line not found")?;
 
-    // Location stubs — full stock location graph not seeded in harness yet.
-    let src_location = fixture.warehouse_id;
-    let dest_location = fixture.warehouse_id + 1;
     let scope = CompanyScopeParams {
         company_id: Some(company_id),
     };
-
-    create_stock_picking(
-        ctx,
-        org_id,
-        CreateStockPickingParams {
-            company_id: Some(company_id),
-            name: "Harness Out Picking".to_string(),
-            picking_type_id: 1,
-            location_id: src_location,
-            location_dest_id: dest_location,
-            move_type: "direct".to_string(),
-            priority: "1".to_string(),
-            partner_id: Some(fixture.partner_id),
-            contact_id: None,
-            scheduled_date: Some(ctx.timestamp),
-            origin: Some(format!("SO/{}", order.id)),
-            note: None,
-            user_id: None,
-            sale_id: Some(order.id),
-            purchase_id: None,
-            group_id: None,
-            is_locked: false,
-            immediate_transfer: false,
-            is_printed: false,
-            is_return: false,
-            has_scrap_move: false,
-            has_tracking: false,
-            date: None,
-            date_done: None,
-            backorder_id: None,
-            backorder_ids: vec![],
-            show_operations: false,
-            show_lots_text: false,
-            show_reserved: false,
-            show_check_availability: true,
-            show_validate: false,
-            show_mark_as_todo: true,
-            show_set_qty_button: false,
-            show_clear_qty_button: false,
-            show_lots_m2o: false,
-            product_id: Some(fixture.product_id),
-            lot_id: None,
-            package_id: None,
-            result_package_id: None,
-            owner_id: None,
-            display_lot_id: None,
-            location_id_name: None,
-            location_dest_id_name: None,
-            picking_code: Some("outgoing".to_string()),
-            product_tracking: None,
-            product_barcode: None,
-            move_line_exist: false,
-            has_packages: false,
-            has_move_lines: false,
-            has_package: false,
-            has_lot: false,
-            has_owner: false,
-            has_entire_package_src: false,
-            has_entire_package_dest: false,
-            package_level_ids: vec![],
-            batch_id: None,
-            metadata: Some(r#"{"test":"delivery_picking"}"#.to_string()),
-        },
-    )?;
 
     let picking = ctx
         .db
         .stock_picking()
         .iter()
-        .find(|p| {
-            p.organization_id == org_id && p.name == "Harness Out Picking"
-        })
-        .ok_or("Delivery picking not found after create")?;
-
-    create_stock_move(
-        ctx,
-        org_id,
-        CreateStockMoveParams {
-            company_id: Some(company_id),
-            name: "Harness delivery move".to_string(),
-            product_id: fixture.product_id,
-            product_tmpl_id: fixture.product_id,
-            product_uom: product.uom_id,
-            product_uom_qty: order_line.product_uom_qty,
-            location_id: src_location,
-            location_dest_id: dest_location,
-            date_expected: ctx.timestamp,
-            move_type: "outgoing".to_string(),
-            priority: "1".to_string(),
-            reference: Some(format!("SO/{}", order.id)),
-            sequence: 10,
-            origin: Some(format!("SO/{}", order.id)),
-            note: None,
-            date: None,
-            date_deadline: None,
-            picking_id: Some(picking.id),
-            picking_type_id: Some(1),
-            partner_id: Some(fixture.partner_id),
-            product_variant_id: None,
-            group_id: None,
-            rule_id: None,
-            procure_method: "make_to_stock".to_string(),
-            price_unit: product.list_price,
-            scrapped: false,
-            to_refund: false,
-            propagate_cancel: true,
-            delay_alert: false,
-            product_packaging_id: None,
-            product_packaging_qty: 0.0,
-            warehouse_id: Some(fixture.warehouse_id),
-            production_id: None,
-            raw_material_production_id: None,
-            unbuild_id: None,
-            consume_unbuild_id: None,
-            cost_share: 0.0,
-            is_subcontract: false,
-            purchase_line_id: None,
-            need_release: false,
-            release_ready: false,
-            propagation_cancel: true,
-            has_tracking: false,
-            inventory_id: None,
-            sale_line_id: Some(order_line.id),
-            lot_id: None,
-            package_id: None,
-            result_package_id: None,
-            owner_id: None,
-            package_level_id: None,
-            product_type: Some("product".to_string()),
-            metadata: None,
-        },
-    )?;
+        .find(|p| p.organization_id == org_id && p.sale_id == Some(order.id) && !p.is_return)
+        .ok_or("Delivery picking not found after confirm (expected auto-create)")?;
 
     confirm_stock_picking(ctx, org_id, picking.id, scope.clone())?;
     assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
@@ -568,6 +547,21 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         return Err(format!(
             "Expected qty_delivered >= {}, got {}",
             order_line.product_uom_qty, delivered_line.qty_delivered
+        ));
+    }
+
+    let expected_qty_to_invoice =
+        (delivered_line.qty_delivered - delivered_line.qty_invoiced).max(0.0);
+    if expected_qty_to_invoice <= 0.0 {
+        return Err(format!(
+            "Expected qty_to_invoice > 0 after delivery, got {}",
+            delivered_line.qty_to_invoice
+        ));
+    }
+    if delivered_line.qty_to_invoice <= 0.0 {
+        return Err(format!(
+            "Expected qty_to_invoice > 0 after delivery, got {}",
+            delivered_line.qty_to_invoice
         ));
     }
 

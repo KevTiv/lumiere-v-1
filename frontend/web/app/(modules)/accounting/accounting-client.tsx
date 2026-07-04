@@ -2182,6 +2182,7 @@ function AccountingClientLoaded({
                 <BillsListView
                   bills={bills as unknown as AccountMove[]}
                   onCreateBill={() => setShowCreateBill(true)}
+                  onSelectBill={(bill) => setSelectedInvoice(bill as unknown as AccountMove)}
                   onRecalculateTotals={(bill) =>
                     void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
                   }

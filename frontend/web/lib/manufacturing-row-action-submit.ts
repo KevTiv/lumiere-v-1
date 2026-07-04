@@ -186,6 +186,7 @@ export async function submitManufacturingRowAction(
             workorderId: Number(woid),
             lossId: num(values.logLossId, 0),
             duration: num(values.logDuration, 0),
+            description: trimOpt(values.logDescription),
           },
         })
         return

@@ -10,6 +10,10 @@ E2E_WEB_PORT       ?= 3100
 E2E_API_PORT       ?= 8082
 # Playwright suite: full (default) or p0 (test:e2e:p0)
 E2E_SUITE          ?= full
+# Single-spec iteration (e2e-single-test / e2e-single)
+E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
+E2E_GREP           ?= creates CRM
+E2E_WORKERS        ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
@@ -28,7 +32,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_inventory_stock_quant_test \
 	run_sales_order_invoice_test \
 	run_sales_order_delivery_test \
-	run_crm_opportunity_convert_test
+	run_crm_opportunity_convert_test \
+	run_purchasing_bill_balanced_test
 
 .PHONY: help setup check check-env check-env-prod build \
         start stop \
@@ -37,6 +42,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
         call-tests logs \
         call-tests-cloud logs-cloud \
         seed-test-user e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
+        e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
         generate-stdb-rust-sdk
 
 help:
@@ -61,6 +67,10 @@ help:
 	@echo "  e2e-smoke-setup      STDB + publish + seed + api-server only (writes .tmp/e2e/env.sh)"
 	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0)"
 	@echo "  e2e-playwright-only  Playwright only when STDB, api-server, and Next.js are already running"
+	@echo "  e2e-single           setup + one Playwright spec (E2E_SPEC, E2E_GREP, E2E_WORKERS=1)"
+	@echo "  e2e-single-test      one spec only — requires e2e-smoke-setup (rebuilds Next, --workers=1)"
+	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
+	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
 	@echo ""
 	@echo "  --- Cloud ---"
@@ -300,6 +310,123 @@ e2e-smoke-test:
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm run "$$E2E_PNPM_SCRIPT"; \
 		echo "[e2e] Smoke tests passed."; \
+	'
+
+e2e-single: e2e-smoke-setup e2e-single-test
+
+# Wave 3 — procure-to-pay UI golden path (see docs/MVP_WORKFLOW_CONTRACT.md secondary path).
+e2e-p2p:
+	@$(MAKE) e2e-single E2E_SPEC=mvp-procure-to-pay.spec.ts E2E_GREP=
+
+# Full MVP golden-path gate (lead-to-cash then procure-to-pay; reuses one e2e-smoke-setup).
+e2e-mvp-golden: e2e-smoke-setup
+	@$(MAKE) e2e-single-test E2E_SPEC=mvp-lead-to-cash.spec.ts E2E_GREP="creates CRM"
+	@$(MAKE) e2e-single-test E2E_SPEC=mvp-procure-to-pay.spec.ts E2E_GREP=
+
+e2e-single-test:
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SPEC="$(E2E_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+		ROOT="$$(pwd)"; \
+		LOG_DIR="$$ROOT/.tmp/e2e"; \
+		mkdir -p "$$LOG_DIR"; \
+		if [ ! -f "$$LOG_DIR/env.sh" ]; then \
+			echo "[e2e] Missing $$LOG_DIR/env.sh — run make e2e-smoke-setup or make e2e-single first."; \
+			exit 1; \
+		fi; \
+		set -a; . "$$LOG_DIR/env.sh"; set +a; \
+		WEB_PID=""; \
+		cleanup_web() { \
+			if [ -n "$$WEB_PID" ] && kill -0 "$$WEB_PID" >/dev/null 2>&1; then \
+				kill "$$WEB_PID" >/dev/null 2>&1 || true; \
+				wait "$$WEB_PID" >/dev/null 2>&1 || true; \
+			fi; \
+		}; \
+		trap cleanup_web EXIT INT TERM; \
+		if ! curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
+			if curl -fsS "$$E2E_STDB_HOST" >/dev/null 2>&1; then \
+				echo "[e2e] api-server not running — starting from $$LOG_DIR/env.sh..."; \
+				cd "$$ROOT"; \
+				set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+				LUMIERE_E2E=1 \
+				PORT="$(E2E_API_PORT)" \
+				STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+				STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+				STDB_MODULE="$(DB)" \
+				NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+				STDB_HOST="$$E2E_STDB_HOST" \
+				NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+				CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+				cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+				for i in {1..60}; do \
+					if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+					sleep 1; \
+					if [ "$$i" = "60" ]; then \
+						echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
+						exit 1; \
+					fi; \
+				done; \
+				cd "$$ROOT/frontend/web"; \
+			else \
+				echo "[e2e] api-server is not reachable on :$(E2E_API_PORT) and STDB is down — run make e2e-smoke-setup first."; \
+				exit 1; \
+			fi; \
+		fi; \
+		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
+			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
+			lsof -ti:"$(E2E_WEB_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+			sleep 1; \
+		fi; \
+		cd "$$ROOT/frontend/web"; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		echo "[e2e] Building Next.js for single-spec run..."; \
+		PORT="" \
+		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_API_GATEWAY_URL="" \
+		pnpm exec next build; \
+		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
+		PORT="" \
+		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_API_GATEWAY_URL="" \
+		pnpm exec next start --hostname 127.0.0.1 --port $(E2E_WEB_PORT) >"$$LOG_DIR/next.log" 2>&1 & \
+		WEB_PID="$$!"; \
+		for i in {1..120}; do \
+			if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then break; fi; \
+			sleep 1; \
+			if [ "$$i" = "120" ]; then \
+				echo "[e2e] Next.js did not become ready. See $$LOG_DIR/next.log"; \
+				exit 1; \
+			fi; \
+		done; \
+		PW_ARGS=(tests/e2e/"$$E2E_SPEC" --workers "$$E2E_WORKERS"); \
+		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
+		echo "[e2e] Running Playwright single spec: $$E2E_SPEC (workers=$$E2E_WORKERS, grep=$${E2E_GREP:-<none>})..."; \
+		pnpm exec playwright install chromium; \
+		PORT="" \
+		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_API_GATEWAY_URL="" \
+		pnpm exec playwright test "$${PW_ARGS[@]}"; \
+		echo "[e2e] Single-spec test passed."; \
 	'
 
 e2e-playwright-only:

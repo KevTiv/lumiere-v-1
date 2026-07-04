@@ -846,6 +846,100 @@ export const editSupplierIntakeForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
+  id: "create-bill-from-purchase-order",
+  title: t("purchasing.forms.createBillFromOrder.title"),
+  description: t("purchasing.forms.createBillFromOrder.description"),
+  submitLabel: t("purchasing.forms.createBillFromOrder.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "accounting",
+      title: t("purchasing.forms.createBillFromOrder.sections.accounting"),
+      fields: [
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.journalId"),
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "defaultExpenseAccountId",
+          name: "defaultExpenseAccountId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.defaultExpenseAccountId"),
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "payableAccountId",
+          name: "payableAccountId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableAccountId"),
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+        {
+          id: "invoiceDate",
+          name: "invoiceDate",
+          type: "date",
+          label: t("purchasing.forms.createBillFromOrder.fields.invoiceDate"),
+          width: "1/2",
+        },
+        {
+          id: "payableLineName",
+          name: "payableLineName",
+          type: "text",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableLineName"),
+          width: "full",
+        },
+        {
+          id: "narration",
+          name: "narration",
+          type: "textarea",
+          label: t("purchasing.forms.createBillFromOrder.fields.narration"),
+          placeholder: t("purchasing.forms.createBillFromOrder.fields.narrationPlaceholder"),
+          width: "full",
+          rows: 3,
+        },
+        {
+          id: "expenseExcludeFromInvoiceTab",
+          name: "expenseExcludeFromInvoiceTab",
+          type: "checkbox",
+          label: t("purchasing.forms.createBillFromOrder.fields.expenseExcludeFromInvoiceTab"),
+          defaultValue: false,
+        },
+        {
+          id: "expenseBlocked",
+          name: "expenseBlocked",
+          type: "checkbox",
+          label: t("purchasing.forms.createBillFromOrder.fields.expenseBlocked"),
+          defaultValue: false,
+        },
+        {
+          id: "payableExcludeFromInvoiceTab",
+          name: "payableExcludeFromInvoiceTab",
+          type: "checkbox",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableExcludeFromInvoiceTab"),
+          defaultValue: true,
+        },
+        {
+          id: "payableBlocked",
+          name: "payableBlocked",
+          type: "checkbox",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableBlocked"),
+          defaultValue: false,
+        },
+      ],
+    },
+  ],
+})
+
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
@@ -862,4 +956,5 @@ export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "new-supplier-intake": newSupplierIntakeForm(t),
   "review-supplier-intake": reviewSupplierIntakeForm(t),
   "edit-supplier-intake": editSupplierIntakeForm(t),
+  "create-bill-from-purchase-order": createBillFromPurchaseOrderForm(t),
 })

@@ -428,7 +428,7 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("convert_lead_to_customer", [
         organizationId,
         toScalarU64(leadId),
-        stdbParamsToJson(params),
+        stdbParamsToJson(params, "ConvertLeadParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert lead')
@@ -447,7 +447,7 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
     mutationFn: async ({ opportunityId, params }) => {
       const { urlPath, init } = crmBffPost("convert_opportunity_to_sale_order", [
         toScalarU64(opportunityId),
-        stdbParamsToJson(params),
+        stdbParamsToJson(params, "ConvertOpportunityParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert opportunity to sale order')

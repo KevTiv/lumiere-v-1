@@ -19,6 +19,7 @@ import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import type { CreatePurchaseOrderParams } from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
 
@@ -164,11 +165,11 @@ export function useCreatePurchaseOrder(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePurchaseOrderParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_PURCHASE_ORDER_DEFAULTS, params)
       const scoped = withCompanyScope(merged, scopedCompanyId)
-      const { urlPath, init } = purchasingBffPost("create_purchase_order", [organizationId, stdbParamsToJson(scoped as object)])
+      const { urlPath, init } = purchasingBffPost("create_purchase_order", [organizationId, stdbParamsToJson(scoped as object, "CreatePurchaseOrderParams")])
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create purchase order')
@@ -256,6 +257,7 @@ export function useAddPurchaseOrderLine(organizationId: bigint) {
           toScalarU64(orderId),
           stdbParamsToJson(
             mergeReducerParams(ADD_PURCHASE_ORDER_LINE_DEFAULTS, params) as object,
+            "AddPurchaseOrderLineParams",
           ),
         ])
 
@@ -798,32 +800,40 @@ export function useHoldSupplierIntake(organizationId: bigint) {
 
 export type CreateBillFromPurchaseOrderInput = {
   orderId: ScalarId
-  journalId: ScalarId
-  defaultExpenseAccountId: ScalarId
-  invoiceDate: Date | string | number
+  params: import("@lumiere/stdb/types").CreateBillFromPurchaseOrderParams
 }
 
 export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateBillFromPurchaseOrderInput>({
-    mutationFn: async ({ orderId, journalId, defaultExpenseAccountId, invoiceDate }) => {
-      const when =
-        invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate)
+    mutationFn: async ({ orderId, params }) => {
+      const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
+      const encodedParams = stdbParamsToJson(
+        {
+          journalId: params.journalId,
+          defaultExpenseAccountId: params.defaultExpenseAccountId,
+          invoiceDate: params.invoiceDate,
+          expenseLine: stdbParamsToJson(
+            params.expenseLine as object,
+            "AddAccountMoveLineParams",
+          ),
+          payableLine: stdbParamsToJson(params.payableLine as object, "AddAccountMoveLineParams"),
+        } as object,
+        "CreateBillFromPurchaseOrderParams",
+      )
       const { urlPath, init } = purchasingBffPost("create_bill_from_purchase_order", [
-          organizationId,
-          toScalarU64(orderId),
-          toScalarU64(journalId),
-          toScalarU64(defaultExpenseAccountId),
-          stbTimestampFromDate(when),
-        ])
+        organizationId,
+        u64(orderId),
+        encodedParams,
+      ])
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create bill from purchase order')
+      if (!r.ok) throw new Error("Failed to create bill from purchase order")
     },
     onSuccess: () => {
       const orgKey = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['purchase-orders', orgKey] })
-      void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
+      void qc.invalidateQueries({ queryKey: ["purchase-orders", orgKey] })
+      void qc.invalidateQueries({ queryKey: ["account-moves", orgKey] })
     },
   })
 }

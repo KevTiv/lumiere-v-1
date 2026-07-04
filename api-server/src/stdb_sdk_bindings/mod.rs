@@ -142,6 +142,7 @@ pub mod create_analytics_metric_params_type;
 pub mod create_audit_rule_params_type;
 pub mod create_barcode_nomenclature_params_type;
 pub mod create_barcode_rule_params_type;
+pub mod create_bill_from_purchase_order_params_type;
 pub mod create_bom_params_type;
 pub mod create_budget_post_params_type;
 pub mod create_calendar_event_params_type;
@@ -184,6 +185,7 @@ pub mod create_helpdesk_team_params_type;
 pub mod create_intercompany_rule_params_type;
 pub mod create_intercompany_transaction_params_type;
 pub mod create_inventory_adjustment_params_type;
+pub mod create_invoice_from_sale_order_params_type;
 pub mod create_job_position_params_type;
 pub mod create_knowledge_article_params_type;
 pub mod create_knowledge_category_params_type;
@@ -1168,6 +1170,7 @@ pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
+pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_sales_order_delivery_test_reducer;
 pub mod run_sales_order_invoice_test_reducer;
 pub mod run_traceability_report_reducer;
@@ -1760,6 +1763,7 @@ pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
 pub use create_audit_rule_params_type::CreateAuditRuleParams;
 pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
 pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
+pub use create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
 pub use create_bom_params_type::CreateBomParams;
 pub use create_budget_post_params_type::CreateBudgetPostParams;
 pub use create_calendar_event_params_type::CreateCalendarEventParams;
@@ -1802,6 +1806,7 @@ pub use create_helpdesk_team_params_type::CreateHelpdeskTeamParams;
 pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
 pub use create_intercompany_transaction_params_type::CreateIntercompanyTransactionParams;
 pub use create_inventory_adjustment_params_type::CreateInventoryAdjustmentParams;
+pub use create_invoice_from_sale_order_params_type::CreateInvoiceFromSaleOrderParams;
 pub use create_job_position_params_type::CreateJobPositionParams;
 pub use create_knowledge_article_params_type::CreateKnowledgeArticleParams;
 pub use create_knowledge_category_params_type::CreateKnowledgeCategoryParams;
@@ -3026,6 +3031,7 @@ pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
+pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
 pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
 pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
 pub use run_traceability_report_reducer::run_traceability_report;
@@ -3913,9 +3919,7 @@ pub enum Reducer {
     CreateBillFromPurchaseOrder {
         organization_id: u64,
         purchase_order_id: u64,
-        journal_id: u64,
-        default_expense_account_id: u64,
-        invoice_date: __sdk::Timestamp,
+        params: CreateBillFromPurchaseOrderParams,
 }    ,
     CreateBom {
         organization_id: u64,
@@ -4126,8 +4130,7 @@ pub enum Reducer {
     CreateInvoiceFromSaleOrder {
         organization_id: u64,
         sale_order_id: u64,
-        journal_id: u64,
-        default_income_account_id: u64,
+        params: CreateInvoiceFromSaleOrderParams,
 }    ,
     CreateIotAction {
         organization_id: u64,
@@ -5565,6 +5568,7 @@ pub enum Reducer {
     RunInventoryProductCategoryTest ,
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
+    RunPurchasingBillBalancedTest ,
     RunSalesOrderDeliveryTest ,
     RunSalesOrderInvoiceTest ,
     RunTraceabilityReport {
@@ -7082,6 +7086,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
+            Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
             Reducer::RunSalesOrderDeliveryTest => "run_sales_order_delivery_test",
             Reducer::RunSalesOrderInvoiceTest => "run_sales_order_invoice_test",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
@@ -8485,15 +8490,11 @@ Reducer::BillTimesheets{
             Reducer::CreateBillFromPurchaseOrder{
                 organization_id,
                 purchase_order_id,
-                journal_id,
-                default_expense_account_id,
-                invoice_date,
+                params,
 }             => __sats::bsatn::to_vec(&create_bill_from_purchase_order_reducer::CreateBillFromPurchaseOrderArgs {
                 organization_id: organization_id.clone(),
                 purchase_order_id: purchase_order_id.clone(),
-                journal_id: journal_id.clone(),
-                default_expense_account_id: default_expense_account_id.clone(),
-                invoice_date: invoice_date.clone(),
+                params: params.clone(),
 }),
             Reducer::CreateBom{
                 organization_id,
@@ -8867,13 +8868,11 @@ Reducer::BillTimesheets{
             Reducer::CreateInvoiceFromSaleOrder{
                 organization_id,
                 sale_order_id,
-                journal_id,
-                default_income_account_id,
+                params,
 }             => __sats::bsatn::to_vec(&create_invoice_from_sale_order_reducer::CreateInvoiceFromSaleOrderArgs {
                 organization_id: organization_id.clone(),
                 sale_order_id: sale_order_id.clone(),
-                journal_id: journal_id.clone(),
-                default_income_account_id: default_income_account_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CreateIotAction{
                 organization_id,
@@ -11433,6 +11432,8 @@ Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),
 Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
+                }),
+Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
                 }),
 Reducer::RunSalesOrderDeliveryTest => __sats::bsatn::to_vec(&run_sales_order_delivery_test_reducer::RunSalesOrderDeliveryTestArgs {
                 }),

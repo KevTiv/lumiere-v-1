@@ -21,6 +21,10 @@ function toScalarU64(v: ScalarId): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
 }
 
+function companyScopeParams(companyId: bigint): Record<string, unknown> {
+  return stdbParamsToJson({ companyId }, "CompanyScopeParams")
+}
+
 /** Shallow merge for reducer JSON: `overrides` entries with value `undefined` are skipped. */
 function mergeReducerParams(
   base: Record<string, unknown>,
@@ -671,7 +675,7 @@ export function useValidateStockPicking(organizationId: bigint, companyId: bigin
       const { urlPath, init } = inventoryBffPost("validate_stock_picking", [
         organizationId,
         toScalarU64(pickingId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate stock picking')
@@ -687,7 +691,7 @@ export function useReserveStockQuant(organizationId: bigint, companyId: bigint) 
       const { urlPath, init } = inventoryBffPost("reserve_stock_quant", [
         organizationId,
         toScalarU64(quantId),
-        stdbParamsToJson({ company_id: companyId, reserve_qty: reserveQty } as object),
+        stdbParamsToJson({ companyId, reserveQty }, "StockQuantReserveParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reserve stock')
@@ -703,7 +707,7 @@ export function useUnreserveStockQuant(organizationId: bigint, companyId: bigint
       const { urlPath, init } = inventoryBffPost("unreserve_stock_quant", [
         organizationId,
         toScalarU64(quantId),
-        stdbParamsToJson({ company_id: companyId, unreserve_qty: unreserveQty } as object),
+        stdbParamsToJson({ companyId, unreserveQty }, "StockQuantUnreserveParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unreserve stock')
@@ -844,7 +848,7 @@ export function useConfirmStockMove(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = inventoryBffPost("confirm_stock_move", [
         organizationId,
         toScalarU64(moveId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock move')
@@ -860,7 +864,7 @@ export function useAssignStockMove(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = inventoryBffPost("assign_stock_move", [
         organizationId,
         toScalarU64(moveId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock move')
@@ -876,7 +880,7 @@ export function useDoneStockMove(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = inventoryBffPost("done_stock_move", [
         organizationId,
         toScalarU64(moveId),
-        stdbParamsToJson({ company_id: companyId, quantity_done: quantityDone } as object),
+        stdbParamsToJson({ companyId, quantityDone }, "DoneStockMoveParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete stock move')
@@ -892,7 +896,7 @@ export function useCancelStockMove(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = inventoryBffPost("cancel_stock_move", [
         organizationId,
         toScalarU64(moveId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock move')
@@ -908,7 +912,7 @@ export function useConfirmStockPicking(organizationId: bigint, companyId: bigint
       const { urlPath, init } = inventoryBffPost("confirm_stock_picking", [
         organizationId,
         toScalarU64(pickingId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm stock picking')
@@ -924,7 +928,7 @@ export function useAssignStockPicking(organizationId: bigint, companyId: bigint)
       const { urlPath, init } = inventoryBffPost("assign_stock_picking", [
         organizationId,
         toScalarU64(pickingId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign stock picking')
@@ -940,7 +944,7 @@ export function useCancelStockPicking(organizationId: bigint, companyId: bigint)
       const { urlPath, init } = inventoryBffPost("cancel_stock_picking", [
         organizationId,
         toScalarU64(pickingId),
-        stdbParamsToJson({ company_id: companyId } as object),
+        companyScopeParams(companyId),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel stock picking')
@@ -2097,7 +2101,7 @@ export function useUpdateStockQuantQuantity(organizationId: bigint, companyId: b
       const { urlPath, init } = inventoryBffPost("update_stock_quant_quantity", [
         organizationId,
         toScalarU64(quantId),
-        stdbParamsToJson({ company_id: companyId, quantity } as object),
+        stdbParamsToJson({ companyId, quantity }, "UpdateStockQuantQuantityParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update quant quantity')

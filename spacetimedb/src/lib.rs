@@ -99,6 +99,10 @@ pub mod sales_tests;
 #[path = "../tests/crm/mod.rs"]
 pub mod crm_tests;
 
+/// Purchasing domain tests — call `run_purchasing_bill_balanced_test` reducer to execute.
+#[path = "../tests/purchasing/mod.rs"]
+pub mod purchasing_tests;
+
 /// Core domain tests — call `run_all_core_tests` reducer to execute.
 #[path = "../tests/core/tests/mod.rs"]
 pub mod core_tests;
@@ -118,6 +122,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;
     sales_tests::run_all_sales_tests(ctx).map_err(|e| format!("sales: {e}"))?;
     crm_tests::run_all_crm_tests(ctx).map_err(|e| format!("crm: {e}"))?;
+    purchasing_tests::run_purchasing_bill_balanced_test(ctx)
+        .map_err(|e| format!("purchasing: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

@@ -2354,6 +2354,7 @@
           "expectedRevenue": "Expected Revenue",
           "probability": "Probability %",
           "probabilityPlaceholder": "10",
+          "state": "Status",
           "description": "Notes",
           "descriptionPlaceholder": "Lead context and background…"
         }
@@ -2379,7 +2380,11 @@
             "Low": "Low",
             "Medium": "Medium",
             "High": "High"
-          }
+          },
+          "color": "Color",
+          "colorPlaceholder": "e.g. blue",
+          "description": "Notes",
+          "descriptionPlaceholder": "Deal context and next steps…"
         }
       },
       "changeStage": {
@@ -2433,7 +2438,11 @@
           "phone": "Phone",
           "phonePlaceholder": "+1 555 0100",
           "city": "City",
-          "zip": "ZIP / Postal Code"
+          "zip": "ZIP / Postal Code",
+          "color": "Color",
+          "colorPlaceholder": "e.g. blue",
+          "description": "Notes",
+          "descriptionPlaceholder": "Internal notes about this contact…"
         }
       },
       "newActivity": {
@@ -2609,6 +2618,7 @@
           "website": "Website",
           "emailSecondary": "Secondary email",
           "fax": "Fax",
+          "color": "Color",
           "description": "Notes"
         },
         "validation": {
@@ -4000,7 +4010,9 @@
           "uomPoPlaceholder": "Same as sales UOM",
           "uomPoSameAsSales": "Same as sales UOM",
           "pricelistId": "Pricelist (currency)",
-          "pricelistPlaceholder": "Select pricelist…"
+          "pricelistPlaceholder": "Select pricelist…",
+          "description": "Description",
+          "descriptionPlaceholder": "Internal notes about this product…"
         }
       },
       "newTransfer": {
@@ -4015,7 +4027,9 @@
           "locationDestId": "Destination location",
           "scheduledDate": "Scheduled Date",
           "origin": "Source Document",
-          "originPlaceholder": "SO-001"
+          "originPlaceholder": "SO-001",
+          "note": "Notes",
+          "notePlaceholder": "Additional details about this transfer…"
         }
       },
       "newInventoryAdjustment": {
@@ -4689,7 +4703,7 @@
       "lockSelected": "Lock",
       "unlockSelected": "Unlock",
       "editLineForm": "Edit draft line…",
-      "createBillsFromSelected": "Create bills",
+      "createBillsFromSelected": "Create bill…",
       "postSelected": "Post",
       "applySelected": "Apply",
       "rejectSelected": "Reject",
@@ -4959,6 +4973,30 @@
           "phone": "Phone",
           "notes": "Notes"
         }
+      },
+      "createBillFromOrder": {
+        "title": "Create bill from purchase order",
+        "description": "Generate a vendor bill for the selected confirmed purchase order.",
+        "submitLabel": "Create bill",
+        "sections": {
+          "accounting": "Accounting"
+        },
+        "fields": {
+          "journalId": "Purchase journal",
+          "defaultExpenseAccountId": "Default expense account",
+          "payableAccountId": "Payable account",
+          "invoiceDate": "Bill date",
+          "payableLineName": "Payable line label (optional)",
+          "narration": "Bill notes",
+          "narrationPlaceholder": "Defaults to the purchase order's notes if left blank…",
+          "expenseExcludeFromInvoiceTab": "Exclude expense lines from bill tab",
+          "expenseBlocked": "Block expense lines",
+          "payableExcludeFromInvoiceTab": "Exclude payable line from bill tab",
+          "payableBlocked": "Block payable line"
+        },
+        "noPayableAccounts": "No payable accounts — create chart of accounts first",
+        "noJournals": "No purchase journals — create one in Accounting",
+        "noAccounts": "No GL accounts — create chart of accounts first"
       }
     }
   },
@@ -5414,10 +5452,45 @@
         },
         "fields": {
           "journalId": "Sales journal",
-          "defaultIncomeAccountId": "Default income account"
+          "defaultIncomeAccountId": "Default income account",
+          "receivableAccountId": "Receivable account",
+          "receivableLineName": "Receivable line label (optional)",
+          "narration": "Invoice notes",
+          "narrationPlaceholder": "Defaults to the sale order's notes if left blank…",
+          "incomeExcludeFromInvoiceTab": "Exclude income lines from invoice tab",
+          "incomeBlocked": "Block income lines",
+          "receivableExcludeFromInvoiceTab": "Exclude receivable line from invoice tab",
+          "receivableBlocked": "Block receivable line"
         },
+        "noReceivableAccounts": "No receivable accounts — create chart of accounts first",
         "noJournals": "No sales journals — create one in Accounting",
         "noAccounts": "No GL accounts — create chart of accounts first"
+      },
+      "addSaleOrderLine": {
+        "title": "Add sale order line",
+        "description": "Add a product line to a draft sale order.",
+        "sections": {
+          "order": "Sale order",
+          "product": "Product & pricing",
+          "details": "Line details"
+        },
+        "fields": {
+          "orderId": "Draft sale order",
+          "orderPlaceholder": "Select a draft SO…",
+          "productId": "Product",
+          "productPlaceholder": "Select product…",
+          "uomId": "Unit of measure",
+          "uomPlaceholder": "Select UoM…",
+          "quantity": "Quantity",
+          "priceUnit": "Unit price",
+          "discount": "Discount %",
+          "sequence": "Sequence",
+          "name": "Description",
+          "namePlaceholder": "Optional line description…",
+          "taxIds": "Tax IDs",
+          "taxIdsPlaceholder": "e.g. 1, 2",
+          "taxIdsHint": "Comma-separated tax record IDs (optional)"
+        }
       }
     },
     "actions": {
@@ -5428,6 +5501,7 @@
       "lockOrders": "Lock",
       "unlockOrders": "Unlock",
       "newPricelistItem": "New rule",
+      "newSaleOrderLine": "New line",
       "togglePricelistActive": "Toggle active",
       "deletePricelists": "Delete",
       "deletePricelistsConfirm": "Delete {{count}} pricelist(s)? This cannot be undone.",
@@ -5627,6 +5701,8 @@
         "routingWorksheetUrl": "Worksheet URL (optional)",
         "routingBlockedByIds": "Blocked by operation IDs (comma-separated, optional)",
         "completeLogId": "Open productivity log ID",
+        "logDescription": "Description",
+        "logDescriptionPlaceholder": "What happened during this time entry?",
         "csvFile": "CSV file"
       },
       "titleOrder": "Manufacturing order",
@@ -6350,7 +6426,9 @@
           "name": "Name",
           "description": "Description",
           "parentId": "Parent category ID",
-          "sequence": "Sequence"
+          "sequence": "Sequence",
+          "color": "Color",
+          "colorPlaceholder": "0-11"
         }
       },
       "newFolder": {

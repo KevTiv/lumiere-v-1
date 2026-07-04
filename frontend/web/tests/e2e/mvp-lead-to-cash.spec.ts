@@ -1,45 +1,49 @@
 import { expect, test } from "@playwright/test"
 
 import {
-  callReducerBff,
   chooseFirstEnabledOption,
-  chooseFirstOption,
+  chooseSelectOptionByLabel,
+  fetchSaleOrderSelectLabel,
+  assertMoveLinesBalanced,
   expectNoAppError,
   expectSeededText,
+  fetchAccountSelectLabelByInternalType,
   fetchDraftInvoiceMoveIdByPartner,
-  fetchFirstOpportunityStageId,
-  fetchFirstPricelistId,
-  fetchFirstWarehouseId,
+  fetchInvoiceMoveDetails,
+  fetchLatestPaymentIdByPartner,
+  fetchSalesInvoiceJournalLabel,
   fetchLeadIdByName,
   fetchOpportunityIdByName,
-  fetchProductIdByName,
   fetchSaleOrderIdByOpportunityId,
-  fetchSessionOrganizationId,
+  fetchFulfillmentPickingIdBySaleOrderId,
   fillField,
   gotoModule,
   openEntityCreate,
+  postDraftInvoiceViaUi,
   selectEntityRowById,
+  selectEntityRowByText,
   smokeName,
   submitForm,
   waitForEntityActionEnabled,
   waitForSaleOrderBillableLines,
   waitForSaleOrderConfirmed,
+  waitForSaleOrderDraftInQuery,
+  waitForSaleOrderLineQtyDelivered,
+  waitForPaymentPosted,
   waitForSaleOrderLineExists,
 } from "./helpers"
 
 /**
  * Golden-path lead → cash workflow (creates data; see docs/MVP_WORKFLOW_CONTRACT.md).
  *
- * Uses BFF `/api/call` for qualified lead create, sale order line add, and invoice post
- * where UI gaps exist.
+ * Steps 3–12 use the product UI (CRM lead create/convert, sales, accounting).
  */
 test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
-  test("creates CRM lead through invoice post", async ({ page }) => {
-    test.setTimeout(180_000)
+  test("creates CRM lead through payment registration", async ({ page }) => {
+    test.setTimeout(240_000)
 
     const contactName = smokeName("mvp-contact")
     const leadName = smokeName("mvp-lead")
-    const orgId = await fetchSessionOrganizationId(page)
 
     // Step 3 — contact (UI)
     await openEntityCreate(page, "/crm", "crm", "contacts", "new-contact")
@@ -53,72 +57,92 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       .catch(() => undefined)
     await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
 
-    // Step 4 — lead (BFF: must start qualified for conversion)
-    await callReducerBff(page, "create_lead", [
-      orgId,
-      {
-        name: leadName,
-        contactName: leadName,
-        email: `${leadName}@example.test`,
-        expectedRevenue: 2500,
-        probability: 10,
-        priority: "Medium",
-        state: "qualified",
-        tagIds: [],
-      },
+    // Step 4 — lead (UI: must start qualified for conversion)
+    await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
+    await fillField(page, "contactName", leadName)
+    await fillField(page, "emailFrom", `${leadName}@example.test`)
+    await fillField(page, "expectedRevenue", "2500")
+    await fillField(page, "probability", "10")
+    await chooseSelectOptionByLabel(page, "state", "Qualified")
+    const [createLeadRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_lead") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "new-lead"),
     ])
+    expect(createLeadRes.ok()).toBe(true)
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-leads").click()
-    await expect(page.getByText(leadName)).toBeVisible()
+    await expect(page.getByText(leadName)).toBeVisible({ timeout: 30_000 })
 
-    // Step 5 — convert lead (BFF — stage select may not be hydrated when modal opens)
-    const leadId = await fetchLeadIdByName(page, leadName)
-    const stageId = await fetchFirstOpportunityStageId(page)
-    await callReducerBff(page, "convert_lead_to_customer", [
-      orgId,
-      leadId,
-      {
-        createContact: true,
-        createOpportunity: true,
-        opportunityStageId: stageId,
-      },
+    // Step 5 — convert lead (UI)
+    await selectEntityRowByText(page, leadName)
+    await waitForEntityActionEnabled(page, "entity-action-convert-lead")
+    await page.getByTestId("entity-action-convert-lead").click()
+    await expect(page.getByTestId("form-modal-convert-lead")).toBeVisible()
+    await chooseFirstEnabledOption(page, "opportunityStageId")
+    const [convertLeadRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/convert_lead_to_customer") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "convert-lead"),
     ])
+    expect(convertLeadRes.ok()).toBe(true)
+    const leadId = await fetchLeadIdByName(page, leadName)
 
-    // Step 6 — convert opportunity → sale order (BFF — pricelist select may be empty on legacy DBs)
+    // Step 6 — convert opportunity → sale order (UI)
     const opportunityName = `${leadName} - Opportunity`
     await page.reload()
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-opportunities").click()
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
-    const pricelistId = await fetchFirstPricelistId(page)
-    const warehouseId = await fetchFirstWarehouseId(page)
-    await callReducerBff(
-      page,
-      "convert_opportunity_to_sale_order",
-      [opportunityId, { pricelistId, warehouseId }],
-      { withCompany: true },
-    )
-    const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId)
-
-    // Step 7 — add sale order line (BFF — no create form on order-lines tab)
-    const productId = await fetchProductIdByName(page, "Lumiere Dev Laptop")
-    await callReducerBff(page, "create_sale_order_line", [
-      orgId,
-      orderId,
-      {
-        productId,
-        quantity: 1,
-        uomId: 1,
-        priceUnit: 1200,
-        discount: 0,
-        taxIds: [],
-        name: "MVP smoke line",
-        sequence: 10,
-        isDownpayment: false,
-        analyticTagIds: [],
-      },
+    await selectEntityRowByText(page, opportunityName)
+    await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
+    await page.getByTestId("entity-action-convert-opp-order").click()
+    await expect(page.getByTestId("form-modal-convert-opportunity-order")).toBeVisible()
+    await chooseFirstEnabledOption(page, "pricelistId")
+    await chooseFirstEnabledOption(page, "warehouseId")
+    const [convertOppRes] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/call/convert_opportunity_to_sale_order") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "convert-opportunity-order"),
     ])
+    expect(convertOppRes.ok()).toBe(true)
+    const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId)
+    await waitForSaleOrderDraftInQuery(page, orderId)
+    const orderLabel = await fetchSaleOrderSelectLabel(page, orderId)
+
+    // Step 7 — add sale order line (UI)
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-order-lines").click()
+    await page
+      .waitForResponse(
+        (res) => res.url().includes("/api/query/sale-orders") && res.ok(),
+        { timeout: 30_000 },
+      )
+      .catch(() => undefined)
+    await page.getByTestId("module-create-sales-order-lines").click()
+    await expect(page.getByTestId("form-modal-add-sale-order-line")).toBeVisible()
+    await chooseSelectOptionByLabel(page, "orderId", orderLabel)
+    await page.getByTestId("form-field-productId").click()
+    await page.getByRole("option", { name: "Lumiere Dev Laptop" }).click()
+    await chooseFirstEnabledOption(page, "uomId")
+    await fillField(page, "quantity", "1")
+    await fillField(page, "priceUnit", "1200")
+    const [lineRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_sale_order_line") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "add-sale-order-line"),
+    ])
+    expect(lineRes.ok()).toBe(true)
 
     await waitForSaleOrderLineExists(page, orderId)
 
@@ -140,13 +164,67 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await waitForSaleOrderConfirmed(page, orderId)
     await waitForSaleOrderBillableLines(page, orderId)
 
+    // Step 9 — confirm → assign → validate delivery (UI)
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await page
+      .waitForResponse(
+        (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
+        { timeout: 30_000 },
+      )
+      .catch(() => undefined)
+    const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
+    const confirmPickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/confirm_stock_picking"),
+      { timeout: 45_000 },
+    )
+    await page.getByTestId("entity-action-confirm-picking").click()
+    const confirmPickingRes = await confirmPickingResPromise
+    if (!confirmPickingRes.ok()) {
+      const body = await confirmPickingRes.text().catch(() => "")
+      throw new Error(`confirm_stock_picking failed (${confirmPickingRes.status()}): ${body}`)
+    }
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-assign-picking")
+    const assignPickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/assign_stock_picking"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-assign-picking").click()
+    const assignPickingRes = await assignPickingResPromise
+    if (!assignPickingRes.ok()) {
+      const body = await assignPickingRes.text().catch(() => "")
+      throw new Error(`assign_stock_picking failed (${assignPickingRes.status()}): ${body}`)
+    }
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-validate-picking")
+    const validatePickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/validate_stock_picking"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-validate-picking").click()
+    const validatePickingRes = await validatePickingResPromise
+    if (!validatePickingRes.ok()) {
+      const body = await validatePickingRes.text().catch(() => "")
+      throw new Error(`validate_stock_picking failed (${validatePickingRes.status()}): ${body}`)
+    }
+    await waitForSaleOrderLineQtyDelivered(page, orderId)
+
     // Step 10 — create invoice from sale order (UI)
+    const journalLabel = await fetchSalesInvoiceJournalLabel(page)
+    const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
+    const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-create-invoice")
     await page.getByTestId("entity-action-create-invoice").click()
     await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
-    await chooseFirstEnabledOption(page, "journalId")
-    await chooseFirstEnabledOption(page, "defaultIncomeAccountId")
+    await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+    await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
+    await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
     const [invoiceRes] = await Promise.all([
       page.waitForResponse(
         (res) =>
@@ -157,13 +235,61 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(invoiceRes.ok()).toBe(true)
 
-    // Step 11 — post invoice (BFF — invoices tab uses custom list, not entity-table)
     const moveId = await fetchDraftInvoiceMoveIdByPartner(page, leadName)
-    await callReducerBff(page, "post_account_move", [orgId, moveId])
+    await assertMoveLinesBalanced(page, moveId)
+
+    // Step 11 — post invoice (UI — invoices tab → detail modal → Post)
+    await postDraftInvoiceViaUi(page, leadName)
 
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-invoices").click()
     await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
+
+    // Step 12 — create payment → post → register on invoice (UI)
+    const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
+
+    await page.getByTestId("module-tab-accounting-payments").click()
+    await page.getByTestId("module-create-accounting-payments").click()
+    await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
+    await fillField(page, "partnerId", String(partnerId))
+    await fillField(page, "amount", String(amountTotal))
+    await fillField(page, "currencyId", String(currencyId))
+    await chooseFirstEnabledOption(page, "journalId")
+    const [createPaymentRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_payment") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "new-account-payment"),
+    ])
+    expect(createPaymentRes.ok()).toBe(true)
+
+    const paymentId = await fetchLatestPaymentIdByPartner(page, partnerId, { state: "NotPaid" })
+    await selectEntityRowById(page, paymentId)
+    await waitForEntityActionEnabled(page, "entity-action-pay-post")
+    const [postPaymentRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/post_payment") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      page.getByTestId("entity-action-pay-post").click(),
+    ])
+    expect(postPaymentRes.ok()).toBe(true)
+    await waitForPaymentPosted(page, paymentId)
+
+    await selectEntityRowById(page, paymentId)
+    await waitForEntityActionEnabled(page, "entity-action-pay-link")
+    await page.getByTestId("entity-action-pay-link").click()
+    await expect(page.getByTestId("form-modal-register-payment-invoices")).toBeVisible()
+    await fillField(page, "invoiceIds", String(moveId))
+    const [registerRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/register_payment_on_invoice") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "register-payment-invoices"),
+    ])
+    expect(registerRes.ok()).toBe(true)
     await expectNoAppError(page)
 
     // Sanity: lead id still resolvable after workflow

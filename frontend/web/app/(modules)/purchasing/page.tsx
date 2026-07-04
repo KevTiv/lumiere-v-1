@@ -1,7 +1,6 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
 import {
-  serverQueryAccountJournals,
   serverQueryPurchaseOrders,
   serverQueryPurchaseOrderLines,
   serverQueryPurchaseRequisitions,
@@ -13,32 +12,6 @@ import {
   serverQueryDepartments,
 } from "@lumiere/stdb/server"
 import { PurchasingClient } from "./purchasing-client"
-
-/** Match {@link orgBigInts}: default company id equals organization id in web. */
-function purchaseBillIdsFromJournals(
-  journals: Record<string, unknown>[],
-  organizationId: number,
-): { purchaseBillJournalId?: string; purchaseBillExpenseAccountId?: string } {
-  const companyKey = String(organizationId)
-  const forCompany = journals.filter((j) => String(j.companyId ?? j.company_id) === companyKey)
-  const purchase = forCompany.find((j) => {
-    const t = j.type_
-    if (t != null && typeof t === "object" && "tag" in t) {
-      return String((t as { tag: string }).tag) === "Purchase"
-    }
-    return false
-  })
-  if (!purchase) return {}
-  const active = purchase.active !== false
-  if (!active) return {}
-  const jid = purchase.id
-  const expenseId = purchase.defaultAccountId ?? purchase.default_account_id
-  if (jid == null || expenseId == null) return {}
-  return {
-    purchaseBillJournalId: String(jid),
-    purchaseBillExpenseAccountId: String(expenseId),
-  }
-}
 
 export default async function PurchasingPage() {
   const session = await getStdbSession()
@@ -60,12 +33,6 @@ export default async function PurchasingPage() {
       serverQueryDepartments(organizationId, opts),
     ]).catch(() => [[], [], [], [], [], [], [], [], []])
 
-  const journals = (await serverQueryAccountJournals(organizationId, opts).catch(() => [])) as Record<
-    string,
-    unknown
-  >[]
-  const billIds = purchaseBillIdsFromJournals(journals, organizationId)
-
   return (
     <Suspense>
       <PurchasingClient
@@ -79,8 +46,6 @@ export default async function PurchasingPage() {
         initialPartnerBanks={partnerBanks as Record<string, unknown>[]}
         initialDepartments={departments as Record<string, unknown>[]}
         organizationId={organizationId}
-        purchaseBillJournalId={billIds.purchaseBillJournalId}
-        purchaseBillExpenseAccountId={billIds.purchaseBillExpenseAccountId}
       />
     </Suspense>
   )

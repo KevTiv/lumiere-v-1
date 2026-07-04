@@ -4,13 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_invoice_from_sale_order_params_type::CreateInvoiceFromSaleOrderParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateInvoiceFromSaleOrderArgs {
     pub organization_id: u64,
     pub sale_order_id: u64,
-    pub journal_id: u64,
-    pub default_income_account_id: u64,
+    pub params: CreateInvoiceFromSaleOrderParams,
 }
 
 impl From<CreateInvoiceFromSaleOrderArgs> for super::Reducer {
@@ -18,8 +19,7 @@ impl From<CreateInvoiceFromSaleOrderArgs> for super::Reducer {
         Self::CreateInvoiceFromSaleOrder {
             organization_id: args.organization_id,
             sale_order_id: args.sale_order_id,
-            journal_id: args.journal_id,
-            default_income_account_id: args.default_income_account_id,
+            params: args.params,
         }
     }
 }
@@ -43,16 +43,9 @@ pub trait create_invoice_from_sale_order {
         &self,
         organization_id: u64,
         sale_order_id: u64,
-        journal_id: u64,
-        default_income_account_id: u64,
+        params: CreateInvoiceFromSaleOrderParams,
     ) -> __sdk::Result<()> {
-        self.create_invoice_from_sale_order_then(
-            organization_id,
-            sale_order_id,
-            journal_id,
-            default_income_account_id,
-            |_, _| {},
-        )
+        self.create_invoice_from_sale_order_then(organization_id, sale_order_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_invoice_from_sale_order` to run as soon as possible,
@@ -65,8 +58,7 @@ pub trait create_invoice_from_sale_order {
         &self,
         organization_id: u64,
         sale_order_id: u64,
-        journal_id: u64,
-        default_income_account_id: u64,
+        params: CreateInvoiceFromSaleOrderParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -79,8 +71,7 @@ impl create_invoice_from_sale_order for super::RemoteReducers {
         &self,
         organization_id: u64,
         sale_order_id: u64,
-        journal_id: u64,
-        default_income_account_id: u64,
+        params: CreateInvoiceFromSaleOrderParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -90,8 +81,7 @@ impl create_invoice_from_sale_order for super::RemoteReducers {
             CreateInvoiceFromSaleOrderArgs {
                 organization_id,
                 sale_order_id,
-                journal_id,
-                default_income_account_id,
+                params,
             },
             callback,
         )

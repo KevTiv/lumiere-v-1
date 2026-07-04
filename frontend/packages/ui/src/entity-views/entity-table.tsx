@@ -29,6 +29,7 @@ import {
   radixSelectItemValue,
   storedValueFromRadixSelect,
 } from "../forms/utils/radix-select-empty-value"
+import { getRowField } from "../lib/entity-row-utils"
 
 interface EntityTableProps {
   config: EntityTableConfig
@@ -132,7 +133,9 @@ export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className
     return rows
   }, [data, search, filters, config.searchKeys])
 
-  const selectedRows = filtered.filter((row) => selectedKeys.has(String(row[rowKey])))
+  const selectedRows = filtered.filter((row) =>
+    selectedKeys.has(String(getRowField(row, rowKey) ?? "")),
+  )
 
   const toggleRow = (key: string) => {
     setSelectedKeys((prev) => {
@@ -254,7 +257,7 @@ export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className
               </TableRow>
             ) : (
               filtered.map((row, i) => {
-                const key = String(row[rowKey] ?? i)
+                const key = String(getRowField(row, rowKey) ?? i)
                 const isSelected = selectedKeys.has(key)
                 const isAiFocused =
                   aiFocusRowKey != null && aiFocusRowKey !== "" && key === aiFocusRowKey
@@ -282,7 +285,7 @@ export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className
                     )}
                   >
                     {columns.map((col) => {
-                      const value = row[col.key]
+                      const value = getRowField(row, col.key)
                       return (
                         <TableCell
                           key={col.key}

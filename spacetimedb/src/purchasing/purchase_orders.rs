@@ -258,6 +258,7 @@ pub struct UpdatePurchaseOrderLineParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePurchaseRequisitionParams {
     pub company_id: Option<u64>,
+    pub origin: Option<String>,
     pub description: Option<String>,
     pub ordering_date: Option<Timestamp>,
     pub date_end: Option<Timestamp>,
@@ -1202,7 +1203,7 @@ pub fn create_purchase_requisition(
     let requisition = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,
         organization_id,
-        origin: None,
+        origin: params.origin,
         ordering_date: params.ordering_date,
         date_end: params.date_end,
         schedule_date: params.schedule_date,

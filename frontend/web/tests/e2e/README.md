@@ -20,6 +20,8 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `auth-shell.spec.ts` | Public landing, auth redirect, sign-in, shell navigation, sign-out |
 | `module-smoke.spec.ts` | Cross-module minimal creates (CRM, Helpdesk, Inventory, Sales, Proposals) |
 | `accounting-module.spec.ts` | All accounting tabs, creates, quick actions, CSV import guard |
+| `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–12; BFF for qualified lead, convert, post invoice) |
+| `mvp-procure-to-pay.spec.ts` | PO create → line → confirm → receive → bill modal → post (@p0) |
 | `purchasing-module.spec.ts` | `/purchasing` shell, dashboard/orders/lines/requisitions/vendors/partner-banks tabs, seeded `PO/2024/0001` |
 | `inventory-module.spec.ts` | `/inventory` shell, key stock/product tabs, seeded `Lumiere Dev Laptop` |
 | `sales-invoice-flow.spec.ts` | Seeded `SO/2024/0001` on Sales, linked `INV/2024/00001` on Accounting Invoices, sale-order quick action |
@@ -32,6 +34,21 @@ From the repo root, run the full local stack and smoke suite with:
 ```bash
 make e2e-smoke
 ```
+
+MVP golden-path gates (from repo root):
+
+```bash
+# Wave 2 — lead-to-cash (steps 3–12)
+E2E_CLEAR_DB=1 make e2e-single
+
+# Wave 3 — procure-to-pay
+E2E_CLEAR_DB=1 make e2e-p2p
+
+# Both paths on a fresh DB
+E2E_CLEAR_DB=1 make e2e-mvp-golden
+```
+
+Note: `e2e-single` defaults to `E2E_GREP=creates CRM`. For other specs use `make e2e-p2p` or set `E2E_GREP=` explicitly.
 
 That target starts local SpacetimeDB when needed, publishes the local module **without** wiping existing data by default (so repeat runs are faster and reflect real migration behavior), runs core reducer tests (continues if unavailable), runs **`seed_dev_data`** via `pnpm run e2e-seed-fixture`, then seeds the browser smoke user with `pnpm run seed-test-user`, starts `api-server`, and then installs the Playwright Chromium browser if needed and lets Playwright start Next.js.
 

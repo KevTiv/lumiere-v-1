@@ -2499,6 +2499,20 @@ export const CreateBarcodeRuleParams = __t.object("CreateBarcodeRuleParams", {
 });
 export type CreateBarcodeRuleParams = __Infer<typeof CreateBarcodeRuleParams>;
 
+export const CreateBillFromPurchaseOrderParams = __t.object("CreateBillFromPurchaseOrderParams", {
+  journalId: __t.u64(),
+  defaultExpenseAccountId: __t.u64(),
+  invoiceDate: __t.timestamp(),
+  get expenseLine() {
+    return AddAccountMoveLineParams;
+  },
+  get payableLine() {
+    return AddAccountMoveLineParams;
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreateBillFromPurchaseOrderParams = __Infer<typeof CreateBillFromPurchaseOrderParams>;
+
 export const CreateBomParams = __t.object("CreateBomParams", {
   companyId: __t.option(__t.u64()),
   get type() {
@@ -3187,6 +3201,19 @@ export const CreateInventoryAdjustmentParams = __t.object("CreateInventoryAdjust
 });
 export type CreateInventoryAdjustmentParams = __Infer<typeof CreateInventoryAdjustmentParams>;
 
+export const CreateInvoiceFromSaleOrderParams = __t.object("CreateInvoiceFromSaleOrderParams", {
+  journalId: __t.u64(),
+  defaultIncomeAccountId: __t.u64(),
+  get receivableLine() {
+    return AddAccountMoveLineParams;
+  },
+  get incomeLine() {
+    return AddAccountMoveLineParams;
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreateInvoiceFromSaleOrderParams = __Infer<typeof CreateInvoiceFromSaleOrderParams>;
+
 export const CreateJobPositionParams = __t.object("CreateJobPositionParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -3806,6 +3833,7 @@ export type CreatePurchaseOrderParams = __Infer<typeof CreatePurchaseOrderParams
 
 export const CreatePurchaseRequisitionParams = __t.object("CreatePurchaseRequisitionParams", {
   companyId: __t.option(__t.u64()),
+  origin: __t.option(__t.string()),
   description: __t.option(__t.string()),
   orderingDate: __t.option(__t.timestamp()),
   dateEnd: __t.option(__t.timestamp()),

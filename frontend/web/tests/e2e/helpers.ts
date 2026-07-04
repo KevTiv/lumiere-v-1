@@ -181,9 +181,212 @@ export async function chooseFirstOption(page: Page, name: string) {
 /** Pick the first non-disabled select option (skips empty placeholders). */
 export async function chooseFirstEnabledOption(page: Page, name: string) {
   await page.getByTestId(`form-field-${name}`).click()
-  const option = page.getByRole("option", { disabled: false }).first()
-  await expect(option).toBeVisible({ timeout: 15_000 })
-  await option.click()
+  const listbox = page.locator('[role="listbox"]')
+  await expect
+    .poll(async () => listbox.getByRole("option", { disabled: false }).count(), {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(0)
+  await listbox.getByRole("option", { disabled: false }).first().click()
+}
+
+function accountInternalTypeTag(row: Record<string, unknown>): string {
+  const v = row.internalType ?? row.internal_type
+  if (v != null && typeof v === "object" && "tag" in v) {
+    return String((v as { tag: string }).tag).toLowerCase()
+  }
+  return String(v ?? "").toLowerCase()
+}
+
+function accountSelectLabel(row: Record<string, unknown>): string {
+  const code = String(row.code ?? "")
+  const name = String(row.name ?? "")
+  if (code && name) return `${code} — ${name}`
+  return name || code || String(row.id ?? "?")
+}
+
+/** First chart account matching internal type (e.g. receivable, income). */
+export async function fetchAccountSelectLabelByInternalType(
+  page: Page,
+  internalType: string,
+): Promise<string> {
+  const res = await page.request.get("/api/query/account-accounts")
+  if (!res.ok()) throw new Error(`account-accounts query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Record<string, unknown>[] }
+  const want = internalType.toLowerCase()
+  let row = (json.data ?? []).find((r) => accountInternalTypeTag(r) === want)
+  // Seed fallback when internalType is not projected (legacy field policy)
+  if (!row) {
+    const codeByType: Record<string, string> = {
+      receivable: "1100",
+      income: "4000",
+      payable: "2000",
+      expense: "5000",
+    }
+    const code = codeByType[want]
+    if (code) row = (json.data ?? []).find((r) => String(r.code ?? "") === code)
+  }
+  if (!row) throw new Error(`no account with internal type ${internalType}`)
+  return accountSelectLabel(row)
+}
+
+/** Sales invoice journal from seed (INV — Customer Invoices). */
+export async function fetchSalesInvoiceJournalLabel(page: Page): Promise<string> {
+  const res = await page.request.get("/api/query/account-journals")
+  if (!res.ok()) throw new Error(`account-journals query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Record<string, unknown>[] }
+  const row =
+    (json.data ?? []).find((r) => String(r.code ?? "").toUpperCase() === "INV") ??
+    (json.data ?? [])[0]
+  if (!row) throw new Error("no account journals in query")
+  const code = String(row.code ?? "")
+  const name = String(row.name ?? "")
+  return code && name ? `${code} — ${name}` : name || code
+}
+
+/** Vendor bill journal from seed (BILL — Vendor Bills). */
+export async function fetchVendorBillJournalLabel(page: Page): Promise<string> {
+  const res = await page.request.get("/api/query/account-journals")
+  if (!res.ok()) throw new Error(`account-journals query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Record<string, unknown>[] }
+  const row =
+    (json.data ?? []).find((r) => String(r.code ?? "").toUpperCase() === "BILL") ??
+    (json.data ?? [])[0]
+  if (!row) throw new Error("no account journals in query")
+  const code = String(row.code ?? "")
+  const name = String(row.name ?? "")
+  return code && name ? `${code} — ${name}` : name || code
+}
+
+function poStateTag(row: Record<string, unknown>): string {
+  const v = row.state
+  if (v != null && typeof v === "object" && "tag" in v) {
+    return String((v as { tag: string }).tag)
+  }
+  return String(v ?? "")
+}
+
+/** Newest purchase order id for a vendor partner id. */
+export async function fetchLatestPurchaseOrderIdByPartner(
+  page: Page,
+  partnerId: number,
+): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/purchase-orders")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; partnerId?: unknown; partner_id?: unknown }>
+      }
+      const matches = (json.data ?? []).filter(
+        (row) => scalarQueryId(row.partnerId ?? row.partner_id) === partnerId,
+      )
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`purchase order not found for partner id ${partnerId}`)
+}
+
+export async function waitForPurchaseOrderState(
+  page: Page,
+  orderId: number,
+  state: string,
+): Promise<void> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/purchase-orders")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Record<string, unknown>[] }
+      const row = (json.data ?? []).find((r) => scalarQueryId(r.id) === orderId)
+      if (row && poStateTag(row) === state) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`purchase order ${orderId} did not reach state ${state}`)
+}
+
+/** Draft vendor bill move id for a partner display name. */
+export async function fetchDraftVendorBillMoveIdByPartner(
+  page: Page,
+  partnerName: string,
+): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-moves")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: number | string
+          state?: string
+          moveType?: string
+          move_type?: string
+          invoicePartnerDisplayName?: string
+          partnerName?: string
+        }>
+      }
+      const row = json.data?.find((m) => {
+        const partner = m.invoicePartnerDisplayName ?? m.partnerName ?? ""
+        const moveType = String(m.moveType ?? m.move_type ?? "").toLowerCase()
+        const isInInvoice = moveType.includes("in")
+        const isDraft = (m.state ?? "").toLowerCase() === "draft"
+        return isInInvoice && isDraft && partner.includes(partnerName)
+      })
+      if (row?.id != null) return Number(row.id)
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`draft vendor bill not found for partner: ${partnerName}`)
+}
+
+export async function fetchVendorPartnerIdByName(page: Page, name: string): Promise<number> {
+  const res = await page.request.get("/api/query/contacts")
+  if (!res.ok()) throw new Error(`contacts query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: unknown; name?: string; displayName?: string; isVendor?: boolean }>
+  }
+  const row = (json.data ?? []).find(
+    (c) =>
+      (String(c.name ?? "").includes(name) || String(c.displayName ?? "").includes(name)) &&
+      c.isVendor !== false,
+  )
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`vendor contact not found: ${name}`)
+  return id
+}
+
+/** Pick a Radix select option by its stored value (not visible label). */
+export async function chooseSelectOptionByValue(
+  page: Page,
+  name: string,
+  value: string | number | bigint,
+) {
+  const v = String(value)
+  await page.getByTestId(`form-field-${name}`).click()
+  const listbox = page.locator('[role="listbox"]')
+  await expect(listbox).toBeVisible({ timeout: 15_000 })
+  const byData = listbox.locator(`[role="option"][data-value="${v}"]`).first()
+  if ((await byData.count()) > 0) {
+    await byData.click()
+    return
+  }
+  await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).first().click()
+}
+
+/** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
+export async function chooseSelectOptionByLabel(
+  page: Page,
+  name: string,
+  label: string | RegExp,
+) {
+  await page.getByTestId(`form-field-${name}`).click()
+  const listbox = page.locator('[role="listbox"]')
+  await expect(listbox).toBeVisible({ timeout: 15_000 })
+  await listbox.getByRole("option", { name: label }).click()
 }
 
 export async function submitForm(page: Page, formId: string) {
@@ -377,7 +580,7 @@ export async function fetchFirstWarehouseId(page: Page): Promise<number> {
 }
 
 /** Normalize id/scalar fields from BFF query rows (handles SATS `some` wrappers). */
-function scalarQueryId(value: unknown): number | null {
+export function scalarQueryId(value: unknown): number | null {
   if (value == null) return null
   if (typeof value === "number") return value
   if (typeof value === "string" && value.trim() !== "") return Number(value)
@@ -466,6 +669,86 @@ export async function fetchSaleOrderIdByOpportunityId(
     throw new Error(`sale order row missing id for opportunity: ${opportunityId}`)
   }
   return orderId
+}
+
+/** Label shown in sale order select options (reference, else `SO {id}`). */
+export async function fetchLatestPurchaseOrderLineIdByOrder(
+  page: Page,
+  orderId: number,
+): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/purchase-order-lines")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; orderId?: unknown; order_id?: unknown }>
+      }
+      const matches = (json.data ?? []).filter(
+        (row) => scalarQueryId(row.orderId ?? row.order_id) === orderId,
+      )
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`no purchase order line found for order ${orderId}`)
+}
+
+export async function fetchPurchaseOrderSelectLabel(
+  page: Page,
+  orderId: number,
+): Promise<string> {
+  const res = await page.request.get("/api/query/purchase-orders")
+  if (!res.ok()) throw new Error(`purchase-orders query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: unknown; name?: string; origin?: string }>
+  }
+  const order = (json.data ?? []).find((row) => scalarQueryId(row.id) === orderId)
+  if (!order) throw new Error(`purchase order ${orderId} not found in query`)
+  const ref = String(order.name ?? order.origin ?? "").trim()
+  return ref || `PO ${orderId}`
+}
+
+export async function fetchSaleOrderSelectLabel(
+  page: Page,
+  orderId: number,
+): Promise<string> {
+  const res = await page.request.get("/api/query/sale-orders")
+  if (!res.ok()) throw new Error(`sale-orders query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{
+      id?: number | string
+      reference?: string
+      clientOrderRef?: string
+      origin?: string
+    }>
+  }
+  const order = (json.data ?? []).find((row) => scalarQueryId(row.id) === orderId)
+  if (!order) throw new Error(`sale order ${orderId} not found in query`)
+  const ref = String(order.reference ?? order.clientOrderRef ?? order.origin ?? "").trim()
+  return ref || `SO ${orderId}`
+}
+
+/** Poll until a draft sale order is visible in the sale-orders query. */
+export async function waitForSaleOrderDraftInQuery(page: Page, orderId: number) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/sale-orders")
+        if (!res.ok()) return false
+        const json = (await res.json()) as {
+          data?: Array<{ id?: unknown; state?: unknown }>
+        }
+        const row = (json.data ?? []).find((o) => scalarQueryId(o.id) === orderId)
+        if (!row) return false
+        return scalarQueryString(row.state).toLowerCase() === "draft"
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 }
 
 /** Poll until a sale order line exists for the order with a product quantity > 0. */
@@ -567,6 +850,87 @@ export async function waitForSaleOrderBillableLines(page: Page, orderId: number)
   throw new Error(`sale order ${orderId} has no billable lines after confirm`)
 }
 
+/** Poll until an outgoing picking exists for the sale order (post-confirm auto-create). */
+export async function fetchFulfillmentPickingIdBySaleOrderId(
+  page: Page,
+  saleOrderId: number,
+): Promise<number> {
+  const deadline = Date.now() + 45_000
+  while (Date.now() < deadline) {
+    const orderRes = await page.request.get("/api/query/sale-orders")
+    if (orderRes.ok()) {
+      const orderJson = (await orderRes.json()) as {
+        data?: Array<{ id?: unknown; pickingIds?: unknown; picking_ids?: unknown }>
+      }
+      const order = (orderJson.data ?? []).find((row) => scalarQueryId(row.id) === saleOrderId)
+      const pickingIdsRaw = order?.pickingIds ?? order?.picking_ids
+      if (Array.isArray(pickingIdsRaw) && pickingIdsRaw.length > 0) {
+        const id = scalarQueryId(pickingIdsRaw[0])
+        if (id != null) return id
+      }
+    }
+
+    const res = await page.request.get("/api/query/stock-pickings")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: unknown
+          saleId?: unknown
+          sale_id?: unknown
+          isReturn?: unknown
+          is_return?: unknown
+          pickingCode?: unknown
+          picking_code?: unknown
+        }>
+      }
+      const picking = (json.data ?? []).find((row) => {
+        const saleId = scalarQueryId(row.saleId ?? row.sale_id)
+        const isReturn = row.isReturn ?? row.is_return
+        if (saleId === saleOrderId && !isReturn) return true
+        const code = String(row.pickingCode ?? row.picking_code ?? "").toLowerCase()
+        return code === "outgoing" && saleId === saleOrderId
+      })
+      const id = scalarQueryId(picking?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`no outgoing picking found for sale order ${saleOrderId}`)
+}
+
+/** Poll until sale order lines show qty_delivered > 0 after picking validate. */
+export async function waitForSaleOrderLineQtyDelivered(
+  page: Page,
+  orderId: number,
+  minQty = 0.01,
+) {
+  const deadline = Date.now() + 45_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/sale-order-lines")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          orderId?: unknown
+          order_id?: unknown
+          qtyDelivered?: unknown
+          qty_delivered?: unknown
+          displayType?: unknown
+          display_type?: unknown
+        }>
+      }
+      const delivered = (json.data ?? []).some((line) => {
+        if (line.displayType != null || line.display_type != null) return false
+        if (scalarQueryId(line.orderId ?? line.order_id) !== orderId) return false
+        const qty = Number(line.qtyDelivered ?? line.qty_delivered ?? 0)
+        return qty >= minQty
+      })
+      if (delivered) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`sale order ${orderId} has no qty_delivered after picking validate`)
+}
+
 /** Poll until a proposal row with the given title appears in the BFF query. */
 export async function fetchProposalIdByTitle(page: Page, title: string): Promise<number> {
   const deadline = Date.now() + 30_000
@@ -586,6 +950,114 @@ export async function fetchProposalIdByTitle(page: Page, title: string): Promise
     await page.waitForTimeout(250)
   }
   throw new Error(`proposal not found in query: ${title}`)
+}
+
+function paymentStateFromQuery(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("tag" in obj) return String(obj.tag)
+  }
+  return String(value)
+}
+
+/** Partner, amount, and currency for an account move (invoice/bill). */
+export async function fetchInvoiceMoveDetails(
+  page: Page,
+  moveId: number,
+): Promise<{ partnerId: number; amountTotal: number; currencyId: number }> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-moves")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: unknown
+          partnerId?: unknown
+          partner_id?: unknown
+          amountTotal?: unknown
+          amount_total?: unknown
+          amountResidual?: unknown
+          amount_residual?: unknown
+          currencyId?: unknown
+          currency_id?: unknown
+        }>
+      }
+      const row = (json.data ?? []).find((m) => scalarQueryId(m.id) === moveId)
+      if (row) {
+        const partnerId = scalarQueryId(row.partnerId ?? row.partner_id)
+        const currencyId = scalarQueryId(row.currencyId ?? row.currency_id)
+        const amountTotal = Number(
+          row.amountTotal ??
+            row.amount_total ??
+            row.amountResidual ??
+            row.amount_residual ??
+            0,
+        )
+        if (partnerId != null && currencyId != null && amountTotal > 0) {
+          return { partnerId, amountTotal, currencyId }
+        }
+      }
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`invoice move ${moveId} not found or incomplete in query`)
+}
+
+/** Newest account payment id for a partner (optional state filter: NotPaid | Paid). */
+export async function fetchLatestPaymentIdByPartner(
+  page: Page,
+  partnerId: number,
+  options?: { state?: string },
+): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-payments")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: unknown
+          partnerId?: unknown
+          partner_id?: unknown
+          state?: unknown
+        }>
+      }
+      const matches = (json.data ?? []).filter((p) => {
+        if (scalarQueryId(p.partnerId ?? p.partner_id) !== partnerId) return false
+        if (options?.state) {
+          return paymentStateFromQuery(p.state) === options.state
+        }
+        return true
+      })
+      if (matches.length > 0) {
+        const newest = [...matches].sort(
+          (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+        )[0]
+        const id = scalarQueryId(newest?.id)
+        if (id != null) return id
+      }
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`payment not found for partner ${partnerId}`)
+}
+
+/** Poll until payment state is Paid (after post_payment). */
+export async function waitForPaymentPosted(page: Page, paymentId: number) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-payments")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; state?: unknown }>
+      }
+      const payment = (json.data ?? []).find((p) => scalarQueryId(p.id) === paymentId)
+      if (payment && paymentStateFromQuery(payment.state) === "Paid") return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`payment ${paymentId} was not posted`)
 }
 
 /** Draft customer invoice move id for a partner display name. */
@@ -617,4 +1089,119 @@ export async function fetchDraftInvoiceMoveIdByPartner(
     await page.waitForTimeout(250)
   }
   throw new Error(`draft invoice not found for partner: ${partnerName}`)
+}
+
+/** Label for the receive-goods line select (`PO {orderId} — {product} ({left} left)`). */
+export async function fetchPurchaseOrderLineReceiveLabel(
+  page: Page,
+  orderId: number,
+  lineId: number,
+): Promise<string> {
+  const [linesRes, productsRes] = await Promise.all([
+    page.request.get("/api/query/purchase-order-lines"),
+    page.request.get("/api/query/products"),
+  ])
+  if (!linesRes.ok()) throw new Error(`purchase-order-lines query failed: ${linesRes.status()}`)
+  if (!productsRes.ok()) throw new Error(`products query failed: ${productsRes.status()}`)
+
+  const linesJson = (await linesRes.json()) as { data?: Record<string, unknown>[] }
+  const productsJson = (await productsRes.json()) as {
+    data?: Array<{ id?: unknown; name?: string }>
+  }
+  const line = (linesJson.data ?? []).find((row) => scalarQueryId(row.id) === lineId)
+  if (!line) throw new Error(`purchase order line ${lineId} not found`)
+
+  const productId = scalarQueryId(line.productId ?? line.product_id)
+  const product = (productsJson.data ?? []).find((p) => scalarQueryId(p.id) === productId)
+  const productName = product?.name ?? `Product ${productId ?? "?"}`
+
+  const pq = Number(line.productQty ?? line.product_qty ?? 0)
+  const qr = Number(line.qtyReceived ?? line.qty_received ?? 0)
+  const left = Math.max(0, pq - qr)
+  const oid = scalarQueryId(line.orderId ?? line.order_id) ?? orderId
+  return `PO ${oid} — ${productName} (${left} left)`
+}
+
+/** Sum debit/credit on move lines; throws when |debit − credit| ≥ 0.01. */
+export async function assertMoveLinesBalanced(page: Page, moveId: number): Promise<void> {
+  const res = await page.request.get("/api/query/account-move-lines")
+  if (!res.ok()) throw new Error(`account-move-lines query failed: ${res.status()}`)
+
+  const json = (await res.json()) as { data?: Record<string, unknown>[] }
+  const lines = (json.data ?? []).filter(
+    (row) => scalarQueryId(row.moveId ?? row.move_id) === moveId,
+  )
+  if (lines.length === 0) {
+    throw new Error(`no move lines found for move ${moveId}`)
+  }
+
+  let debit = 0
+  let credit = 0
+  for (const row of lines) {
+    debit += Number(row.debit ?? 0)
+    credit += Number(row.credit ?? 0)
+  }
+  if (Math.abs(debit - credit) >= 0.01) {
+    throw new Error(
+      `move ${moveId} lines not balanced: debit=${debit} credit=${credit}`,
+    )
+  }
+}
+
+/** Poll until an account move reaches a posted state. */
+export async function waitForMovePosted(page: Page, moveId: number): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/account-moves")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as { data?: Array<{ id?: unknown; state?: unknown }> }
+        const row = (json.data ?? []).find((m) => scalarQueryId(m.id) === moveId)
+        return scalarQueryString(row?.state).toLowerCase()
+      },
+      { timeout: 30_000 },
+    )
+    .toMatch(/post/)
+}
+
+/** Open invoice detail and post draft via accounting invoices tab. */
+export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Promise<number> {
+  const moveId = await fetchDraftInvoiceMoveIdByPartner(page, partnerName)
+
+  await gotoModule(page, "/accounting", "accounting")
+  await page.getByTestId("module-tab-accounting-invoices").click()
+  await page.getByRole("row").filter({ hasText: partnerName }).first().click()
+  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+
+  const [postRes] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("invoice-detail-post-draft").click(),
+  ])
+  expect(postRes.ok()).toBe(true)
+  await waitForMovePosted(page, moveId)
+  return moveId
+}
+
+/** Open vendor bill detail and post draft via accounting bills tab. */
+export async function postDraftBillViaUi(page: Page, vendorName: string): Promise<number> {
+  const moveId = await fetchDraftVendorBillMoveIdByPartner(page, vendorName)
+
+  await gotoModule(page, "/accounting", "accounting")
+  await page.getByTestId("module-tab-accounting-bills").click()
+  await page.getByRole("row").filter({ hasText: vendorName }).first().click()
+  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+
+  const [postRes] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("invoice-detail-post-draft").click(),
+  ])
+  expect(postRes.ok()).toBe(true)
+  await waitForMovePosted(page, moveId)
+  return moveId
 }

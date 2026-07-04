@@ -95,7 +95,9 @@ async function main() {
   const args = new Set(process.argv.slice(2))
 
   if (args.has('--login-only')) {
-    loginLocal({ forceLogout: true })
+    // Default: keep existing cli.toml identity (DB owner after first publish).
+    // Set E2E_FORCE_LOCAL_LOGIN=1 to logout + server-issued login (new identity).
+    loginLocal({ forceLogout: process.env.E2E_FORCE_LOCAL_LOGIN === '1' })
     return
   }
 

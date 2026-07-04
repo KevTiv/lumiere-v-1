@@ -4,14 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateBillFromPurchaseOrderArgs {
     pub organization_id: u64,
     pub purchase_order_id: u64,
-    pub journal_id: u64,
-    pub default_expense_account_id: u64,
-    pub invoice_date: __sdk::Timestamp,
+    pub params: CreateBillFromPurchaseOrderParams,
 }
 
 impl From<CreateBillFromPurchaseOrderArgs> for super::Reducer {
@@ -19,9 +19,7 @@ impl From<CreateBillFromPurchaseOrderArgs> for super::Reducer {
         Self::CreateBillFromPurchaseOrder {
             organization_id: args.organization_id,
             purchase_order_id: args.purchase_order_id,
-            journal_id: args.journal_id,
-            default_expense_account_id: args.default_expense_account_id,
-            invoice_date: args.invoice_date,
+            params: args.params,
         }
     }
 }
@@ -45,16 +43,12 @@ pub trait create_bill_from_purchase_order {
         &self,
         organization_id: u64,
         purchase_order_id: u64,
-        journal_id: u64,
-        default_expense_account_id: u64,
-        invoice_date: __sdk::Timestamp,
+        params: CreateBillFromPurchaseOrderParams,
     ) -> __sdk::Result<()> {
         self.create_bill_from_purchase_order_then(
             organization_id,
             purchase_order_id,
-            journal_id,
-            default_expense_account_id,
-            invoice_date,
+            params,
             |_, _| {},
         )
     }
@@ -69,9 +63,7 @@ pub trait create_bill_from_purchase_order {
         &self,
         organization_id: u64,
         purchase_order_id: u64,
-        journal_id: u64,
-        default_expense_account_id: u64,
-        invoice_date: __sdk::Timestamp,
+        params: CreateBillFromPurchaseOrderParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -84,9 +76,7 @@ impl create_bill_from_purchase_order for super::RemoteReducers {
         &self,
         organization_id: u64,
         purchase_order_id: u64,
-        journal_id: u64,
-        default_expense_account_id: u64,
-        invoice_date: __sdk::Timestamp,
+        params: CreateBillFromPurchaseOrderParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -96,9 +86,7 @@ impl create_bill_from_purchase_order for super::RemoteReducers {
             CreateBillFromPurchaseOrderArgs {
                 organization_id,
                 purchase_order_id,
-                journal_id,
-                default_expense_account_id,
-                invoice_date,
+                params,
             },
             callback,
         )

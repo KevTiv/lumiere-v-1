@@ -3,8 +3,11 @@
  */
 
 import type {
+  AddAccountMoveLineParams,
+  CreateInvoiceFromSaleOrderParams,
   CreatePickingBatchParams,
   CreatePricelistParams,
+  CreateSaleOrderLineParams,
   CreateSaleOrderParams,
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
@@ -103,6 +106,90 @@ export function toCreateSaleOrderParams(
   } as CreateSaleOrderParams
 }
 
+function checkboxFromForm(raw: unknown, fallback: boolean): boolean {
+  if (raw === true || raw === 1 || raw === '1' || raw === 'true') return true
+  if (raw === false || raw === 0 || raw === '0' || raw === 'false') return false
+  return fallback
+}
+
+function emptyMoveLineParams(accountId: bigint): AddAccountMoveLineParams {
+  return {
+    accountId,
+    name: '',
+    debit: 0,
+    credit: 0,
+    sequence: 0,
+    quantity: 0,
+    priceUnit: 0,
+    discount: 0,
+    taxIds: [],
+    partnerId: undefined,
+    productId: undefined,
+    productUomId: undefined,
+    productCategoryId: undefined,
+    analyticAccountId: undefined,
+    analyticTagIds: [],
+    displayType: undefined,
+    isDownpayment: false,
+    excludeFromInvoiceTab: false,
+    blocked: false,
+    groupTaxId: undefined,
+    taxLineId: undefined,
+    taxGroupId: undefined,
+    taxRepartitionLineId: undefined,
+    taxAudit: undefined,
+    reconcileModelId: undefined,
+    paymentId: undefined,
+    statementLineId: undefined,
+    matchingNumber: undefined,
+    matchingLabel: undefined,
+    expectedPayDate: undefined,
+    expectedPayDateCurrencyId: undefined,
+    expectedPayDateAmount: 0,
+    expectedPayDateResidual: 0,
+    metadata: undefined,
+  }
+}
+
+export function toCreateInvoiceFromSaleOrderParams(
+  formData: Record<string, unknown>,
+  order?: { partnerInvoiceId?: bigint },
+): CreateInvoiceFromSaleOrderParams | null {
+  const journalId = requiredBigIntU64(formData.journalId)
+  const defaultIncomeAccountId = requiredBigIntU64(formData.defaultIncomeAccountId)
+  const receivableAccountId = requiredBigIntU64(formData.receivableAccountId)
+  if (journalId == null || defaultIncomeAccountId == null || receivableAccountId == null) {
+    return null
+  }
+
+  const partnerId = order?.partnerInvoiceId
+  const receivableLineName = optionalTrimmedString(formData.receivableLineName) ?? ''
+
+  const incomeLine = emptyMoveLineParams(defaultIncomeAccountId)
+  incomeLine.excludeFromInvoiceTab = checkboxFromForm(
+    formData.incomeExcludeFromInvoiceTab,
+    false,
+  )
+  incomeLine.blocked = checkboxFromForm(formData.incomeBlocked, false)
+
+  const receivableLine = emptyMoveLineParams(receivableAccountId)
+  receivableLine.name = receivableLineName
+  receivableLine.partnerId = partnerId
+  receivableLine.excludeFromInvoiceTab = checkboxFromForm(
+    formData.receivableExcludeFromInvoiceTab,
+    true,
+  )
+  receivableLine.blocked = checkboxFromForm(formData.receivableBlocked, false)
+
+  return {
+    journalId,
+    defaultIncomeAccountId,
+    receivableLine,
+    incomeLine,
+    metadata: optionalTrimmedString(formData.narration),
+  }
+}
+
 export function toCreatePricelistParams(
   formData: Record<string, unknown>,
 ): CreatePricelistParams | null {
@@ -125,6 +212,69 @@ export function salesParamsToJson(
     return stdbParamsToJson(params, "CreateSaleOrderParams")
   }
   return stdbParamsToJson(params)
+}
+
+function parseU64IdList(raw: unknown): bigint[] {
+  if (raw == null || String(raw).trim() === '') return []
+  return String(raw)
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((p) => BigInt(p))
+}
+
+export function toCreateSaleOrderLineParams(
+  formData: Record<string, unknown>,
+): CreateSaleOrderLineParams | null {
+  const productId = requiredBigIntU64(formData.productId)
+  const uomId = requiredBigIntU64(formData.uomId)
+  const quantity = Number(formData.quantity)
+  if (
+    productId == null ||
+    uomId == null ||
+    !Number.isFinite(quantity) ||
+    quantity <= 0
+  ) {
+    return null
+  }
+
+  const priceUnitRaw = formData.priceUnit
+  let priceUnit: number | undefined
+  if (priceUnitRaw !== '' && priceUnitRaw != null) {
+    const n = Number(priceUnitRaw)
+    if (!Number.isFinite(n) || n < 0) return null
+    priceUnit = n
+  }
+
+  const discountRaw = formData.discount
+  const discount =
+    discountRaw === '' || discountRaw == null ? 0 : Number(discountRaw)
+  if (!Number.isFinite(discount) || discount < 0) return null
+
+  const sequenceRaw = formData.sequence
+  const sequence =
+    sequenceRaw === '' || sequenceRaw == null
+      ? 10
+      : Math.max(0, Math.trunc(Number(sequenceRaw)))
+
+  return {
+    productId,
+    quantity,
+    uomId,
+    priceUnit,
+    discount,
+    taxIds: parseU64IdList(formData.taxIds),
+    name: optionalTrimmedString(formData.name),
+    sequence,
+    isDownpayment: false,
+    displayType: undefined,
+    productVariantId: undefined,
+    packagingId: undefined,
+    routeId: undefined,
+    analyticTagIds: [],
+    customerLead: undefined,
+    metadata: undefined,
+  }
 }
 
 /** Default when the form does not include an explicit wave batch toggle. */

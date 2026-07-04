@@ -1571,8 +1571,7 @@ pub fn validate_stock_picking(
         for (sl_id, qty_done) in &delivered {
             if let Some(sol) = ctx.db.sale_order_line().id().find(sl_id) {
                 let new_qty_delivered = sol.qty_delivered + qty_done;
-                let new_qty_to_invoice =
-                    (sol.product_uom_qty - sol.qty_invoiced - new_qty_delivered).max(0.0);
+                let new_qty_to_invoice = (new_qty_delivered - sol.qty_invoiced).max(0.0);
                 let new_line_status = if new_qty_delivered >= sol.product_uom_qty {
                     LineInvoiceStatus::ToInvoice
                 } else {

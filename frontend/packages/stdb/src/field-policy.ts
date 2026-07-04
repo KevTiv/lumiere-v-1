@@ -442,6 +442,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'deprecated',
     'used',
     'companyId',
+    'internalType',
     'internalGroup',
     'isBankAccount',
     'openingBalance',
@@ -631,10 +632,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   ),
   'sale-orders': orgEntry<SaleOrder>('sale_order', ['sale-orders', 'sale_order'], [
     'reference', 'clientOrderRef', 'state', 'partnerId', 'companyId', 'dateOrder', 'opportunityId',
+    'pickingIds',
   ]),
   'sale-order-lines': orgEntry<SaleOrderLine>('sale_order_line', ['sale-order-lines', 'sale_order_line'], [
     'name', 'orderId', 'productId', 'productUomQty', 'priceUnit', 'qtyToInvoice', 'qtyInvoiced',
-    'displayType', 'invoiceStatus',
+    'qtyDelivered', 'displayType', 'invoiceStatus',
   ]),
   pricelists: orgEntry<ProductPricelist>('product_pricelist', ['pricelists', 'product_pricelist'], [
     'name', 'currencyId', 'isActive',
@@ -736,7 +738,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'productId', 'locationId', 'quantity', 'companyId',
   ]),
   'stock-pickings': orgEntry<StockPicking>('stock_picking', ['stock-pickings', 'stock_picking'], [
-    'name', 'state', 'companyId',
+    'name', 'state', 'companyId', 'saleId', 'pickingCode', 'isReturn',
   ]),
   warehouses: orgEntry<Warehouse>('warehouse', ['warehouses', 'warehouse'], [
     'name', 'code', 'companyId', 'active',

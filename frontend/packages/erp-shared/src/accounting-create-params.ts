@@ -897,7 +897,7 @@ export function toCreatePaymentParamsFromInvoice(
 }
 
 export function paymentParamsToJson(params: CreatePaymentParams): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params, "CreatePaymentParams")
 }
 
 /** Manual payment (Payments tab) — journal, partner, and currency from form. */

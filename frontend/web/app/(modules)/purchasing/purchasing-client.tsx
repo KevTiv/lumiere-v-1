@@ -21,6 +21,7 @@ import {
   newSupplierIntakeForm,
   reviewSupplierIntakeForm,
   editSupplierIntakeForm,
+  createBillFromPurchaseOrderForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
@@ -93,6 +94,7 @@ import {
   useDeletePartnerBank,
 } from "@lumiere/query-hooks/hooks/purchasing"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -108,9 +110,13 @@ import {
   purchaseOrderLineRowsToInvoiceOptions,
   partnerBankRowsToSelectOptions,
   departmentRowsToSelectOptions,
+  accountJournalRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   toAddPurchaseOrderLineParams,
+  toCreateBillFromPurchaseOrderParams,
+  toCreatePurchaseOrderParams,
   toInvoicePoLineArgs,
   toReceivePoLineArgs,
   toUpdatePurchaseOrderLineParams,
@@ -125,6 +131,20 @@ function poState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
+}
+
+function journalTypeTag(row: Record<string, unknown>): string {
+  const v = row.type_ ?? row.type
+  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
+  return String(v ?? "")
+}
+
+function accountInternalTypeTag(row: Record<string, unknown>): string {
+  const v = row.internalType ?? row.internal_type
+  if (v != null && typeof v === "object" && "tag" in v) {
+    return String((v as { tag: string }).tag).toLowerCase()
+  }
+  return String(v ?? "").toLowerCase()
 }
 
 function requisitionState(row: Record<string, unknown>): string {
@@ -201,12 +221,6 @@ interface PurchasingClientProps {
   initialPartnerBanks?: Record<string, unknown>[]
   initialDepartments?: Record<string, unknown>[]
   organizationId?: number
-  /**
-   * Resolved on the server from `account_journal` (active Purchase journal for this org’s company + its `default_account_id`).
-   * Required for “create bill from PO” to run; omit when no suitable journal row exists.
-   */
-  purchaseBillJournalId?: string
-  purchaseBillExpenseAccountId?: string
 }
 
 type PurchasingClientLoadedProps = Omit<PurchasingClientProps, "organizationId"> & {
@@ -233,8 +247,6 @@ function PurchasingClientLoaded({
   initialPartnerBanks,
   initialDepartments,
   organizationId,
-  purchaseBillJournalId,
-  purchaseBillExpenseAccountId,
 }: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
@@ -257,6 +269,8 @@ function PurchasingClientLoaded({
   const [formModalKey, setFormModalKey] = useState(0)
   const [csvKind, setCsvKind] = useState<PurchasingCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
+  const [billOrderId, setBillOrderId] = useState<bigint | null>(null)
+  const [billOrderError, setBillOrderError] = useState<string | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -281,6 +295,8 @@ function PurchasingClientLoaded({
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
+  const { data: accountJournals = [] } = useAccountJournals(orgId)
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
@@ -380,6 +396,60 @@ function PurchasingClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
   }, [products, t])
+
+  const purchaseJournalFieldOptions = useMemo(() => {
+    const purchaseRows = (accountJournals as Record<string, unknown>[]).filter(
+      (row) => journalTypeTag(row) === "Purchase" && row.active !== false,
+    )
+    const fromApi = accountJournalRowsToSelectOptions(purchaseRows)
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("purchasing.forms.createBillFromOrder.noJournals"),
+        disabled: true,
+      },
+    ]
+  }, [accountJournals, t])
+
+  const expenseAccountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(
+      accountAccounts as Record<string, unknown>[],
+    )
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("purchasing.forms.createBillFromOrder.noAccounts"),
+        disabled: true,
+      },
+    ]
+  }, [accountAccounts, t])
+
+  const payableAccountFieldOptions = useMemo(() => {
+    const payableRows = (accountAccounts as Record<string, unknown>[]).filter(
+      (row) => accountInternalTypeTag(row) === "payable",
+    )
+    const fromApi = accountAccountRowsToSelectOptions(payableRows)
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("purchasing.forms.createBillFromOrder.noPayableAccounts"),
+        disabled: true,
+      },
+    ]
+  }, [accountAccounts, t])
+
+  const createBillFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(createBillFromPurchaseOrderForm(t), {
+        journalId: purchaseJournalFieldOptions,
+        defaultExpenseAccountId: expenseAccountFieldOptions,
+        payableAccountId: payableAccountFieldOptions,
+      }),
+    [t, purchaseJournalFieldOptions, expenseAccountFieldOptions, payableAccountFieldOptions],
+  )
 
   const uomFieldOptions = useMemo(() => {
     const fromApi = uomRowsToSelectOptions(uoms)
@@ -688,20 +758,13 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.createBillsFromSelected"),
             requiresSelection: true,
             onClick: (rows) => {
-              const j = purchaseBillJournalId?.trim()
-              const exp = purchaseBillExpenseAccountId?.trim()
-              if (!j || !exp) return
-              for (const r of rows) {
-                const st = poState(r)
-                if (st === "Approved" || st === "Done") {
-                  void createBillFromPurchaseOrder.mutateAsync({
-                    orderId: r.id as string | number | bigint,
-                    journalId: j,
-                    defaultExpenseAccountId: exp,
-                    invoiceDate: new Date(),
-                  })
-                }
-              }
+              if (rows.length !== 1) return
+              const st = poState(rows[0] as Record<string, unknown>)
+              if (st !== "Purchase" && st !== "Done") return
+              const id = rows[0]?.id
+              if (id == null) return
+              setBillOrderError(null)
+              setBillOrderId(BigInt(String(id)))
             },
           },
         ],
@@ -719,8 +782,7 @@ function PurchasingClientLoaded({
     lockPurchaseOrder,
     unlockPurchaseOrder,
     createBillFromPurchaseOrder,
-    purchaseBillJournalId,
-    purchaseBillExpenseAccountId
+    updatePurchaseOrderLine,
   ])
 
   const linesEntityConfig = useMemo((): EntityViewConfig => {
@@ -1089,7 +1151,7 @@ function PurchasingClientLoaded({
       (o) => String(o.state) !== "Done" && String(o.state) !== "Cancelled",
     )
     const spendMtd = orders
-      .filter((o) => String(o.state) === "Approved" || String(o.state) === "Done")
+      .filter((o) => String(o.state) === "Purchase" || String(o.state) === "Done")
       .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
     const pendingReceipt = orders.filter((o) => o.receiptStatus === "pending").length
     const toApprove = orders.filter((o) => String(o.state) === "ToApprove").length
@@ -1311,27 +1373,12 @@ function PurchasingClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createPurchaseOrder") {
-      const partnerRaw = formData.partnerId
-      const pricelistRaw = formData.pricelistId
-      if (partnerRaw === "" || partnerRaw == null) return
-      if (pricelistRaw === "" || pricelistRaw == null) return
-      const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
-      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      const currencyId = Number(pl.currencyId)
-      const selectedPricelistId = String(pricelistRaw)
-
-      await createPurchaseOrder.mutateAsync({
-        partnerId: Number(partnerRaw),
-        currencyId: selectedPricelistId === String(pl.id) ? currencyId : currencyId,
-        origin: formData.origin ? String(formData.origin) : undefined,
-        partnerRef: formData.partnerRef ? String(formData.partnerRef) : undefined,
-        notes: formData.notes ? String(formData.notes) : undefined,
-        datePlanned: formData.datePlanned ? new Date(String(formData.datePlanned)) : undefined,
-        paymentTermId:
-          formData.paymentTermId != null && formData.paymentTermId !== ""
-            ? Number(formData.paymentTermId)
-            : undefined,
-      })
+      const params = toCreatePurchaseOrderParams(
+        formData,
+        pricelists as Array<{ id: unknown; currencyId?: unknown }>,
+      )
+      if (params == null) return
+      await createPurchaseOrder.mutateAsync(params)
     } else if (action === "createPurchaseRequisition") {
       const vendorRaw = formData.vendorId
       await createPurchaseRequisition.mutateAsync({
@@ -1349,9 +1396,7 @@ function PurchasingClientLoaded({
             : undefined,
         vendorId:
           vendorRaw !== "" && vendorRaw != null ? Number(vendorRaw) : undefined,
-        metadata: formData.origin
-          ? JSON.stringify({ origin: String(formData.origin) })
-          : undefined,
+        origin: optionalFormString(formData.origin),
       })
     } else if (action === "addPurchaseOrderLine") {
       const params = toAddPurchaseOrderLineParams(formData)
@@ -1629,6 +1674,44 @@ function PurchasingClientLoaded({
               setCsvKind(null)
             } catch (e) {
               setCsvError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      ) : null}
+      {billOrderId != null ? (
+        <FormModal
+          key={`bill-order-${billOrderId.toString()}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setBillOrderId(null)
+              setBillOrderError(null)
+            }
+          }}
+          config={createBillFormConfig}
+          closeOnSubmit={false}
+          submitError={billOrderError}
+          isPending={createBillFromPurchaseOrder.isPending}
+          onSubmit={async (formData) => {
+            setBillOrderError(null)
+            const orderRow = (orders as Record<string, unknown>[]).find(
+              (o) => String(o.id) === String(billOrderId),
+            )
+            const partnerId =
+              orderRow?.partnerId != null ? BigInt(String(orderRow.partnerId)) : undefined
+            const params = toCreateBillFromPurchaseOrderParams(formData, { partnerId })
+            if (!params) {
+              setBillOrderError(t("common.validation.required"))
+              return
+            }
+            try {
+              await createBillFromPurchaseOrder.mutateAsync({
+                orderId: billOrderId,
+                params,
+              })
+              setBillOrderId(null)
+            } catch (e) {
+              setBillOrderError(e instanceof Error ? e.message : String(e))
             }
           }}
         />

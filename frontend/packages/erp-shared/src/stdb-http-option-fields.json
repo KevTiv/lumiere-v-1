@@ -1296,6 +1296,12 @@
     "reason_notes",
     "metadata"
   ],
+  "CreateBillFromPurchaseOrderParams": [
+    "metadata"
+  ],
+  "CreateInvoiceFromSaleOrderParams": [
+    "metadata"
+  ],
   "CreateJobPositionParams": [
     "company_id",
     "department_id",
@@ -1596,6 +1602,7 @@
   ],
   "CreatePurchaseRequisitionParams": [
     "company_id",
+    "origin",
     "description",
     "ordering_date",
     "date_end",

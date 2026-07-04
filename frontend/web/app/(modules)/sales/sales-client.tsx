@@ -12,6 +12,7 @@ import {
   newPricelistItemForm,
   newPickingBatchForm,
   newLoyaltyCardForm,
+  addSaleOrderLineForm,
   createInvoiceFromSaleOrderForm,
   InvoiceListView,
   MissingOrganization,
@@ -24,6 +25,7 @@ import {
   salesReturnsTableConfig,
   csvImportForm,
   ImportAssistantWizard,
+  getRowField,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
@@ -35,6 +37,8 @@ import {
   toCreatePickingBatchParams,
   toCreatePricelistParams,
   toCreateSaleOrderParams,
+  toCreateSaleOrderLineParams,
+  toCreateInvoiceFromSaleOrderParams,
 } from '@/lib/sales-create-params';
 import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
 import {
@@ -110,7 +114,7 @@ import {
   useCancelStockPicking,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
-import { useWarehouses } from '@lumiere/query-hooks/hooks/inventory';
+import { useWarehouses, useProducts, useUoms } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import {
@@ -120,6 +124,9 @@ import {
   loyaltyProgramRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
+  productRowsToSelectOptions,
+  uomRowsToSelectOptions,
+  saleOrderRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import { stdbParamsToJson } from '@/lib/stdb-params-json';
 import { enumTag } from '@/lib/accounting-post-draft';
@@ -155,7 +162,14 @@ function pickingIsFulfillment(row: Record<string, unknown>): boolean {
 }
 
 function pickingStateStr(row: Record<string, unknown>): string {
-  return String(row.state ?? '').toLowerCase();
+  return enumTag(getRowField(row, 'state')).toLowerCase();
+}
+
+function pickingRowId(row: Record<string, unknown>): string | number | bigint | null {
+  const id = getRowField(row, 'id');
+  if (id == null) return null;
+  if (typeof id === 'string' || typeof id === 'number' || typeof id === 'bigint') return id;
+  return String(id);
 }
 
 function toCreatePricelistItemParams(
@@ -307,6 +321,8 @@ function SalesClientLoaded({
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: users = [] } = useUsers(orgId);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
+  const { data: products = [] } = useProducts(orgId);
+  const { data: uoms = [] } = useUoms(orgId);
   const { data: accountMoves = [] } = useAccountMoves(orgId, { initialData: initialAccountMoves });
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
@@ -387,6 +403,43 @@ function SalesClientLoaded({
       { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
     ];
   }, [warehouses, t]);
+
+  const productFieldOptions = useMemo(() => {
+    const fromApi = productRowsToSelectOptions(products);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: t('common.lookup.noProducts'), disabled: true }];
+  }, [products, t]);
+
+  const uomFieldOptions = useMemo(() => {
+    const fromApi = uomRowsToSelectOptions(uoms);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: t('common.lookup.noUoms'), disabled: true }];
+  }, [uoms, t]);
+
+  const draftSaleOrderOptions = useMemo(() => {
+    const draft = (orders as Record<string, unknown>[]).filter(
+      (o) => saleOrderState(o) === 'Draft',
+    );
+    const fromApi = saleOrderRowsToSelectOptions(draft);
+    if (fromApi.length > 0) return fromApi;
+    return [
+      {
+        value: '',
+        label: t('sales.forms.addSaleOrderLine.fields.orderPlaceholder'),
+        disabled: true,
+      },
+    ];
+  }, [orders, t]);
+
+  const addSaleOrderLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(addSaleOrderLineForm(t), {
+        orderId: draftSaleOrderOptions,
+        productId: productFieldOptions,
+        uomId: uomFieldOptions,
+      }),
+    [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions],
+  );
 
   const pricelistItemFormConfig = useMemo(
     () =>
@@ -483,13 +536,36 @@ function SalesClientLoaded({
     ];
   }, [accountAccounts, t]);
 
+  const receivableAccountFieldOptions = useMemo(() => {
+    const receivableRows = (accountAccounts as Record<string, unknown>[]).filter(
+      (row) => {
+        const v = row.internalType ?? row.internal_type;
+        const tag =
+          v != null && typeof v === 'object' && 'tag' in v
+            ? String((v as { tag: string }).tag).toLowerCase()
+            : String(v ?? '').toLowerCase();
+        return tag === 'receivable';
+      },
+    );
+    const fromApi = accountAccountRowsToSelectOptions(receivableRows);
+    if (fromApi.length > 0) return fromApi;
+    return [
+      {
+        value: '',
+        label: t('sales.forms.createInvoiceFromOrder.noReceivableAccounts'),
+        disabled: true,
+      },
+    ];
+  }, [accountAccounts, t]);
+
   const createInvoiceFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(createInvoiceFromSaleOrderForm(t), {
         journalId: journalFieldOptions,
         defaultIncomeAccountId: incomeAccountFieldOptions,
+        receivableAccountId: receivableAccountFieldOptions,
       }),
-    [t, journalFieldOptions, incomeAccountFieldOptions],
+    [t, journalFieldOptions, incomeAccountFieldOptions, receivableAccountFieldOptions],
   );
 
   const pickingActions = useMemo(
@@ -499,10 +575,10 @@ function SalesClientLoaded({
         label: t('inventory.transferActions.confirm'),
         requiresSelection: true,
         onClick: (rows) => {
-          const id = rows[0]?.id;
-          if (id != null && pickingStateStr(rows[0] as Record<string, unknown>) === 'draft') {
-            void confirmPicking.mutateAsync(id as string | number | bigint);
-          }
+          const row = rows[0] as Record<string, unknown> | undefined;
+          if (!row) return;
+          const id = pickingRowId(row);
+          if (id != null) void confirmPicking.mutateAsync(id);
         },
       },
       {
@@ -510,8 +586,10 @@ function SalesClientLoaded({
         label: t('inventory.transferActions.assign'),
         requiresSelection: true,
         onClick: (rows) => {
-          const id = rows[0]?.id;
-          if (id != null) void assignPicking.mutateAsync(id as string | number | bigint);
+          const row = rows[0] as Record<string, unknown> | undefined;
+          if (!row) return;
+          const id = pickingRowId(row);
+          if (id != null) void assignPicking.mutateAsync(id);
         },
       },
       {
@@ -519,8 +597,10 @@ function SalesClientLoaded({
         label: t('inventory.transferActions.validate'),
         requiresSelection: true,
         onClick: (rows) => {
-          const id = rows[0]?.id;
-          if (id != null) void validatePicking.mutateAsync(id as string | number | bigint);
+          const row = rows[0] as Record<string, unknown> | undefined;
+          if (!row) return;
+          const id = pickingRowId(row);
+          if (id != null) void validatePicking.mutateAsync(id);
         },
       },
       {
@@ -529,10 +609,12 @@ function SalesClientLoaded({
         requiresSelection: true,
         variant: 'destructive',
         onClick: (rows) => {
-          const id = rows[0]?.id;
-          const st = pickingStateStr(rows[0] as Record<string, unknown>);
+          const row = rows[0] as Record<string, unknown> | undefined;
+          if (!row) return;
+          const id = pickingRowId(row);
+          const st = pickingStateStr(row);
           if (id != null && st !== 'done') {
-            void cancelPicking.mutateAsync(id as string | number | bigint);
+            void cancelPicking.mutateAsync(id);
           }
         },
       },
@@ -983,6 +1065,9 @@ function SalesClientLoaded({
             const view = base.view as EntityTableConfig;
             return {
               ...tab,
+              createForm: addSaleOrderLineFormConfig,
+              createLabel: t('sales.actions.newSaleOrderLine'),
+              createAction: 'createSaleOrderLine',
               entityConfig: {
                 ...base,
                 view: {
@@ -1051,6 +1136,7 @@ function SalesClientLoaded({
       moduleConfig,
       liveSections,
       saleOrderFormConfig,
+      addSaleOrderLineFormConfig,
       ordersEntityConfig,
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
@@ -1128,6 +1214,14 @@ function SalesClientLoaded({
     } else if (action === 'createPricelistItem') {
       const p = toCreatePricelistItemParams(formData);
       if (p) await createPricelistItem.mutateAsync(stdbParamsToJson(p));
+    } else if (action === 'createSaleOrderLine') {
+      const params = toCreateSaleOrderLineParams(formData);
+      const orderId = formData.orderId;
+      if (params == null || orderId === '' || orderId == null) return;
+      await createSaleOrderLine.mutateAsync({
+        orderId: orderId as string | number | bigint,
+        params,
+      });
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParams(formData);
       if (p) await createPickingBatch.mutateAsync(p);
@@ -1285,22 +1379,24 @@ function SalesClientLoaded({
           isPending={createInvoiceFromSaleOrder.isPending}
           onSubmit={async (formData) => {
             setInvoiceOrderError(null);
-            const journalId = formData.journalId;
-            const defaultIncomeAccountId = formData.defaultIncomeAccountId;
-            if (
-              journalId == null ||
-              String(journalId).trim() === '' ||
-              defaultIncomeAccountId == null ||
-              String(defaultIncomeAccountId).trim() === ''
-            ) {
+            const orderRow = (orders as Record<string, unknown>[]).find(
+              (o) => String(o.id) === String(invoiceOrderId),
+            );
+            const partnerInvoiceId =
+              orderRow?.partnerInvoiceId != null
+                ? BigInt(String(orderRow.partnerInvoiceId))
+                : undefined;
+            const params = toCreateInvoiceFromSaleOrderParams(formData, {
+              partnerInvoiceId,
+            });
+            if (!params) {
               setInvoiceOrderError(t('common.validation.required'));
               return;
             }
             try {
               await createInvoiceFromSaleOrder.mutateAsync({
                 orderId: invoiceOrderId,
-                journalId: BigInt(String(journalId)),
-                defaultIncomeAccountId: BigInt(String(defaultIncomeAccountId)),
+                params,
               });
               setInvoiceOrderId(null);
             } catch (e) {

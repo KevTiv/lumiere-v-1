@@ -546,6 +546,7 @@ import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_r
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
+import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced_test_reducer";
 import RunSalesOrderDeliveryTestReducer from "./run_sales_order_delivery_test_reducer";
 import RunSalesOrderInvoiceTestReducer from "./run_sales_order_invoice_test_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
@@ -5806,6 +5807,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
   __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
+  __reducerSchema("run_purchasing_bill_balanced_test", RunPurchasingBillBalancedTestReducer),
   __reducerSchema("run_sales_order_delivery_test", RunSalesOrderDeliveryTestReducer),
   __reducerSchema("run_sales_order_invoice_test", RunSalesOrderInvoiceTestReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),

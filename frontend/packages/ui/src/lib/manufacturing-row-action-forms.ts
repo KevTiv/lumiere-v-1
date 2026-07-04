@@ -400,6 +400,14 @@ export function manufacturingWorkcenterRowActionForm(
             width: "1/2",
           },
           {
+            type: "text",
+            id: "logDescription",
+            name: "logDescription",
+            label: t("manufacturing.rowActions.form.logDescription"),
+            placeholder: t("manufacturing.rowActions.form.logDescriptionPlaceholder"),
+            width: "full",
+          },
+          {
             type: "number",
             id: "completeLogId",
             name: "completeLogId",

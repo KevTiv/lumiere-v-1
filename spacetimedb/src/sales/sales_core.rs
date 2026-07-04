@@ -652,6 +652,213 @@ pub fn create_sale_order(
     Ok(())
 }
 
+/// Create draft outgoing pickings and stock moves for deliverable SO lines (MVP fulfillment path).
+fn create_outgoing_pickings_for_confirmed_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    use crate::inventory::stock::{
+        create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams,
+        CreateStockPickingParams,
+    };
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found for picking creation")?;
+
+    if ctx.db.stock_picking().iter().any(|p| {
+        p.organization_id == organization_id
+            && p.sale_id == Some(order_id)
+            && !p.is_return
+    }) {
+        return Ok(());
+    }
+
+    let order_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order_id)
+        .filter(|l| l.display_type.is_none() && l.product_uom_qty > 0.0)
+        .collect();
+
+    if order_lines.is_empty() {
+        return Ok(());
+    }
+
+    let company_id = order.company_id;
+    let warehouse_id = order.warehouse_id;
+    let src_location = warehouse_id;
+    let dest_location = warehouse_id.saturating_add(1);
+    let order_label = order
+        .reference
+        .as_deref()
+        .or(order.client_order_ref.as_deref())
+        .or(order.origin.as_deref())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| order_id.to_string());
+
+    create_stock_picking(
+        ctx,
+        organization_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: format!("OUT/{order_label}"),
+            picking_type_id: 1,
+            location_id: src_location,
+            location_dest_id: dest_location,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(order.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some(format!("SO/{order_label}")),
+            note: order.note.clone(),
+            user_id: None,
+            sale_id: Some(order_id),
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: false,
+            show_check_availability: true,
+            show_validate: false,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(order_lines[0].product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: false,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: Some(format!(r#"{{"sale_order_id":{order_id}}}"#)),
+        },
+    )?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| {
+            p.organization_id == organization_id && p.sale_id == Some(order_id) && !p.is_return
+        })
+        .ok_or("Outgoing picking not found after create")?;
+
+    for (idx, line) in order_lines.iter().enumerate() {
+        let product = ctx
+            .db
+            .product()
+            .id()
+            .find(&line.product_id)
+            .ok_or("Product not found for sale order line")?;
+
+        create_stock_move(
+            ctx,
+            organization_id,
+            CreateStockMoveParams {
+                company_id: Some(company_id),
+                name: format!("{} x {}", line.product_uom_qty, product.name),
+                product_id: line.product_id,
+                product_tmpl_id: line.product_id,
+                product_uom: line.product_uom,
+                product_uom_qty: line.product_uom_qty,
+                location_id: src_location,
+                location_dest_id: dest_location,
+                date_expected: ctx.timestamp,
+                move_type: "outgoing".to_string(),
+                priority: "1".to_string(),
+                reference: Some(format!("SO/{order_label}")),
+                sequence: ((idx + 1) as i32) * 10,
+                origin: Some(format!("SO/{order_label}")),
+                note: order.note.clone(),
+                date: None,
+                date_deadline: None,
+                picking_id: Some(picking.id),
+                picking_type_id: Some(1),
+                partner_id: Some(order.partner_id),
+                product_variant_id: None,
+                group_id: None,
+                rule_id: None,
+                procure_method: "make_to_stock".to_string(),
+                price_unit: line.price_unit,
+                scrapped: false,
+                to_refund: false,
+                propagate_cancel: true,
+                delay_alert: false,
+                product_packaging_id: None,
+                product_packaging_qty: 0.0,
+                warehouse_id: Some(warehouse_id),
+                production_id: None,
+                raw_material_production_id: None,
+                unbuild_id: None,
+                consume_unbuild_id: None,
+                cost_share: 0.0,
+                is_subcontract: false,
+                purchase_line_id: None,
+                need_release: false,
+                release_ready: false,
+                propagation_cancel: true,
+                has_tracking: false,
+                inventory_id: None,
+                sale_line_id: Some(line.id),
+                lot_id: None,
+                package_id: None,
+                result_package_id: None,
+                owner_id: None,
+                package_level_id: None,
+                product_type: Some("product".to_string()),
+                metadata: None,
+            },
+        )?;
+    }
+
+    let mut picking_ids = order.picking_ids.clone();
+    if !picking_ids.contains(&picking.id) {
+        picking_ids.push(picking.id);
+    }
+    ctx.db.sale_order().id().update(SaleOrder {
+        picking_ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    Ok(())
+}
+
 #[reducer]
 pub fn confirm_sales_order(
     ctx: &ReducerContext,
@@ -712,6 +919,8 @@ pub fn confirm_sales_order(
             ..line
         });
     }
+
+    create_outgoing_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
 
     // Increment customer_rank on the partner contact
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {

@@ -589,6 +589,11 @@ function DocumentsClientLoaded({
       const seqRaw = formData.sequence
       const sequence =
         seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+      const colorRaw = formData.color
+      const color =
+        colorRaw != null && String(colorRaw).trim() !== ""
+          ? Math.min(11, Math.max(0, Math.floor(Number(colorRaw))))
+          : undefined
       await createKnowledgeCategory.mutateAsync({
         name: String(formData.name ?? "").trim(),
         description:
@@ -597,7 +602,7 @@ function DocumentsClientLoaded({
             : undefined,
         parentId: optionalBigIntU64(formData.parentId),
         sequence,
-        color: undefined,
+        color,
         metadata: undefined,
       })
     } else if (action === "createDocumentFolder") {

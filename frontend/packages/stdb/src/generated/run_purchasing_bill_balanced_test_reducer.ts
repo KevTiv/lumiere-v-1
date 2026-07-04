@@ -10,14 +10,4 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  CreateInvoiceFromSaleOrderParams,
-} from "./types";
-
-export default {
-  organizationId: __t.u64(),
-  saleOrderId: __t.u64(),
-  get params() {
-    return CreateInvoiceFromSaleOrderParams;
-  },
-};
+export default {};

@@ -355,6 +355,53 @@ function CrmClientLoaded({
     return t(titleKey[csvKind])
   }, [csvKind, t])
 
+  const buildConvertLeadForm = useCallback(() => {
+    const base = convertLeadForm(t, opportunityStageOptions)
+    const defaults: Record<string, unknown> = {
+      createContact: true,
+      createOpportunity: true,
+    }
+    if (opportunityStageOptions[0]) {
+      defaults.opportunityStageId = opportunityStageOptions[0].value
+    }
+    return mergeFieldDefaultValues(base, defaults)
+  }, [t, opportunityStageOptions])
+
+  const buildConvertOppForm = useCallback(() => {
+    let base = convertOpportunityToOrderForm(t)
+    base = mergeSelectOptionsForFields(base, {
+      pricelistId: pricelistSelectOptions,
+      warehouseId: warehouseSelectOptions,
+    })
+    const defaults: Record<string, unknown> = {}
+    if (pricelistSelectOptions[0]) defaults.pricelistId = pricelistSelectOptions[0].value
+    if (warehouseSelectOptions[0]) defaults.warehouseId = warehouseSelectOptions[0].value
+    return mergeFieldDefaultValues(base, defaults)
+  }, [t, pricelistSelectOptions, warehouseSelectOptions])
+
+  useEffect(() => {
+    setWorkflowModal((prev) => {
+      if (!prev) return prev
+      if (prev.kind === "convertLead" && opportunityStageOptions.length > 0) {
+        return { ...prev, form: buildConvertLeadForm() }
+      }
+      if (
+        prev.kind === "convertOpp" &&
+        pricelistSelectOptions.length > 0 &&
+        warehouseSelectOptions.length > 0
+      ) {
+        return { ...prev, form: buildConvertOppForm() }
+      }
+      return prev
+    })
+  }, [
+    buildConvertLeadForm,
+    buildConvertOppForm,
+    opportunityStageOptions.length,
+    pricelistSelectOptions.length,
+    warehouseSelectOptions.length,
+  ])
+
   const openConvertLeadModal = useCallback(
     (rows: Record<string, unknown>[]) => {
       const row = rows[0]
@@ -364,14 +411,9 @@ function CrmClientLoaded({
         return
       }
       const leadId = rowIdBigInt(row)
-      const base = convertLeadForm(t, opportunityStageOptions)
-      const form = mergeFieldDefaultValues(base, {
-        createContact: true,
-        createOpportunity: true,
-      })
-      setWorkflowModal({ kind: "convertLead", leadId, form })
+      setWorkflowModal({ kind: "convertLead", leadId, form: buildConvertLeadForm() })
     },
-    [t, opportunityStageOptions],
+    [t, buildConvertLeadForm],
   )
 
   const openConvertOppModal = useCallback(
@@ -384,18 +426,9 @@ function CrmClientLoaded({
         return
       }
       const opportunityId = rowIdBigInt(row)
-      let base = convertOpportunityToOrderForm(t)
-      base = mergeSelectOptionsForFields(base, {
-        pricelistId: pricelistSelectOptions,
-        warehouseId: warehouseSelectOptions,
-      })
-      const defaults: Record<string, unknown> = {}
-      if (pricelistSelectOptions[0]) defaults.pricelistId = pricelistSelectOptions[0].value
-      if (warehouseSelectOptions[0]) defaults.warehouseId = warehouseSelectOptions[0].value
-      const form = mergeFieldDefaultValues(base, defaults)
-      setWorkflowModal({ kind: "convertOpp", opportunityId, form })
+      setWorkflowModal({ kind: "convertOpp", opportunityId, form: buildConvertOppForm() })
     },
-    [t, pricelistSelectOptions, warehouseSelectOptions],
+    [t, buildConvertOppForm],
   )
 
   const openAssignTagModal = useCallback(

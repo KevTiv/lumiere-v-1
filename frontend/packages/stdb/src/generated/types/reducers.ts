@@ -518,6 +518,7 @@ import RunInventoryAdjustmentTestReducer from "../run_inventory_adjustment_test_
 import RunInventoryProductCategoryTestReducer from "../run_inventory_product_category_test_reducer";
 import RunInventoryStockInventoryTestReducer from "../run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "../run_inventory_stock_quant_test_reducer";
+import RunPurchasingBillBalancedTestReducer from "../run_purchasing_bill_balanced_test_reducer";
 import RunSalesOrderDeliveryTestReducer from "../run_sales_order_delivery_test_reducer";
 import RunSalesOrderInvoiceTestReducer from "../run_sales_order_invoice_test_reducer";
 import RunTraceabilityReportReducer from "../run_traceability_report_reducer";
@@ -1251,6 +1252,7 @@ export type RunInventoryAdjustmentTestParams = __Infer<typeof RunInventoryAdjust
 export type RunInventoryProductCategoryTestParams = __Infer<typeof RunInventoryProductCategoryTestReducer>;
 export type RunInventoryStockInventoryTestParams = __Infer<typeof RunInventoryStockInventoryTestReducer>;
 export type RunInventoryStockQuantTestParams = __Infer<typeof RunInventoryStockQuantTestReducer>;
+export type RunPurchasingBillBalancedTestParams = __Infer<typeof RunPurchasingBillBalancedTestReducer>;
 export type RunSalesOrderDeliveryTestParams = __Infer<typeof RunSalesOrderDeliveryTestReducer>;
 export type RunSalesOrderInvoiceTestParams = __Infer<typeof RunSalesOrderInvoiceTestReducer>;
 export type RunTraceabilityReportParams = __Infer<typeof RunTraceabilityReportReducer>;

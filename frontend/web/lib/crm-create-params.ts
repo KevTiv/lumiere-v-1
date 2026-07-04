@@ -65,10 +65,13 @@ export function toCreateLeadParams(formData: Record<string, unknown>): Partial<C
 
   const partnerName = optionalTrimmedString(formData.partnerName)
 
+  const stateRaw = optionalTrimmedString(formData.state)
+
   return {
     name: contactName,
     expectedRevenue: parseF64(formData.expectedRevenue, 0),
     probability: parseF64(formData.probability, 0),
+    state: stateRaw,
     email: optionalTrimmedString(formData.emailFrom),
     phone: optionalTrimmedString(formData.phone),
     companyName: partnerName,
@@ -97,6 +100,8 @@ export function toCreateOpportunityParams(formData: Record<string, unknown>): Pa
     stageId,
     priority,
     dateDeadline,
+    color: optionalTrimmedString(formData.color),
+    description: optionalTrimmedString(formData.description),
   }
   return out
 }
@@ -116,6 +121,8 @@ export function toCreateContactParams(formData: Record<string, unknown>): Partia
     isCustomer: !isCompany,
     city: optionalTrimmedString(formData.city),
     zip: optionalTrimmedString(formData.zip),
+    color: optionalTrimmedString(formData.color),
+    description: optionalTrimmedString(formData.description),
   }
 }
 
