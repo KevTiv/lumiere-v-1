@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   chooseFirstOption,
+  chooseSelectOptionByLabel,
   expectNoAppError,
   expectSeededText,
   fillField,
@@ -200,8 +201,11 @@ test.describe("Accounting module e2e", () => {
     await openEntityCreate(page, "/accounting", "accounting", "account-periods", "new-account-period")
     await fillField(page, "name", periodName)
     await fillField(page, "code", periodCode)
-    await page.getByTestId("form-field-fiscalYearId").click()
-    await page.getByRole("option", { name: fyName }).click()
+    await page.waitForResponse(
+      (res) => res.url().includes("/api/query/fiscal-years") && res.ok(),
+      { timeout: 30_000 },
+    ).catch(() => undefined)
+    await chooseSelectOptionByLabel(page, "fiscalYearId", fyName, { optionTimeoutMs: 30_000 })
     await fillField(page, "dateFrom", isoDateTimeLocal(fyYear, 1, 1, 0, 0))
     await fillField(page, "dateTo", isoDateTimeLocal(fyYear, 3, 31, 23, 59))
     await submitForm(page, "new-account-period")
@@ -251,11 +255,13 @@ test.describe("Accounting module e2e", () => {
     await expect(page.getByTestId("form-modal-new-journal-entry")).toBeVisible()
     await fillField(page, "date", isoDate(0))
     await page.getByTestId("form-field-journalId").click()
-    const jeOptions = page.getByRole("option", { disabled: false })
+    const jeModal = page.getByTestId("form-modal-new-journal-entry")
+    const listbox = page.locator('[role="listbox"]')
+    await listbox.waitFor({ state: "visible", timeout: 10_000 }).catch(() => undefined)
+    const jeOptions = listbox.getByRole("option", { disabled: false })
     if ((await jeOptions.count()) === 0) {
-      await page.keyboard.press("Escape")
-      await page.getByTestId("form-modal-new-journal-entry").getByRole("button", { name: /^cancel$/i }).click()
-      await expect(page.getByTestId("form-modal-new-journal-entry")).toBeHidden()
+      await jeModal.getByRole("button", { name: /^cancel$/i }).click()
+      await expect(jeModal).toBeHidden()
     } else {
       await jeOptions.first().click()
       await submitForm(page, "new-journal-entry")

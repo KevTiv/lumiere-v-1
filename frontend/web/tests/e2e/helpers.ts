@@ -169,7 +169,9 @@ export async function openTabAndCancelCreate(
 }
 
 export async function fillField(page: Page, name: string, value: string) {
-  await page.getByTestId(`form-field-${name}`).fill(value)
+  const field = page.getByTestId(`form-field-${name}`)
+  await field.click()
+  await field.fill(value)
 }
 
 export async function chooseFirstOption(page: Page, name: string) {
@@ -368,6 +370,15 @@ export async function chooseSelectOptionByValue(
   const listbox = page.locator('[role="listbox"]')
   await expect(listbox).toBeVisible({ timeout: 15_000 })
   const byData = listbox.locator(`[role="option"][data-value="${v}"]`).first()
+  await expect
+    .poll(async () => {
+      if ((await byData.count()) > 0) return "data-value"
+      if ((await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).count()) > 0) {
+        return "label"
+      }
+      return ""
+    }, { timeout: 30_000 })
+    .not.toBe("")
   if ((await byData.count()) > 0) {
     await byData.click()
     return
@@ -380,11 +391,14 @@ export async function chooseSelectOptionByLabel(
   page: Page,
   name: string,
   label: string | RegExp,
+  options?: { optionTimeoutMs?: number },
 ) {
   await page.getByTestId(`form-field-${name}`).click()
   const listbox = page.locator('[role="listbox"]')
   await expect(listbox).toBeVisible({ timeout: 15_000 })
-  await listbox.getByRole("option", { name: label }).click()
+  const option = listbox.getByRole("option", { name: label })
+  await expect(option).toBeVisible({ timeout: options?.optionTimeoutMs ?? 15_000 })
+  await option.click()
 }
 
 export async function submitForm(page: Page, formId: string) {
@@ -958,6 +972,22 @@ export async function waitForSaleOrderLineQtyDelivered(
   throw new Error(`sale order ${orderId} has no qty_delivered after picking validate`)
 }
 
+/** Poll until a fiscal year row with the given name appears in the BFF query. */
+export async function fetchFiscalYearIdByName(page: Page, name: string): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/fiscal-years")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+      const row = (json.data ?? []).find((fy) => String(fy.name ?? "") === name)
+      const id = scalarQueryId(row?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`fiscal year not found in query: ${name}`)
+}
+
 /** Poll until a proposal row with the given title appears in the BFF query. */
 export async function fetchProposalIdByTitle(page: Page, title: string): Promise<number> {
   const deadline = Date.now() + 30_000
@@ -1286,7 +1316,7 @@ export async function createAiActionDraftTask(
     [
       {
         reducer_name: "create_task",
-        params_json: JSON.stringify({ name: taskName, company_id: 0 }),
+        params_json: JSON.stringify({ name: taskName }),
         summary: `Create task ${taskName}`,
         confidence: 0.95,
         elevated: false,

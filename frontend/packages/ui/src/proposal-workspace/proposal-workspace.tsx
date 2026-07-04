@@ -423,13 +423,15 @@ export function ProposalWorkspace({
   )
 
   // ── Presence cleanup on unmount ─────────────────────────────────────────────
+  const clearPresenceMutateRef = useRef(clearPresence.mutate)
+  clearPresenceMutateRef.current = clearPresence.mutate
+
   useEffect(() => {
     return () => {
-      clearPresence.mutate(proposalIdBig)
+      clearPresenceMutateRef.current(proposalIdBig)
       if (presenceDebounceRef.current) clearTimeout(presenceDebounceRef.current)
     }
-
-  }, [proposalIdBig, clearPresence.mutate])
+  }, [proposalIdBig])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 

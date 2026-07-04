@@ -26,6 +26,7 @@ export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
     queryKey: ['audit-log', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/audit-log', 'Failed to fetch audit log'),
+    enabled: organizationId > 0n,
     staleTime: 30_000,
     initialData,
   })

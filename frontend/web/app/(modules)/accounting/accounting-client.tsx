@@ -667,6 +667,8 @@ function AccountingClientLoaded({
   const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
   const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
     enabled: organizationId > 0,
@@ -714,7 +716,12 @@ function AccountingClientLoaded({
   )
 
   const fiscalYearSelectOptionsForPeriods = useMemo(() => {
-    const rows = fiscalYearsRaw as Record<string, unknown>[]
+    const companyKey = operatingCompanyId > 0n ? String(operatingCompanyId) : null
+    const rows = (fiscalYearsRaw as Record<string, unknown>[]).filter((fy) => {
+      if (companyKey == null) return true
+      const fyCompany = String(fy.companyId ?? fy.company_id ?? "")
+      return fyCompany === "" || fyCompany === companyKey
+    })
     if (rows.length === 0) {
       return [
         {
@@ -728,7 +735,7 @@ function AccountingClientLoaded({
       value: String(fy.id ?? ""),
       label: String(fy.name ?? fy.id ?? ""),
     }))
-  }, [fiscalYearsRaw, t])
+  }, [fiscalYearsRaw, operatingCompanyId, t])
 
   const accountPeriodCreateFormConfig = useMemo(
     () =>

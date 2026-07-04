@@ -562,6 +562,7 @@ fn build_create_sale_order_params(
     let param_company = obj
         .get("company_id")
         .and_then(json_u64)
+        .filter(|id| *id > 0)
         .unwrap_or(company_id);
     if param_company != company_id {
         return Err("params company_id does not match draft company scope".to_string());
@@ -688,6 +689,7 @@ fn build_create_purchase_order_params(
     let param_company = obj
         .get("company_id")
         .and_then(json_u64)
+        .filter(|id| *id > 0)
         .unwrap_or(company_id);
     if param_company != company_id {
         return Err("params company_id does not match draft company scope".to_string());
@@ -783,6 +785,7 @@ fn build_create_task_params(company_id: u64, value: &Value) -> Result<CreateTask
     let param_company = obj
         .get("company_id")
         .and_then(json_u64)
+        .filter(|id| *id > 0)
         .unwrap_or(company_id);
     if param_company != company_id {
         return Err("params company_id does not match draft company scope".to_string());
