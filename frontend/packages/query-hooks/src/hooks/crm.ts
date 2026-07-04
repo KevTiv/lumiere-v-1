@@ -25,7 +25,7 @@ import type {
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
-  UpdateContactParams,
+  UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
@@ -295,7 +295,7 @@ export function useCreateActivity(organizationId: bigint) {
 
 export function useUpdateContact(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ContactPatch<UpdateContactParams>>({
+  return useMutation<void, Error, ContactPatch<UpdateContactCoreParams>>({
     mutationFn: async ({ contactId, params }) => {
       const { urlPath, init } = crmBffPost("update_contact", [
         organizationId,
@@ -653,7 +653,7 @@ export type {
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
-  UpdateContactParams,
+  UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,

@@ -8,7 +8,7 @@ import type {
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
-  UpdateContactParams,
+  UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
@@ -185,8 +185,8 @@ export function finalizeCreateContactSegmentParams(
 
 /** Strip undefined keys from CRM update patches before `stdbParamsToJson`. */
 export function finalizeUpdateContactParams(
-  partial: Partial<UpdateContactParams>,
-): UpdateContactParams {
+  partial: Partial<UpdateContactCoreParams>,
+): UpdateContactCoreParams {
   return pickDefined(partial);
 }
 

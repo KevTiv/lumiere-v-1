@@ -418,7 +418,7 @@ pub fn test_subscription_plan_create(ctx: &ReducerContext) -> Result<(), String>
             trial_duration: 0,
             trial_unit: "day".to_string(),
             auto_close_limit: 0,
-            payment_mode: "manual".to_string(),
+            payment_mode: "draft_invoice".to_string(),
             template_id: None,
             invoice_mail_template_id: None,
             website_url: None,

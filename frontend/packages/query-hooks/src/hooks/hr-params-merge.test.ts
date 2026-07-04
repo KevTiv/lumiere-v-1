@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { finalizeUpdateLeaveTypeParams } from "./hr-params-merge.ts"
+import { finalizeUpdateLeaveTypeParams } from "./hr-params-merge"
 
 describe("finalizeUpdateLeaveTypeParams", () => {
   it("includes only explicitly provided leave type fields", () => {

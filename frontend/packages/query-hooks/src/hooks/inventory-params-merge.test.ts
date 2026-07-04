@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { finalizeUpdateProductParams } from "./inventory-params-merge.ts"
+import { finalizeUpdateProductParams } from "./inventory-params-merge"
 
 describe("finalizeUpdateProductParams", () => {
   it("includes only explicitly provided product fields", () => {

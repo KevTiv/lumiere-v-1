@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { finalizeUpdateTicketParams } from "./helpdesk-params-merge.ts"
+import { finalizeUpdateTicketParams } from "./helpdesk-params-merge"
 
 describe("finalizeUpdateTicketParams", () => {
   it("includes only explicitly provided ticket fields", () => {

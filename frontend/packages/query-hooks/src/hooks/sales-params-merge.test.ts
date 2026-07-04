@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { finalizeUpdateSaleOrderParams } from "./sales-params-merge.ts"
+import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
 
 describe("finalizeUpdateSaleOrderParams", () => {
   it("includes only explicitly provided sale order fields", () => {

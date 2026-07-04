@@ -13,7 +13,7 @@ import {
   finalizeUpdateLeadDetailsParams,
   finalizeUpdateLeadRevenueParams,
   finalizeUpdateOpportunityParams,
-} from "./crm-params-merge.ts"
+} from "./crm-params-merge"
 
 describe("finalizeCreateLeadParams", () => {
   it("fills required defaults for partial lead input", () => {
