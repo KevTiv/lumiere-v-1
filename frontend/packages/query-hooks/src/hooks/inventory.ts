@@ -14,6 +14,8 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { buildWarehouse3DView } from "@lumiere/erp-shared/warehouse-3d-from-api"
+import type { UpdateProductParams } from "@lumiere/stdb/types"
+import { finalizeUpdateProductParams } from "./inventory-params-merge"
 type ScalarId = bigint | number | string
 
 /** Coerce reducer u64 ids from table/API scalars (avoids unsafe `Number` for large ids). */
@@ -478,9 +480,9 @@ export function useCreateProduct(
 
 export function useUpdateProduct(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { productId: ScalarId; params: Partial<UpdateProductParams> }>({
     mutationFn: async ({ productId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_product", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const { urlPath, init } = inventoryBffPost("update_product", [organizationId, toScalarU64(productId), stdbParamsToJson(finalizeUpdateProductParams(params))])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update product')
     },

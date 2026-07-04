@@ -7,3 +7,15 @@ pub async fn health() -> Json<Value> {
         "service": "lumiere-ai-gateway",
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn health_returns_ok_payload() {
+        let Json(body) = health().await;
+        assert_eq!(body["status"], "ok");
+        assert_eq!(body["service"], "lumiere-ai-gateway");
+    }
+}

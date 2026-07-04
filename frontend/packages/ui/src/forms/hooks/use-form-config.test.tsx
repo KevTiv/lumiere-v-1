@@ -17,11 +17,8 @@ vi.mock("@lumiere/stdb/client-ui-bridge", () => ({
   deleteUserCustomField: vi.fn(),
 }))
 
-vi.mock("@lumiere/ui/forms", async () => {
-  const actual = await vi.importActual("@lumiere/ui/forms")
-  return {
-    ...actual,
-    getDefaultFormConfig: vi.fn((moduleId: string, formId: string) => {
+vi.mock("../config/registry", () => ({
+  getDefaultFormConfig: vi.fn((moduleId: string, formId: string) => {
       if (moduleId === "journal" && formId === "daily-entry") {
         return {
           moduleId: "journal",
@@ -73,8 +70,7 @@ vi.mock("@lumiere/ui/forms", async () => {
       }
       return undefined
     }),
-  }
-})
+}))
 
 describe("useFormConfiguration", () => {
   const defaultOptions = {

@@ -3,7 +3,10 @@ import type {
   CreateHelpdeskStageParams,
   CreateHelpdeskTeamParams,
   CreateTicketParams,
+  UpdateTicketParams,
 } from "@lumiere/stdb/types"
+
+import { pickDefined } from "./params-merge-utils"
 
 const defaultTicketPriority: CreateTicketParams["priority"] = { tag: "Normal" }
 
@@ -60,4 +63,11 @@ export function finalizeCreateHelpdeskSlaParams(
     timeHours: partial.timeHours ?? 0,
     isActive: partial.isActive ?? true,
   }
+}
+
+/** Strip undefined keys from Helpdesk update patches before `stdbParamsToJson`. */
+export function finalizeUpdateTicketParams(
+  partial: Partial<UpdateTicketParams>,
+): UpdateTicketParams {
+  return pickDefined(partial)
 }

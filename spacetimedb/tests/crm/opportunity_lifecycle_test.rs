@@ -6,8 +6,8 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::opportunities::{
     convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opportunity,
-    opportunity_line, opp_stage, ConvertOpportunityParams, CreateOpportunityLineParams,
-    CreateOpportunityParams, OpportunityStage,
+    opportunity_line, opp_stage, update_opportunity, ConvertOpportunityParams,
+    CreateOpportunityLineParams, CreateOpportunityParams, OpportunityStage, UpdateOpportunityParams,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::sale_order;
@@ -270,6 +270,122 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
         .count();
     if line_count != 1 {
         return Err(format!("Expected 1 opportunity line, got {line_count}"));
+    }
+
+    Ok(())
+}
+
+pub fn test_opportunity_stage_transition(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let stage_open = ctx.db.opp_stage().insert(OpportunityStage {
+        id: 0,
+        organization_id: org_id,
+        name: "Harness Open".to_string(),
+        sequence: 1,
+        probability: 20.0,
+        requirements: None,
+        fold: false,
+        is_won: false,
+        team_id: None,
+        is_active: true,
+        metadata: Some(r#"{"harness":true}"#.to_string()),
+    });
+
+    let stage_won = ctx.db.opp_stage().insert(OpportunityStage {
+        id: 0,
+        organization_id: org_id,
+        name: "Harness Closed Won".to_string(),
+        sequence: 10,
+        probability: 100.0,
+        requirements: None,
+        fold: true,
+        is_won: true,
+        team_id: None,
+        is_active: true,
+        metadata: Some(r#"{"harness":true}"#.to_string()),
+    });
+
+    create_opportunity(
+        ctx,
+        org_id,
+        CreateOpportunityParams {
+            name: "Harness Stage Opp".to_string(),
+            expected_revenue: 2_000.0,
+            probability: 20.0,
+            stage_id: stage_open.id,
+            priority: "medium".to_string(),
+            is_won: false,
+            is_lost: false,
+            tag_ids: vec![],
+            lead_id: None,
+            partner_id: Some(fixture.partner_id),
+            contact_id: Some(fixture.partner_id),
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            user_id: None,
+            team_id: None,
+            company_id: Some(company_id),
+            company_currency_id: Some(1),
+            lost_reason_id: None,
+            date_open: Some(ctx.timestamp),
+            date_closed: None,
+            date_deadline: None,
+            date_last_stage_update: Some(ctx.timestamp),
+            day_open: None,
+            day_close: None,
+            color: None,
+            description: None,
+            metadata: Some(r#"{"test":"stage_transition"}"#.to_string()),
+        },
+    )?;
+
+    let opp = ctx
+        .db
+        .opportunity()
+        .iter()
+        .find(|o| o.organization_id == org_id && o.name == "Harness Stage Opp")
+        .ok_or("Opportunity not found after create")?;
+
+    update_opportunity(
+        ctx,
+        org_id,
+        company_id,
+        opp.id,
+        UpdateOpportunityParams {
+            stage_id: Some(stage_won.id),
+            name: None,
+            expected_revenue: None,
+            probability: None,
+            priority: None,
+            is_won: None,
+            is_lost: None,
+            partner_id: None,
+            contact_id: None,
+            date_deadline: None,
+            date_closed: None,
+            lost_reason_id: None,
+            description: None,
+            tag_ids: None,
+        },
+    )?;
+
+    let updated = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opp.id)
+        .ok_or("Opportunity not found after stage update")?;
+
+    if updated.stage_id != stage_won.id {
+        return Err("Opportunity stage_id did not update".to_string());
+    }
+    if !updated.is_won {
+        return Err("Expected opportunity marked won after won stage".to_string());
     }
 
     Ok(())

@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest"
 import type { FormConfig } from "./form-types"
 import { serializeAiFormSchema } from "./ai-form-schema"
 

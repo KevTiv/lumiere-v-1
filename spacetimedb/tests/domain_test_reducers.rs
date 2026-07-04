@@ -13,6 +13,10 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_all_inventory_tests);
     let _ = stringify!(run_all_sales_tests);
     let _ = stringify!(run_all_crm_tests);
+    let _ = stringify!(run_all_platform_tests);
+    let _ = stringify!(run_inventory_receipt_quant_test);
+    let _ = stringify!(run_sales_order_update_test);
+    let _ = stringify!(run_accounting_payment_term_update_test);
 }
 
 fn run_all_domain_tests() {}
@@ -21,3 +25,7 @@ fn run_all_accounting_tests() {}
 fn run_all_inventory_tests() {}
 fn run_all_sales_tests() {}
 fn run_all_crm_tests() {}
+fn run_all_platform_tests() {}
+fn run_inventory_receipt_quant_test() {}
+fn run_sales_order_update_test() {}
+fn run_accounting_payment_term_update_test() {}

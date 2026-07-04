@@ -1,6 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 mod helpers;
 pub mod journal_entries_test;
+pub mod payment_terms_test;
 pub mod payments_test;
 
 use spacetimedb::ReducerContext;
@@ -12,6 +13,7 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_post_invoice_test(ctx)?;
     run_accounting_payment_reconcile_test(ctx)?;
     run_accounting_payment_cancel_test(ctx)?;
+    run_accounting_payment_term_update_test(ctx)?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
@@ -32,4 +34,10 @@ pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(),
 pub fn run_accounting_payment_cancel_test(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_cancel_payment_audited(ctx)
         .map_err(|e| format!("cancel_payment_audited: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_payment_term_update_test(ctx: &ReducerContext) -> Result<(), String> {
+    payment_terms_test::test_payment_term_update_and_delete(ctx)
+        .map_err(|e| format!("payment_term_update_and_delete: {e}"))
 }

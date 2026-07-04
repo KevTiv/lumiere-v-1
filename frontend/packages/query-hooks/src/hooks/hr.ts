@@ -36,6 +36,7 @@ import {
   finalizeCreateJobPositionParams,
   finalizeCreateLeaveRequestParams,
   finalizeCreatePayslipParams,
+  finalizeUpdateLeaveTypeParams,
 } from "./hr-params-merge"
 
 type ScalarId = bigint | number | string
@@ -381,7 +382,7 @@ export function useUpdateLeaveType(organizationId: bigint, companyId: bigint) {
           organizationId,
           companyId,
           toScalarU64(leaveTypeId),
-          stdbParamsToJson(params),
+          stdbParamsToJson(finalizeUpdateLeaveTypeParams(params)),
         ])
 
       const r = await apiFetch(urlPath, init)

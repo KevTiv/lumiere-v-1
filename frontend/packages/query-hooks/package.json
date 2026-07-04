@@ -14,7 +14,8 @@
     "./hooks/*": "./src/hooks/*.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/hooks/*-params-merge.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.0"
   }
 }

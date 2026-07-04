@@ -24,7 +24,10 @@ import type {
   CreateSaleOrderParams,
   CreateSaleOrderLineParams,
   CreateShippingMethodParams,
+  UpdateSaleOrderParams,
 } from "@lumiere/stdb/types"
+
+import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -355,13 +358,13 @@ export function useCancelPickingBatch(organizationId: bigint) {
 
 export function useUpdateSaleOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { orderId: bigint | number | string; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { orderId: bigint | number | string; params: Partial<UpdateSaleOrderParams> }>({
     mutationFn: async ({ orderId, params }) => {
       const { urlPath, init } = salesBffPost("update_sale_order", [
           organizationId,
           companyId,
           toScalarU64(orderId),
-          stdbParamsToJson(params as object),
+          stdbParamsToJson(finalizeUpdateSaleOrderParams(params)),
         ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update sale order')

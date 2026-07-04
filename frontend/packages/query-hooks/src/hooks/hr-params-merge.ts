@@ -5,7 +5,10 @@ import type {
   CreateJobPositionParams,
   CreateLeaveRequestParams,
   CreatePayslipParams,
+  UpdateLeaveTypeParams,
 } from "@lumiere/stdb/types"
+
+import { pickDefined } from "./params-merge-utils"
 
 const UNIX_EPOCH_TIMESTAMP = { microsSinceUnixEpoch: 0n }
 const DEFAULT_EMPLOYMENT_TYPE: CreateEmployeeParams["employmentType"] = { tag: "FullTime" }
@@ -118,4 +121,11 @@ export function finalizeCreatePayslipParams(
     contractId: partial.contractId,
     notes: partial.notes,
   }
+}
+
+/** Strip undefined keys from HR update patches before `stdbParamsToJson`. */
+export function finalizeUpdateLeaveTypeParams(
+  partial: Partial<UpdateLeaveTypeParams>,
+): UpdateLeaveTypeParams {
+  return pickDefined(partial)
 }

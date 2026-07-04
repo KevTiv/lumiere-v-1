@@ -42,6 +42,10 @@ pub fn blocked_reducer_reason(reducer: &str, mode: ReducerAllowlistMode) -> Opti
         return Some("domain test reducers are not callable via the public API");
     }
 
+    if name.starts_with("run_") && name.ends_with("_test") {
+        return Some("domain test reducers are not callable via the public API");
+    }
+
     match name {
         "bootstrap_new_tenant" | "seed_dev_data" | "backfill_external_ids" => {
             Some("bootstrap and seed reducers are not callable via the public API")
@@ -82,5 +86,79 @@ mod tests {
             ReducerAllowlistMode::Off
         )
         .is_none());
+    }
+
+    #[test]
+    fn strict_blocks_individual_test_reducers() {
+        assert!(blocked_reducer_reason(
+            "run_inventory_receipt_quant_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+        assert!(blocked_reducer_reason(
+            "run_helpdesk_ticket_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn strict_blocks_csv_import_reducers() {
+        assert!(blocked_reducer_reason(
+            "import_contact_csv",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn strict_blocks_empty_reducer_name() {
+        assert!(blocked_reducer_reason("   ", ReducerAllowlistMode::Strict).is_some());
+    }
+
+    #[test]
+    fn strict_allows_user_update_delete_reducers() {
+        for reducer in [
+            "update_contact",
+            "delete_contact",
+            "delete_lead",
+            "update_ticket",
+            "update_opportunity",
+            "delete_product_category",
+            "update_sale_order",
+            "update_payment_term",
+            "delete_payment_term",
+        ] {
+            assert!(
+                blocked_reducer_reason(reducer, ReducerAllowlistMode::Strict).is_none(),
+                "{reducer} should not be blocked in strict mode"
+            );
+        }
+
+        assert!(blocked_reducer_reason(
+            "delete_organization",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+        assert!(blocked_reducer_reason(
+            "run_crm_contact_update_delete_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+        assert!(blocked_reducer_reason(
+            "run_inventory_product_update_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+        assert!(blocked_reducer_reason(
+            "run_sales_order_update_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
+        assert!(blocked_reducer_reason(
+            "run_accounting_payment_term_update_test",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
     }
 }

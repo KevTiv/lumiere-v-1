@@ -23,6 +23,7 @@ import {
   finalizeCreateHelpdeskStageParams,
   finalizeCreateHelpdeskTeamParams,
   finalizeCreateTicketParams,
+  finalizeUpdateTicketParams,
 } from "./helpdesk-params-merge"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -114,7 +115,7 @@ export function useUpdateTicket(organizationId: bigint) {
       const { urlPath, init } = helpdeskBffPost("update_ticket", [
         organizationId,
         toScalarU64(ticketId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateTicketParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update ticket')

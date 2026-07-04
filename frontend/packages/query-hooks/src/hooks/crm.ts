@@ -41,6 +41,14 @@ import {
   finalizeCreateContactTagParams,
   finalizeCreateLeadParams,
   finalizeCreateOpportunityParams,
+  finalizeUpdateContactAddressParams,
+  finalizeUpdateContactBusinessParams,
+  finalizeUpdateContactDetailsParams,
+  finalizeUpdateContactParams,
+  finalizeUpdateLeadAddressParams,
+  finalizeUpdateLeadDetailsParams,
+  finalizeUpdateLeadRevenueParams,
+  finalizeUpdateOpportunityParams,
 } from "./crm-params-merge"
 
 type ScalarId = string | number | bigint
@@ -207,7 +215,7 @@ export function useUpdateOpportunity(
         organizationId,
         scopedCompanyId,
         toScalarU64(opportunityId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateOpportunityParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update opportunity")
@@ -292,7 +300,7 @@ export function useUpdateContact(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateContactParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact')
@@ -308,7 +316,7 @@ export function useUpdateContactAddress(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_address", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateContactAddressParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact address')
@@ -324,7 +332,7 @@ export function useUpdateContactBusiness(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_business", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateContactBusinessParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact business')
@@ -340,7 +348,7 @@ export function useUpdateContactDetails(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_details", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateContactDetailsParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
@@ -356,7 +364,7 @@ export function useUpdateLeadDetails(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_lead_details", [
         organizationId,
         toScalarU64(leadId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateLeadDetailsParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead details')
@@ -372,7 +380,7 @@ export function useUpdateLeadAddress(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_lead_address", [
         organizationId,
         toScalarU64(leadId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateLeadAddressParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead address')
@@ -388,7 +396,7 @@ export function useUpdateLeadRevenue(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_lead_revenue", [
         organizationId,
         toScalarU64(leadId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(finalizeUpdateLeadRevenueParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead revenue')

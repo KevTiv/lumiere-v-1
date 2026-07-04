@@ -5,7 +5,17 @@ import type {
   CreateContactTagParams,
   CreateLeadParams,
   CreateOpportunityParams,
+  UpdateContactAddressParams,
+  UpdateContactBusinessParams,
+  UpdateContactDetailsParams,
+  UpdateContactParams,
+  UpdateLeadAddressParams,
+  UpdateLeadDetailsParams,
+  UpdateLeadRevenueParams,
+  UpdateOpportunityParams,
 } from "@lumiere/stdb/types";
+
+import { pickDefined } from "./params-merge-utils";
 
 /** Merge partial CRM create payloads with hook defaults before `stdbParamsToJson`. */
 export function finalizeCreateLeadParams(
@@ -171,4 +181,53 @@ export function finalizeCreateContactSegmentParams(
     parentId: partial.parentId,
     metadata: partial.metadata,
   }
+}
+
+/** Strip undefined keys from CRM update patches before `stdbParamsToJson`. */
+export function finalizeUpdateContactParams(
+  partial: Partial<UpdateContactParams>,
+): UpdateContactParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateOpportunityParams(
+  partial: Partial<UpdateOpportunityParams>,
+): UpdateOpportunityParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateContactAddressParams(
+  partial: Partial<UpdateContactAddressParams>,
+): UpdateContactAddressParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateContactBusinessParams(
+  partial: Partial<UpdateContactBusinessParams>,
+): UpdateContactBusinessParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateContactDetailsParams(
+  partial: Partial<UpdateContactDetailsParams>,
+): UpdateContactDetailsParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateLeadDetailsParams(
+  partial: Partial<UpdateLeadDetailsParams>,
+): UpdateLeadDetailsParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateLeadAddressParams(
+  partial: Partial<UpdateLeadAddressParams>,
+): UpdateLeadAddressParams {
+  return pickDefined(partial);
+}
+
+export function finalizeUpdateLeadRevenueParams(
+  partial: Partial<UpdateLeadRevenueParams>,
+): UpdateLeadRevenueParams {
+  return pickDefined(partial);
 }

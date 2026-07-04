@@ -26,14 +26,26 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_accounting_post_invoice_test \
 	run_accounting_payment_reconcile_test \
 	run_accounting_payment_cancel_test \
+	run_accounting_payment_term_update_test \
 	run_inventory_product_category_test \
+	run_inventory_product_update_test \
 	run_inventory_stock_inventory_test \
 	run_inventory_adjustment_test \
 	run_inventory_stock_quant_test \
+	run_inventory_receipt_quant_test \
+	run_inventory_delivery_quant_test \
 	run_sales_order_invoice_test \
 	run_sales_order_delivery_test \
+	run_sales_order_update_test \
 	run_crm_opportunity_convert_test \
-	run_purchasing_bill_balanced_test
+	run_crm_contact_update_delete_test \
+	run_purchasing_bill_balanced_test \
+	run_helpdesk_ticket_test \
+	run_hr_leave_type_test \
+	run_manufacturing_workcenter_test \
+	run_documents_folder_test \
+	run_workflow_definition_test \
+	run_subscription_plan_test
 
 .PHONY: help setup check check-env check-env-prod build \
         start stop \
