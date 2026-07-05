@@ -37,9 +37,11 @@ import {
   purchaseOrderLinesTableConfig,
   purchaseRequisitionsTableConfig,
   csvImportForm,
+  RecordChatterDialog,
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
+import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import {
   usePurchaseOrders,
@@ -291,6 +293,7 @@ function PurchasingClientLoaded({
   const [csvError, setCsvError] = useState<string | null>(null)
   const [billOrderId, setBillOrderId] = useState<bigint | null>(null)
   const [billOrderError, setBillOrderError] = useState<string | null>(null)
+  const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -1674,7 +1677,24 @@ function PurchasingClientLoaded({
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
         isPending={isFormMutationPending}
+        onRowClick={(tabId, row) => {
+          const target = chatterTargetFromRow("purchasing", tabId, row)
+          if (target) setChatterTarget(target)
+        }}
       />
+      {chatterTarget ? (
+        <RecordChatterDialog
+          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) setChatterTarget(null)
+          }}
+          organizationId={organizationId}
+          resModel={chatterTarget.resModel}
+          resId={chatterTarget.resId}
+          recordTitle={chatterTarget.recordTitle}
+        />
+      ) : null}
       <RuntimeFormModal
         key={formModalKey}
         open={quickActionForm !== null}

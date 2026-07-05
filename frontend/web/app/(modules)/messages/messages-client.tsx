@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import {
   ModuleView,
   FormModal,
@@ -39,6 +40,34 @@ function csvList(value: unknown): string[] {
     .filter(Boolean)
 }
 
+function identityHex(v: unknown): string {
+  if (v == null) return ""
+  if (typeof v === "string") return v.toLowerCase()
+  if (typeof v === "object" && v !== null && "toHex" in v) {
+    const th = (v as { toHex: () => { toString: () => string } }).toHex
+    if (typeof th === "function") return th.call(v).toString().toLowerCase()
+  }
+  return String(v).toLowerCase()
+}
+
+function parseMetadataRecipient(metadata: unknown): string | null {
+  if (metadata == null || metadata === "") return null
+  try {
+    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata
+    if (parsed && typeof parsed === "object" && "recipient" in parsed) {
+      return String((parsed as { recipient: unknown }).recipient).toLowerCase()
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function isNotificationMessage(row: Record<string, unknown>): boolean {
+  const type = String(row.messageType ?? row.message_type ?? "").toLowerCase()
+  return type === "notification" || type === "user_notification"
+}
+
 export function MessagesClient(props: MessagesClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -48,6 +77,7 @@ export function MessagesClient(props: MessagesClientProps) {
 
 function MessagesClientLoaded({ initialMessages, initialFollowers, organizationId }: MessagesClientLoadedProps) {
   const { t } = useTranslation()
+  const { identity } = useErpSession()
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -57,12 +87,28 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const subscribeToRecord = useSubscribeToRecord(orgId)
   const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId)
 
+  const myNotifications = useMemo(() => {
+    if (!identity) return []
+    const me = identity.toLowerCase()
+    const followedKeys = new Set(
+      followers
+        .filter((f) => identityHex(f.partnerId ?? f.partner_id) === me)
+        .map((f) => `${String(f.resModel ?? f.res_model)}:${String(f.resId ?? f.res_id)}`),
+    )
+
+    return (messages as Record<string, unknown>[]).filter((m) => {
+      if (!isNotificationMessage(m)) return false
+      const recipient = parseMetadataRecipient(m.metadata)
+      if (recipient === me) return true
+      const key = `${String(m.model)}:${String(m.resId ?? m.res_id)}`
+      return followedKeys.has(key)
+    })
+  }, [messages, followers, identity])
+
   const liveSections = useMemo(() => {
     const emails = messages.filter((m) => String(m.messageType) === "email").length
     const comments = messages.filter((m) => String(m.messageType) === "comment").length
-    const notifications = messages.filter(
-      (m) => String(m.messageType) === "notification" || String(m.messageType) === "user_notification",
-    ).length
+    const notifications = myNotifications.length
 
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
@@ -102,7 +148,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
         return w
       }),
     }))
-  }, [messages, moduleConfig, t])
+  }, [messages, myNotifications.length, moduleConfig, t])
 
   const config = useMemo(
     () => ({
@@ -117,9 +163,10 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const data = useMemo(
     () => ({
       messages: messages as unknown as Record<string, unknown>[],
+      notifications: myNotifications as unknown as Record<string, unknown>[],
       followers: followers as unknown as Record<string, unknown>[],
     }),
-    [messages, followers],
+    [messages, myNotifications, followers],
   )
 
   const handleFormSubmit = async (

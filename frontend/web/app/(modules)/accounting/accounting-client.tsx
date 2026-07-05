@@ -52,6 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
   csvImportForm,
+  RecordChatterDialog,
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
@@ -115,6 +116,7 @@ import type {
   UpdateAccountJournalParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
+import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import {
   useAccountAccounts,
   useAccountMoves,
@@ -622,6 +624,7 @@ function AccountingClientLoaded({
   const [reconcilePaymentError, setReconcilePaymentError] = useState<string | null>(null)
   const [journalEdit, setJournalEdit] = useState<Record<string, unknown> | null>(null)
   const [paymentTermLineEdit, setPaymentTermLineEdit] = useState<Record<string, unknown> | null>(null)
+  const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
@@ -2738,6 +2741,11 @@ function AccountingClientLoaded({
   )
 
   const handleEntityRowClick = useCallback((tabId: string, row: Record<string, unknown>) => {
+    const target = chatterTargetFromRow("accounting", tabId, row)
+    if (target) {
+      setChatterTarget(target)
+      return
+    }
     if (tabId === "analytic") setAnalyticAccountEdit(row)
     else if (tabId === "analytic-lines") setAnalyticLineEdit(row)
     else if (tabId === "analytic-distribution") setAnalyticDistEdit(row)
@@ -2763,6 +2771,20 @@ function AccountingClientLoaded({
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
       />
+
+      {chatterTarget ? (
+        <RecordChatterDialog
+          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) setChatterTarget(null)
+          }}
+          organizationId={organizationId}
+          resModel={chatterTarget.resModel}
+          resId={chatterTarget.resId}
+          recordTitle={chatterTarget.recordTitle}
+        />
+      ) : null}
 
       {fiscalSetupOpen ? (
         <FormModal

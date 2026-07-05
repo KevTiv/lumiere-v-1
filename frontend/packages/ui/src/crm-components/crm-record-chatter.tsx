@@ -299,3 +299,10 @@ export function CrmRecordChatterDialog({
     </Dialog>
   )
 }
+
+/** Generic aliases — same component, usable outside CRM modules. */
+export type RecordChatterProps = CrmRecordChatterProps
+export const RecordChatter = CrmRecordChatter
+
+export type RecordChatterDialogProps = CrmRecordChatterDialogProps
+export const RecordChatterDialog = CrmRecordChatterDialog

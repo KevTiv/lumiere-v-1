@@ -61,6 +61,75 @@ pub struct MailFollower {
     pub subtypes: Vec<String>, // ["comment", "note"] — which events trigger notifications
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn follower_wants_subtype(follower: &MailFollower, subtype: &str) -> bool {
+    follower.subtypes.is_empty()
+        || follower
+            .subtypes
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(subtype))
+}
+
+fn truncate_for_notification(body: &str, max_chars: usize) -> String {
+    if body.chars().count() <= max_chars {
+        return body.to_string();
+    }
+    let truncated: String = body.chars().take(max_chars).collect();
+    format!("{truncated}…")
+}
+
+/// Insert `MailMessageType::Notification` rows for followers subscribed to the event subtype.
+fn notify_record_followers(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    model: &str,
+    res_id: u64,
+    author: Identity,
+    subtype: &str,
+    source_body: &str,
+    parent_message_id: u64,
+) {
+    let preview = truncate_for_notification(source_body, 200);
+    let notification_body = format!("New {subtype}: {preview}");
+    let model_key = model.to_string();
+
+    for follower in ctx
+        .db
+        .mail_follower()
+        .mail_follower_by_model()
+        .filter(&model_key)
+    {
+        if follower.organization_id != organization_id || follower.res_id != res_id {
+            continue;
+        }
+        if follower.partner_id == author {
+            continue;
+        }
+        if !follower_wants_subtype(&follower, subtype) {
+            continue;
+        }
+
+        let recipient = follower.partner_id.to_hex().to_string();
+        ctx.db.mail_message().insert(MailMessage {
+            id: 0,
+            organization_id,
+            model: model_key.clone(),
+            res_id,
+            author_id: author,
+            body: notification_body.clone(),
+            message_type: MailMessageType::Notification,
+            subtype: Some(format!("mail.mt_{subtype}")),
+            date: ctx.timestamp,
+            parent_id: Some(parent_message_id),
+            attachment_ids: vec![],
+            metadata: Some(
+                serde_json::json!({ "recipient": recipient, "event": subtype }).to_string(),
+            ),
+        });
+    }
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 /// Post a message (comment visible to all followers) on any record.
@@ -95,6 +164,17 @@ pub fn post_message(
         attachment_ids,
         metadata: None,
     });
+    notify_record_followers(
+        ctx,
+        organization_id,
+        &msg.model,
+        msg.res_id,
+        ctx.sender(),
+        "comment",
+        &msg.body,
+        msg.id,
+    );
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -128,13 +208,13 @@ pub fn post_internal_note(
     if body.is_empty() {
         return Err("Note body cannot be empty".to_string());
     }
-    ctx.db.mail_message().insert(MailMessage {
+    let note = ctx.db.mail_message().insert(MailMessage {
         id: 0,
         organization_id,
-        model,
+        model: model.clone(),
         res_id,
         author_id: ctx.sender(),
-        body,
+        body: body.clone(),
         message_type: MailMessageType::Note,
         subtype: Some("mail.mt_note".to_string()),
         date: ctx.timestamp,
@@ -142,6 +222,18 @@ pub fn post_internal_note(
         attachment_ids: vec![],
         metadata: None,
     });
+
+    notify_record_followers(
+        ctx,
+        organization_id,
+        &model,
+        res_id,
+        ctx.sender(),
+        "note",
+        &body,
+        note.id,
+    );
+
     Ok(())
 }
 

@@ -28,6 +28,7 @@ import {
   csvImportForm,
   ImportAssistantWizard,
   getRowField,
+  RecordChatterDialog,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
@@ -51,6 +52,7 @@ import {
   toCreateShippingMethodParams,
 } from '@/lib/sales-logistics-params';
 import { salesModuleConfig } from '@/lib/module-dashboard-configs';
+import { chatterTargetFromRow, type ChatterTarget } from '@/lib/record-chatter';
 import { groupBy, groupByMonth } from '@/lib/utils';
 import { identityToHex } from '@/lib/helpdesk-display';
 import {
@@ -305,6 +307,7 @@ function SalesClientLoaded({
   const [csvError, setCsvError] = useState<string | null>(null);
   const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
   const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
+  const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null);
 
   const { data: orders = [] } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
@@ -1353,7 +1356,24 @@ function SalesClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        onRowClick={(tabId, row) => {
+          const target = chatterTargetFromRow('sales', tabId, row);
+          if (target) setChatterTarget(target);
+        }}
       />
+      {chatterTarget ? (
+        <RecordChatterDialog
+          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) setChatterTarget(null);
+          }}
+          organizationId={organizationId}
+          resModel={chatterTarget.resModel}
+          resId={chatterTarget.resId}
+          recordTitle={chatterTarget.recordTitle}
+        />
+      ) : null}
       <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

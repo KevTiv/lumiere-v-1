@@ -122,7 +122,8 @@ stop:
 publish:
 	spacetime publish $(DB) --module-path $(MODULE) --server local -y
 
-db-client:
+
+generate-stdb-ts-sdk:
 	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
 
 publish-clear:

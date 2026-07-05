@@ -47,6 +47,27 @@ export const mailMessagesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const mailMyNotificationsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "mail-my-notifications-table",
+  title: t("messages.notifications.title"),
+  description: t("messages.notifications.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("messages.notifications.searchPlaceholder"),
+    searchKeys: ["body", "model", "subtype"],
+    columns: [
+      { key: "body", label: t("messages.messages.columns.body"), width: "min-w-64" },
+      { key: "model", label: t("messages.messages.columns.model"), width: "min-w-28" },
+      { key: "resId", label: t("messages.messages.columns.resId"), type: "number", align: "right" },
+      { key: "messageType", label: t("messages.messages.columns.messageType"), type: "badge", ...messageTypeBadges(t) },
+      { key: "date", label: t("messages.messages.columns.date"), type: "date" },
+    ],
+    emptyMessage: t("messages.notifications.emptyMessage"),
+  },
+})
+
 export const mailFollowersTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "mail-followers-table",
   title: t("messages.followers.title"),
@@ -70,5 +91,6 @@ export const mailFollowersTableConfig = (t: TFunction): EntityViewConfig => ({
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const messagesEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "mail-messages-table": mailMessagesTableConfig(t),
+  "mail-my-notifications-table": mailMyNotificationsTableConfig(t),
   "mail-followers-table": mailFollowersTableConfig(t),
 })

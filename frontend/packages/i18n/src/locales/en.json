@@ -7684,6 +7684,13 @@
           "resId": "Record ID"
         }
       }
+    },
+    "notifications": {
+      "tabLabel": "My notifications",
+      "title": "My notifications",
+      "description": "Chatter notifications for records you follow",
+      "searchPlaceholder": "Search notifications…",
+      "emptyMessage": "No notifications for you yet. Follow a record and post a note to receive updates."
     }
   },
   "pos": {

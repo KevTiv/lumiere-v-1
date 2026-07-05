@@ -195,6 +195,7 @@ import {
   workflowInstancesTableConfig,
   newWorkflowForm,
   mailMessagesTableConfig,
+  mailMyNotificationsTableConfig,
   mailFollowersTableConfig,
   newMailMessageForm,
   subscribeToRecordForm,
@@ -2861,6 +2862,12 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newMailMessageForm(t),
       createLabel: "New Message",
       createAction: "createMessage",
+    },
+    {
+      id: "notifications",
+      label: t("messages.notifications.tabLabel"),
+      type: "entity",
+      entityConfig: mailMyNotificationsTableConfig(t),
     },
     {
       id: "followers",
