@@ -7,6 +7,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::accounting::journal_entries::{account_move, AccountMove};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType};
+use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,15 @@ pub fn post_payment(
     organization_id: u64,
     payment_id: u64,
 ) -> Result<(), String> {
+    post_payment_impl(ctx, organization_id, payment_id, false)
+}
+
+pub fn post_payment_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "post")?;
     let payment = ctx
         .db
@@ -131,6 +141,39 @@ pub fn post_payment(
     }
     if payment.state != PaymentState::NotPaid {
         return Err("Payment is not in draft state".to_string());
+    }
+
+    if !skip_approval_check {
+        let amount = payment.amount;
+        let params_json = serde_json::json!({
+            "organization_id": organization_id,
+            "payment_id": payment_id,
+        })
+        .to_string();
+        let context_json = serde_json::json!({
+            "amount": amount,
+            "payment_type": format!("{:?}", payment.payment_type),
+        })
+        .to_string();
+        let summary = format!("Post payment (amount {:.2})", amount);
+
+        if let Some(_request_id) = gate_action_with_approval(
+            ctx,
+            organization_id,
+            payment.company_id,
+            "account_payment",
+            payment_id,
+            "post_payment",
+            amount,
+            &summary,
+            &params_json,
+            Some(context_json),
+        )? {
+            return Err(format!(
+                "Payment requires approval before posting (amount {:.2})",
+                amount
+            ));
+        }
     }
 
     // Generate document number

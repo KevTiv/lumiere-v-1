@@ -36,6 +36,8 @@ pub struct MailMessage {
     pub date: Timestamp,
     pub parent_id: Option<u64>, // For threaded replies → FK to MailMessage.id
     pub attachment_ids: Vec<u64>, // Document attachment IDs
+    #[default(None::<String>)]
+    pub metadata: Option<String>,
 }
 
 /// Mail Follower — A user subscribed to notifications on a record.
@@ -91,6 +93,7 @@ pub fn post_message(
         date: ctx.timestamp,
         parent_id,
         attachment_ids,
+        metadata: None,
     });
     write_audit_log_v2(
         ctx,
@@ -137,6 +140,7 @@ pub fn post_internal_note(
         date: ctx.timestamp,
         parent_id: None,
         attachment_ids: vec![],
+        metadata: None,
     });
     Ok(())
 }
@@ -204,5 +208,59 @@ pub fn unsubscribe_from_record(
     if let Some(follower) = existing {
         ctx.db.mail_follower().id().delete(&follower.id);
     }
+    Ok(())
+}
+
+/// Mark a queued outbound email as delivered (called by api-server after Resend send).
+#[reducer]
+pub fn mark_mail_message_delivered(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    message_id: u64,
+    delivery_metadata: Option<String>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mail_message", "write")?;
+
+    let message = ctx
+        .db
+        .mail_message()
+        .id()
+        .find(&message_id)
+        .ok_or("mail message not found")?;
+
+    if message.organization_id != organization_id {
+        return Err("mail message does not belong to this organization".to_string());
+    }
+
+    let metadata = delivery_metadata.or_else(|| {
+        Some(
+            serde_json::json!({
+                "delivery": "sent",
+                "sent_at": ctx.timestamp.to_duration_since_unix_epoch().unwrap_or_default().as_micros(),
+            })
+            .to_string(),
+        )
+    });
+
+    ctx.db.mail_message().id().update(MailMessage {
+        metadata,
+        ..message
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "mail_message",
+            record_id: message_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(r#"{"delivery":"sent"}"#.to_string()),
+            changed_fields: vec!["metadata".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }

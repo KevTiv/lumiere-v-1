@@ -23,6 +23,7 @@ use crate::sales::pricelists::product_pricelist;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
 };
+use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
@@ -865,6 +866,15 @@ pub fn confirm_sales_order(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
+    confirm_sales_order_impl(ctx, organization_id, order_id, false)
+}
+
+pub fn confirm_sales_order_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     let order = ctx
         .db
         .sale_order()
@@ -875,13 +885,71 @@ pub fn confirm_sales_order(
     validate_order_org_scope(&order, organization_id)?;
     check_permission(ctx, organization_id, "sale_order", "confirm")?;
 
-    if order.state != SaleState::Draft && order.state != SaleState::Sent {
-        return Err("Order must be in Draft or Sent state to confirm".to_string());
+    if order.state != SaleState::Draft
+        && order.state != SaleState::Sent
+        && order.state != SaleState::ToApprove
+    {
+        return Err("Order must be in Draft, Sent, or ToApprove state to confirm".to_string());
     }
 
     if let Some(validity) = order.validity_date {
         if ctx.timestamp > validity {
             return Err("Order has expired".to_string());
+        }
+    }
+
+    if !skip_approval_check {
+        let max_discount = ctx
+            .db
+            .sale_order_line()
+            .order_line_by_order()
+            .filter(&order_id)
+            .filter(|line| line.display_type.is_none())
+            .map(|line| line.discount)
+            .fold(0.0_f64, f64::max);
+
+        let params_json = serde_json::json!({
+            "organization_id": organization_id,
+            "order_id": order_id,
+        })
+        .to_string();
+        let context_json = serde_json::json!({
+            "max_discount_percent": max_discount,
+            "amount_total": order.amount_total,
+        })
+        .to_string();
+        let so_label = order
+            .origin
+            .as_deref()
+            .or(order.client_order_ref.as_deref())
+            .unwrap_or("SO");
+        let summary = format!(
+            "Confirm sale order {} (max line discount {:.1}%)",
+            so_label, max_discount
+        );
+
+        if let Some(_request_id) = gate_action_with_approval(
+            ctx,
+            organization_id,
+            order.company_id,
+            "sale_order",
+            order_id,
+            "confirm_sales_order",
+            max_discount,
+            &summary,
+            &params_json,
+            Some(context_json),
+        )? {
+            ctx.db.sale_order().id().update(SaleOrder {
+                state: SaleState::ToApprove,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..order
+            });
+            return Err(format!(
+                "Sale order requires approval before confirmation (max discount {:.1}%)",
+                max_discount
+            ));
         }
     }
 

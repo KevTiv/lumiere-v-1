@@ -252,6 +252,7 @@ fn notify_draft_event(ctx: &ReducerContext, draft: &AiActionDraft, event: &str, 
         date: ctx.timestamp,
         parent_id: None,
         attachment_ids: vec![],
+        metadata: None,
     });
 }
 
@@ -267,22 +268,26 @@ fn queue_email_notifications(ctx: &ReducerContext, draft: &AiActionDraft, body: 
         .collect::<Vec<_>>()
         .join(", ");
 
-    let email_body = format!(
-        "{body}\n\nEmail queued for approvers: {recipient_lines}\nReview in AI Approvals."
-    );
-
     ctx.db.mail_message().insert(MailMessage {
         id: 0,
         organization_id: draft.organization_id,
         model: "ai_action_draft".to_string(),
         res_id: draft.id,
         author_id: ctx.sender(),
-        body: email_body,
+        body: body.to_string(),
         message_type: MailMessageType::Email,
         subtype: Some("ai.action_draft.email".to_string()),
         date: ctx.timestamp,
         parent_id: None,
         attachment_ids: vec![],
+        metadata: Some(
+            serde_json::json!({
+                "delivery": "queued",
+                "subject": format!("AI action draft #{} pending approval", draft.id),
+                "approver_identities": recipient_lines,
+            })
+            .to_string(),
+        ),
     });
 }
 

@@ -175,6 +175,254 @@ pub struct UserRoleAssignment {
     pub metadata: Option<String>,
 }
 
+// ── Policy snapshot (unified permission cache per user/org) ───────────────────
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct PolicyActionGrant {
+    pub resource: String,
+    pub action: String,
+    pub effect: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct PolicyFieldPermission {
+    pub resource: String,
+    pub fields: Vec<String>,
+}
+
+#[spacetimedb::table(
+    accessor = policy_snapshot,
+    public,
+    index(accessor = policy_snapshot_by_user, btree(columns = [organization_id, user_identity]))
+)]
+pub struct PolicySnapshot {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub user_identity: Identity,
+    pub role_id: u64,
+    pub role_name: String,
+    pub role_permissions: Vec<String>,
+    pub org_permission_grants: Vec<PolicyActionGrant>,
+    pub field_permissions: Vec<PolicyFieldPermission>,
+    pub is_superuser: bool,
+    pub version_hash: String,
+    pub refreshed_at: Timestamp,
+}
+
+fn permission_action_label(action: &PermissionAction) -> &'static str {
+    match action {
+        PermissionAction::Read => "read",
+        PermissionAction::Write => "write",
+        PermissionAction::Create => "create",
+        PermissionAction::Delete => "delete",
+        PermissionAction::All => "*",
+    }
+}
+
+fn permission_effect_label(effect: &PermissionEffect) -> &'static str {
+    match effect {
+        PermissionEffect::Allow => "allow",
+        PermissionEffect::Deny => "deny",
+    }
+}
+
+fn org_permission_applies_to_user(p: &OrgPermission, user_identity: Identity, role_id: u64) -> bool {
+    match &p.subject {
+        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::User(id) => *id == user_identity,
+    }
+}
+
+fn parse_casbin_field_list(metadata: &Option<String>) -> Option<Vec<String>> {
+    let meta = metadata.as_ref()?;
+    let value: serde_json::Value = serde_json::from_str(meta).ok()?;
+    let fields = value
+        .get("fields")?
+        .as_array()?
+        .iter()
+        .filter_map(|entry| entry.as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    if fields.is_empty() {
+        None
+    } else {
+        Some(fields)
+    }
+}
+
+fn fnv1a_hash(parts: &[&str]) -> String {
+    let mut hash: u64 = 14695981039346656037;
+    for part in parts {
+        for byte in part.as_bytes() {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(1099511628211);
+        }
+        hash ^= u64::from(b'|');
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    format!("{:016x}", hash)
+}
+
+pub(crate) fn build_policy_snapshot_row(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+) -> Result<PolicySnapshot, String> {
+    use crate::core::users::{user_organization, user_profile};
+
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(user_identity)
+        .ok_or("User not found")?;
+
+    let user_org = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .find(|uo| uo.organization_id == organization_id && uo.is_active)
+        .ok_or("Not a member of this organization")?;
+
+    let role = ctx
+        .db
+        .role()
+        .id()
+        .find(&user_org.role_id)
+        .ok_or("Role not found")?;
+
+    let mut org_permission_grants = Vec::new();
+    let mut hash_parts: Vec<String> = Vec::new();
+
+    hash_parts.push(format!("role:{}", role.id));
+    hash_parts.push(format!("perms:{}", role.permissions.join(",")));
+
+    for p in ctx
+        .db
+        .org_permission()
+        .perm_by_org()
+        .filter(&organization_id)
+    {
+        if !org_permission_applies_to_user(&p, user_identity, role.id) {
+            continue;
+        }
+        let action = permission_action_label(&p.action).to_string();
+        let effect = permission_effect_label(&p.effect).to_string();
+        org_permission_grants.push(PolicyActionGrant {
+            resource: p.resource.clone(),
+            action: action.clone(),
+            effect: effect.clone(),
+        });
+        hash_parts.push(format!(
+            "op:{}:{}:{}:{}",
+            p.id, p.resource, action, effect
+        ));
+    }
+
+    let role_str = role.id.to_string();
+    let role_name = role.name.as_str();
+    let identity_hex = user_identity.to_hex().to_string();
+    let org_str = organization_id.to_string();
+
+    let mut field_permissions = Vec::new();
+    for rule in ctx
+        .db
+        .casbin_rule()
+        .casbin_by_ptype()
+        .filter(&"p".to_string())
+    {
+        if rule.v1.as_deref() != Some(org_str.as_str()) {
+            continue;
+        }
+        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
+            || rule.v0.as_deref() == Some(role_name)
+            || rule.v0.as_deref() == Some(identity_hex.as_str());
+        if !subject_ok {
+            continue;
+        }
+        let action = rule.v3.as_deref().unwrap_or("");
+        if action != "read" && action != "*" {
+            continue;
+        }
+        let resource = match rule.v2.as_deref() {
+            Some(r) if !r.is_empty() => r.to_string(),
+            _ => continue,
+        };
+        if let Some(fields) = parse_casbin_field_list(&rule.metadata) {
+            hash_parts.push(format!("cf:{}:{}", rule.id, resource));
+            field_permissions.push(PolicyFieldPermission { resource, fields });
+        }
+    }
+
+    for rule in ctx
+        .db
+        .casbin_rule()
+        .casbin_by_ptype()
+        .filter(&"p".to_string())
+    {
+        if rule.v1.as_deref() != Some(org_str.as_str()) {
+            continue;
+        }
+        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
+            || rule.v0.as_deref() == Some(role_name)
+            || rule.v0.as_deref() == Some(identity_hex.as_str());
+        if subject_ok {
+            hash_parts.push(format!(
+                "cb:{}:{}:{}:{}",
+                rule.id,
+                rule.v2.as_deref().unwrap_or(""),
+                rule.v3.as_deref().unwrap_or(""),
+                rule.v4.as_deref().unwrap_or("")
+            ));
+        }
+    }
+
+    let version_hash = fnv1a_hash(
+        &hash_parts
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+    );
+
+    Ok(PolicySnapshot {
+        id: 0,
+        organization_id,
+        user_identity,
+        role_id: role.id,
+        role_name: role.name.clone(),
+        role_permissions: role.permissions.clone(),
+        org_permission_grants,
+        field_permissions,
+        is_superuser: user.is_superuser,
+        version_hash,
+        refreshed_at: ctx.timestamp,
+    })
+}
+
+pub(crate) fn upsert_policy_snapshot(
+    ctx: &ReducerContext,
+    snapshot: PolicySnapshot,
+) -> Result<u64, String> {
+    let organization_id = snapshot.organization_id;
+    let user_identity = snapshot.user_identity;
+
+    if let Some(existing) = ctx.db.policy_snapshot().iter().find(|row| {
+        row.organization_id == organization_id && row.user_identity == user_identity
+    }) {
+        let record_id = existing.id;
+        ctx.db.policy_snapshot().id().update(PolicySnapshot {
+            id: record_id,
+            ..snapshot
+        });
+        Ok(record_id)
+    } else {
+        let row = ctx.db.policy_snapshot().insert(snapshot);
+        Ok(row.id)
+    }
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 fn casbin_rule_belongs_to_org(rule: &CasbinRule, organization_id: u64) -> bool {
@@ -679,6 +927,17 @@ pub fn revoke_role(
         },
     );
 
+    Ok(())
+}
+
+/// Rebuild and cache the unified permission snapshot for the caller in an organization.
+#[spacetimedb::reducer]
+pub fn refresh_policy_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let snapshot = build_policy_snapshot_row(ctx, organization_id, ctx.sender())?;
+    upsert_policy_snapshot(ctx, snapshot)?;
     Ok(())
 }
 

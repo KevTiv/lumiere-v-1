@@ -16,6 +16,7 @@ use crate::helpers::{
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
 };
+use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -409,12 +410,64 @@ pub fn send_purchase_order(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
+    send_purchase_order_impl(ctx, organization_id, order_id, false)
+}
+
+pub fn send_purchase_order_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     if !matches!(order.state, PoState::Draft) {
         return Err("Purchase order must be in Draft state to send".to_string());
+    }
+
+    if !skip_approval_check {
+        let amount_total = order.amount_total;
+        let params_json = serde_json::json!({
+            "organization_id": organization_id,
+            "order_id": order_id,
+        })
+        .to_string();
+        let context_json = serde_json::json!({
+            "amount_total": amount_total,
+            "name": order.name,
+        })
+        .to_string();
+        let po_label = order.name.as_deref().unwrap_or("PO");
+        let summary = format!(
+            "Send PO {} to vendor (total {:.2})",
+            po_label, amount_total
+        );
+
+        if let Some(_request_id) = gate_action_with_approval(
+            ctx,
+            organization_id,
+            order.company_id,
+            "purchase_order",
+            order_id,
+            "send_purchase_order",
+            amount_total,
+            &summary,
+            &params_json,
+            Some(context_json),
+        )? {
+            ctx.db.purchase_order().id().update(PurchaseOrder {
+                state: PoState::ToApprove,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..order
+            });
+            return Err(format!(
+                "Purchase order requires approval before sending (amount {:.2})",
+                amount_total
+            ));
+        }
     }
 
     ctx.db.purchase_order().id().update(PurchaseOrder {
@@ -450,6 +503,15 @@ pub fn confirm_purchase_order(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
+    confirm_purchase_order_impl(ctx, organization_id, order_id, false)
+}
+
+pub fn confirm_purchase_order_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
@@ -461,6 +523,49 @@ pub fn confirm_purchase_order(
         return Err(
             "Purchase order must be in Sent, ToApprove, or Draft state to confirm".to_string(),
         );
+    }
+
+    if !skip_approval_check {
+        let amount_total = order.amount_total;
+        let params_json = serde_json::json!({
+            "organization_id": organization_id,
+            "order_id": order_id,
+        })
+        .to_string();
+        let context_json = serde_json::json!({
+            "amount_total": amount_total,
+            "name": order.name,
+        })
+        .to_string();
+        let po_label = order.name.as_deref().unwrap_or("PO");
+        let summary = format!(
+            "Confirm PO {} (total {:.2})",
+            po_label, amount_total
+        );
+
+        if let Some(_request_id) = gate_action_with_approval(
+            ctx,
+            organization_id,
+            order.company_id,
+            "purchase_order",
+            order_id,
+            "confirm_purchase_order",
+            amount_total,
+            &summary,
+            &params_json,
+            Some(context_json),
+        )? {
+            ctx.db.purchase_order().id().update(PurchaseOrder {
+                state: PoState::ToApprove,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..order
+            });
+            return Err(format!(
+                "Purchase order requires approval before confirmation (amount {:.2})",
+                amount_total
+            ));
+        }
     }
 
     let partner_id = order.partner_id;

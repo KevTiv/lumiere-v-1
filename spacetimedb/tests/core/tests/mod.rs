@@ -51,6 +51,16 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
         Err(e) => log::error!("✗ Permission tests failed: {}", e),
     }
 
+    match permissions_tests::test_permissions_error_cases(ctx) {
+        Ok(_) => log::info!("✓ Permission error case tests passed"),
+        Err(e) => log::error!("✗ Permission error case tests failed: {}", e),
+    }
+
+    match permissions_tests::test_org_permission_deny_beats_allow(ctx) {
+        Ok(_) => log::info!("✓ Org permission deny/allow tests passed"),
+        Err(e) => log::error!("✗ Org permission deny/allow tests failed: {}", e),
+    }
+
     // Run reference data tests
     match reference_tests::test_reference_data(ctx) {
         Ok(_) => log::info!("✓ Reference data tests passed"),

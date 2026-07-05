@@ -6871,6 +6871,7 @@ Prioritize high-severity findings and cite related records."#,
         date: ctx.timestamp,
         parent_id: None,
         attachment_ids: vec![],
+        metadata: None,
     });
     ctx.db.mail_follower().insert(MailFollower {
         id: 0,

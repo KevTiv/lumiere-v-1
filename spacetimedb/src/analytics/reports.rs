@@ -598,3 +598,197 @@ pub fn update_metric_values(
     );
     Ok(())
 }
+
+// ============================================================================
+// SAVED REPORTS / PIVOT DEFINITIONS
+// ============================================================================
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateSavedReportParams {
+    pub name: String,
+    pub model: String,
+    pub row_dimension: String,
+    pub column_dimension: Option<String>,
+    pub measure_field: String,
+    pub measure_op: String,
+    pub filter_json: Option<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateSavedReportParams {
+    pub name: Option<String>,
+    pub row_dimension: Option<String>,
+    pub column_dimension: Option<Option<String>>,
+    pub measure_field: Option<String>,
+    pub measure_op: Option<String>,
+    pub filter_json: Option<Option<String>>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[spacetimedb::table(
+    accessor = saved_report,
+    public,
+    index(accessor = saved_report_by_org, btree(columns = [organization_id])),
+    index(accessor = saved_report_by_company, btree(columns = [company_id])),
+    index(accessor = saved_report_by_model, btree(columns = [model]))
+)]
+pub struct SavedReport {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub name: String,
+    pub model: String,
+    pub row_dimension: String,
+    pub column_dimension: Option<String>,
+    pub measure_field: String,
+    pub measure_op: String,
+    pub filter_json: Option<String>,
+    pub is_active: bool,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
+#[reducer]
+pub fn create_saved_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateSavedReportParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "saved_report", "create")?;
+    if params.name.trim().is_empty() {
+        return Err("Saved report name is required".to_string());
+    }
+    let row = ctx.db.saved_report().insert(SavedReport {
+        id: 0,
+        organization_id,
+        company_id,
+        name: params.name.trim().to_string(),
+        model: params.model,
+        row_dimension: params.row_dimension,
+        column_dimension: params.column_dimension,
+        measure_field: params.measure_field,
+        measure_op: params.measure_op,
+        filter_json: params.filter_json,
+        is_active: params.is_active,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "saved_report",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": row.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn update_saved_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    saved_report_id: u64,
+    params: UpdateSavedReportParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "saved_report", "write")?;
+    let existing = ctx
+        .db
+        .saved_report()
+        .id()
+        .find(&saved_report_id)
+        .ok_or("Saved report not found")?;
+    if existing.organization_id != organization_id {
+        return Err("Saved report does not belong to this organization".to_string());
+    }
+    if existing.company_id != company_id {
+        return Err("Saved report does not belong to this company".to_string());
+    }
+    ctx.db.saved_report().id().update(SavedReport {
+        name: params.name.unwrap_or(existing.name),
+        row_dimension: params.row_dimension.unwrap_or(existing.row_dimension),
+        column_dimension: params
+            .column_dimension
+            .unwrap_or(existing.column_dimension),
+        measure_field: params.measure_field.unwrap_or(existing.measure_field),
+        measure_op: params.measure_op.unwrap_or(existing.measure_op),
+        filter_json: params.filter_json.unwrap_or(existing.filter_json),
+        is_active: params.is_active.unwrap_or(existing.is_active),
+        metadata: params.metadata.or(existing.metadata),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..existing
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "saved_report",
+            record_id: saved_report_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["row_dimension".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn delete_saved_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    saved_report_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "saved_report", "delete")?;
+    let existing = ctx
+        .db
+        .saved_report()
+        .id()
+        .find(&saved_report_id)
+        .ok_or("Saved report not found")?;
+    if existing.organization_id != organization_id {
+        return Err("Saved report does not belong to this organization".to_string());
+    }
+    if existing.company_id != company_id {
+        return Err("Saved report does not belong to this company".to_string());
+    }
+    ctx.db.saved_report().id().delete(&saved_report_id);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "saved_report",
+            record_id: saved_report_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "name": existing.name }).to_string()),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}

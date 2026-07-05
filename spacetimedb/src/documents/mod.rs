@@ -10,6 +10,8 @@
 /// | **KnowledgeArticle** | Wiki articles with hierarchy and permissions |
 pub mod documents;
 pub mod knowledge;
+pub mod templates;
 
 pub use documents::*;
 pub use knowledge::*;
+pub use templates::*;

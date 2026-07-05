@@ -12,7 +12,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_account;
-use crate::accounting::journal_entries::account_move_line;
+use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountMoveState, ReportState, ReportType};
 
@@ -803,9 +803,9 @@ pub fn export_financial_report(
 
     report.export_format = Some(params.export_format.clone());
     report.exported_file_url = Some(format!(
-        "/reports/{}/export.{}",
-        report_id,
-        params.export_format.to_lowercase()
+        "/api/documents/{}/financial-report/{}",
+        params.export_format.to_lowercase(),
+        report_id
     ));
     report.state = ReportState::Exported;
     report.write_uid = Some(ctx.sender());
@@ -1047,6 +1047,142 @@ pub fn delete_financial_report(
             old_values: Some(serde_json::json!({ "name": report.name }).to_string()),
             new_values: None,
             changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct GenerateEuVatReportParams {
+    pub name: String,
+    pub date_from: Timestamp,
+    pub date_to: Timestamp,
+    pub currency_id: u64,
+    pub locale: String,
+}
+
+/// Generate an EU VAT return summary from posted customer/vendor invoices in the period.
+#[spacetimedb::reducer]
+pub fn generate_eu_vat_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: GenerateEuVatReportParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "financial_report", "write")?;
+
+    if params.date_from >= params.date_to {
+        return Err("End date must be after start date".to_string());
+    }
+
+    let report = ctx.db.financial_report().insert(FinancialReport {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        report_type: ReportType::VatReturn,
+        date_from: params.date_from,
+        date_to: params.date_to,
+        company_id,
+        currency_id: params.currency_id,
+        target_move: "posted".to_string(),
+        comparison_mode: "none".to_string(),
+        filter_analytic_account_ids: vec![],
+        filter_account_ids: vec![],
+        filter_partner_ids: vec![],
+        filter_journal_ids: vec![],
+        hierarchy_level: 0,
+        show_zero_lines: false,
+        show_hierarchy: false,
+        show_percentage: false,
+        show_debit_credit: true,
+        result_currency_id: params.currency_id,
+        state: ReportState::Draft,
+        generated_by: None,
+        generated_at: None,
+        report_data: None,
+        export_format: None,
+        exported_file_url: None,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(format!(r#"{{"locale":"{}"}}"#, params.locale)),
+    });
+
+    let report_id = report.id;
+
+    let mut sales_base = 0.0f64;
+    let mut sales_tax = 0.0f64;
+    let mut purchase_base = 0.0f64;
+    let mut purchase_tax = 0.0f64;
+
+    for mv in ctx.db.account_move().iter() {
+        if mv.organization_id != organization_id || mv.company_id != company_id {
+            continue;
+        }
+        if mv.state != AccountMoveState::Posted {
+            continue;
+        }
+        if mv.date < params.date_from || mv.date > params.date_to {
+            continue;
+        }
+        match mv.move_type {
+            crate::types::MoveType::OutInvoice | crate::types::MoveType::OutRefund => {
+                sales_base += mv.amount_untaxed;
+                sales_tax += mv.amount_tax;
+            }
+            crate::types::MoveType::InInvoice | crate::types::MoveType::InRefund => {
+                purchase_base += mv.amount_untaxed;
+                purchase_tax += mv.amount_tax;
+            }
+            _ => {}
+        }
+    }
+
+    let report_data = serde_json::json!({
+        "locale": params.locale,
+        "boxes": {
+            "box_01_taxable_supplies": sales_base,
+            "box_02_vat_due_on_sales": sales_tax,
+            "box_03_taxable_purchases": purchase_base,
+            "box_04_vat_deductible": purchase_tax,
+            "box_71_vat_payable": (sales_tax - purchase_tax).max(0.0),
+            "box_72_vat_refundable": (purchase_tax - sales_tax).max(0.0),
+        },
+        "summary": {
+            "sales_base": sales_base,
+            "sales_tax": sales_tax,
+            "purchase_base": purchase_base,
+            "purchase_tax": purchase_tax,
+            "net_vat": sales_tax - purchase_tax,
+        }
+    })
+    .to_string();
+
+    let mut updated = report;
+    updated.state = ReportState::Generated;
+    updated.generated_by = Some(ctx.sender());
+    updated.generated_at = Some(ctx.timestamp);
+    updated.report_data = Some(report_data);
+    updated.write_uid = Some(ctx.sender());
+    updated.write_date = Some(ctx.timestamp);
+    ctx.db.financial_report().id().update(updated);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "financial_report",
+            record_id: report_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "state": "Generated", "report_type": "VatReturn" }).to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "report_data".to_string()],
             metadata: None,
         },
     );

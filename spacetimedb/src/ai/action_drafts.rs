@@ -7,6 +7,7 @@ use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::workflow::approval_gate::create_ai_draft_approval_request;
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
@@ -139,6 +140,16 @@ pub fn create_ai_action_draft(
 
     on_draft_created(ctx, &row);
 
+    create_ai_draft_approval_request(
+        ctx,
+        organization_id,
+        company_id,
+        row.id,
+        &row.summary,
+        &row.params_json,
+        row.elevated,
+    );
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -234,7 +245,15 @@ pub fn approve_ai_action_draft(
     draft_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_action_draft", "write")?;
+    approve_ai_action_draft_core(ctx, organization_id, company_id, draft_id)
+}
 
+pub fn approve_ai_action_draft_core(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    draft_id: u64,
+) -> Result<(), String> {
     let draft = load_mutable_draft(ctx, organization_id, company_id, draft_id)?;
 
     if draft.status != "pending" {
@@ -345,7 +364,16 @@ pub fn reject_ai_action_draft(
     reason: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_action_draft", "write")?;
+    reject_ai_action_draft_core(ctx, organization_id, company_id, draft_id, &reason)
+}
 
+pub fn reject_ai_action_draft_core(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    draft_id: u64,
+    reason: &str,
+) -> Result<(), String> {
     let draft = load_mutable_draft(ctx, organization_id, company_id, draft_id)?;
 
     if draft.status != "pending" {

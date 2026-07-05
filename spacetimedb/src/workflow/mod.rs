@@ -8,8 +8,12 @@
 /// | **WorkflowTransition** | Edges connecting activities with conditions |
 /// | **WorkflowInstance** | Runtime instances bound to ERP records |
 /// | **WorkflowWorkitem** | Active work items within a running instance |
+pub mod approval_gate;
+pub mod approvals;
 pub mod definitions;
 pub mod runtime;
 
+pub use approval_gate::*;
+pub use approvals::*;
 pub use definitions::*;
 pub use runtime::*;

@@ -829,3 +829,157 @@ pub fn close_account_period(
 
     Ok(())
 }
+
+/// Reject posting when the move date falls in a closed accounting period.
+pub fn ensure_accounting_period_open_for_date(
+    ctx: &ReducerContext,
+    company_id: u64,
+    move_date: Timestamp,
+) -> Result<(), String> {
+    for period in ctx.db.account_period().period_by_company().filter(&company_id) {
+        if move_date >= period.date_from
+            && move_date <= period.date_to
+            && period.state == PeriodState::Closed
+        {
+            return Err(format!(
+                "Accounting period {} is closed; cannot post moves dated in this period",
+                period.name
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetupFiscalCalendarParams {
+    pub fiscal_year_name: String,
+    pub date_from: Timestamp,
+    pub date_to: Timestamp,
+    pub open_first_period: bool,
+}
+
+/// Create a fiscal year plus twelve monthly periods for a company (implementation wizard).
+#[spacetimedb::reducer]
+pub fn setup_fiscal_calendar(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: SetupFiscalCalendarParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_fiscal_year", "create")?;
+
+    if params.date_from >= params.date_to {
+        return Err("Fiscal year start date must be before end date".to_string());
+    }
+
+    create_fiscal_year(
+        ctx,
+        organization_id,
+        company_id,
+        CreateFiscalYearParams {
+            name: params.fiscal_year_name.clone(),
+            date_from: params.date_from,
+            date_to: params.date_to,
+            type_: "standard".to_string(),
+            state: FiscalYearState::Running,
+            carry_over_accounts: vec![],
+            closing_move_id: None,
+            opening_move_id: None,
+            is_adjustment: false,
+            notes: Some("Created by fiscal setup wizard".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    let fiscal_year_id = ctx
+        .db
+        .account_fiscal_year()
+        .fiscal_year_by_company()
+        .filter(&company_id)
+        .filter(|fy| fy.name == params.fiscal_year_name)
+        .map(|fy| fy.id)
+        .last()
+        .ok_or("Fiscal year not found after create")?;
+
+    let total_micros = params
+        .date_to
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_micros()
+        .saturating_sub(
+            params
+                .date_from
+                .to_duration_since_unix_epoch()
+                .unwrap_or_default()
+                .as_micros(),
+        );
+    let month_micros = (total_micros / 12).max(1);
+
+    for month in 0..12 {
+        let start_micros = params
+            .date_from
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_micros()
+            + month_micros * month as u128;
+        let end_micros = if month == 11 {
+            params
+                .date_to
+                .to_duration_since_unix_epoch()
+                .unwrap_or_default()
+                .as_micros()
+        } else {
+            start_micros + month_micros - 1
+        };
+
+        let period_from = Timestamp::from_micros_since_unix_epoch(start_micros as i64);
+        let period_to = Timestamp::from_micros_since_unix_epoch(end_micros as i64);
+        let code = format!("{:02}", month + 1);
+        let name = format!("{} / {}", params.fiscal_year_name, code);
+
+        create_account_period(
+            ctx,
+            organization_id,
+            company_id,
+            CreateAccountPeriodParams {
+                name,
+                code,
+                date_from: period_from,
+                date_to: period_to,
+                fiscal_year_id,
+                state: if params.open_first_period && month == 0 {
+                    PeriodState::Open
+                } else {
+                    PeriodState::Draft
+                },
+                is_adjustment: false,
+                notes: None,
+                metadata: None,
+            },
+        )?;
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_fiscal_year",
+            record_id: fiscal_year_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": params.fiscal_year_name,
+                    "periods": 12,
+                    "open_first_period": params.open_first_period,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}

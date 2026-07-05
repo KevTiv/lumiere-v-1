@@ -3,6 +3,9 @@ mod helpers;
 pub mod journal_entries_test;
 pub mod payment_terms_test;
 pub mod payments_test;
+pub mod period_lock_test;
+pub mod posted_immutability_test;
+pub mod trial_balance_test;
 
 use spacetimedb::ReducerContext;
 
@@ -14,6 +17,9 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_payment_reconcile_test(ctx)?;
     run_accounting_payment_cancel_test(ctx)?;
     run_accounting_payment_term_update_test(ctx)?;
+    run_accounting_period_lock_test(ctx)?;
+    run_accounting_posted_immutability_test(ctx)?;
+    run_accounting_trial_balance_test(ctx)?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
@@ -40,4 +46,22 @@ pub fn run_accounting_payment_cancel_test(ctx: &ReducerContext) -> Result<(), St
 pub fn run_accounting_payment_term_update_test(ctx: &ReducerContext) -> Result<(), String> {
     payment_terms_test::test_payment_term_update_and_delete(ctx)
         .map_err(|e| format!("payment_term_update_and_delete: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_period_lock_test(ctx: &ReducerContext) -> Result<(), String> {
+    period_lock_test::test_post_blocked_in_closed_period(ctx)
+        .map_err(|e| format!("period_lock: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_posted_immutability_test(ctx: &ReducerContext) -> Result<(), String> {
+    posted_immutability_test::test_cannot_edit_posted_move_line(ctx)
+        .map_err(|e| format!("posted_immutability: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_trial_balance_test(ctx: &ReducerContext) -> Result<(), String> {
+    trial_balance_test::test_trial_balance_summary_balances(ctx)
+        .map_err(|e| format!("trial_balance: {e}"))
 }

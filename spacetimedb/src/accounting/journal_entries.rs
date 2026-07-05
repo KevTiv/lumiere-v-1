@@ -10,6 +10,7 @@ use crate::accounting::budgeting::{
     CrossoveredBudgetLines,
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::crm::contacts::contact;
 use crate::helpers::{
@@ -24,6 +25,7 @@ use crate::types::{
     AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
     PoInvoiceStatus,
 };
+use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -1153,6 +1155,15 @@ pub fn post_account_move(
     organization_id: u64,
     move_id: u64,
 ) -> Result<(), String> {
+    post_account_move_impl(ctx, organization_id, move_id, false)
+}
+
+pub fn post_account_move_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
 
     let move_record = ctx
@@ -1164,6 +1175,53 @@ pub fn post_account_move(
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Only draft moves can be posted".to_string());
+    }
+
+    let is_vendor_bill = matches!(
+        move_record.move_type,
+        MoveType::InInvoice | MoveType::InRefund
+    );
+
+    if !skip_approval_check && is_vendor_bill {
+        let amount_total = move_record.amount_total;
+        let params_json = serde_json::json!({
+            "organization_id": organization_id,
+            "move_id": move_id,
+        })
+        .to_string();
+        let context_json = serde_json::json!({
+            "amount_total": amount_total,
+            "move_type": format!("{:?}", move_record.move_type),
+            "name": move_record.name,
+        })
+        .to_string();
+        let summary = format!(
+            "Post vendor bill {} (total {:.2})",
+            if move_record.name.is_empty() {
+                format!("#{move_id}")
+            } else {
+                move_record.name.clone()
+            },
+            amount_total
+        );
+
+        if let Some(_request_id) = gate_action_with_approval(
+            ctx,
+            organization_id,
+            move_record.company_id,
+            "account_move",
+            move_id,
+            "post_account_move",
+            amount_total,
+            &summary,
+            &params_json,
+            Some(context_json),
+        )? {
+            return Err(format!(
+                "Vendor bill requires approval before posting (amount {:.2})",
+                amount_total
+            ));
+        }
     }
 
     // Check balance - sum of debit must equal sum of credit
@@ -1184,6 +1242,8 @@ pub fn post_account_move(
     if lines.is_empty() {
         return Err("Cannot post a move without lines".to_string());
     }
+
+    ensure_accounting_period_open_for_date(ctx, move_record.company_id, move_record.date)?;
 
     // Generate name from document sequence if not set
     let name = if move_record.name.is_empty() {

@@ -154,6 +154,21 @@ pub struct CreateRoleConfigParams {
     pub default_prompts: Vec<String>,
 }
 
+/// Single custom field value for a business record (EAV row payload).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordCustomFieldEntry {
+    pub field_key: String,
+    pub value_json: String,
+}
+
+/// Parameters for upserting record-level custom field values.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetRecordCustomFieldValuesParams {
+    pub model: String,
+    pub record_id: u64,
+    pub entries: Vec<RecordCustomFieldEntry>,
+}
+
 /// Parameters for creating a user custom field
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateUserCustomFieldParams {
@@ -238,6 +253,34 @@ pub struct FormRoleConfig {
     pub is_active: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+}
+
+/// Record-level custom field value (EAV) — `(org, company, model, record_id, field_key)`.
+#[spacetimedb::table(
+    public,
+    accessor = record_custom_field_value,
+    index(
+        name = "by_org_company_record",
+        accessor = record_custom_field_by_org_company_record,
+        btree(columns = [organization_id, company_id, record_id])
+    )
+)]
+pub struct RecordCustomFieldValue {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub organization_id: u64,
+    #[index(btree)]
+    pub company_id: u64,
+    pub model: String,
+    pub record_id: u64,
+    pub field_key: String,
+    pub value_json: String,
+    pub create_uid: Option<Identity>,
+    pub write_uid: Option<Identity>,
+    pub create_date: Option<Timestamp>,
+    pub write_date: Option<Timestamp>,
 }
 
 /// User custom field - allows users to add custom fields to forms
@@ -770,6 +813,155 @@ pub fn delete_user_custom_field(
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Deleted custom field: {}", field.field_id)),
+        },
+    );
+
+    Ok(())
+}
+
+/// Upsert custom field values on a business record (keys must start with `custom:`).
+#[spacetimedb::reducer]
+pub fn set_record_custom_field_values(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: SetRecordCustomFieldValuesParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, &params.model, "write")?;
+
+    if params.model.trim().is_empty() {
+        return Err("model is required".to_string());
+    }
+    if params.record_id == 0 {
+        return Err("record_id is required".to_string());
+    }
+
+    for entry in &params.entries {
+        if !entry.field_key.starts_with("custom:") {
+            return Err(format!(
+                "field_key must start with 'custom:': {}",
+                entry.field_key
+            ));
+        }
+    }
+
+    let existing_for_record: Vec<_> = ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .filter(|r| {
+            r.organization_id == organization_id
+                && r.company_id == company_id
+                && r.model == params.model
+                && r.record_id == params.record_id
+        })
+        .collect();
+
+    let changed_keys: Vec<String> = params.entries.iter().map(|e| e.field_key.clone()).collect();
+    let model = params.model.clone();
+    let record_id = params.record_id;
+    let mut last_id = 0u64;
+    for entry in &params.entries {
+        if let Some(row) = existing_for_record
+            .iter()
+            .find(|r| r.field_key == entry.field_key)
+        {
+            ctx.db.record_custom_field_value().id().update(RecordCustomFieldValue {
+                id: row.id,
+                organization_id: row.organization_id,
+                company_id: row.company_id,
+                model: row.model.clone(),
+                record_id: row.record_id,
+                field_key: row.field_key.clone(),
+                value_json: entry.value_json.clone(),
+                create_uid: row.create_uid,
+                write_uid: Some(ctx.sender()),
+                create_date: row.create_date,
+                write_date: Some(ctx.timestamp),
+            });
+            last_id = row.id;
+        } else {
+            let inserted = ctx.db.record_custom_field_value().insert(RecordCustomFieldValue {
+                id: 0,
+                organization_id,
+                company_id,
+                model: model.clone(),
+                record_id,
+                field_key: entry.field_key.clone(),
+                value_json: entry.value_json.clone(),
+                create_uid: Some(ctx.sender()),
+                write_uid: Some(ctx.sender()),
+                create_date: Some(ctx.timestamp),
+                write_date: Some(ctx.timestamp),
+            });
+            last_id = inserted.id;
+        }
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "record_custom_field_value",
+            record_id: last_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "model": model,
+                    "record_id": record_id,
+                    "field_count": changed_keys.len(),
+                })
+                .to_string(),
+            ),
+            changed_fields: changed_keys,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Delete all custom field values for a business record.
+#[spacetimedb::reducer]
+pub fn delete_record_custom_field_values(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    model: String,
+    record_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, &model, "write")?;
+
+    let rows: Vec<_> = ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .filter(|r| {
+            r.organization_id == organization_id
+                && r.company_id == company_id
+                && r.model == model
+                && r.record_id == record_id
+        })
+        .collect();
+
+    for row in rows {
+        ctx.db.record_custom_field_value().id().delete(&row.id);
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "record_custom_field_value",
+            record_id,
+            action: "DELETE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: Some(format!("Cleared custom fields for {}:{}", model, record_id)),
         },
     );
 

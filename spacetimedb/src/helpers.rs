@@ -17,12 +17,83 @@ use crate::core::reference::{document_sequence, DocumentSequence};
 use crate::core::users::{user_organization, user_profile};
 use crate::types::TaxAmountType;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PermissionResolution {
+    Allow,
+    Deny,
+    NotGranted,
+}
+
+/// Core permission resolution for a known org membership + role context.
+///
 /// Resolution order:
-///   1. Superuser → always allowed
+///   1. Superuser → Allow
 ///   2. Role.permissions string list (`"resource:action"` or `"resource:*"`)
 ///   3. OrgPermission rows for the org (explicit **Deny** wins over **Allow**)
 ///   4. Legacy CasbinRule policy rows (`ptype == "p"`), org-scoped via index
-///
+pub fn resolve_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+    role_id: u64,
+    role_name: &str,
+    role_permissions: &[String],
+    is_superuser: bool,
+    resource: &str,
+    action: &str,
+) -> PermissionResolution {
+    if is_superuser {
+        return PermissionResolution::Allow;
+    }
+
+    let permission = format!("{}:{}", resource, action);
+    let wildcard = format!("{}:*", resource);
+    let global_wildcard = "*:*".to_string();
+
+    if role_permissions.contains(&permission)
+        || role_permissions.contains(&wildcard)
+        || role_permissions.contains(&global_wildcard)
+    {
+        return PermissionResolution::Allow;
+    }
+
+    if let Some(r) = try_org_permission(
+        ctx,
+        organization_id,
+        resource,
+        action,
+        role_id,
+        user_identity,
+    ) {
+        return match r {
+            Ok(()) => PermissionResolution::Allow,
+            Err(_) => PermissionResolution::Deny,
+        };
+    }
+
+    let role_str = role_id.to_string();
+    let org_str = organization_id.to_string();
+    let has_casbin = ctx
+        .db
+        .casbin_rule()
+        .casbin_by_ptype()
+        .filter(&"p".to_string())
+        .any(|r| {
+            let subject_ok = r.v0.as_deref() == Some(role_str.as_str())
+                || r.v0.as_deref() == Some(role_name)
+                || r.v0.as_deref() == Some(user_identity.to_hex().to_string().as_str());
+            let res_ok = r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
+            let act_ok = r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
+            subject_ok && r.v1.as_deref() == Some(org_str.as_str()) && res_ok && act_ok
+        });
+
+    if has_casbin {
+        return PermissionResolution::Allow;
+    }
+
+    PermissionResolution::NotGranted
+}
+
 /// Returns `Ok(())` when allowed, `Err(reason)` otherwise.
 pub fn check_permission(
     ctx: &ReducerContext,
@@ -41,10 +112,6 @@ pub fn check_permission(
         return Err("User account is inactive".to_string());
     }
 
-    if user.is_superuser {
-        return Ok(());
-    }
-
     let user_org = ctx
         .db
         .user_organization()
@@ -60,43 +127,23 @@ pub fn check_permission(
         .find(&user_org.role_id)
         .ok_or("Role not found")?;
 
-    let permission = format!("{}:{}", resource, action);
-    let wildcard = format!("{}:*", resource);
-    let global_wildcard = "*:*".to_string();
-
-    if role.permissions.contains(&permission)
-        || role.permissions.contains(&wildcard)
-        || role.permissions.contains(&global_wildcard)
-    {
-        return Ok(());
+    match resolve_permission(
+        ctx,
+        organization_id,
+        ctx.sender(),
+        role.id,
+        &role.name,
+        &role.permissions,
+        user.is_superuser,
+        resource,
+        action,
+    ) {
+        PermissionResolution::Allow => Ok(()),
+        PermissionResolution::Deny | PermissionResolution::NotGranted => Err(format!(
+            "Permission denied: {} on {}",
+            action, resource
+        )),
     }
-
-    if let Some(r) = try_org_permission(ctx, organization_id, resource, action, role.id) {
-        return r;
-    }
-
-    // Legacy Casbin "p" rules (v0 = role id or role name; v1 = org id string)
-    let role_str = role.id.to_string();
-    let role_name = role.name.as_str();
-    let org_str = organization_id.to_string();
-    let has_casbin = ctx
-        .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-        .any(|r| {
-            let subject_ok =
-                r.v0.as_deref() == Some(role_str.as_str()) || r.v0.as_deref() == Some(role_name);
-            let res_ok = r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
-            let act_ok = r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
-            subject_ok && r.v1.as_deref() == Some(org_str.as_str()) && res_ok && act_ok
-        });
-
-    if has_casbin {
-        return Ok(());
-    }
-
-    Err(format!("Permission denied: {} on {}", action, resource))
 }
 
 fn org_perm_subject_matches(subject: &PermissionSubject, sender: Identity, role_id: u64) -> bool {
@@ -128,6 +175,7 @@ fn try_org_permission(
     resource: &str,
     action: &str,
     role_id: u64,
+    user_identity: Identity,
 ) -> Option<Result<(), String>> {
     let mut saw_deny = false;
     let mut saw_allow = false;
@@ -138,7 +186,7 @@ fn try_org_permission(
         .perm_by_org()
         .filter(&organization_id)
     {
-        if !org_perm_subject_matches(&p.subject, ctx.sender(), role_id) {
+        if !org_perm_subject_matches(&p.subject, user_identity, role_id) {
             continue;
         }
         if !org_perm_resource_matches(&p.resource, resource) {

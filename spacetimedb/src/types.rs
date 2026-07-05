@@ -373,6 +373,7 @@ pub enum SaleState {
     Sale,
     Done,
     Cancelled,
+    ToApprove,
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -722,6 +723,7 @@ pub enum ReportType {
     AgedReceivable,
     AgedPayable,
     PartnerBalance,
+    VatReturn,
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]

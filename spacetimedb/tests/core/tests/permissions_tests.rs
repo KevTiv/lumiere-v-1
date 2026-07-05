@@ -590,3 +590,140 @@ pub fn test_permissions_error_cases(ctx: &ReducerContext) -> Result<(), String> 
     log::info!("✅ Permission error case tests passed!");
     Ok(())
 }
+
+/// OrgPermission deny must override role allow strings.
+#[spacetimedb::reducer]
+pub fn test_org_permission_deny_beats_allow(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::permissions::{
+        seed_insert_org_permission, PermissionAction, PermissionEffect, PermissionSubject,
+    };
+    use crate::helpers::{PermissionResolution, resolve_permission};
+
+    create_organization(
+        ctx,
+        CreateOrganizationParams {
+            name: "Deny Test Org".to_string(),
+            code: "DENYORG".to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: None,
+        },
+    )?;
+
+    let org = ctx
+        .db
+        .organization()
+        .iter()
+        .find(|o| o.code == "DENYORG")
+        .ok_or("Test organization not found")?;
+
+    create_role(
+        ctx,
+        org.id,
+        CreateRoleParams {
+            name: "Sales Rep".to_string(),
+            description: None,
+            parent_id: None,
+            permissions: vec!["sale_order:create".to_string()],
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+
+    let role = ctx
+        .db
+        .role()
+        .iter()
+        .find(|r| r.name == "Sales Rep" && r.organization_id == org.id)
+        .ok_or("Role not created")?;
+
+    seed_insert_org_permission(
+        ctx,
+        org.id,
+        PermissionSubject::Role(role.id),
+        "sale_order".to_string(),
+        PermissionAction::Create,
+        PermissionEffect::Deny,
+    );
+
+    let allowed = resolve_permission(
+        ctx,
+        org.id,
+        ctx.sender(),
+        role.id,
+        &role.name,
+        &role.permissions,
+        false,
+        "sale_order",
+        "create",
+    );
+    if allowed != PermissionResolution::Deny {
+        return Err(format!(
+            "Expected Deny when org permission denies sale_order:create, got {:?}",
+            allowed
+        ));
+    }
+
+    seed_insert_org_permission(
+        ctx,
+        org.id,
+        PermissionSubject::User(ctx.sender()),
+        "purchase_order".to_string(),
+        PermissionAction::Create,
+        PermissionEffect::Allow,
+    );
+
+    let user_allowed = resolve_permission(
+        ctx,
+        org.id,
+        ctx.sender(),
+        role.id,
+        &role.name,
+        &role.permissions,
+        false,
+        "purchase_order",
+        "create",
+    );
+    if user_allowed != PermissionResolution::Allow {
+        return Err(format!(
+            "Expected Allow from user-level org permission, got {:?}",
+            user_allowed
+        ));
+    }
+
+    let snapshot = crate::core::permissions::build_policy_snapshot_row(ctx, org.id, ctx.sender())?;
+    if snapshot.org_permission_grants.len() < 2 {
+        return Err("Policy snapshot should include org permission grants".to_string());
+    }
+
+    let before = snapshot.version_hash.clone();
+    update_role(
+        ctx,
+        role.id,
+        UpdateRoleParams {
+            name: None,
+            description: None,
+            permissions: Some(vec![
+                "sale_order:create".to_string(),
+                "sale_order:read".to_string(),
+            ]),
+            is_active: None,
+        },
+    )?;
+
+    let after = crate::core::permissions::build_policy_snapshot_row(ctx, org.id, ctx.sender())?;
+    if before == after.version_hash {
+        return Err("version_hash should change when role permissions change".to_string());
+    }
+
+    log::info!("✅ Org permission deny/allow tests passed!");
+    Ok(())
+}
