@@ -1,6 +1,6 @@
 "use client"
 
-import { approvalsBffPost } from "@lumiere/stdb/commands/approvals-http"
+import { approvalsBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"

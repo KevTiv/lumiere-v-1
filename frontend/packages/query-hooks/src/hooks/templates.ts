@@ -6,7 +6,7 @@ import {
   type DocumentExportFormat,
   type DocumentExportKind,
   type DocumentPdfKind,
-} from "@lumiere/stdb/commands/templates-http"
+} from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
