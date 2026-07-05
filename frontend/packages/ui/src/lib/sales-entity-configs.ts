@@ -5,10 +5,18 @@ import { transfersTableConfig } from "./inventory-entity-configs"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const saleStateBadges = (t: TFunction) => ({
-  badgeVariants: { Draft: "secondary", Sent: "outline", Sale: "default", Done: "default", Cancel: "destructive" },
+  badgeVariants: {
+    Draft: "secondary",
+    Sent: "outline",
+    ToApprove: "outline",
+    Sale: "default",
+    Done: "default",
+    Cancel: "destructive",
+  },
   badgeLabels: {
     Draft: t("sales.salesOrders.states.Draft"),
     Sent: t("sales.salesOrders.states.Sent"),
+    ToApprove: t("sales.salesOrders.states.ToApprove"),
     Sale: t("sales.salesOrders.states.Sale"),
     Done: t("sales.salesOrders.states.Done"),
     Cancel: t("sales.salesOrders.states.Cancel"),
@@ -104,6 +112,7 @@ export const saleOrdersTableConfig = (
           options: [
             { value: "Draft", label: t("sales.salesOrders.filters.state.options.Draft") },
             { value: "Sent", label: t("sales.salesOrders.filters.state.options.Sent") },
+            { value: "ToApprove", label: t("sales.salesOrders.filters.state.options.ToApprove") },
             { value: "Sale", label: t("sales.salesOrders.filters.state.options.Sale") },
             { value: "Done", label: t("sales.salesOrders.filters.state.options.Done") },
             { value: "Cancel", label: t("sales.salesOrders.filters.state.options.Cancel") },

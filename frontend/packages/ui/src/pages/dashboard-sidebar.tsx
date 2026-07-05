@@ -95,7 +95,8 @@ export function DashboardSidebar({
         { label: t("nav.forensics"), href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
         { label: t("nav.trackers"), href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
         { label: "AI Skills", href: "/ai-skills", icon: Sparkles, resource: "dashboard:analytics" },
-        { label: "AI Approvals", href: "/ai-action-drafts", icon: ClipboardCheck, resource: "dashboard:analytics" },
+        { label: "Approvals", href: "/approvals", icon: ClipboardCheck, resource: "module:workflows" },
+        { label: "AI Approvals", href: "/ai-action-drafts", icon: Sparkles, resource: "dashboard:analytics" },
       ],
     },
     {

@@ -5,6 +5,7 @@ import {
   serverQueryDashboardWidgets,
   serverQueryFinancialReports,
   serverQueryReportTemplates,
+  serverQuerySavedReports,
   serverQueryScheduledReports,
   serverQueryTrialBalances,
 } from "@lumiere/stdb/server"
@@ -17,7 +18,7 @@ export default async function ReportsPage() {
   }
   const { organizationId, opts } = session
 
-  const [reports, balances, templates, scheduled, metrics, dashboards, widgets] = await Promise.all([
+  const [reports, balances, templates, scheduled, metrics, dashboards, widgets, savedReports] = await Promise.all([
     serverQueryFinancialReports(organizationId, opts),
     serverQueryTrialBalances(organizationId, opts),
     serverQueryReportTemplates(organizationId, opts),
@@ -25,7 +26,8 @@ export default async function ReportsPage() {
     serverQueryAnalyticsMetrics(organizationId, opts),
     serverQueryDashboards(organizationId, opts),
     serverQueryDashboardWidgets(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], []])
+    serverQuerySavedReports(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], [], [], []])
 
   return (
     <ReportsClient

@@ -92,6 +92,8 @@ import {
   Sparkles,
 } from "lucide-react"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
+import { PivotExplorer } from "./pivot-explorer"
+import { VatReportPanel } from "./vat-report-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -776,6 +778,31 @@ function ReportsClientLoaded({
         }
         if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig }
         if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig }
+        if (tab.id === "pivot-explorer") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <PivotExplorer
+                organizationId={orgId}
+                financialReports={reports as Record<string, unknown>[]}
+                trialBalances={trialBalances as Record<string, unknown>[]}
+              />
+            ),
+          }
+        }
+        if (tab.id === "vat-report") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <VatReportPanel
+                organizationId={orgId}
+                financialReports={reports as Record<string, unknown>[]}
+              />
+            ),
+          }
+        }
         return tab
       }),
     }),
@@ -790,7 +817,11 @@ function ReportsClientLoaded({
       scheduledReportsEntityConfig,
       dashboardsEntityConfig,
       dashboardWidgetsEntityConfig,
-      scheduledReportFormConfig, t
+      scheduledReportFormConfig,
+      reports,
+      trialBalances,
+      orgId,
+      t
     ],
   )
 

@@ -198,6 +198,7 @@ import {
   useDeleteFiscalYear,
   useOpenFiscalYear,
   useCloseFiscalYear,
+  useSetupFiscalCalendar,
   useAccountPeriods,
   useCreateAccountPeriod,
   useUpdateAccountPeriod,
@@ -262,6 +263,12 @@ import {
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import {
+  downloadDocumentPdf,
+  useDispatchQueuedMail,
+  useMailTemplates,
+  useQueueMailFromTemplate,
+} from "@lumiere/query-hooks/hooks/templates"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   enumTag,
@@ -604,6 +611,8 @@ function AccountingClientLoaded({
   const [manualReconcileResidual, setManualReconcileResidual] = useState("0")
   const [reconciliationWidgetEdit, setReconciliationWidgetEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalYearEdit, setFiscalYearEdit] = useState<Record<string, unknown> | null>(null)
+  const [fiscalSetupOpen, setFiscalSetupOpen] = useState(false)
+  const [fiscalSetupError, setFiscalSetupError] = useState<string | null>(null)
   const [accountPeriodEdit, setAccountPeriodEdit] = useState<Record<string, unknown> | null>(null)
   const [csvKind, setCsvKind] = useState<AccountingCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
@@ -679,6 +688,7 @@ function AccountingClientLoaded({
   const deleteFiscalYear = useDeleteFiscalYear(organizationId, operatingCompanyId)
   const openFiscalYear = useOpenFiscalYear(organizationId, operatingCompanyId)
   const closeFiscalYear = useCloseFiscalYear(organizationId, operatingCompanyId)
+  const setupFiscalCalendar = useSetupFiscalCalendar(organizationId, operatingCompanyId)
 
   const createAccountPeriod = useCreateAccountPeriod(organizationId, operatingCompanyId)
   const updateAccountPeriod = useUpdateAccountPeriod(organizationId, operatingCompanyId)
@@ -926,6 +936,13 @@ function AccountingClientLoaded({
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId)
   const postInvoice = usePostInvoice(organizationId)
+  const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
+  const queueMailFromTemplate = useQueueMailFromTemplate(
+    organizationId,
+    Number(operatingCompanyId),
+  )
+  const dispatchQueuedMail = useDispatchQueuedMail()
+  const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | null>(null)
   const cancelMove = useCancelAccountMove(organizationId)
   const addAccountMoveLine = useAddAccountMoveLine(organizationId)
   const deleteAccountMoveLine = useDeleteAccountMoveLine(organizationId)
@@ -1297,6 +1314,14 @@ function AccountingClientLoaded({
         ...view,
         actions: [
           {
+            id: "fy-setup-wizard",
+            label: t("accounting.entities.fiscalYears.actions.setupCalendar"),
+            onClick: () => {
+              setFiscalSetupError(null)
+              setFiscalSetupOpen(true)
+            },
+          },
+          {
             id: "fy-open",
             label: t("accounting.entities.fiscalYears.actions.openSelected"),
             requiresSelection: true,
@@ -1337,6 +1362,54 @@ function AccountingClientLoaded({
       },
     }
   }, [t, openFiscalYear, closeFiscalYear, deleteFiscalYear])
+
+  const fiscalSetupFormConfig = useMemo((): FormConfig => {
+    const year = new Date().getFullYear()
+    return {
+      id: "fiscal-setup-wizard",
+      title: t("accounting.fiscalSetup.title"),
+      description: t("accounting.fiscalSetup.description"),
+      submitLabel: t("accounting.fiscalSetup.submit"),
+      sections: [
+        {
+          id: "setup",
+          fields: [
+            {
+              id: "fiscalYearName",
+              name: "fiscalYearName",
+              label: t("accounting.fiscalSetup.fields.name"),
+              type: "text",
+              required: true,
+              defaultValue: String(year),
+            },
+            {
+              id: "dateFrom",
+              name: "dateFrom",
+              label: t("accounting.fiscalSetup.fields.dateFrom"),
+              type: "date",
+              required: true,
+              defaultValue: `${year}-01-01`,
+            },
+            {
+              id: "dateTo",
+              name: "dateTo",
+              label: t("accounting.fiscalSetup.fields.dateTo"),
+              type: "date",
+              required: true,
+              defaultValue: `${year}-12-31`,
+            },
+            {
+              id: "openFirstPeriod",
+              name: "openFirstPeriod",
+              label: t("accounting.fiscalSetup.fields.openFirstPeriod"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+          ],
+        },
+      ],
+    }
+  }, [t])
 
   const accountPeriodsEntityConfig = useMemo((): EntityViewConfig => {
     const base = accountPeriodsTableConfig(t)
@@ -1867,6 +1940,70 @@ function AccountingClientLoaded({
     },
     [postMove, postInvoice, organizationId, accounts, toast, t],
   )
+
+  const handleInvoiceDownloadPdf = useCallback(async () => {
+    if (!selectedInvoice?.id) return
+    try {
+      setInvoiceDocBusy("download")
+      await downloadDocumentPdf("account-move", Number(selectedInvoice.id))
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: t("accounting.invoices.invoiceActions.download"),
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setInvoiceDocBusy(null)
+    }
+  }, [selectedInvoice, toast, t])
+
+  const handleInvoiceSendEmail = useCallback(async () => {
+    if (!selectedInvoice?.id) return
+    const recipient = window.prompt("Recipient email address")
+    if (!recipient?.trim()) return
+    const template = (mailTemplatesQuery.data ?? []).find(
+      (row) =>
+        (row.model ?? "") === "account_move" &&
+        (row.isActive ?? row.is_active) !== false,
+    )
+    if (!template?.id) {
+      toast({
+        variant: "destructive",
+        title: t("accounting.invoices.invoiceActions.send"),
+        description: "No active mail template for account_move. Create one in settings first.",
+      })
+      return
+    }
+    try {
+      setInvoiceDocBusy("send")
+      await queueMailFromTemplate.mutateAsync({
+        templateId: Number(template.id),
+        model: "account_move",
+        resId: Number(selectedInvoice.id),
+        recipientEmail: recipient.trim(),
+      })
+      const dispatchResult = await dispatchQueuedMail.mutateAsync()
+      toast({
+        title: t("accounting.invoices.invoiceActions.send"),
+        description: `Queued and dispatched ${dispatchResult.sent ?? 0} email(s).`,
+      })
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: t("accounting.invoices.invoiceActions.send"),
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setInvoiceDocBusy(null)
+    }
+  }, [
+    selectedInvoice,
+    mailTemplatesQuery.data,
+    queueMailFromTemplate,
+    dispatchQueuedMail,
+    toast,
+    t,
+  ])
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const invoices = useMemo(
@@ -2627,6 +2764,33 @@ function AccountingClientLoaded({
         onRowClick={handleEntityRowClick}
       />
 
+      {fiscalSetupOpen ? (
+        <FormModal
+          open={fiscalSetupOpen}
+          onOpenChange={(open) => {
+            setFiscalSetupOpen(open)
+            if (!open) setFiscalSetupError(null)
+          }}
+          config={fiscalSetupFormConfig}
+          closeOnSubmit={false}
+          submitError={fiscalSetupError}
+          onSubmit={async (fd) => {
+            setFiscalSetupError(null)
+            try {
+              await setupFiscalCalendar.mutateAsync({
+                fiscalYearName: String(fd.fiscalYearName ?? "").trim(),
+                dateFrom: dateInputToStdbTimestamp(fd.dateFrom),
+                dateTo: dateInputToStdbTimestamp(fd.dateTo, new Date(`${new Date().getFullYear()}-12-31`)),
+                openFirstPeriod: fd.openFirstPeriod !== false && fd.openFirstPeriod !== "false",
+              })
+              setFiscalSetupOpen(false)
+            } catch (e) {
+              setFiscalSetupError(e instanceof Error ? e.message : t("common.error.generic"))
+            }
+          }}
+        />
+      ) : null}
+
       {registerPaymentForId != null ? (
         <FormModal
           key={`reg-pay-${registerPaymentForId.toString()}`}
@@ -2736,6 +2900,8 @@ function AccountingClientLoaded({
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
         onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onDownloadPdf={selectedInvoice ? () => void handleInvoiceDownloadPdf() : undefined}
+        onSendEmail={selectedInvoice ? () => void handleInvoiceSendEmail() : undefined}
         onRecalculateTotals={
           selectedInvoice
             ? () =>
@@ -2745,6 +2911,8 @@ function AccountingClientLoaded({
             : undefined
         }
         postDraftPending={postMove.isPending || postInvoice.isPending}
+        downloadPdfPending={invoiceDocBusy === "download"}
+        sendEmailPending={invoiceDocBusy === "send"}
         recalculateTotalsPending={computeInvoiceTotals.isPending}
       />
 

@@ -6,6 +6,8 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  RuntimeFormModal,
+  useRBAC,
   newPurchaseOrderForm,
   newPurchaseRequisitionForm,
   newPartnerBankForm,
@@ -98,6 +100,13 @@ import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hoo
 import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useRuntimeListConfig } from "@lumiere/ui/forms"
+import {
+  customFieldEntriesFromMetadata,
+  findNewestRowByPartnerId,
+  persistCustomFieldsToEav,
+} from "@/lib/persist-record-custom-fields"
+import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   contactRowsToVendorSelectOptions,
@@ -249,8 +258,19 @@ function PurchasingClientLoaded({
   organizationId,
 }: PurchasingClientLoadedProps) {
   const { t } = useTranslation()
+  const { currentUser } = useRBAC()
+  const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+
+  const purchaseOrdersTableRuntime = useRuntimeListConfig({
+    base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
+    moduleId: "purchasing",
+    formId: "new-purchase-order",
+    organizationId,
+    roleId: runtimeRoleId,
+    listViewKey: `list-filters:purchasing:orders:${organizationId}`,
+  })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
     () => [...moduleConfig.tabs.map((tab) => tab.id), "landed-costs", "supplier-intakes"],
@@ -643,11 +663,10 @@ function PurchasingClientLoaded({
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseOrdersTableConfig(t)
-    const view = base.view as EntityTableConfig
     return {
       ...base,
       view: {
-        ...view,
+        ...purchaseOrdersTableRuntime,
         actions: [
           {
             id: "csv-purchase-orders",
@@ -772,6 +791,7 @@ function PurchasingClientLoaded({
     }
   }, [
     t,
+    purchaseOrdersTableRuntime,
     sendPurchaseOrder,
     confirmPurchaseOrder,
     cancelPurchaseOrder,
@@ -1379,6 +1399,25 @@ function PurchasingClientLoaded({
       )
       if (params == null) return
       await createPurchaseOrder.mutateAsync(params)
+      if (params.metadata && operatingCompanyId !== 0n) {
+        const entries = customFieldEntriesFromMetadata(params.metadata)
+        if (entries.length > 0) {
+          const rows = await fetchQueryList(
+            "/api/query/purchase-orders",
+            "Failed to fetch purchase orders",
+          )
+          const row = findNewestRowByPartnerId(rows, params.partnerId)
+          if (row?.id) {
+            await persistCustomFieldsToEav({
+              organizationId,
+              companyId: operatingCompanyId,
+              model: "purchase_order",
+              recordId: BigInt(String(row.id)),
+              metadata: params.metadata,
+            })
+          }
+        }
+      }
     } else if (action === "createPurchaseRequisition") {
       const vendorRaw = formData.vendorId
       await createPurchaseRequisition.mutateAsync({
@@ -1636,11 +1675,14 @@ function PurchasingClientLoaded({
         onActiveTabChange={setActiveTab}
         isPending={isFormMutationPending}
       />
-      <FormModal
+      <RuntimeFormModal
         key={formModalKey}
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? defaultQuickForm}
+        staticConfig={quickActionForm?.form ?? defaultQuickForm}
+        moduleId="purchasing"
+        organizationId={organizationId}
+        roleId={runtimeRoleId}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1679,7 +1721,7 @@ function PurchasingClientLoaded({
         />
       ) : null}
       {billOrderId != null ? (
-        <FormModal
+        <RuntimeFormModal
           key={`bill-order-${billOrderId.toString()}`}
           open
           onOpenChange={(o) => {
@@ -1688,7 +1730,12 @@ function PurchasingClientLoaded({
               setBillOrderError(null)
             }
           }}
-          config={createBillFormConfig}
+          staticConfig={createBillFormConfig}
+          moduleId="purchasing"
+          formId="create-bill-from-purchase-order"
+          organizationId={organizationId}
+          roleId={runtimeRoleId}
+          foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={billOrderError}
           isPending={createBillFromPurchaseOrder.isPending}

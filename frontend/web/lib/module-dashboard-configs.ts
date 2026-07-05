@@ -2444,6 +2444,16 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       createLabel: t("reports.actions.newWidget"),
       createAction: "createDashboardWidget",
     },
+    {
+      id: "pivot-explorer",
+      label: t("reports.tabs.pivotExplorer"),
+      type: "custom",
+    },
+    {
+      id: "vat-report",
+      label: t("reports.tabs.vatReport"),
+      type: "custom",
+    },
   ],
 })
 

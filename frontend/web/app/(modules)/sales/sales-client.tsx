@@ -7,6 +7,8 @@ import { useTranslation } from '@lumiere/i18n';
 import {
   ModuleView,
   FormModal,
+  RuntimeFormModal,
+  useRBAC,
   newSaleOrderForm,
   newPricelistForm,
   newPricelistItemForm,
@@ -116,7 +118,15 @@ import {
 import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses, useProducts, useUoms } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { useRuntimeListConfig } from '@lumiere/ui/forms';
+import {
+  customFieldEntriesFromMetadata,
+  findNewestRowByField,
+  findNewestRowByPartnerId,
+  persistCustomFieldsToEav,
+} from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
+import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
@@ -272,8 +282,21 @@ function SalesClientLoaded({
 }: SalesClientLoadedProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const { currentUser } = useRBAC();
+  const runtimeRoleId = currentUser?.roles[0];
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
+
+  const saleOrdersTableRuntime = useRuntimeListConfig({
+    base: saleOrdersTableConfig(t, {
+      formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+    }).view as EntityTableConfig,
+    moduleId: 'sales',
+    formId: 'new-sale-order',
+    organizationId,
+    roleId: runtimeRoleId,
+    listViewKey: `list-filters:sales:orders:${organizationId}`,
+  });
   const [quickActionForm, setQuickActionForm] = useState<{
     form: FormConfig;
     action: string;
@@ -650,11 +673,10 @@ function SalesClientLoaded({
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
     });
-    const view = base.view as EntityTableConfig;
     return {
       ...base,
       view: {
-        ...view,
+        ...saleOrdersTableRuntime,
         actions: [
           {
             id: 'csv-sale-orders',
@@ -720,6 +742,19 @@ function SalesClientLoaded({
             },
           },
           {
+            id: 'download-pdf',
+            label: 'Download PDF',
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const id = rows[0]?.id;
+              if (id == null) return;
+              void downloadDocumentPdf('sale-order', Number(id)).catch((e) => {
+                window.alert(e instanceof Error ? e.message : String(e));
+              });
+            },
+          },
+          {
             id: 'lock-orders',
             label: t('sales.actions.lockOrders'),
             requiresSelection: true,
@@ -744,6 +779,7 @@ function SalesClientLoaded({
     };
   }, [
     t,
+    saleOrdersTableRuntime,
     confirmSaleOrder,
     cancelSaleOrder,
     computeSoTotals,
@@ -1207,6 +1243,25 @@ function SalesClientLoaded({
       if (p) {
         await createSaleOrder.mutateAsync(p);
         phCapture('sale_order_created', { organization_id: organizationId });
+        if (p.metadata && operatingCompanyId !== 0n) {
+          const entries = customFieldEntriesFromMetadata(p.metadata);
+          if (entries.length > 0) {
+            const rows = await fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders');
+            const row =
+              p.clientOrderRef != null && String(p.clientOrderRef).trim() !== ''
+                ? findNewestRowByField(rows, 'clientOrderRef', String(p.clientOrderRef))
+                : findNewestRowByPartnerId(rows, p.partnerId);
+            if (row?.id) {
+              await persistCustomFieldsToEav({
+                organizationId,
+                companyId: operatingCompanyId,
+                model: 'sale_order',
+                recordId: BigInt(String(row.id)),
+                metadata: p.metadata,
+              });
+            }
+          }
+        }
       }
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData);
@@ -1299,10 +1354,13 @@ function SalesClientLoaded({
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
-      <FormModal
+      <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? saleOrderFormConfig}
+        staticConfig={quickActionForm?.form ?? saleOrderFormConfig}
+        moduleId="sales"
+        organizationId={organizationId}
+        roleId={runtimeRoleId}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1364,7 +1422,7 @@ function SalesClientLoaded({
         />
       ) : null}
       {invoiceOrderId != null ? (
-        <FormModal
+        <RuntimeFormModal
           key={`invoice-order-${invoiceOrderId.toString()}`}
           open
           onOpenChange={(o) => {
@@ -1373,7 +1431,12 @@ function SalesClientLoaded({
               setInvoiceOrderError(null);
             }
           }}
-          config={createInvoiceFormConfig}
+          staticConfig={createInvoiceFormConfig}
+          moduleId="sales"
+          formId="create-invoice-from-sale-order"
+          organizationId={organizationId}
+          roleId={runtimeRoleId}
+          foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={invoiceOrderError}
           isPending={createInvoiceFromSaleOrder.isPending}

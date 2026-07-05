@@ -240,3 +240,23 @@ export {
   stdbCommandContract,
   type StdbBffReducerKey,
 } from "./stdb-http";
+export {
+  APPROVALS_BFF_REDUCERS,
+  APPROVALS_COMMAND_SUBSCRIPTION_HINTS,
+  approvalsBffCallUrl,
+  approvalsBffPost,
+  approvalsCommandContract,
+  type ApprovalsBffReducerKey,
+} from "./approvals-http";
+export {
+  TEMPLATES_BFF_REDUCERS,
+  documentPdfUrl,
+  documentExportUrl,
+  templatesBffCallUrl,
+  templatesBffPost,
+  templatesCommandContract,
+  type DocumentPdfKind,
+  type DocumentExportFormat,
+  type DocumentExportKind,
+  type TemplatesBffReducerKey,
+} from "./templates-http";

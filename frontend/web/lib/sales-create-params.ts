@@ -84,10 +84,23 @@ export function toCreateSaleOrderParams(
   const clientOrderRef = optionalTrimmedString(formData.clientOrderRef)
   const note = optionalTrimmedString(formData.note)
   const validityRaw = formData.validityDate
+  const metadataObj: Record<string, unknown> = {}
+  if (validityRaw != null && String(validityRaw).trim() !== "") {
+    metadataObj.validityDate = validityRaw
+  }
+  const customMeta = optionalTrimmedString(formData.metadata)
+  if (customMeta) {
+    try {
+      const parsed = JSON.parse(customMeta) as unknown
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        Object.assign(metadataObj, parsed as Record<string, unknown>)
+      }
+    } catch {
+      // ignore invalid custom metadata JSON
+    }
+  }
   const metadata =
-    validityRaw != null && String(validityRaw).trim() !== ''
-      ? JSON.stringify({ validityDate: validityRaw })
-      : undefined
+    Object.keys(metadataObj).length > 0 ? JSON.stringify(metadataObj) : undefined
 
   return {
     companyId,

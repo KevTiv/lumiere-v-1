@@ -33,11 +33,11 @@ import {
 } from "@lumiere/query-hooks/hooks/ai-harness"
 import {
   useApproveAiActionDraft,
-  useAiActionDraftInboxCount,
   usePersistGatewayActionDrafts,
   useRejectAiActionDraft,
   useUpdateAiActionDraftParams,
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
+import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
@@ -345,7 +345,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
       const assistantText =
         draftActions.length > 0 && !out.answer.includes("draft")
-          ? `${out.answer}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`
+          ? `${out.answer}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
           : out.answer
       void persistExchange({
         userText,
@@ -444,9 +444,9 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       if (draftActions.length > 0) {
         handlers.onActions?.(draftActions)
         if (!content.includes("draft")) {
-          content = `${content}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`
+          content = `${content}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
           handlers.onDelta(
-            `\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open AI Approvals in the sidebar to review the team inbox.`,
+            `\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`,
           )
         }
       }
@@ -499,17 +499,15 @@ function ModulesContent({ children }: { children: ReactNode }) {
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
-  const inboxCountQuery = useAiActionDraftInboxCount(
+  const approvalInboxCountQuery = useApprovalInboxCount(
     orgId,
     orgReady && operatingCompanyId != null && operatingCompanyId > 0,
   )
-  const navBadges = useMemo(
-    () =>
-      inboxCountQuery.count > 0
-        ? { "/ai-action-drafts": inboxCountQuery.count }
-        : undefined,
-    [inboxCountQuery.count],
-  )
+  const navBadges = useMemo(() => {
+    const badges: Record<string, number> = {}
+    if (approvalInboxCountQuery.count > 0) badges["/approvals"] = approvalInboxCountQuery.count
+    return Object.keys(badges).length > 0 ? badges : undefined
+  }, [approvalInboxCountQuery.count])
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">

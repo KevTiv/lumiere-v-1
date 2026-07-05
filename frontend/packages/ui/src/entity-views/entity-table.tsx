@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { cn } from "../lib/utils"
 import type { EntityTableConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
@@ -100,6 +100,31 @@ export function EntityTable({ config, data, aiFocusRowKey, onRowClick, className
   const [search, setSearch] = useState("")
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        setFilters(parsed as Record<string, string>)
+      }
+    } catch {
+      // ignore corrupt saved filters
+    }
+  }, [config.listViewKey])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(key, JSON.stringify(filters))
+    } catch {
+      // ignore quota errors
+    }
+  }, [config.listViewKey, filters])
 
   const columns = useMemo(
     () => filterEntitySurface(config.columns, checkPermission),

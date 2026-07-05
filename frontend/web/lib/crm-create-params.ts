@@ -77,6 +77,7 @@ export function toCreateLeadParams(formData: Record<string, unknown>): Partial<C
     companyName: partnerName,
     contactName,
     description: optionalTrimmedString(formData.description),
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
@@ -102,6 +103,7 @@ export function toCreateOpportunityParams(formData: Record<string, unknown>): Pa
     dateDeadline,
     color: optionalTrimmedString(formData.color),
     description: optionalTrimmedString(formData.description),
+    metadata: optionalTrimmedString(formData.metadata),
   }
   return out
 }
@@ -123,6 +125,7 @@ export function toCreateContactParams(formData: Record<string, unknown>): Partia
     zip: optionalTrimmedString(formData.zip),
     color: optionalTrimmedString(formData.color),
     description: optionalTrimmedString(formData.description),
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 

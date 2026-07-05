@@ -59,9 +59,13 @@ interface InvoiceDetailModalProps {
   onPostDraft?: () => void
   onRecordPayment?: () => void
   onRecalculateTotals?: () => void
+  onDownloadPdf?: () => void
+  onSendEmail?: () => void
   postDraftPending?: boolean
   recordPaymentPending?: boolean
   recalculateTotalsPending?: boolean
+  downloadPdfPending?: boolean
+  sendEmailPending?: boolean
 }
 
 export function InvoiceDetailModal({
@@ -71,9 +75,13 @@ export function InvoiceDetailModal({
   onPostDraft,
   onRecordPayment,
   onRecalculateTotals,
+  onDownloadPdf,
+  onSendEmail,
   postDraftPending,
   recordPaymentPending,
   recalculateTotalsPending,
+  downloadPdfPending,
+  sendEmailPending,
 }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
 
@@ -133,13 +141,27 @@ export function InvoiceDetailModal({
         {/* Quick Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              type="button"
+              disabled={!onSendEmail || sendEmailPending}
+              onClick={() => onSendEmail?.()}
+            >
               <Send className="h-4 w-4" />{t("accounting.invoices.invoiceActions.send")}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              type="button"
+              disabled={!onDownloadPdf || downloadPdfPending}
+              onClick={() => onDownloadPdf?.()}
+            >
               <Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" type="button" disabled>
+            <Button variant="outline" size="sm" className="gap-2" type="button" disabled={!onDownloadPdf || downloadPdfPending} onClick={() => onDownloadPdf?.()}>
               <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
             </Button>
             {isDraft &&

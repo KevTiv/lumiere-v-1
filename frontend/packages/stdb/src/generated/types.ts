@@ -1226,6 +1226,53 @@ export const AppendAiChatMessageParams = __t.object("AppendAiChatMessageParams",
 });
 export type AppendAiChatMessageParams = __Infer<typeof AppendAiChatMessageParams>;
 
+export const ApprovalRequest = __t.object("ApprovalRequest", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  ruleId: __t.u64(),
+  model: __t.string(),
+  resId: __t.u64(),
+  action: __t.string(),
+  paramsJson: __t.string(),
+  status: __t.string(),
+  summary: __t.string(),
+  contextJson: __t.option(__t.string()),
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  reviewedBy: __t.option(__t.identity()),
+  reviewedAt: __t.option(__t.timestamp()),
+  rejectReason: __t.option(__t.string()),
+  reviewerComment: __t.option(__t.string()),
+  aiDraftId: __t.option(__t.u64()),
+  workflowInstanceId: __t.option(__t.u64()),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ApprovalRequest = __Infer<typeof ApprovalRequest>;
+
+export const ApprovalRule = __t.object("ApprovalRule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  model: __t.string(),
+  action: __t.string(),
+  ruleType: __t.string(),
+  threshold: __t.f64(),
+  approverRoleId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ApprovalRule = __Infer<typeof ApprovalRule>;
+
 // The tagged union or sum type for the algebraic type `AssetState`.
 export const AssetState = __t.enum("AssetState", {
   Draft: __t.unit(),
@@ -2465,6 +2512,20 @@ export const CreateAnalyticsMetricParams = __t.object("CreateAnalyticsMetricPara
 });
 export type CreateAnalyticsMetricParams = __Infer<typeof CreateAnalyticsMetricParams>;
 
+export const CreateApprovalRuleParams = __t.object("CreateApprovalRuleParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  model: __t.string(),
+  action: __t.string(),
+  ruleType: __t.string(),
+  threshold: __t.f64(),
+  approverRoleId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateApprovalRuleParams = __Infer<typeof CreateApprovalRuleParams>;
+
 export const CreateAuditRuleParams = __t.object("CreateAuditRuleParams", {
   tableName: __t.string(),
   logReads: __t.bool(),
@@ -2959,6 +3020,20 @@ export const CreateDocumentProcessingJobParams = __t.object("CreateDocumentProce
 });
 export type CreateDocumentProcessingJobParams = __Infer<typeof CreateDocumentProcessingJobParams>;
 
+export const CreateDocumentTemplateParams = __t.object("CreateDocumentTemplateParams", {
+  name: __t.string(),
+  model: __t.string(),
+  reportType: __t.string(),
+  bodyHtml: __t.string(),
+  headerHtml: __t.option(__t.string()),
+  footerHtml: __t.option(__t.string()),
+  variableBindingsJson: __t.option(__t.string()),
+  isDefault: __t.bool(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateDocumentTemplateParams = __Infer<typeof CreateDocumentTemplateParams>;
+
 export const CreateEliminationEntryParams = __t.object("CreateEliminationEntryParams", {
   journalId: __t.u64(),
   name: __t.string(),
@@ -3343,6 +3418,19 @@ export const CreateLoyaltyProgramParams = __t.object("CreateLoyaltyProgramParams
   limitUsage: __t.u32(),
 });
 export type CreateLoyaltyProgramParams = __Infer<typeof CreateLoyaltyProgramParams>;
+
+export const CreateMailTemplateParams = __t.object("CreateMailTemplateParams", {
+  name: __t.string(),
+  model: __t.string(),
+  subject: __t.string(),
+  bodyHtml: __t.string(),
+  documentTemplateId: __t.option(__t.u64()),
+  attachDocument: __t.bool(),
+  isDefault: __t.bool(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateMailTemplateParams = __Infer<typeof CreateMailTemplateParams>;
 
 export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams", {
   companyId: __t.option(__t.u64()),
@@ -4100,6 +4188,19 @@ export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateSaleOrderParams = __Infer<typeof CreateSaleOrderParams>;
+
+export const CreateSavedReportParams = __t.object("CreateSavedReportParams", {
+  name: __t.string(),
+  model: __t.string(),
+  rowDimension: __t.string(),
+  columnDimension: __t.option(__t.string()),
+  measureField: __t.string(),
+  measureOp: __t.string(),
+  filterJson: __t.option(__t.string()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSavedReportParams = __Infer<typeof CreateSavedReportParams>;
 
 export const CreateScheduledReportParams = __t.object("CreateScheduledReportParams", {
   name: __t.string(),
@@ -5329,6 +5430,27 @@ export const DocumentSequence = __t.object("DocumentSequence", {
 });
 export type DocumentSequence = __Infer<typeof DocumentSequence>;
 
+export const DocumentTemplate = __t.object("DocumentTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  model: __t.string(),
+  reportType: __t.string(),
+  bodyHtml: __t.string(),
+  headerHtml: __t.option(__t.string()),
+  footerHtml: __t.option(__t.string()),
+  variableBindingsJson: __t.option(__t.string()),
+  isDefault: __t.bool(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type DocumentTemplate = __Infer<typeof DocumentTemplate>;
+
 export const DocumentVersion = __t.object("DocumentVersion", {
   id: __t.u64(),
   documentId: __t.u64(),
@@ -5599,6 +5721,15 @@ export const FormRoleConfig = __t.object("FormRoleConfig", {
   updatedAt: __t.timestamp(),
 });
 export type FormRoleConfig = __Infer<typeof FormRoleConfig>;
+
+export const GenerateEuVatReportParams = __t.object("GenerateEuVatReportParams", {
+  name: __t.string(),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.timestamp(),
+  currencyId: __t.u64(),
+  locale: __t.string(),
+});
+export type GenerateEuVatReportParams = __Infer<typeof GenerateEuVatReportParams>;
 
 export const GenerateSubscriptionInvoiceParams = __t.object("GenerateSubscriptionInvoiceParams", {
   invoiceDate: __t.timestamp(),
@@ -6556,6 +6687,7 @@ export const MailMessage = __t.object("MailMessage", {
   date: __t.timestamp(),
   parentId: __t.option(__t.u64()),
   attachmentIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
 });
 export type MailMessage = __Infer<typeof MailMessage>;
 
@@ -6567,6 +6699,26 @@ export const MailMessageType = __t.enum("MailMessageType", {
   Notification: __t.unit(),
 });
 export type MailMessageType = __Infer<typeof MailMessageType>;
+
+export const MailTemplate = __t.object("MailTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  model: __t.string(),
+  subject: __t.string(),
+  bodyHtml: __t.string(),
+  documentTemplateId: __t.option(__t.u64()),
+  attachDocument: __t.bool(),
+  isDefault: __t.bool(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type MailTemplate = __Infer<typeof MailTemplate>;
 
 // The tagged union or sum type for the algebraic type `MoState`.
 export const MoState = __t.enum("MoState", {
@@ -7166,6 +7318,38 @@ export const PoState = __t.enum("PoState", {
   Cancelled: __t.unit(),
 });
 export type PoState = __Infer<typeof PoState>;
+
+export const PolicyActionGrant = __t.object("PolicyActionGrant", {
+  resource: __t.string(),
+  action: __t.string(),
+  effect: __t.string(),
+});
+export type PolicyActionGrant = __Infer<typeof PolicyActionGrant>;
+
+export const PolicyFieldPermission = __t.object("PolicyFieldPermission", {
+  resource: __t.string(),
+  fields: __t.array(__t.string()),
+});
+export type PolicyFieldPermission = __Infer<typeof PolicyFieldPermission>;
+
+export const PolicySnapshot = __t.object("PolicySnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  userIdentity: __t.identity(),
+  roleId: __t.u64(),
+  roleName: __t.string(),
+  rolePermissions: __t.array(__t.string()),
+  get orgPermissionGrants() {
+    return __t.array(PolicyActionGrant);
+  },
+  get fieldPermissions() {
+    return __t.array(PolicyFieldPermission);
+  },
+  isSuperuser: __t.bool(),
+  versionHash: __t.string(),
+  refreshedAt: __t.timestamp(),
+});
+export type PolicySnapshot = __Infer<typeof PolicySnapshot>;
 
 export const PosConfig = __t.object("PosConfig", {
   id: __t.u64(),
@@ -8397,6 +8581,15 @@ export const QueueJob = __t.object("QueueJob", {
 });
 export type QueueJob = __Infer<typeof QueueJob>;
 
+export const QueueMailFromTemplateParams = __t.object("QueueMailFromTemplateParams", {
+  templateId: __t.u64(),
+  model: __t.string(),
+  resId: __t.u64(),
+  recipientEmail: __t.string(),
+  contextJson: __t.option(__t.string()),
+});
+export type QueueMailFromTemplateParams = __Infer<typeof QueueMailFromTemplateParams>;
+
 export const QueueWorker = __t.object("QueueWorker", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -8433,6 +8626,27 @@ export const RecordBarcodeScanParams = __t.object("RecordBarcodeScanParams", {
   metadata: __t.option(__t.string()),
 });
 export type RecordBarcodeScanParams = __Infer<typeof RecordBarcodeScanParams>;
+
+export const RecordCustomFieldEntry = __t.object("RecordCustomFieldEntry", {
+  fieldKey: __t.string(),
+  valueJson: __t.string(),
+});
+export type RecordCustomFieldEntry = __Infer<typeof RecordCustomFieldEntry>;
+
+export const RecordCustomFieldValue = __t.object("RecordCustomFieldValue", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  model: __t.string(),
+  recordId: __t.u64(),
+  fieldKey: __t.string(),
+  valueJson: __t.string(),
+  createUid: __t.option(__t.identity()),
+  writeUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeDate: __t.option(__t.timestamp()),
+});
+export type RecordCustomFieldValue = __Infer<typeof RecordCustomFieldValue>;
 
 export const RecordCycleCountLineParams = __t.object("RecordCycleCountLineParams", {
   productId: __t.u64(),
@@ -8493,6 +8707,12 @@ export const RegisterQueueWorkerParams = __t.object("RegisterQueueWorkerParams",
   metadata: __t.option(__t.string()),
 });
 export type RegisterQueueWorkerParams = __Infer<typeof RegisterQueueWorkerParams>;
+
+export const RejectApprovalRequestParams = __t.object("RejectApprovalRequestParams", {
+  reason: __t.string(),
+  comment: __t.option(__t.string()),
+});
+export type RejectApprovalRequestParams = __Infer<typeof RejectApprovalRequestParams>;
 
 export const ReplenishmentRule = __t.object("ReplenishmentRule", {
   id: __t.u64(),
@@ -8569,6 +8789,7 @@ export const ReportType = __t.enum("ReportType", {
   AgedReceivable: __t.unit(),
   AgedPayable: __t.unit(),
   PartnerBalance: __t.unit(),
+  VatReturn: __t.unit(),
 });
 export type ReportType = __Infer<typeof ReportType>;
 
@@ -8858,6 +9079,7 @@ export const SaleState = __t.enum("SaleState", {
   Sale: __t.unit(),
   Done: __t.unit(),
   Cancelled: __t.unit(),
+  ToApprove: __t.unit(),
 });
 export type SaleState = __Infer<typeof SaleState>;
 
@@ -8867,6 +9089,26 @@ export const SaveImportMappingTemplateParams = __t.object("SaveImportMappingTemp
   mappingJson: __t.string(),
 });
 export type SaveImportMappingTemplateParams = __Infer<typeof SaveImportMappingTemplateParams>;
+
+export const SavedReport = __t.object("SavedReport", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  model: __t.string(),
+  rowDimension: __t.string(),
+  columnDimension: __t.option(__t.string()),
+  measureField: __t.string(),
+  measureOp: __t.string(),
+  filterJson: __t.option(__t.string()),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SavedReport = __Infer<typeof SavedReport>;
 
 export const ScheduledReport = __t.object("ScheduledReport", {
   id: __t.u64(),
@@ -8989,6 +9231,23 @@ export const SetConsolidationCompanyRateParams = __t.object("SetConsolidationCom
   metadata: __t.option(__t.string()),
 });
 export type SetConsolidationCompanyRateParams = __Infer<typeof SetConsolidationCompanyRateParams>;
+
+export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomFieldValuesParams", {
+  model: __t.string(),
+  recordId: __t.u64(),
+  get entries() {
+    return __t.array(RecordCustomFieldEntry);
+  },
+});
+export type SetRecordCustomFieldValuesParams = __Infer<typeof SetRecordCustomFieldValuesParams>;
+
+export const SetupFiscalCalendarParams = __t.object("SetupFiscalCalendarParams", {
+  fiscalYearName: __t.string(),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.timestamp(),
+  openFirstPeriod: __t.bool(),
+});
+export type SetupFiscalCalendarParams = __Infer<typeof SetupFiscalCalendarParams>;
 
 export const ShippingMethod = __t.object("ShippingMethod", {
   id: __t.u64(),
@@ -10382,6 +10641,18 @@ export const UpdateAnalyticLineParams = __t.object("UpdateAnalyticLineParams", {
 });
 export type UpdateAnalyticLineParams = __Infer<typeof UpdateAnalyticLineParams>;
 
+export const UpdateApprovalRuleParams = __t.object("UpdateApprovalRuleParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  ruleType: __t.option(__t.string()),
+  threshold: __t.option(__t.f64()),
+  approverRoleId: __t.option(__t.option(__t.u64())),
+  sequence: __t.option(__t.u32()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateApprovalRuleParams = __Infer<typeof UpdateApprovalRuleParams>;
+
 export const UpdateAuditRuleParams = __t.object("UpdateAuditRuleParams", {
   logReads: __t.option(__t.bool()),
   logWrites: __t.option(__t.bool()),
@@ -10617,6 +10888,19 @@ export const UpdateDocumentParams = __t.object("UpdateDocumentParams", {
 });
 export type UpdateDocumentParams = __Infer<typeof UpdateDocumentParams>;
 
+export const UpdateDocumentTemplateParams = __t.object("UpdateDocumentTemplateParams", {
+  name: __t.option(__t.string()),
+  reportType: __t.option(__t.string()),
+  bodyHtml: __t.option(__t.string()),
+  headerHtml: __t.option(__t.option(__t.string())),
+  footerHtml: __t.option(__t.option(__t.string())),
+  variableBindingsJson: __t.option(__t.option(__t.string())),
+  isDefault: __t.option(__t.bool()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateDocumentTemplateParams = __Infer<typeof UpdateDocumentTemplateParams>;
+
 export const UpdateEmployeeParams = __t.object("UpdateEmployeeParams", {
   name: __t.option(__t.string()),
   jobTitle: __t.option(__t.string()),
@@ -10789,6 +11073,18 @@ export const UpdateLeaveTypeParams = __t.object("UpdateLeaveTypeParams", {
   isActive: __t.option(__t.bool()),
 });
 export type UpdateLeaveTypeParams = __Infer<typeof UpdateLeaveTypeParams>;
+
+export const UpdateMailTemplateParams = __t.object("UpdateMailTemplateParams", {
+  name: __t.option(__t.string()),
+  subject: __t.option(__t.string()),
+  bodyHtml: __t.option(__t.string()),
+  documentTemplateId: __t.option(__t.option(__t.u64())),
+  attachDocument: __t.option(__t.bool()),
+  isDefault: __t.option(__t.bool()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateMailTemplateParams = __Infer<typeof UpdateMailTemplateParams>;
 
 export const UpdateMetricValuesParams = __t.object("UpdateMetricValuesParams", {
   currentValue: __t.f64(),
@@ -11064,6 +11360,18 @@ export const UpdateSaleOrderParams = __t.object("UpdateSaleOrderParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateSaleOrderParams = __Infer<typeof UpdateSaleOrderParams>;
+
+export const UpdateSavedReportParams = __t.object("UpdateSavedReportParams", {
+  name: __t.option(__t.string()),
+  rowDimension: __t.option(__t.string()),
+  columnDimension: __t.option(__t.option(__t.string())),
+  measureField: __t.option(__t.string()),
+  measureOp: __t.option(__t.string()),
+  filterJson: __t.option(__t.option(__t.string())),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSavedReportParams = __Infer<typeof UpdateSavedReportParams>;
 
 export const UpdateStockLocationParams = __t.object("UpdateStockLocationParams", {
   name: __t.option(__t.string()),

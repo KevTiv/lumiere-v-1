@@ -36,6 +36,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "auth-role-table",
   "user-organization",
   "casbin-rule",
+  "org-permissions",
+  "policy-snapshots",
   "account-accounts",
   "account-account-types",
   "account-groups",
@@ -91,6 +93,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "payslips",
   "financial-reports",
   "trial-balances",
+  "saved-reports",
   "report-templates",
   "scheduled-reports",
   "analytics-metrics",
@@ -340,6 +343,8 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("financial-reports", "financial_report", id, fa, ""),
   "trial-balances": (id, fa) =>
     selectOrgScopedSql("trial-balances", "trial_balance", id, fa, ""),
+  "saved-reports": (id, fa) =>
+    selectOrgScopedSql("saved-reports", "saved_report", id, fa, ""),
   "report-templates": (id, fa) =>
     selectOrgScopedSql("report-templates", "report_template", id, fa, ""),
   "scheduled-reports": (id, fa) =>
@@ -590,6 +595,33 @@ export function subscriptionQueriesForResource(
   if (r === "user-roles") {
     if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
     return [selectUserRoleAssignmentsForIdentitySql(ctx.identityHex, ctx.fieldAccess)];
+  }
+
+  if (r === "org-permissions") {
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) {
+      return null;
+    }
+    return [
+      `SELECT id, organization_id, subject, role_id, resource, action, effect, created_by, created_at FROM org_permission WHERE organization_id = ${Number(org)}`,
+    ];
+  }
+
+  if (r === "policy-snapshots") {
+    const org = ctx.organizationId;
+    if (
+      org === undefined ||
+      org === null ||
+      Number.isNaN(Number(org)) ||
+      !ctx.identityHex ||
+      ctx.identityHex === "unknown"
+    ) {
+      return null;
+    }
+    const id = ctx.identityHex.toLowerCase();
+    return [
+      `SELECT id, organization_id, user_identity, role_id, role_name, role_permissions, org_permission_grants, field_permissions, is_superuser, version_hash, refreshed_at FROM policy_snapshot WHERE organization_id = ${Number(org)} AND user_identity = 0x${id}`,
+    ];
   }
 
   const org = ctx.organizationId;

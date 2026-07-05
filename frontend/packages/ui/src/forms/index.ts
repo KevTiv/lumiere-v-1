@@ -24,6 +24,8 @@ export * from "./config/registry"
 
 // Hooks exports
 export * from "./hooks/use-form-config"
+export * from "./hooks/use-runtime-form-modal-config"
+export * from "./hooks/use-runtime-list-config"
 
 // Metadata helpers (custom:* fields ↔ JSON metadata column)
 export * from "./utils/metadata-defaults"
@@ -32,3 +34,4 @@ export { pushRegistryFormToDatabase, registryFieldToStdbParams } from "./utils/p
 // Component exports
 export * from "./components/configurable-form"
 export * from "./components/form-field-renderer"
+export * from "./runtime-form-modal"

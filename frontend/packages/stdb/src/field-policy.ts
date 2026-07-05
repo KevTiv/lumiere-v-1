@@ -148,6 +148,7 @@ import type {
   BarcodeRule,
   ReportTemplate,
   ScheduledReport,
+  SavedReport,
   InventoryValuation,
   PickingWave,
   QualityAlert,
@@ -169,6 +170,7 @@ import type {
   StockTraceabilityReport,
   SupplierIntakeRequest,
   UserCustomField,
+  RecordCustomFieldValue,
   UserOrganization,
   UserProfile,
   UserRoleAssignment,
@@ -306,6 +308,7 @@ export type QueryResourceKey =
   | 'hr-resources'
   | 'financial-reports'
   | 'trial-balances'
+  | 'saved-reports'
   | 'report-templates'
   | 'scheduled-reports'
   | 'analytics-metrics'
@@ -344,6 +347,7 @@ export type QueryResourceKey =
   | 'form-config-fields'
   | 'form-role-configs'
   | 'user-custom-fields'
+  | 'record-custom-field-values'
   | 'mail-followers'
   | 'utm-campaigns'
   | 'utm-media'
@@ -961,6 +965,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     ['reportId', 'accountCode', 'accountName'],
     ['id', 'organizationId', 'companyId'] as readonly (keyof TrialBalance)[],
   ),
+  'saved-reports': orgEntry<SavedReport>(
+    'saved_report',
+    ['saved-reports', 'saved_report'],
+    ['name', 'model', 'rowDimension', 'measureField', 'measureOp', 'isActive'],
+  ),
   'report-templates': orgEntry<ReportTemplate>(
     'report_template',
     ['report-templates', 'report_template'],
@@ -1130,6 +1139,11 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'user_custom_field',
     ['user-custom-fields', 'user_custom_field'],
     ['configurationId', 'fieldId', 'fieldDataJson', 'userId'],
+  ),
+  'record-custom-field-values': orgEntry<RecordCustomFieldValue>(
+    'record_custom_field_value',
+    ['record-custom-field-values', 'record_custom_field_value'],
+    ['companyId', 'model', 'recordId', 'fieldKey', 'valueJson'],
   ),
   'utm-campaigns': orgEntry<UtmCampaign>('utm_campaign', ['utm-campaigns', 'utm_campaign'], [
     'name',

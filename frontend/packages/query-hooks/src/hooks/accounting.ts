@@ -725,6 +725,26 @@ export function useCreateFiscalYear(organizationId: number, companyId: bigint) {
   })
 }
 
+/** Bootstrap fiscal year + 12 monthly periods — args `[organizationId, companyId, params]`. */
+export function useSetupFiscalCalendar(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("setup_fiscal_calendar", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      invalidateFiscalYearQueries(qc, organizationId)
+      invalidateAccountPeriodQueries(qc, organizationId)
+    },
+  })
+}
+
 export function useUpdateFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({

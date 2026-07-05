@@ -5,10 +5,10 @@ import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
-  postInternalNote,
   subscribeToRecord,
   unsubscribeFromRecord,
 } from "@lumiere/stdb/client-ui-bridge"
+import { usePostMessage } from "@lumiere/query-hooks/hooks/messages"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -41,6 +41,14 @@ function messageTypeLabel(v: unknown): string {
   return s || "message"
 }
 
+function parseAttachmentIds(raw: string): bigint[] {
+  return raw
+    .split(/[,\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => BigInt(part))
+}
+
 export interface CrmRecordChatterProps {
   organizationId: number
   /** SpacetimeDB polymorphic model, e.g. `lead`, `contact`, `opportunity`, `activity` */
@@ -60,8 +68,10 @@ export function CrmRecordChatter({
   const { t } = useTranslation()
   const { identity } = useErpSession()
   const org = BigInt(organizationId)
+  const postMessage = usePostMessage(org)
 
   const [noteBody, setNoteBody] = useState("")
+  const [attachmentIdsRaw, setAttachmentIdsRaw] = useState("")
   const [busy, setBusy] = useState(false)
   const [messages, setMessages] = useState<
     Array<{ id: bigint; body: string; messageType: unknown; date: unknown }>
@@ -140,10 +150,27 @@ export function CrmRecordChatter({
   const postNote = async () => {
     const body = noteBody.trim()
     if (!body || !identity) return
+    let attachmentIds: bigint[] = []
+    if (attachmentIdsRaw.trim()) {
+      try {
+        attachmentIds = parseAttachmentIds(attachmentIdsRaw)
+      } catch {
+        window.alert("Attachment IDs must be numeric document IDs.")
+        return
+      }
+    }
     try {
       setBusy(true)
-      await postInternalNote(org, resModel, resId, body)
+      await postMessage.mutateAsync({
+        model: resModel,
+        resId,
+        body,
+        messageType: attachmentIds.length > 0 ? "comment" : "note",
+        parentId: null,
+        attachmentIds,
+      })
       setNoteBody("")
+      setAttachmentIdsRaw("")
       reloadMessages()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
@@ -198,6 +225,12 @@ export function CrmRecordChatter({
           onChange={(e) => setNoteBody(e.target.value)}
           rows={3}
           className="resize-y min-h-[4.5rem]"
+        />
+        <input
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+          placeholder="Attachment document IDs (comma-separated, optional)"
+          value={attachmentIdsRaw}
+          onChange={(e) => setAttachmentIdsRaw(e.target.value)}
         />
         <Button type="button" size="sm" disabled={busy || !noteBody.trim()} onClick={() => void postNote()}>
           {t("crm.chatter.postNote")}

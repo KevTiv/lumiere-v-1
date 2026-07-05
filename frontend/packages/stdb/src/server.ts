@@ -2048,6 +2048,18 @@ export function serverQueryTrialBalances(
   )
 }
 
+export function serverQuerySavedReports(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('saved-reports', 'saved_report', organizationId, fq(opts), ''),
+    httpOpts(opts),
+  ).then(rows =>
+    sortSqlRows(rows as Record<string, unknown>[], (a, b) => Number(b.id ?? 0) - Number(a.id ?? 0)),
+  )
+}
+
 export function serverQueryReportTemplates(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,

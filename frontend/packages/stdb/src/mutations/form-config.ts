@@ -4,6 +4,7 @@ import type {
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
+  SetRecordCustomFieldValuesParams,
   UpdateFormFieldParams,
 } from "../generated/types"
 
@@ -12,6 +13,7 @@ export type {
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
+  SetRecordCustomFieldValuesParams,
   UpdateFormFieldParams,
 }
 
@@ -106,5 +108,31 @@ export function deleteUserCustomField(
   return stdbBrowserCall("delete_user_custom_field", [
     organizationId.toString(),
     customFieldId.toString(),
+  ])
+}
+
+export function setRecordCustomFieldValues(
+  organizationId: bigint,
+  companyId: bigint,
+  params: SetRecordCustomFieldValuesParams,
+) {
+  return stdbBrowserCall("set_record_custom_field_values", [
+    organizationId.toString(),
+    companyId.toString(),
+    params,
+  ])
+}
+
+export function deleteRecordCustomFieldValues(
+  organizationId: bigint,
+  companyId: bigint,
+  model: string,
+  recordId: bigint,
+) {
+  return stdbBrowserCall("delete_record_custom_field_values", [
+    organizationId.toString(),
+    companyId.toString(),
+    model,
+    recordId.toString(),
   ])
 }

@@ -96,6 +96,8 @@ export interface EntityTableConfig {
   columns: EntityColumn[]
   /** Key used for row identity (for selection) */
   rowKey?: string
+  /** When set, filter UI state is persisted in localStorage under this key. */
+  listViewKey?: string
   searchable?: boolean
   searchPlaceholder?: string
   searchKeys?: string[]

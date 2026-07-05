@@ -163,11 +163,9 @@ export function toCreatePurchaseOrderParams(
     messageIds: [],
     activityIds: [],
     isQuantityCopy: undefined,
-    metadata: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
-
-/** Params for `add_purchase_order_line` (third argument). */
 export function toAddPurchaseOrderLineParams(
   formData: Record<string, unknown>,
 ): Record<string, unknown> | null {

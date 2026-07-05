@@ -1438,7 +1438,8 @@
           "openSelected": "Open (draft → running)",
           "closeSelected": "Close year",
           "editForm": "Edit…",
-          "deleteSelected": "Delete draft"
+          "deleteSelected": "Delete draft",
+          "setupCalendar": "Setup fiscal calendar"
         }
       },
       "accountPeriods": {
@@ -2127,6 +2128,17 @@
       "reconcile": "Reconcile",
       "registerPayment": "Register Payment",
       "reopenPeriod": "Reopen Period"
+    },
+    "fiscalSetup": {
+      "title": "Fiscal setup wizard",
+      "description": "Create a fiscal year and twelve monthly accounting periods.",
+      "submit": "Create calendar",
+      "fields": {
+        "name": "Fiscal year name",
+        "dateFrom": "Start date",
+        "dateTo": "End date",
+        "openFirstPeriod": "Open first period"
+      }
     }
   },
   "crm": {
@@ -3285,31 +3297,43 @@
       "newLeaveType": {
         "title": "New Leave Type",
         "description": "Define a time-off category",
-        "sections": { "details": "Leave Type Details" },
+        "sections": {
+          "details": "Leave Type Details"
+        },
         "fields": {
           "name": "Name",
           "code": "Code",
           "allocationType": "Allocation Type",
           "maxLeaves": "Max Days",
           "isActive": "Active",
-          "options": { "fixed": "Fixed allocation", "accrual": "Accrual" }
+          "options": {
+            "fixed": "Fixed allocation",
+            "accrual": "Accrual"
+          }
         }
       },
       "newPayrollStructure": {
         "title": "New Payroll Structure",
         "description": "Create a salary structure template",
-        "sections": { "details": "Structure Details" },
+        "sections": {
+          "details": "Structure Details"
+        },
         "fields": {
           "name": "Name",
           "type": "Type",
           "isActive": "Active",
-          "options": { "regular": "Regular pay", "bonus": "Bonus" }
+          "options": {
+            "regular": "Regular pay",
+            "bonus": "Bonus"
+          }
         }
       },
       "newSalaryRule": {
         "title": "New Salary Rule",
         "description": "Add a computation rule to a payroll structure",
-        "sections": { "details": "Rule Details" },
+        "sections": {
+          "details": "Rule Details"
+        },
         "fields": {
           "name": "Name",
           "code": "Code",
@@ -5074,6 +5098,7 @@
           "options": {
             "Draft": "Draft",
             "Sent": "Sent",
+            "ToApprove": "To Approve",
             "Sale": "Confirmed",
             "Done": "Done",
             "Cancel": "Cancelled"
@@ -5083,6 +5108,7 @@
       "states": {
         "Draft": "Draft",
         "Sent": "Sent",
+        "ToApprove": "To Approve",
         "Sale": "Confirmed",
         "Done": "Done",
         "Cancel": "Cancelled"
@@ -7768,18 +7794,39 @@
           "closingBalance": "Closing balance",
           "activeByDefault": "Active by default"
         },
-        "createTerminal": { "title": "Create POS Terminal", "submit": "Create terminal" },
+        "createTerminal": {
+          "title": "Create POS Terminal",
+          "submit": "Create terminal"
+        },
         "updateTerminal": {
           "title": "Update POS Terminal",
           "description": "Update status and metrics for a terminal.",
           "submit": "Update terminal"
         },
-        "createConfig": { "title": "Create POS Config", "submit": "Create config" },
-        "activateConfig": { "title": "Activate POS Config", "submit": "Activate" },
-        "deactivateConfig": { "title": "Deactivate POS Config", "submit": "Deactivate" },
-        "openSession": { "title": "Open POS Session", "submit": "Open session" },
-        "computeTotals": { "title": "Compute Session Totals", "submit": "Compute totals" },
-        "closeSession": { "title": "Close POS Session", "submit": "Close session" }
+        "createConfig": {
+          "title": "Create POS Config",
+          "submit": "Create config"
+        },
+        "activateConfig": {
+          "title": "Activate POS Config",
+          "submit": "Activate"
+        },
+        "deactivateConfig": {
+          "title": "Deactivate POS Config",
+          "submit": "Deactivate"
+        },
+        "openSession": {
+          "title": "Open POS Session",
+          "submit": "Open session"
+        },
+        "computeTotals": {
+          "title": "Compute Session Totals",
+          "submit": "Compute totals"
+        },
+        "closeSession": {
+          "title": "Close POS Session",
+          "submit": "Close session"
+        }
       },
       "operations": "Operations"
     }
@@ -8651,7 +8698,9 @@
       "scheduledReports": "Scheduled",
       "analyticsMetrics": "Metrics",
       "dashboards": "Dashboards",
-      "dashboardWidgets": "Widgets"
+      "dashboardWidgets": "Widgets",
+      "pivotExplorer": "Pivot explorer",
+      "vatReport": "VAT report"
     },
     "createButton": {
       "generateReport": "Generate report",
@@ -9055,6 +9104,44 @@
           "metadata": "Metadata (optional)"
         }
       }
+    },
+    "pivot": {
+      "title": "Pivot explorer",
+      "description": "Explore trial balance data with saved pivot definitions and export to Excel.",
+      "sourceReport": "Source financial report",
+      "sourceReportPlaceholder": "Select a generated report",
+      "savedDefinition": "Saved pivot",
+      "savedDefinitionPlaceholder": "Load a saved definition",
+      "name": "Definition name",
+      "rowDimension": "Row dimension",
+      "columnDimension": "Column dimension",
+      "measureField": "Measure",
+      "none": "None",
+      "saveDefinition": "Save pivot",
+      "updateDefinition": "Update pivot",
+      "deleteDefinition": "Delete pivot",
+      "exportXlsx": "Export XLSX",
+      "empty": "Select a generated report to preview the pivot.",
+      "searchPlaceholder": "Search pivot rows…"
+    },
+    "vat": {
+      "title": "EU VAT return",
+      "description": "Generate VAT box summaries from posted invoices for a period.",
+      "name": "Report name",
+      "dateFrom": "Period start",
+      "dateTo": "Period end",
+      "locale": "Locale",
+      "generate": "Generate VAT report",
+      "empty": "No VAT reports yet.",
+      "columns": {
+        "name": "Name",
+        "state": "State",
+        "box01": "Box 01 supplies",
+        "box02": "Box 02 VAT due",
+        "netVat": "Net VAT",
+        "actions": "Actions"
+      },
+      "searchPlaceholder": "Search VAT reports…"
     }
   },
   "proposalWorkspace": {

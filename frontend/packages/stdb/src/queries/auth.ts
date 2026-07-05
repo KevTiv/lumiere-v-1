@@ -77,11 +77,25 @@ export function authSubscriptions(
           .join(" OR ")})`
       : "SELECT * FROM casbin_rule";
 
+  const orgPermissionSql =
+    orgIdNum !== undefined
+      ? `SELECT * FROM org_permission WHERE organization_id = ${orgIdNum}`
+      : "SELECT * FROM org_permission";
+
+  const policySnapshotSql =
+    orgIdNum !== undefined && id
+      ? `SELECT * FROM policy_snapshot WHERE organization_id = ${orgIdNum} AND user_identity = 0x${id}`
+      : id
+        ? `SELECT * FROM policy_snapshot WHERE user_identity = 0x${id}`
+        : "SELECT * FROM policy_snapshot";
+
   return [
     userProfileSql,
     userRoleAssignmentSql,
     roleSql,
     userOrganizationSql,
     casbinSql,
+    orgPermissionSql,
+    policySnapshotSql,
   ];
 }

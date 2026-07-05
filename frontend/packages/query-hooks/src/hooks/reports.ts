@@ -13,6 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { reportsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { downloadDocumentExport } from "./templates"
 import { toCreateFinancialReportParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
@@ -87,6 +89,18 @@ export function useAnalyticsMetrics(
   })
 }
 
+export function useSavedReports(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['saved-reports', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/saved-reports', 'Failed to fetch saved reports'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useDashboards(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
     queryKey: ['dashboards', rqBigIntKey(organizationId)],
@@ -116,6 +130,7 @@ function invalidateReportsModule(
     qc.invalidateQueries({ queryKey: ['report-templates', k] }),
     qc.invalidateQueries({ queryKey: ['scheduled-reports', k] }),
     qc.invalidateQueries({ queryKey: ['analytics-metrics', k] }),
+    qc.invalidateQueries({ queryKey: ['saved-reports', k] }),
     qc.invalidateQueries({ queryKey: ['dashboards', k] }),
     qc.invalidateQueries({ queryKey: ['dashboard-widgets', k] }),
   ])
@@ -202,6 +217,12 @@ export function useExportFinancialReport(organizationId: bigint) {
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to export report')
+      await downloadDocumentExport(
+        exportFormat,
+        "financial-report",
+        Number(reportId),
+        `financial_report_${reportId}.${exportFormat === "pdf" ? "pdf" : exportFormat}`,
+      )
     },
     onSuccess: async () => {
       await invalidateReportsModule(qc, organizationId)
@@ -232,6 +253,122 @@ export function useDeleteFinancialReport(organizationId: bigint) {
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete report')
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useGenerateEuVatReport(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const name = String(formData.name ?? "").trim()
+      const dateFromRaw = formData.dateFrom ?? formData.date_from
+      const dateToRaw = formData.dateTo ?? formData.date_to
+      const currencyId = Number(formData.currencyId ?? formData.currency_id ?? 1)
+      const locale = String(formData.locale ?? "EU").trim() || "EU"
+      if (!name || dateFromRaw == null || dateToRaw == null) {
+        throw new Error("Name and date range are required")
+      }
+      const dateFrom = stbTimestampFromDate(new Date(String(dateFromRaw)))
+      const dateTo = stbTimestampFromDate(new Date(String(dateToRaw)))
+      const { urlPath, init } = reportsBffPost("generate_eu_vat_report", [
+        stdbParamsToJson({
+          name,
+          dateFrom,
+          dateTo,
+          currencyId,
+          locale,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorReports(r))
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useCreateSavedReport(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const { urlPath, init } = reportsBffPost("create_saved_report", [
+        stdbParamsToJson({
+          name: String(formData.name ?? "").trim(),
+          model: String(formData.model ?? "trial_balance"),
+          rowDimension: String(formData.rowDimension ?? formData.row_dimension ?? "accountCode"),
+          columnDimension:
+            formData.columnDimension != null && String(formData.columnDimension).trim() !== ""
+              ? String(formData.columnDimension)
+              : null,
+          measureField: String(formData.measureField ?? formData.measure_field ?? "closingDebit"),
+          measureOp: String(formData.measureOp ?? formData.measure_op ?? "sum"),
+          filterJson:
+            formData.filterJson != null && String(formData.filterJson).trim() !== ""
+              ? String(formData.filterJson)
+              : null,
+          isActive: formData.isActive !== false,
+          metadata: null,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorReports(r))
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useUpdateSavedReport(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { savedReportId: string | number | bigint; formData: Record<string, unknown> }>({
+    mutationFn: async ({ savedReportId, formData }) => {
+      const { urlPath, init } = reportsBffPost("update_saved_report", [
+        savedReportId,
+        stdbParamsToJson({
+          name: formData.name != null ? String(formData.name).trim() : undefined,
+          rowDimension:
+            formData.rowDimension != null ? String(formData.rowDimension) : undefined,
+          columnDimension:
+            formData.columnDimension !== undefined
+              ? formData.columnDimension == null || String(formData.columnDimension).trim() === ""
+                ? null
+                : String(formData.columnDimension)
+              : undefined,
+          measureField:
+            formData.measureField != null ? String(formData.measureField) : undefined,
+          measureOp: formData.measureOp != null ? String(formData.measureOp) : undefined,
+          filterJson:
+            formData.filterJson !== undefined
+              ? formData.filterJson == null || String(formData.filterJson).trim() === ""
+                ? null
+                : String(formData.filterJson)
+              : undefined,
+          isActive: formData.isActive != null ? Boolean(formData.isActive) : undefined,
+          metadata: undefined,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorReports(r))
+    },
+    onSuccess: async () => {
+      await invalidateReportsModule(qc, organizationId)
+    },
+  })
+}
+
+export function useDeleteSavedReport(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string | number | bigint>({
+    mutationFn: async (savedReportId) => {
+      const { urlPath, init } = reportsBffPost("delete_saved_report", [savedReportId])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },
     onSuccess: async () => {
       await invalidateReportsModule(qc, organizationId)

@@ -15,9 +15,12 @@ export const REPORTS_BFF_REDUCERS = [
   "create_financial_report",
   "create_report_template",
   "create_scheduled_report",
+  "create_saved_report",
   "create_trial_balance_entry",
   "delete_financial_report",
+  "delete_saved_report",
   "export_financial_report",
+  "generate_eu_vat_report",
   "generate_financial_report",
   "import_analytics_metric_csv",
   "import_report_template_csv",
@@ -26,6 +29,7 @@ export const REPORTS_BFF_REDUCERS = [
   "update_financial_report",
   "update_metric_values",
   "update_report_template",
+  "update_saved_report",
   "update_widget_layout",
 ] as const;
 
@@ -34,11 +38,15 @@ export type ReportsBffReducerKey = (typeof REPORTS_BFF_REDUCERS)[number];
 const WITH_COMPANY_QUERY = new Set<ReportsBffReducerKey>([
   "archive_financial_report",
   "create_financial_report",
+  "create_saved_report",
   "create_trial_balance_entry",
   "delete_financial_report",
+  "delete_saved_report",
   "export_financial_report",
+  "generate_eu_vat_report",
   "generate_financial_report",
   "update_financial_report",
+  "update_saved_report",
 ]);
 
 /** Same-origin path used by `apiFetch` in the web app. */
@@ -67,6 +75,7 @@ const REPORTS_MODULE_RESOURCES = [
   "report-templates",
   "scheduled-reports",
   "analytics-metrics",
+  "saved-reports",
 ] as const;
 
 const REPORTS_HINT_OVERRIDES: Partial<

@@ -8,6 +8,7 @@ import type {
   BackendRoleRow,
   Resource,
   Action,
+  Effect,
 } from "./rbac-types"
 
 // ── Backend bridge ───────────────────────────────────────────────────────────
@@ -108,6 +109,110 @@ export function permissionStringsToPolicyRules(
       resource: parsed.resource,
       action: parsed.action,
       effect: "allow",
+    })
+  })
+
+  return rules
+}
+
+/** SpacetimeDB `org_permission` row (camelCase or snake_case from BFF). */
+export interface BackendOrgPermissionRow {
+  id?: number | string
+  organizationId?: number
+  organization_id?: number
+  roleId?: number | null
+  role_id?: number | null
+  resource?: string
+  subject?: unknown
+  action?: unknown
+  effect?: unknown
+}
+
+function readOrgPermissionEnumTag(value: unknown): string | null {
+  if (value == null) return null
+  if (typeof value === "string") return value
+  if (typeof value !== "object") return null
+  const record = value as Record<string, unknown>
+  if (typeof record.tag === "string") return record.tag
+  const keys = Object.keys(record)
+  if (keys.length === 1) return keys[0] ?? null
+  return null
+}
+
+function orgPermissionActionToUiAction(action: unknown): Action | "*" {
+  const tag = readOrgPermissionEnumTag(action)
+  switch (tag) {
+    case "Read":
+      return "read"
+    case "Write":
+      return "write"
+    case "Create":
+      return "create"
+    case "Delete":
+      return "delete"
+    case "All":
+      return "*"
+    default:
+      return "read"
+  }
+}
+
+function orgPermissionSubjectToPolicySubject(
+  subject: unknown,
+  roleId: number | null | undefined,
+): string | null {
+  const tag = readOrgPermissionEnumTag(subject)
+  if (tag === "Role") {
+    const numeric =
+      typeof subject === "object" && subject !== null
+        ? (subject as Record<string, unknown>).Role ??
+          (subject as Record<string, unknown>).role ??
+          roleId
+        : roleId
+    if (numeric == null || numeric === "") return null
+    return String(numeric)
+  }
+  if (tag === "User") {
+    const raw =
+      typeof subject === "object" && subject !== null
+        ? (subject as Record<string, unknown>).User ??
+          (subject as Record<string, unknown>).user
+        : null
+    if (raw == null) return null
+    if (typeof raw === "string") return raw.toLowerCase()
+    if (typeof raw === "object" && raw !== null && "toHexString" in raw) {
+      return String((raw as { toHexString?: () => string }).toHexString?.() ?? raw)
+        .toLowerCase()
+    }
+    return String(raw).toLowerCase()
+  }
+  return null
+}
+
+export function mapOrgPermissionRowsToPolicyRules(
+  rows: readonly BackendOrgPermissionRow[],
+): PolicyRule[] {
+  const rules: PolicyRule[] = []
+
+  rows.forEach((row, index) => {
+    const resource = String(row.resource ?? "").trim()
+    if (!resource) return
+
+    const roleId = row.roleId ?? row.role_id ?? null
+    const subject = orgPermissionSubjectToPolicySubject(row.subject, roleId)
+    if (!subject) return
+
+    const effectTag = readOrgPermissionEnumTag(row.effect)
+    const effect: Effect = effectTag === "Deny" ? "deny" : "allow"
+    const action = orgPermissionActionToUiAction(row.action)
+    const rowId = row.id ?? index
+
+    rules.push({
+      id: `org-perm-${rowId}`,
+      subject,
+      resource: resource as Resource | "*",
+      action,
+      effect,
     })
   })
 

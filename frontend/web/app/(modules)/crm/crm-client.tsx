@@ -1,6 +1,12 @@
 "use client"
 
 import { phCapture } from "@/lib/posthog-browser"
+import {
+  customFieldEntriesFromMetadata,
+  findNewestRowByField,
+  persistCustomFieldsToEav,
+} from "@/lib/persist-record-custom-fields"
+import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { crmModuleConfig } from "@/lib/module-dashboard-configs"
 import {
   toConvertLeadParams,
@@ -32,6 +38,7 @@ import {
 } from "@/lib/crm-update-params"
 import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useActivities,
@@ -73,9 +80,10 @@ import {
   DEFAULT_KANBAN_COLUMN_COLORS,
   CrmRecordChatterDialog,
   CrmUtmSettings,
-  FormModal,
   ModuleView,
   MissingOrganization,
+  RuntimeFormModal,
+  useRBAC,
   activitiesTableConfig,
   addContactToSegmentForm,
   addOpportunityLineForm,
@@ -218,8 +226,69 @@ function CrmClientLoaded({
   organizationId,
 }: CrmClientLoadedProps) {
   const { t } = useTranslation()
+  const { currentUser } = useRBAC()
+  const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
+
+  const leadsTableRuntime = useRuntimeListConfig({
+    base: leadsTableConfig(t).view as EntityTableConfig,
+    moduleId: "crm",
+    formId: "new-lead",
+    organizationId,
+    roleId: runtimeRoleId,
+    listViewKey: `list-filters:crm:leads:${organizationId}`,
+  })
+  const contactsTableRuntime = useRuntimeListConfig({
+    base: contactsTableConfig(t, { formatContactDisplayName: contactPrimaryLabel }).view as EntityTableConfig,
+    moduleId: "crm",
+    formId: "new-contact",
+    organizationId,
+    roleId: runtimeRoleId,
+    listViewKey: `list-filters:crm:contacts:${organizationId}`,
+  })
+  const opportunitiesTableRuntime = useRuntimeListConfig({
+    base: opportunitiesTableConfig(t).view as EntityTableConfig,
+    moduleId: "crm",
+    formId: "new-opportunity",
+    organizationId,
+    roleId: runtimeRoleId,
+    listViewKey: `list-filters:crm:opportunities:${organizationId}`,
+  })
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+
+  async function persistCrmCustomFields(args: {
+    model: "lead" | "contact" | "opportunity"
+    recordId: bigint
+    metadata: unknown
+  }) {
+    if (!operatingCompanyId || operatingCompanyId === 0n) return
+    if (customFieldEntriesFromMetadata(args.metadata).length === 0) return
+    await persistCustomFieldsToEav({
+      organizationId,
+      companyId: operatingCompanyId,
+      model: args.model,
+      recordId: args.recordId,
+      metadata: args.metadata,
+    })
+  }
+
+  async function persistCrmCustomFieldsAfterCreate(args: {
+    model: "lead" | "contact" | "opportunity"
+    metadata: unknown
+    queryPath: string
+    matchField: string
+    matchValue: string
+  }) {
+    if (customFieldEntriesFromMetadata(args.metadata).length === 0) return
+    const rows = await fetchQueryList(args.queryPath, "Failed to fetch records")
+    const row = findNewestRowByField(rows, args.matchField, args.matchValue)
+    if (!row?.id) return
+    await persistCrmCustomFields({
+      model: args.model,
+      recordId: BigInt(String(row.id)),
+      metadata: args.metadata,
+    })
+  }
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
@@ -799,7 +868,7 @@ function CrmClientLoaded({
     const leadsEntity: EntityViewConfig = {
       ...leadsCfg,
       view: {
-        ...(leadsCfg.view as EntityTableConfig),
+        ...leadsTableRuntime,
         actions: [
           {
             id: "csv-leads",
@@ -853,7 +922,7 @@ function CrmClientLoaded({
             view: {
               ...oppCfg.view,
               table: {
-                ...oppCfg.view.table,
+                ...opportunitiesTableRuntime,
                 actions: [
                   {
                     id: "csv-opportunities",
@@ -902,7 +971,7 @@ function CrmClientLoaded({
         : {
             ...oppCfg,
             view: {
-              ...(oppCfg.view as EntityTableConfig),
+              ...opportunitiesTableRuntime,
               actions: [],
             },
           }
@@ -910,7 +979,7 @@ function CrmClientLoaded({
     const contactEntity: EntityViewConfig = {
       ...contactCfg,
       view: {
-        ...(contactCfg.view as EntityTableConfig),
+        ...contactsTableRuntime,
         actions: [
           {
             id: "csv-contacts",
@@ -1065,6 +1134,9 @@ function CrmClientLoaded({
     markOpportunityLost,
     opportunityStageOptions,
     addOpportunityLineFormConfig,
+    leadsTableRuntime,
+    contactsTableRuntime,
+    opportunitiesTableRuntime,
   ])
 
   // Live KPI overrides
@@ -1205,13 +1277,44 @@ function CrmClientLoaded({
       if (p) {
         await createLead.mutateAsync(p)
         phCapture("lead_created", { organization_id: organizationId })
+        if (p.metadata && p.name) {
+          await persistCrmCustomFieldsAfterCreate({
+            model: "lead",
+            metadata: p.metadata,
+            queryPath: "/api/query/leads",
+            matchField: "name",
+            matchValue: p.name,
+          })
+        }
       }
     } else if (action === "createOpportunity") {
       const p = toCreateOpportunityParams(formData)
-      if (p) await createOpportunity.mutateAsync(p)
+      if (p) {
+        await createOpportunity.mutateAsync(p)
+        if (p.metadata && p.name) {
+          await persistCrmCustomFieldsAfterCreate({
+            model: "opportunity",
+            metadata: p.metadata,
+            queryPath: "/api/query/opportunities",
+            matchField: "name",
+            matchValue: p.name,
+          })
+        }
+      }
     } else if (action === "createContact") {
       const p = toCreateContactParams(formData)
-      if (p) await createContact.mutateAsync(p)
+      if (p) {
+        await createContact.mutateAsync(p)
+        if (p.metadata && p.name) {
+          await persistCrmCustomFieldsAfterCreate({
+            model: "contact",
+            metadata: p.metadata,
+            queryPath: "/api/query/contacts",
+            matchField: "name",
+            matchValue: p.name,
+          })
+        }
+      }
     } else if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
       if (p) await createActivity.mutateAsync(p)
@@ -1303,6 +1406,13 @@ function CrmClientLoaded({
           companyId: workflowModal.companyId,
           params: p,
         })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "opportunity",
+            recordId: workflowModal.opportunityId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editOpportunity") {
         const p = toUpdateOpportunityParams(formData)
         if (!p) throw new Error(t("crm.forms.editOpportunity.validation.noChanges"))
@@ -1311,34 +1421,90 @@ function CrmClientLoaded({
           companyId: workflowModal.companyId,
           params: p,
         })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "opportunity",
+            recordId: workflowModal.opportunityId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editContact") {
         const p = toUpdateContactParams(formData)
         if (!p) throw new Error(t("crm.forms.editContact.validation.noChanges"))
         await updateContact.mutateAsync({ contactId: workflowModal.contactId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "contact",
+            recordId: workflowModal.contactId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editContactAddress") {
         const p = toUpdateContactAddressParams(formData)
         if (!p) throw new Error(t("crm.forms.editContactAddress.validation.noChanges"))
         await updateContactAddress.mutateAsync({ contactId: workflowModal.contactId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "contact",
+            recordId: workflowModal.contactId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editContactBusiness") {
         const p = toUpdateContactBusinessParams(formData)
         if (!p) throw new Error(t("crm.forms.editContactBusiness.validation.noChanges"))
         await updateContactBusiness.mutateAsync({ contactId: workflowModal.contactId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "contact",
+            recordId: workflowModal.contactId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editContactDetails") {
         const p = toUpdateContactDetailsParams(formData)
         if (!p) throw new Error(t("crm.forms.editContactDetails.validation.noChanges"))
         await updateContactDetails.mutateAsync({ contactId: workflowModal.contactId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "contact",
+            recordId: workflowModal.contactId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editLeadDetails") {
         const p = toUpdateLeadDetailsParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadDetails.validation.noChanges"))
         await updateLeadDetails.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "lead",
+            recordId: workflowModal.leadId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editLeadAddress") {
         const p = toUpdateLeadAddressParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadAddress.validation.noChanges"))
         await updateLeadAddress.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "lead",
+            recordId: workflowModal.leadId,
+            metadata: formData.metadata,
+          })
+        }
       } else if (workflowModal.kind === "editLeadRevenue") {
         const p = toUpdateLeadRevenueParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadRevenue.validation.noChanges"))
         await updateLeadRevenue.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        if (formData.metadata) {
+          await persistCrmCustomFields({
+            model: "lead",
+            recordId: workflowModal.leadId,
+            metadata: formData.metadata,
+          })
+        }
       }
       setWorkflowModal(null)
     } catch (e) {
@@ -1407,10 +1573,13 @@ function CrmClientLoaded({
           recordTitle={chatterTarget.recordTitle}
         />
       ) : null}
-      <FormModal
+      <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newLeadForm(t)}
+        staticConfig={quickActionForm?.form ?? newLeadForm(t)}
+        moduleId="crm"
+        organizationId={organizationId}
+        roleId={runtimeRoleId}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1419,11 +1588,14 @@ function CrmClientLoaded({
           }
         }}
       />
-      <FormModal
+      <RuntimeFormModal
         key={workflowModalKey}
         open={workflowModal !== null}
         onOpenChange={(open) => !open && setWorkflowModal(null)}
-        config={workflowModal?.form ?? closedWorkflowFormConfig}
+        staticConfig={workflowModal?.form ?? closedWorkflowFormConfig}
+        moduleId="crm"
+        organizationId={organizationId}
+        roleId={runtimeRoleId}
         isPending={isFormMutationPending}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)

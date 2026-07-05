@@ -9,6 +9,7 @@ import {
   ThemeProvider,
   type User,
   type Role,
+  type PolicyRule,
   type BackendRoleRow,
   mapBackendRolesToRoles,
   buildRbacUserFromServer,
@@ -16,6 +17,7 @@ import {
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { useStdbQuery } from "@lumiere/query-hooks/hooks/stdb"
+import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
 import { webApi } from "@/lib/lumiere-web-http"
@@ -26,15 +28,19 @@ function RBACBridge({
   children,
   serverIdentity,
   serverRoleNames,
+  organizationId,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
+  organizationId?: number
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [] } = useStdbQuery('roles', 0, {
+  const { data: rolesData = [] } = useStdbQuery("roles", 0, {
     enabled: hasIdentity,
   })
+
+  const { orgPolicyRules } = usePolicySnapshot(organizationId, serverIdentity)
 
   const rbacRoles = useMemo<Role[]>(() => {
     return mapBackendRolesToRoles(rolesData as BackendRoleRow[])
@@ -44,10 +50,18 @@ function RBACBridge({
     return buildRbacUserFromServer(rbacRoles, serverRoleNames, serverIdentity)
   }, [serverIdentity, serverRoleNames, rbacRoles])
 
+  const mergedPolicies = useMemo<PolicyRule[]>(() => {
+    const rolePolicies = rbacRoles.flatMap((role) =>
+      rbacUser?.roles.includes(role.id) ? role.permissions : [],
+    )
+    return [...rolePolicies, ...orgPolicyRules]
+  }, [rbacRoles, rbacUser, orgPolicyRules])
+
   return (
     <RBACProvider
       initialUser={hasIdentity ? rbacUser : null}
       initialRoles={hasIdentity ? rbacRoles : undefined}
+      initialPolicies={hasIdentity ? mergedPolicies : undefined}
     >
       {children}
     </RBACProvider>
@@ -112,7 +126,11 @@ export function Providers({
                 companyIds,
               }}
             >
-              <RBACBridge serverIdentity={serverIdentity} serverRoleNames={serverRoleNames}>
+              <RBACBridge
+                serverIdentity={serverIdentity}
+                serverRoleNames={serverRoleNames}
+                organizationId={organizationId}
+              >
                 {children}
               </RBACBridge>
             </ErpSessionProvider>

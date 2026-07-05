@@ -28,4 +28,5 @@ export default __t.row({
   date: __t.timestamp(),
   parentId: __t.option(__t.u64()).name("parent_id"),
   attachmentIds: __t.array(__t.u64()).name("attachment_ids"),
+  metadata: __t.option(__t.string()),
 });

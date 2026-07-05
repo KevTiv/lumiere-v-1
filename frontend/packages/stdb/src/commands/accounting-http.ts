@@ -96,6 +96,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "register_payment_on_invoice",
   "retry_intercompany_transaction",
   "schedule_tax_deadline_updates",
+  "setup_fiscal_calendar",
   "set_analytic_account_active",
   "set_asset_active",
   "set_consolidation_company_rate",

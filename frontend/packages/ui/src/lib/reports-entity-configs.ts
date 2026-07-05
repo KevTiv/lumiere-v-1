@@ -72,6 +72,49 @@ export const trialBalancesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── EU VAT reports ─────────────────────────────────────────────────────────────
+export const vatReportsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "vat-reports-table",
+  title: t("reports.vat.title"),
+  description: t("reports.vat.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("reports.vat.searchPlaceholder"),
+    searchKeys: ["name"],
+    rowSelectionToggleOnClick: true,
+    columns: [
+      { key: "name", label: t("reports.vat.columns.name"), width: "min-w-48" },
+      {
+        key: "state",
+        label: t("reports.vat.columns.state"),
+        type: "badge",
+        ...reportStateBadges(t),
+      },
+      {
+        key: "box01TaxableSupplies",
+        label: t("reports.vat.columns.box01"),
+        type: "currency",
+        align: "right",
+      },
+      {
+        key: "box02VatDue",
+        label: t("reports.vat.columns.box02"),
+        type: "currency",
+        align: "right",
+      },
+      {
+        key: "netVat",
+        label: t("reports.vat.columns.netVat"),
+        type: "currency",
+        align: "right",
+      },
+    ],
+    emptyMessage: t("reports.vat.empty"),
+  },
+})
+
 // ── Report templates ─────────────────────────────────────────────────────────────
 export const reportTemplatesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "report-templates-table",

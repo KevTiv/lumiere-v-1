@@ -10,6 +10,7 @@ export const REPORTS_WORKSPACE_RESOURCE_KEYS = [
   "dashboard-widgets",
   "financial-reports",
   "report-templates",
+  "saved-reports",
   "scheduled-reports",
   "trial-balances",
 ] as const;
