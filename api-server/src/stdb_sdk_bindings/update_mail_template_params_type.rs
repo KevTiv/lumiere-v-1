@@ -6,21 +6,17 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum SaleState {
-    Draft,
-
-    Sent,
-
-    Sale,
-
-    Done,
-
-    Cancelled,
-
-    ToApprove,
+pub struct UpdateMailTemplateParams {
+    pub name: Option<String>,
+    pub subject: Option<String>,
+    pub body_html: Option<String>,
+    pub document_template_id: Option<Option<u64>>,
+    pub attach_document: Option<bool>,
+    pub is_default: Option<bool>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for SaleState {
+impl __sdk::InModule for UpdateMailTemplateParams {
     type Module = super::RemoteModule;
 }

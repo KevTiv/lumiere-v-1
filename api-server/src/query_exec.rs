@@ -178,6 +178,68 @@ pub async fn execute_resource_query(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
+        "approval-requests-inbox" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, rule_id, model, res_id, action, params_json, status, summary, context_json, requested_by, requested_at, reviewed_by, reviewed_at, reject_reason, reviewer_comment, ai_draft_id, workflow_instance_id, create_date, write_date, metadata FROM approval_request WHERE organization_id = {organization_id} AND status = 'pending'"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "approval-rules" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, name, description, model, action, rule_type, threshold, approver_role_id, sequence, is_active, create_date, write_date, metadata FROM approval_rule WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "document-templates" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, name, model, report_type, body_html, header_html, footer_html, variable_bindings_json, is_default, is_active, create_date, write_date, metadata FROM document_template WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "mail-templates" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, name, model, subject, body_html, document_template_id, attach_document, is_default, is_active, create_date, write_date, metadata FROM mail_template WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "queued-mail-messages" => {
+            let sql = format!(
+                "SELECT id, organization_id, model, res_id, author_id, body, message_type, subtype, date, parent_id, attachment_ids, metadata FROM mail_message WHERE organization_id = {organization_id} AND message_type = 'Email'"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            rows.retain(|row| {
+                row.get("metadata")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                    .and_then(|meta| meta.get("delivery").and_then(|d| d.as_str()).map(|d| d == "queued"))
+                    .unwrap_or(false)
+            });
+            return Ok(rows);
+        }
         "consolidation-accounts" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
             let sql = format!("SELECT {} FROM consolidation_account", col.join(", "));
@@ -636,6 +698,25 @@ pub async fn execute_resource_query(
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
+        }
+        "org-permissions" => {
+            let sql = format!(
+                "SELECT id, organization_id, subject, role_id, resource, action, effect, created_by, created_at FROM org_permission WHERE organization_id = {organization_id}"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "policy-snapshots" => {
+            let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT id, organization_id, user_identity, role_id, role_name, role_permissions, org_permission_grants, field_permissions, is_superuser, version_hash, refreshed_at FROM policy_snapshot WHERE organization_id = {organization_id} AND user_identity = {id}"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
         }
         _ => {}
     }

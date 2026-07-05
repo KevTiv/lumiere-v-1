@@ -62,6 +62,8 @@ pub mod ai_team_member_skill_type;
 pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
+pub mod approval_request_type;
+pub mod approval_rule_type;
 pub mod asset_state_type;
 pub mod asset_type_type;
 pub mod assign_role_params_type;
@@ -139,6 +141,7 @@ pub mod create_analytic_account_params_type;
 pub mod create_analytic_distribution_model_params_type;
 pub mod create_analytic_line_params_type;
 pub mod create_analytics_metric_params_type;
+pub mod create_approval_rule_params_type;
 pub mod create_audit_rule_params_type;
 pub mod create_barcode_nomenclature_params_type;
 pub mod create_barcode_rule_params_type;
@@ -171,6 +174,7 @@ pub mod create_depreciation_line_params_type;
 pub mod create_document_folder_params_type;
 pub mod create_document_params_type;
 pub mod create_document_processing_job_params_type;
+pub mod create_document_template_params_type;
 pub mod create_elimination_entry_params_type;
 pub mod create_employee_params_type;
 pub mod create_expense_params_type;
@@ -194,6 +198,7 @@ pub mod create_lead_params_type;
 pub mod create_leave_request_params_type;
 pub mod create_leave_type_params_type;
 pub mod create_loyalty_program_params_type;
+pub mod create_mail_template_params_type;
 pub mod create_mrp_production_params_type;
 pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
@@ -294,6 +299,7 @@ pub mod dispose_account_asset_params_type;
 pub mod document_type;
 pub mod document_folder_type;
 pub mod document_sequence_type;
+pub mod document_template_type;
 pub mod document_version_type;
 pub mod done_stock_move_params_type;
 pub mod employment_type_type;
@@ -370,6 +376,7 @@ pub mod log_timesheet_params_type;
 pub mod mail_follower_type;
 pub mod mail_message_type;
 pub mod mail_message_type_type;
+pub mod mail_template_type;
 pub mod mo_state_type;
 pub mod module_config_input_type;
 pub mod move_stock_quant_params_type;
@@ -403,6 +410,9 @@ pub mod permission_subject_type;
 pub mod picking_wave_type;
 pub mod po_invoice_status_type;
 pub mod po_state_type;
+pub mod policy_action_grant_type;
+pub mod policy_field_permission_type;
+pub mod policy_snapshot_type;
 pub mod pos_config_type;
 pub mod pos_loyalty_card_type;
 pub mod pos_loyalty_program_type;
@@ -448,10 +458,13 @@ pub mod quality_check_type;
 pub mod quality_point_type;
 pub mod quality_team_type;
 pub mod queue_job_type;
+pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
 pub mod record_barcode_scan_params_type;
+pub mod record_custom_field_entry_type;
+pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
 pub mod record_privacy_consent_params_type;
 pub mod record_telemetry_params_type;
@@ -459,6 +472,7 @@ pub mod record_whats_app_health_check_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
+pub mod reject_approval_request_params_type;
 pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
@@ -481,6 +495,7 @@ pub mod serial_lot_traceability_type;
 pub mod session_state_type;
 pub mod set_article_published_params_type;
 pub mod set_consolidation_company_rate_params_type;
+pub mod set_record_custom_field_values_params_type;
 pub mod shipping_method_type;
 pub mod split_method_type;
 pub mod start_timesheet_timer_params_type;
@@ -546,6 +561,7 @@ pub mod update_ai_chat_session_title_params_type;
 pub mod update_analytic_account_params_type;
 pub mod update_analytic_distribution_model_params_type;
 pub mod update_analytic_line_params_type;
+pub mod update_approval_rule_params_type;
 pub mod update_audit_rule_params_type;
 pub mod update_barcode_nomenclature_params_type;
 pub mod update_barcode_rule_params_type;
@@ -568,6 +584,7 @@ pub mod update_crossovered_budget_params_type;
 pub mod update_dashboard_share_params_type;
 pub mod update_department_params_type;
 pub mod update_document_params_type;
+pub mod update_document_template_params_type;
 pub mod update_employee_params_type;
 pub mod update_expense_params_type;
 pub mod update_financial_report_params_type;
@@ -582,6 +599,7 @@ pub mod update_lead_address_params_type;
 pub mod update_lead_details_params_type;
 pub mod update_lead_revenue_params_type;
 pub mod update_leave_type_params_type;
+pub mod update_mail_template_params_type;
 pub mod update_metric_values_params_type;
 pub mod update_opportunity_params_type;
 pub mod update_org_member_details_params_type;
@@ -688,6 +706,7 @@ pub mod append_ai_chat_message_reducer;
 pub mod apply_landed_costs_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod approve_ai_action_draft_reducer;
+pub mod approve_approval_request_reducer;
 pub mod approve_document_processing_job_reducer;
 pub mod approve_expense_sheet_reducer;
 pub mod approve_intercompany_transaction_reducer;
@@ -793,6 +812,7 @@ pub mod create_analytic_account_reducer;
 pub mod create_analytic_distribution_model_reducer;
 pub mod create_analytic_line_reducer;
 pub mod create_analytics_metric_reducer;
+pub mod create_approval_rule_reducer;
 pub mod create_audit_rule_reducer;
 pub mod create_barcode_nomenclature_reducer;
 pub mod create_barcode_rule_reducer;
@@ -825,6 +845,7 @@ pub mod create_depreciation_line_reducer;
 pub mod create_document_reducer;
 pub mod create_document_folder_reducer;
 pub mod create_document_processing_job_reducer;
+pub mod create_document_template_reducer;
 pub mod create_elimination_entry_reducer;
 pub mod create_employee_reducer;
 pub mod create_expense_reducer;
@@ -852,6 +873,7 @@ pub mod create_leave_request_reducer;
 pub mod create_leave_type_reducer;
 pub mod create_loyalty_card_reducer;
 pub mod create_loyalty_program_reducer;
+pub mod create_mail_template_reducer;
 pub mod create_manufacturing_order_reducer;
 pub mod create_opportunity_reducer;
 pub mod create_opportunity_line_reducer;
@@ -939,6 +961,7 @@ pub mod delete_account_move_line_reducer;
 pub mod delete_account_period_reducer;
 pub mod delete_account_reconciliation_widget_reducer;
 pub mod delete_analytic_line_reducer;
+pub mod delete_approval_rule_reducer;
 pub mod delete_barcode_nomenclature_reducer;
 pub mod delete_barcode_rule_reducer;
 pub mod delete_bom_reducer;
@@ -972,6 +995,7 @@ pub mod delete_proposal_source_doc_reducer;
 pub mod delete_quality_alert_reason_reducer;
 pub mod delete_quality_point_reducer;
 pub mod delete_quality_team_reducer;
+pub mod delete_record_custom_field_values_reducer;
 pub mod delete_search_embedding_reducer;
 pub mod delete_stock_location_reducer;
 pub mod delete_stock_production_lot_reducer;
@@ -1087,6 +1111,7 @@ pub mod log_workcenter_productivity_reducer;
 pub mod mark_action_sent_reducer;
 pub mod mark_embedding_synced_reducer;
 pub mod mark_invite_accepted_reducer;
+pub mod mark_mail_message_delivered_reducer;
 pub mod mark_reset_token_used_reducer;
 pub mod match_bank_line_reducer;
 pub mod match_elimination_entries_reducer;
@@ -1112,6 +1137,7 @@ pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
+pub mod queue_mail_from_template_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
@@ -1128,6 +1154,7 @@ pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
+pub mod refresh_policy_snapshot_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
@@ -1136,6 +1163,7 @@ pub mod register_iot_hub_reducer;
 pub mod register_payment_on_invoice_reducer;
 pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
+pub mod reject_approval_request_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod remove_article_member_reducer;
 pub mod remove_casbin_rule_reducer;
@@ -1160,22 +1188,35 @@ pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_reconcile_test_reducer;
+pub mod run_accounting_payment_term_update_test_reducer;
 pub mod run_accounting_post_invoice_test_reducer;
 pub mod run_all_accounting_tests_reducer;
 pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
+pub mod run_all_platform_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
+pub mod run_documents_folder_test_reducer;
+pub mod run_helpdesk_ticket_test_reducer;
+pub mod run_hr_leave_type_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
+pub mod run_inventory_delivery_quant_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
+pub mod run_inventory_product_update_test_reducer;
+pub mod run_inventory_receipt_quant_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
+pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_sales_order_delivery_test_reducer;
 pub mod run_sales_order_invoice_test_reducer;
+pub mod run_sales_order_update_test_reducer;
+pub mod run_subscription_plan_test_reducer;
 pub mod run_traceability_report_reducer;
+pub mod run_workflow_definition_test_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
@@ -1185,6 +1226,7 @@ pub mod send_purchase_order_reducer;
 pub mod set_ai_agent_active_reducer;
 pub mod set_ai_skill_active_reducer;
 pub mod set_analytic_account_active_reducer;
+pub mod set_approval_rule_active_reducer;
 pub mod set_article_published_reducer;
 pub mod set_asset_active_reducer;
 pub mod set_consolidation_company_rate_reducer;
@@ -1192,6 +1234,7 @@ pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
 pub mod set_project_active_reducer;
+pub mod set_record_custom_field_values_reducer;
 pub mod set_task_parent_reducer;
 pub mod set_whatsapp_primary_account_reducer;
 pub mod set_workflow_active_reducer;
@@ -1228,6 +1271,7 @@ pub mod test_currency_rate_edge_cases_reducer;
 pub mod test_data_protection_settings_reducer;
 pub mod test_iot_device_reducer;
 pub mod test_onboarding_rbac_membership_flows_reducer;
+pub mod test_org_permission_deny_beats_allow_reducer;
 pub mod test_organization_isolation_reducer;
 pub mod test_organization_lifecycle_reducer;
 pub mod test_organization_settings_edge_cases_reducer;
@@ -1275,6 +1319,7 @@ pub mod update_ai_chat_session_title_reducer;
 pub mod update_analytic_account_reducer;
 pub mod update_analytic_distribution_model_reducer;
 pub mod update_analytic_line_reducer;
+pub mod update_approval_rule_reducer;
 pub mod update_audit_rule_reducer;
 pub mod update_barcode_nomenclature_reducer;
 pub mod update_barcode_rule_reducer;
@@ -1297,6 +1342,7 @@ pub mod update_crossovered_budget_reducer;
 pub mod update_department_reducer;
 pub mod update_device_status_reducer;
 pub mod update_document_reducer;
+pub mod update_document_template_reducer;
 pub mod update_employee_reducer;
 pub mod update_expense_reducer;
 pub mod update_financial_report_reducer;
@@ -1315,6 +1361,7 @@ pub mod update_lead_address_reducer;
 pub mod update_lead_details_reducer;
 pub mod update_lead_revenue_reducer;
 pub mod update_leave_type_reducer;
+pub mod update_mail_template_reducer;
 pub mod update_metric_values_reducer;
 pub mod update_opportunity_reducer;
 pub mod update_org_member_details_reducer;
@@ -1430,6 +1477,8 @@ pub mod ai_skill_config_table;
 pub mod ai_team_member_table;
 pub mod ai_team_member_skill_table;
 pub mod analytics_metric_table;
+pub mod approval_request_table;
+pub mod approval_rule_table;
 pub mod assignment_rule_table;
 pub mod audit_log_table;
 pub mod audit_rule_table;
@@ -1472,6 +1521,7 @@ pub mod delivery_price_rule_table;
 pub mod doc_folder_table;
 pub mod document_table;
 pub mod document_sequence_table;
+pub mod document_template_table;
 pub mod document_version_table;
 pub mod expense_sheet_table;
 pub mod financial_report_table;
@@ -1516,6 +1566,7 @@ pub mod lead_lost_reason_table;
 pub mod lead_source_table;
 pub mod mail_follower_table;
 pub mod mail_message_table;
+pub mod mail_template_table;
 pub mod mrp_bom_table;
 pub mod mrp_bom_line_table;
 pub mod mrp_production_table;
@@ -1531,6 +1582,7 @@ pub mod organization_table;
 pub mod organization_settings_table;
 pub mod packaging_material_table;
 pub mod picking_wave_table;
+pub mod policy_snapshot_table;
 pub mod pos_config_table;
 pub mod pos_loyalty_card_table;
 pub mod pos_loyalty_program_table;
@@ -1572,6 +1624,7 @@ pub mod quality_point_table;
 pub mod quality_team_table;
 pub mod queue_job_table;
 pub mod queue_worker_table;
+pub mod record_custom_field_value_table;
 pub mod replenishment_rule_table;
 pub mod report_template_table;
 pub mod res_partner_bank_table;
@@ -1685,6 +1738,8 @@ pub use ai_team_member_skill_type::AiTeamMemberSkill;
 pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
+pub use approval_request_type::ApprovalRequest;
+pub use approval_rule_type::ApprovalRule;
 pub use asset_state_type::AssetState;
 pub use asset_type_type::AssetType;
 pub use assign_role_params_type::AssignRoleParams;
@@ -1762,6 +1817,7 @@ pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
 pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
 pub use create_analytic_line_params_type::CreateAnalyticLineParams;
 pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
+pub use create_approval_rule_params_type::CreateApprovalRuleParams;
 pub use create_audit_rule_params_type::CreateAuditRuleParams;
 pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
 pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
@@ -1794,6 +1850,7 @@ pub use create_depreciation_line_params_type::CreateDepreciationLineParams;
 pub use create_document_folder_params_type::CreateDocumentFolderParams;
 pub use create_document_params_type::CreateDocumentParams;
 pub use create_document_processing_job_params_type::CreateDocumentProcessingJobParams;
+pub use create_document_template_params_type::CreateDocumentTemplateParams;
 pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
 pub use create_employee_params_type::CreateEmployeeParams;
 pub use create_expense_params_type::CreateExpenseParams;
@@ -1817,6 +1874,7 @@ pub use create_lead_params_type::CreateLeadParams;
 pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
+pub use create_mail_template_params_type::CreateMailTemplateParams;
 pub use create_mrp_production_params_type::CreateMrpProductionParams;
 pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
@@ -1917,6 +1975,7 @@ pub use dispose_account_asset_params_type::DisposeAccountAssetParams;
 pub use document_type::Document;
 pub use document_folder_type::DocumentFolder;
 pub use document_sequence_type::DocumentSequence;
+pub use document_template_type::DocumentTemplate;
 pub use document_version_type::DocumentVersion;
 pub use done_stock_move_params_type::DoneStockMoveParams;
 pub use employment_type_type::EmploymentType;
@@ -1993,6 +2052,7 @@ pub use log_timesheet_params_type::LogTimesheetParams;
 pub use mail_follower_type::MailFollower;
 pub use mail_message_type::MailMessage;
 pub use mail_message_type_type::MailMessageType;
+pub use mail_template_type::MailTemplate;
 pub use mo_state_type::MoState;
 pub use module_config_input_type::ModuleConfigInput;
 pub use move_stock_quant_params_type::MoveStockQuantParams;
@@ -2026,6 +2086,9 @@ pub use permission_subject_type::PermissionSubject;
 pub use picking_wave_type::PickingWave;
 pub use po_invoice_status_type::PoInvoiceStatus;
 pub use po_state_type::PoState;
+pub use policy_action_grant_type::PolicyActionGrant;
+pub use policy_field_permission_type::PolicyFieldPermission;
+pub use policy_snapshot_type::PolicySnapshot;
 pub use pos_config_type::PosConfig;
 pub use pos_loyalty_card_type::PosLoyaltyCard;
 pub use pos_loyalty_program_type::PosLoyaltyProgram;
@@ -2071,10 +2134,13 @@ pub use quality_check_type::QualityCheck;
 pub use quality_point_type::QualityPoint;
 pub use quality_team_type::QualityTeam;
 pub use queue_job_type::QueueJob;
+pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
+pub use record_custom_field_entry_type::RecordCustomFieldEntry;
+pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
@@ -2082,6 +2148,7 @@ pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckPara
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
+pub use reject_approval_request_params_type::RejectApprovalRequestParams;
 pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
@@ -2104,6 +2171,7 @@ pub use serial_lot_traceability_type::SerialLotTraceability;
 pub use session_state_type::SessionState;
 pub use set_article_published_params_type::SetArticlePublishedParams;
 pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
+pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use shipping_method_type::ShippingMethod;
 pub use split_method_type::SplitMethod;
 pub use start_timesheet_timer_params_type::StartTimesheetTimerParams;
@@ -2169,6 +2237,7 @@ pub use update_ai_chat_session_title_params_type::UpdateAiChatSessionTitleParams
 pub use update_analytic_account_params_type::UpdateAnalyticAccountParams;
 pub use update_analytic_distribution_model_params_type::UpdateAnalyticDistributionModelParams;
 pub use update_analytic_line_params_type::UpdateAnalyticLineParams;
+pub use update_approval_rule_params_type::UpdateApprovalRuleParams;
 pub use update_audit_rule_params_type::UpdateAuditRuleParams;
 pub use update_barcode_nomenclature_params_type::UpdateBarcodeNomenclatureParams;
 pub use update_barcode_rule_params_type::UpdateBarcodeRuleParams;
@@ -2191,6 +2260,7 @@ pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
 pub use update_dashboard_share_params_type::UpdateDashboardShareParams;
 pub use update_department_params_type::UpdateDepartmentParams;
 pub use update_document_params_type::UpdateDocumentParams;
+pub use update_document_template_params_type::UpdateDocumentTemplateParams;
 pub use update_employee_params_type::UpdateEmployeeParams;
 pub use update_expense_params_type::UpdateExpenseParams;
 pub use update_financial_report_params_type::UpdateFinancialReportParams;
@@ -2205,6 +2275,7 @@ pub use update_lead_address_params_type::UpdateLeadAddressParams;
 pub use update_lead_details_params_type::UpdateLeadDetailsParams;
 pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
 pub use update_leave_type_params_type::UpdateLeaveTypeParams;
+pub use update_mail_template_params_type::UpdateMailTemplateParams;
 pub use update_metric_values_params_type::UpdateMetricValuesParams;
 pub use update_opportunity_params_type::UpdateOpportunityParams;
 pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
@@ -2319,6 +2390,8 @@ pub use ai_skill_config_table::*;
 pub use ai_team_member_table::*;
 pub use ai_team_member_skill_table::*;
 pub use analytics_metric_table::*;
+pub use approval_request_table::*;
+pub use approval_rule_table::*;
 pub use assignment_rule_table::*;
 pub use audit_log_table::*;
 pub use audit_rule_table::*;
@@ -2361,6 +2434,7 @@ pub use delivery_price_rule_table::*;
 pub use doc_folder_table::*;
 pub use document_table::*;
 pub use document_sequence_table::*;
+pub use document_template_table::*;
 pub use document_version_table::*;
 pub use expense_sheet_table::*;
 pub use financial_report_table::*;
@@ -2405,6 +2479,7 @@ pub use lead_lost_reason_table::*;
 pub use lead_source_table::*;
 pub use mail_follower_table::*;
 pub use mail_message_table::*;
+pub use mail_template_table::*;
 pub use mrp_bom_table::*;
 pub use mrp_bom_line_table::*;
 pub use mrp_production_table::*;
@@ -2420,6 +2495,7 @@ pub use organization_table::*;
 pub use organization_settings_table::*;
 pub use packaging_material_table::*;
 pub use picking_wave_table::*;
+pub use policy_snapshot_table::*;
 pub use pos_config_table::*;
 pub use pos_loyalty_card_table::*;
 pub use pos_loyalty_program_table::*;
@@ -2461,6 +2537,7 @@ pub use quality_point_table::*;
 pub use quality_team_table::*;
 pub use queue_job_table::*;
 pub use queue_worker_table::*;
+pub use record_custom_field_value_table::*;
 pub use replenishment_rule_table::*;
 pub use report_template_table::*;
 pub use res_partner_bank_table::*;
@@ -2551,6 +2628,7 @@ pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use approve_ai_action_draft_reducer::approve_ai_action_draft;
+pub use approve_approval_request_reducer::approve_approval_request;
 pub use approve_document_processing_job_reducer::approve_document_processing_job;
 pub use approve_expense_sheet_reducer::approve_expense_sheet;
 pub use approve_intercompany_transaction_reducer::approve_intercompany_transaction;
@@ -2656,6 +2734,7 @@ pub use create_analytic_account_reducer::create_analytic_account;
 pub use create_analytic_distribution_model_reducer::create_analytic_distribution_model;
 pub use create_analytic_line_reducer::create_analytic_line;
 pub use create_analytics_metric_reducer::create_analytics_metric;
+pub use create_approval_rule_reducer::create_approval_rule;
 pub use create_audit_rule_reducer::create_audit_rule;
 pub use create_barcode_nomenclature_reducer::create_barcode_nomenclature;
 pub use create_barcode_rule_reducer::create_barcode_rule;
@@ -2688,6 +2767,7 @@ pub use create_depreciation_line_reducer::create_depreciation_line;
 pub use create_document_reducer::create_document;
 pub use create_document_folder_reducer::create_document_folder;
 pub use create_document_processing_job_reducer::create_document_processing_job;
+pub use create_document_template_reducer::create_document_template;
 pub use create_elimination_entry_reducer::create_elimination_entry;
 pub use create_employee_reducer::create_employee;
 pub use create_expense_reducer::create_expense;
@@ -2715,6 +2795,7 @@ pub use create_leave_request_reducer::create_leave_request;
 pub use create_leave_type_reducer::create_leave_type;
 pub use create_loyalty_card_reducer::create_loyalty_card;
 pub use create_loyalty_program_reducer::create_loyalty_program;
+pub use create_mail_template_reducer::create_mail_template;
 pub use create_manufacturing_order_reducer::create_manufacturing_order;
 pub use create_opportunity_reducer::create_opportunity;
 pub use create_opportunity_line_reducer::create_opportunity_line;
@@ -2802,6 +2883,7 @@ pub use delete_account_move_line_reducer::delete_account_move_line;
 pub use delete_account_period_reducer::delete_account_period;
 pub use delete_account_reconciliation_widget_reducer::delete_account_reconciliation_widget;
 pub use delete_analytic_line_reducer::delete_analytic_line;
+pub use delete_approval_rule_reducer::delete_approval_rule;
 pub use delete_barcode_nomenclature_reducer::delete_barcode_nomenclature;
 pub use delete_barcode_rule_reducer::delete_barcode_rule;
 pub use delete_bom_reducer::delete_bom;
@@ -2835,6 +2917,7 @@ pub use delete_proposal_source_doc_reducer::delete_proposal_source_doc;
 pub use delete_quality_alert_reason_reducer::delete_quality_alert_reason;
 pub use delete_quality_point_reducer::delete_quality_point;
 pub use delete_quality_team_reducer::delete_quality_team;
+pub use delete_record_custom_field_values_reducer::delete_record_custom_field_values;
 pub use delete_search_embedding_reducer::delete_search_embedding;
 pub use delete_stock_location_reducer::delete_stock_location;
 pub use delete_stock_production_lot_reducer::delete_stock_production_lot;
@@ -2950,6 +3033,7 @@ pub use log_workcenter_productivity_reducer::log_workcenter_productivity;
 pub use mark_action_sent_reducer::mark_action_sent;
 pub use mark_embedding_synced_reducer::mark_embedding_synced;
 pub use mark_invite_accepted_reducer::mark_invite_accepted;
+pub use mark_mail_message_delivered_reducer::mark_mail_message_delivered;
 pub use mark_reset_token_used_reducer::mark_reset_token_used;
 pub use match_bank_line_reducer::match_bank_line;
 pub use match_elimination_entries_reducer::match_elimination_entries;
@@ -2975,6 +3059,7 @@ pub use process_intercompany_transaction_reducer::process_intercompany_transacti
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
+pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
@@ -2991,6 +3076,7 @@ pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
+pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
@@ -2999,6 +3085,7 @@ pub use register_iot_hub_reducer::register_iot_hub;
 pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
 pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
+pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use remove_article_member_reducer::remove_article_member;
 pub use remove_casbin_rule_reducer::remove_casbin_rule;
@@ -3023,22 +3110,35 @@ pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_reconcile_test_reducer::run_accounting_payment_reconcile_test;
+pub use run_accounting_payment_term_update_test_reducer::run_accounting_payment_term_update_test;
 pub use run_accounting_post_invoice_test_reducer::run_accounting_post_invoice_test;
 pub use run_all_accounting_tests_reducer::run_all_accounting_tests;
 pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
+pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
+pub use run_documents_folder_test_reducer::run_documents_folder_test;
+pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
+pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
+pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
+pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
+pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
+pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
 pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
 pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
+pub use run_sales_order_update_test_reducer::run_sales_order_update_test;
+pub use run_subscription_plan_test_reducer::run_subscription_plan_test;
 pub use run_traceability_report_reducer::run_traceability_report;
+pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
@@ -3048,6 +3148,7 @@ pub use send_purchase_order_reducer::send_purchase_order;
 pub use set_ai_agent_active_reducer::set_ai_agent_active;
 pub use set_ai_skill_active_reducer::set_ai_skill_active;
 pub use set_analytic_account_active_reducer::set_analytic_account_active;
+pub use set_approval_rule_active_reducer::set_approval_rule_active;
 pub use set_article_published_reducer::set_article_published;
 pub use set_asset_active_reducer::set_asset_active;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
@@ -3055,6 +3156,7 @@ pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
 pub use set_project_active_reducer::set_project_active;
+pub use set_record_custom_field_values_reducer::set_record_custom_field_values;
 pub use set_task_parent_reducer::set_task_parent;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
 pub use set_workflow_active_reducer::set_workflow_active;
@@ -3091,6 +3193,7 @@ pub use test_currency_rate_edge_cases_reducer::test_currency_rate_edge_cases;
 pub use test_data_protection_settings_reducer::test_data_protection_settings;
 pub use test_iot_device_reducer::test_iot_device;
 pub use test_onboarding_rbac_membership_flows_reducer::test_onboarding_rbac_membership_flows;
+pub use test_org_permission_deny_beats_allow_reducer::test_org_permission_deny_beats_allow;
 pub use test_organization_isolation_reducer::test_organization_isolation;
 pub use test_organization_lifecycle_reducer::test_organization_lifecycle;
 pub use test_organization_settings_edge_cases_reducer::test_organization_settings_edge_cases;
@@ -3138,6 +3241,7 @@ pub use update_ai_chat_session_title_reducer::update_ai_chat_session_title;
 pub use update_analytic_account_reducer::update_analytic_account;
 pub use update_analytic_distribution_model_reducer::update_analytic_distribution_model;
 pub use update_analytic_line_reducer::update_analytic_line;
+pub use update_approval_rule_reducer::update_approval_rule;
 pub use update_audit_rule_reducer::update_audit_rule;
 pub use update_barcode_nomenclature_reducer::update_barcode_nomenclature;
 pub use update_barcode_rule_reducer::update_barcode_rule;
@@ -3160,6 +3264,7 @@ pub use update_crossovered_budget_reducer::update_crossovered_budget;
 pub use update_department_reducer::update_department;
 pub use update_device_status_reducer::update_device_status;
 pub use update_document_reducer::update_document;
+pub use update_document_template_reducer::update_document_template;
 pub use update_employee_reducer::update_employee;
 pub use update_expense_reducer::update_expense;
 pub use update_financial_report_reducer::update_financial_report;
@@ -3178,6 +3283,7 @@ pub use update_lead_address_reducer::update_lead_address;
 pub use update_lead_details_reducer::update_lead_details;
 pub use update_lead_revenue_reducer::update_lead_revenue;
 pub use update_leave_type_reducer::update_leave_type;
+pub use update_mail_template_reducer::update_mail_template;
 pub use update_metric_values_reducer::update_metric_values;
 pub use update_opportunity_reducer::update_opportunity;
 pub use update_org_member_details_reducer::update_org_member_details;
@@ -3419,6 +3525,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         draft_id: u64,
+}    ,
+    ApproveApprovalRequest {
+        organization_id: u64,
+        company_id: u64,
+        request_id: u64,
 }    ,
     ApproveDocumentProcessingJob {
         organization_id: u64,
@@ -3908,6 +4019,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateAnalyticsMetricParams,
 }    ,
+    CreateApprovalRule {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        params: CreateApprovalRuleParams,
+}    ,
     CreateAuditRule {
         organization_id: u64,
         params: CreateAuditRuleParams,
@@ -4050,6 +4166,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateDocumentProcessingJobParams,
 }    ,
+    CreateDocumentTemplate {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        params: CreateDocumentTemplateParams,
+}    ,
     CreateEliminationEntry {
         organization_id: u64,
         params: CreateEliminationEntryParams,
@@ -4189,6 +4310,11 @@ pub enum Reducer {
     CreateLoyaltyProgram {
         organization_id: u64,
         params: CreateLoyaltyProgramParams,
+}    ,
+    CreateMailTemplate {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        params: CreateMailTemplateParams,
 }    ,
     CreateManufacturingOrder {
         organization_id: u64,
@@ -4584,6 +4710,11 @@ pub enum Reducer {
         organization_id: u64,
         line_id: u64,
 }    ,
+    DeleteApprovalRule {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        rule_id: u64,
+}    ,
     DeleteBarcodeNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
@@ -4718,6 +4849,12 @@ pub enum Reducer {
     DeleteQualityTeam {
         organization_id: u64,
         team_id: u64,
+}    ,
+    DeleteRecordCustomFieldValues {
+        organization_id: u64,
+        company_id: u64,
+        model: String,
+        record_id: u64,
 }    ,
     DeleteSearchEmbedding {
         organization_id: u64,
@@ -5230,6 +5367,11 @@ pub enum Reducer {
     MarkInviteAccepted {
         invite_id: u64,
 }    ,
+    MarkMailMessageDelivered {
+        organization_id: u64,
+        message_id: u64,
+        delivery_metadata: Option::<String>,
+}    ,
     MarkResetTokenUsed {
         token_id: u64,
 }    ,
@@ -5350,6 +5492,11 @@ pub enum Reducer {
         mo_id: u64,
         qty_producing: f64,
 }    ,
+    QueueMailFromTemplate {
+        organization_id: u64,
+        company_id: u64,
+        params: QueueMailFromTemplateParams,
+}    ,
     ReceivePoLine {
         organization_id: u64,
         line_id: u64,
@@ -5429,6 +5576,9 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    RefreshPolicySnapshot {
+        organization_id: u64,
+}    ,
     RefreshTaxDeadlineStatuses {
         organization_id: u64,
 }    ,
@@ -5466,6 +5616,12 @@ pub enum Reducer {
         company_id: u64,
         draft_id: u64,
         reason: String,
+}    ,
+    RejectApprovalRequest {
+        organization_id: u64,
+        company_id: u64,
+        request_id: u64,
+        params: RejectApprovalRequestParams,
 }    ,
     RejectSupplierIntake {
         organization_id: u64,
@@ -5566,25 +5722,38 @@ pub enum Reducer {
 }    ,
     RunAccountingPaymentCancelTest ,
     RunAccountingPaymentReconcileTest ,
+    RunAccountingPaymentTermUpdateTest ,
     RunAccountingPostInvoiceTest ,
     RunAllAccountingTests ,
     RunAllCoreTests ,
     RunAllCrmTests ,
     RunAllDomainTests ,
     RunAllInventoryTests ,
+    RunAllPlatformTests ,
     RunAllSalesTests ,
+    RunCrmContactUpdateDeleteTest ,
     RunCrmOpportunityConvertTest ,
+    RunDocumentsFolderTest ,
+    RunHelpdeskTicketTest ,
+    RunHrLeaveTypeTest ,
     RunInventoryAdjustmentTest ,
+    RunInventoryDeliveryQuantTest ,
     RunInventoryProductCategoryTest ,
+    RunInventoryProductUpdateTest ,
+    RunInventoryReceiptQuantTest ,
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
+    RunManufacturingWorkcenterTest ,
     RunPurchasingBillBalancedTest ,
     RunSalesOrderDeliveryTest ,
     RunSalesOrderInvoiceTest ,
+    RunSalesOrderUpdateTest ,
+    RunSubscriptionPlanTest ,
     RunTraceabilityReport {
         organization_id: u64,
         report_id: u64,
 }    ,
+    RunWorkflowDefinitionTest ,
     SaveImportMappingTemplate {
         organization_id: u64,
         template_id: Option::<u64>,
@@ -5619,6 +5788,12 @@ pub enum Reducer {
     SetAnalyticAccountActive {
         organization_id: u64,
         account_id: u64,
+        active: bool,
+}    ,
+    SetApprovalRuleActive {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        rule_id: u64,
         active: bool,
 }    ,
     SetArticlePublished {
@@ -5659,6 +5834,11 @@ pub enum Reducer {
         organization_id: u64,
         project_id: u64,
         active: bool,
+}    ,
+    SetRecordCustomFieldValues {
+        organization_id: u64,
+        company_id: u64,
+        params: SetRecordCustomFieldValuesParams,
 }    ,
     SetTaskParent {
         organization_id: u64,
@@ -5788,6 +5968,7 @@ pub enum Reducer {
         device_id: u64,
 }    ,
     TestOnboardingRbacMembershipFlows ,
+    TestOrgPermissionDenyBeatsAllow ,
     TestOrganizationIsolation ,
     TestOrganizationLifecycle ,
     TestOrganizationSettingsEdgeCases ,
@@ -5953,6 +6134,12 @@ pub enum Reducer {
         line_id: u64,
         params: UpdateAnalyticLineParams,
 }    ,
+    UpdateApprovalRule {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        rule_id: u64,
+        params: UpdateApprovalRuleParams,
+}    ,
     UpdateAuditRule {
         rule_id: u64,
         params: UpdateAuditRuleParams,
@@ -6058,6 +6245,12 @@ pub enum Reducer {
         organization_id: u64,
         document_id: u64,
         params: UpdateDocumentParams,
+}    ,
+    UpdateDocumentTemplate {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        template_id: u64,
+        params: UpdateDocumentTemplateParams,
 }    ,
     UpdateEmployee {
         organization_id: u64,
@@ -6169,6 +6362,12 @@ pub enum Reducer {
         company_id: u64,
         leave_type_id: u64,
         params: UpdateLeaveTypeParams,
+}    ,
+    UpdateMailTemplate {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        template_id: u64,
+        params: UpdateMailTemplateParams,
 }    ,
     UpdateMetricValues {
         organization_id: u64,
@@ -6613,6 +6812,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApproveAiActionDraft { .. } => "approve_ai_action_draft",
+            Reducer::ApproveApprovalRequest { .. } => "approve_approval_request",
             Reducer::ApproveDocumentProcessingJob { .. } => "approve_document_processing_job",
             Reducer::ApproveExpenseSheet { .. } => "approve_expense_sheet",
             Reducer::ApproveIntercompanyTransaction { .. } => "approve_intercompany_transaction",
@@ -6718,6 +6918,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAnalyticDistributionModel { .. } => "create_analytic_distribution_model",
             Reducer::CreateAnalyticLine { .. } => "create_analytic_line",
             Reducer::CreateAnalyticsMetric { .. } => "create_analytics_metric",
+            Reducer::CreateApprovalRule { .. } => "create_approval_rule",
             Reducer::CreateAuditRule { .. } => "create_audit_rule",
             Reducer::CreateBarcodeNomenclature { .. } => "create_barcode_nomenclature",
             Reducer::CreateBarcodeRule { .. } => "create_barcode_rule",
@@ -6750,6 +6951,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateDocument { .. } => "create_document",
             Reducer::CreateDocumentFolder { .. } => "create_document_folder",
             Reducer::CreateDocumentProcessingJob { .. } => "create_document_processing_job",
+            Reducer::CreateDocumentTemplate { .. } => "create_document_template",
             Reducer::CreateEliminationEntry { .. } => "create_elimination_entry",
             Reducer::CreateEmployee { .. } => "create_employee",
             Reducer::CreateExpense { .. } => "create_expense",
@@ -6777,6 +6979,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateLeaveType { .. } => "create_leave_type",
             Reducer::CreateLoyaltyCard { .. } => "create_loyalty_card",
             Reducer::CreateLoyaltyProgram { .. } => "create_loyalty_program",
+            Reducer::CreateMailTemplate { .. } => "create_mail_template",
             Reducer::CreateManufacturingOrder { .. } => "create_manufacturing_order",
             Reducer::CreateOpportunity { .. } => "create_opportunity",
             Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
@@ -6864,6 +7067,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteAccountPeriod { .. } => "delete_account_period",
             Reducer::DeleteAccountReconciliationWidget { .. } => "delete_account_reconciliation_widget",
             Reducer::DeleteAnalyticLine { .. } => "delete_analytic_line",
+            Reducer::DeleteApprovalRule { .. } => "delete_approval_rule",
             Reducer::DeleteBarcodeNomenclature { .. } => "delete_barcode_nomenclature",
             Reducer::DeleteBarcodeRule { .. } => "delete_barcode_rule",
             Reducer::DeleteBom { .. } => "delete_bom",
@@ -6897,6 +7101,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteQualityAlertReason { .. } => "delete_quality_alert_reason",
             Reducer::DeleteQualityPoint { .. } => "delete_quality_point",
             Reducer::DeleteQualityTeam { .. } => "delete_quality_team",
+            Reducer::DeleteRecordCustomFieldValues { .. } => "delete_record_custom_field_values",
             Reducer::DeleteSearchEmbedding { .. } => "delete_search_embedding",
             Reducer::DeleteStockLocation { .. } => "delete_stock_location",
             Reducer::DeleteStockProductionLot { .. } => "delete_stock_production_lot",
@@ -7012,6 +7217,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::MarkActionSent { .. } => "mark_action_sent",
             Reducer::MarkEmbeddingSynced { .. } => "mark_embedding_synced",
             Reducer::MarkInviteAccepted { .. } => "mark_invite_accepted",
+            Reducer::MarkMailMessageDelivered { .. } => "mark_mail_message_delivered",
             Reducer::MarkResetTokenUsed { .. } => "mark_reset_token_used",
             Reducer::MatchBankLine { .. } => "match_bank_line",
             Reducer::MatchEliminationEntries { .. } => "match_elimination_entries",
@@ -7037,6 +7243,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProcessInventoryAdjustment { .. } => "process_inventory_adjustment",
             Reducer::ProcessPendingScans { .. } => "process_pending_scans",
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
+            Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
@@ -7053,6 +7260,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
+            Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
             Reducer::RefuseLeave { .. } => "refuse_leave",
@@ -7061,6 +7269,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterPaymentOnInvoice { .. } => "register_payment_on_invoice",
             Reducer::RegisterQueueWorker { .. } => "register_queue_worker",
             Reducer::RejectAiActionDraft { .. } => "reject_ai_action_draft",
+            Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
             Reducer::RemoveCasbinRule { .. } => "remove_casbin_rule",
@@ -7085,22 +7294,35 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentReconcileTest => "run_accounting_payment_reconcile_test",
+            Reducer::RunAccountingPaymentTermUpdateTest => "run_accounting_payment_term_update_test",
             Reducer::RunAccountingPostInvoiceTest => "run_accounting_post_invoice_test",
             Reducer::RunAllAccountingTests => "run_all_accounting_tests",
             Reducer::RunAllCoreTests => "run_all_core_tests",
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
+            Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
+            Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
+            Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
+            Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
+            Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
+            Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
+            Reducer::RunInventoryReceiptQuantTest => "run_inventory_receipt_quant_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
+            Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
             Reducer::RunSalesOrderDeliveryTest => "run_sales_order_delivery_test",
             Reducer::RunSalesOrderInvoiceTest => "run_sales_order_invoice_test",
+            Reducer::RunSalesOrderUpdateTest => "run_sales_order_update_test",
+            Reducer::RunSubscriptionPlanTest => "run_subscription_plan_test",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
+            Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
@@ -7110,6 +7332,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetAiAgentActive { .. } => "set_ai_agent_active",
             Reducer::SetAiSkillActive { .. } => "set_ai_skill_active",
             Reducer::SetAnalyticAccountActive { .. } => "set_analytic_account_active",
+            Reducer::SetApprovalRuleActive { .. } => "set_approval_rule_active",
             Reducer::SetArticlePublished { .. } => "set_article_published",
             Reducer::SetAssetActive { .. } => "set_asset_active",
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
@@ -7117,6 +7340,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
             Reducer::SetProjectActive { .. } => "set_project_active",
+            Reducer::SetRecordCustomFieldValues { .. } => "set_record_custom_field_values",
             Reducer::SetTaskParent { .. } => "set_task_parent",
             Reducer::SetWhatsappPrimaryAccount { .. } => "set_whatsapp_primary_account",
             Reducer::SetWorkflowActive { .. } => "set_workflow_active",
@@ -7153,6 +7377,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::TestDataProtectionSettings => "test_data_protection_settings",
             Reducer::TestIotDevice { .. } => "test_iot_device",
             Reducer::TestOnboardingRbacMembershipFlows => "test_onboarding_rbac_membership_flows",
+            Reducer::TestOrgPermissionDenyBeatsAllow => "test_org_permission_deny_beats_allow",
             Reducer::TestOrganizationIsolation => "test_organization_isolation",
             Reducer::TestOrganizationLifecycle => "test_organization_lifecycle",
             Reducer::TestOrganizationSettingsEdgeCases => "test_organization_settings_edge_cases",
@@ -7200,6 +7425,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateAnalyticAccount { .. } => "update_analytic_account",
             Reducer::UpdateAnalyticDistributionModel { .. } => "update_analytic_distribution_model",
             Reducer::UpdateAnalyticLine { .. } => "update_analytic_line",
+            Reducer::UpdateApprovalRule { .. } => "update_approval_rule",
             Reducer::UpdateAuditRule { .. } => "update_audit_rule",
             Reducer::UpdateBarcodeNomenclature { .. } => "update_barcode_nomenclature",
             Reducer::UpdateBarcodeRule { .. } => "update_barcode_rule",
@@ -7222,6 +7448,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateDepartment { .. } => "update_department",
             Reducer::UpdateDeviceStatus { .. } => "update_device_status",
             Reducer::UpdateDocument { .. } => "update_document",
+            Reducer::UpdateDocumentTemplate { .. } => "update_document_template",
             Reducer::UpdateEmployee { .. } => "update_employee",
             Reducer::UpdateExpense { .. } => "update_expense",
             Reducer::UpdateFinancialReport { .. } => "update_financial_report",
@@ -7240,6 +7467,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateLeadDetails { .. } => "update_lead_details",
             Reducer::UpdateLeadRevenue { .. } => "update_lead_revenue",
             Reducer::UpdateLeaveType { .. } => "update_leave_type",
+            Reducer::UpdateMailTemplate { .. } => "update_mail_template",
             Reducer::UpdateMetricValues { .. } => "update_metric_values",
             Reducer::UpdateOpportunity { .. } => "update_opportunity",
             Reducer::UpdateOrgMemberDetails { .. } => "update_org_member_details",
@@ -7604,6 +7832,15 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 draft_id: draft_id.clone(),
+}),
+            Reducer::ApproveApprovalRequest{
+                organization_id,
+                company_id,
+                request_id,
+}             => __sats::bsatn::to_vec(&approve_approval_request_reducer::ApproveApprovalRequestArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                request_id: request_id.clone(),
 }),
             Reducer::ApproveDocumentProcessingJob{
                 organization_id,
@@ -8477,6 +8714,15 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateApprovalRule{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_approval_rule_reducer::CreateApprovalRuleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateAuditRule{
                 organization_id,
                 params,
@@ -8725,6 +8971,15 @@ Reducer::BillTimesheets{
                 company_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_document_processing_job_reducer::CreateDocumentProcessingJobArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateDocumentTemplate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_document_template_reducer::CreateDocumentTemplateArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 params: params.clone(),
@@ -8980,6 +9235,15 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_loyalty_program_reducer::CreateLoyaltyProgramArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateMailTemplate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_mail_template_reducer::CreateMailTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateManufacturingOrder{
@@ -9683,6 +9947,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 line_id: line_id.clone(),
 }),
+            Reducer::DeleteApprovalRule{
+                organization_id,
+                company_id,
+                rule_id,
+}             => __sats::bsatn::to_vec(&delete_approval_rule_reducer::DeleteApprovalRuleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rule_id: rule_id.clone(),
+}),
             Reducer::DeleteBarcodeNomenclature{
                 organization_id,
                 nomenclature_id,
@@ -9919,6 +10192,17 @@ Reducer::BillTimesheets{
 }             => __sats::bsatn::to_vec(&delete_quality_team_reducer::DeleteQualityTeamArgs {
                 organization_id: organization_id.clone(),
                 team_id: team_id.clone(),
+}),
+            Reducer::DeleteRecordCustomFieldValues{
+                organization_id,
+                company_id,
+                model,
+                record_id,
+}             => __sats::bsatn::to_vec(&delete_record_custom_field_values_reducer::DeleteRecordCustomFieldValuesArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                model: model.clone(),
+                record_id: record_id.clone(),
 }),
             Reducer::DeleteSearchEmbedding{
                 organization_id,
@@ -10829,6 +11113,15 @@ Reducer::ErrorIntercompanyTransaction{
 }             => __sats::bsatn::to_vec(&mark_invite_accepted_reducer::MarkInviteAcceptedArgs {
                 invite_id: invite_id.clone(),
 }),
+            Reducer::MarkMailMessageDelivered{
+                organization_id,
+                message_id,
+                delivery_metadata,
+}             => __sats::bsatn::to_vec(&mark_mail_message_delivered_reducer::MarkMailMessageDeliveredArgs {
+                organization_id: organization_id.clone(),
+                message_id: message_id.clone(),
+                delivery_metadata: delivery_metadata.clone(),
+}),
             Reducer::MarkResetTokenUsed{
                 token_id,
 }             => __sats::bsatn::to_vec(&mark_reset_token_used_reducer::MarkResetTokenUsedArgs {
@@ -11045,6 +11338,15 @@ Reducer::MoveStockQuant{
                 mo_id: mo_id.clone(),
                 qty_producing: qty_producing.clone(),
 }),
+            Reducer::QueueMailFromTemplate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&queue_mail_from_template_reducer::QueueMailFromTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReceivePoLine{
                 organization_id,
                 line_id,
@@ -11187,6 +11489,11 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::RefreshPolicySnapshot{
+                organization_id,
+}             => __sats::bsatn::to_vec(&refresh_policy_snapshot_reducer::RefreshPolicySnapshotArgs {
+                organization_id: organization_id.clone(),
+}),
             Reducer::RefreshTaxDeadlineStatuses{
                 organization_id,
 }             => __sats::bsatn::to_vec(&refresh_tax_deadline_statuses_reducer::RefreshTaxDeadlineStatusesArgs {
@@ -11254,6 +11561,17 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 draft_id: draft_id.clone(),
                 reason: reason.clone(),
+}),
+            Reducer::RejectApprovalRequest{
+                organization_id,
+                company_id,
+                request_id,
+                params,
+}             => __sats::bsatn::to_vec(&reject_approval_request_reducer::RejectApprovalRequestArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                request_id: request_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RejectSupplierIntake{
                 organization_id,
@@ -11431,6 +11749,8 @@ Reducer::MoveStockQuant{
                 }),
 Reducer::RunAccountingPaymentReconcileTest => __sats::bsatn::to_vec(&run_accounting_payment_reconcile_test_reducer::RunAccountingPaymentReconcileTestArgs {
                 }),
+Reducer::RunAccountingPaymentTermUpdateTest => __sats::bsatn::to_vec(&run_accounting_payment_term_update_test_reducer::RunAccountingPaymentTermUpdateTestArgs {
+                }),
 Reducer::RunAccountingPostInvoiceTest => __sats::bsatn::to_vec(&run_accounting_post_invoice_test_reducer::RunAccountingPostInvoiceTestArgs {
                 }),
 Reducer::RunAllAccountingTests => __sats::bsatn::to_vec(&run_all_accounting_tests_reducer::RunAllAccountingTestsArgs {
@@ -11443,23 +11763,45 @@ Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reduce
                 }),
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
                 }),
+Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
+                }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
+                }),
+Reducer::RunCrmContactUpdateDeleteTest => __sats::bsatn::to_vec(&run_crm_contact_update_delete_test_reducer::RunCrmContactUpdateDeleteTestArgs {
                 }),
 Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
                 }),
+Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
+                }),
+Reducer::RunHelpdeskTicketTest => __sats::bsatn::to_vec(&run_helpdesk_ticket_test_reducer::RunHelpdeskTicketTestArgs {
+                }),
+Reducer::RunHrLeaveTypeTest => __sats::bsatn::to_vec(&run_hr_leave_type_test_reducer::RunHrLeaveTypeTestArgs {
+                }),
 Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adjustment_test_reducer::RunInventoryAdjustmentTestArgs {
                 }),
+Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_delivery_quant_test_reducer::RunInventoryDeliveryQuantTestArgs {
+                }),
 Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
+                }),
+Reducer::RunInventoryProductUpdateTest => __sats::bsatn::to_vec(&run_inventory_product_update_test_reducer::RunInventoryProductUpdateTestArgs {
+                }),
+Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_receipt_quant_test_reducer::RunInventoryReceiptQuantTestArgs {
                 }),
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),
 Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
+                }),
+Reducer::RunManufacturingWorkcenterTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_test_reducer::RunManufacturingWorkcenterTestArgs {
                 }),
 Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
                 }),
 Reducer::RunSalesOrderDeliveryTest => __sats::bsatn::to_vec(&run_sales_order_delivery_test_reducer::RunSalesOrderDeliveryTestArgs {
                 }),
 Reducer::RunSalesOrderInvoiceTest => __sats::bsatn::to_vec(&run_sales_order_invoice_test_reducer::RunSalesOrderInvoiceTestArgs {
+                }),
+Reducer::RunSalesOrderUpdateTest => __sats::bsatn::to_vec(&run_sales_order_update_test_reducer::RunSalesOrderUpdateTestArgs {
+                }),
+Reducer::RunSubscriptionPlanTest => __sats::bsatn::to_vec(&run_subscription_plan_test_reducer::RunSubscriptionPlanTestArgs {
                 }),
 Reducer::RunTraceabilityReport{
                 organization_id,
@@ -11468,7 +11810,9 @@ Reducer::RunTraceabilityReport{
                 organization_id: organization_id.clone(),
                 report_id: report_id.clone(),
 }),
-            Reducer::SaveImportMappingTemplate{
+            Reducer::RunWorkflowDefinitionTest => __sats::bsatn::to_vec(&run_workflow_definition_test_reducer::RunWorkflowDefinitionTestArgs {
+                }),
+Reducer::SaveImportMappingTemplate{
                 organization_id,
                 template_id,
                 params,
@@ -11530,6 +11874,17 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&set_analytic_account_active_reducer::SetAnalyticAccountActiveArgs {
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
+                active: active.clone(),
+}),
+            Reducer::SetApprovalRuleActive{
+                organization_id,
+                company_id,
+                rule_id,
+                active,
+}             => __sats::bsatn::to_vec(&set_approval_rule_active_reducer::SetApprovalRuleActiveArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rule_id: rule_id.clone(),
                 active: active.clone(),
 }),
             Reducer::SetArticlePublished{
@@ -11602,6 +11957,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 project_id: project_id.clone(),
                 active: active.clone(),
+}),
+            Reducer::SetRecordCustomFieldValues{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_record_custom_field_values_reducer::SetRecordCustomFieldValuesArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SetTaskParent{
                 organization_id,
@@ -11834,6 +12198,8 @@ Reducer::TestIotDevice{
                 device_id: device_id.clone(),
 }),
             Reducer::TestOnboardingRbacMembershipFlows => __sats::bsatn::to_vec(&test_onboarding_rbac_membership_flows_reducer::TestOnboardingRbacMembershipFlowsArgs {
+                }),
+Reducer::TestOrgPermissionDenyBeatsAllow => __sats::bsatn::to_vec(&test_org_permission_deny_beats_allow_reducer::TestOrgPermissionDenyBeatsAllowArgs {
                 }),
 Reducer::TestOrganizationIsolation => __sats::bsatn::to_vec(&test_organization_isolation_reducer::TestOrganizationIsolationArgs {
                 }),
@@ -12136,6 +12502,17 @@ Reducer::ToggleProjectFavorite{
                 line_id: line_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateApprovalRule{
+                organization_id,
+                company_id,
+                rule_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_approval_rule_reducer::UpdateApprovalRuleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rule_id: rule_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateAuditRule{
                 rule_id,
                 params,
@@ -12324,6 +12701,17 @@ Reducer::ToggleProjectFavorite{
 }             => __sats::bsatn::to_vec(&update_document_reducer::UpdateDocumentArgs {
                 organization_id: organization_id.clone(),
                 document_id: document_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateDocumentTemplate{
+                organization_id,
+                company_id,
+                template_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_document_template_reducer::UpdateDocumentTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                template_id: template_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateEmployee{
@@ -12528,6 +12916,17 @@ Reducer::ToggleProjectFavorite{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 leave_type_id: leave_type_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateMailTemplate{
+                organization_id,
+                company_id,
+                template_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_mail_template_reducer::UpdateMailTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                template_id: template_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateMetricValues{
@@ -13306,6 +13705,8 @@ pub struct DbUpdate {
     ai_team_member: __sdk::TableUpdate<AiTeamMember>,
     ai_team_member_skill: __sdk::TableUpdate<AiTeamMemberSkill>,
     analytics_metric: __sdk::TableUpdate<AnalyticsMetric>,
+    approval_request: __sdk::TableUpdate<ApprovalRequest>,
+    approval_rule: __sdk::TableUpdate<ApprovalRule>,
     assignment_rule: __sdk::TableUpdate<AssignmentRule>,
     audit_log: __sdk::TableUpdate<AuditLog>,
     audit_rule: __sdk::TableUpdate<AuditRule>,
@@ -13348,6 +13749,7 @@ pub struct DbUpdate {
     doc_folder: __sdk::TableUpdate<DocumentFolder>,
     document: __sdk::TableUpdate<Document>,
     document_sequence: __sdk::TableUpdate<DocumentSequence>,
+    document_template: __sdk::TableUpdate<DocumentTemplate>,
     document_version: __sdk::TableUpdate<DocumentVersion>,
     expense_sheet: __sdk::TableUpdate<HrExpenseSheet>,
     financial_report: __sdk::TableUpdate<FinancialReport>,
@@ -13392,6 +13794,7 @@ pub struct DbUpdate {
     lead_source: __sdk::TableUpdate<LeadSource>,
     mail_follower: __sdk::TableUpdate<MailFollower>,
     mail_message: __sdk::TableUpdate<MailMessage>,
+    mail_template: __sdk::TableUpdate<MailTemplate>,
     mrp_bom: __sdk::TableUpdate<MrpBom>,
     mrp_bom_line: __sdk::TableUpdate<MrpBomLine>,
     mrp_production: __sdk::TableUpdate<MrpProduction>,
@@ -13407,6 +13810,7 @@ pub struct DbUpdate {
     organization_settings: __sdk::TableUpdate<OrganizationSettings>,
     packaging_material: __sdk::TableUpdate<PackagingMaterial>,
     picking_wave: __sdk::TableUpdate<PickingWave>,
+    policy_snapshot: __sdk::TableUpdate<PolicySnapshot>,
     pos_config: __sdk::TableUpdate<PosConfig>,
     pos_loyalty_card: __sdk::TableUpdate<PosLoyaltyCard>,
     pos_loyalty_program: __sdk::TableUpdate<PosLoyaltyProgram>,
@@ -13448,6 +13852,7 @@ pub struct DbUpdate {
     quality_team: __sdk::TableUpdate<QualityTeam>,
     queue_job: __sdk::TableUpdate<QueueJob>,
     queue_worker: __sdk::TableUpdate<QueueWorker>,
+    record_custom_field_value: __sdk::TableUpdate<RecordCustomFieldValue>,
     replenishment_rule: __sdk::TableUpdate<ReplenishmentRule>,
     report_template: __sdk::TableUpdate<ReportTemplate>,
     res_partner_bank: __sdk::TableUpdate<ResPartnerBank>,
@@ -13556,6 +13961,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "ai_team_member" => db_update.ai_team_member.append(ai_team_member_table::parse_table_update(table_update)?),
     "ai_team_member_skill" => db_update.ai_team_member_skill.append(ai_team_member_skill_table::parse_table_update(table_update)?),
     "analytics_metric" => db_update.analytics_metric.append(analytics_metric_table::parse_table_update(table_update)?),
+    "approval_request" => db_update.approval_request.append(approval_request_table::parse_table_update(table_update)?),
+    "approval_rule" => db_update.approval_rule.append(approval_rule_table::parse_table_update(table_update)?),
     "assignment_rule" => db_update.assignment_rule.append(assignment_rule_table::parse_table_update(table_update)?),
     "audit_log" => db_update.audit_log.append(audit_log_table::parse_table_update(table_update)?),
     "audit_rule" => db_update.audit_rule.append(audit_rule_table::parse_table_update(table_update)?),
@@ -13598,6 +14005,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "doc_folder" => db_update.doc_folder.append(doc_folder_table::parse_table_update(table_update)?),
     "document" => db_update.document.append(document_table::parse_table_update(table_update)?),
     "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
+    "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
     "document_version" => db_update.document_version.append(document_version_table::parse_table_update(table_update)?),
     "expense_sheet" => db_update.expense_sheet.append(expense_sheet_table::parse_table_update(table_update)?),
     "financial_report" => db_update.financial_report.append(financial_report_table::parse_table_update(table_update)?),
@@ -13642,6 +14050,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "lead_source" => db_update.lead_source.append(lead_source_table::parse_table_update(table_update)?),
     "mail_follower" => db_update.mail_follower.append(mail_follower_table::parse_table_update(table_update)?),
     "mail_message" => db_update.mail_message.append(mail_message_table::parse_table_update(table_update)?),
+    "mail_template" => db_update.mail_template.append(mail_template_table::parse_table_update(table_update)?),
     "mrp_bom" => db_update.mrp_bom.append(mrp_bom_table::parse_table_update(table_update)?),
     "mrp_bom_line" => db_update.mrp_bom_line.append(mrp_bom_line_table::parse_table_update(table_update)?),
     "mrp_production" => db_update.mrp_production.append(mrp_production_table::parse_table_update(table_update)?),
@@ -13657,6 +14066,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "organization_settings" => db_update.organization_settings.append(organization_settings_table::parse_table_update(table_update)?),
     "packaging_material" => db_update.packaging_material.append(packaging_material_table::parse_table_update(table_update)?),
     "picking_wave" => db_update.picking_wave.append(picking_wave_table::parse_table_update(table_update)?),
+    "policy_snapshot" => db_update.policy_snapshot.append(policy_snapshot_table::parse_table_update(table_update)?),
     "pos_config" => db_update.pos_config.append(pos_config_table::parse_table_update(table_update)?),
     "pos_loyalty_card" => db_update.pos_loyalty_card.append(pos_loyalty_card_table::parse_table_update(table_update)?),
     "pos_loyalty_program" => db_update.pos_loyalty_program.append(pos_loyalty_program_table::parse_table_update(table_update)?),
@@ -13698,6 +14108,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "quality_team" => db_update.quality_team.append(quality_team_table::parse_table_update(table_update)?),
     "queue_job" => db_update.queue_job.append(queue_job_table::parse_table_update(table_update)?),
     "queue_worker" => db_update.queue_worker.append(queue_worker_table::parse_table_update(table_update)?),
+    "record_custom_field_value" => db_update.record_custom_field_value.append(record_custom_field_value_table::parse_table_update(table_update)?),
     "replenishment_rule" => db_update.replenishment_rule.append(replenishment_rule_table::parse_table_update(table_update)?),
     "report_template" => db_update.report_template.append(report_template_table::parse_table_update(table_update)?),
     "res_partner_bank" => db_update.res_partner_bank.append(res_partner_bank_table::parse_table_update(table_update)?),
@@ -13818,6 +14229,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.ai_team_member = cache.apply_diff_to_table::<AiTeamMember>("ai_team_member", &self.ai_team_member).with_updates_by_pk(|row| &row.id);
         diff.ai_team_member_skill = cache.apply_diff_to_table::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill).with_updates_by_pk(|row| &row.id);
         diff.analytics_metric = cache.apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric).with_updates_by_pk(|row| &row.id);
+        diff.approval_request = cache.apply_diff_to_table::<ApprovalRequest>("approval_request", &self.approval_request).with_updates_by_pk(|row| &row.id);
+        diff.approval_rule = cache.apply_diff_to_table::<ApprovalRule>("approval_rule", &self.approval_rule).with_updates_by_pk(|row| &row.id);
         diff.assignment_rule = cache.apply_diff_to_table::<AssignmentRule>("assignment_rule", &self.assignment_rule).with_updates_by_pk(|row| &row.id);
         diff.audit_log = cache.apply_diff_to_table::<AuditLog>("audit_log", &self.audit_log).with_updates_by_pk(|row| &row.id);
         diff.audit_rule = cache.apply_diff_to_table::<AuditRule>("audit_rule", &self.audit_rule).with_updates_by_pk(|row| &row.id);
@@ -13860,6 +14273,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.doc_folder = cache.apply_diff_to_table::<DocumentFolder>("doc_folder", &self.doc_folder).with_updates_by_pk(|row| &row.id);
         diff.document = cache.apply_diff_to_table::<Document>("document", &self.document).with_updates_by_pk(|row| &row.id);
         diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
+        diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
         diff.document_version = cache.apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version).with_updates_by_pk(|row| &row.id);
         diff.expense_sheet = cache.apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet).with_updates_by_pk(|row| &row.id);
         diff.financial_report = cache.apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report).with_updates_by_pk(|row| &row.id);
@@ -13904,6 +14318,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.lead_source = cache.apply_diff_to_table::<LeadSource>("lead_source", &self.lead_source).with_updates_by_pk(|row| &row.id);
         diff.mail_follower = cache.apply_diff_to_table::<MailFollower>("mail_follower", &self.mail_follower).with_updates_by_pk(|row| &row.id);
         diff.mail_message = cache.apply_diff_to_table::<MailMessage>("mail_message", &self.mail_message).with_updates_by_pk(|row| &row.id);
+        diff.mail_template = cache.apply_diff_to_table::<MailTemplate>("mail_template", &self.mail_template).with_updates_by_pk(|row| &row.id);
         diff.mrp_bom = cache.apply_diff_to_table::<MrpBom>("mrp_bom", &self.mrp_bom).with_updates_by_pk(|row| &row.id);
         diff.mrp_bom_line = cache.apply_diff_to_table::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line).with_updates_by_pk(|row| &row.id);
         diff.mrp_production = cache.apply_diff_to_table::<MrpProduction>("mrp_production", &self.mrp_production).with_updates_by_pk(|row| &row.id);
@@ -13919,6 +14334,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.organization_settings = cache.apply_diff_to_table::<OrganizationSettings>("organization_settings", &self.organization_settings).with_updates_by_pk(|row| &row.organization_id);
         diff.packaging_material = cache.apply_diff_to_table::<PackagingMaterial>("packaging_material", &self.packaging_material).with_updates_by_pk(|row| &row.id);
         diff.picking_wave = cache.apply_diff_to_table::<PickingWave>("picking_wave", &self.picking_wave).with_updates_by_pk(|row| &row.id);
+        diff.policy_snapshot = cache.apply_diff_to_table::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot).with_updates_by_pk(|row| &row.id);
         diff.pos_config = cache.apply_diff_to_table::<PosConfig>("pos_config", &self.pos_config).with_updates_by_pk(|row| &row.id);
         diff.pos_loyalty_card = cache.apply_diff_to_table::<PosLoyaltyCard>("pos_loyalty_card", &self.pos_loyalty_card).with_updates_by_pk(|row| &row.id);
         diff.pos_loyalty_program = cache.apply_diff_to_table::<PosLoyaltyProgram>("pos_loyalty_program", &self.pos_loyalty_program).with_updates_by_pk(|row| &row.id);
@@ -13960,6 +14376,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.quality_team = cache.apply_diff_to_table::<QualityTeam>("quality_team", &self.quality_team).with_updates_by_pk(|row| &row.id);
         diff.queue_job = cache.apply_diff_to_table::<QueueJob>("queue_job", &self.queue_job).with_updates_by_pk(|row| &row.id);
         diff.queue_worker = cache.apply_diff_to_table::<QueueWorker>("queue_worker", &self.queue_worker).with_updates_by_pk(|row| &row.id);
+        diff.record_custom_field_value = cache.apply_diff_to_table::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value).with_updates_by_pk(|row| &row.id);
         diff.replenishment_rule = cache.apply_diff_to_table::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule).with_updates_by_pk(|row| &row.id);
         diff.report_template = cache.apply_diff_to_table::<ReportTemplate>("report_template", &self.report_template).with_updates_by_pk(|row| &row.id);
         diff.res_partner_bank = cache.apply_diff_to_table::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank).with_updates_by_pk(|row| &row.id);
@@ -14065,6 +14482,8 @@ for table_rows in raw.tables {
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14107,6 +14526,7 @@ for table_rows in raw.tables {
                 "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document" => db_update.document.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14151,6 +14571,7 @@ for table_rows in raw.tables {
                 "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14166,6 +14587,7 @@ for table_rows in raw.tables {
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "pos_loyalty_card" => db_update.pos_loyalty_card.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "pos_loyalty_program" => db_update.pos_loyalty_program.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14207,6 +14629,7 @@ for table_rows in raw.tables {
                 "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -14312,6 +14735,8 @@ for table_rows in raw.tables {
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14354,6 +14779,7 @@ for table_rows in raw.tables {
                 "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document" => db_update.document.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14398,6 +14824,7 @@ for table_rows in raw.tables {
                 "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14413,6 +14840,7 @@ for table_rows in raw.tables {
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "pos_loyalty_card" => db_update.pos_loyalty_card.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "pos_loyalty_program" => db_update.pos_loyalty_program.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14454,6 +14882,7 @@ for table_rows in raw.tables {
                 "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -14561,6 +14990,8 @@ pub struct AppliedDiff<'r> {
     ai_team_member: __sdk::TableAppliedDiff<'r, AiTeamMember>,
     ai_team_member_skill: __sdk::TableAppliedDiff<'r, AiTeamMemberSkill>,
     analytics_metric: __sdk::TableAppliedDiff<'r, AnalyticsMetric>,
+    approval_request: __sdk::TableAppliedDiff<'r, ApprovalRequest>,
+    approval_rule: __sdk::TableAppliedDiff<'r, ApprovalRule>,
     assignment_rule: __sdk::TableAppliedDiff<'r, AssignmentRule>,
     audit_log: __sdk::TableAppliedDiff<'r, AuditLog>,
     audit_rule: __sdk::TableAppliedDiff<'r, AuditRule>,
@@ -14603,6 +15034,7 @@ pub struct AppliedDiff<'r> {
     doc_folder: __sdk::TableAppliedDiff<'r, DocumentFolder>,
     document: __sdk::TableAppliedDiff<'r, Document>,
     document_sequence: __sdk::TableAppliedDiff<'r, DocumentSequence>,
+    document_template: __sdk::TableAppliedDiff<'r, DocumentTemplate>,
     document_version: __sdk::TableAppliedDiff<'r, DocumentVersion>,
     expense_sheet: __sdk::TableAppliedDiff<'r, HrExpenseSheet>,
     financial_report: __sdk::TableAppliedDiff<'r, FinancialReport>,
@@ -14647,6 +15079,7 @@ pub struct AppliedDiff<'r> {
     lead_source: __sdk::TableAppliedDiff<'r, LeadSource>,
     mail_follower: __sdk::TableAppliedDiff<'r, MailFollower>,
     mail_message: __sdk::TableAppliedDiff<'r, MailMessage>,
+    mail_template: __sdk::TableAppliedDiff<'r, MailTemplate>,
     mrp_bom: __sdk::TableAppliedDiff<'r, MrpBom>,
     mrp_bom_line: __sdk::TableAppliedDiff<'r, MrpBomLine>,
     mrp_production: __sdk::TableAppliedDiff<'r, MrpProduction>,
@@ -14662,6 +15095,7 @@ pub struct AppliedDiff<'r> {
     organization_settings: __sdk::TableAppliedDiff<'r, OrganizationSettings>,
     packaging_material: __sdk::TableAppliedDiff<'r, PackagingMaterial>,
     picking_wave: __sdk::TableAppliedDiff<'r, PickingWave>,
+    policy_snapshot: __sdk::TableAppliedDiff<'r, PolicySnapshot>,
     pos_config: __sdk::TableAppliedDiff<'r, PosConfig>,
     pos_loyalty_card: __sdk::TableAppliedDiff<'r, PosLoyaltyCard>,
     pos_loyalty_program: __sdk::TableAppliedDiff<'r, PosLoyaltyProgram>,
@@ -14703,6 +15137,7 @@ pub struct AppliedDiff<'r> {
     quality_team: __sdk::TableAppliedDiff<'r, QualityTeam>,
     queue_job: __sdk::TableAppliedDiff<'r, QueueJob>,
     queue_worker: __sdk::TableAppliedDiff<'r, QueueWorker>,
+    record_custom_field_value: __sdk::TableAppliedDiff<'r, RecordCustomFieldValue>,
     replenishment_rule: __sdk::TableAppliedDiff<'r, ReplenishmentRule>,
     report_template: __sdk::TableAppliedDiff<'r, ReportTemplate>,
     res_partner_bank: __sdk::TableAppliedDiff<'r, ResPartnerBank>,
@@ -14811,6 +15246,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AiTeamMember>("ai_team_member", &self.ai_team_member, event);
         callbacks.invoke_table_row_callbacks::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill, event);
         callbacks.invoke_table_row_callbacks::<AnalyticsMetric>("analytics_metric", &self.analytics_metric, event);
+        callbacks.invoke_table_row_callbacks::<ApprovalRequest>("approval_request", &self.approval_request, event);
+        callbacks.invoke_table_row_callbacks::<ApprovalRule>("approval_rule", &self.approval_rule, event);
         callbacks.invoke_table_row_callbacks::<AssignmentRule>("assignment_rule", &self.assignment_rule, event);
         callbacks.invoke_table_row_callbacks::<AuditLog>("audit_log", &self.audit_log, event);
         callbacks.invoke_table_row_callbacks::<AuditRule>("audit_rule", &self.audit_rule, event);
@@ -14853,6 +15290,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<DocumentFolder>("doc_folder", &self.doc_folder, event);
         callbacks.invoke_table_row_callbacks::<Document>("document", &self.document, event);
         callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
+        callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
         callbacks.invoke_table_row_callbacks::<DocumentVersion>("document_version", &self.document_version, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseSheet>("expense_sheet", &self.expense_sheet, event);
         callbacks.invoke_table_row_callbacks::<FinancialReport>("financial_report", &self.financial_report, event);
@@ -14897,6 +15335,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<LeadSource>("lead_source", &self.lead_source, event);
         callbacks.invoke_table_row_callbacks::<MailFollower>("mail_follower", &self.mail_follower, event);
         callbacks.invoke_table_row_callbacks::<MailMessage>("mail_message", &self.mail_message, event);
+        callbacks.invoke_table_row_callbacks::<MailTemplate>("mail_template", &self.mail_template, event);
         callbacks.invoke_table_row_callbacks::<MrpBom>("mrp_bom", &self.mrp_bom, event);
         callbacks.invoke_table_row_callbacks::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line, event);
         callbacks.invoke_table_row_callbacks::<MrpProduction>("mrp_production", &self.mrp_production, event);
@@ -14912,6 +15351,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<OrganizationSettings>("organization_settings", &self.organization_settings, event);
         callbacks.invoke_table_row_callbacks::<PackagingMaterial>("packaging_material", &self.packaging_material, event);
         callbacks.invoke_table_row_callbacks::<PickingWave>("picking_wave", &self.picking_wave, event);
+        callbacks.invoke_table_row_callbacks::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot, event);
         callbacks.invoke_table_row_callbacks::<PosConfig>("pos_config", &self.pos_config, event);
         callbacks.invoke_table_row_callbacks::<PosLoyaltyCard>("pos_loyalty_card", &self.pos_loyalty_card, event);
         callbacks.invoke_table_row_callbacks::<PosLoyaltyProgram>("pos_loyalty_program", &self.pos_loyalty_program, event);
@@ -14953,6 +15393,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<QualityTeam>("quality_team", &self.quality_team, event);
         callbacks.invoke_table_row_callbacks::<QueueJob>("queue_job", &self.queue_job, event);
         callbacks.invoke_table_row_callbacks::<QueueWorker>("queue_worker", &self.queue_worker, event);
+        callbacks.invoke_table_row_callbacks::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value, event);
         callbacks.invoke_table_row_callbacks::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule, event);
         callbacks.invoke_table_row_callbacks::<ReportTemplate>("report_template", &self.report_template, event);
         callbacks.invoke_table_row_callbacks::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank, event);
@@ -15692,6 +16133,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         ai_team_member_table::register_table(client_cache);
         ai_team_member_skill_table::register_table(client_cache);
         analytics_metric_table::register_table(client_cache);
+        approval_request_table::register_table(client_cache);
+        approval_rule_table::register_table(client_cache);
         assignment_rule_table::register_table(client_cache);
         audit_log_table::register_table(client_cache);
         audit_rule_table::register_table(client_cache);
@@ -15734,6 +16177,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         doc_folder_table::register_table(client_cache);
         document_table::register_table(client_cache);
         document_sequence_table::register_table(client_cache);
+        document_template_table::register_table(client_cache);
         document_version_table::register_table(client_cache);
         expense_sheet_table::register_table(client_cache);
         financial_report_table::register_table(client_cache);
@@ -15778,6 +16222,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         lead_source_table::register_table(client_cache);
         mail_follower_table::register_table(client_cache);
         mail_message_table::register_table(client_cache);
+        mail_template_table::register_table(client_cache);
         mrp_bom_table::register_table(client_cache);
         mrp_bom_line_table::register_table(client_cache);
         mrp_production_table::register_table(client_cache);
@@ -15793,6 +16238,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         organization_settings_table::register_table(client_cache);
         packaging_material_table::register_table(client_cache);
         picking_wave_table::register_table(client_cache);
+        policy_snapshot_table::register_table(client_cache);
         pos_config_table::register_table(client_cache);
         pos_loyalty_card_table::register_table(client_cache);
         pos_loyalty_program_table::register_table(client_cache);
@@ -15834,6 +16280,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         quality_team_table::register_table(client_cache);
         queue_job_table::register_table(client_cache);
         queue_worker_table::register_table(client_cache);
+        record_custom_field_value_table::register_table(client_cache);
         replenishment_rule_table::register_table(client_cache);
         report_template_table::register_table(client_cache);
         res_partner_bank_table::register_table(client_cache);
@@ -15934,6 +16381,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "ai_team_member",
         "ai_team_member_skill",
         "analytics_metric",
+        "approval_request",
+        "approval_rule",
         "assignment_rule",
         "audit_log",
         "audit_rule",
@@ -15976,6 +16425,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "doc_folder",
         "document",
         "document_sequence",
+        "document_template",
         "document_version",
         "expense_sheet",
         "financial_report",
@@ -16020,6 +16470,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "lead_source",
         "mail_follower",
         "mail_message",
+        "mail_template",
         "mrp_bom",
         "mrp_bom_line",
         "mrp_production",
@@ -16035,6 +16486,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "organization_settings",
         "packaging_material",
         "picking_wave",
+        "policy_snapshot",
         "pos_config",
         "pos_loyalty_card",
         "pos_loyalty_program",
@@ -16076,6 +16528,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "quality_team",
         "queue_job",
         "queue_worker",
+        "record_custom_field_value",
         "replenishment_rule",
         "report_template",
         "res_partner_bank",

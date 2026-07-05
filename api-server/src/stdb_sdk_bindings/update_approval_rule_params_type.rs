@@ -6,21 +6,17 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum SaleState {
-    Draft,
-
-    Sent,
-
-    Sale,
-
-    Done,
-
-    Cancelled,
-
-    ToApprove,
+pub struct UpdateApprovalRuleParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub rule_type: Option<String>,
+    pub threshold: Option<f64>,
+    pub approver_role_id: Option<Option<u64>>,
+    pub sequence: Option<u32>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for SaleState {
+impl __sdk::InModule for UpdateApprovalRuleParams {
     type Module = super::RemoteModule;
 }

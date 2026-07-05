@@ -20,6 +20,7 @@ pub struct MailMessage {
     pub date: __sdk::Timestamp,
     pub parent_id: Option<u64>,
     pub attachment_ids: Vec<u64>,
+    pub metadata: Option<String>,
 }
 
 impl __sdk::InModule for MailMessage {
@@ -41,6 +42,7 @@ pub struct MailMessageCols {
     pub date: __sdk::__query_builder::Col<MailMessage, __sdk::Timestamp>,
     pub parent_id: __sdk::__query_builder::Col<MailMessage, Option<u64>>,
     pub attachment_ids: __sdk::__query_builder::Col<MailMessage, Vec<u64>>,
+    pub metadata: __sdk::__query_builder::Col<MailMessage, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for MailMessage {
@@ -58,6 +60,7 @@ impl __sdk::__query_builder::HasCols for MailMessage {
             date: __sdk::__query_builder::Col::new(table_name, "date"),
             parent_id: __sdk::__query_builder::Col::new(table_name, "parent_id"),
             attachment_ids: __sdk::__query_builder::Col::new(table_name, "attachment_ids"),
+            metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
         }
     }
 }
