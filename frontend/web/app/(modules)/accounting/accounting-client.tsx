@@ -44,6 +44,7 @@ import {
   newCurrencyRateForm,
   registerPaymentInvoicesForm,
   reconcilePaymentInvoiceForm,
+  createCreditNoteForm,
   intercompanyRulesTableConfig,
   intercompanyTransactionsTableConfig,
   Dialog,
@@ -151,6 +152,7 @@ import {
   useUpdateBudgetPost,
   usePostAccountMove,
   usePostInvoice,
+  useCreateCreditNoteFromInvoice,
   useCancelAccountMove,
   useAddAccountMoveLine,
   useDeleteAccountMoveLine,
@@ -249,6 +251,7 @@ import {
   useCreateCurrencyRate,
   useSetAccountAssetActive,
 } from "@lumiere/query-hooks/hooks/accounting"
+import { useFinancialReports } from "@lumiere/query-hooks/hooks/reports"
 import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
 import type { AccountMove } from "@lumiere/query-hooks/hooks/accounting"
@@ -260,8 +263,11 @@ import {
   ChartOfAccountsView,
   ChartStructureWorkspace,
   GeneralLedgerView,
+  AccountGlDrilldownPanel,
+  PeriodCloseChecklist,
   BudgetsWorkspace,
   ConsolidationWorkspace,
+  type AccountAccount,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -600,6 +606,7 @@ function AccountingClientLoaded({
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
+  const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
   const [analyticLineEdit, setAnalyticLineEdit] = useState<Record<string, unknown> | null>(null)
@@ -625,6 +632,8 @@ function AccountingClientLoaded({
   const [journalEdit, setJournalEdit] = useState<Record<string, unknown> | null>(null)
   const [paymentTermLineEdit, setPaymentTermLineEdit] = useState<Record<string, unknown> | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
+  const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
+  const [accountingActiveTab, setAccountingActiveTab] = useState<string>("dashboard")
 
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
@@ -685,6 +694,7 @@ function AccountingClientLoaded({
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
   })
+  const { data: financialReportsRaw = [] } = useFinancialReports(orgId)
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
   const updateFiscalYear = useUpdateFiscalYear(organizationId, operatingCompanyId)
@@ -788,6 +798,8 @@ function AccountingClientLoaded({
       mergeSelectOptionsByFieldName(newJournalEntryForm(t), "journalId", journalFieldOptionsForModularForm),
     [t, journalFieldOptionsForModularForm],
   )
+
+  const creditNoteFormConfig = useMemo(() => createCreditNoteForm(t), [t])
 
   const defaultCurrencyId = useMemo(() => {
     for (const a of accounts) {
@@ -939,6 +951,7 @@ function AccountingClientLoaded({
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId)
   const postInvoice = usePostInvoice(organizationId)
+  const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
   const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
   const queueMailFromTemplate = useQueueMailFromTemplate(
     organizationId,
@@ -2244,7 +2257,7 @@ function AccountingClientLoaded({
       const params = toCreateAccountJournalParamsFromForm(formData, operatingCompanyId)
       await createAccountJournal.mutateAsync([
         organizationId,
-        stdbParamsToJson(params),
+        accountingParamsToJson(params, "CreateAccountJournalParams"),
       ])
     } else if (action === "addAccountMoveLine") {
       const parsed = toAddAccountMoveLineParamsFromForm(formData)
@@ -2252,7 +2265,7 @@ function AccountingClientLoaded({
         await addAccountMoveLine.mutateAsync([
           organizationId,
           parsed.moveId,
-          stdbParamsToJson(parsed.params),
+          accountingParamsToJson(parsed.params, "AddAccountMoveLineParams"),
         ])
       }
     } else if (action === "createCurrencyRate") {
@@ -2301,323 +2314,349 @@ function AccountingClientLoaded({
       const { tabs: _ignoreBaseTabs, ...moduleWithoutTabs } = moduleConfigBase
       return {
         ...moduleWithoutTabs,
-        tabs: moduleConfigBase.tabs.map((tab) => {
-          if (tab.id === "analytic-lines") {
-            return { ...tab, createForm: analyticLineFormConfig }
-          }
-          if (tab.id === "analytic-distribution") {
-            return { ...tab, createForm: analyticDistFormConfig }
-          }
-          if (tab.id === "dashboard") {
-            return { ...tab, sections: liveSections }
-          }
-          if (tab.id === "invoices") {
-            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
-            return {
-              ...tabRest,
-              type: "custom" as const,
-              customContent: (
-                <InvoiceListView
-                  invoices={invoices as unknown as AccountMove[]}
-                  onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
-                  onCreateInvoice={() => setShowCreateInvoice(true)}
-                  onRecalculateTotals={(inv) =>
-                    void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
-                  }
-                />
-              ),
+        tabs: (() => {
+          const mapped = moduleConfigBase.tabs.map((tab) => {
+            if (tab.id === "analytic-lines") {
+              return { ...tab, createForm: analyticLineFormConfig }
             }
-          }
-          if (tab.id === "bills") {
-            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
-            return {
-              ...tabRest,
-              type: "custom" as const,
-              customContent: (
-                <BillsListView
-                  bills={bills as unknown as AccountMove[]}
-                  onCreateBill={() => setShowCreateBill(true)}
-                  onSelectBill={(bill) => setSelectedInvoice(bill as unknown as AccountMove)}
-                  onRecalculateTotals={(bill) =>
-                    void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
-                  }
-                />
-              ),
+            if (tab.id === "analytic-distribution") {
+              return { ...tab, createForm: analyticDistFormConfig }
             }
-          }
-          if (tab.id === "accounts") {
-            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
-            return {
-              ...tabRest,
-              type: "custom" as const,
-              customContent: (
-                <ChartOfAccountsView
-                  accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
-                  chartStructureContent={chartStructurePanel}
-                  onImportAccountsCsv={() => setCsvKind("account")}
-                  onCreate={async (data) => {
-                    const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
-                      accountTypes: accountTypes as Record<string, unknown>[],
-                    })
-                    if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
-                  }}
-                />
-              ),
+            if (tab.id === "dashboard") {
+              return { ...tab, sections: liveSections }
             }
-          }
-          if (tab.id === "journal-entries") {
-            const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
-            return {
-              ...tabRest,
-              type: "custom" as const,
-              customContent: (
-                <GeneralLedgerView
-                  moves={allMoves as unknown as AccountMove[]}
-                  onImportMovesCsv={() => setCsvKind("accountMove")}
-                  onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
-                  onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
-                  onPostMove={(move) => postDraft(move)}
-                  onCancelMove={(move) =>
-                    cancelMove.mutate([organizationId, move.id as string | number | bigint])
-                  }
-                  onComputeInvoiceTotals={(move) =>
-                    void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
-                  }
-                  postMovePending={postMove.isPending || postInvoice.isPending}
-                  cancelMovePending={cancelMove.isPending}
-                  computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
-                />
-              ),
+            if (tab.id === "invoices") {
+              const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+              return {
+                ...tabRest,
+                type: "custom" as const,
+                customContent: (
+                  <InvoiceListView
+                    invoices={invoices as unknown as AccountMove[]}
+                    onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
+                    onCreateInvoice={() => setShowCreateInvoice(true)}
+                    onRecalculateTotals={(inv) =>
+                      void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
+                    }
+                  />
+                ),
+              }
             }
-          }
-          if (tab.id === "budgets") {
-            return {
-              ...tab,
-              type: "custom" as const,
-              customContent: (
-                <div className="space-y-3">
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
-                      {t("accounting.csvImport.toolbarBudgets")}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
-                      {t("accounting.csvImport.toolbarBudgetLines")}
-                    </Button>
-                  </div>
-                  <BudgetsWorkspace
-                    budgets={budgets as unknown as Record<string, unknown>[]}
-                    budgetLines={budgetLines as unknown as Record<string, unknown>[]}
-                    budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
-                    onCreateBudget={(params) =>
-                      createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params), "CreateCrossoveredBudgetParams"))
+            if (tab.id === "bills") {
+              const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+              return {
+                ...tabRest,
+                type: "custom" as const,
+                customContent: (
+                  <BillsListView
+                    bills={bills as unknown as AccountMove[]}
+                    onCreateBill={() => setShowCreateBill(true)}
+                    onSelectBill={(bill) => setSelectedInvoice(bill as unknown as AccountMove)}
+                    onRecalculateTotals={(bill) =>
+                      void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
                     }
-                    onUpdateBudget={(budgetId, params) =>
-                      updateBudget.mutateAsync([
-                        organizationId,
-                        budgetId,
-                        stdbParamsToJson(toUpdateBudgetParams(params)),
-                      ])
-                    }
-                    onCreateBudgetLine={(budgetId, params) =>
-                      createBudgetLine.mutateAsync([
-                        organizationId,
-                        budgetId,
-                        stdbParamsToJson(toCreateBudgetLineParams(params)),
-                      ])
-                    }
-                    onUpdateBudgetLine={(lineId, params) =>
-                      updateBudgetLine.mutateAsync([
-                        organizationId,
-                        lineId,
-                        stdbParamsToJson(toUpdateBudgetLineParams(params)),
-                      ])
-                    }
-                    onConfirmBudget={(budgetId) => confirmBudget.mutateAsync(budgetId)}
-                    onValidateBudget={(budgetId) => validateBudget.mutateAsync(budgetId)}
-                    onDoneBudget={(budgetId) => doneBudget.mutateAsync(budgetId)}
-                    onCancelBudget={(budgetId) => cancelBudget.mutateAsync(budgetId)}
-                    onDeleteBudgetLine={(lineId) => deleteBudgetLine.mutateAsync(lineId)}
-                    onUpdateLineActuals={(lineId, params) =>
-                      updateBudgetLineActuals.mutateAsync({ lineId, params })
-                    }
-                    onCreateBudgetPost={(params) =>
-                      createBudgetPost.mutateAsync(stdbParamsToJson(toCreateBudgetPostParams(params)))
-                    }
-                    onUpdateBudgetPost={(postId, params) =>
-                      updateBudgetPost.mutateAsync({
-                        postId,
-                        params: stdbParamsToJson(toUpdateBudgetPostParams(params)),
+                  />
+                ),
+              }
+            }
+            if (tab.id === "accounts") {
+              const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+              return {
+                ...tabRest,
+                type: "custom" as const,
+                customContent: (
+                  <ChartOfAccountsView
+                    accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
+                    chartStructureContent={chartStructurePanel}
+                    onImportAccountsCsv={() => setCsvKind("account")}
+                    onAccountClick={(account) => setGlDrilldownAccount(account)}
+                    onCreate={async (data) => {
+                      const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
+                        accountTypes: accountTypes as Record<string, unknown>[],
                       })
-                    }
-                    workflowPending={
-                      confirmBudget.isPending ||
-                      validateBudget.isPending ||
-                      doneBudget.isPending ||
-                      cancelBudget.isPending
-                    }
-                    linePending={
-                      createBudgetLine.isPending ||
-                      updateBudgetLine.isPending ||
-                      deleteBudgetLine.isPending ||
-                      updateBudgetLineActuals.isPending
-                    }
-                    postPending={createBudgetPost.isPending || updateBudgetPost.isPending}
+                      if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
+                    }}
                   />
-                </div>
-              ),
+                ),
+              }
             }
-          }
-          if (tab.id === "taxes" && tab.entityConfig) {
-            return {
-              ...tab,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
-                {
-                  id: "csv-tax",
-                  label: t("accounting.csvImport.toolbarTaxRates"),
-                  onClick: () => setCsvKind("tax"),
-                },
-                {
-                  id: "tax-refresh-deadline-statuses",
-                  label: t("accounting.taxes.refreshDeadlineStatuses"),
-                  onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
-                },
-                {
-                  id: "tax-schedule-deadline-updates",
-                  label: t("accounting.taxes.scheduleDeadlineUpdates"),
-                  onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
-                },
-              ]),
-            }
-          }
-          if (tab.id === "analytic" && tab.entityConfig) {
-            return {
-              ...tab,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
-                {
-                  id: "csv-analytic",
-                  label: t("accounting.csvImport.toolbarAnalytic"),
-                  onClick: () => setCsvKind("analytic"),
-                },
-              ]),
-            }
-          }
-          if (tab.id === "fiscal-years") {
-            return { ...tab, entityConfig: fiscalYearsEntityConfig }
-          }
-          if (tab.id === "account-periods") {
-            return {
-              ...tab,
-              entityConfig: accountPeriodsEntityConfig,
-              createForm: accountPeriodCreateFormConfig,
-            }
-          }
-          if (tab.id === "fixed-assets") {
-            return { ...tab, entityConfig: fixedAssetsEntityConfig }
-          }
-          if (tab.id === "payments") {
-            return {
-              ...tab,
-              createForm: accountPaymentFormConfig,
-              entityConfig: accountPaymentsEntityConfig,
-            }
-          }
-          if (tab.id === "payment-terms") {
-            return { ...tab, entityConfig: paymentTermsEntityConfig }
-          }
-          if (tab.id === "payment-term-lines") {
-            return {
-              ...tab,
-              createForm: paymentTermLineFormConfig,
-              entityConfig: paymentTermLinesEntityConfig,
-            }
-          }
-          if (tab.id === "intercompany-rules") {
-            return { ...tab, entityConfig: intercompanyRulesEntityConfig }
-          }
-          if (tab.id === "intercompany-transactions") {
-            return { ...tab, entityConfig: intercompanyTransactionsEntityConfig }
-          }
-          if (tab.id === "bank-statements") {
-            return {
-              ...tab,
-              type: "custom" as const,
-              customContent: (
-                <div className="space-y-3">
-                  <EntityView
-                    config={bankStatementsEntityConfig}
-                    data={bankStatements as unknown as Record<string, unknown>[]}
-                    onRowClick={(row) => setBankStatementDetail(row)}
+            if (tab.id === "journal-entries") {
+              const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
+              return {
+                ...tabRest,
+                type: "custom" as const,
+                customContent: (
+                  <GeneralLedgerView
+                    moves={allMoves as unknown as AccountMove[]}
+                    onImportMovesCsv={() => setCsvKind("accountMove")}
+                    onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
+                    onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
+                    onPostMove={(move) => postDraft(move)}
+                    onCancelMove={(move) =>
+                      cancelMove.mutate([organizationId, move.id as string | number | bigint])
+                    }
+                    onComputeInvoiceTotals={(move) =>
+                      void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
+                    }
+                    postMovePending={postMove.isPending || postInvoice.isPending}
+                    cancelMovePending={cancelMove.isPending}
+                    computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
                   />
-                </div>
-              ),
+                ),
+              }
             }
-          }
-          if (tab.id === "reconciliation-widgets") {
-            return {
-              ...tab,
-              createForm: reconciliationWidgetCreateFormConfig,
+            if (tab.id === "budgets") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <div className="space-y-3">
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
+                        {t("accounting.csvImport.toolbarBudgets")}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
+                        {t("accounting.csvImport.toolbarBudgetLines")}
+                      </Button>
+                    </div>
+                    <BudgetsWorkspace
+                      budgets={budgets as unknown as Record<string, unknown>[]}
+                      budgetLines={budgetLines as unknown as Record<string, unknown>[]}
+                      budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
+                      onCreateBudget={(params) =>
+                        createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params), "CreateCrossoveredBudgetParams"))
+                      }
+                      onUpdateBudget={(budgetId, params) =>
+                        updateBudget.mutateAsync([
+                          organizationId,
+                          budgetId,
+                          stdbParamsToJson(toUpdateBudgetParams(params)),
+                        ])
+                      }
+                      onCreateBudgetLine={(budgetId, params) =>
+                        createBudgetLine.mutateAsync([
+                          organizationId,
+                          budgetId,
+                          stdbParamsToJson(toCreateBudgetLineParams(params)),
+                        ])
+                      }
+                      onUpdateBudgetLine={(lineId, params) =>
+                        updateBudgetLine.mutateAsync([
+                          organizationId,
+                          lineId,
+                          stdbParamsToJson(toUpdateBudgetLineParams(params)),
+                        ])
+                      }
+                      onConfirmBudget={(budgetId) => confirmBudget.mutateAsync(budgetId)}
+                      onValidateBudget={(budgetId) => validateBudget.mutateAsync(budgetId)}
+                      onDoneBudget={(budgetId) => doneBudget.mutateAsync(budgetId)}
+                      onCancelBudget={(budgetId) => cancelBudget.mutateAsync(budgetId)}
+                      onDeleteBudgetLine={(lineId) => deleteBudgetLine.mutateAsync(lineId)}
+                      onUpdateLineActuals={(lineId, params) =>
+                        updateBudgetLineActuals.mutateAsync({ lineId, params })
+                      }
+                      onCreateBudgetPost={(params) =>
+                        createBudgetPost.mutateAsync(stdbParamsToJson(toCreateBudgetPostParams(params)))
+                      }
+                      onUpdateBudgetPost={(postId, params) =>
+                        updateBudgetPost.mutateAsync({
+                          postId,
+                          params: stdbParamsToJson(toUpdateBudgetPostParams(params)),
+                        })
+                      }
+                      workflowPending={
+                        confirmBudget.isPending ||
+                        validateBudget.isPending ||
+                        doneBudget.isPending ||
+                        cancelBudget.isPending
+                      }
+                      linePending={
+                        createBudgetLine.isPending ||
+                        updateBudgetLine.isPending ||
+                        deleteBudgetLine.isPending ||
+                        updateBudgetLineActuals.isPending
+                      }
+                      postPending={createBudgetPost.isPending || updateBudgetPost.isPending}
+                    />
+                  </div>
+                ),
+              }
             }
-          }
-          if (tab.id === "consolidation") {
-            return {
-              ...tab,
-              type: "custom" as const,
-              customContent: (
-                <ConsolidationWorkspace
-                  consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
-                  consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
-                  eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
-                  onCreateConsolidationAccount={(params) =>
-                    createConsolidationAccount.mutateAsync(params)
-                  }
-                  onUpdateConsolidationAccount={(accountId, params) =>
-                    updateConsolidationAccount.mutateAsync({ accountId, params })
-                  }
-                  onCreateConsolidationJournal={(params) =>
-                    createConsolidationJournal.mutateAsync(params)
-                  }
-                  onCreateEliminationEntry={(params) => createEliminationEntry.mutateAsync(params)}
-                  onProcessConsolidation={(journalId) => processConsolidation.mutateAsync(journalId)}
-                  onValidateConsolidation={(journalId) =>
-                    validateConsolidation.mutateAsync(journalId)
-                  }
-                  onCancelConsolidation={(journalId, reason) =>
-                    cancelConsolidation.mutateAsync({ journalId, reason })
-                  }
-                  onMatchEliminationEntries={(entryId, matchedEntryId) =>
-                    matchEliminationEntries.mutateAsync({ entryId, matchedEntryId })
-                  }
-                  onUnmatchEliminationEntry={(entryId) =>
-                    unmatchEliminationEntry.mutateAsync(entryId)
-                  }
-                  processConsolidationPending={processConsolidation.isPending}
-                  validateConsolidationPending={validateConsolidation.isPending}
-                  cancelConsolidationPending={cancelConsolidation.isPending}
-                />
-              ),
+            if (tab.id === "taxes" && tab.entityConfig) {
+              return {
+                ...tab,
+                entityConfig: addCsvToolbar(tab.entityConfig, [
+                  {
+                    id: "csv-tax",
+                    label: t("accounting.csvImport.toolbarTaxRates"),
+                    onClick: () => setCsvKind("tax"),
+                  },
+                  {
+                    id: "tax-refresh-deadline-statuses",
+                    label: t("accounting.taxes.refreshDeadlineStatuses"),
+                    onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
+                  },
+                  {
+                    id: "tax-schedule-deadline-updates",
+                    label: t("accounting.taxes.scheduleDeadlineUpdates"),
+                    onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
+                  },
+                ]),
+              }
             }
+            if (tab.id === "analytic" && tab.entityConfig) {
+              return {
+                ...tab,
+                entityConfig: addCsvToolbar(tab.entityConfig, [
+                  {
+                    id: "csv-analytic",
+                    label: t("accounting.csvImport.toolbarAnalytic"),
+                    onClick: () => setCsvKind("analytic"),
+                  },
+                ]),
+              }
+            }
+            if (tab.id === "fiscal-years") {
+              return { ...tab, entityConfig: fiscalYearsEntityConfig }
+            }
+            if (tab.id === "account-periods") {
+              return {
+                ...tab,
+                entityConfig: accountPeriodsEntityConfig,
+                createForm: accountPeriodCreateFormConfig,
+              }
+            }
+            if (tab.id === "fixed-assets") {
+              return { ...tab, entityConfig: fixedAssetsEntityConfig }
+            }
+            if (tab.id === "payments") {
+              return {
+                ...tab,
+                createForm: accountPaymentFormConfig,
+                entityConfig: accountPaymentsEntityConfig,
+              }
+            }
+            if (tab.id === "payment-terms") {
+              return { ...tab, entityConfig: paymentTermsEntityConfig }
+            }
+            if (tab.id === "payment-term-lines") {
+              return {
+                ...tab,
+                createForm: paymentTermLineFormConfig,
+                entityConfig: paymentTermLinesEntityConfig,
+              }
+            }
+            if (tab.id === "intercompany-rules") {
+              return { ...tab, entityConfig: intercompanyRulesEntityConfig }
+            }
+            if (tab.id === "intercompany-transactions") {
+              return { ...tab, entityConfig: intercompanyTransactionsEntityConfig }
+            }
+            if (tab.id === "bank-statements") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <div className="space-y-3">
+                    <EntityView
+                      config={bankStatementsEntityConfig}
+                      data={bankStatements as unknown as Record<string, unknown>[]}
+                      onRowClick={(row) => setBankStatementDetail(row)}
+                    />
+                  </div>
+                ),
+              }
+            }
+            if (tab.id === "reconciliation-widgets") {
+              return {
+                ...tab,
+                createForm: reconciliationWidgetCreateFormConfig,
+              }
+            }
+            if (tab.id === "consolidation") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <ConsolidationWorkspace
+                    consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
+                    consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
+                    eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
+                    onCreateConsolidationAccount={(params) =>
+                      createConsolidationAccount.mutateAsync(params)
+                    }
+                    onUpdateConsolidationAccount={(accountId, params) =>
+                      updateConsolidationAccount.mutateAsync({ accountId, params })
+                    }
+                    onCreateConsolidationJournal={(params) =>
+                      createConsolidationJournal.mutateAsync(params)
+                    }
+                    onCreateEliminationEntry={(params) => createEliminationEntry.mutateAsync(params)}
+                    onProcessConsolidation={(journalId) => processConsolidation.mutateAsync(journalId)}
+                    onValidateConsolidation={(journalId) =>
+                      validateConsolidation.mutateAsync(journalId)
+                    }
+                    onCancelConsolidation={(journalId, reason) =>
+                      cancelConsolidation.mutateAsync({ journalId, reason })
+                    }
+                    onMatchEliminationEntries={(entryId, matchedEntryId) =>
+                      matchEliminationEntries.mutateAsync({ entryId, matchedEntryId })
+                    }
+                    onUnmatchEliminationEntry={(entryId) =>
+                      unmatchEliminationEntry.mutateAsync(entryId)
+                    }
+                    processConsolidationPending={processConsolidation.isPending}
+                    validateConsolidationPending={validateConsolidation.isPending}
+                    cancelConsolidationPending={cancelConsolidation.isPending}
+                  />
+                ),
+              }
+            }
+            return tab
+          }).concat([
+            {
+              id: "account-journals",
+              label: t("accounting.tabs.journals"),
+              type: "entity" as const,
+              entityConfig: accountJournalsEntityConfig,
+              createForm: accountJournalCreateFormConfig,
+              createLabel: t("accounting.actions.newJournal"),
+              createAction: "createAccountJournal",
+            },
+            {
+              id: "move-lines",
+              label: t("accounting.tabs.moveLines"),
+              type: "entity" as const,
+              entityConfig: accountMoveLinesEntityConfig,
+              createForm: addMoveLineFormConfig,
+              createLabel: t("accounting.actions.addMoveLine"),
+              createAction: "addAccountMoveLine",
+            },
+          ])
+          const periodCloseTab = {
+            id: "period-close",
+            label: t("accounting.periodClose.tab"),
+            type: "custom" as const,
+            customContent: (
+              <PeriodCloseChecklist
+                companyId={operatingCompanyId}
+                fiscalYears={fiscalYearsRaw as Record<string, unknown>[]}
+                accountPeriods={accountPeriodsRaw as Record<string, unknown>[]}
+                moves={allMoves as Record<string, unknown>[]}
+                bankStatementLines={bankStatementLines as Record<string, unknown>[]}
+                financialReports={financialReportsRaw as Record<string, unknown>[]}
+                onNavigateToTab={setAccountingActiveTab}
+              />
+            ),
           }
-          return tab
-        }).concat([
-          {
-            id: "account-journals",
-            label: t("accounting.tabs.journals"),
-            type: "entity" as const,
-            entityConfig: accountJournalsEntityConfig,
-            createForm: accountJournalCreateFormConfig,
-            createLabel: t("accounting.actions.newJournal"),
-            createAction: "createAccountJournal",
-          },
-          {
-            id: "move-lines",
-            label: t("accounting.tabs.moveLines"),
-            type: "entity" as const,
-            entityConfig: accountMoveLinesEntityConfig,
-            createForm: addMoveLineFormConfig,
-            createLabel: t("accounting.actions.addMoveLine"),
-            createAction: "addAccountMoveLine",
-          },
-        ]),
+          const dashIdx = mapped.findIndex((row) => row.id === "dashboard")
+          if (dashIdx < 0) return [...mapped, periodCloseTab]
+          return [
+            ...mapped.slice(0, dashIdx + 1),
+            periodCloseTab,
+            ...mapped.slice(dashIdx + 1),
+          ]
+        })(),
       } as ModuleConfig
     },
     [
@@ -2631,6 +2670,7 @@ function AccountingClientLoaded({
       bankStatements,
       bankStatementsEntityConfig,
       createAccount.mutate,
+      organizationId,
       budgets,
       budgetLines,
       budgetPosts,
@@ -2697,6 +2737,11 @@ function AccountingClientLoaded({
       unmatchEliminationEntry.mutateAsync,
       addCsvToolbar,
       computeInvoiceTotals.isPending,
+      operatingCompanyId,
+      fiscalYearsRaw,
+      accountPeriodsRaw,
+      bankStatementLines,
+      financialReportsRaw,
     ],
   )
 
@@ -2770,6 +2815,18 @@ function AccountingClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
+        activeTab={accountingActiveTab}
+        onActiveTabChange={setAccountingActiveTab}
+      />
+
+      <AccountGlDrilldownPanel
+        account={glDrilldownAccount}
+        moveLines={accountMoveLines as Record<string, unknown>[]}
+        moves={allMoves as unknown as AccountMove[]}
+        open={glDrilldownAccount != null}
+        onOpenChange={(open) => {
+          if (!open) setGlDrilldownAccount(null)
+        }}
       />
 
       {chatterTarget ? (
@@ -2922,6 +2979,16 @@ function AccountingClientLoaded({
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
         onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onCreateCreditNote={
+          selectedInvoice &&
+            moveTypeTag(selectedInvoice as Record<string, unknown>) === "OutInvoice" &&
+            moveStateStr(selectedInvoice as Record<string, unknown>) === "Posted"
+            ? () => {
+              setCreditNoteSource(selectedInvoice)
+              setSelectedInvoice(null)
+            }
+            : undefined
+        }
         onDownloadPdf={selectedInvoice ? () => void handleInvoiceDownloadPdf() : undefined}
         onSendEmail={selectedInvoice ? () => void handleInvoiceSendEmail() : undefined}
         onRecalculateTotals={
@@ -2937,6 +3004,39 @@ function AccountingClientLoaded({
         sendEmailPending={invoiceDocBusy === "send"}
         recalculateTotalsPending={computeInvoiceTotals.isPending}
       />
+
+      {creditNoteSource ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) setCreditNoteSource(null)
+          }}
+          config={mergeFieldDefaultValues(creditNoteFormConfig, {
+            invoiceId: String(creditNoteSource.id),
+          })}
+          isPending={createCreditNote.isPending}
+          onSubmit={async (data) => {
+            const reasonRaw = String(data.reason ?? "").trim()
+            await createCreditNote.mutateAsync([
+              organizationId,
+              Number(operatingCompanyId),
+              Number(creditNoteSource.id),
+              accountingParamsToJson(
+                {
+                  lineIds: [],
+                  reason: reasonRaw.length > 0 ? reasonRaw : null,
+                },
+                "CreateCreditNoteParams",
+              ),
+            ])
+            toast({
+              title: t("accounting.forms.createCreditNote.title"),
+              description: t("accounting.forms.createCreditNote.description"),
+            })
+            setCreditNoteSource(null)
+          }}
+        />
+      ) : null}
 
       {/* Create invoice */}
       <CreateInvoiceModal

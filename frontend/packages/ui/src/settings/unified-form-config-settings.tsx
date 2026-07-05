@@ -192,6 +192,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
               <Card
                 key={module.id}
                 className="cursor-pointer transition-all hover:border-primary/50"
+                data-testid={`form-config-module-${module.id}`}
                 onClick={() => handleModuleSelect(module.id)}
               >
                 <CardHeader className="pb-3">
@@ -246,6 +247,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
               <Card
                 key={form.formId}
                 className="cursor-pointer transition-all hover:border-primary/50"
+                data-testid={`form-config-form-${form.formId}`}
                 onClick={() => { handleFormSelect(form); setIsViewingSettings(true) }}
               >
                 <CardHeader className="pb-3">
@@ -555,6 +557,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
                 size="sm"
                 className="gap-2"
                 disabled={isSaving || !connected || !canEditForms}
+                data-testid="form-config-push-registry"
                 onClick={() => void handlePushRegistry()}
               >
                 <Save className={cn("h-4 w-4", isSaving && "animate-spin")} />
@@ -633,6 +636,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
               onClick={() => setIsFieldDialogOpen(true)}
               className="gap-2"
               disabled={!canEditForms || !dbConfigurationId || isLoading}
+              data-testid="form-config-add-field"
             >
               <Plus className="h-4 w-4" />
               {t("settings.formConfig.addField")}
@@ -791,6 +795,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
                   placeholder={t("settings.formConfig.fieldDialog.fieldKeyPlaceholder")}
                   value={fieldKey}
                   onChange={e => setFieldKey(e.target.value)}
+                  data-testid="form-config-field-key"
                 />
               </div>
               <div className="space-y-2">
@@ -828,7 +833,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
             <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)} type="button">
               {t("common.cancel")}
             </Button>
-            <Button onClick={() => void handleAddCustomField()} disabled={isSaving} type="button">
+            <Button onClick={() => void handleAddCustomField()} disabled={isSaving} type="button" data-testid="form-config-save-field">
               {t("settings.formConfig.fieldDialog.saveField")}
             </Button>
           </DialogFooter>
@@ -902,7 +907,7 @@ function FieldConfigCard({
   }
 
   return (
-    <Card className={cn("transition-all", !field.isEnabled && "opacity-50")}>
+    <Card className={cn("transition-all", !field.isEnabled && "opacity-50")} data-testid={`form-config-field-row-${field.fieldId}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="mt-1 cursor-move">
@@ -951,6 +956,7 @@ function FieldConfigCard({
                   <DropdownMenuItem
                     className="text-destructive"
                     disabled={!canMutate}
+                    data-testid={`form-config-delete-field-${field.fieldId}`}
                     onClick={() => onDelete(field)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />

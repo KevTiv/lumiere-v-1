@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use crate::state::AppState;
+use stdb_config::runtime_is_production;
 use stdb_auth::{
     select_casbin_rules_in_subjects_sql, select_roles_active_sql,
     select_user_organization_for_identity_sql, select_user_profile_by_identity_sql, CasbinRuleLike,
@@ -249,24 +250,26 @@ pub async fn resolve_api_session(
     cookie_token: Option<&str>,
     x_std_identity: Option<&str>,
 ) -> Result<Option<ApiSession>, ApiError> {
-    // Dev mock: DEV_MOCK_ORG_ID + STDB_SERVER_TOKEN
-    if let (Some(org), Some(tok)) = (
-        state.config.dev_mock_org_id,
-        state.config.stdb_server_token.as_deref(),
-    ) {
-        if !tok.is_empty() {
-            let client = state.client_with_token(tok);
-            let identity_hex = "dev-mock-identity".to_string();
-            let fa = load_field_access_context(&client, &identity_hex, org)
-                .await
-                .ok()
-                .flatten();
-            return Ok(Some(ApiSession {
-                stdb_token: tok.to_string(),
-                identity_hex,
-                organization_id: Some(org),
-                field_access: fa,
-            }));
+    // Dev mock: DEV_MOCK_ORG_ID + STDB_SERVER_TOKEN (local dev only — never in production).
+    if !runtime_is_production() {
+        if let (Some(org), Some(tok)) = (
+            state.config.dev_mock_org_id,
+            state.config.stdb_server_token.as_deref(),
+        ) {
+            if !tok.is_empty() {
+                let client = state.client_with_token(tok);
+                let identity_hex = "dev-mock-identity".to_string();
+                let fa = load_field_access_context(&client, &identity_hex, org)
+                    .await
+                    .ok()
+                    .flatten();
+                return Ok(Some(ApiSession {
+                    stdb_token: tok.to_string(),
+                    identity_hex,
+                    organization_id: Some(org),
+                    field_access: fa,
+                }));
+            }
         }
     }
 
@@ -281,65 +284,140 @@ pub async fn resolve_api_session(
             token = Some(c.to_string());
         }
     }
-    if token.is_none() {
-        if let Some(t) = state.config.stdb_server_token.clone() {
-            if is_usable_admin_token(&t) {
-                token = Some(t);
-            }
-        }
-    }
 
     let Some(stdb_token) = token.filter(|t| !t.is_empty()) else {
         return Ok(None);
     };
 
-    let client = state.client_with_token(&stdb_token);
+    // Hint from `x-stdb-identity` / `stdb_identity` cookie — not trusted without a matching JWT.
+    let _ = x_std_identity;
 
-    // Prefer identity embedded in the SpacetimeDB JWT; `sub` may be a WorkOS UUID on hybrid tokens.
-    let identity_hex = decode_identity_hex_from_stdb_token(&stdb_token)
-        .or_else(|| x_std_identity.and_then(|s| parse_stdb_identity_hex(s)));
+    let Some(identity_hex) = decode_identity_hex_from_stdb_token(&stdb_token) else {
+        return Ok(None);
+    };
+
+    let client = state.client_with_token(&stdb_token);
 
     let admin = state.config.stdb_server_token.as_deref();
 
     let mut organization_id: Option<u64> = None;
-    if let Some(ref id_hex) = identity_hex {
-        let rows = query_user_organization_with_fallback(&client, id_hex, admin)
-            .await
-            .map_err(|e| ApiError::Internal(format!("user_organization query: {e}")))?;
-        let org = rows.iter().find(|o| {
-            o.get("isDefault")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-        });
-        let org = org.or_else(|| rows.first());
-        if let Some(o) = org {
-            organization_id = o
-                .get("organizationId")
-                .and_then(|v| v.as_u64())
-                .or_else(|| {
-                    o.get("organizationId")
-                        .and_then(|x| x.as_str())
-                        .and_then(|s| s.parse().ok())
-                });
-        }
+    let rows = query_user_organization_with_fallback(&client, &identity_hex, admin)
+        .await
+        .map_err(|e| ApiError::Internal(format!("user_organization query: {e}")))?;
+    let org = rows.iter().find(|o| {
+        o.get("isDefault")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    });
+    let org = org.or_else(|| rows.first());
+    if let Some(o) = org {
+        organization_id = o
+            .get("organizationId")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                o.get("organizationId")
+                    .and_then(|x| x.as_str())
+                    .and_then(|s| s.parse().ok())
+            });
     }
-
-    let resolved_identity = identity_hex.unwrap_or_else(|| "unknown".into());
 
     let mut field_access: Option<FieldAccessContext> = None;
     if let Some(oid) = organization_id {
-        if resolved_identity != "unknown" {
-            field_access = load_field_access_context(&client, &resolved_identity, oid)
-                .await
-                .ok()
-                .flatten();
-        }
+        field_access = load_field_access_context(&client, &identity_hex, oid)
+            .await
+            .ok()
+            .flatten();
     }
 
     Ok(Some(ApiSession {
         stdb_token,
-        identity_hex: resolved_identity,
+        identity_hex,
         organization_id,
         field_access,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn test_config(server_token: Option<&str>) -> Config {
+        Config {
+            port: 8082,
+            stdb_host: "http://127.0.0.1:3000".into(),
+            stdb_module: "test-module".into(),
+            stdb_server_token: server_token.map(str::to_string),
+            cors_origins: vec![],
+            dev_mock_org_id: None,
+            ai_gateway_url: "http://127.0.0.1:3001".into(),
+            workos_client_id: None,
+            stdb_credential_encryption_key: None,
+            resend_api_key: None,
+            resend_from_email: "test@example.com".into(),
+            app_url: "http://localhost:3000".into(),
+            cookie_secure: false,
+        }
+    }
+
+    fn fake_jwt(payload_json: &str) -> String {
+        let header = STANDARD.encode(b"{\"alg\":\"none\"}");
+        let payload = STANDARD.encode(payload_json.as_bytes());
+        format!("{header}.{payload}.sig")
+    }
+
+    const VALID_IDENTITY_HEX: &str =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn decode_identity_from_jwt_identity_claim() {
+        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
+        assert_eq!(
+            decode_identity_hex_from_stdb_token(&token).as_deref(),
+            Some(VALID_IDENTITY_HEX)
+        );
+    }
+
+    #[test]
+    fn decode_identity_rejects_non_hex_sub() {
+        let token = fake_jwt(r#"{"sub":"00000000-0000-4000-8000-000000000000"}"#);
+        assert!(decode_identity_hex_from_stdb_token(&token).is_none());
+    }
+
+    #[tokio::test]
+    async fn anonymous_request_does_not_use_server_token() {
+        let state = AppState::new(test_config(Some("real-admin-jwt-token-value")));
+        let session = resolve_api_session(&state, None, None, None)
+            .await
+            .expect("resolve should not error");
+        assert!(session.is_none());
+    }
+
+    #[tokio::test]
+    async fn identity_header_without_jwt_claim_is_rejected() {
+        let state = AppState::new(test_config(None));
+        let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
+        let auth = format!("Bearer {token}");
+        let session = resolve_api_session(
+            &state,
+            Some(&auth),
+            None,
+            Some(VALID_IDENTITY_HEX),
+        )
+        .await
+        .expect("resolve should not error");
+        assert!(session.is_none());
+    }
+
+    #[tokio::test]
+    async fn bearer_with_identity_claim_resolves_session() {
+        let state = AppState::new(test_config(None));
+        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
+        let auth = format!("Bearer {token}");
+        let session = resolve_api_session(&state, Some(&auth), None, None)
+            .await
+            .expect("resolve should not error");
+        assert!(session.is_some());
+        assert_eq!(session.unwrap().identity_hex, VALID_IDENTITY_HEX);
+    }
 }

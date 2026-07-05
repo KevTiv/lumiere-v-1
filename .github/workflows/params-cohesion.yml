@@ -1,0 +1,42 @@
+name: Params cohesion
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "spacetimedb/src/**"
+      - "frontend/web/lib/**"
+      - "frontend/packages/erp-shared/src/**"
+      - "scripts/check-params-mapper-coverage.ts"
+      - ".github/workflows/params-cohesion.yml"
+
+concurrency:
+  group: params-cohesion-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mapper-coverage:
+    name: Create*Params mapper coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.31.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies (tsx)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Params mapper coverage
+        working-directory: frontend/web
+        run: pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 53 --warn-coverage 70

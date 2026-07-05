@@ -71,6 +71,12 @@ impl Config {
         let dev_mock_org_id = std::env::var("DEV_MOCK_ORG_ID")
             .ok()
             .and_then(|s| s.parse().ok());
+        let dev_mock_org_id = if prod && dev_mock_org_id.is_some() {
+            tracing::warn!("DEV_MOCK_ORG_ID is set in production — ignoring dev mock bypass");
+            None
+        } else {
+            dev_mock_org_id
+        };
 
         let ai_gateway_url = if prod {
             std::env::var("AI_GATEWAY_URL")

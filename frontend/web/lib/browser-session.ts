@@ -1,10 +1,13 @@
 import 'server-only'
 
 import { cookies } from 'next/headers'
-import { getStdbSession, type ApiSession } from '@/lib/api-session'
+import { getStdbSession, runtimeIsProduction, type ApiSession } from '@/lib/api-session'
 
 function allowDevMockSession() {
-  return Boolean(process.env.DEV_MOCK_ORG_ID && process.env.STDB_SERVER_TOKEN)
+  return (
+    !runtimeIsProduction() &&
+    Boolean(process.env.DEV_MOCK_ORG_ID && process.env.STDB_SERVER_TOKEN)
+  )
 }
 
 export async function hasStdbSessionCookie() {

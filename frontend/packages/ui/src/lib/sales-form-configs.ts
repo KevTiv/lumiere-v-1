@@ -1045,6 +1045,196 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "add-return-order-line",
+  title: t("sales.forms.addReturnOrderLine.title"),
+  description: t("sales.forms.addReturnOrderLine.description"),
+  sections: [
+    {
+      id: "rol-product",
+      title: t("sales.forms.addReturnOrderLine.sections.product"),
+      fields: [
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("sales.forms.addReturnOrderLine.fields.productId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("sales.forms.addReturnOrderLine.fields.uomId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "productUomQty",
+          name: "productUomQty",
+          type: "number",
+          label: t("sales.forms.addReturnOrderLine.fields.quantity"),
+          required: true,
+          width: "1/3",
+          defaultValue: 1,
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("sales.forms.addReturnOrderLine.fields.priceUnit"),
+          required: true,
+          width: "1/3",
+        },
+        {
+          id: "toRefund",
+          name: "toRefund",
+          type: "checkbox",
+          label: t("sales.forms.addReturnOrderLine.fields.toRefund"),
+          defaultValue: true,
+          width: "1/3",
+        },
+      ],
+    },
+  ],
+})
+
+export const newReturnOrderForm = (t: TFunction): FormConfig => {
+  const lineFields = addReturnOrderLineForm(t).sections.flatMap((s) => s.fields)
+  return {
+    id: "new-return-order",
+    title: t("sales.forms.newReturnOrder.title"),
+    description: t("sales.forms.newReturnOrder.description"),
+    sections: [
+      {
+        id: "ro-header",
+        title: t("sales.forms.newReturnOrder.sections.header"),
+        fields: [
+          {
+            id: "partnerId",
+            name: "partnerId",
+            type: "select",
+            label: t("sales.forms.newReturnOrder.fields.partnerId"),
+            required: true,
+            width: "1/2",
+            options: emptySelect,
+          },
+          {
+            id: "saleOrderId",
+            name: "saleOrderId",
+            type: "select",
+            label: t("sales.forms.newReturnOrder.fields.saleOrderId"),
+            width: "1/2",
+            options: emptySelect,
+          },
+          {
+            id: "returnReason",
+            name: "returnReason",
+            type: "textarea",
+            label: t("sales.forms.newReturnOrder.fields.returnReason"),
+            width: "full",
+            rows: 2,
+          },
+        ],
+      },
+      {
+        id: "ro-line",
+        title: t("sales.forms.newReturnOrder.sections.line"),
+        fields: lineFields,
+      },
+    ],
+  }
+}
+
+export interface PartialDeliveryMoveLine {
+  moveId: string
+  productLabel: string
+  orderedQty: number
+}
+
+/** Per-move qty fields for partial delivery validate on an assigned picking. */
+export function buildPartialDeliveryForm(
+  t: TFunction,
+  pickingName: string,
+  moves: PartialDeliveryMoveLine[],
+): FormConfig {
+  return {
+    id: "partial-delivery-validate",
+    title: t("sales.forms.partialDelivery.title"),
+    description: t("sales.forms.partialDelivery.description", { picking: pickingName }),
+    submitLabel: t("sales.forms.partialDelivery.submitLabel"),
+    cancelLabel: t("common.cancel"),
+    sections: [
+      {
+        id: "move-lines",
+        title: t("sales.forms.partialDelivery.sections.moveLines"),
+        fields: moves.map((line) => ({
+          id: `qty_${line.moveId}`,
+          name: `qty_${line.moveId}`,
+          type: "number" as const,
+          label: line.productLabel,
+          description: t("sales.forms.partialDelivery.fields.orderedQty", {
+            qty: line.orderedQty,
+          }),
+          required: true,
+          width: "1/2" as const,
+          defaultValue: line.orderedQty,
+        })),
+      },
+      {
+        id: "backorder-hint",
+        title: t("sales.forms.partialDelivery.sections.backorder"),
+        fields: [
+          {
+            id: "createBackorder",
+            name: "createBackorder",
+            type: "checkbox",
+            label: t("sales.forms.partialDelivery.fields.createBackorder"),
+            description: t("sales.forms.partialDelivery.fields.createBackorderHint"),
+            defaultValue: false,
+            disabled: true,
+            width: "full",
+          },
+        ],
+      },
+    ],
+  }
+}
+
+export const cancelPickingConfirmForm = (t: TFunction): FormConfig => ({
+  id: "cancel-picking-confirm",
+  title: t("sales.forms.cancelPicking.title"),
+  description: t("sales.forms.cancelPicking.description"),
+  submitLabel: t("sales.forms.cancelPicking.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "confirm",
+      fields: [
+        {
+          id: "pickingReference",
+          name: "pickingReference",
+          type: "text",
+          label: t("sales.forms.cancelPicking.fields.pickingReference"),
+          disabled: true,
+          width: "full",
+        },
+        {
+          id: "confirmCancel",
+          name: "confirmCancel",
+          type: "checkbox",
+          label: t("sales.forms.cancelPicking.fields.confirmCancel"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-sale-order": newSaleOrderForm(t),
   "new-pricelist": newPricelistForm(t),
@@ -1052,6 +1242,9 @@ export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-picking-batch": newPickingBatchForm(t),
   "add-sale-order-line": addSaleOrderLineForm(t),
   "create-invoice-from-sale-order": createInvoiceFromSaleOrderForm(t),
+  "new-return-order": newReturnOrderForm(t),
+  "add-return-order-line": addReturnOrderLineForm(t),
+  "cancel-picking-confirm": cancelPickingConfirmForm(t),
   "new-delivery-price-rule": newDeliveryPriceRuleForm(t),
   "new-delivery-carrier": newDeliveryCarrierForm(t),
   "new-shipping-method": newShippingMethodForm(t),

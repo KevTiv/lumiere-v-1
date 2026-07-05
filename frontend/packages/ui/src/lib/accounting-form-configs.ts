@@ -664,6 +664,40 @@ export const newBillForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const createCreditNoteForm = (t: TFunction): FormConfig => ({
+  id: "create-credit-note",
+  title: t("accounting.forms.createCreditNote.title"),
+  description: t("accounting.forms.createCreditNote.description"),
+  submitLabel: t("accounting.forms.createCreditNote.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.createCreditNote.sections.main"),
+      fields: [
+        { id: "invoiceId", name: "invoiceId", type: "hidden", defaultValue: "" },
+        {
+          id: "reason",
+          name: "reason",
+          type: "textarea",
+          label: t("accounting.forms.createCreditNote.fields.reason"),
+          placeholder: t("accounting.forms.createCreditNote.fields.reasonPlaceholder"),
+          width: "full",
+          rows: 3,
+        },
+        {
+          id: "confirmed",
+          name: "confirmed",
+          type: "checkbox",
+          label: t("accounting.forms.createCreditNote.fields.confirmed"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const postMoveForm = (t: TFunction): FormConfig => ({
   id: "post-move",
   title: t("accounting.forms.postMove.title"),
@@ -1900,6 +1934,7 @@ export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "update-budget-line-actuals": updateBudgetLineActualsForm(t),
   "account-account-type": accountAccountTypeForm(t),
   "account-group": accountGroupForm(t),
+  "create-credit-note": createCreditNoteForm(t),
   "post-move": postMoveForm(t),
   "record-payment": recordPaymentForm(t),
   "new-analytic-account": newAnalyticAccountForm(t),

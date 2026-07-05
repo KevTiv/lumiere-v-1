@@ -120,6 +120,8 @@ import type {
   PurchaseOrderLine,
   PurchaseRequisition,
   ResPartnerBank,
+  ReturnOrder,
+  ReturnOrderLine,
   RevenueRecognitionRule,
   Role,
   SaleOrder,
@@ -237,6 +239,8 @@ export type QueryResourceKey =
   | 'delivery-price-rules'
   | 'sale-orders'
   | 'sale-order-lines'
+  | 'return-orders'
+  | 'return-order-lines'
   | 'pricelists'
   | 'pricelist-items'
   | 'picking-batches'
@@ -670,6 +674,14 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     'name', 'orderId', 'productId', 'productUomQty', 'priceUnit', 'qtyToInvoice', 'qtyInvoiced',
     'qtyDelivered', 'displayType', 'invoiceStatus',
   ]),
+  'return-orders': orgEntry<ReturnOrder>('return_order', ['return-orders', 'return_order'], [
+    'name', 'state', 'partnerId', 'saleOrderId', 'pickingId', 'creditMoveId', 'returnReason',
+  ]),
+  'return-order-lines': orgEntry<ReturnOrderLine>(
+    'return_order_line',
+    ['return-order-lines', 'return_order_line'],
+    ['returnOrderId', 'productId', 'productUomQty', 'priceUnit', 'toRefund', 'saleOrderLineId'],
+  ),
   pricelists: orgEntry<ProductPricelist>('product_pricelist', ['pricelists', 'product_pricelist'], [
     'name', 'currencyId', 'isActive',
   ]),

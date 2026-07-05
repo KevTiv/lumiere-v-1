@@ -212,7 +212,7 @@ export function PivotExplorer({
               loadSaved(v)
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger data-testid="pivot-saved-select">
               <SelectValue placeholder={t("reports.pivot.savedDefinitionPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
@@ -272,6 +272,7 @@ export function PivotExplorer({
         <Button
           variant="outline"
           disabled={!name.trim() || createSavedReport.isPending}
+          data-testid="pivot-save-report"
           onClick={() =>
             void createSavedReport.mutateAsync({
               name,
@@ -311,6 +312,7 @@ export function PivotExplorer({
             <Button
               variant="destructive"
               disabled={deleteSavedReport.isPending}
+              data-testid="pivot-delete-definition"
               onClick={() => void deleteSavedReport.mutateAsync(activeSaved.id as string | number | bigint)}
             >
               <Trash2 className="mr-2 h-4 w-4" />

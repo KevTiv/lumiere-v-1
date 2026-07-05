@@ -16,6 +16,7 @@
 /// | privacy          | DataClassification · … · PrivacyConsent             |
 /// | messaging        | MailMessage · MailFollower                          |
 /// | utm              | UtmCampaign · UtmMedium · UtmSource                 |
+pub mod billing;
 pub mod audit;
 pub mod auth;
 pub mod messaging;

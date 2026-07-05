@@ -22,6 +22,7 @@ pub mod delivery_shipping;
 pub mod pos_config;
 pub mod pos_transactions;
 pub mod pricelists;
+pub mod return_orders;
 pub mod sales_core;
 
 // Re-export commonly used types for convenience
@@ -31,4 +32,5 @@ pub use delivery_shipping::{
 pub use pos_config::{PosConfig, PosLoyaltyProgram, PosPaymentMethod};
 pub use pos_transactions::{PosLoyaltyCard, PosOrder, PosOrderLine, PosPayment, PosSession};
 pub use pricelists::{ProductPricelist, ProductPricelistItem};
+pub use return_orders::{ReturnOrder, ReturnOrderLine};
 pub use sales_core::{SaleOrder, SaleOrderLine, SaleOrderOption};

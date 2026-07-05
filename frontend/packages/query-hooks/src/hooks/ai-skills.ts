@@ -269,3 +269,44 @@ export function useUnassignTeamMemberSkill(organizationId: number) {
     },
   })
 }
+
+export type AiAgentRunRow = {
+  id: number
+  run_key: string
+  status: string
+  summary?: string
+  step_count?: number
+  error_message?: string
+}
+
+export function useAiAgentRuns(organizationId?: number) {
+  return useQuery({
+    queryKey: ["ai-agent-runs", organizationId],
+    enabled: organizationId != null && organizationId > 0,
+    queryFn: async () => {
+      const r = await apiFetch(`/api/query/ai-agent-runs?organizationId=${organizationId}`)
+      if (!r.ok) throw new Error(await parseAiError(r))
+      const json = (await r.json()) as { data?: AiAgentRunRow[] }
+      return json.data ?? []
+    },
+    refetchInterval: 5_000,
+  })
+}
+
+export function useCancelAiAgentRun(organizationId: number, companyId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (runId: number) => {
+      const cid = companyId ?? 0
+      const r = await apiFetch("/api/call/cancel_ai_agent_run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([organizationId, cid, runId, "Cancelled from UI"]),
+      })
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["ai-agent-runs", organizationId] })
+    },
+  })
+}

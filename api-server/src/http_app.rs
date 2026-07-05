@@ -8,6 +8,7 @@ use axum::{
         header::{HeaderName, ACCEPT, ACCEPT_LANGUAGE, AUTHORIZATION, CONTENT_TYPE, COOKIE},
         HeaderMap, Method, StatusCode,
     },
+    middleware::from_fn,
     routing::{get, post},
     Json, Router,
 };
@@ -22,6 +23,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::Config;
 use crate::error::ApiError;
+use crate::metrics;
+use crate::middleware::metrics::track_http_metrics;
 use crate::openapi;
 use crate::query_exec::{default_company_id, execute_resource_query};
 use crate::reducer_allowlist::{blocked_reducer_reason, ReducerAllowlistMode};
@@ -44,6 +47,32 @@ struct CallQuery {
 
 async fn health() -> StatusCode {
     StatusCode::OK
+}
+
+async fn health_ready(State(state): State<Arc<AppState>>) -> Result<StatusCode, StatusCode> {
+    let token = state
+        .config
+        .stdb_server_token
+        .as_deref()
+        .filter(|t| !t.is_empty())
+        .unwrap_or("");
+    let client = state.client_with_token(token);
+    if client.query_sql("SELECT 1").await.is_err() {
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
+    if !state.config.ai_gateway_url.is_empty() {
+        let url = format!("{}/health", state.config.ai_gateway_url.trim_end_matches('/'));
+        if let Ok(resp) = state.http.get(&url).send().await {
+            if !resp.status().is_success() {
+                return Err(StatusCode::SERVICE_UNAVAILABLE);
+            }
+        }
+    }
+    Ok(StatusCode::OK)
+}
+
+async fn metrics_handler() -> (StatusCode, String) {
+    (StatusCode::OK, metrics::render_prometheus())
 }
 
 async fn get_openapi() -> Json<Value> {
@@ -261,10 +290,13 @@ pub async fn serve() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/health/ready", get(health_ready))
+        .route("/metrics", get(metrics_handler))
         .nest("/v1", v1)
         .layer(CookieManagerLayer::new())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(from_fn(track_http_metrics))
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", port);

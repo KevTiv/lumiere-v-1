@@ -20,10 +20,13 @@ import type {
   CreateLoyaltyProgramParams,
   CreatePaymentMethodParams,
   CreatePickingBatchParams,
+  CreatePricelistItemParams,
   CreatePricelistParams,
   CreateSaleOrderParams,
   CreateSaleOrderLineParams,
   CreateShippingMethodParams,
+  CreateReturnOrderParams,
+  CreateCreditNoteFromReturnOrderParams,
   UpdateSaleOrderParams,
 } from "@lumiere/stdb/types"
 
@@ -152,6 +155,25 @@ export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRo
   })
 }
 
+export function useReturnOrders(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['return-orders', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/return-orders', 'Failed to fetch return orders'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function useReturnOrderLines(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['return-order-lines', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/return-order-lines', 'Failed to fetch return order lines'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
@@ -259,11 +281,11 @@ export function useUpdatePricelist(organizationId: bigint) {
 
 export function useCreatePricelistItem(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePricelistItemParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = salesBffPost("create_pricelist_item", [
         organizationId,
-        params,
+        stdbParamsToJson(params as object, "CreatePricelistItemParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist item')
@@ -309,7 +331,7 @@ export function useCreatePickingBatch(organizationId: bigint, companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePickingBatchParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object)
+      const json = stdbParamsToJson(params as object, "CreatePickingBatchParams")
       const { urlPath, init } = salesBffPost("create_picking_batch", [organizationId, withCompanyScope(json, companyId)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create picking batch')
@@ -449,8 +471,6 @@ export function useDeleteSaleOrderLine(organizationId: bigint) {
   })
 }
 
-// ── Invoice Creation ──────────────────────────────────────────────────────────
-
 export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
@@ -488,6 +508,106 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
       const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] })
       void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
+    },
+  })
+}
+
+// ── Return orders (RMA) ─────────────────────────────────────────────────────
+
+export function useCreateReturnOrder(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateReturnOrderParams>({
+    mutationFn: async (params) => {
+      const json = stdbParamsToJson(params as object, "CreateReturnOrderParams")
+      const { urlPath, init } = salesBffPost("create_return_order", [
+        organizationId,
+        companyId,
+        json,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
+      void qc.invalidateQueries({ queryKey: ['return-order-lines', k] })
+    },
+  })
+}
+
+export function useConfirmReturnOrder(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (returnOrderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("confirm_return_order", [
+        organizationId,
+        companyId,
+        toScalarU64(returnOrderId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
+      void qc.invalidateQueries({ queryKey: ['stock-pickings', k] })
+      void qc.invalidateQueries({ queryKey: ['stock-moves', k] })
+    },
+  })
+}
+
+export function useCancelReturnOrder(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (returnOrderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("cancel_return_order", [
+        organizationId,
+        companyId,
+        toScalarU64(returnOrderId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['return-orders', rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
+export function useCreateCreditNoteFromReturnOrder(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { returnOrderId: bigint | number | string; params: CreateCreditNoteFromReturnOrderParams }
+  >({
+    mutationFn: async ({ returnOrderId, params }) => {
+      const encodedParams = stdbParamsToJson(
+        {
+          journalId: params.journalId,
+          defaultIncomeAccountId: params.defaultIncomeAccountId,
+          receivableLine: stdbParamsToJson(
+            params.receivableLine as object,
+            "AddAccountMoveLineParams",
+          ),
+          incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
+          metadata: params.metadata,
+        } as object,
+        "CreateCreditNoteFromReturnOrderParams",
+      )
+      const { urlPath, init } = salesBffPost("create_credit_note_from_return_order", [
+        organizationId,
+        companyId,
+        toScalarU64(returnOrderId),
+        encodedParams,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
+      void qc.invalidateQueries({ queryKey: ['account-moves', k] })
     },
   })
 }

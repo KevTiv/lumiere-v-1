@@ -38,8 +38,11 @@ import {
   useApproveDocumentProcessingJob,
   useAcknowledgeInsight,
 } from "@lumiere/query-hooks/hooks/documents"
-import type { CreateDocumentParams, CreateKnowledgeArticleParams } from "@lumiere/query-hooks/hooks/documents"
-import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
+import {
+  toCreateDocumentParams,
+  toCreateKnowledgeArticleParams,
+} from "@/lib/documents-create-params"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
@@ -561,30 +564,13 @@ function DocumentsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createDocument" || action === "uploadDocument") {
-      await createDocument.mutateAsync({
-        name: formData.name as string,
-        fileName: formData.fileName as string,
-        mimetype: formData.mimetype as string | undefined,
-        description: formData.description as string | undefined,
-        isFavorite: Boolean(formData.isFavorite),
-        isShared: Boolean(formData.isShared),
-        folderId: optionalBigIntU64(formData.folderId),
-        tagIds: u64IdArrayFromForm(formData.tagIds),
-        url: undefined,
-        metadata: undefined,
-      } as unknown as CreateDocumentParams)
+      const params = toCreateDocumentParams(formData)
+      if (!params) return
+      await createDocument.mutateAsync(params)
     } else if (action === "createArticle") {
-      await createKnowledgeArticle.mutateAsync({
-        name: formData.name as string,
-        description: formData.description as string | undefined,
-        body: formData.body as string | undefined,
-        isPublished: Boolean(formData.isPublished),
-        parentId: optionalBigIntU64(formData.parentId),
-        categoryId: optionalBigIntU64(formData.categoryId),
-        coverId: undefined,
-        websiteUrl: undefined,
-        metadata: undefined,
-      } as unknown as CreateKnowledgeArticleParams)
+      const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
+      if (!params) return
+      await createKnowledgeArticle.mutateAsync(params)
     } else if (action === "createKnowledgeCategory") {
       const seqRaw = formData.sequence
       const sequence =

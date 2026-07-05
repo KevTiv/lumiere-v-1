@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
+  useArchiveFinancialReport,
   useExportFinancialReport,
   useGenerateEuVatReport,
 } from "@lumiere/query-hooks/hooks/reports"
@@ -14,7 +15,9 @@ import {
   Label,
 } from "@lumiere/ui"
 import type { EntityTableConfig } from "@lumiere/ui"
-import { FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
+import { Archive, FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
+import { reportStateTag } from "@/lib/reports-create-params"
+import { useToast } from "@/hooks/use-toast"
 
 type VatReportPanelProps = {
   organizationId: bigint
@@ -42,14 +45,23 @@ function parseBoxes(row: Record<string, unknown>): Record<string, number> {
 }
 
 function vatRowIsExportable(row: Record<string, unknown>): boolean {
-  const state = String(row.state ?? "").toLowerCase()
-  return state === "generated" || state === "exported"
+  return reportStateTag(row.state) === "generated"
+}
+
+function vatRowIsArchivable(row: Record<string, unknown>): boolean {
+  return reportStateTag(row.state) === "exported"
+}
+
+function mutationErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() !== "" ? error.message : fallback
 }
 
 export function VatReportPanel({ organizationId, financialReports }: VatReportPanelProps) {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const generateEuVatReport = useGenerateEuVatReport(organizationId)
   const exportFinancialReport = useExportFinancialReport(organizationId)
+  const archiveFinancialReport = useArchiveFinancialReport(organizationId)
 
   const [name, setName] = useState("EU VAT Return")
   const [dateFrom, setDateFrom] = useState("")
@@ -71,6 +83,7 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
               : (boxes.box_02_vat_due_on_sales ?? 0) - (boxes.box_04_vat_deductible ?? 0)
           return {
             ...row,
+            state: reportStateTag((row as { state?: unknown }).state),
             box01TaxableSupplies: boxes.box_01_taxable_supplies ?? 0,
             box02VatDue: boxes.box_02_vat_due_on_sales ?? 0,
             netVat: net,
@@ -91,12 +104,26 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
           requiresSelection: true,
           onClick: (rows) => {
             for (const r of rows) {
-              if (vatRowIsExportable(r)) {
-                void exportFinancialReport.mutateAsync({
+              if (!vatRowIsExportable(r)) {
+                toast({
+                  variant: "destructive",
+                  title: t("reports.vat.errors.exportBlocked"),
+                  description: t("reports.vat.errors.exportRequiresGenerated"),
+                })
+                continue
+              }
+              void exportFinancialReport
+                .mutateAsync({
                   reportId: r.id as string | number | bigint,
                   exportFormat: "pdf",
                 })
-              }
+                .catch((e) => {
+                  toast({
+                    variant: "destructive",
+                    title: t("reports.vat.errors.exportFailed"),
+                    description: mutationErrorMessage(e, t("common.error.generic")),
+                  })
+                })
             }
           },
         },
@@ -107,18 +134,68 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
           requiresSelection: true,
           onClick: (rows) => {
             for (const r of rows) {
-              if (vatRowIsExportable(r)) {
-                void exportFinancialReport.mutateAsync({
+              if (!vatRowIsExportable(r)) {
+                toast({
+                  variant: "destructive",
+                  title: t("reports.vat.errors.exportBlocked"),
+                  description: t("reports.vat.errors.exportRequiresGenerated"),
+                })
+                continue
+              }
+              void exportFinancialReport
+                .mutateAsync({
                   reportId: r.id as string | number | bigint,
                   exportFormat: "xlsx",
                 })
+                .catch((e) => {
+                  toast({
+                    variant: "destructive",
+                    title: t("reports.vat.errors.exportFailed"),
+                    description: mutationErrorMessage(e, t("common.error.generic")),
+                  })
+                })
+            }
+          },
+        },
+        {
+          id: "vat-archive",
+          label: t("reports.actions.archive"),
+          icon: Archive,
+          requiresSelection: true,
+          onClick: (rows) => {
+            for (const r of rows) {
+              const st = reportStateTag(r.state)
+              if (st === "archived") {
+                toast({
+                  variant: "destructive",
+                  title: t("reports.vat.errors.archiveBlocked"),
+                  description: t("reports.vat.errors.alreadyArchived"),
+                })
+                continue
               }
+              if (!vatRowIsArchivable(r)) {
+                toast({
+                  variant: "destructive",
+                  title: t("reports.vat.errors.archiveBlocked"),
+                  description: t("reports.vat.errors.archiveRequiresExported"),
+                })
+                continue
+              }
+              void archiveFinancialReport
+                .mutateAsync(r.id as string | number | bigint)
+                .catch((e) => {
+                  toast({
+                    variant: "destructive",
+                    title: t("reports.vat.errors.archiveFailed"),
+                    description: mutationErrorMessage(e, t("common.error.generic")),
+                  })
+                })
             }
           },
         },
       ],
     }
-  }, [t, exportFinancialReport])
+  }, [t, exportFinancialReport, archiveFinancialReport, toast])
 
   return (
     <div className="space-y-6 p-4">
@@ -148,14 +225,23 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
 
       <Button
         disabled={!name.trim() || !dateFrom || !dateTo || generateEuVatReport.isPending}
+        data-testid="vat-report-generate"
         onClick={() =>
-          void generateEuVatReport.mutateAsync({
-            name,
-            dateFrom: `${dateFrom}T00:00:00.000Z`,
-            dateTo: `${dateTo}T23:59:59.999Z`,
-            currencyId: 1,
-            locale,
-          })
+          void generateEuVatReport
+            .mutateAsync({
+              name,
+              dateFrom: `${dateFrom}T00:00:00.000Z`,
+              dateTo: `${dateTo}T23:59:59.999Z`,
+              currencyId: 1,
+              locale,
+            })
+            .catch((e) => {
+              toast({
+                variant: "destructive",
+                title: t("reports.vat.errors.generateFailed"),
+                description: mutationErrorMessage(e, t("common.error.generic")),
+              })
+            })
         }
       >
         <PlayCircle className="mr-2 h-4 w-4" />

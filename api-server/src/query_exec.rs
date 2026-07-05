@@ -164,6 +164,17 @@ pub async fn execute_resource_query(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
+        "ai-agent-runs" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, skill_id, run_key, status, summary, step_count, error_message, started_at, completed_at, create_date, write_date FROM ai_agent_run WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
         "ai-action-drafts-inbox" => {
             // `ai_action_draft` has `organization_id`; `company_id IN (...)` is redundant and
             // SpacetimeDB SQL does not support `IN` clauses. Scope by org only.

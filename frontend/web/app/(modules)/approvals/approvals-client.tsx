@@ -134,7 +134,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
             }
 
             return (
-              <div key={requestId} className="rounded-lg border bg-card p-5 space-y-4">
+              <div key={requestId} className="rounded-lg border bg-card p-5 space-y-4" data-testid={`approval-card-${requestId}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <h3 className="font-medium flex items-center gap-2">
@@ -166,6 +166,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
+                    data-testid={`approval-approve-${requestId}`}
                     onClick={() => void handleApprove(requestId)}
                     disabled={approveRequest.isPending || operatingCompanyId == null}
                   >
@@ -175,6 +176,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   <Button
                     size="sm"
                     variant="outline"
+                    data-testid={`approval-reject-${requestId}`}
                     onClick={() => {
                       setRejectingId(rejectingId === requestId ? null : requestId)
                       setRejectReason("")
@@ -193,11 +195,13 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       rows={3}
+                      data-testid={`approval-reject-reason-${requestId}`}
                     />
                     <Button
                       size="sm"
                       variant="destructive"
                       disabled={!rejectReason.trim() || rejectRequest.isPending}
+                      data-testid={`approval-reject-confirm-${requestId}`}
                       onClick={() => void handleReject(requestId)}
                     >
                       Confirm rejection
@@ -218,7 +222,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
               Active threshold rules for this organization.
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setShowRuleForm((v) => !v)}>
+          <Button size="sm" variant="outline" data-testid="approval-rule-create" onClick={() => setShowRuleForm((v) => !v)}>
             <Plus className="mr-1.5 h-4 w-4" />
             Add rule
           </Button>
@@ -253,6 +257,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 value={ruleName}
                 onChange={(e) => setRuleName(e.target.value)}
                 placeholder="PO confirm over 5k"
+                data-testid="approval-rule-name"
               />
             </label>
             <label className="space-y-1 text-sm">
@@ -301,12 +306,14 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 value={ruleThreshold}
                 onChange={(e) => setRuleThreshold(e.target.value)}
                 inputMode="decimal"
+                data-testid="approval-rule-threshold"
               />
             </label>
             <div className="sm:col-span-2">
               <Button
                 size="sm"
                 disabled={createRule.isPending || !ruleName.trim()}
+                data-testid="approval-rule-submit"
                 onClick={() => void handleCreateRule()}
               >
                 Save rule

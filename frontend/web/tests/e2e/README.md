@@ -12,6 +12,7 @@ These Playwright tests exercise the current high-value ERP web flows:
 - Purchasing module shell, key tabs, and seeded PO visibility (`purchasing-module.spec.ts`).
 - Inventory module shell, key tabs, and seeded product visibility (`inventory-module.spec.ts`).
 - Sales-to-invoice smoke linkage via seeded SO/INV records (`sales-invoice-flow.spec.ts`).
+- ERP parity Phases 1–5 mutation coverage (`parity-phase*-mutations.spec.ts`, `@p0` + `@parity-phase-N`; phase 3/5 also `@dev-fixture`).
 
 ## Spec files
 
@@ -31,8 +32,15 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `auth-lifecycle.spec.ts` | Sign-up, forgot-password, onboarding redirect (@unauthenticated) |
 | `crm-opportunity-stage.spec.ts` | CRM opportunity stage change via UI |
 | `realtime-smoke.spec.ts` | Query refetch after reducer mutation |
+| `parity-phase1-rbac-mutations.spec.ts` | Grant + revoke organization permission via Settings (`@parity-phase-1`) |
+| `parity-phase2-forms-mutations.spec.ts` | Add/delete custom field on CRM new-lead form config (`@parity-phase-2`) |
+| `parity-phase3-approvals-documents-mutations.spec.ts` | Approval rule → gated PO confirm → reject (`@parity-phase-3`) |
+| `parity-phase4-accounting-reports-mutations.spec.ts` | Fiscal setup wizard; pivot report save/delete (`@parity-phase-4`) |
+| `parity-phase5-chatter-mutations.spec.ts` | Post note on seeded sale order + mail_message assert (`@parity-phase-5`) |
 
 ## Local Setup
+
+E2E uses a **dedicated local module** (`lumiere-v1-local-e2e` by default), not the maincloud module name in `spacetime.local.json`. Override with `E2E_STDB_MODULE=my-local-db`.
 
 From the repo root, run the full local stack and smoke suite with:
 
@@ -65,8 +73,11 @@ To force a clean database and full fixture re-seed (same as old behavior), set:
 
 ```bash
 E2E_CLEAR_DB=1 make e2e-smoke
-# P0 only (includes both MVP golden specs):
+# P0 only (includes both MVP golden specs; excludes @dev-fixture):
 E2E_CLEAR_DB=1 E2E_SUITE=p0 make e2e-smoke
+
+# CI profile — fail if ai-gateway is down:
+E2E_REQUIRE_AI=1 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts E2E_GREP=
 ```
 
 Smoke Playwright runs use `E2E_WORKERS=1` by default (serial) so tests share one api-server reliably.
@@ -90,6 +101,17 @@ Use the UI runner when debugging:
 pnpm --dir frontend/web run test:e2e:ui
 ```
 
+Parity phase specs (single file or by phase tag):
+
+```bash
+# All parity mutation specs
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=parity-phase1-rbac-mutations.spec.ts E2E_GREP=
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=parity-phase5-chatter-mutations.spec.ts E2E_GREP=
+
+# Full suite filtered by phase tag
+pnpm --dir frontend/web exec playwright test --grep @parity-phase-3
+```
+
 ## Notes
 
 - Tests create records with a `smoke-` prefix and unique suffixes.
@@ -105,5 +127,24 @@ pnpm --dir frontend/web run test:e2e:ui
 | `purchasing-module.spec.ts` | Purchase order `PO/2024/0001` |
 | `inventory-module.spec.ts` | Product `Lumiere Dev Laptop` |
 | `sales-invoice-flow.spec.ts` | Sale order `SO/2024/0001`, customer invoice `INV/2024/00001` (origin `SO/2024/0001`, partner Acme Corporation) |
+| `parity-phase3-approvals-documents-mutations.spec.ts` | Vendor partner `Globex Corp`, product `Lumiere Dev Laptop` |
+| `parity-phase5-chatter-mutations.spec.ts` | Sale order `SO/2024/0001` (same as sales-invoice-flow) |
 
 If the database was published without `seed_dev_data`, use `E2E_CLEAR_DB=1 make e2e-smoke` to republish and re-seed. The sales-invoice spec does **not** create invoices end-to-end; it verifies the seeded sales → accounting linkage only.
+
+### Troubleshooting: 403 on `reset database` / `update database`
+
+Local SpacetimeDB databases are owned by the identity that created them. If `make e2e-smoke` fails with **403 Forbidden** on `lumiere-v1-j1uo0`, your CLI identity does not own that local database (often after `spacetime login` to maincloud or a wiped `cli.toml`).
+
+**Fix (recommended):** use the default E2E module (already separate from cloud):
+
+```bash
+E2E_CLEAR_DB=1 make e2e-smoke
+```
+
+**Nuclear option** (deletes **all** local SpacetimeDB data, including orphaned modules):
+
+```bash
+make e2e-wipe-local-stdb
+E2E_FORCE_LOCAL_LOGIN=1 E2E_CLEAR_DB=1 make e2e-smoke
+```

@@ -15,6 +15,8 @@ import {
   serverQueryWarehouses,
   serverQueryAccountMoves,
   serverQueryStockPickings,
+  serverQueryReturnOrders,
+  serverQueryReturnOrderLines,
 } from "@lumiere/stdb/server"
 import { SalesClient } from "./sales-client"
 
@@ -41,6 +43,8 @@ export default async function SalesPage() {
     warehouses,
     accountMoves,
     stockPickings,
+    returnOrders,
+    returnOrderLines,
   ] = await Promise.all([
     serverQuerySaleOrders(organizationId, opts),
     serverQuerySaleOrderLines(organizationId, opts),
@@ -57,7 +61,9 @@ export default async function SalesPage() {
     serverQueryWarehouses(organizationId, opts),
     serverQueryAccountMoves(organizationId, undefined, opts),
     serverQueryStockPickings(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], [], []])
+    serverQueryReturnOrders(organizationId, opts),
+    serverQueryReturnOrderLines(organizationId, opts),
+  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []])
 
   return (
     <SalesClient
@@ -76,6 +82,8 @@ export default async function SalesPage() {
       initialWarehouses={warehouses as Record<string, unknown>[]}
       initialAccountMoves={accountMoves as Record<string, unknown>[]}
       initialStockPickings={stockPickings as Record<string, unknown>[]}
+      initialReturnOrders={returnOrders as Record<string, unknown>[]}
+      initialReturnOrderLines={returnOrderLines as Record<string, unknown>[]}
       organizationId={organizationId}
     />
   )

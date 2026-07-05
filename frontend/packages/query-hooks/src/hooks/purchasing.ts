@@ -19,7 +19,7 @@ import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
-import type { CreatePurchaseOrderParams } from "@lumiere/stdb/types"
+import type { CreatePurchaseOrderParams, CreatePartnerBankParams, CreatePurchaseRequisitionParams } from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
 
@@ -185,11 +185,14 @@ export function useCreatePurchaseRequisition(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePurchaseRequisitionParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_PURCHASE_REQUISITION_DEFAULTS, params)
       const scoped = withCompanyScope(merged, scopedCompanyId)
-      const { urlPath, init } = purchasingBffPost("create_purchase_requisition", [organizationId, stdbParamsToJson(scoped as object)])
+      const { urlPath, init } = purchasingBffPost("create_purchase_requisition", [
+        organizationId,
+        stdbParamsToJson(scoped as object, "CreatePurchaseRequisitionParams"),
+      ])
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create purchase requisition')
@@ -454,7 +457,7 @@ export function useUpdatePurchaseOrder(organizationId: bigint, companyId?: bigin
           organizationId,
           BigInt(cid),
           toScalarU64(orderId),
-          stdbParamsToJson(payload as object),
+          stdbParamsToJson(payload as object, "UpdatePurchaseOrderParams"),
         ])
 
       const r = await apiFetch(urlPath, init)
@@ -500,7 +503,7 @@ export function useUpdatePurchaseOrderLine(organizationId: bigint) {
       const { urlPath, init } = purchasingBffPost("update_purchase_order_line", [
           organizationId,
           toScalarU64(lineId),
-          stdbParamsToJson(params as object),
+          stdbParamsToJson(params as object, "UpdatePurchaseOrderLineParams"),
         ])
 
       const r = await apiFetch(urlPath, init)
@@ -535,7 +538,7 @@ export function useCreateLandedCost(organizationId: bigint, companyId?: bigint) 
       const { urlPath, init } = purchasingBffPost("create_landed_cost", [
           organizationId,
           BigInt(cid),
-          stdbParamsToJson(payload as object),
+          stdbParamsToJson(payload as object, "CreateLandedCostParams"),
         ])
 
       const r = await apiFetch(urlPath, init)
@@ -552,7 +555,7 @@ export function useUpdateLandedCost(organizationId: bigint) {
       const { urlPath, init } = purchasingBffPost("update_landed_cost", [
           organizationId,
           toScalarU64(landedCostId),
-          stdbParamsToJson(params as object),
+          stdbParamsToJson(params as object, "UpdateLandedCostParams"),
         ])
 
       const r = await apiFetch(urlPath, init)
@@ -582,7 +585,7 @@ export function useAddLandedCostLine(organizationId: bigint) {
       const { urlPath, init } = purchasingBffPost("add_landed_cost_line", [
           organizationId,
           toScalarU64(landedCostId),
-          stdbParamsToJson(params as object),
+          stdbParamsToJson(params as object, "AddLandedCostLineParams"),
         ])
 
       const r = await apiFetch(urlPath, init)
@@ -931,13 +934,16 @@ export function useCreatePartnerBank(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePartnerBankParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(
         scopedCompanyId != null ? { companyId: scopedCompanyId } : {},
         params,
       )
-      const { urlPath, init } = purchasingBffPost("create_partner_bank", [organizationId, stdbParamsToJson(merged as object)])
+      const { urlPath, init } = purchasingBffPost("create_partner_bank", [
+        organizationId,
+        stdbParamsToJson(merged as object, "CreatePartnerBankParams"),
+      ])
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))

@@ -9,6 +9,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::sales::return_orders::return_order;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{InvoiceStatus, LineInvoiceStatus, ProcureMethod};
 use serde_json;
@@ -1551,7 +1552,81 @@ pub fn validate_stock_picking(
     }
 
     // Propagate delivered quantities back to SaleOrderLine
-    if let Some(so_id) = picking.sale_id {
+    if picking.is_return {
+        let mut returned: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_org()
+            .filter(&picking.organization_id)
+        {
+            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+                continue;
+            }
+            if let Some(sl_id) = move_record.sale_line_id {
+                *returned.entry(sl_id).or_default() += move_record.quantity_done;
+            }
+        }
+
+        for (sl_id, qty_returned) in &returned {
+            if let Some(sol) = ctx.db.sale_order_line().id().find(sl_id) {
+                let new_qty_delivered = (sol.qty_delivered - qty_returned).max(0.0);
+                let new_qty_to_invoice = if sol.qty_invoiced > new_qty_delivered {
+                    sol.qty_invoiced - new_qty_delivered
+                } else {
+                    0.0
+                };
+                ctx.db
+                    .sale_order_line()
+                    .id()
+                    .update(crate::sales::sales_core::SaleOrderLine {
+                        qty_delivered: new_qty_delivered,
+                        is_delivered: new_qty_delivered >= sol.product_uom_qty,
+                        qty_to_invoice: new_qty_to_invoice,
+                        invoice_status: if new_qty_to_invoice > 0.0 {
+                            LineInvoiceStatus::ToInvoice
+                        } else {
+                            sol.invoice_status.clone()
+                        },
+                        write_uid: ctx.sender(),
+                        write_date: ctx.timestamp,
+                        ..sol
+                    });
+            }
+        }
+
+        for mut return_order in ctx.db.return_order().iter() {
+            if return_order.organization_id != picking.organization_id
+                || return_order.company_id != company_id
+            {
+                continue;
+            }
+            if return_order.picking_id != Some(picking_id) {
+                continue;
+            }
+            if return_order.state == "confirmed" {
+                return_order.state = "received".to_string();
+                return_order.write_uid = ctx.sender();
+                return_order.write_date = ctx.timestamp;
+                let ro_id = return_order.id;
+                ctx.db.return_order().id().update(return_order);
+                write_audit_log_v2(
+                    ctx,
+                    organization_id,
+                    AuditLogParams {
+                        company_id: Some(company_id),
+                        table_name: "return_order",
+                        record_id: ro_id,
+                        action: "UPDATE",
+                        old_values: Some(serde_json::json!({ "state": "confirmed" }).to_string()),
+                        new_values: Some(serde_json::json!({ "state": "received" }).to_string()),
+                        changed_fields: vec!["state".to_string()],
+                        metadata: None,
+                    },
+                );
+            }
+        }
+    } else if let Some(so_id) = picking.sale_id {
         // Collect qty_done per sale_line_id
         let mut delivered: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
         for move_record in ctx

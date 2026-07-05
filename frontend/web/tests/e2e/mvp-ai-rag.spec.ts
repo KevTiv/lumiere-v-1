@@ -10,6 +10,9 @@ test.describe("MVP AI RAG insight", { tag: "@p0" }, () => {
     test.setTimeout(90_000)
 
     if (!(await isAiGatewayAvailable(page))) {
+      if (process.env.E2E_REQUIRE_AI === "1") {
+        throw new Error("E2E_REQUIRE_AI=1 but ai-gateway health check failed")
+      }
       test.skip(true, "ai-gateway health check unavailable in this environment")
     }
 

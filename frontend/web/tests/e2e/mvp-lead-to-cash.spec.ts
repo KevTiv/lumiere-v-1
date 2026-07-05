@@ -34,7 +34,22 @@ import {
   waitForPaymentPosted,
   waitForSaleOrderLineExists,
   waitForAuditLogEntry,
+  waitForBffQueryMinRows,
+  fetchSaleOrderSelectLabel,
 } from "./helpers"
+
+const SEEDED_CUSTOMER_NAME = "Acme Corporation"
+
+function queryString(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("some" in obj) return queryString(obj.some)
+    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
+  }
+  return String(value)
+}
 
 /**
  * Golden-path lead → cash workflow (creates data; see docs/MVP_WORKFLOW_CONTRACT.md).
@@ -303,5 +318,144 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     // Sanity: lead id still resolvable after workflow
     expect(leadId).toBeGreaterThan(0)
+  })
+
+  test("adds sale order line via Order Lines tab (step 7)", async ({ page }) => {
+    test.setTimeout(240_000)
+
+    const clientRef = smokeName("so-line-ref")
+
+    // Draft sale order without opportunity lines (UI-only create)
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await waitForBffQueryMinRows(page, "/api/query/contacts")
+    await waitForBffQueryMinRows(page, "/api/query/pricelists")
+    await waitForBffQueryMinRows(page, "/api/query/warehouses")
+    await page.getByTestId("module-create-sales-orders").click()
+    await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
+    await chooseSelectOptionByLabel(page, "partnerId", SEEDED_CUSTOMER_NAME)
+    await chooseFirstEnabledOption(page, "pricelistId")
+    await chooseFirstEnabledOption(page, "warehouseId")
+    await fillField(page, "clientOrderRef", clientRef)
+
+    const [createOrderRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_sale_order") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "new-sale-order"),
+    ])
+    expect(createOrderRes.ok()).toBe(true)
+
+    let orderId = 0
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get("/api/query/sale-orders")
+          if (!res.ok()) return 0
+          const json = (await res.json()) as {
+            data?: Array<{
+              id?: unknown
+              clientOrderRef?: unknown
+              client_order_ref?: unknown
+            }>
+          }
+          const row = (json.data ?? []).find((order) => {
+            const ref = queryString(order.clientOrderRef ?? order.client_order_ref)
+            return ref === clientRef
+          })
+          if (!row) return 0
+          orderId = Number(row.id)
+          return orderId
+        },
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(0)
+
+    await waitForSaleOrderDraftInQuery(page, orderId)
+
+    // Step 7 — add sale order line (Order Lines tab → add-sale-order-line form)
+    await openEntityCreate(page, "/sales", "sales", "order-lines", "add-sale-order-line")
+    const orderLabel = await fetchSaleOrderSelectLabel(page, orderId)
+    await chooseSelectOptionByLabel(page, "orderId", orderLabel)
+    await page.getByTestId("form-field-productId").click()
+    await page.getByRole("option", { name: "Lumiere Dev Laptop" }).click()
+    await chooseFirstEnabledOption(page, "uomId")
+    await fillField(page, "quantity", "1")
+    await fillField(page, "priceUnit", "1200")
+    const [lineRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_sale_order_line") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "add-sale-order-line"),
+    ])
+    expect(lineRes.ok()).toBe(true)
+    await waitForSaleOrderLineExists(page, orderId)
+    await expect(page.getByText("Lumiere Dev Laptop").first()).toBeVisible({ timeout: 15_000 })
+
+    // Confirm → delivery → invoice (proves UI-added line participates in lead-to-cash)
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await selectEntityRowById(page, orderId)
+    await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
+    const confirmResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/confirm_sales_order"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-confirm-orders").click()
+    const confirmRes = await confirmResPromise
+    if (!confirmRes.ok()) {
+      const body = await confirmRes.text().catch(() => "")
+      throw new Error(`confirm_sales_order failed (${confirmRes.status()}): ${body}`)
+    }
+    await waitForSaleOrderConfirmed(page, orderId)
+    await waitForSaleOrderBillableLines(page, orderId)
+
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await page
+      .waitForResponse(
+        (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
+        { timeout: 30_000 },
+      )
+      .catch(() => undefined)
+    const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
+    await page.getByTestId("entity-action-confirm-picking").click()
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-assign-picking")
+    await page.getByTestId("entity-action-assign-picking").click()
+    await selectEntityRowById(page, pickingId)
+    await waitForEntityActionEnabled(page, "entity-action-validate-picking")
+    await page.getByTestId("entity-action-validate-picking").click()
+    await waitForSaleOrderLineQtyDelivered(page, orderId)
+
+    const journalLabel = await fetchSalesInvoiceJournalLabel(page)
+    const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
+    const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await selectEntityRowById(page, orderId)
+    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
+    await page.getByTestId("entity-action-create-invoice").click()
+    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
+    await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+    await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
+    await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
+    const [invoiceRes] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "create-invoice-from-sale-order"),
+    ])
+    expect(invoiceRes.ok()).toBe(true)
+
+    const moveId = await fetchDraftInvoiceMoveIdByPartner(page, SEEDED_CUSTOMER_NAME)
+    await assertMoveLinesBalanced(page, moveId)
+    await expectNoAppError(page)
   })
 })

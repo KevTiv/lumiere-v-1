@@ -10,7 +10,8 @@
 /// The `update_user_email` reducer is called by the connected client after sign-up.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::core::users::{user_profile, UserProfile};
+use crate::core::users::{user_organization, user_profile, UserProfile};
+use crate::helpers::{write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // TABLES (private — NO `public` flag)
@@ -71,6 +72,23 @@ pub struct PasswordResetToken {
 // HELPERS
 // ============================================================================
 
+fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> u64 {
+    ctx.db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .find(|uo| uo.is_active && uo.is_default)
+        .or_else(|| {
+            ctx.db
+                .user_organization()
+                .user_org_by_user()
+                .filter(&identity)
+                .find(|uo| uo.is_active)
+        })
+        .map(|uo| uo.organization_id)
+        .unwrap_or(0)
+}
+
 /// Asserts the calling identity is a superuser (i.e. the server admin identity).
 /// All admin-called reducers must call this first.
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
@@ -115,6 +133,26 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
             updated_at: ctx.timestamp,
             ..profile
         });
+        write_audit_log_v2(
+            ctx,
+            audit_organization_for_identity(ctx, sender),
+            AuditLogParams {
+                company_id: None,
+                table_name: "user_profile",
+                record_id: 0,
+                action: "UPDATE",
+                old_values: Some(serde_json::json!({ "is_superuser": false }).to_string()),
+                new_values: Some(serde_json::json!({ "is_superuser": true }).to_string()),
+                changed_fields: vec!["is_superuser".to_string()],
+                metadata: Some(
+                    serde_json::json!({
+                        "identity": sender.to_hex().to_string(),
+                        "source": "dev_promote_caller_superuser",
+                    })
+                    .to_string(),
+                ),
+            },
+        );
     } else {
         ctx.db.user_profile().insert(UserProfile {
             identity: sender,
@@ -138,6 +176,26 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
             last_login: Some(ctx.timestamp),
             metadata: Some("{\"dev_promote_caller_superuser\":true}".to_string()),
         });
+        write_audit_log_v2(
+            ctx,
+            0,
+            AuditLogParams {
+                company_id: None,
+                table_name: "user_profile",
+                record_id: 0,
+                action: "CREATE",
+                old_values: None,
+                new_values: Some(serde_json::json!({ "is_superuser": true }).to_string()),
+                changed_fields: vec!["is_superuser".to_string()],
+                metadata: Some(
+                    serde_json::json!({
+                        "identity": sender.to_hex().to_string(),
+                        "source": "dev_promote_caller_superuser",
+                    })
+                    .to_string(),
+                ),
+            },
+        );
     }
     Ok(())
 }
@@ -213,7 +271,7 @@ pub fn store_user_credential(
     }
 
     let profile_email = email.clone();
-    ctx.db.user_credential().insert(UserCredential {
+    let row = ctx.db.user_credential().insert(UserCredential {
         id: 0,
         email,
         identity: new_identity,
@@ -226,6 +284,27 @@ pub fn store_user_credential(
     });
 
     ensure_user_profile_for_identity(ctx, new_identity, profile_email, false);
+
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, new_identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_credential",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "identity": new_identity.to_hex().to_string(),
+                    "email_verified": false,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["email".to_string(), "identity".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -269,12 +348,12 @@ pub fn store_sso_user_credential(
     }
 
     let profile_email = email.clone();
-    ctx.db.user_credential().insert(UserCredential {
+    let row = ctx.db.user_credential().insert(UserCredential {
         id: 0,
         email,
         identity: new_identity,
         password_hash: String::new(),
-        workos_user_id: Some(workos_user_id),
+        workos_user_id: Some(workos_user_id.clone()),
         stdb_token_enc,
         email_verified,
         created_at: ctx.timestamp,
@@ -282,6 +361,32 @@ pub fn store_sso_user_credential(
     });
 
     ensure_user_profile_for_identity(ctx, new_identity, profile_email, email_verified);
+
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, new_identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_credential",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "identity": new_identity.to_hex().to_string(),
+                    "workos_user_id": workos_user_id,
+                    "email_verified": email_verified,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "email".to_string(),
+                "identity".to_string(),
+                "workos_user_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -320,10 +425,31 @@ pub fn link_workos_user(
     }
 
     ctx.db.user_credential().id().update(UserCredential {
-        workos_user_id: Some(workos_user_id),
+        workos_user_id: Some(workos_user_id.clone()),
         updated_at: ctx.timestamp,
         ..cred
     });
+
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, target_identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_credential",
+            record_id: cred.id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "workos_user_id": workos_user_id,
+                    "identity": target_identity.to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["workos_user_id".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -351,6 +477,27 @@ pub fn update_user_password(
         ..cred
     });
 
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, target_identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_credential",
+            record_id: cred.id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "identity": target_identity.to_hex().to_string(),
+                    "password_updated": true,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["password_hash".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -368,16 +515,38 @@ pub fn create_user_invite(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
-    ctx.db.user_invite().insert(UserInvite {
+    let row = ctx.db.user_invite().insert(UserInvite {
         id: 0,
         organization_id,
         role_id,
-        email,
+        email: email.clone(),
         token_hash,
         invited_by,
         expires_at,
         accepted_at: None,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_invite",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "email": email,
+                    "role_id": role_id,
+                    "invited_by": invited_by.to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["email".to_string(), "role_id".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -400,6 +569,21 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
         ..invite
     });
 
+    write_audit_log_v2(
+        ctx,
+        invite.organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_invite",
+            record_id: invite_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "accepted_at": null }).to_string()),
+            new_values: Some(serde_json::json!({ "accepted_at": "set" }).to_string()),
+            changed_fields: vec!["accepted_at".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -414,13 +598,33 @@ pub fn create_password_reset_token(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
-    ctx.db.password_reset_token().insert(PasswordResetToken {
+    let row = ctx.db.password_reset_token().insert(PasswordResetToken {
         id: 0,
         identity: target_identity,
         token_hash,
         expires_at,
         used_at: None,
     });
+
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, target_identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "password_reset_token",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "identity": target_identity.to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["identity".to_string(), "token_hash".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -446,6 +650,21 @@ pub fn mark_reset_token_used(ctx: &ReducerContext, token_id: u64) -> Result<(), 
             ..token
         });
 
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, token.identity),
+        AuditLogParams {
+            company_id: None,
+            table_name: "password_reset_token",
+            record_id: token_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "used_at": null }).to_string()),
+            new_values: Some(serde_json::json!({ "used_at": "set" }).to_string()),
+            changed_fields: vec!["used_at".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -470,11 +689,39 @@ pub fn update_user_email(
         .ok_or("UserProfile not found — connect first")?;
 
     ctx.db.user_profile().identity().update(UserProfile {
-        email,
+        email: email.clone(),
         email_verified,
         updated_at: ctx.timestamp,
         ..profile
     });
+
+    write_audit_log_v2(
+        ctx,
+        audit_organization_for_identity(ctx, ctx.sender()),
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_profile",
+            record_id: 0,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "email": profile.email,
+                    "email_verified": profile.email_verified,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "email": email, "email_verified": email_verified }).to_string(),
+            ),
+            changed_fields: vec!["email".to_string(), "email_verified".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "identity": ctx.sender().to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+        },
+    );
 
     Ok(())
 }

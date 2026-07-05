@@ -49,6 +49,39 @@ When `NODE_ENV=production` or `LUMIERE_ENV=production`, **api-server** requires:
 
 Run `make check-env-prod` to validate required production variables (see [`PRODUCTION_DEPLOY.md`](PRODUCTION_DEPLOY.md)).
 
+### Staging (maincloud, non-production module)
+
+Use a **separate** SpacetimeDB module on maincloud so staging never shares production tenant data. Treat staging like production for security (`LUMIERE_REDUCER_ALLOWLIST=strict`, real CORS, no localhost AI gateway).
+
+| Variable | Staging value |
+|----------|---------------|
+| `STDB_MODULE` | Separate maincloud database name (e.g. `lumiere-staging`) — **not** the production module |
+| `STDB_HOST` | `https://maincloud.spacetimedb.com` |
+| `NEXT_PUBLIC_STDB_HOST` | Same as `STDB_HOST` (baked into web build) |
+| `NEXT_PUBLIC_STDB_MODULE` | Same as `STDB_MODULE` (baked into web build) |
+| `LUMIERE_ENV` | `staging` (optional; api-server production checks also accept `NODE_ENV=production` with a non-prod module) |
+| `LUMIERE_REDUCER_ALLOWLIST` | `strict` — match production; blocks `seed_dev_data` and test reducers on generic `/v1/call/{reducer}` |
+| `CORS_ORIGINS` | Staging web origin (e.g. `https://staging.example.com`) |
+| `NEXT_PUBLIC_APP_URL` | Staging browser origin (same host as CORS entry) |
+
+**Publish flow:**
+
+```bash
+# Point .env / compose at staging STDB_MODULE, then:
+spacetime login
+spacetime publish lumiere-staging --module-path spacetimedb --server maincloud
+make check-env-prod   # validate staging .env (STDB_MODULE, tokens, AI_GATEWAY_URL, CORS, etc.)
+docker compose up --build
+```
+
+Or use Makefile cloud targets with overrides:
+
+```bash
+make publish-cloud STDB_MODULE=lumiere-staging STDB_CLOUD_MODULE=lumiere-staging
+```
+
+**Data and seeding:** staging uses its own module — no production data. Seed tenants via the normal onboarding flow (`/onboarding` → `POST /api/bootstrap/tenant`). Do **not** rely on `seed_dev_data` in strict mode; use the dedicated bootstrap route (see [`PILOT_RUNBOOK.md`](PILOT_RUNBOOK.md) §2.1).
+
 ## Realtime WebSocket (web app)
 
 Kong/reverse-proxy deployments use same-origin realtime by default: `wss://<current-host>/v1/realtime/ws`. Plain Next.js development on `localhost:3000` still falls back to `ws://127.0.0.1:8082/v1/realtime/ws`.
@@ -71,3 +104,26 @@ Client and server use the **same project API key** (from [Project settings](http
 If `NEXT_PUBLIC_POSTHOG_TOKEN` is unset, the web app skips PostHog initialization and event helpers no-op (useful for local dev without a token).
 
 Server routes call `captureServerEvent` in `lib/posthog-server.ts`, which flushes after each event (serverless-safe).
+
+## Backup and export
+
+SpacetimeDB CLI has **no** `backup` / `restore` / `dump` subcommands. Operators rely on hosted dashboard expectations (maincloud), local filesystem copy, and Lumiere’s partial tenant export.
+
+| Mechanism | Scope | Restore |
+|-----------|--------|---------|
+| Maincloud dashboard | Module-level (hosted) | Contact SpacetimeDB — not documented in-repo |
+| Local `E2E_STDB_DATA_DIR` tarball | Entire local SpacetimeDB data dir | Filesystem replace after `spacetime stop` (dev only) |
+| `POST /v1/admin/organizations/{id}/export` | 13 org-scoped tables (see [`PILOT_RUNBOOK.md`](PILOT_RUNBOOK.md) §3.4) | **None** — archive / support only |
+| [`scripts/backup-stdb.sh`](../scripts/backup-stdb.sh) | Logs + manifest; optional local data tar + tenant JSON | Same as above |
+
+**Script env vars** (optional tenant JSON):
+
+| Variable | Purpose |
+|----------|---------|
+| `BACKUP_DIR` | Output directory (default `./.tmp/stdb-backups`) |
+| `BACKUP_ORG_ID` | Organization ID for admin export |
+| `BACKUP_SESSION_TOKEN` | Superuser SpacetimeDB JWT (`Authorization: Bearer …`) |
+| `LUMIERE_API_SERVER_URL` | api-server base for export curl (default `http://127.0.0.1:8082`) |
+| `E2E_STDB_DATA_DIR` | Local SpacetimeDB data path (default `~/.local/share/spacetime/data`) |
+
+**Limitations:** export is not a full module dump; large orgs may hit HTTP SQL limits; `product_product` is not a table name (export uses `product`). Do not treat export JSON as a DR restore source without a dedicated import pipeline ([prod-ops-export-v2] mission).

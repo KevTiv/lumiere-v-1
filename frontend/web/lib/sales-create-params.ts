@@ -6,7 +6,10 @@ import type {
   AddAccountMoveLineParams,
   CreateInvoiceFromSaleOrderParams,
   CreatePickingBatchParams,
+  CreatePricelistItemParams,
   CreatePricelistParams,
+  CreateReturnOrderLineParams,
+  CreateReturnOrderParams,
   CreateSaleOrderLineParams,
   CreateSaleOrderParams,
 } from '@lumiere/stdb/types'
@@ -218,6 +221,54 @@ export function toCreatePricelistParams(
   }
 }
 
+export function toCreatePricelistItemParams(
+  formData: Record<string, unknown>,
+): CreatePricelistItemParams | null {
+  const pricelistRaw = formData.pricelistId
+  if (pricelistRaw == null || String(pricelistRaw).trim() === '') return null
+  const pricelistId = BigInt(String(pricelistRaw))
+  const appliedOnRaw = String(formData.appliedOn ?? 'AllProducts')
+  const computeRaw = String(formData.computePrice ?? 'Fixed')
+  const appliedOn =
+    appliedOnRaw === 'Category'
+      ? { tag: 'Category' as const }
+      : appliedOnRaw === 'Product'
+        ? { tag: 'Product' as const }
+        : { tag: 'AllProducts' as const }
+  const computePrice =
+    computeRaw === 'Percentage'
+      ? { tag: 'Percentage' as const }
+      : computeRaw === 'Formula'
+        ? { tag: 'Formula' as const }
+        : { tag: 'Fixed' as const }
+  const productRaw = formData.productId
+  const categRaw = formData.categId
+  return {
+    pricelistId,
+    appliedOn,
+    computePrice,
+    productTmplId: undefined,
+    productId:
+      productRaw == null || String(productRaw).trim() === ''
+        ? undefined
+        : BigInt(String(productRaw)),
+    categId:
+      categRaw == null || String(categRaw).trim() === ''
+        ? undefined
+        : BigInt(String(categRaw)),
+    minQuantity: Number(formData.minQuantity ?? 1) || 0,
+    dateStart: undefined,
+    dateEnd: undefined,
+    fixedPrice: Number(formData.fixedPrice ?? 0) || 0,
+    percentPrice: Number(formData.percentPrice ?? 0) || 0,
+    priceDiscount: Number(formData.priceDiscount ?? 0) || 0,
+    priceSurcharge: 0,
+    priceMinMargin: 0,
+    priceMaxMargin: 0,
+    sequence: Math.max(0, Math.trunc(Number(formData.sequence ?? 10))),
+  }
+}
+
 export function salesParamsToJson(
   params: CreateSaleOrderParams | CreatePricelistParams,
 ): Record<string, unknown> {
@@ -317,4 +368,61 @@ export function toCreatePickingBatchParams(
             .map((p) => BigInt(p)),
     isWave: isWaveFromForm(formData.isWave),
   } as CreatePickingBatchParams
+}
+
+export function toCreateReturnOrderLineParams(
+  formData: Record<string, unknown>,
+): CreateReturnOrderLineParams | null {
+  const productId = requiredBigIntU64(formData.productId)
+  const productUom = requiredBigIntU64(formData.uomId)
+  const productUomQty = Number(formData.productUomQty ?? formData.quantity)
+  const priceUnit = Number(formData.priceUnit)
+  if (
+    productId == null ||
+    productUom == null ||
+    !Number.isFinite(productUomQty) ||
+    productUomQty <= 0 ||
+    !Number.isFinite(priceUnit) ||
+    priceUnit < 0
+  ) {
+    return null
+  }
+
+  const saleOrderLineRaw = formData.saleOrderLineId
+  const saleOrderLineId =
+    saleOrderLineRaw == null || String(saleOrderLineRaw).trim() === ''
+      ? undefined
+      : requiredBigIntU64(saleOrderLineRaw) ?? undefined
+
+  return {
+    saleOrderLineId,
+    productId,
+    productUom,
+    productUomQty,
+    priceUnit,
+    toRefund: checkboxFromForm(formData.toRefund, true),
+  }
+}
+
+export function toCreateReturnOrderParams(
+  formData: Record<string, unknown>,
+): CreateReturnOrderParams | null {
+  const partnerId = requiredBigIntU64(formData.partnerId)
+  if (partnerId == null) return null
+
+  const line = toCreateReturnOrderLineParams(formData)
+  if (line == null) return null
+
+  const saleOrderRaw = formData.saleOrderId
+  const saleOrderId =
+    saleOrderRaw == null || String(saleOrderRaw).trim() === ''
+      ? undefined
+      : requiredBigIntU64(saleOrderRaw) ?? undefined
+
+  return {
+    partnerId,
+    saleOrderId,
+    returnReason: optionalTrimmedString(formData.returnReason),
+    lines: [line],
+  }
 }

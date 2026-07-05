@@ -203,7 +203,7 @@ export function AIChatPanel({
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && messages) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
@@ -749,7 +749,7 @@ export function AIChatPanel({
                               const scope = src.entity_type ?? src.content_type ?? "ref"
                               const idLabel =
                                 src.entity_id != null && String(src.entity_id) !== ""
-                                    ? String(src.entity_id)
+                                  ? String(src.entity_id)
                                   : src.content_id != null
                                     ? String(src.content_id)
                                     : null
@@ -761,41 +761,42 @@ export function AIChatPanel({
                               const badgeLabel = isWeb
                                 ? "Web"
                                 : isLive
-                                ? t("aiChat.sourceLive")
-                                : src.kind === "activity"
-                                  ? t("aiChat.sourceActivity")
-                                  : t("aiChat.sourceMemory")
+                                  ? t("aiChat.sourceLive")
+                                  : src.kind === "activity"
+                                    ? t("aiChat.sourceActivity")
+                                    : t("aiChat.sourceMemory")
                               return (
-                              <li key={`${message.id}-src-${i}`} className="break-all">
-                                <span
-                                  className={cn(
-                                    "mr-1 inline-flex rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide",
-                                    isLive
-                                      ? "bg-success/15 text-success"
-                                      : "bg-muted text-muted-foreground",
-                                  )}
-                                  title={
-                                    src.snapshot_at
-                                      ? t("aiChat.sourceAsOf", { time: src.snapshot_at })
-                                      : undefined
-                                  }
-                                >
-                                  {badgeLabel}
-                                </span>
-                                {src.href ? (
-                                  <a
-                                    href={src.href}
-                                    className="text-primary hover:underline underline-offset-2"
+                                <li key={`${message.id}-src-${i}`} className="break-all">
+                                  <span
+                                    className={cn(
+                                      "mr-1 inline-flex rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide",
+                                      isLive
+                                        ? "bg-success/15 text-success"
+                                        : "bg-muted text-muted-foreground",
+                                    )}
+                                    title={
+                                      src.snapshot_at
+                                        ? t("aiChat.sourceAsOf", { time: src.snapshot_at })
+                                        : undefined
+                                    }
                                   >
-                                    {citationLabel}
-                                  </a>
-                                ) : (
-                                  citationLabel
-                                )}
-                                {src.score != null && src.kind !== "live" ? ` · ${src.score.toFixed(2)}` : ""}
-                                {src.excerpt ? ` — ${src.excerpt}` : ""}
-                              </li>
-                            )})}
+                                    {badgeLabel}
+                                  </span>
+                                  {src.href ? (
+                                    <a
+                                      href={src.href}
+                                      className="text-primary hover:underline underline-offset-2"
+                                    >
+                                      {citationLabel}
+                                    </a>
+                                  ) : (
+                                    citationLabel
+                                  )}
+                                  {src.score != null && src.kind !== "live" ? ` · ${src.score.toFixed(2)}` : ""}
+                                  {src.excerpt ? ` — ${src.excerpt}` : ""}
+                                </li>
+                              )
+                            })}
                           </ul>
                         </div>
                       )}

@@ -7,6 +7,8 @@ import {
   useAiTeamMemberSkills,
   useAiTeamMembers,
   useAssignTeamMemberSkill,
+  useAiAgentRuns,
+  useCancelAiAgentRun,
   useCreateAiSkill,
   useRunAiSkill,
   useSetAiSkillActive,
@@ -271,6 +273,8 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const upsertConfig = useUpsertAiSkillConfig()
   const assignSkill = useAssignTeamMemberSkill(organizationId)
   const unassignSkill = useUnassignTeamMemberSkill(organizationId)
+  const { data: agentRuns = [] } = useAiAgentRuns(organizationId)
+  const cancelRun = useCancelAiAgentRun(organizationId, operatingCompanyId ?? undefined)
 
   const [activeSkillKey, setActiveSkillKey] = useState<string | null>(null)
   const [modal, setModal] = useState<"create" | "assign" | "config" | "active" | null>(null)
@@ -648,6 +652,40 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onSubmit={handleModalSubmit}
         />
       ) : null}
+
+      <section className="rounded-xl border border-border bg-card p-4 space-y-3" data-testid="ai-agent-runs-panel">
+        <h2 className="text-base font-semibold">Agent runs</h2>
+        <p className="text-sm text-muted-foreground">Live skill orchestration runs for this organization.</p>
+        {agentRuns.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No runs yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {agentRuns.map((run) => (
+              <li key={run.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium">{run.run_key || `#${run.id}`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {run.status}
+                    {run.summary ? ` — ${run.summary}` : ""}
+                    {run.step_count != null ? ` (${run.step_count} steps)` : ""}
+                  </p>
+                </div>
+                {run.status === "running" || run.status === "pending" ? (
+                  <button
+                    type="button"
+                    className="text-xs underline"
+                    onClick={() =>
+                      void cancelRun.mutateAsync(run.id).catch((e) => setSubmitError(String(e)))
+                    }
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }

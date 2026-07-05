@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, ShieldAlert, X } from "lucide-react"
 import type { ChatActionDraftPayload } from "@/lib/ai-chat-types"
+import { AiActionDraftDiffPanel } from "./ai-action-draft-diff-panel"
 
 interface AiActionDraftCardProps {
   draft: ChatActionDraftPayload
@@ -30,6 +31,7 @@ export function AiActionDraftCard({
   const [editJson, setEditJson] = useState("")
   const [editError, setEditError] = useState<string | null>(null)
   const [confirmedElevated, setConfirmedElevated] = useState(false)
+  const [confirmedReview, setConfirmedReview] = useState(false)
   const [busy, setBusy] = useState<"approve" | "reject" | "save" | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,11 +42,13 @@ export function AiActionDraftCard({
   useEffect(() => {
     setEditJson(paramsPreview)
     setEditError(null)
+    setConfirmedReview(false)
     setConfirmedElevated(false)
   }, [draft.draftId, paramsPreview])
 
   const canApprove =
     isPending &&
+    confirmedReview &&
     (!draft.elevated || confirmedElevated) &&
     (!editing || editJson === paramsPreview)
 
@@ -202,6 +206,16 @@ export function AiActionDraftCard({
           {error ? <p className="text-[10px] text-destructive">{error}</p> : null}
         </div>
       </div>
+
+      {isPending ? (
+        <div className="px-2.5 pb-2">
+          <AiActionDraftDiffPanel
+            draft={draft}
+            reviewed={confirmedReview}
+            onReviewedChange={setConfirmedReview}
+          />
+        </div>
+      ) : null}
 
       <div className="border-t border-border/60 px-2.5 py-1.5">
         <div className="flex items-center justify-between gap-2">

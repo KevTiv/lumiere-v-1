@@ -42,10 +42,17 @@ import {
   useImportSubscriptionPlanCsv,
   useImportSubscriptionCsv,
 } from "@lumiere/query-hooks/hooks/subscriptions"
-import type {
-  CreateSubscriptionFromSaleOrderParams,
-  CreateSubscriptionPlanParams,
-} from "@lumiere/query-hooks/hooks/subscriptions"
+import {
+  toCreateSubscriptionFromSaleOrderParams,
+  toCreateSubscriptionPlanParams,
+} from "@/lib/subscriptions-create-params"
+import {
+  buildCloseSubscriptionParams,
+  buildCreateDeferredRevenueScheduleParams,
+  buildCreateRevenueRecognitionRuleParams,
+  buildGenerateSubscriptionInvoiceParams,
+  buildRecognizeDeferredRevenueParams,
+} from "@/lib/subscriptions-revenue-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
@@ -59,13 +66,6 @@ import {
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
-import {
-  buildCloseSubscriptionParams,
-  buildCreateDeferredRevenueScheduleParams,
-  buildCreateRevenueRecognitionRuleParams,
-  buildGenerateSubscriptionInvoiceParams,
-  buildRecognizeDeferredRevenueParams,
-} from "@/lib/subscriptions-revenue-params"
 
 function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
   const state = String(row.state ?? "")
@@ -448,93 +448,13 @@ function SubscriptionsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createSubscription") {
-      const soRaw = formData.saleOrderId
-      const planRaw = formData.planId
-      if (soRaw === "" || soRaw == null || planRaw === "" || planRaw == null) return
-      const so = saleOrders.find((s) => String(s.id) === String(soRaw))
-      if (!so) return
-      const currencyId = Number(so.currencyId)
-      const pricelistId = Number(so.pricelistId)
-      if (Number.isNaN(currencyId) || Number.isNaN(pricelistId)) return
-      const recurringDay = Math.min(31, Math.max(1, Math.floor(Number(formData.recurringInvoiceDay ?? 1))))
-      createSubscription.mutate({
-        saleOrderId: Number(soRaw),
-        code: formData.code ? String(formData.code) : undefined,
-        planId: Number(planRaw),
-        dateStart: new Date(String(formData.dateStart ?? new Date().toISOString())) as unknown as CreateSubscriptionFromSaleOrderParams["dateStart"],
-        recurringInvoiceDay: recurringDay,
-        isTrial: formData.isTrial === true,
-        description: formData.description ? String(formData.description) : undefined,
-        recurringRuleType: String(formData.recurringRuleType ?? "monthly"),
-        recurringInterval: Math.max(1, Math.floor(Number(formData.recurringInterval ?? 1))),
-        paymentMode: String(formData.paymentMode ?? "manual"),
-        partnerId: Number(so.partnerId),
-        partnerInvoiceId: Number(so.partnerInvoiceId),
-        partnerShippingId: Number(so.partnerShippingId),
-        currencyId,
-        pricelistId,
-        analyticAccountId: undefined,
-        teamId: undefined,
-        health: String(formData.health ?? "normal"),
-        stageId: undefined,
-        state: String(formData.state ?? "draft"),
-        isActive: true,
-        invoiceCount: 0,
-        recurringTotal: 0,
-        recurringMonthly: 0,
-        recurringMrr: 0,
-        recurringMrrLocal: 0,
-        percentageMrr: 0,
-        kpi1MonthMrr: 0,
-        kpi3MonthsMrr: 0,
-        kpi12MonthsMrr: 0,
-        ratingLastValue: 0,
-        invoiceIds: [],
-        subscriptionLineIds: [],
-        activityIds: [],
-        messageFollowerIds: [],
-        messageIds: [],
-        metadata: undefined,
-      } as unknown as CreateSubscriptionFromSaleOrderParams)
+      const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, orgId)
+      if (!params) return
+      createSubscription.mutate(params)
     } else if (action === "createPlan") {
-      const plRaw = formData.pricelistId
-      const jRaw = formData.journalId
-      const prodRaw = formData.productId
-      if (plRaw === "" || plRaw == null || jRaw === "" || jRaw == null || prodRaw === "" || prodRaw == null)
-        return
-      const pl = pricelists.find((p) => String(p.id) === String(plRaw))
-      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      const currencyId = Number(pl.currencyId)
-      createPlan.mutate({
-        name: String(formData.name ?? ""),
-        code: String(formData.code ?? formData.name ?? ""),
-        description: formData.description ? String(formData.description) : undefined,
-        currencyId: plRaw == null ? currencyId : currencyId,
-        journalId: Number(jRaw),
-        productId: Number(prodRaw),
-        billingPeriod: String(formData.billingPeriod ?? "monthly"),
-        billingPeriodUnit: Number(formData.billingPeriodUnit ?? 1),
-        recurringInvoiceDay: 1,
-        trialPeriod: Boolean(formData.trialPeriod),
-        trialDuration: Number(formData.trialDuration ?? 0),
-        trialUnit: "day",
-        autoCloseLimit: 0,
-        paymentMode: "manual",
-        templateId: undefined,
-        invoiceMailTemplateId: undefined,
-        websiteUrl: undefined,
-        isPublished: true,
-        isDefault: Boolean(formData.isDefault),
-        color: 0,
-        image1920Url: undefined,
-        active: true,
-        recurringRuleCount: Number(formData.billingPeriodUnit ?? 1),
-        recurringRuleMinUnit: String(formData.billingPeriod ?? "monthly"),
-        recurringRuleMaxUnit: String(formData.billingPeriod ?? "monthly"),
-        recurringRuleMinCount: Number(formData.billingPeriodUnit ?? 1),
-        recurringRuleMaxCount: Number(formData.billingPeriodUnit ?? 1),
-        metadata: undefined,
-      } as unknown as CreateSubscriptionPlanParams)
+      const params = toCreateSubscriptionPlanParams(formData, pricelists, orgId)
+      if (!params) return
+      createPlan.mutate(params)
     } else if (action === "createDeferredSchedule") {
       const params = buildCreateDeferredRevenueScheduleParams(formData)
       void createDeferredSchedule.mutate(params)

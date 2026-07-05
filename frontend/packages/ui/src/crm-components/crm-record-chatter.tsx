@@ -213,7 +213,14 @@ export function CrmRecordChatter({
     <div className={cn("flex flex-col gap-4", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-muted-foreground">{heading}</h3>
-        <Button type="button" variant="outline" size="sm" disabled={busy || !identity} onClick={() => void toggleFollow()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy || !identity}
+          data-testid="record-chatter-follow"
+          onClick={() => void toggleFollow()}
+        >
           {following ? t("crm.chatter.unfollow") : t("crm.chatter.follow")}
         </Button>
       </div>
@@ -225,6 +232,7 @@ export function CrmRecordChatter({
           onChange={(e) => setNoteBody(e.target.value)}
           rows={3}
           className="resize-y min-h-[4.5rem]"
+          data-testid="record-chatter-note"
         />
         <input
           className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
@@ -232,7 +240,13 @@ export function CrmRecordChatter({
           value={attachmentIdsRaw}
           onChange={(e) => setAttachmentIdsRaw(e.target.value)}
         />
-        <Button type="button" size="sm" disabled={busy || !noteBody.trim()} onClick={() => void postNote()}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy || !noteBody.trim()}
+          data-testid="record-chatter-post"
+          onClick={() => void postNote()}
+        >
           {t("crm.chatter.postNote")}
         </Button>
       </div>
@@ -280,7 +294,7 @@ export function CrmRecordChatterDialog({
   const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="record-chatter-dialog">
         <DialogHeader>
           <DialogTitle>{t("crm.chatter.dialogTitle")}</DialogTitle>
         </DialogHeader>

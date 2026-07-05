@@ -59,6 +59,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "tax-schedules",
   "sale-orders",
   "sale-order-lines",
+  "return-orders",
+  "return-order-lines",
   "pos-loyalty-programs",
   "pos-loyalty-cards",
   "pricelists",
@@ -223,6 +225,17 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
+  "return-orders": (id, fa) =>
+    selectOrgScopedSql("return-orders", "return_order", id, fa, "", " ORDER BY id DESC"),
+  "return-order-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "return-order-lines",
+      "return_order_line",
+      id,
+      fa,
+      "",
+      " ORDER BY return_order_id ASC, id ASC",
+    ),
   "pos-loyalty-programs": (id, fa) =>
     selectOrgScopedSql(
       "pos-loyalty-programs",

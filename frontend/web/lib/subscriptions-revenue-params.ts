@@ -39,8 +39,8 @@ export function buildCreateDeferredRevenueScheduleParams(
   const recognized = Number(formData.recognizedAmount ?? 0)
   const deferred = Math.max(0, total - recognized)
 
-  return stdbParamsToJson({
-    description: String(formData.description ?? ''),
+  return {
+    description: String(formData.description ?? ""),
     journalId: BigInt(String(formData.journalId ?? 0)),
     accountId: BigInt(String(formData.accountId ?? 0)),
     deferredAccountId: BigInt(String(formData.deferredAccountId ?? 0)),
@@ -50,38 +50,38 @@ export function buildCreateDeferredRevenueScheduleParams(
     deferredAmount: deferred,
     startDate: timestampFromInput(formData.startDate),
     endDate: timestampFromInput(formData.endDate),
-    recognitionMethod: String(formData.recognitionMethod ?? 'straight_line'),
-    recognitionPeriod: String(formData.recognitionPeriod ?? 'month'),
-    state: String(formData.state ?? 'draft'),
+    recognitionMethod: String(formData.recognitionMethod ?? "straight_line"),
+    recognitionPeriod: String(formData.recognitionPeriod ?? "month"),
+    state: String(formData.state ?? "draft"),
     originMoveId: undefined,
     originMoveLineId: undefined,
     lineIds: [],
     journalEntryIds: [],
-    notes: String(formData.notes ?? ''),
+    notes: String(formData.notes ?? ""),
     metadata: undefined,
-  }) as unknown as CreateDeferredRevenueScheduleParams
+  }
 }
 
 export function buildCreateRevenueRecognitionRuleParams(
   formData: Record<string, unknown>,
 ): CreateRevenueRecognitionRuleParams {
-  return stdbParamsToJson({
-    description: String(formData.description ?? ''),
+  return {
+    description: String(formData.description ?? ""),
     productCategoryIds: parseU64List(formData.productCategoryIds),
     productIds: parseU64List(formData.productIds),
-    recognitionMethod: String(formData.recognitionMethod ?? 'straight_line'),
-    recognitionPeriod: String(formData.recognitionPeriod ?? 'month'),
+    recognitionMethod: String(formData.recognitionMethod ?? "straight_line"),
+    recognitionPeriod: String(formData.recognitionPeriod ?? "month"),
     recognitionAccountId: BigInt(String(formData.recognitionAccountId ?? 0)),
     deferredAccountId: BigInt(String(formData.deferredAccountId ?? 0)),
     expenseAccountId:
-      formData.expenseAccountId != null && String(formData.expenseAccountId).trim() !== ''
+      formData.expenseAccountId != null && String(formData.expenseAccountId).trim() !== ""
         ? BigInt(String(formData.expenseAccountId))
         : undefined,
     priority: Number(formData.priority ?? 10),
-    notes: String(formData.notes ?? ''),
-    isActive: formData.isActive === true || formData.isActive === 'true',
+    notes: String(formData.notes ?? ""),
+    isActive: formData.isActive === true || formData.isActive === "true",
     metadata: undefined,
-  }) as unknown as CreateRevenueRecognitionRuleParams
+  }
 }
 
 export function buildRecognizeDeferredRevenueParams(

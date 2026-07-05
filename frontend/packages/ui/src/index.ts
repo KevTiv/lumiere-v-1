@@ -184,6 +184,7 @@ export { mlSnippets, reportTemplates as notebookReportTemplates } from "./lib/no
 // Feature components
 export * from "./ai-chat/ai-chat-panel";
 export * from "./ai-chat/ai-action-draft-card";
+export * from "./ai-chat/ai-action-draft-diff-panel";
 export * from "./entry-table/entry-table-viewer";
 export * from "./entry-table/entry-detail-modal";
 export * from "./entry-table/entry-table-cell";
@@ -220,6 +221,9 @@ export * from "./crm-components/crm-record-chatter";
 export * from "./accounting-components/chart-of-accounts-view";
 export * from "./accounting-components/chart-structure-workspace";
 export * from "./accounting-components/general-ledger-view";
+export * from "./accounting-components/account-gl-drilldown-panel";
+export * from "./accounting-components/period-close-checklist";
+export type { AccountAccount, AccountMove } from "./lib/accounting-types";
 export * from "./accounting-components/budgets-workspace";
 export * from "./accounting-components/consolidation-workspace";
 

@@ -665,6 +665,56 @@
       },
       "coasTab": "Accounts"
     },
+    "glDrilldown": {
+      "title": "{{code}} — {{name}}",
+      "titleFallback": "Account move lines",
+      "dateFrom": "From date",
+      "dateTo": "To date",
+      "empty": "No move lines for this account in the selected range.",
+      "moveDetail": "Journal entry",
+      "columns": {
+        "date": "Date",
+        "move": "Entry",
+        "partner": "Partner",
+        "debit": "Debit",
+        "credit": "Credit",
+        "balance": "Running balance"
+      }
+    },
+    "periodClose": {
+      "tab": "Period close",
+      "title": "Month-end close checklist",
+      "description": "Guided steps before locking the accounting period.",
+      "progress": "{{done}} of {{total}} steps complete",
+      "goToStep": "Open step",
+      "status": {
+        "done": "Done",
+        "pending": "Pending",
+        "blocked": "Blocked"
+      },
+      "steps": {
+        "fiscalCalendar": {
+          "title": "Fiscal calendar configured",
+          "description": "Fiscal years and accounting periods are set up for this company."
+        },
+        "bankRecon": {
+          "title": "Bank reconciliation reviewed",
+          "description": "{{count}} unreconciled bank statement line(s) remaining."
+        },
+        "draftMoves": {
+          "title": "Draft moves cleared",
+          "description": "{{count}} draft journal entry(ies) still open."
+        },
+        "vatReport": {
+          "title": "VAT report generated",
+          "description": "Generate and review the EU VAT return for the period."
+        },
+        "closePeriod": {
+          "title": "Close accounting period",
+          "description": "{{count}} period(s) still open — close when ready."
+        }
+      }
+    },
     "chartStructure": {
       "tabLabel": "Chart structure",
       "typesTitle": "Account types",
@@ -747,7 +797,8 @@
         "print": "Print",
         "recordPayment": "Record Payment",
         "postDraft": "Post",
-        "recalculateTotals": "Recalculate totals"
+        "recalculateTotals": "Recalculate totals",
+        "createCreditNote": "Create credit note"
       },
       "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
     },
@@ -1765,6 +1816,19 @@
           "parentId": "Parent group",
           "metadata": "Metadata",
           "metadataPlaceholder": "Optional JSON or notes"
+        }
+      },
+      "createCreditNote": {
+        "title": "Create credit note",
+        "description": "Issue a full credit note reversing this posted customer invoice.",
+        "submitLabel": "Create credit note",
+        "sections": {
+          "main": "Correction"
+        },
+        "fields": {
+          "reason": "Reason",
+          "reasonPlaceholder": "e.g. Pricing error, returned goods",
+          "confirmed": "I confirm this credit note should reverse the selected invoice"
         }
       },
       "postMove": {
@@ -4647,11 +4711,29 @@
         "productId": "Product",
         "productQty": "Qty Ordered",
         "qtyReceived": "Qty Received",
+        "qtyBilled": "Qty Billed",
         "qtyToInvoice": "Qty to Bill",
+        "matchStatus": "Match",
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
         "state": "Status",
         "datePlanned": "Expected"
+      },
+      "matchStatus": {
+        "matched": "Matched",
+        "pending": "Pending",
+        "under_received": "Under-received",
+        "over_received": "Over-received",
+        "under_billed": "Under-billed",
+        "over_billed": "Over-billed",
+        "tooltips": {
+          "matched": "Received and billed quantities align within tolerance.",
+          "pending": "No goods received yet — match pending receipt.",
+          "under_received": "Partial receipt — ordered quantity not fully received.",
+          "over_received": "Received quantity exceeds ordered quantity.",
+          "under_billed": "Billed less than received — variance {{variance}} units.",
+          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}})."
+        }
       },
       "states": {
         "Draft": "Draft",
@@ -5203,13 +5285,59 @@
       "title": "Order fulfillment",
       "description": "Outgoing stock pickings linked to sales orders",
       "searchPlaceholder": "Search by reference or origin…",
-      "emptyMessage": "No fulfillment pickings found."
+      "emptyMessage": "No fulfillment pickings found.",
+      "columns": {
+        "backorder": "Backorder"
+      },
+      "actions": {
+        "partialValidate": "Partial delivery…"
+      }
     },
     "returns": {
       "title": "Returns / RMA",
       "description": "Customer return pickings and reverse logistics",
       "searchPlaceholder": "Search returns…",
       "emptyMessage": "No return pickings found."
+    },
+    "returnOrders": {
+      "title": "Returns / RMA",
+      "description": "Customer return orders and credit note workflow",
+      "searchPlaceholder": "Search return orders…",
+      "emptyMessage": "No return orders yet.",
+      "columns": {
+        "name": "RMA",
+        "state": "State",
+        "partnerId": "Customer",
+        "saleOrderId": "Source SO",
+        "pickingId": "Picking",
+        "creditMoveId": "Credit note",
+        "returnReason": "Reason"
+      },
+      "states": {
+        "draft": "Draft",
+        "confirmed": "Confirmed",
+        "received": "Received",
+        "refunded": "Refunded",
+        "cancelled": "Cancelled"
+      },
+      "actions": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "receive": "Receive return",
+        "createCreditNote": "Create credit note"
+      }
+    },
+    "returnOrderLines": {
+      "title": "Return lines",
+      "description": "Lines for the selected return order",
+      "emptyMessage": "Select a return order to view lines.",
+      "columns": {
+        "productId": "Product",
+        "quantity": "Qty",
+        "priceUnit": "Unit price",
+        "toRefund": "Refund",
+        "saleOrderLineId": "SO line"
+      }
     },
     "tabs": {
       "invoices": "Invoices",
@@ -5391,6 +5519,33 @@
           "isWaveHint": "When enabled, the batch is created as a wave (multi-step picking) instead of a simple batch."
         }
       },
+      "newReturnOrder": {
+        "title": "New return order",
+        "description": "Create a customer RMA with at least one return line.",
+        "sections": {
+          "header": "Return details",
+          "line": "Return line"
+        },
+        "fields": {
+          "partnerId": "Customer",
+          "saleOrderId": "Source sale order",
+          "returnReason": "Return reason"
+        }
+      },
+      "addReturnOrderLine": {
+        "title": "Return line",
+        "description": "Product and quantity to return.",
+        "sections": {
+          "product": "Product"
+        },
+        "fields": {
+          "productId": "Product",
+          "uomId": "Unit of measure",
+          "quantity": "Quantity",
+          "priceUnit": "Unit price",
+          "toRefund": "Issue credit note for this line"
+        }
+      },
       "newDeliveryPriceRule": {
         "title": "New delivery price rule",
         "description": "Create a pricing rule (link to a carrier after creation using carrier settings)",
@@ -5563,6 +5718,34 @@
           "taxIdsPlaceholder": "e.g. 1, 2",
           "taxIdsHint": "Comma-separated tax record IDs (optional)"
         }
+      },
+      "partialDelivery": {
+        "title": "Partial delivery",
+        "description": "Set done quantity per move line for {{picking}}, then validate the picking.",
+        "submitLabel": "Validate delivery",
+        "sections": {
+          "moveLines": "Move lines",
+          "backorder": "Backorder"
+        },
+        "fields": {
+          "orderedQty": "Ordered: {{qty}}",
+          "createBackorder": "Create backorder for short quantities",
+          "createBackorderHint": "Automatic backorder creation is not wired yet. Short quantities are recorded on validate; link backorders manually if needed."
+        },
+        "errors": {
+          "noAssignedMoves": "No assigned move lines on this picking.",
+          "invalidQty": "Quantity must be between 0 and the ordered amount.",
+          "qtyRequired": "Enter a quantity for each move line."
+        }
+      },
+      "cancelPicking": {
+        "title": "Cancel picking",
+        "description": "This cancels the picking and its open move lines. Completed pickings cannot be cancelled.",
+        "submitLabel": "Cancel picking",
+        "fields": {
+          "pickingReference": "Picking",
+          "confirmCancel": "I understand this picking will be cancelled"
+        }
       }
     },
     "actions": {
@@ -5574,6 +5757,7 @@
       "unlockOrders": "Unlock",
       "newPricelistItem": "New rule",
       "newSaleOrderLine": "New line",
+      "newReturnOrder": "New return",
       "togglePricelistActive": "Toggle active",
       "deletePricelists": "Delete",
       "deletePricelistsConfirm": "Delete {{count}} pricelist(s)? This cannot be undone.",
@@ -9148,7 +9332,17 @@
         "netVat": "Net VAT",
         "actions": "Actions"
       },
-      "searchPlaceholder": "Search VAT reports…"
+      "searchPlaceholder": "Search VAT reports…",
+      "errors": {
+        "exportBlocked": "Export not allowed",
+        "exportRequiresGenerated": "Only generated VAT reports can be exported.",
+        "exportFailed": "Export failed",
+        "archiveBlocked": "Archive not allowed",
+        "archiveRequiresExported": "Only exported VAT reports can be archived.",
+        "alreadyArchived": "Archived reports cannot be changed.",
+        "archiveFailed": "Archive failed",
+        "generateFailed": "Generate failed"
+      }
     }
   },
   "proposalWorkspace": {

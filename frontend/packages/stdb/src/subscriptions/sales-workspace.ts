@@ -15,6 +15,8 @@ export const SALES_WORKSPACE_RESOURCE_KEYS = [
   "pricelists",
   "sale-order-lines",
   "sale-orders",
+  "return-orders",
+  "return-order-lines",
   "shipping-methods",
 ] as const;
 

@@ -6,7 +6,7 @@
 ///          PrivacyConsent tracks GDPR/CCPA opt-in/opt-out per contact.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -127,16 +127,42 @@ pub fn create_data_classification(
         );
     }
 
-    ctx.db.data_classification().insert(DataClassification {
+    let row = ctx.db.data_classification().insert(DataClassification {
         id: 0,
         organization_id,
-        name: params.name,
+        name: params.name.clone(),
         level: params.level,
-        description: params.description,
+        description: params.description.clone(),
         retention_days: params.retention_days,
         encryption_required: params.encryption_required,
-        metadata: params.metadata,
+        metadata: params.metadata.clone(),
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "data_classification",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": params.name,
+                    "level": params.level,
+                    "encryption_required": params.encryption_required,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "level".to_string(),
+                "encryption_required".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -155,19 +181,46 @@ pub fn create_data_classification_rule(
         .find(&params.classification_id)
         .ok_or("Data classification not found")?;
 
-    ctx.db
+    let row = ctx.db
         .data_classification_rule()
         .insert(DataClassificationRule {
             id: 0,
             organization_id,
-            table_name: params.table_name,
-            column_name: params.column_name,
+            table_name: params.table_name.clone(),
+            column_name: params.column_name.clone(),
             classification_id: params.classification_id,
-            applies_to: params.applies_to,
+            applies_to: params.applies_to.clone(),
             // System-derived: creation timestamp
             created_at: ctx.timestamp,
-            metadata: params.metadata,
+            metadata: params.metadata.clone(),
         });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "data_classification_rule",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "table_name": params.table_name,
+                    "column_name": params.column_name,
+                    "classification_id": params.classification_id,
+                    "applies_to": params.applies_to,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "table_name".to_string(),
+                "classification_id".to_string(),
+                "applies_to".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -182,11 +235,11 @@ pub fn record_privacy_consent(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "privacy_consent", "create")?;
 
-    ctx.db.privacy_consent().insert(PrivacyConsent {
+    let row = ctx.db.privacy_consent().insert(PrivacyConsent {
         id: 0,
         organization_id,
         contact_id: params.contact_id,
-        consent_type: params.consent_type,
+        consent_type: params.consent_type.clone(),
         granted: params.granted,
         // System-derived: computed from granted flag + ctx.timestamp
         granted_at: if params.granted {
@@ -199,10 +252,36 @@ pub fn record_privacy_consent(
         } else {
             None
         },
-        ip_address: params.ip_address,
-        user_agent: params.user_agent,
-        metadata: params.metadata,
+        ip_address: params.ip_address.clone(),
+        user_agent: params.user_agent.clone(),
+        metadata: params.metadata.clone(),
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "privacy_consent",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "contact_id": params.contact_id,
+                    "consent_type": params.consent_type,
+                    "granted": params.granted,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "contact_id".to_string(),
+                "consent_type".to_string(),
+                "granted".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

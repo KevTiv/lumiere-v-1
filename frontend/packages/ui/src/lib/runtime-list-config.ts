@@ -61,11 +61,14 @@ export function mergeRuntimeListConfig(
 ): EntityTableConfig {
   if (!runtime) return base
 
+  const baseColumns = base.columns ?? []
+  const runtimeFields = runtime.fields ?? []
+
   const existingKeys = new Set(
-    base.columns.map((c) => normalizeFormFieldKey(c.key.replace(/^metadata:/, ""))),
+    baseColumns.map((c) => normalizeFormFieldKey(c.key.replace(/^metadata:/, ""))),
   )
 
-  const runtimeColumns = runtime.fields
+  const runtimeColumns = runtimeFields
     .filter((f) => f.showInList && f.isEnabled)
     .sort((a, b) => a.order - b.order)
     .map(parsedFieldToColumn)
@@ -83,7 +86,7 @@ export function mergeRuntimeListConfig(
 
   return {
     ...base,
-    columns: [...base.columns, ...runtimeColumns],
+    columns: [...baseColumns, ...runtimeColumns],
   }
 }
 
@@ -92,12 +95,12 @@ export function runtimeListFiltersFromFields(
   runtime: MergedFormConfiguration | null,
 ): EntityFilter[] {
   if (!runtime) return []
-  return runtime.fields
+  return (runtime.fields ?? [])
     .filter((f) => f.showInList && f.isEnabled && (f.type === "Select" || f.type === "Radio"))
     .map((f) => ({
       key: f.name || f.fieldId,
       label: f.label,
       type: "select" as const,
-      options: f.options.map((o) => ({ value: o.value, label: o.label })),
+      options: (f.options ?? []).map((o) => ({ value: o.value, label: o.label })),
     }))
 }

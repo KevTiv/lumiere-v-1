@@ -14,17 +14,24 @@ import {
   newPricelistItemForm,
   newPickingBatchForm,
   newLoyaltyCardForm,
+  newReturnOrderForm,
   addSaleOrderLineForm,
   createInvoiceFromSaleOrderForm,
+  buildPartialDeliveryForm,
+  cancelPickingConfirmForm,
   InvoiceListView,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  mergeFieldDefaultValues,
   saleOrdersTableConfig,
   pricelistsTableConfig,
   pricelistItemsTableConfig,
   deliveriesTableConfig,
   salesFulfillmentTableConfig,
   salesReturnsTableConfig,
+  returnOrderLinesTableConfig,
+  EntityView,
+  Button,
   csvImportForm,
   ImportAssistantWizard,
   getRowField,
@@ -39,9 +46,11 @@ import type {
 import {
   toCreatePickingBatchParams,
   toCreatePricelistParams,
+  toCreatePricelistItemParams,
   toCreateSaleOrderParams,
   toCreateSaleOrderLineParams,
   toCreateInvoiceFromSaleOrderParams,
+  toCreateReturnOrderParams,
 } from '@/lib/sales-create-params';
 import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
 import {
@@ -102,6 +111,12 @@ import {
   useCreatePaymentMethod,
   useCreateLoyaltyProgram,
   useCreateLoyaltyCard,
+  useReturnOrders,
+  useReturnOrderLines,
+  useCreateReturnOrder,
+  useConfirmReturnOrder,
+  useCancelReturnOrder,
+  useCreateCreditNoteFromReturnOrder,
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
@@ -112,10 +127,12 @@ import {
 } from '@lumiere/query-hooks/hooks/accounting';
 import {
   useStockPickings,
+  useStockMoves,
   useConfirmStockPicking,
   useAssignStockPicking,
   useValidateStockPicking,
   useCancelStockPicking,
+  useDoneStockMove,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses, useProducts, useUoms } from '@lumiere/query-hooks/hooks/inventory';
@@ -140,9 +157,7 @@ import {
   uomRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
 } from '@/lib/form-lookup';
-import { stdbParamsToJson } from '@/lib/stdb-params-json';
 import { enumTag } from '@/lib/accounting-post-draft';
-import type { CreatePricelistItemParams } from '@lumiere/stdb/types';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -184,52 +199,13 @@ function pickingRowId(row: Record<string, unknown>): string | number | bigint | 
   return String(id);
 }
 
-function toCreatePricelistItemParams(
-  formData: Record<string, unknown>,
-): CreatePricelistItemParams | null {
-  const pricelistRaw = formData.pricelistId;
-  if (pricelistRaw == null || String(pricelistRaw).trim() === '') return null;
-  const pricelistId = BigInt(String(pricelistRaw));
-  const appliedOnRaw = String(formData.appliedOn ?? 'AllProducts');
-  const computeRaw = String(formData.computePrice ?? 'Fixed');
-  const appliedOn =
-    appliedOnRaw === 'Category'
-      ? { tag: 'Category' as const }
-      : appliedOnRaw === 'Product'
-        ? { tag: 'Product' as const }
-        : { tag: 'AllProducts' as const };
-  const computePrice =
-    computeRaw === 'Percentage'
-      ? { tag: 'Percentage' as const }
-      : computeRaw === 'Formula'
-        ? { tag: 'Formula' as const }
-        : { tag: 'Fixed' as const };
-  const productRaw = formData.productId;
-  const categRaw = formData.categId;
-  return {
-    pricelistId,
-    appliedOn,
-    computePrice,
-    productTmplId: undefined,
-    productId:
-      productRaw == null || String(productRaw).trim() === ''
-        ? undefined
-        : BigInt(String(productRaw)),
-    categId:
-      categRaw == null || String(categRaw).trim() === ''
-        ? undefined
-        : BigInt(String(categRaw)),
-    minQuantity: Number(formData.minQuantity ?? 1) || 0,
-    dateStart: undefined,
-    dateEnd: undefined,
-    fixedPrice: Number(formData.fixedPrice ?? 0) || 0,
-    percentPrice: Number(formData.percentPrice ?? 0) || 0,
-    priceDiscount: Number(formData.priceDiscount ?? 0) || 0,
-    priceSurcharge: 0,
-    priceMinMargin: 0,
-    priceMaxMargin: 0,
-    sequence: Math.max(0, Math.trunc(Number(formData.sequence ?? 10))),
-  };
+function stockMoveState(row: Record<string, unknown>): string {
+  return enumTag(getRowField(row, 'state')).toLowerCase();
+}
+
+function stockMovePickingId(row: Record<string, unknown>): string | null {
+  const pid = row.pickingId ?? row.picking_id;
+  return pid == null ? null : String(pid);
 }
 
 interface SalesClientProps {
@@ -248,6 +224,8 @@ interface SalesClientProps {
   initialWarehouses?: Record<string, unknown>[];
   initialAccountMoves?: Record<string, unknown>[];
   initialStockPickings?: Record<string, unknown>[];
+  initialReturnOrders?: Record<string, unknown>[];
+  initialReturnOrderLines?: Record<string, unknown>[];
   organizationId?: number;
 }
 
@@ -262,6 +240,15 @@ export function SalesClient(props: SalesClientProps) {
     return <MissingOrganization />;
   }
   return <SalesClientLoaded {...props} organizationId={props.organizationId} />;
+}
+
+function returnOrderState(row: Record<string, unknown>): string {
+  return String(row.state ?? '').toLowerCase();
+}
+
+function returnOrderRowId(row: Record<string, unknown>): string | null {
+  const id = getRowField(row, 'id');
+  return id == null ? null : String(id);
 }
 
 function SalesClientLoaded({
@@ -280,6 +267,8 @@ function SalesClientLoaded({
   initialWarehouses,
   initialAccountMoves,
   initialStockPickings,
+  initialReturnOrders,
+  initialReturnOrderLines,
   organizationId,
 }: SalesClientLoadedProps) {
   const { t } = useTranslation();
@@ -308,6 +297,16 @@ function SalesClientLoaded({
   const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
   const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null);
+  const [partialDeliveryPicking, setPartialDeliveryPicking] =
+    useState<Record<string, unknown> | null>(null);
+  const [partialDeliveryError, setPartialDeliveryError] = useState<string | null>(null);
+  const [cancelPickingTarget, setCancelPickingTarget] =
+    useState<Record<string, unknown> | null>(null);
+  const [cancelPickingError, setCancelPickingError] = useState<string | null>(null);
+  const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<string | null>(null);
+  const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
+  const [creditReturnOrderError, setCreditReturnOrderError] = useState<string | null>(null);
+  const [openReturnForm, setOpenReturnForm] = useState(false);
 
   const { data: orders = [] } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
@@ -353,6 +352,9 @@ function SalesClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
+  const { data: stockMoves = [] } = useStockMoves(orgId);
+  const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
+  const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
@@ -385,11 +387,19 @@ function SalesClientLoaded({
   const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
+  const createReturnOrder = useCreateReturnOrder(orgId, operatingCompanyId);
+  const confirmReturnOrder = useConfirmReturnOrder(orgId, operatingCompanyId);
+  const cancelReturnOrder = useCancelReturnOrder(orgId, operatingCompanyId);
+  const createCreditNoteFromReturnOrder = useCreateCreditNoteFromReturnOrder(
+    orgId,
+    operatingCompanyId,
+  );
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
   const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId);
   const assignPicking = useAssignStockPicking(orgId, operatingCompanyId);
   const validatePicking = useValidateStockPicking(orgId, operatingCompanyId);
   const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId);
+  const doneStockMove = useDoneStockMove(orgId, operatingCompanyId);
 
   useEffect(() => {
     if (csvKind) setCsvError(null);
@@ -456,6 +466,33 @@ function SalesClientLoaded({
       },
     ];
   }, [orders, t]);
+
+  const returnSourceSaleOrderOptions = useMemo(() => {
+    const eligible = (orders as Record<string, unknown>[]).filter((o) => {
+      const st = saleOrderState(o);
+      return st === 'Sale' || st === 'Done';
+    });
+    const fromApi = saleOrderRowsToSelectOptions(eligible);
+    if (fromApi.length > 0) return fromApi;
+    return [
+      {
+        value: '',
+        label: t('sales.forms.newReturnOrder.fields.saleOrderId'),
+        disabled: true,
+      },
+    ];
+  }, [orders, t]);
+
+  const returnOrderFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newReturnOrderForm(t), {
+        partnerId: partnerFieldOptions,
+        saleOrderId: returnSourceSaleOrderOptions,
+        productId: productFieldOptions,
+        uomId: uomFieldOptions,
+      }),
+    [t, partnerFieldOptions, returnSourceSaleOrderOptions, productFieldOptions, uomFieldOptions],
+  );
 
   const addSaleOrderLineFormConfig = useMemo(
     () =>
@@ -534,12 +571,17 @@ function SalesClientLoaded({
     [stockPickings],
   );
 
-  const returnPickings = useMemo(
-    () =>
-      (stockPickings as Record<string, unknown>[]).filter((p) =>
-        pickingIsReturn(p),
-      ),
-    [stockPickings],
+  const linesForSelectedReturn = useMemo(() => {
+    if (selectedReturnOrderId == null) return [];
+    return (returnOrderLines as Record<string, unknown>[]).filter(
+      (line) =>
+        String(line.returnOrderId ?? line.return_order_id) === selectedReturnOrderId,
+    );
+  }, [returnOrderLines, selectedReturnOrderId]);
+
+  const returnOrderLinesEntityConfig = useMemo(
+    () => returnOrderLinesTableConfig(t),
+    [t],
   );
 
   const journalFieldOptions = useMemo(() => {
@@ -594,6 +636,53 @@ function SalesClientLoaded({
     [t, journalFieldOptions, incomeAccountFieldOptions, receivableAccountFieldOptions],
   );
 
+  const productLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of products as Record<string, unknown>[]) {
+      map.set(String(row.id), String(row.name ?? row.displayName ?? `Product ${row.id}`));
+    }
+    return map;
+  }, [products]);
+
+  const assignedMovesForPartialDelivery = useMemo(() => {
+    if (!partialDeliveryPicking) return [];
+    const pickingId = pickingRowId(partialDeliveryPicking);
+    if (pickingId == null) return [];
+    return (stockMoves as Record<string, unknown>[]).filter(
+      (m) =>
+        stockMovePickingId(m) === String(pickingId) && stockMoveState(m) === 'assigned',
+    );
+  }, [partialDeliveryPicking, stockMoves]);
+
+  const partialDeliveryFormConfig = useMemo(() => {
+    if (!partialDeliveryPicking) return null;
+    const pickingName = String(
+      partialDeliveryPicking.name ?? partialDeliveryPicking.origin ?? pickingRowId(partialDeliveryPicking),
+    );
+    const lines = assignedMovesForPartialDelivery.map((m) => {
+      const moveId = String(m.id);
+      const productId = String(m.productId ?? m.product_id ?? '');
+      return {
+        moveId,
+        productLabel: productLabelById.get(productId) ?? `Product ${productId}`,
+        orderedQty: Number(m.productUomQty ?? m.product_uom_qty ?? 0),
+      };
+    });
+    return buildPartialDeliveryForm(t, pickingName, lines);
+  }, [partialDeliveryPicking, assignedMovesForPartialDelivery, productLabelById, t]);
+
+  const cancelPickingFormConfig = useMemo(() => {
+    if (!cancelPickingTarget) return null;
+    const base = cancelPickingConfirmForm(t);
+    return mergeFieldDefaultValues(base, {
+      pickingReference: String(
+        cancelPickingTarget.name ??
+          cancelPickingTarget.origin ??
+          pickingRowId(cancelPickingTarget),
+      ),
+    });
+  }, [cancelPickingTarget, t]);
+
   const pickingActions = useMemo(
     (): EntityTableConfig['actions'] => [
       {
@@ -619,6 +708,18 @@ function SalesClientLoaded({
         },
       },
       {
+        id: 'partial-validate-picking',
+        label: t('sales.fulfillment.actions.partialValidate'),
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0] as Record<string, unknown> | undefined;
+          if (!row) return;
+          if (pickingStateStr(row) !== 'assigned') return;
+          setPartialDeliveryError(null);
+          setPartialDeliveryPicking(row);
+        },
+      },
+      {
         id: 'validate-picking',
         label: t('inventory.transferActions.validate'),
         requiresSelection: true,
@@ -637,15 +738,14 @@ function SalesClientLoaded({
         onClick: (rows) => {
           const row = rows[0] as Record<string, unknown> | undefined;
           if (!row) return;
-          const id = pickingRowId(row);
           const st = pickingStateStr(row);
-          if (id != null && st !== 'done') {
-            void cancelPicking.mutateAsync(id);
-          }
+          if (st === 'done') return;
+          setCancelPickingError(null);
+          setCancelPickingTarget(row);
         },
       },
     ],
-    [t, confirmPicking, assignPicking, validatePicking, cancelPicking],
+    [t, confirmPicking, assignPicking, validatePicking],
   );
 
   const fulfillmentEntityConfig = useMemo((): EntityViewConfig => {
@@ -667,10 +767,69 @@ function SalesClientLoaded({
       ...base,
       view: {
         ...view,
-        actions: pickingActions,
+        actions: [
+          {
+            id: 'confirm-return',
+            label: t('sales.returnOrders.actions.confirm'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const row of rows) {
+                if (returnOrderState(row) !== 'draft') continue;
+                const id = returnOrderRowId(row);
+                if (id != null) void confirmReturnOrder.mutateAsync(id);
+              }
+            },
+          },
+          {
+            id: 'receive-return',
+            label: t('sales.returnOrders.actions.receive'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              void (async () => {
+                for (const row of rows) {
+                  if (returnOrderState(row) !== 'confirmed') continue;
+                  const pickingId = row.pickingId ?? row.picking_id;
+                  if (pickingId == null) continue;
+                  await confirmPicking.mutateAsync(pickingId as string | number | bigint);
+                  await assignPicking.mutateAsync(pickingId as string | number | bigint);
+                  await validatePicking.mutateAsync(pickingId as string | number | bigint);
+                }
+              })();
+            },
+          },
+          {
+            id: 'create-return-credit-note',
+            label: t('sales.returnOrders.actions.createCreditNote'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const row = rows[0] as Record<string, unknown>;
+              if (returnOrderState(row) !== 'received') return;
+              if (row.creditMoveId != null || row.credit_move_id != null) return;
+              const id = returnOrderRowId(row);
+              if (id == null) return;
+              setCreditReturnOrderError(null);
+              setCreditReturnOrderId(BigInt(id));
+            },
+          },
+          {
+            id: 'cancel-return',
+            label: t('sales.returnOrders.actions.cancel'),
+            requiresSelection: true,
+            variant: 'destructive',
+            onClick: (rows) => {
+              for (const row of rows) {
+                const st = returnOrderState(row);
+                if (st === 'received' || st === 'refunded' || st === 'cancelled') continue;
+                const id = returnOrderRowId(row);
+                if (id != null) void cancelReturnOrder.mutateAsync(id);
+              }
+            },
+          },
+        ],
       },
     };
-  }, [t, pickingActions]);
+  }, [t, confirmReturnOrder, cancelReturnOrder, confirmPicking, assignPicking, validatePicking]);
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
@@ -1146,8 +1305,38 @@ function SalesClientLoaded({
           if (tab.id === 'fulfillment' && tab.type === 'entity') {
             return { ...tab, entityConfig: fulfillmentEntityConfig };
           }
-          if (tab.id === 'returns' && tab.type === 'entity') {
-            return { ...tab, entityConfig: returnsEntityConfig };
+          if (tab.id === 'returns') {
+            return {
+              ...tab,
+              type: 'custom' as const,
+              customContent: (
+                <div className="space-y-6">
+                  <div className="flex justify-end">
+                    <Button
+                      size="lg"
+                      onClick={() => setOpenReturnForm(true)}
+                      data-testid="module-create-sales-returns"
+                    >
+                      {t('sales.actions.newReturnOrder')}
+                    </Button>
+                  </div>
+                  <EntityView
+                    config={returnsEntityConfig}
+                    data={returnOrders as unknown as Record<string, unknown>[]}
+                    onRowClick={(row) => {
+                      const id = returnOrderRowId(row);
+                      setSelectedReturnOrderId(id);
+                      const target = chatterTargetFromRow('sales', 'returns', row);
+                      if (target) setChatterTarget(target);
+                    }}
+                  />
+                  <EntityView
+                    config={returnOrderLinesEntityConfig}
+                    data={linesForSelectedReturn as unknown as Record<string, unknown>[]}
+                  />
+                </div>
+              ),
+            };
           }
           if (tab.id === 'invoices') {
             return {
@@ -1183,6 +1372,10 @@ function SalesClientLoaded({
       deliveriesEntityConfig,
       fulfillmentEntityConfig,
       returnsEntityConfig,
+      returnOrderLinesEntityConfig,
+      returnOrders,
+      linesForSelectedReturn,
+      returnOrderFormConfig,
       salesInvoices,
       computeInvoiceTotals,
       loyaltyCardFormConfig,
@@ -1205,7 +1398,7 @@ function SalesClientLoaded({
       'pricelist-items': pricelistItems as unknown as Record<string, unknown>[],
       deliveries: deliveries as unknown as Record<string, unknown>[],
       fulfillment: fulfillmentPickings as unknown as Record<string, unknown>[],
-      returns: returnPickings as unknown as Record<string, unknown>[],
+      returns: returnOrders as unknown as Record<string, unknown>[],
       'delivery-price-rules': deliveryPriceRules as unknown as Record<
         string,
         unknown
@@ -1226,7 +1419,7 @@ function SalesClientLoaded({
       pricelistItems,
       deliveries,
       fulfillmentPickings,
-      returnPickings,
+      returnOrders,
       deliveryPriceRules,
       deliveryCarriers,
       shippingMethods,
@@ -1271,7 +1464,7 @@ function SalesClientLoaded({
       if (p) await createPricelist.mutateAsync(p);
     } else if (action === 'createPricelistItem') {
       const p = toCreatePricelistItemParams(formData);
-      if (p) await createPricelistItem.mutateAsync(stdbParamsToJson(p));
+      if (p) await createPricelistItem.mutateAsync(p);
     } else if (action === 'createSaleOrderLine') {
       const params = toCreateSaleOrderLineParams(formData);
       const orderId = formData.orderId;
@@ -1280,6 +1473,9 @@ function SalesClientLoaded({
         orderId: orderId as string | number | bigint,
         params,
       });
+    } else if (action === 'createReturnOrder') {
+      const params = toCreateReturnOrderParams(formData);
+      if (params) await createReturnOrder.mutateAsync(params);
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParams(formData);
       if (p) await createPickingBatch.mutateAsync(p);
@@ -1341,13 +1537,18 @@ function SalesClientLoaded({
     createPaymentMethod.isPending ||
     createLoyaltyProgram.isPending ||
     createLoyaltyCard.isPending ||
+    createReturnOrder.isPending ||
+    confirmReturnOrder.isPending ||
+    cancelReturnOrder.isPending ||
+    createCreditNoteFromReturnOrder.isPending ||
     importSaleOrderCsv.isPending ||
     importSaleOrderLineCsv.isPending ||
     computeInvoiceTotals.isPending ||
     confirmPicking.isPending ||
     assignPicking.isPending ||
     validatePicking.isPending ||
-    cancelPicking.isPending;
+    cancelPicking.isPending ||
+    doneStockMove.isPending;
 
   return (
     <>
@@ -1484,6 +1685,134 @@ function SalesClientLoaded({
               setInvoiceOrderId(null);
             } catch (e) {
               setInvoiceOrderError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
+      {partialDeliveryPicking != null && partialDeliveryFormConfig ? (
+        <FormModal
+          key={`partial-delivery-${String(pickingRowId(partialDeliveryPicking))}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setPartialDeliveryPicking(null);
+              setPartialDeliveryError(null);
+            }
+          }}
+          config={partialDeliveryFormConfig}
+          closeOnSubmit={false}
+          submitError={partialDeliveryError}
+          isPending={doneStockMove.isPending || validatePicking.isPending}
+          onSubmit={async (formData) => {
+            setPartialDeliveryError(null);
+            if (assignedMovesForPartialDelivery.length === 0) {
+              setPartialDeliveryError(t('sales.forms.partialDelivery.errors.noAssignedMoves'));
+              return;
+            }
+            const pickingId = pickingRowId(partialDeliveryPicking);
+            if (pickingId == null) return;
+            try {
+              for (const move of assignedMovesForPartialDelivery) {
+                const moveId = move.id as string | number | bigint;
+                const ordered = Number(move.productUomQty ?? move.product_uom_qty ?? 0);
+                const qty = Number(formData[`qty_${String(moveId)}`]);
+                if (!Number.isFinite(qty)) {
+                  setPartialDeliveryError(t('sales.forms.partialDelivery.errors.qtyRequired'));
+                  return;
+                }
+                if (qty < 0 || qty > ordered) {
+                  setPartialDeliveryError(t('sales.forms.partialDelivery.errors.invalidQty'));
+                  return;
+                }
+                if (qty > 0 && qty < ordered) {
+                  await doneStockMove.mutateAsync({ moveId, quantityDone: qty });
+                }
+              }
+              await validatePicking.mutateAsync(pickingId);
+              setPartialDeliveryPicking(null);
+            } catch (e) {
+              setPartialDeliveryError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
+      {cancelPickingTarget != null && cancelPickingFormConfig ? (
+        <FormModal
+          key={`cancel-picking-${String(pickingRowId(cancelPickingTarget))}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setCancelPickingTarget(null);
+              setCancelPickingError(null);
+            }
+          }}
+          config={cancelPickingFormConfig}
+          closeOnSubmit={false}
+          submitError={cancelPickingError}
+          isPending={cancelPicking.isPending}
+          onSubmit={async (formData) => {
+            setCancelPickingError(null);
+            if (formData.confirmCancel !== true) {
+              setCancelPickingError(t('common.validation.required'));
+              return;
+            }
+            const id = pickingRowId(cancelPickingTarget);
+            if (id == null) return;
+            try {
+              await cancelPicking.mutateAsync(id);
+              setCancelPickingTarget(null);
+            } catch (e) {
+              setCancelPickingError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
+      <FormModal
+        open={openReturnForm}
+        onOpenChange={setOpenReturnForm}
+        config={returnOrderFormConfig}
+        isPending={createReturnOrder.isPending}
+        onSubmit={async (formData) => {
+          const params = toCreateReturnOrderParams(formData);
+          if (!params) return;
+          await createReturnOrder.mutateAsync(params);
+          setOpenReturnForm(false);
+        }}
+      />
+      {creditReturnOrderId != null ? (
+        <RuntimeFormModal
+          key={`credit-return-${creditReturnOrderId.toString()}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setCreditReturnOrderId(null);
+              setCreditReturnOrderError(null);
+            }
+          }}
+          staticConfig={createInvoiceFormConfig}
+          moduleId="sales"
+          formId="create-invoice-from-sale-order"
+          organizationId={organizationId}
+          roleId={runtimeRoleId}
+          foldCustomFieldsIntoMetadata={false}
+          closeOnSubmit={false}
+          submitError={creditReturnOrderError}
+          isPending={createCreditNoteFromReturnOrder.isPending}
+          onSubmit={async (formData) => {
+            setCreditReturnOrderError(null);
+            const params = toCreateInvoiceFromSaleOrderParams(formData);
+            if (!params) {
+              setCreditReturnOrderError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await createCreditNoteFromReturnOrder.mutateAsync({
+                returnOrderId: creditReturnOrderId,
+                params,
+              });
+              setCreditReturnOrderId(null);
+            } catch (e) {
+              setCreditReturnOrderError(e instanceof Error ? e.message : String(e));
             }
           }}
         />

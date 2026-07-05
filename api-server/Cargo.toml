@@ -45,5 +45,9 @@ futures-util = "0.3"
 # Do not use bare "2.0.1" — Cargo will pick 2.1.x and break generated client bindings.
 spacetimedb-sdk = "2.0.1"
 
+[dev-dependencies]
+base64.workspace = true
+tokio.workspace = true
+
 [build-dependencies]
 serde_json = "1"

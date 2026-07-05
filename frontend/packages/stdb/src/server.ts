@@ -942,6 +942,33 @@ export function serverQuerySaleOrderLines(
   )
 }
 
+export function serverQueryReturnOrders(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql('return-orders', 'return_order', organizationId, fq(opts), '', ' ORDER BY id DESC'),
+    httpOpts(opts),
+  )
+}
+
+export function serverQueryReturnOrderLines(
+  organizationId: bigint | number,
+  opts?: StdbServerQueryOptions,
+) {
+  return stdbSql(
+    selectOrgScopedSql(
+      'return-order-lines',
+      'return_order_line',
+      organizationId,
+      fq(opts),
+      '',
+      ' ORDER BY return_order_id ASC, id ASC',
+    ),
+    httpOpts(opts),
+  )
+}
+
 export function serverQueryPricelists(
   organizationId: bigint | number,
   opts?: StdbServerQueryOptions,

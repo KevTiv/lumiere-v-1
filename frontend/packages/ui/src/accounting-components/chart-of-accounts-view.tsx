@@ -113,9 +113,10 @@ type TFunction = ReturnType<typeof useTranslation>["t"]
 interface AccountsTableProps {
   accounts: AccountAccount[]
   t: TFunction
+  onAccountClick?: (account: AccountAccount) => void
 }
 
-function AccountsTable({ accounts, t }: AccountsTableProps) {
+function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -135,7 +136,11 @@ function AccountsTable({ accounts, t }: AccountsTableProps) {
           const group = getDisplayGroup(account)
           const conf = groupConfig[group]
           return (
-            <TableRow key={String(account.id)}>
+            <TableRow
+              key={String(account.id)}
+              className={onAccountClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+              onClick={onAccountClick ? () => onAccountClick(account) : undefined}
+            >
               <TableCell className="font-mono font-medium">{account.code}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -174,6 +179,8 @@ interface ChartOfAccountsViewProps {
   accounts: AccountAccount[]
   onCreate?: (data: Record<string, unknown>) => void | Promise<void>
   onImportAccountsCsv?: () => void
+  /** Click account row to open GL move-line drilldown. */
+  onAccountClick?: (account: AccountAccount) => void
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
 }
@@ -182,6 +189,7 @@ export function ChartOfAccountsView({
   accounts,
   onCreate,
   onImportAccountsCsv,
+  onAccountClick,
   chartStructureContent,
 }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
@@ -272,7 +280,7 @@ export function ChartOfAccountsView({
             </TabsList>
             {tabGroups.map(({ value, accounts: tabAccounts }) => (
               <TabsContent key={value} value={value}>
-                <AccountsTable accounts={tabAccounts} t={t} />
+                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} />
               </TabsContent>
             ))}
           </Tabs>

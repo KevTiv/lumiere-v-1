@@ -4,7 +4,7 @@
 /// Supports multiple Google Drive accounts per organization.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
 /// Google Drive Connection Configuration
@@ -110,7 +110,8 @@ pub fn create_google_drive_connection(
         return Err("Credentials reference cannot be empty".to_string());
     }
 
-    ctx.db
+    let row = ctx
+        .db
         .google_drive_connection()
         .insert(GoogleDriveConnection {
             id: 0,
@@ -144,10 +145,19 @@ pub fn create_google_drive_connection(
             metadata: None,
         });
 
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "google_drive_connection",
+        record_id: row.id,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "name": row.name, "account_email": row.account_email }).to_string()),
+        changed_fields: vec!["name".to_string(), "account_email".to_string()],
+        metadata: None,
+    });
+
     Ok(())
 }
-
-/// Update Google Drive connection settings
 #[spacetimedb::reducer]
 pub fn update_google_drive_connection(
     ctx: &ReducerContext,
@@ -200,6 +210,17 @@ pub fn update_google_drive_connection(
             updated_at: ctx.timestamp,
             ..conn
         });
+
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "google_drive_connection",
+        record_id: connection_id,
+        action: "UPDATE",
+        old_values: None,
+        new_values: None,
+        changed_fields: vec!["name".to_string(), "sync_enabled".to_string()],
+        metadata: None,
+    });
 
     Ok(())
 }

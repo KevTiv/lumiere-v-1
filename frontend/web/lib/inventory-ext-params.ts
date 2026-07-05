@@ -4,6 +4,7 @@
 
 import type {
   CreateAdjustmentReasonParams,
+  CreateStockMoveParams,
   CreateStockTraceabilityReportParams,
   CreateTraceabilityRecordParams,
 } from "@lumiere/stdb/types"
@@ -189,6 +190,74 @@ export function toCreateStockPickingParamsFromForm(
     scheduledDate: formData.scheduledDate ? new Date(String(formData.scheduledDate)) : undefined,
     origin: originStr.trim() !== "" ? originStr : undefined,
     note: optionalTrimmedString(formData.note),
+  }
+}
+
+/** Manual / prompt-driven stock move — full `CreateStockMoveParams` with explicit defaults. */
+export function toCreateStockMoveParams(input: {
+  companyId?: bigint | number
+  name: string
+  productId: bigint | number
+  productUom: bigint | number
+  quantity: number
+  locationId: bigint | number
+  locationDestId: bigint | number
+  dateExpected?: Timestamp
+}): CreateStockMoveParams {
+  const productId = BigInt(input.productId)
+  return {
+    companyId: input.companyId != null ? BigInt(input.companyId) : undefined,
+    name: input.name,
+    productId,
+    productTmplId: productId,
+    productUom: BigInt(input.productUom),
+    productUomQty: input.quantity,
+    locationId: BigInt(input.locationId),
+    locationDestId: BigInt(input.locationDestId),
+    dateExpected: input.dateExpected ?? stbTimestampFromDate(new Date()),
+    moveType: "direct",
+    priority: "0",
+    reference: undefined,
+    sequence: 10,
+    origin: undefined,
+    note: undefined,
+    date: undefined,
+    dateDeadline: undefined,
+    pickingId: undefined,
+    pickingTypeId: undefined,
+    partnerId: undefined,
+    productVariantId: undefined,
+    groupId: undefined,
+    ruleId: undefined,
+    procureMethod: "make_to_stock",
+    priceUnit: 0,
+    scrapped: false,
+    toRefund: false,
+    propagateCancel: false,
+    delayAlert: false,
+    productPackagingId: undefined,
+    productPackagingQty: 0,
+    warehouseId: undefined,
+    productionId: undefined,
+    rawMaterialProductionId: undefined,
+    unbuildId: undefined,
+    consumeUnbuildId: undefined,
+    costShare: 0,
+    isSubcontract: false,
+    purchaseLineId: undefined,
+    needRelease: false,
+    releaseReady: false,
+    propagationCancel: false,
+    hasTracking: false,
+    inventoryId: undefined,
+    saleLineId: undefined,
+    lotId: undefined,
+    packageId: undefined,
+    resultPackageId: undefined,
+    ownerId: undefined,
+    packageLevelId: undefined,
+    productType: undefined,
+    metadata: undefined,
   }
 }
 

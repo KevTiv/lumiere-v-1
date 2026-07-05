@@ -1,4 +1,12 @@
+/**
+ * Requires `seed_dev_data` (via `make e2e-smoke` / `pnpm run e2e-seed-fixture`) for the
+ * seeded PO visibility test. Other tests create their own data or only open modals.
+ *
+ * Seeded records: purchase order `PO/2024/0001`.
+ */
 import { expect, test, type Page } from "@playwright/test"
+
+/** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import { expectNoAppError, expectSeededText, gotoModule, openEntityCreate } from "./helpers"
 
@@ -57,7 +65,7 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
   }
 }
 
-test.describe("Purchasing module e2e", () => {
+test.describe("Purchasing module e2e", { tag: "@dev-fixture" }, () => {
   test("renders purchasing shell and key tabs without errors", async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
 
@@ -78,8 +86,7 @@ test.describe("Purchasing module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("seeded purchase order appears on Purchase Orders tab", { tag: "@p0" }, async ({ page }) => {
-    // Requires `seed_dev_data` from `make e2e-smoke` (PO/2024/0001).
+  test("seeded purchase order appears on Purchase Orders tab", { tag: "@dev-fixture" }, async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
     await openPurchasingTab(page, "orders")
 

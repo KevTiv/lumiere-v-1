@@ -1097,6 +1097,19 @@ export const AiInsight = __t.object("AiInsight", {
 });
 export type AiInsight = __Infer<typeof AiInsight>;
 
+export const AiReducerAllowlist = __t.object("AiReducerAllowlist", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  reducerName: __t.string(),
+  permissionResource: __t.string(),
+  permissionAction: __t.string(),
+  enabled: __t.bool(),
+  createDate: __t.timestamp(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiReducerAllowlist = __Infer<typeof AiReducerAllowlist>;
+
 export const AiSkill = __t.object("AiSkill", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1479,6 +1492,21 @@ export const BillTimesheetsParams = __t.object("BillTimesheetsParams", {
   invoiceDate: __t.option(__t.timestamp()),
 });
 export type BillTimesheetsParams = __Infer<typeof BillTimesheetsParams>;
+
+export const BillingAccount = __t.object("BillingAccount", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  planTier: __t.string(),
+  seatCount: __t.u32(),
+  status: __t.string(),
+  trialEndsAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type BillingAccount = __Infer<typeof BillingAccount>;
 
 export const BomExplosionResult = __t.object("BomExplosionResult", {
   id: __t.u64(),
@@ -2392,6 +2420,15 @@ export const CreateAiInsightParams = __t.object("CreateAiInsightParams", {
 });
 export type CreateAiInsightParams = __Infer<typeof CreateAiInsightParams>;
 
+export const CreateAiReducerAllowlistParams = __t.object("CreateAiReducerAllowlistParams", {
+  reducerName: __t.string(),
+  permissionResource: __t.string(),
+  permissionAction: __t.string(),
+  enabled: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiReducerAllowlistParams = __Infer<typeof CreateAiReducerAllowlistParams>;
+
 export const CreateAiSkillParams = __t.object("CreateAiSkillParams", {
   skillKey: __t.string(),
   name: __t.string(),
@@ -2573,6 +2610,15 @@ export const CreateBillFromPurchaseOrderParams = __t.object("CreateBillFromPurch
   metadata: __t.option(__t.string()),
 });
 export type CreateBillFromPurchaseOrderParams = __Infer<typeof CreateBillFromPurchaseOrderParams>;
+
+export const CreateBillingAccountParams = __t.object("CreateBillingAccountParams", {
+  planTier: __t.string(),
+  seatCount: __t.u32(),
+  status: __t.string(),
+  trialEndsAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateBillingAccountParams = __Infer<typeof CreateBillingAccountParams>;
 
 export const CreateBomParams = __t.object("CreateBomParams", {
   companyId: __t.option(__t.u64()),
@@ -2771,6 +2817,25 @@ export const CreateCountryParams = __t.object("CreateCountryParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateCountryParams = __Infer<typeof CreateCountryParams>;
+
+export const CreateCreditNoteFromReturnOrderParams = __t.object("CreateCreditNoteFromReturnOrderParams", {
+  journalId: __t.u64(),
+  defaultIncomeAccountId: __t.u64(),
+  get receivableLine() {
+    return AddAccountMoveLineParams;
+  },
+  get incomeLine() {
+    return AddAccountMoveLineParams;
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreateCreditNoteFromReturnOrderParams = __Infer<typeof CreateCreditNoteFromReturnOrderParams>;
+
+export const CreateCreditNoteParams = __t.object("CreateCreditNoteParams", {
+  lineIds: __t.array(__t.u64()),
+  reason: __t.option(__t.string()),
+});
+export type CreateCreditNoteParams = __Infer<typeof CreateCreditNoteParams>;
 
 export const CreateCrossoveredBudgetLineParams = __t.object("CreateCrossoveredBudgetLineParams", {
   analyticAccountId: __t.option(__t.u64()),
@@ -4059,6 +4124,26 @@ export const CreateReportTemplateParams = __t.object("CreateReportTemplateParams
   metadata: __t.option(__t.string()),
 });
 export type CreateReportTemplateParams = __Infer<typeof CreateReportTemplateParams>;
+
+export const CreateReturnOrderLineParams = __t.object("CreateReturnOrderLineParams", {
+  saleOrderLineId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  priceUnit: __t.f64(),
+  toRefund: __t.bool(),
+});
+export type CreateReturnOrderLineParams = __Infer<typeof CreateReturnOrderLineParams>;
+
+export const CreateReturnOrderParams = __t.object("CreateReturnOrderParams", {
+  saleOrderId: __t.option(__t.u64()),
+  partnerId: __t.u64(),
+  returnReason: __t.option(__t.string()),
+  get lines() {
+    return __t.array(CreateReturnOrderLineParams);
+  },
+});
+export type CreateReturnOrderParams = __Infer<typeof CreateReturnOrderParams>;
 
 export const CreateRevenueRecognitionRuleParams = __t.object("CreateRevenueRecognitionRuleParams", {
   description: __t.string(),
@@ -8827,6 +8912,39 @@ export const ResPartnerBank = __t.object("ResPartnerBank", {
 });
 export type ResPartnerBank = __Infer<typeof ResPartnerBank>;
 
+export const ReturnOrder = __t.object("ReturnOrder", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  saleOrderId: __t.option(__t.u64()),
+  partnerId: __t.u64(),
+  state: __t.string(),
+  returnReason: __t.option(__t.string()),
+  pickingId: __t.option(__t.u64()),
+  creditMoveId: __t.option(__t.u64()),
+  lineIds: __t.array(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ReturnOrder = __Infer<typeof ReturnOrder>;
+
+export const ReturnOrderLine = __t.object("ReturnOrderLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  returnOrderId: __t.u64(),
+  saleOrderLineId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  priceUnit: __t.f64(),
+  toRefund: __t.bool(),
+});
+export type ReturnOrderLine = __Infer<typeof ReturnOrderLine>;
+
 export const RevenueRecognitionRule = __t.object("RevenueRecognitionRule", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10602,6 +10720,15 @@ export const UpdateAiChatSessionTitleParams = __t.object("UpdateAiChatSessionTit
 });
 export type UpdateAiChatSessionTitleParams = __Infer<typeof UpdateAiChatSessionTitleParams>;
 
+export const UpdateAiReducerAllowlistParams = __t.object("UpdateAiReducerAllowlistParams", {
+  reducerName: __t.option(__t.string()),
+  permissionResource: __t.option(__t.string()),
+  permissionAction: __t.option(__t.string()),
+  enabled: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateAiReducerAllowlistParams = __Infer<typeof UpdateAiReducerAllowlistParams>;
+
 export const UpdateAnalyticAccountParams = __t.object("UpdateAnalyticAccountParams", {
   companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
@@ -10684,6 +10811,15 @@ export const UpdateBarcodeRuleParams = __t.object("UpdateBarcodeRuleParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateBarcodeRuleParams = __Infer<typeof UpdateBarcodeRuleParams>;
+
+export const UpdateBillingAccountParams = __t.object("UpdateBillingAccountParams", {
+  planTier: __t.option(__t.string()),
+  seatCount: __t.option(__t.u32()),
+  status: __t.option(__t.string()),
+  trialEndsAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateBillingAccountParams = __Infer<typeof UpdateBillingAccountParams>;
 
 export const UpdateBomParams = __t.object("UpdateBomParams", {
   productQty: __t.option(__t.f64()),

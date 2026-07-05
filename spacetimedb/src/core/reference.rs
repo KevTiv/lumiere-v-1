@@ -6,7 +6,7 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::users::user_profile;
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -253,8 +253,8 @@ pub fn create_country(
     }
 
     ctx.db.country().insert(Country {
-        code,
-        name: params.name,
+        code: code.clone(),
+        name: params.name.clone(),
         official_name: params.official_name,
         iso3: params.iso3,
         numcode: params.numcode,
@@ -263,6 +263,17 @@ pub fn create_country(
         language_codes: params.language_codes,
         is_active: params.is_active,
         metadata: params.metadata,
+    });
+
+    write_audit_log_v2(ctx, 0, AuditLogParams {
+        company_id: None,
+        table_name: "country",
+        record_id: 0,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "code": code, "name": params.name }).to_string()),
+        changed_fields: vec!["code".to_string(), "name".to_string()],
+        metadata: None,
     });
 
     Ok(())

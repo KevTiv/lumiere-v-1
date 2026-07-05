@@ -15,6 +15,14 @@ import { serverQueryUserOrganizationWithFallback } from '@/lib/stdb-org-resolve'
 import { callReducer } from '@/lib/stdb-reducer'
 import { decodeIdentityHexFromStdbToken } from '@/lib/stdb-token-identity'
 
+/** Mirrors `stdb_config::runtime_is_production` — dev bypasses must not run in prod. */
+export function runtimeIsProduction(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    process.env.LUMIERE_ENV === 'production'
+  )
+}
+
 /** When true with `NEXT_PUBLIC_DEV_ADMIN`, auto-call `ensure_dev_admin` and dev seed org fallbacks. */
 const DEV_ADMIN_AUTO_ORG = process.env.NEXT_PUBLIC_DEV_ADMIN_AUTO_ORG === 'true'
 
@@ -97,29 +105,30 @@ export interface ApiSession {
 export const getStdbSession = (req?: Request) => resolveApiSession(req)
 
 export async function resolveApiSession(req?: Request): Promise<ApiSession | null> {
-  // Dev mode: bypass cookie/header lookup entirely and use a hardcoded org ID.
-  // Set DEV_MOCK_ORG_ID=1 in .env.local when running locally with seed data.
-  const mockOrgId = process.env['DEV_MOCK_ORG_ID']
-  const mockToken = process.env['STDB_SERVER_TOKEN']
-  if (mockOrgId && mockToken) {
-    const opts: StdbHttpOptions = { token: mockToken }
-    const organizationId = Number(mockOrgId)
-    const identityHex = 'dev-mock-identity'
-    let fieldAccess: FieldAccessContext | undefined
-    try {
-      fieldAccess = await fetchFieldAccessFromApiServer({
-        token: mockToken,
+  // Dev mock: DEV_MOCK_ORG_ID + STDB_SERVER_TOKEN (local dev only — never in production).
+  if (!runtimeIsProduction()) {
+    const mockOrgId = process.env['DEV_MOCK_ORG_ID']
+    const mockToken = process.env['STDB_SERVER_TOKEN']?.trim()
+    if (mockOrgId && mockToken) {
+      const opts: StdbHttpOptions = { token: mockToken }
+      const organizationId = Number(mockOrgId)
+      const identityHex = 'dev-mock-identity'
+      let fieldAccess: FieldAccessContext | undefined
+      try {
+        fieldAccess = await fetchFieldAccessFromApiServer({
+          token: mockToken,
+          identityHex,
+        })
+      } catch {
+        fieldAccess = undefined
+      }
+      return {
+        stdbToken: mockToken,
         identityHex,
-      })
-    } catch {
-      fieldAccess = undefined
-    }
-    return {
-      stdbToken: mockToken,
-      identityHex,
-      organizationId,
-      opts,
-      fieldAccess,
+        organizationId,
+        opts,
+        fieldAccess,
+      }
     }
   }
 
@@ -147,11 +156,6 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
       // Cookies() throws if called outside of request context
       // This is fine - we'll check for token below
     }
-  }
-
-  // If still no token, try server token as fallback (admin / server-side SQL)
-  if (!token) {
-    token = process.env['STDB_SERVER_TOKEN']
   }
 
   if (!token) {

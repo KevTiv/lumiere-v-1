@@ -1146,6 +1146,60 @@ pub fn update_po_invoice_status(
     Ok(())
 }
 
+/// Default quantity tolerance for PO three-way match (ordered / received / billed).
+pub const DEFAULT_QTY_MATCH_TOLERANCE: f64 = 0.001;
+
+/// Compute three-way match state for a purchase order line.
+///
+/// Returns one of: `matched`, `pending`, `under_received`, `over_received`, `under_billed`, `over_billed`.
+pub fn compute_line_match_state(line: &PurchaseOrderLine, tolerance: f64) -> String {
+    let ordered = line.product_qty;
+    let received = line.qty_received;
+    let billed = line.qty_invoiced;
+
+    if received <= tolerance && billed <= tolerance {
+        return "pending".to_string();
+    }
+    if received > ordered + tolerance {
+        return "over_received".to_string();
+    }
+    if billed > received + tolerance || billed > ordered + tolerance {
+        return "over_billed".to_string();
+    }
+    if (received - billed).abs() <= tolerance && received <= ordered + tolerance {
+        return "matched".to_string();
+    }
+    if billed < received - tolerance {
+        return "under_billed".to_string();
+    }
+    if received < ordered - tolerance {
+        return "under_received".to_string();
+    }
+    "pending".to_string()
+}
+
+/// Block vendor bill posting when billed quantity exceeds received (+ tolerance) on linked PO lines.
+pub fn validate_three_way_match_po_lines(
+    lines: &[PurchaseOrderLine],
+    tolerance: f64,
+) -> Result<(), String> {
+    for line in lines {
+        if line.qty_invoiced > line.qty_received + tolerance {
+            return Err(format!(
+                "three-way match failed: line {} billed {:.4} exceeds received {:.4}",
+                line.id, line.qty_invoiced, line.qty_received
+            ));
+        }
+        if line.qty_invoiced > line.product_qty + tolerance {
+            return Err(format!(
+                "three-way match failed: line {} billed {:.4} exceeds ordered {:.4}",
+                line.id, line.qty_invoiced, line.product_qty
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Increment received quantity on a purchase order line and refresh statuses/totals.
 #[reducer]
 pub fn receive_po_line(

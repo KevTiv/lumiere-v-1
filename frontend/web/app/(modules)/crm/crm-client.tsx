@@ -76,6 +76,7 @@ import {
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
   DEFAULT_KANBAN_COLUMN_COLORS,
   CrmRecordChatterDialog,
@@ -231,7 +232,7 @@ function CrmClientLoaded({
   const { orgId } = orgBigInts(organizationId)
 
   const leadsTableRuntime = useRuntimeListConfig({
-    base: leadsTableConfig(t).view as EntityTableConfig,
+    base: entityTableConfigFromView(leadsTableConfig(t).view),
     moduleId: "crm",
     formId: "new-lead",
     organizationId,
@@ -239,7 +240,9 @@ function CrmClientLoaded({
     listViewKey: `list-filters:crm:leads:${organizationId}`,
   })
   const contactsTableRuntime = useRuntimeListConfig({
-    base: contactsTableConfig(t, { formatContactDisplayName: contactPrimaryLabel }).view as EntityTableConfig,
+    base: entityTableConfigFromView(
+      contactsTableConfig(t, { formatContactDisplayName: contactPrimaryLabel }).view,
+    ),
     moduleId: "crm",
     formId: "new-contact",
     organizationId,
@@ -247,7 +250,7 @@ function CrmClientLoaded({
     listViewKey: `list-filters:crm:contacts:${organizationId}`,
   })
   const opportunitiesTableRuntime = useRuntimeListConfig({
-    base: opportunitiesTableConfig(t).view as EntityTableConfig,
+    base: entityTableConfigFromView(opportunitiesTableConfig(t).view),
     moduleId: "crm",
     formId: "new-opportunity",
     organizationId,

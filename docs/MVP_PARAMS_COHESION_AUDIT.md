@@ -41,6 +41,9 @@ rg 'pub struct Create.*Params' spacetimedb/src --glob '*.rs'
 # Frontend mappers
 rg 'export function toCreate|ParamsFromForm' frontend/web/lib frontend/packages/erp-shared/src --glob '*.ts'
 
+# Automated mapper coverage (Phase B/C)
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --json
+
 # Leaky partial payloads
 rg 'as unknown as Create' frontend/web/app --glob '*.tsx'
 
@@ -58,13 +61,13 @@ cat frontend/web/reducer-coverage-report.json
 
 | Metric | Count | Notes |
 |--------|------:|-------|
-| `Create*Params` structs (Rust) | **160** | `spacetimedb/src/**/*.rs` |
+| `Create*Params` structs (Rust) | **166** | `spacetimedb/src/**/*.rs` |
 | `Create*` entries in option-fields JSON | **~147** | `stdb-http-option-fields.json` |
-| Dedicated `toCreate*` / `*FromForm` mappers | **~83** | `frontend/web/lib` + `erp-shared` |
+| Dedicated `toCreate*` / `*FromForm` mappers | **~88** | `frontend/web/lib` + `erp-shared` (see § tooling) |
 | `REDUCER_PARAM_STRUCTS` (E2E helper) | **8** | `stdb-params-json.ts` |
 | Form field definitions (UI configs) | **~1,500+** | 23 `*-form-configs.ts` modules |
 | `as unknown as Create*` in web clients | **8** | calendar, documents, subscriptions (+ others TBD) |
-| **Mapper coverage gap (rough)** | **~50%** | 83 mappers vs 160 structs |
+| **Mapper coverage (automated)** | **53%** | 88 / 166 — `scripts/check-params-mapper-coverage.ts` |
 
 ---
 
@@ -260,3 +263,57 @@ Form (createInvoiceFromSaleOrderForm)
 | 2026-07-01 | Initial audit; Phase A pre-filled from codebase grep; `create_bill_from_purchase_order` marked Pass |
 | 2026-07-01 | Wave 3: `toCreatePurchaseOrderParams`, P2P E2E, PO dashboard `Purchase` filter, `internalType` in account-accounts field policy |
 | 2026-07-04 | Wave 3 gate green: `E2E_CLEAR_DB=1 make e2e-p2p`; Makefile `e2e-p2p` + `e2e-mvp-golden` |
+| 2026-07-05 | Phase B/C tooling: `scripts/check-params-mapper-coverage.ts` + CI floor in `params-cohesion.yml` (baseline **53%**, 88/166 mapped) |
+
+---
+
+## Tooling
+
+Automated mapper coverage diff for Phase B/C regression gates.
+
+### `scripts/check-params-mapper-coverage.ts`
+
+Compares Rust `Create*Params` structs under `spacetimedb/src` against frontend mapper exports in `frontend/web/lib` and `frontend/packages/erp-shared/src`.
+
+**Recognized mapper patterns:**
+
+- `export function toCreate*Params` (including `*ParamsFromManualForm` variants)
+- `export function *ParamsFromForm` (e.g. `pickingWaveCreateParamsFromForm`)
+- `export function buildCreate*Params` (e.g. subscription revenue builders)
+
+**Usage:**
+
+```bash
+# Human-readable report
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts
+
+# JSON for scripts / CI artifacts
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --json
+
+# Include mapped struct → mapper locations
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --json --verbose
+
+# CI floor (exit 1 when below threshold)
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 53
+```
+
+**Output shape:**
+
+```json
+{
+  "totalStructs": 166,
+  "mappedCount": 88,
+  "coveragePct": 53,
+  "unmapped": ["CreateAccountAssetParams", "..."]
+}
+```
+
+**CI:** `.github/workflows/params-cohesion.yml` runs on PR/push when Rust or mapper paths change. Floor **53%** (2026-07-05 baseline); target **70%** emits a warning annotation via `--warn-coverage 70`.
+
+**Thresholds ([params-cohesion-v2 mission](../.cursor/plans/params-cohesion-v2-mission.md)):**
+
+| Level | Coverage | CI behavior |
+|-------|----------|-------------|
+| Floor | 53% → raise toward 55%+ as mappers land | `exit 1` on PR |
+| Target | 70% | warning |
+| Stretch | 85% | backlog |

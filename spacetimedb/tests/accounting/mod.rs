@@ -51,7 +51,9 @@ pub fn run_accounting_payment_term_update_test(ctx: &ReducerContext) -> Result<(
 #[spacetimedb::reducer]
 pub fn run_accounting_period_lock_test(ctx: &ReducerContext) -> Result<(), String> {
     period_lock_test::test_post_blocked_in_closed_period(ctx)
-        .map_err(|e| format!("period_lock: {e}"))
+        .map_err(|e| format!("period_lock invoice: {e}"))?;
+    period_lock_test::test_post_payment_blocked_in_closed_period(ctx)
+        .map_err(|e| format!("period_lock payment: {e}"))
 }
 
 #[spacetimedb::reducer]

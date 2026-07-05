@@ -49,6 +49,7 @@ import {
   useUpdateCompanyBusiness,
   useUpdateCompanyHierarchy,
 } from "@lumiere/query-hooks/hooks/organization-company"
+import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 type SettingsAction =
@@ -1202,6 +1203,10 @@ function SettingsLoaded({
       <DashboardHeader title={title} description={description} />
       <SettingsModule />
 
+      <section className="rounded-xl border border-border bg-card p-4">
+        <GuidedImportWizard organizationId={organizationId} />
+      </section>
+
       <section className="rounded-xl border border-border bg-card">
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Integrations</p>
@@ -1245,6 +1250,7 @@ function SettingsLoaded({
               key={action.id}
               type="button"
               className="rounded-lg border border-border bg-background p-3 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+              data-testid={`settings-admin-action-${action.id}`}
               onClick={() => openAction(action.id)}
             >
               <p className="text-sm font-medium">{action.title}</p>

@@ -13,6 +13,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { documentsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type {
+  CreateDocumentParams,
+  CreateKnowledgeArticleParams,
+} from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
 
@@ -110,12 +114,12 @@ export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryR
 
 export function useCreateDocument(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateDocumentParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = documentsBffPost("create_document", [
         organizationId,
         companyId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "CreateDocumentParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
@@ -250,15 +254,15 @@ export function useCreateDocumentFolder(organizationId: bigint) {
 
 export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateKnowledgeArticleParams>({
     mutationFn: async (params) => {
       const payload = {
         ...params,
-        ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
+        ...(params.companyId == null && companyId != null ? { companyId } : {}),
       }
       const { urlPath, init } = documentsBffPost("create_knowledge_article", [
         organizationId,
-        stdbParamsToJson(payload as object),
+        stdbParamsToJson(payload as object, "CreateKnowledgeArticleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge article')

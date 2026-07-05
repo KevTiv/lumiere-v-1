@@ -5,6 +5,9 @@ STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
 STDB_HOST          ?= https://maincloud.spacetimedb.com
 # Local E2E: always use the local SpacetimeDB server (see e2e-smoke target)
 E2E_STDB_HOST      ?= http://127.0.0.1:3000
+# Local Playwright stack uses its own module name (--no-config) so it is not tied to
+# spacetime.local.json / cloud module ownership on 127.0.0.1:3000.
+E2E_STDB_MODULE    ?= lumiere-v1-local-e2e
 # Local E2E ports. e2e-smoke-test pre-builds Next.js and starts next start; Makefile starts api-server.
 E2E_WEB_PORT       ?= 3100
 E2E_API_PORT       ?= 8082
@@ -18,7 +21,9 @@ E2E_WORKERS        ?= 1
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 DB         := $(STDB_MODULE)
+E2E_DB     := $(E2E_STDB_MODULE)
 DB_CLOUD   := $(STDB_CLOUD_MODULE)
+E2E_STDB_DATA_DIR ?= $(HOME)/.local/share/spacetime/data
 MODULE     := ./spacetimedb
 LOCAL      := $(STDB_HOST)
 # One reducer per domain test case — avoids WASM limits and yields clearer CI errors.
@@ -54,7 +59,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
         call-tests logs \
         call-tests-cloud logs-cloud \
         seed-test-user e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
-        e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
+        e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
         generate-stdb-rust-sdk
 
 help:
@@ -76,7 +81,8 @@ help:
 	@echo "  logs                 Tail logs from local"
 	@echo "  seed-test-user       Provision test@email.com + admin org (run e2e-seed-fixture first if DB was cleared)"
 	@echo "  e2e-smoke            Full stack: setup + Playwright (E2E_SUITE=full|p0, default full)"
-	@echo "  e2e-smoke-setup      STDB + publish + seed + api-server only (writes .tmp/e2e/env.sh)"
+	@echo "  e2e-smoke-setup      STDB + publish + seed + api-server only (writes .tmp/e2e/env.sh; module=$(E2E_STDB_MODULE))"
+	@echo "  e2e-wipe-local-stdb  Stop local SpacetimeDB and delete ~/.local/share/spacetime/data (destructive)"
 	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0)"
 	@echo "  e2e-playwright-only  Playwright only when STDB, api-server, and Next.js are already running"
 	@echo "  e2e-single           setup + one Playwright spec (E2E_SPEC, E2E_GREP, E2E_WORKERS=1)"
@@ -140,6 +146,13 @@ logs:
 seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
 
+# Destructive: removes ALL local SpacetimeDB databases (fixes 403 "not authorized to reset database").
+e2e-wipe-local-stdb:
+	@echo "[e2e] Stopping local SpacetimeDB and removing $(E2E_STDB_DATA_DIR)..."
+	spacetime stop >/dev/null 2>&1 || true
+	rm -rf "$(E2E_STDB_DATA_DIR)"
+	@echo "[e2e] Local SpacetimeDB data wiped. Run make e2e-smoke (or e2e-smoke-setup) to start fresh."
+
 e2e-smoke-setup:
 	@env PATH="$(E2E_PATH):$$PATH" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
@@ -170,15 +183,15 @@ e2e-smoke-setup:
 		fi; \
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
-		echo "[e2e] Publishing local database $(DB)..."; \
+		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local --clear-database -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
 		else \
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
 		fi; \
-		if spacetime call "$(DB)" run_all_core_tests --server local; then \
+		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
 			echo "[e2e] Core reducer tests passed."; \
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
@@ -186,15 +199,15 @@ e2e-smoke-setup:
 		echo "[e2e] Running domain test reducers (one case per call)..."; \
 		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
 			echo "[e2e] Calling $$_domain_reducer..."; \
-			if ! spacetime call "$(DB)" "$$_domain_reducer" --server local; then \
+			if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
 				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-				spacetime logs "$(DB)" --server local 2>/dev/null | tail -40 || true; \
+				spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 				exit 1; \
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
-		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
+		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
 			echo "[e2e] Failed to obtain local SpacetimeDB owner token (see messages above)"; \
 			exit 1; \
@@ -202,9 +215,9 @@ e2e-smoke-setup:
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
 		cd "$$ROOT/frontend/web"; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
@@ -219,8 +232,8 @@ e2e-smoke-setup:
 		PORT="$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
@@ -279,8 +292,8 @@ e2e-smoke-test:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -291,8 +304,8 @@ e2e-smoke-test:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -309,15 +322,15 @@ e2e-smoke-test:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -364,8 +377,8 @@ e2e-single-test:
 				PORT="$(E2E_API_PORT)" \
 				STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 				STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-				STDB_MODULE="$(DB)" \
-				NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+				STDB_MODULE="$(E2E_DB)" \
+				NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 				STDB_HOST="$$E2E_STDB_HOST" \
 				NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 				CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
@@ -397,8 +410,8 @@ e2e-single-test:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -409,8 +422,8 @@ e2e-single-test:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -434,8 +447,8 @@ e2e-single-test:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -467,8 +480,8 @@ e2e-playwright-only:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$${E2E_STDB_TOKEN:-}" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$${STDB_CREDENTIAL_ENCRYPTION_KEY:-}" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}" \
 		NEXT_PUBLIC_STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -521,15 +534,15 @@ e2e-smoke:
 		fi; \
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
-		echo "[e2e] Publishing local database $(DB)..."; \
+		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local --clear-database -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
 		else \
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(DB)" --module-path "$(MODULE)" --server local -y; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
 		fi; \
-		if spacetime call "$(DB)" run_all_core_tests --server local; then \
+		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
 			echo "[e2e] Core reducer tests passed."; \
 		else \
 			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
@@ -537,15 +550,15 @@ e2e-smoke:
 		echo "[e2e] Running domain test reducers (one case per call)..."; \
 		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
 			echo "[e2e] Calling $$_domain_reducer..."; \
-			if ! spacetime call "$(DB)" "$$_domain_reducer" --server local; then \
+			if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
 				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-				spacetime logs "$(DB)" --server local 2>/dev/null | tail -40 || true; \
+				spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 				exit 1; \
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
-		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
+		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
 			echo "[e2e] Failed to obtain local SpacetimeDB owner token (see messages above)"; \
 			exit 1; \
@@ -553,9 +566,9 @@ e2e-smoke:
 		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
 		cd "$$ROOT/frontend/web"; \
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(DB)" NEXT_PUBLIC_STDB_MODULE="$(DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
@@ -570,8 +583,8 @@ e2e-smoke:
 		PORT="$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
@@ -597,8 +610,8 @@ e2e-smoke:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -609,8 +622,8 @@ e2e-smoke:
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
@@ -627,15 +640,15 @@ e2e-smoke:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(DB)" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \

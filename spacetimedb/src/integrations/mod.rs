@@ -8,7 +8,7 @@
 /// like HashiCorp Vault, AWS Secrets Manager, or similar.
 use spacetimedb::ReducerContext;
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
 use self::google_drive::google_drive_connection;
@@ -97,10 +97,22 @@ pub fn update_integration_status(
         }
     }
 
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "integration",
+        record_id: integration_id,
+        action: "UPDATE",
+        old_values: None,
+        new_values: Some(
+            serde_json::json!({ "integration_type": format!("{:?}", integration_type), "status": format!("{:?}", status) })
+                .to_string(),
+        ),
+        changed_fields: vec!["status".to_string(), "sync_status".to_string()],
+        metadata: None,
+    });
+
     Ok(())
 }
-
-/// Generic integration deletion reducer (soft delete)
 #[spacetimedb::reducer]
 pub fn delete_integration(
     ctx: &ReducerContext,
@@ -163,6 +175,17 @@ pub fn delete_integration(
             ));
         }
     }
+
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "integration",
+        record_id: integration_id,
+        action: "DELETE",
+        old_values: None,
+        new_values: None,
+        changed_fields: vec!["is_active".to_string()],
+        metadata: Some(format!("{:?}", integration_type)),
+    });
 
     Ok(())
 }

@@ -609,7 +609,10 @@ export function useCreateStockPicking(
         scopedCompanyId != null ? { companyId: Number(scopedCompanyId) } : {},
       )
       const merged = mergeReducerParams(base, params)
-      const { urlPath, init } = inventoryBffPost("create_stock_picking", [organizationId, stdbParamsToJson(merged as object)])
+      const { urlPath, init } = inventoryBffPost("create_stock_picking", [
+        organizationId,
+        stdbParamsToJson(merged as object, "CreateStockPickingParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock picking')
     },
@@ -622,7 +625,10 @@ export function useCreateInventoryAdjustment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_inventory_adjustment", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = inventoryBffPost("create_inventory_adjustment", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateInventoryAdjustmentParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create inventory adjustment')
     },
@@ -837,7 +843,10 @@ export function useCreateStockMove(organizationId: bigint, _companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_stock_move", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = inventoryBffPost("create_stock_move", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateStockMoveParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock move')
     },

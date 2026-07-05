@@ -17,6 +17,8 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateDeferredRevenueScheduleParams,
   CreateRevenueRecognitionRuleParams,
+  CreateSubscriptionFromSaleOrderParams,
+  CreateSubscriptionPlanParams,
 } from '@lumiere/stdb/types'
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -94,11 +96,11 @@ export function useRevenueRecognitionRules(
 
 export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateSubscriptionPlanParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = subscriptionsBffPost("create_subscription_plan", [
         organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
+        stdbParamsToJson(withCompanyScope(params, companyId), "CreateSubscriptionPlanParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create subscription plan')
@@ -110,11 +112,14 @@ export function useCreateSubscriptionPlan(organizationId: bigint, companyId?: bi
 
 export function useCreateSubscriptionFromSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateSubscriptionFromSaleOrderParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = subscriptionsBffPost("create_subscription_from_sale_order", [
         organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
+        stdbParamsToJson(
+          withCompanyScope(params, companyId),
+          "CreateSubscriptionFromSaleOrderParams",
+        ),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create subscription from sale order')
@@ -192,7 +197,7 @@ export function useCreateDeferredRevenueSchedule(organizationId: bigint, company
       const { urlPath, init } = subscriptionsBffPost("create_deferred_revenue_schedule", [
         organizationId,
         companyId ?? organizationId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "CreateDeferredRevenueScheduleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create deferred revenue schedule')
@@ -235,7 +240,7 @@ export function useCreateRevenueRecognitionRule(organizationId: bigint, companyI
       const { urlPath, init } = subscriptionsBffPost("create_revenue_recognition_rule", [
         organizationId,
         companyId ?? organizationId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "CreateRevenueRecognitionRuleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create revenue recognition rule')

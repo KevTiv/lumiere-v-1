@@ -14,6 +14,7 @@ import {
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { ChatActionDraftPayload } from "@lumiere/ui"
+import { phCapture } from "@/lib/posthog-browser"
 import { GitBranch, Loader2 } from "lucide-react"
 
 function hasValidOrganizationId(value?: number): value is number {
@@ -137,6 +138,10 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
               await approveDraft.mutateAsync({
                 draftId: nextDraft.draftId,
                 companyId: nextDraft.companyId ?? draft.companyId,
+              })
+              phCapture("ai_action_draft_approved", {
+                reducer: nextDraft.reducerName,
+                draft_id: nextDraft.draftId,
               })
               patchDraft(nextDraft.draftId, { status: "approved" })
             }}

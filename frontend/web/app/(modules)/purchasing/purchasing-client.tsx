@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
+import { Badge } from "@lumiere/ui/components/badge"
 import {
   ModuleView,
   FormModal,
@@ -125,11 +126,15 @@ import {
   accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
+  toAddLandedCostLineParams,
   toAddPurchaseOrderLineParams,
   toCreateBillFromPurchaseOrderParams,
+  toCreateLandedCostParams,
   toCreatePurchaseOrderParams,
+  toCreatePurchaseRequisitionParams,
   toInvoicePoLineArgs,
   toReceivePoLineArgs,
+  toUpdateLandedCostParams,
   toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -219,6 +224,81 @@ function stockPickingRowsToSelectOptions(
     value: String(row.id),
     label: String(row.name ?? `Transfer ${row.id}`),
   }))
+}
+
+const PO_QTY_MATCH_TOLERANCE = 0.001
+
+type PoLineMatchStatus =
+  | "matched"
+  | "pending"
+  | "under_received"
+  | "over_received"
+  | "under_billed"
+  | "over_billed"
+
+function computeLineMatchState(
+  row: Record<string, unknown>,
+  tolerance = PO_QTY_MATCH_TOLERANCE,
+): { status: PoLineMatchStatus; tooltip: string } {
+  const ordered = Number(row.productQty ?? row.product_qty ?? 0)
+  const received = Number(row.qtyReceived ?? row.qty_received ?? 0)
+  const billed = Number(row.qtyInvoiced ?? row.qty_invoiced ?? 0)
+
+  let status: PoLineMatchStatus = "pending"
+  if (received <= tolerance && billed <= tolerance) {
+    status = "pending"
+  } else if (received > ordered + tolerance) {
+    status = "over_received"
+  } else if (billed > received + tolerance || billed > ordered + tolerance) {
+    status = "over_billed"
+  } else if (Math.abs(received - billed) <= tolerance && received <= ordered + tolerance) {
+    status = "matched"
+  } else if (billed < received - tolerance) {
+    status = "under_billed"
+  } else if (received < ordered - tolerance) {
+    status = "under_received"
+  }
+
+  const variance =
+    status === "over_billed" || status === "under_billed"
+      ? billed - received
+      : status === "over_received" || status === "under_received"
+        ? received - ordered
+        : 0
+
+  const tooltipKey = `purchasing.orderLines.matchStatus.tooltips.${status}`
+  const tooltip = variance !== 0 ? `${tooltipKey}:var=${variance.toFixed(4)}` : tooltipKey
+
+  return { status, tooltip }
+}
+
+function poLineMatchBadges(t: (key: string) => string) {
+  return {
+    badgeVariants: {
+      matched: "default",
+      pending: "secondary",
+      under_received: "outline",
+      under_billed: "outline",
+      over_received: "destructive",
+      over_billed: "destructive",
+    },
+    badgeLabels: {
+      matched: t("purchasing.orderLines.matchStatus.matched"),
+      pending: t("purchasing.orderLines.matchStatus.pending"),
+      under_received: t("purchasing.orderLines.matchStatus.under_received"),
+      under_billed: t("purchasing.orderLines.matchStatus.under_billed"),
+      over_received: t("purchasing.orderLines.matchStatus.over_received"),
+      over_billed: t("purchasing.orderLines.matchStatus.over_billed"),
+    },
+  } as const
+}
+
+function poLineMatchTooltip(t: (key: string, opts?: Record<string, unknown>) => string, raw: string): string {
+  const [key, variancePart] = raw.split(":var=")
+  if (variancePart != null) {
+    return t(key, { variance: variancePart })
+  }
+  return t(key)
 }
 
 interface PurchasingClientProps {
@@ -811,10 +891,101 @@ function PurchasingClientLoaded({
   const linesEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseOrderLinesTableConfig(t)
     const view = base.view as EntityTableConfig
+    const matchBadges = poLineMatchBadges(t)
     return {
       ...base,
       view: {
         ...view,
+        columns: [
+          { key: "orderId", label: t("purchasing.orderLines.columns.orderId"), width: "min-w-24" },
+          { key: "productId", label: t("purchasing.orderLines.columns.productId"), width: "min-w-40" },
+          {
+            key: "productQty",
+            label: t("purchasing.orderLines.columns.productQty"),
+            type: "number",
+            align: "right",
+          },
+          {
+            key: "qtyReceived",
+            label: t("purchasing.orderLines.columns.qtyReceived"),
+            type: "number",
+            align: "right",
+          },
+          {
+            key: "qtyInvoiced",
+            label: t("purchasing.orderLines.columns.qtyBilled"),
+            type: "number",
+            align: "right",
+          },
+          {
+            key: "matchStatus",
+            label: t("purchasing.orderLines.columns.matchStatus"),
+            type: "badge",
+            ...matchBadges,
+            render: (value, row) => {
+              const status = String(value ?? "") as PoLineMatchStatus
+              const variant = (matchBadges.badgeVariants[status] ?? "secondary") as
+                | "default"
+                | "secondary"
+                | "destructive"
+                | "outline"
+              const label = matchBadges.badgeLabels[status] ?? status
+              const tooltip = poLineMatchTooltip(
+                t,
+                String(row.matchTooltip ?? `purchasing.orderLines.matchStatus.tooltips.${status}`),
+              )
+              return (
+                <span
+                  title={tooltip}
+                  className={
+                    status === "over_billed" || status === "over_received"
+                      ? "inline-flex rounded-md ring-2 ring-destructive/40"
+                      : undefined
+                  }
+                >
+                  <Badge variant={variant}>{label}</Badge>
+                </span>
+              )
+            },
+          },
+          {
+            key: "qtyToInvoice",
+            label: t("purchasing.orderLines.columns.qtyToInvoice"),
+            type: "number",
+            align: "right",
+          },
+          {
+            key: "priceUnit",
+            label: t("purchasing.orderLines.columns.priceUnit"),
+            type: "currency",
+            align: "right",
+          },
+          {
+            key: "priceSubtotal",
+            label: t("purchasing.orderLines.columns.priceSubtotal"),
+            type: "currency",
+            align: "right",
+          },
+          {
+            key: "state",
+            label: t("purchasing.orderLines.columns.state"),
+            type: "badge",
+            width: "min-w-24",
+            badgeVariants: {
+              Draft: "secondary",
+              Confirmed: "outline",
+              Done: "default",
+              Cancelled: "destructive",
+            },
+            badgeLabels: {
+              Draft: t("purchasing.orderLines.states.Draft"),
+              Confirmed: t("purchasing.orderLines.states.Confirmed"),
+              Done: t("purchasing.orderLines.states.Done"),
+              Cancelled: t("purchasing.orderLines.states.Cancelled"),
+            },
+          },
+          { key: "datePlanned", label: t("purchasing.orderLines.columns.datePlanned"), type: "date" },
+        ],
         actions: [
           {
             id: "csv-purchase-order-lines",
@@ -1377,17 +1548,30 @@ function PurchasingClientLoaded({
     ],
   )
 
+  const enrichedLines = useMemo(
+    () =>
+      (lines as Record<string, unknown>[]).map((line) => {
+        const match = computeLineMatchState(line)
+        return {
+          ...line,
+          matchStatus: match.status,
+          matchTooltip: match.tooltip,
+        }
+      }),
+    [lines],
+  )
+
   const data = useMemo(
     () => ({
       orders: orders as unknown as Record<string, unknown>[],
-      lines: lines as unknown as Record<string, unknown>[],
+      lines: enrichedLines,
       requisitions: requisitions as unknown as Record<string, unknown>[],
       vendors: vendors as unknown as Record<string, unknown>[],
       "landed-costs": landedCosts as unknown as Record<string, unknown>[],
       "supplier-intakes": supplierIntakes as unknown as Record<string, unknown>[],
       "partner-banks": partnerBanks as unknown as Record<string, unknown>[],
     }),
-    [orders, lines, requisitions, vendors, landedCosts, supplierIntakes, partnerBanks],
+    [orders, enrichedLines, requisitions, vendors, landedCosts, supplierIntakes, partnerBanks],
   )
 
   const handleFormSubmit = async (
@@ -1422,24 +1606,7 @@ function PurchasingClientLoaded({
         }
       }
     } else if (action === "createPurchaseRequisition") {
-      const vendorRaw = formData.vendorId
-      await createPurchaseRequisition.mutateAsync({
-        description: formData.description ? String(formData.description) : undefined,
-        orderingDate: formData.orderingDate
-          ? new Date(String(formData.orderingDate))
-          : undefined,
-        dateEnd: formData.dateEnd ? new Date(String(formData.dateEnd)) : undefined,
-        scheduleDate: formData.scheduleDate
-          ? new Date(String(formData.scheduleDate))
-          : undefined,
-        departmentId:
-          formData.departmentId != null && formData.departmentId !== ""
-            ? Number(formData.departmentId)
-            : undefined,
-        vendorId:
-          vendorRaw !== "" && vendorRaw != null ? Number(vendorRaw) : undefined,
-        origin: optionalFormString(formData.origin),
-      })
+      await createPurchaseRequisition.mutateAsync(toCreatePurchaseRequisitionParams(formData))
     } else if (action === "addPurchaseOrderLine") {
       const params = toAddPurchaseOrderLineParams(formData)
       const orderId = formData.orderId
@@ -1466,74 +1633,31 @@ function PurchasingClientLoaded({
       await invoicePurchaseOrderLine.mutateAsync(args)
     } else if (action === "createPartnerBank") {
       const bankParams = toCreatePartnerBankParams(formData)
-      if (bankParams) await createPartnerBank.mutateAsync(bankParams as Record<string, unknown>)
+      if (bankParams) await createPartnerBank.mutateAsync(bankParams)
     } else if (action === "updatePartnerBank") {
       const u = toUpdatePartnerBankParams(formData)
       if (u) await updatePartnerBank.mutateAsync(u)
     } else if (action === "createLandedCost") {
-      const pickingRaw = formData.pickingId
-      const currencyId = Number(formData.currencyId)
-      const amountTotal = Number(formData.amountTotal)
-      if (pickingRaw === "" || pickingRaw == null) return
-      if (!Number.isFinite(currencyId) || currencyId <= 0) return
-      if (!Number.isFinite(amountTotal) || amountTotal < 0) return
-      const dateRaw = formData.date
-      const date =
-        dateRaw != null && dateRaw !== ""
-          ? stbTimestampFromDate(new Date(String(dateRaw)))
-          : stbTimestampFromDate(new Date())
-      await createLandedCost.mutateAsync({
-        date,
-        targetMove: formData.targetMove ? String(formData.targetMove) : "receipt",
-        currencyId,
-        amountTotal,
-        pickingIds: [Number(pickingRaw)],
-        costLines: [],
-        valuationAdjustmentLines: [],
-        activityIds: [],
-        messageFollowerIds: [],
-        messageIds: [],
-        description: optionalFormString(formData.description),
-      })
+      const params = toCreateLandedCostParams(formData)
+      if (!params) return
+      await createLandedCost.mutateAsync(params)
     } else if (action === "updateLandedCost") {
       const landedCostId = formData.landedCostId
       if (landedCostId === "" || landedCostId == null) return
-      const params: Record<string, unknown> = {}
-      if (formData.targetMove != null && formData.targetMove !== "") {
-        params.targetMove = String(formData.targetMove)
-      }
-      const currencyId = Number(formData.currencyId)
-      if (Number.isFinite(currencyId) && currencyId > 0) params.currencyId = currencyId
-      const amountTotal = Number(formData.amountTotal)
-      if (Number.isFinite(amountTotal) && amountTotal >= 0) params.amountTotal = amountTotal
-      if (formData.date != null && formData.date !== "") {
-        params.date = stbTimestampFromDate(new Date(String(formData.date)))
-      }
-      const description = optionalFormString(formData.description)
-      if (description != null) params.description = description
-      if (Object.keys(params).length === 0) return
+      const params = toUpdateLandedCostParams(formData)
+      if (!params) return
       await updateLandedCost.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,
         params,
       })
     } else if (action === "addLandedCostLine") {
       const landedCostId = formData.landedCostId
-      const productId = formData.productId
-      const currencyId = Number(formData.currencyId)
-      const priceUnit = Number(formData.priceUnit)
-      const splitTag = String(formData.splitMethod ?? "Equal")
       if (landedCostId === "" || landedCostId == null) return
-      if (productId === "" || productId == null) return
-      if (!Number.isFinite(currencyId) || currencyId <= 0) return
-      if (!Number.isFinite(priceUnit) || priceUnit < 0) return
+      const params = toAddLandedCostLineParams(formData)
+      if (!params) return
       await addLandedCostLine.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,
-        params: {
-          productId: Number(productId),
-          priceUnit,
-          currencyId,
-          splitMethod: { tag: splitTag },
-        },
+        params,
       })
     } else if (action === "removeLandedCostLine") {
       const lineId = formData.lineId

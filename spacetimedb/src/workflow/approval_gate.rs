@@ -3,6 +3,7 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::messaging::{mail_message, MailMessage};
+use crate::helpers::{write_audit_log_v2, AuditLogParams};
 use crate::types::MailMessageType;
 
 use super::approvals::{approval_request, approval_rule, ApprovalRequest, ApprovalRule};
@@ -113,6 +114,33 @@ pub fn create_ai_draft_approval_request(
         ),
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "approval_request",
+            record_id: request.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "model": "ai_action_draft",
+                    "res_id": draft_id,
+                    "status": "pending",
+                    "elevated": elevated,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "model".to_string(),
+                "status".to_string(),
+                "ai_draft_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     notify_approval_event(
         ctx,
         &request,
@@ -211,7 +239,7 @@ fn insert_approval_request(
     params_json: &str,
     context_json: Option<String>,
 ) -> ApprovalRequest {
-    ctx.db.approval_request().insert(ApprovalRequest {
+    let request = ctx.db.approval_request().insert(ApprovalRequest {
         id: 0,
         organization_id,
         company_id,
@@ -241,7 +269,37 @@ fn insert_approval_request(
             })
             .to_string(),
         ),
-    })
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "approval_request",
+            record_id: request.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "model": model,
+                    "res_id": res_id,
+                    "action": action,
+                    "status": "pending",
+                    "rule_id": rule.id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "model".to_string(),
+                "action".to_string(),
+                "status".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    request
 }
 
 pub fn notify_approval_event(

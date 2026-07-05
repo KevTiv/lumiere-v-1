@@ -5,15 +5,18 @@ import { expectNoAppError, expectSeededText, gotoModule, openAccountingTab } fro
 /**
  * Smoke-level sales → invoice linkage checks.
  *
- * Assumes `make e2e-smoke` has run `seed_dev_data`, which seeds:
+ * Requires `seed_dev_data` (via `make e2e-smoke` / `pnpm run e2e-seed-fixture`) for the
+ * seeded SO/INV tests. The quick-action test does not depend on fixture rows.
+ *
+ * Seeded records:
  * - Sale order SO/2024/0001 (client ref ACME-2024-001, partner Acme Corporation)
  * - Customer invoice INV/2024/00001 linked via `invoice_origin` to SO/2024/0001
  *
  * Does not exercise full order-to-invoice creation; that path needs journals,
  * partners, and products beyond what a minimal smoke create can guarantee.
  */
-test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
-  test("seeded sale order is visible on Sales Orders tab", async ({ page }) => {
+test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
+  test("seeded sale order is visible on Sales Orders tab", { tag: "@dev-fixture" }, async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
 
@@ -22,7 +25,7 @@ test.describe("Sales and invoice flow e2e", { tag: "@p0" }, () => {
     await expectNoAppError(page)
   })
 
-  test("seeded customer invoice linked to sale order appears in Accounting Invoices", async ({ page }) => {
+  test("seeded customer invoice linked to sale order appears in Accounting Invoices", { tag: "@dev-fixture" }, async ({ page }) => {
     test.setTimeout(120_000)
 
     await gotoModule(page, "/accounting", "accounting")

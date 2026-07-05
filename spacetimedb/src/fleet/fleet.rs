@@ -8,7 +8,7 @@
 /// | **WarehouseGeo** | Lat/lng enrichment for warehouse records |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // ENUMS
@@ -172,7 +172,7 @@ pub fn create_fleet_vehicle(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "fleet_vehicle", "create")?;
 
-    ctx.db.fleet_vehicle().insert(FleetVehicle {
+    let row = ctx.db.fleet_vehicle().insert(FleetVehicle {
         id: 0,
         organization_id,
         name,
@@ -193,6 +193,17 @@ pub fn create_fleet_vehicle(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
+        metadata: None,
+    });
+
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "fleet_vehicle",
+        record_id: row.id,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "name": row.name, "vehicle_type": row.vehicle_type }).to_string()),
+        changed_fields: vec!["name".to_string(), "vehicle_type".to_string()],
         metadata: None,
     });
 
@@ -233,6 +244,17 @@ pub fn update_vehicle_position(
         ..vehicle
     });
 
+    write_audit_log_v2(ctx, vehicle.organization_id, AuditLogParams {
+        company_id: vehicle.company_id,
+        table_name: "fleet_vehicle",
+        record_id: vehicle_id,
+        action: "UPDATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "latitude": latitude, "longitude": longitude, "status": status }).to_string()),
+        changed_fields: vec!["latitude".to_string(), "longitude".to_string(), "status".to_string()],
+        metadata: None,
+    });
+
     Ok(())
 }
 
@@ -248,7 +270,7 @@ pub fn create_pos_terminal(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "pos_terminal", "create")?;
 
-    ctx.db.pos_terminal().insert(PosTerminal {
+    let row = ctx.db.pos_terminal().insert(PosTerminal {
         id: 0,
         organization_id,
         name,
@@ -267,10 +289,19 @@ pub fn create_pos_terminal(
         metadata: None,
     });
 
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: None,
+        table_name: "pos_terminal",
+        record_id: row.id,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "name": row.name }).to_string()),
+        changed_fields: vec!["name".to_string()],
+        metadata: None,
+    });
+
     Ok(())
 }
-
-/// Update POS terminal status and daily stats
 #[reducer]
 pub fn update_pos_terminal(
     ctx: &ReducerContext,
@@ -299,10 +330,19 @@ pub fn update_pos_terminal(
         ..terminal
     });
 
+    write_audit_log_v2(ctx, terminal.organization_id, AuditLogParams {
+        company_id: terminal.company_id,
+        table_name: "pos_terminal",
+        record_id: terminal_id,
+        action: "UPDATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({ "status": status, "daily_revenue": daily_revenue }).to_string()),
+        changed_fields: vec!["status".to_string(), "daily_revenue".to_string()],
+        metadata: None,
+    });
+
     Ok(())
 }
-
-/// Upsert geo coordinates for a warehouse
 #[reducer]
 pub fn upsert_warehouse_geo(
     ctx: &ReducerContext,
@@ -337,8 +377,18 @@ pub fn upsert_warehouse_geo(
             write_date: ctx.timestamp,
             ..geo
         });
+        write_audit_log_v2(ctx, organization_id, AuditLogParams {
+            company_id: None,
+            table_name: "warehouse_geo",
+            record_id: geo.id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "warehouse_id": warehouse_id, "latitude": latitude, "longitude": longitude }).to_string()),
+            changed_fields: vec!["latitude".to_string(), "longitude".to_string()],
+            metadata: None,
+        });
     } else {
-        ctx.db.warehouse_geo().insert(WarehouseGeo {
+        let row = ctx.db.warehouse_geo().insert(WarehouseGeo {
             id: 0,
             organization_id,
             warehouse_id,
@@ -352,6 +402,16 @@ pub fn upsert_warehouse_geo(
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
+        });
+        write_audit_log_v2(ctx, organization_id, AuditLogParams {
+            company_id: None,
+            table_name: "warehouse_geo",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "warehouse_id": warehouse_id }).to_string()),
+            changed_fields: vec!["warehouse_id".to_string()],
+            metadata: None,
         });
     }
 

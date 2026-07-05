@@ -411,25 +411,125 @@ export const salesFulfillmentTableConfig = (t: TFunction): EntityViewConfig => {
       ...view,
       searchPlaceholder: t("sales.fulfillment.searchPlaceholder"),
       emptyMessage: t("sales.fulfillment.emptyMessage"),
+      columns: [
+        ...(view.columns ?? []),
+        {
+          key: "backorderId",
+          label: t("sales.fulfillment.columns.backorder"),
+          width: "min-w-24",
+        },
+      ],
     },
   }
 }
 
 export const salesReturnsTableConfig = (t: TFunction): EntityViewConfig => {
-  const base = transfersTableConfig(t)
-  const view = base.view as EntityTableConfig
+  const returnStateBadges = {
+    badgeVariants: {
+      draft: "secondary",
+      confirmed: "outline",
+      received: "default",
+      refunded: "default",
+      cancelled: "destructive",
+    },
+    badgeLabels: {
+      draft: t("sales.returnOrders.states.draft"),
+      confirmed: t("sales.returnOrders.states.confirmed"),
+      received: t("sales.returnOrders.states.received"),
+      refunded: t("sales.returnOrders.states.refunded"),
+      cancelled: t("sales.returnOrders.states.cancelled"),
+    },
+  } as const
+
   return {
-    ...base,
     id: "sales-returns-table",
-    title: t("sales.returns.title"),
-    description: t("sales.returns.description"),
+    entityType: "return_order",
+    title: t("sales.returnOrders.title"),
+    description: t("sales.returnOrders.description"),
     view: {
-      ...view,
-      searchPlaceholder: t("sales.returns.searchPlaceholder"),
-      emptyMessage: t("sales.returns.emptyMessage"),
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchPlaceholder: t("sales.returnOrders.searchPlaceholder"),
+      searchKeys: ["name", "state", "returnReason", "return_reason"],
+      emptyMessage: t("sales.returnOrders.emptyMessage"),
+      columns: [
+        { key: "name", label: t("sales.returnOrders.columns.name"), width: "min-w-32" },
+        {
+          key: "state",
+          label: t("sales.returnOrders.columns.state"),
+          type: "badge",
+          width: "min-w-24",
+          ...returnStateBadges,
+        },
+        {
+          key: "partnerId",
+          label: t("sales.returnOrders.columns.partnerId"),
+          width: "min-w-24",
+        },
+        {
+          key: "saleOrderId",
+          label: t("sales.returnOrders.columns.saleOrderId"),
+          width: "min-w-24",
+        },
+        {
+          key: "pickingId",
+          label: t("sales.returnOrders.columns.pickingId"),
+          width: "min-w-24",
+        },
+        {
+          key: "creditMoveId",
+          label: t("sales.returnOrders.columns.creditMoveId"),
+          width: "min-w-24",
+        },
+        {
+          key: "returnReason",
+          label: t("sales.returnOrders.columns.returnReason"),
+          width: "min-w-40",
+        },
+      ],
     },
   }
 }
+
+export const returnOrderLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "return-order-lines-table",
+  entityType: "return_order_line",
+  title: t("sales.returnOrderLines.title"),
+  description: t("sales.returnOrderLines.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: false,
+    emptyMessage: t("sales.returnOrderLines.emptyMessage"),
+    columns: [
+      { key: "productId", label: t("sales.returnOrderLines.columns.productId"), width: "min-w-24" },
+      {
+        key: "productUomQty",
+        label: t("sales.returnOrderLines.columns.quantity"),
+        type: "number",
+        width: "min-w-20",
+      },
+      {
+        key: "priceUnit",
+        label: t("sales.returnOrderLines.columns.priceUnit"),
+        type: "currency",
+        width: "min-w-24",
+      },
+      {
+        key: "toRefund",
+        label: t("sales.returnOrderLines.columns.toRefund"),
+        type: "boolean",
+        width: "min-w-20",
+      },
+      {
+        key: "saleOrderLineId",
+        label: t("sales.returnOrderLines.columns.saleOrderLineId"),
+        width: "min-w-24",
+      },
+    ],
+  },
+})
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
@@ -440,6 +540,7 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
   "deliveries-table": deliveriesTableConfig(t),
   "sales-fulfillment-table": salesFulfillmentTableConfig(t),
   "sales-returns-table": salesReturnsTableConfig(t),
+  "return-order-lines-table": returnOrderLinesTableConfig(t),
   "delivery-price-rules-table": deliveryPriceRulesTableConfig(t),
   "delivery-carriers-table": deliveryCarriersTableConfig(t),
   "shipping-methods-table": shippingMethodsTableConfig(t),

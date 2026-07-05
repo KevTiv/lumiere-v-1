@@ -1,11 +1,12 @@
 "use client"
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
+import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
+import type { UpdateCalendarEventParams } from "@lumiere/query-hooks/hooks/calendar"
 import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
-import type { CreateCalendarEventParams, UpdateCalendarEventParams } from "@lumiere/query-hooks/hooks/calendar"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOrganization } from "@lumiere/ui"
 import { useEffect, useMemo, useState } from "react"
@@ -202,25 +203,9 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       return
     }
     if (action === "createEvent") {
-      const title = String(formData.name ?? "").trim()
-      if (!title) return
-      const start = new Date(String(formData.start ?? ""))
-      const stop = new Date(String(formData.stop ?? ""))
-      if (Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return
-      createCalendarEvent.mutate({
-        name: title,
-        start: start as unknown as CreateCalendarEventParams["start"],
-        stop: stop as unknown as CreateCalendarEventParams["stop"],
-        allday: Boolean(formData.allday),
-        privacy: (formData.privacy as string) ?? "public",
-        showAs: "busy",
-        state: "confirmed",
-        recurrency: false,
-        partnerIds: [],
-        alarmIds: [],
-        location: formData.location as string | undefined,
-        description: formData.description as string | undefined,
-      } as unknown as CreateCalendarEventParams)
+      const params = toCreateCalendarEventParams(formData)
+      if (!params) return
+      createCalendarEvent.mutate(params)
     } else if (action === "editEvent" && quickActionForm?.eventId) {
       const title = String(formData.name ?? "").trim()
       if (!title) return

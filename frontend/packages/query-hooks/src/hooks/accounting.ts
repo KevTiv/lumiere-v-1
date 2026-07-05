@@ -342,6 +342,17 @@ export function usePostInvoice(organizationId: number) {
 }
 
 /**
+ * Create a draft credit note (OutRefund) from a posted customer invoice.
+ */
+export function useCreateCreditNoteFromInvoice(organizationId: number) {
+  return useAccountingCallMutation(
+    "create_credit_note_from_invoice",
+    organizationId,
+    ["account-moves", "account-move-lines"],
+  )
+}
+
+/**
  * Cancel an account move.
  */
 export function useCancelAccountMove(organizationId: number) {
@@ -403,7 +414,10 @@ export function useCreateCrossoveredBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_crossovered_budget", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_crossovered_budget", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateCrossoveredBudgetParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -415,7 +429,10 @@ export function useCreateAccountAccountType(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_account_account_type", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_account_account_type", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAccountAccountTypeParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -443,7 +460,10 @@ export function useCreateAccountGroup(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_account_group", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_account_group", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAccountGroupParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -579,7 +599,10 @@ export function useCreateBudgetPost(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_budget_post", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_budget_post", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateBudgetPostParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -717,7 +740,11 @@ export function useCreateFiscalYear(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_fiscal_year", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_fiscal_year", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreateFiscalYearParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -803,7 +830,11 @@ export function useCreateAccountPeriod(organizationId: number, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_account_period", [organizationId, companyId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_account_period", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreateAccountPeriodParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -868,7 +899,10 @@ export function useCreateAnalyticAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_analytic_account", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_analytic_account", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAnalyticAccountParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -904,7 +938,10 @@ export function useCreateAnalyticLine(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_analytic_line", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_analytic_line", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAnalyticLineParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -940,7 +977,10 @@ export function useCreateAnalyticDistributionModel(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_analytic_distribution_model", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_analytic_distribution_model", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAnalyticDistributionModelParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1699,7 +1739,10 @@ export function useCreatePaymentTerm(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_payment_term", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_payment_term", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreatePaymentTermParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1752,7 +1795,10 @@ export function useCreatePaymentTermLine(organizationId: number) {
   const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = accountingBffPost("create_payment_term_line", [organizationId, stdbParamsToJson(params as object)])
+      const { urlPath, init } = accountingBffPost("create_payment_term_line", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreatePaymentTermLineParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

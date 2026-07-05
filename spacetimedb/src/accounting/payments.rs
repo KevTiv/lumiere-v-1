@@ -4,6 +4,7 @@
 /// A payment is a cash/bank movement that settles one or more invoices or bills.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{account_move, AccountMove};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType};
@@ -175,6 +176,8 @@ pub fn post_payment_impl(
             ));
         }
     }
+
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, payment.date)?;
 
     // Generate document number
     let name = next_doc_number(ctx, "PAY");

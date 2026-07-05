@@ -57,6 +57,7 @@ interface InvoiceDetailModalProps {
   open: boolean
   onClose: () => void
   onPostDraft?: () => void
+  onCreateCreditNote?: () => void
   onRecordPayment?: () => void
   onRecalculateTotals?: () => void
   onDownloadPdf?: () => void
@@ -73,6 +74,7 @@ export function InvoiceDetailModal({
   open,
   onClose,
   onPostDraft,
+  onCreateCreditNote,
   onRecordPayment,
   onRecalculateTotals,
   onDownloadPdf,
@@ -115,6 +117,12 @@ export function InvoiceDetailModal({
   const stateStr = moveStateStr(invoice.state)
   const isDraft = stateStr === "Draft"
   const isPosted = stateStr === "Posted"
+  const moveType =
+    invoice.moveType != null && typeof invoice.moveType === "object" && "tag" in invoice.moveType
+      ? String((invoice.moveType as { tag: string }).tag)
+      : String(invoice.moveType ?? "")
+  const canCreateCreditNote =
+    Boolean(onCreateCreditNote) && isPosted && moveType === "OutInvoice"
   const canRecordPayment =
     Boolean(onRecordPayment) && isPosted && invoice.amountResidual > 0
 
@@ -189,6 +197,18 @@ export function InvoiceDetailModal({
                 onClick={() => onPostDraft()}
               >
                 {t("accounting.invoices.invoiceActions.postDraft")}
+              </Button>
+            )}
+            {canCreateCreditNote && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                data-testid="invoice-detail-create-credit-note"
+                onClick={() => onCreateCreditNote?.()}
+              >
+                {t("accounting.invoices.invoiceActions.createCreditNote")}
               </Button>
             )}
           </div>

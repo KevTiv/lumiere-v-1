@@ -9,7 +9,9 @@ required_tools:
 optional_tools: []
 default_max_steps: 4
 default_max_tool_calls: 8
-allowed_action_drafts: []
+allowed_action_drafts:
+  - create_task
+  - acknowledge_insight
 ---
 
 You are an ERP insights analyst. Review detector output and semantic search hits.

@@ -179,3 +179,12 @@ export interface EntityViewConfig {
   description?: string
   view: EntityTableConfig | EntityDetailConfig | EntityBoardConfig | EntityTableBoardViewConfig
 }
+
+/** Extract the table portion of an entity view for list runtime config merging. */
+export function entityTableConfigFromView(
+  view: EntityViewConfig["view"],
+): EntityTableConfig {
+  if (view.mode === "table") return view
+  if (view.mode === "table-or-board") return view.table
+  throw new Error(`Expected table or table-or-board view, got ${view.mode}`)
+}

@@ -8,7 +8,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::organization;
 use crate::core::permissions::{role, Role};
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -157,6 +157,23 @@ pub struct UserSession {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
+fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> u64 {
+    ctx.db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .find(|uo| uo.is_active && uo.is_default)
+        .or_else(|| {
+            ctx.db
+                .user_organization()
+                .user_org_by_user()
+                .filter(&identity)
+                .find(|uo| uo.is_active)
+        })
+        .map(|uo| uo.organization_id)
+        .unwrap_or(0)
+}
+
 /// Update the calling user's own profile fields.
 /// Clients cannot change `is_active` or `is_superuser` through this reducer.
 #[spacetimedb::reducer]
@@ -171,15 +188,21 @@ pub fn update_user_profile(
         .find(ctx.sender())
         .ok_or("User profile not found")?;
 
+    let updated_name = params.name.unwrap_or(profile.name.clone());
+    let updated_first_name = params.first_name.or(profile.first_name.clone());
+    let updated_last_name = params.last_name.or(profile.last_name.clone());
+    let updated_timezone = params.timezone.unwrap_or(profile.timezone.clone());
+    let updated_language = params.language.unwrap_or(profile.language.clone());
+
     ctx.db.user_profile().identity().update(UserProfile {
-        name: params.name.unwrap_or(profile.name),
-        first_name: params.first_name.or(profile.first_name),
-        last_name: params.last_name.or(profile.last_name),
+        name: updated_name.clone(),
+        first_name: updated_first_name.clone(),
+        last_name: updated_last_name.clone(),
         avatar_url: params.avatar_url.or(profile.avatar_url),
         phone: params.phone.or(profile.phone),
         mobile: params.mobile.or(profile.mobile),
-        timezone: params.timezone.unwrap_or(profile.timezone),
-        language: params.language.unwrap_or(profile.language),
+        timezone: updated_timezone.clone(),
+        language: updated_language.clone(),
         signature: params.signature.or(profile.signature),
         notification_preferences: params
             .notification_preferences
@@ -188,6 +211,47 @@ pub fn update_user_profile(
         updated_at: ctx.timestamp,
         ..profile
     });
+
+    let organization_id = audit_organization_for_identity(ctx, ctx.sender());
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_profile",
+            record_id: 0,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "name": profile.name,
+                    "timezone": profile.timezone,
+                    "language": profile.language,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "name": updated_name,
+                    "timezone": updated_timezone,
+                    "language": updated_language,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "first_name".to_string(),
+                "last_name".to_string(),
+                "timezone".to_string(),
+                "language".to_string(),
+            ],
+            metadata: Some(
+                serde_json::json!({
+                    "identity": ctx.sender().to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+        },
+    );
 
     Ok(())
 }
@@ -228,7 +292,7 @@ pub fn add_user_to_organization(
         return Err("User is already an active member of this organization".to_string());
     }
 
-    ctx.db.user_organization().insert(UserOrganization {
+    let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
         user_identity,
         organization_id,
@@ -242,6 +306,33 @@ pub fn add_user_to_organization(
         is_default: params.is_default,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: params.company_id,
+            table_name: "user_organization",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": user_identity.to_hex().to_string(),
+                    "role_id": params.role_id,
+                    "is_active": params.is_active,
+                    "is_default": params.is_default,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "user_identity".to_string(),
+                "role_id".to_string(),
+                "is_active".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -287,7 +378,7 @@ pub fn add_org_member(
         return Err("User is already an active member of this organization".to_string());
     }
 
-    ctx.db.user_organization().insert(UserOrganization {
+    let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
         user_identity,
         organization_id,
@@ -301,6 +392,34 @@ pub fn add_org_member(
         is_default: params.is_default,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: params.company_id,
+            table_name: "user_organization",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": user_identity.to_hex().to_string(),
+                    "role_id": selected_role.id,
+                    "role_name": selected_role.name,
+                    "is_active": params.is_active,
+                    "is_default": params.is_default,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "user_identity".to_string(),
+                "role_id".to_string(),
+                "is_active".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -347,6 +466,29 @@ pub fn update_org_member_role(
         ..membership
     });
 
+    write_audit_log_v2(
+        ctx,
+        membership.organization_id,
+        AuditLogParams {
+            company_id: membership.company_id,
+            table_name: "user_organization",
+            record_id: user_org_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "role_id": membership.role_id }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "role_id": selected_role.id,
+                    "role_name": selected_role.name,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["role_id".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -370,12 +512,49 @@ pub fn update_org_member_details(
         "write",
     )?;
 
+    let updated_department_id = params.department_id.or(membership.department_id);
+    let updated_job_title = params.job_title.or(membership.job_title.clone());
+    let updated_employee_id = params.employee_id.or(membership.employee_id.clone());
+
     ctx.db.user_organization().id().update(UserOrganization {
-        department_id: params.department_id.or(membership.department_id),
-        job_title: params.job_title.or(membership.job_title),
-        employee_id: params.employee_id.or(membership.employee_id),
+        department_id: updated_department_id,
+        job_title: updated_job_title.clone(),
+        employee_id: updated_employee_id.clone(),
         ..membership
     });
+
+    write_audit_log_v2(
+        ctx,
+        membership.organization_id,
+        AuditLogParams {
+            company_id: membership.company_id,
+            table_name: "user_organization",
+            record_id: user_org_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "department_id": membership.department_id,
+                    "job_title": membership.job_title,
+                    "employee_id": membership.employee_id,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "department_id": updated_department_id,
+                    "job_title": updated_job_title,
+                    "employee_id": updated_employee_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "department_id".to_string(),
+                "job_title".to_string(),
+                "employee_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -407,6 +586,29 @@ pub fn update_user_organization_status(
         ..membership
     });
 
+    write_audit_log_v2(
+        ctx,
+        membership.organization_id,
+        AuditLogParams {
+            company_id: membership.company_id,
+            table_name: "user_organization",
+            record_id: user_org_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "is_active": membership.is_active,
+                    "is_default": membership.is_default,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "is_active": is_active, "is_default": is_default }).to_string(),
+            ),
+            changed_fields: vec!["is_active".to_string(), "is_default".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -435,6 +637,26 @@ pub fn remove_user_from_organization(
         ..membership
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: membership.company_id,
+            table_name: "user_organization",
+            record_id: membership.id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "user_identity": user_identity.to_hex().to_string(),
+                })
+                .to_string(),
+            ),
+        },
+    );
+
     Ok(())
 }
 
@@ -458,7 +680,7 @@ pub fn create_user_session(
 
     let expires_at = Timestamp::from_micros_since_unix_epoch(params.expires_at_micros as i64);
 
-    ctx.db.user_session().insert(UserSession {
+    let row = ctx.db.user_session().insert(UserSession {
         id: 0,
         user_identity: ctx.sender(),
         organization_id,
@@ -473,6 +695,27 @@ pub fn create_user_session(
         is_active: true,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_session",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": ctx.sender().to_hex().to_string(),
+                    "expires_at_micros": params.expires_at_micros,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["user_identity".to_string(), "expires_at".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -495,6 +738,21 @@ pub fn end_user_session(ctx: &ReducerContext, session_id: u64) -> Result<(), Str
         is_active: false,
         ..session
     });
+
+    write_audit_log_v2(
+        ctx,
+        session.organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_session",
+            record_id: session_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

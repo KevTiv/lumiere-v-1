@@ -4,8 +4,12 @@
 
 import type {
   AddAccountMoveLineParams,
+  AddLandedCostLineParams,
   CreateBillFromPurchaseOrderParams,
+  CreateLandedCostParams,
   CreatePurchaseOrderParams,
+  CreatePurchaseRequisitionParams,
+  UpdateLandedCostParams,
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
@@ -38,6 +42,13 @@ function timestampFromFormDate(v: unknown, fallback: Date): Timestamp {
   if (v == null || String(v).trim() === "") return stbTimestampFromDate(fallback)
   const d = new Date(String(v))
   if (Number.isNaN(d.getTime())) return stbTimestampFromDate(fallback)
+  return stbTimestampFromDate(d)
+}
+
+function optionalTimestampFromForm(v: unknown): Timestamp | undefined {
+  if (v == null || String(v).trim() === "") return undefined
+  const d = new Date(String(v))
+  if (Number.isNaN(d.getTime())) return undefined
   return stbTimestampFromDate(d)
 }
 
@@ -166,6 +177,30 @@ export function toCreatePurchaseOrderParams(
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
+
+export function toCreatePurchaseRequisitionParams(
+  formData: Record<string, unknown>,
+): CreatePurchaseRequisitionParams {
+  return {
+    companyId: undefined,
+    origin: optionalTrimmedString(formData.origin),
+    description: optionalTrimmedString(formData.description),
+    orderingDate: optionalTimestampFromForm(formData.orderingDate),
+    dateEnd: optionalTimestampFromForm(formData.dateEnd),
+    scheduleDate: optionalTimestampFromForm(formData.scheduleDate),
+    departmentId: optionalBigIntU64(formData.departmentId),
+    exclusive: undefined,
+    multipleProduct: false,
+    lineIds: [],
+    purchaseIds: [],
+    vendorId: optionalBigIntU64(formData.vendorId),
+    activityIds: [],
+    messageFollowerIds: [],
+    messageIds: [],
+    metadata: undefined,
+  }
+}
+
 export function toAddPurchaseOrderLineParams(
   formData: Record<string, unknown>,
 ): Record<string, unknown> | null {
@@ -236,5 +271,72 @@ export function toUpdatePurchaseOrderLineParams(
     taxIds: [] as number[],
     productId: productIdValue,
     uomId: uomIdValue,
+  }
+}
+
+export function toCreateLandedCostParams(
+  formData: Record<string, unknown>,
+): CreateLandedCostParams | null {
+  const pickingRaw = formData.pickingId
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  const amountTotal = Number(formData.amountTotal)
+  if (pickingRaw == null || pickingRaw === "" || currencyId == null) return null
+  if (!Number.isFinite(amountTotal) || amountTotal < 0) return null
+
+  return {
+    date: timestampFromFormDate(formData.date, new Date()),
+    targetMove: formData.targetMove ? String(formData.targetMove) : "receipt",
+    currencyId,
+    amountTotal,
+    pickingIds: [BigInt(Number(pickingRaw))],
+    costLines: [],
+    valuationAdjustmentLines: [],
+    accountMoveId: undefined,
+    accountJournalId: undefined,
+    vendorBillId: undefined,
+    description: optionalTrimmedString(formData.description),
+    activityIds: [],
+    messageFollowerIds: [],
+    messageIds: [],
+    metadata: undefined,
+  }
+}
+
+export function toUpdateLandedCostParams(
+  formData: Record<string, unknown>,
+): UpdateLandedCostParams | null {
+  const params: Partial<UpdateLandedCostParams> = {}
+  if (formData.targetMove != null && formData.targetMove !== "") {
+    params.targetMove = String(formData.targetMove)
+  }
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  if (currencyId != null) params.currencyId = currencyId
+  const amountTotal = Number(formData.amountTotal)
+  if (Number.isFinite(amountTotal) && amountTotal >= 0) params.amountTotal = amountTotal
+  if (formData.date != null && formData.date !== "") {
+    params.date = timestampFromFormDate(formData.date, new Date())
+  }
+  const description = optionalTrimmedString(formData.description)
+  if (description != null) params.description = description
+  if (Object.keys(params).length === 0) return null
+  return params as UpdateLandedCostParams
+}
+
+export function toAddLandedCostLineParams(
+  formData: Record<string, unknown>,
+): AddLandedCostLineParams | null {
+  const productId = requiredBigIntU64(formData.productId)
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  const priceUnit = Number(formData.priceUnit)
+  const splitTag = String(formData.splitMethod ?? "Equal")
+  if (productId == null || currencyId == null) return null
+  if (!Number.isFinite(priceUnit) || priceUnit < 0) return null
+
+  return {
+    productId,
+    priceUnit,
+    currencyId,
+    splitMethod: { tag: splitTag } as AddLandedCostLineParams["splitMethod"],
+    metadata: undefined,
   }
 }

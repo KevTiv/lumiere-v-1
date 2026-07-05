@@ -36,7 +36,7 @@ export function useCreateCalendarEvent(organizationId: bigint) {
     mutationFn: async (params) => {
       const { urlPath, init } = calendarBffPost("create_calendar_event", [
         organizationId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "CreateCalendarEventParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create calendar event')

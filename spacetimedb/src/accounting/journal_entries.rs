@@ -19,7 +19,10 @@ use crate::helpers::{
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
 use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
-use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
+use crate::purchasing::purchase_orders::{
+    purchase_order, purchase_order_line, validate_three_way_match_po_lines,
+    DEFAULT_QTY_MATCH_TOLERANCE,
+};
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{
     AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
@@ -274,6 +277,15 @@ pub struct CreateInvoiceFromSaleOrderParams {
     pub income_line: AddAccountMoveLineParams,
     /// User-entered invoice narration; falls back to the sale order's `note` when omitted.
     pub metadata: Option<String>,
+}
+
+/// Parameters for creating a customer credit note (OutRefund) from a posted invoice.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateCreditNoteParams {
+    /// Invoice line ids to credit; empty means full reversal of all lines on the invoice.
+    pub line_ids: Vec<u64>,
+    /// Optional correction reason stored on the credit note metadata.
+    pub reason: Option<String>,
 }
 
 /// Parameters for creating a vendor bill from a confirmed purchase order.
@@ -800,6 +812,62 @@ fn mark_move_lines_posted(
     Ok(())
 }
 
+/// Enforce PO three-way match before posting a vendor bill linked via `invoice_origin` (e.g. `PO123`).
+fn validate_in_invoice_three_way_match(
+    ctx: &ReducerContext,
+    move_record: &AccountMove,
+    move_id: u64,
+) -> Result<(), String> {
+    let Some(origin) = move_record.invoice_origin.as_ref() else {
+        return Ok(());
+    };
+    let Some(po_id_str) = origin.strip_prefix("PO") else {
+        return Ok(());
+    };
+    let Ok(po_id) = po_id_str.parse::<u64>() else {
+        return Ok(());
+    };
+
+    let po_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&po_id)
+        .collect();
+
+    if po_lines.is_empty() {
+        return Ok(());
+    }
+
+    let tolerance = DEFAULT_QTY_MATCH_TOLERANCE;
+    validate_three_way_match_po_lines(&po_lines, tolerance)?;
+
+    for ml in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+    {
+        if ml.debit <= 0.0 {
+            continue;
+        }
+        let Some(product_id) = ml.product_id else {
+            continue;
+        };
+        let Some(po_line) = po_lines.iter().find(|l| l.product_id == product_id) else {
+            continue;
+        };
+        if ml.quantity > po_line.qty_received + tolerance {
+            return Err(format!(
+                "three-way match failed: line {} billed {:.4} exceeds received {:.4}",
+                po_line.id, ml.quantity, po_line.qty_received
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn post_invoice(
     ctx: &ReducerContext,
@@ -824,6 +892,10 @@ pub fn post_invoice(
     match move_record.move_type {
         MoveType::OutInvoice | MoveType::InInvoice | MoveType::OutRefund | MoveType::InRefund => {}
         _ => return Err("post_invoice is only valid for invoice/refund moves".to_string()),
+    }
+
+    if move_record.move_type == MoveType::InInvoice {
+        validate_in_invoice_three_way_match(ctx, &move_record, move_id)?;
     }
 
     compute_invoice_totals_internal(ctx, move_id)?;
@@ -1011,7 +1083,7 @@ pub fn create_account_move(
 }
 
 /// Insert a line on a draft move using caller-supplied [`AddAccountMoveLineParams`].
-fn insert_draft_account_move_line(
+pub(crate) fn insert_draft_account_move_line(
     ctx: &ReducerContext,
     move_record: &AccountMove,
     params: AddAccountMoveLineParams,
@@ -2152,6 +2224,310 @@ pub fn create_bill_from_purchase_order(
         "Created bill {} for purchase order {}",
         move_record.id,
         purchase_order_id
+    );
+    Ok(())
+}
+
+fn inverted_move_line_params(line: &AccountMoveLine, sequence: u32) -> AddAccountMoveLineParams {
+    AddAccountMoveLineParams {
+        account_id: line.account_id,
+        name: if line.name.starts_with("Credit: ") {
+            line.name.clone()
+        } else {
+            format!("Credit: {}", line.name)
+        },
+        debit: line.credit,
+        credit: line.debit,
+        sequence,
+        quantity: line.quantity,
+        price_unit: line.price_unit,
+        discount: line.discount,
+        tax_ids: line.tax_ids.clone(),
+        partner_id: line.partner_id,
+        product_id: line.product_id,
+        product_uom_id: line.product_uom_id,
+        product_category_id: line.product_category_id,
+        analytic_account_id: line.analytic_account_id,
+        analytic_tag_ids: line.analytic_tag_ids.clone(),
+        display_type: line.display_type.clone(),
+        is_downpayment: line.is_downpayment,
+        exclude_from_invoice_tab: line.exclude_from_invoice_tab,
+        blocked: line.blocked,
+        group_tax_id: line.group_tax_id,
+        tax_line_id: line.tax_line_id,
+        tax_group_id: line.tax_group_id,
+        tax_repartition_line_id: line.tax_repartition_line_id,
+        tax_audit: line.tax_audit.clone(),
+        reconcile_model_id: line.reconcile_model_id,
+        payment_id: line.payment_id,
+        statement_line_id: line.statement_line_id,
+        matching_number: line.matching_number.clone(),
+        matching_label: line.matching_label.clone(),
+        expected_pay_date: line.expected_pay_date,
+        expected_pay_date_currency_id: line.expected_pay_date_currency_id,
+        expected_pay_date_amount: line.expected_pay_date_amount,
+        expected_pay_date_residual: line.expected_pay_date_residual,
+        metadata: line.metadata.clone(),
+    }
+}
+
+/// Create a draft customer credit note (OutRefund) reversing a posted customer invoice.
+#[spacetimedb::reducer]
+pub fn create_credit_note_from_invoice(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    invoice_id: u64,
+    params: CreateCreditNoteParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let source = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("Invoice not found")?;
+
+    if source.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    if source.move_type != MoveType::OutInvoice {
+        return Err("Credit notes can only be created from customer invoices".to_string());
+    }
+
+    if source.state != AccountMoveState::Posted {
+        return Err("Invoice must be posted before creating a credit note".to_string());
+    }
+
+    let all_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_id)
+        .collect();
+
+    if all_lines.is_empty() {
+        return Err("Invoice has no lines".to_string());
+    }
+
+    let metadata = Some(
+        serde_json::json!({
+            "reversed_entry_id": invoice_id,
+            "reason": params.reason,
+        })
+        .to_string(),
+    );
+
+    let credit_note = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: String::new(),
+        ref_: source.ref_.clone(),
+        move_type: MoveType::OutRefund,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_date: source.invoice_date,
+        invoice_date_due: source.invoice_date_due,
+        invoice_payment_term_id: source.invoice_payment_term_id,
+        invoice_origin: Some(format!("Reversal of {}", source.name)),
+        invoice_partner_display_name: source.invoice_partner_display_name.clone(),
+        invoice_cash_rounding_id: source.invoice_cash_rounding_id,
+        payment_reference: source.payment_reference.clone(),
+        partner_shipping_id: source.partner_shipping_id,
+        sale_order_id: source.sale_order_id,
+        partner_id: source.partner_id,
+        commercial_partner_id: source.commercial_partner_id,
+        partner_bank_id: source.partner_bank_id,
+        fiscal_position_id: source.fiscal_position_id,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: source.invoice_incoterm_id,
+        incoterm_location: source.incoterm_location.clone(),
+        campaign_id: source.campaign_id,
+        source_id: source.source_id,
+        medium_id: source.medium_id,
+        company_id: source.company_id,
+        journal_id: source.journal_id,
+        currency_id: source.currency_id,
+        company_currency_id: source.company_currency_id,
+        amount_untaxed: 0.0,
+        amount_tax: 0.0,
+        amount_total: 0.0,
+        amount_residual: 0.0,
+        amount_untaxed_signed: 0.0,
+        amount_tax_signed: 0.0,
+        amount_total_signed: 0.0,
+        amount_total_in_currency_signed: 0.0,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: source.restrict_mode_hash_table,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: metadata.clone(),
+    });
+
+    let full_reversal = params.line_ids.is_empty();
+    let mut amount_untaxed = 0.0f64;
+    let mut amount_tax = 0.0f64;
+    let amount_total;
+    let mut sequence = 0u32;
+
+    if full_reversal {
+        for line in &all_lines {
+            insert_draft_account_move_line(
+                ctx,
+                &credit_note,
+                inverted_move_line_params(line, sequence),
+            )?;
+            sequence += 1;
+        }
+        amount_untaxed = source.amount_untaxed;
+        amount_tax = source.amount_tax;
+        amount_total = source.amount_total;
+    } else {
+        let selected: Vec<_> = all_lines
+            .iter()
+            .filter(|line| params.line_ids.contains(&line.id))
+            .collect();
+
+        if selected.is_empty() {
+            return Err("No matching invoice lines found for credit note".to_string());
+        }
+
+        let mut receivable_credit = 0.0f64;
+        for line in selected {
+            let line_amount = line.debit.max(line.credit).max(line.price_subtotal.abs());
+            receivable_credit += line_amount;
+            if line.product_id.is_some() && line.display_type.is_none() {
+                amount_untaxed += line.price_subtotal.abs();
+            }
+            insert_draft_account_move_line(
+                ctx,
+                &credit_note,
+                inverted_move_line_params(line, sequence),
+            )?;
+            sequence += 1;
+        }
+
+        let receivable_source = all_lines
+            .iter()
+            .find(|line| line.product_id.is_none() && line.debit > line.credit)
+            .or_else(|| all_lines.iter().find(|line| line.debit > line.credit));
+
+        let receivable_account_id = receivable_source
+            .map(|line| line.account_id)
+            .ok_or("Could not resolve receivable account on source invoice")?;
+
+        let receivable_partner = receivable_source
+            .and_then(|line| line.partner_id)
+            .or(source.partner_id);
+
+        insert_draft_account_move_line(
+            ctx,
+            &credit_note,
+            AddAccountMoveLineParams {
+                account_id: receivable_account_id,
+                name: format!(
+                    "Credit: {}",
+                    source
+                        .invoice_partner_display_name
+                        .clone()
+                        .unwrap_or_else(|| "Accounts Receivable".to_string())
+                ),
+                debit: 0.0,
+                credit: receivable_credit,
+                sequence,
+                quantity: 1.0,
+                price_unit: receivable_credit,
+                discount: 0.0,
+                tax_ids: Vec::new(),
+                partner_id: receivable_partner,
+                product_id: None,
+                product_uom_id: None,
+                product_category_id: None,
+                analytic_account_id: None,
+                analytic_tag_ids: Vec::new(),
+                display_type: None,
+                is_downpayment: false,
+                exclude_from_invoice_tab: false,
+                blocked: false,
+                group_tax_id: None,
+                tax_line_id: None,
+                tax_group_id: None,
+                tax_repartition_line_id: None,
+                tax_audit: None,
+                reconcile_model_id: None,
+                payment_id: None,
+                statement_line_id: None,
+                matching_number: None,
+                matching_label: None,
+                expected_pay_date: None,
+                expected_pay_date_currency_id: None,
+                expected_pay_date_amount: 0.0,
+                expected_pay_date_residual: 0.0,
+                metadata: None,
+            },
+        )?;
+
+        amount_total = receivable_credit;
+    }
+
+    ctx.db.account_move().id().update(AccountMove {
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
+        amount_untaxed_signed: amount_untaxed,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total,
+        amount_residual_signed: amount_total,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..credit_note.clone()
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: credit_note.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": "OutRefund",
+                    "reversed_entry_id": invoice_id,
+                    "amount_total": amount_total,
+                    "reason": params.reason,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "move_type".to_string(),
+                "reversed_entry_id".to_string(),
+                "amount_total".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Created credit note {} from invoice {}",
+        credit_note.id,
+        invoice_id
     );
     Ok(())
 }

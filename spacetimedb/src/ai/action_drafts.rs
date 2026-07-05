@@ -6,6 +6,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
+use crate::ai::reducer_allowlist::is_allowed_ai_reducer;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::workflow::approval_gate::create_ai_draft_approval_request;
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
@@ -96,9 +97,7 @@ pub fn create_ai_action_draft(
     if reducer_name.is_empty() {
         return Err("reducer_name is required".to_string());
     }
-    if !is_whitelisted_reducer(&reducer_name) {
-        return Err(format!("reducer '{reducer_name}' is not allowed for AI drafts"));
-    }
+    is_allowed_ai_reducer(ctx, organization_id, &reducer_name)?;
     if params.params_json.trim().is_empty() {
         return Err("params_json is required".to_string());
     }
@@ -273,6 +272,13 @@ pub fn approve_ai_action_draft_core(
 
     match execution_result {
         Ok(record_id) => {
+            let draft_snapshot = serde_json::json!({
+                "status": draft.status,
+                "reducer_name": draft.reducer_name.clone(),
+                "params_json": draft.params_json.clone(),
+                "summary": draft.summary.clone(),
+            });
+
             let updated = AiActionDraft {
                 status: "approved".to_string(),
                 reviewed_by: Some(ctx.sender()),
@@ -294,24 +300,21 @@ pub fn approve_ai_action_draft_core(
                     company_id: Some(company_id),
                     table_name: "ai_action_draft",
                     record_id: draft_id,
-                    action: "UPDATE",
-                    old_values: Some(
-                        serde_json::json!({ "status": "pending" }).to_string(),
-                    ),
+                    action: "EXECUTE",
+                    old_values: Some(draft_snapshot.to_string()),
                     new_values: Some(
                         serde_json::json!({
-                            "status": "approved",
                             "reducer_name": updated.reducer_name,
-                            "execution_record_id": record_id,
+                            "created_record_id": record_id,
+                            "status": "approved",
                         })
                         .to_string(),
                     ),
                     changed_fields: vec![
                         "status".to_string(),
-                        "executed_at".to_string(),
-                        "execution_record_id".to_string(),
+                        "executed_record_id".to_string(),
                     ],
-                    metadata: None,
+                    metadata: Some(updated.params_json.clone()),
                 },
             );
             Ok(())
@@ -381,6 +384,11 @@ pub fn reject_ai_action_draft_core(
     }
 
     let trimmed_reason = reason.trim().to_string();
+    let reject_snapshot = serde_json::json!({
+        "status": draft.status,
+        "reducer_name": draft.reducer_name.clone(),
+        "params_json": draft.params_json.clone(),
+    });
     let updated = AiActionDraft {
         status: "rejected".to_string(),
         reviewed_by: Some(ctx.sender()),
@@ -408,8 +416,8 @@ pub fn reject_ai_action_draft_core(
             company_id: Some(company_id),
             table_name: "ai_action_draft",
             record_id: draft_id,
-            action: "UPDATE",
-            old_values: Some(serde_json::json!({ "status": "pending" }).to_string()),
+            action: "REJECT",
+            old_values: Some(reject_snapshot.to_string()),
             new_values: Some(
                 serde_json::json!({
                     "status": "rejected",
@@ -418,7 +426,9 @@ pub fn reject_ai_action_draft_core(
                 .to_string(),
             ),
             changed_fields: vec!["status".to_string(), "reject_reason".to_string()],
-            metadata: None,
+            metadata: updated.reject_reason.as_ref().map(|reason| {
+                serde_json::json!({ "reject_reason": reason }).to_string()
+            }),
         },
     );
 
@@ -466,13 +476,12 @@ pub fn expire_ai_action_drafts(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-fn is_whitelisted_reducer(reducer_name: &str) -> bool {
-    matches!(
-        reducer_name,
-        "create_task" | "create_sale_order" | "create_purchase_order"
-    )
-}
+//
+// Execution registry: `execute_whitelisted_draft` dispatches known reducers via
+// builder fns (`build_create_task_params`, etc.). To add a new reducer:
+// 1. Add a builder + match arm in `execute_whitelisted_draft`
+// 2. Add an `AiReducerAllowlist` row (or rely on default allowlist before org rows exist)
+// 3. Ensure Casbin grants the target resource `create` permission
 
 fn load_mutable_draft(
     ctx: &ReducerContext,

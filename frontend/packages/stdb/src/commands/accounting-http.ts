@@ -43,6 +43,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "create_budget_post",
   "create_consolidation_account",
   "create_consolidation_journal",
+  "create_credit_note_from_invoice",
   "create_crossovered_budget",
   "create_currency_rate",
   "create_depreciation_line",
@@ -209,6 +210,7 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["create_budget_post"] = []
   o["create_consolidation_account"] = []
   o["create_consolidation_journal"] = []
+  o["create_credit_note_from_invoice"] = ["account-moves","account-move-lines"] as const
   o["create_crossovered_budget"] = []
   o["create_currency_rate"] = []
   o["create_depreciation_line"] = []

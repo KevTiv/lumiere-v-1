@@ -8,10 +8,13 @@ import type { ReducerCommandContractMeta } from "./types";
  */
 export const SALES_BFF_REDUCERS = [
   "cancel_picking_batch",
+  "cancel_return_order",
   "cancel_sale_order",
   "complete_picking_batch",
   "compute_so_totals",
+  "confirm_return_order",
   "confirm_sales_order",
+  "create_credit_note_from_return_order",
   "create_delivery_carrier",
   "create_delivery_price_rule",
   "create_invoice_from_sale_order",
@@ -21,6 +24,7 @@ export const SALES_BFF_REDUCERS = [
   "create_picking_batch",
   "create_pricelist",
   "create_pricelist_item",
+  "create_return_order",
   "create_sale_order",
   "create_sale_order_line",
   "create_shipping_method",
@@ -66,10 +70,13 @@ const SALES_HINT_OVERRIDES: Partial<
   Record<SalesBffReducerKey, readonly string[]>
 > = {
   cancel_picking_batch: ["picking-batches"],
+  cancel_return_order: ["return-orders"],
   cancel_sale_order: ["sale-orders", "sale-order-lines"],
   complete_picking_batch: ["picking-batches"],
   compute_so_totals: ["sale-orders", "sale-order-lines"],
+  confirm_return_order: ["return-orders", "stock-pickings", "stock-moves"],
   confirm_sales_order: ["sale-orders", "sale-order-lines", "picking-batches"],
+  create_credit_note_from_return_order: ["return-orders", "account-moves"],
   create_delivery_carrier: ["delivery-carriers"],
   create_delivery_price_rule: ["delivery-price-rules"],
   create_invoice_from_sale_order: ["sale-orders", "account-moves"],
@@ -79,6 +86,7 @@ const SALES_HINT_OVERRIDES: Partial<
   create_picking_batch: ["picking-batches"],
   create_pricelist: ["pricelists"],
   create_pricelist_item: ["pricelists", "pricelist-items"],
+  create_return_order: ["return-orders", "return-order-lines"],
   create_sale_order: ["sale-orders"],
   create_sale_order_line: ["sale-order-lines"],
   create_shipping_method: ["shipping-methods"],

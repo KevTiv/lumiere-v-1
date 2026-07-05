@@ -1302,6 +1302,9 @@
   "CreateInvoiceFromSaleOrderParams": [
     "metadata"
   ],
+  "CreateCreditNoteParams": [
+    "reason"
+  ],
   "CreateJobPositionParams": [
     "company_id",
     "department_id",

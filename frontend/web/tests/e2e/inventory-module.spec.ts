@@ -1,4 +1,12 @@
+/**
+ * Requires `seed_dev_data` (via `make e2e-smoke` / `pnpm run e2e-seed-fixture`) for the
+ * seeded product visibility test. Other tests create their own data or only open modals.
+ *
+ * Seeded records: product `Lumiere Dev Laptop`.
+ */
 import { expect, test, type Page } from "@playwright/test"
+
+/** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import {
   chooseFirstOption,
@@ -83,7 +91,7 @@ async function assertInventoryTabRenders(page: Page, tabId: string) {
   }
 }
 
-test.describe("Inventory module e2e", () => {
+test.describe("Inventory module e2e", { tag: "@dev-fixture" }, () => {
   test("renders inventory shell and key tabs without errors", async ({ page }) => {
     await gotoModule(page, "/inventory", "inventory")
 
@@ -104,8 +112,7 @@ test.describe("Inventory module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("seeded product appears on Products tab", { tag: "@p0" }, async ({ page }) => {
-    // Requires `seed_dev_data` from `make e2e-smoke` (Lumiere Dev Laptop).
+  test("seeded product appears on Products tab", { tag: "@dev-fixture" }, async ({ page }) => {
     await gotoModule(page, "/inventory", "inventory")
     await openInventoryTab(page, "products")
 
