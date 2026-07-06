@@ -41,7 +41,10 @@ function fq(opts?: StdbServerQueryOptions): FieldAccessContext | undefined {
 
 /** SpacetimeDB HTTP SQL does not support `deleted_at IS NULL` — filter after fetch (rows use camelCase keys). */
 function rowNotSoftDeleted(r: Record<string, unknown>): boolean {
-  return r.deletedAt == null
+  const deleted = r.deletedAt ?? r.deleted_at
+  if (deleted == null) return true
+  if (typeof deleted === 'object' && deleted !== null && 'none' in deleted) return true
+  return false
 }
 
 /** SpacetimeDB HTTP SQL rejects some `ORDER BY` shapes; sort client-side after fetch. */

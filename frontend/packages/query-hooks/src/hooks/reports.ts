@@ -18,6 +18,7 @@ import { downloadDocumentExport } from "./templates"
 import { toCreateFinancialReportParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
+import { toCreateSavedReportParams } from "@lumiere/erp-shared/reports-saved-params"
 import { toCreateAnalyticsMetricParams } from "@lumiere/erp-shared/reports-analytics-params"
 import { toUpdateFinancialReportParams } from "@lumiere/erp-shared/reports-update-params"
 import {
@@ -296,24 +297,10 @@ export function useCreateSavedReport(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
+      const params = toCreateSavedReportParams(formData)
+      if (!params) throw new Error("Invalid saved report params")
       const { urlPath, init } = reportsBffPost("create_saved_report", [
-        stdbParamsToJson({
-          name: String(formData.name ?? "").trim(),
-          model: String(formData.model ?? "trial_balance"),
-          rowDimension: String(formData.rowDimension ?? formData.row_dimension ?? "accountCode"),
-          columnDimension:
-            formData.columnDimension != null && String(formData.columnDimension).trim() !== ""
-              ? String(formData.columnDimension)
-              : null,
-          measureField: String(formData.measureField ?? formData.measure_field ?? "closingDebit"),
-          measureOp: String(formData.measureOp ?? formData.measure_op ?? "sum"),
-          filterJson:
-            formData.filterJson != null && String(formData.filterJson).trim() !== ""
-              ? String(formData.filterJson)
-              : null,
-          isActive: formData.isActive !== false,
-          metadata: null,
-        }),
+        stdbParamsToJson(params, "CreateSavedReportParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))

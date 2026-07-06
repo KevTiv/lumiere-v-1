@@ -12,6 +12,7 @@ import { authBffPost, stdbBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 type ScalarId = bigint | number | string
@@ -567,16 +568,10 @@ export function useCreateAuditRule(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
-      const params = {
-        name: String(formData.name ?? ''),
-        resourceType: String(formData.resourceType ?? ''),
-        actionType: String(formData.actionType ?? ''),
-        isActive: Boolean(formData.isActive ?? true),
-        severity: String(formData.severity ?? 'info'),
-      }
+      const params = toCreateAuditRuleParams(formData)
       const { urlPath, init } = authBffPost("create_audit_rule", [
         organizationId,
-        stdbParamsToJson(params),
+        stdbParamsToJson(params, "CreateAuditRuleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create audit rule')

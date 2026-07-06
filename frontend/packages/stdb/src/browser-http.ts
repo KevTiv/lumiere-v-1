@@ -11,6 +11,7 @@ import {
   queryStdbList,
   type LumiereHttpFetch,
 } from "@lumiere/api-client"
+import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 
 function resolveApiFetch(): LumiereHttpFetch {
   const c = getLumiereApiClient()
@@ -28,5 +29,5 @@ export async function stdbBrowserQuery(resource: string): Promise<Record<string,
 }
 
 export async function stdbBrowserCall(reducer: string, args: unknown[]): Promise<void> {
-  return callStdbReducer(resolveApiFetch(), reducer, args)
+  return callStdbReducer(resolveApiFetch(), reducer, encodeReducerCallArgs(reducer, args))
 }

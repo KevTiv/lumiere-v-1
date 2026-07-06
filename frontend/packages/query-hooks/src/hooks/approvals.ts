@@ -1,6 +1,8 @@
 "use client"
 
 import { approvalsBffPost } from "@lumiere/stdb/commands"
+import { toCreateApprovalRuleParams } from "@lumiere/erp-shared/approvals-create-params"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -147,29 +149,13 @@ export function useApprovalRules(organizationId: number, enabled = true) {
 export function useCreateApprovalRule(organizationId: number, companyId?: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: {
-      name: string
-      model: string
-      action: string
-      ruleType: string
-      threshold: number
-      sequence?: number
-    }) => {
+    mutationFn: async (input: Record<string, unknown>) => {
+      const params = toCreateApprovalRuleParams(input)
+      if (!params) throw new Error("Invalid approval rule params")
       const { urlPath, init } = approvalsBffPost("create_approval_rule", [
         organizationId,
         companyId ?? null,
-        {
-          name: input.name,
-          description: null,
-          model: input.model,
-          action: input.action,
-          rule_type: input.ruleType,
-          threshold: input.threshold,
-          approver_role_id: null,
-          sequence: input.sequence ?? 10,
-          is_active: true,
-          metadata: null,
-        },
+        stdbParamsToJson(params, "CreateApprovalRuleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))

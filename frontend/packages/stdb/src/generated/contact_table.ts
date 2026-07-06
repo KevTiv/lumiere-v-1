@@ -54,5 +54,6 @@ export default __t.row({
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
   deletedAt: __t.option(__t.timestamp()).name("deleted_at"),
+  mergeTargetId: __t.option(__t.u64()).name("merge_target_id"),
   metadata: __t.option(__t.string()),
 });

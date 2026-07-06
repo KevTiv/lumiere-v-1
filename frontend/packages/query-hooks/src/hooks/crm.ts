@@ -10,7 +10,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRows } from "../http"
 import { crmBffPost } from "@lumiere/stdb/commands"
 import type {
   ConvertLeadParams,
@@ -30,6 +30,7 @@ import type {
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,
   UpdateOpportunityParams,
+  MergeContactsParams,
 } from "@lumiere/stdb/types"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -125,7 +126,7 @@ export function useContacts(
     queryKey: ['contacts', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contacts', 'Failed to fetch contacts'),
     staleTime: 30_000,
-    initialData,
+    initialData: coalesceQueryInitialData(initialData),
   })
 }
 
@@ -628,6 +629,60 @@ export function useImportOpportunityCsv(organizationId: bigint) {
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useFindDuplicateContacts(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (companyId) => {
+      const { urlPath, init } = crmBffPost("find_duplicate_contacts", [
+        organizationId,
+        toScalarU64(companyId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to scan for duplicate contacts")
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ["contacts", rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useMergeContacts(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
+  const qc = useQueryClient()
+  const defaultCompanyId = options?.companyId
+  return useMutation<
+    void,
+    Error,
+    { sourceContactId: ScalarId; targetContactId: ScalarId; companyId?: ScalarId }
+  >({
+    mutationFn: async ({ sourceContactId, targetContactId, companyId }) => {
+      const scopedCompanyId =
+        companyId != null ? toScalarU64(companyId) : defaultCompanyId
+      if (scopedCompanyId == null || scopedCompanyId === 0n) {
+        throw new Error("Company scope required to merge contacts")
+      }
+      const params: MergeContactsParams = {
+        targetContactId: toScalarU64(targetContactId),
+      }
+      const { urlPath, init } = crmBffPost("merge_contacts", [
+        organizationId,
+        scopedCompanyId,
+        toScalarU64(sourceContactId),
+        stdbParamsToJson(params as object, "MergeContactsParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to merge contacts")
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["contacts", rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ["leads", rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ["opportunities", rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
+    },
   })
 }
 

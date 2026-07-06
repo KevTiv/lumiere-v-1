@@ -244,18 +244,24 @@ export function grantPermission(
     effect: "Allow" | "Deny"
   },
 ) {
+  const actionKey = args.action.charAt(0).toLowerCase() + args.action.slice(1)
+  const effectKey = args.effect.charAt(0).toLowerCase() + args.effect.slice(1)
   const subject =
     args.subjectType === "Role"
-      ? { tag: "Role", value: args.subjectValue }
-      : { tag: "User", value: String(args.subjectValue) }
+      ? { role: Number(args.subjectValue) }
+      : {
+          user: {
+            __identity__: `0x${String(args.subjectValue).replace(/^0x/i, "")}`,
+          },
+        }
 
   return stdbBrowserCall("grant_permission", [
     organizationId,
     {
       subject,
       resource: args.resource,
-      action: unit(args.action),
-      effect: unit(args.effect),
+      action: { [actionKey]: [] },
+      effect: { [effectKey]: [] },
     },
   ])
 }

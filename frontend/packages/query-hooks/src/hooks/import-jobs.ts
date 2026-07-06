@@ -1,8 +1,10 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { fetchQueryList, rqBigIntKey } from "../http"
+import { stdbBffPost } from "@lumiere/stdb/commands"
+
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 
 export type ImportJobRow = {
   id?: number | string
@@ -77,6 +79,24 @@ export function findLatestImportJob(
   return jobs.find((row) => jobTableName(row).toLowerCase() === normalized)
 }
 
+export function jobsForEntity(
+  jobs: ImportJobRow[] | undefined,
+  tableName: string,
+  limit = 10,
+): ImportJobRow[] {
+  if (!jobs?.length) return []
+  const normalized = tableName.trim().toLowerCase()
+  return jobs
+    .filter((row) => jobTableName(row).toLowerCase() === normalized)
+    .slice(0, limit)
+}
+
+export function canRollbackImportJob(job: ImportJobRow | undefined): boolean {
+  if (!job?.id) return false
+  const status = String(job.status ?? "")
+  return status === "success" || status === "partial"
+}
+
 export function errorsForJob(
   errors: ImportJobErrorRow[] | undefined,
   job: ImportJobRow | undefined,
@@ -104,4 +124,24 @@ export function downloadImportJobErrorsCsv(errors: ImportJobErrorRow[], fileName
   anchor.download = fileName
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+export function useRollbackImportJob(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (jobId: bigint | number) => {
+      const { urlPath, init } = stdbBffPost("rollback_import_job", [
+        organizationId,
+        BigInt(jobId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        const json = (await r.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error ?? "Failed to rollback import job")
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["import-jobs", rqBigIntKey(organizationId)] })
+    },
+  })
 }

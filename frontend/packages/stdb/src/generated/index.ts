@@ -393,6 +393,7 @@ import ExportFinancialReportReducer from "./export_financial_report_reducer";
 import FailIotActionReducer from "./fail_iot_action_reducer";
 import FailQualityCheckReducer from "./fail_quality_check_reducer";
 import FinalizeImportAssistantJobReducer from "./finalize_import_assistant_job_reducer";
+import FindDuplicateContactsReducer from "./find_duplicate_contacts_reducer";
 import FinishManufacturingOrderReducer from "./finish_manufacturing_order_reducer";
 import FinishWorkorderReducer from "./finish_workorder_reducer";
 import GenerateEuVatReportReducer from "./generate_eu_vat_report_reducer";
@@ -483,6 +484,7 @@ import MarkMailMessageDeliveredReducer from "./mark_mail_message_delivered_reduc
 import MarkResetTokenUsedReducer from "./mark_reset_token_used_reducer";
 import MatchBankLineReducer from "./match_bank_line_reducer";
 import MatchEliminationEntriesReducer from "./match_elimination_entries_reducer";
+import MergeContactsReducer from "./merge_contacts_reducer";
 import MigrateAllOrganizationsReducer from "./migrate_all_organizations_reducer";
 import MoveStockQuantReducer from "./move_stock_quant_reducer";
 import OpenAccountPeriodReducer from "./open_account_period_reducer";
@@ -554,6 +556,7 @@ import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
+import RollbackImportJobReducer from "./rollback_import_job_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentReconcileTestReducer from "./run_accounting_payment_reconcile_test_reducer";
 import RunAccountingPaymentTermUpdateTestReducer from "./run_accounting_payment_term_update_test_reducer";
@@ -884,6 +887,7 @@ import ConsolidationJournalRow from "./consolidation_journal_table";
 import ContactRow from "./contact_table";
 import ContactCategoryRow from "./contact_category_table";
 import ContactCategoryAssignmentRow from "./contact_category_assignment_table";
+import ContactDuplicateCandidateRow from "./contact_duplicate_candidate_table";
 import ContactRelationshipRow from "./contact_relationship_table";
 import ContactSegmentRow from "./contact_segment_table";
 import ContactTagRow from "./contact_tag_table";
@@ -930,6 +934,7 @@ import HrResourceRow from "./hr_resource_table";
 import HrSalaryRuleRow from "./hr_salary_rule_table";
 import ImportJobRow from "./import_job_table";
 import ImportJobErrorRow from "./import_job_error_table";
+import ImportJobRecordRow from "./import_job_record_table";
 import ImportMappingTemplateRow from "./import_mapping_template_table";
 import IntercompanyRuleRow from "./intercompany_rule_table";
 import IntercompanyTransactionRow from "./intercompany_transaction_table";
@@ -2288,6 +2293,21 @@ const tablesSchema = __schema({
       { name: 'contact_category_assignment_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactCategoryAssignmentRow),
+  contact_duplicate_candidate: __table({
+    name: 'contact_duplicate_candidate',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'dup_by_org_company', algorithm: 'btree', columns: [
+        'organizationId',
+        'companyId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_duplicate_candidate_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactDuplicateCandidateRow),
   contact_relationship: __table({
     name: 'contact_relationship',
     indexes: [
@@ -3034,6 +3054,20 @@ const tablesSchema = __schema({
       { name: 'import_job_error_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ImportJobErrorRow),
+  import_job_record: __table({
+    name: 'import_job_record',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'import_record_by_job', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+    ],
+    constraints: [
+      { name: 'import_job_record_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ImportJobRecordRow),
   import_mapping_template: __table({
     name: 'import_mapping_template',
     indexes: [
@@ -5899,6 +5933,7 @@ const reducersSchema = __reducers(
   __reducerSchema("fail_iot_action", FailIotActionReducer),
   __reducerSchema("fail_quality_check", FailQualityCheckReducer),
   __reducerSchema("finalize_import_assistant_job", FinalizeImportAssistantJobReducer),
+  __reducerSchema("find_duplicate_contacts", FindDuplicateContactsReducer),
   __reducerSchema("finish_manufacturing_order", FinishManufacturingOrderReducer),
   __reducerSchema("finish_workorder", FinishWorkorderReducer),
   __reducerSchema("generate_eu_vat_report", GenerateEuVatReportReducer),
@@ -5989,6 +6024,7 @@ const reducersSchema = __reducers(
   __reducerSchema("mark_reset_token_used", MarkResetTokenUsedReducer),
   __reducerSchema("match_bank_line", MatchBankLineReducer),
   __reducerSchema("match_elimination_entries", MatchEliminationEntriesReducer),
+  __reducerSchema("merge_contacts", MergeContactsReducer),
   __reducerSchema("migrate_all_organizations", MigrateAllOrganizationsReducer),
   __reducerSchema("move_stock_quant", MoveStockQuantReducer),
   __reducerSchema("open_account_period", OpenAccountPeriodReducer),
@@ -6060,6 +6096,7 @@ const reducersSchema = __reducers(
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
+  __reducerSchema("rollback_import_job", RollbackImportJobReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
   __reducerSchema("run_accounting_payment_reconcile_test", RunAccountingPaymentReconcileTestReducer),
   __reducerSchema("run_accounting_payment_term_update_test", RunAccountingPaymentTermUpdateTestReducer),

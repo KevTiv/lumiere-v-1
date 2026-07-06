@@ -1905,6 +1905,7 @@ export const Contact = __t.object("Contact", {
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
   deletedAt: __t.option(__t.timestamp()),
+  mergeTargetId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type Contact = __Infer<typeof Contact>;
@@ -1931,6 +1932,17 @@ export const ContactCategoryAssignment = __t.object("ContactCategoryAssignment",
   metadata: __t.option(__t.string()),
 });
 export type ContactCategoryAssignment = __Infer<typeof ContactCategoryAssignment>;
+
+export const ContactDuplicateCandidate = __t.object("ContactDuplicateCandidate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  contactIdA: __t.u64(),
+  contactIdB: __t.u64(),
+  matchReason: __t.string(),
+  scannedAt: __t.timestamp(),
+});
+export type ContactDuplicateCandidate = __Infer<typeof ContactDuplicateCandidate>;
 
 export const ContactRelationship = __t.object("ContactRelationship", {
   id: __t.u64(),
@@ -6218,6 +6230,16 @@ export const ImportJobError = __t.object("ImportJobError", {
 });
 export type ImportJobError = __Infer<typeof ImportJobError>;
 
+export const ImportJobRecord = __t.object("ImportJobRecord", {
+  id: __t.u64(),
+  jobId: __t.u64(),
+  tableName: __t.string(),
+  recordId: __t.u64(),
+  rowNumber: __t.u32(),
+  createDate: __t.timestamp(),
+});
+export type ImportJobRecord = __Infer<typeof ImportJobRecord>;
+
 export const ImportMappingTemplate = __t.object("ImportMappingTemplate", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -6804,6 +6826,11 @@ export const MailTemplate = __t.object("MailTemplate", {
   metadata: __t.option(__t.string()),
 });
 export type MailTemplate = __Infer<typeof MailTemplate>;
+
+export const MergeContactsParams = __t.object("MergeContactsParams", {
+  targetContactId: __t.u64(),
+});
+export type MergeContactsParams = __Infer<typeof MergeContactsParams>;
 
 // The tagged union or sum type for the algebraic type `MoState`.
 export const MoState = __t.enum("MoState", {

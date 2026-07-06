@@ -14,6 +14,18 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { buildWarehouse3DView } from "@lumiere/erp-shared/warehouse-3d-from-api"
+import {
+  toCreateBarcodeNomenclatureParams,
+  toCreateProductPackagingParams,
+  toCreateProductSupplierInfoParams,
+  toCreateProductVariantParams,
+  toCreateReplenishmentRuleParams,
+  toCreateStockInventoryLineParams,
+  toCreateStockInventoryParams,
+  toCreateUomCategoryParams,
+  toCreateUomConversionParams,
+  toCreateUomParams,
+} from "@lumiere/erp-shared/inventory-create-params"
 import type { UpdateProductParams } from "@lumiere/stdb/types"
 import { finalizeUpdateProductParams } from "./inventory-params-merge"
 type ScalarId = bigint | number | string
@@ -512,7 +524,9 @@ export function useCreateProductVariant(organizationId: bigint) {
     { productTmplId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ productTmplId, params }) => {
-      const { urlPath, init } = inventoryBffPost("create_product_variant", [organizationId, toScalarU64(productTmplId), stdbParamsToJson(params as object)])
+      const mapped = toCreateProductVariantParams(params)
+      if (!mapped) throw new Error('Invalid product variant params')
+      const { urlPath, init } = inventoryBffPost("create_product_variant", [organizationId, toScalarU64(productTmplId), stdbParamsToJson(mapped, "CreateProductVariantParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create product variant')
     },
@@ -970,7 +984,9 @@ export function useCreateStockInventory(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_stock_inventory", [organizationId, stdbParamsToJson(params as object)])
+      const mapped = toCreateStockInventoryParams(params)
+      if (!mapped) throw new Error('Invalid stock inventory params')
+      const { urlPath, init } = inventoryBffPost("create_stock_inventory", [organizationId, stdbParamsToJson(mapped, "CreateStockInventoryParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock inventory')
     },
@@ -982,7 +998,9 @@ export function useCreateStockInventoryLine(organizationId: bigint, _companyId?:
   const qc = useQueryClient()
   return useMutation<void, Error, { inventoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ inventoryId, params }) => {
-      const { urlPath, init } = inventoryBffPost("create_stock_inventory_line", [organizationId, toScalarU64(inventoryId), stdbParamsToJson(params as object)])
+      const mapped = toCreateStockInventoryLineParams(params)
+      if (!mapped) throw new Error('Invalid stock inventory line params')
+      const { urlPath, init } = inventoryBffPost("create_stock_inventory_line", [organizationId, toScalarU64(inventoryId), stdbParamsToJson(mapped, "CreateStockInventoryLineParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create stock inventory line')
     },
@@ -1360,7 +1378,9 @@ export function useCreateBarcodeNomenclature(organizationId: bigint, _companyId?
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_barcode_nomenclature", [organizationId, stdbParamsToJson(params as object)])
+      const mapped = toCreateBarcodeNomenclatureParams(params)
+      if (!mapped) throw new Error('Invalid barcode nomenclature params')
+      const { urlPath, init } = inventoryBffPost("create_barcode_nomenclature", [organizationId, stdbParamsToJson(mapped, "CreateBarcodeNomenclatureParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create barcode nomenclature')
     },
@@ -1490,7 +1510,9 @@ export function useCreateUomCategory(organizationId: bigint, _companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_uom_category", [organizationId, stdbParamsToJson(params as object)])
+      const mapped = toCreateUomCategoryParams(params)
+      if (!mapped) throw new Error('Invalid UOM category params')
+      const { urlPath, init } = inventoryBffPost("create_uom_category", [organizationId, stdbParamsToJson(mapped, "CreateUomCategoryParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM category')
     },
@@ -1502,7 +1524,9 @@ export function useCreateUom(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_uom", [organizationId, stdbParamsToJson(params as object)])
+      const mapped = toCreateUomParams(params)
+      if (!mapped) throw new Error('Invalid UOM params')
+      const { urlPath, init } = inventoryBffPost("create_uom", [organizationId, stdbParamsToJson(mapped, "CreateUomParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM')
     },
@@ -1538,10 +1562,12 @@ export function useCreateUomConversion(organizationId: bigint, _companyId?: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ categoryId, params }) => {
+      const mapped = toCreateUomConversionParams(params)
+      if (!mapped) throw new Error('Invalid UOM conversion params')
       const { urlPath, init } = inventoryBffPost("create_uom_conversion", [
         organizationId,
         toScalarU64(categoryId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(mapped, "CreateUomConversionParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create UOM conversion')
@@ -1556,10 +1582,12 @@ export function useCreateReplenishmentRule(organizationId: bigint, companyId: bi
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
+      const mapped = toCreateReplenishmentRuleParams(params)
+      if (!mapped) throw new Error('Invalid replenishment rule params')
       const { urlPath, init } = inventoryBffPost("create_replenishment_rule", [
         organizationId,
         companyId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(mapped, "CreateReplenishmentRuleParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create replenishment rule')
@@ -2249,7 +2277,9 @@ export function useCreateProductSupplierInfo(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = inventoryBffPost("create_product_supplier_info", [organizationId, stdbParamsToJson(params as object)])
+      const mapped = toCreateProductSupplierInfoParams(params)
+      if (!mapped) throw new Error('Invalid supplier info params')
+      const { urlPath, init } = inventoryBffPost("create_product_supplier_info", [organizationId, stdbParamsToJson(mapped, "CreateProductSupplierInfoParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create supplier info')
     },
@@ -2273,7 +2303,9 @@ export function useCreateProductPackaging(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { productId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ productId, params }) => {
-      const { urlPath, init } = inventoryBffPost("create_product_packaging", [organizationId, toScalarU64(productId), stdbParamsToJson(params as object)])
+      const mapped = toCreateProductPackagingParams(params)
+      if (!mapped) throw new Error('Invalid packaging params')
+      const { urlPath, init } = inventoryBffPost("create_product_packaging", [organizationId, toScalarU64(productId), stdbParamsToJson(mapped, "CreateProductPackagingParams")])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create packaging')
     },

@@ -29,9 +29,11 @@ export const CRM_BFF_REDUCERS = [
   "assign_tag_to_contact",
   "add_contact_to_segment",
   "complete_activity",
+  "find_duplicate_contacts",
   "import_contact_csv",
   "import_lead_csv",
   "import_opportunity_csv",
+  "merge_contacts",
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
@@ -85,12 +87,14 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
   create_opportunity_line: ["opportunity-lines", "opportunities"],
   delete_contact: ["contacts"],
   delete_lead: ["leads"],
+  find_duplicate_contacts: ["contacts"],
   assign_tag_to_contact: ["contacts"],
   add_contact_to_segment: ["contacts"],
   complete_activity: ["activities"],
   import_contact_csv: ["contacts"],
   import_lead_csv: ["leads"],
   import_opportunity_csv: ["opportunities"],
+  merge_contacts: ["contacts", "leads", "opportunities", "sale-orders"],
 };
 
 export function crmCommandContract(
