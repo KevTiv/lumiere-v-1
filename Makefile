@@ -60,7 +60,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
         call-tests-cloud logs-cloud \
         seed-test-user e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
         e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-        generate-stdb-rust-sdk
+        generate-stdb-rust-sdk codegen check-codegen
 
 help:
 	@echo "Usage: make <target>"
@@ -90,6 +90,8 @@ help:
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
+	@echo "  codegen                 Emit query-registry.ts + stdb-reducer-invalidation from Rust assets"
+	@echo "  check-codegen           Fail if generated TS drifts from registry (CI)"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -237,8 +239,9 @@ e2e-smoke-setup:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+		nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
 		API_PID="$$!"; \
+		disown "$$API_PID" 2>/dev/null || true; \
 		for i in {1..180}; do \
 			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
 			sleep 1; \
@@ -275,10 +278,39 @@ e2e-smoke-test:
 			fi; \
 		}; \
 		trap cleanup_web EXIT INT TERM; \
-		if ! curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
-			echo "[e2e] api-server is not reachable on :$(E2E_API_PORT) — run make e2e-smoke-setup first."; \
+		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
+			echo "[e2e] SpacetimeDB is down — run make e2e-smoke-setup first."; \
 			exit 1; \
 		fi; \
+		echo "[e2e] Building api-server..."; \
+		cd "$$ROOT"; \
+		cargo build -p api-server -q; \
+		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
+			echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
+			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+			sleep 1; \
+		fi; \
+		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		LUMIERE_E2E=1 \
+		PORT="$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+		nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
+		for i in {1..60}; do \
+			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+			sleep 1; \
+			if [ "$$i" = "60" ]; then \
+				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
+				exit 1; \
+			fi; \
+		done; \
+		cd "$$ROOT/frontend/web"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
 			lsof -ti:"$(E2E_WEB_PORT)" | xargs kill >/dev/null 2>&1 || true; \
@@ -368,35 +400,39 @@ e2e-single-test:
 			fi; \
 		}; \
 		trap cleanup_web EXIT INT TERM; \
-		if ! curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
-			if curl -fsS "$$E2E_STDB_HOST" >/dev/null 2>&1; then \
-				echo "[e2e] api-server not running — starting from $$LOG_DIR/env.sh..."; \
-				cd "$$ROOT"; \
-				set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-				LUMIERE_E2E=1 \
-				PORT="$(E2E_API_PORT)" \
-				STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
-				STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-				STDB_MODULE="$(E2E_DB)" \
-				NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
-				STDB_HOST="$$E2E_STDB_HOST" \
-				NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
-				CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-				cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
-				for i in {1..60}; do \
-					if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
-					sleep 1; \
-					if [ "$$i" = "60" ]; then \
-						echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
-						exit 1; \
-					fi; \
-				done; \
-				cd "$$ROOT/frontend/web"; \
-			else \
-				echo "[e2e] api-server is not reachable on :$(E2E_API_PORT) and STDB is down — run make e2e-smoke-setup first."; \
+		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
+			echo "[e2e] SpacetimeDB is down — run make e2e-smoke-setup or make e2e-single first."; \
+			exit 1; \
+		fi; \
+		echo "[e2e] Building api-server..."; \
+		cd "$$ROOT"; \
+		cargo build -p api-server -q; \
+		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
+			echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
+			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+			sleep 1; \
+		fi; \
+		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		LUMIERE_E2E=1 \
+		PORT="$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+		cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+		for i in {1..60}; do \
+			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+			sleep 1; \
+			if [ "$$i" = "60" ]; then \
+				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
 				exit 1; \
 			fi; \
-		fi; \
+		done; \
+		cd "$$ROOT/frontend/web"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
 			lsof -ti:"$(E2E_WEB_PORT)" | xargs kill >/dev/null 2>&1 || true; \
@@ -661,6 +697,14 @@ e2e-smoke:
 generate-stdb-rust-sdk:
 	spacetime generate --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
 	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
+
+codegen:
+	cargo run -p lumiere-codegen
+
+check-codegen: codegen
+	@git add -N frontend/packages/stdb/src/generated/query-registry.ts frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts 2>/dev/null || true
+	@git diff --exit-code -- frontend/packages/stdb/src/generated/query-registry.ts frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts || \
+		(echo "Generated TypeScript is out of date. Run: make codegen" && exit 1)
 
 api-server-run:
 	source api-server/.env.local && cargo run -p api-server

@@ -4,7 +4,7 @@ members = [
     "api-server",
     "ai-gateway",
     "iot-gateway",
-    "api-codegen",
+    "lumiere-codegen",
     "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",

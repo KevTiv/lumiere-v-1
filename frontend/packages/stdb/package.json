@@ -17,13 +17,15 @@
     "./proposal-row-types": "./src/proposal-row-types.ts",
     "./warehouse-3d": "./src/warehouse-3d-types.ts",
     "./generated/types": "./src/generated/types.ts",
-    "./generated/types/reducers": "./src/generated/types/reducers.ts"
+    "./generated/types/reducers": "./src/generated/types/reducers.ts",
+    "./generated/query-registry": "./src/generated/query-registry.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
+    "@lumiere/erp-shared": "workspace:*",
     "spacetimedb": "^2.0.3"
   },
   "peerDependencies": {

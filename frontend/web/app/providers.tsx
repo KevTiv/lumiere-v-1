@@ -96,7 +96,6 @@ export function Providers({
   serverRoleNames,
   organizationId,
   companyIds,
-  stdbModule: _stdbModule,
 }: {
   children: React.ReactNode
   serverIdentity?: string
@@ -104,8 +103,6 @@ export function Providers({
   organizationId?: number
   /** Company row ids for realtime subscription context (fixed-assets, intercompany, …). */
   companyIds?: readonly number[]
-  /** @deprecated unused; module name is configured on api-server */
-  stdbModule?: string
 }) {
   const [queryClient] = useState(() => new QueryClient())
   return (

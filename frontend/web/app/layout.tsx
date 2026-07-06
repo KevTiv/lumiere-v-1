@@ -9,7 +9,6 @@ import {
 } from '@lumiere/stdb/server'
 import './globals.css'
 
-import { getDefaultStdbHttpConnect } from '@/lib/stdb-http-env'
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -47,7 +46,6 @@ export default async function RootLayout({
   const identityHex = hasAuthenticatedIdentity(session) ? session?.identityHex : undefined
   const organizationId = session?.organizationId
   const opts = session?.opts ?? {}
-  const stdbModule = getDefaultStdbHttpConnect().module
 
   let serverRoleNames: string[] = []
   if (identityHex) {
@@ -91,7 +89,6 @@ export default async function RootLayout({
           serverRoleNames={serverRoleNames}
           organizationId={organizationId}
           companyIds={companyIds}
-          stdbModule={stdbModule}
         >
           {children}
         </Providers>

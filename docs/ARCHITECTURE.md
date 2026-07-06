@@ -28,6 +28,13 @@ flowchart LR
 - Browser WebSocket: same-origin `/v1/realtime/ws` (Kong) or `ws://127.0.0.1:8082/v1/realtime/ws` in local dev.
 - api-server bridges SDK subscriptions to the client; see [`api-server/src/realtime/`](../api-server/src/realtime/).
 
+### Query registry (Rust → TypeScript)
+
+- **Source of truth:** [`crates/stdb-auth/assets/resource_registry.json`](../crates/stdb-auth/assets/resource_registry.json)
+- **Codegen:** `make codegen` (`lumiere-codegen`) emits `frontend/packages/stdb/src/generated/query-registry.ts`
+- **CI:** `make check-codegen` fails if generated TS drifts from the registry
+- Browser reads use `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
+
 ### AI
 
 - Next.js `/api/ai/*` routes proxy to **ai-gateway** (RAG, action drafts, skills).
@@ -43,7 +50,7 @@ flowchart LR
 | Service | Path | Owns |
 |---------|------|------|
 | **Next.js web** | `frontend/web/` | App shell, SSR, BFF forward, `/api/ai/*`, auth signup/signin forward |
-| **api-server** | `api-server/` | Session, `/v1/query`, `/v1/call`, typed REST (CRM, sales, …), OpenAPI, realtime WS |
+| **api-server** | `api-server/` | Session, `/v1/query`, `/v1/call`, typed REST (CRM, sales, …), realtime WS |
 | **SpacetimeDB module** | `spacetimedb/` | Tables, reducers, permissions, audit, domain logic |
 | **ai-gateway** | `ai-gateway/` | LLM, RAG, embeddings, action draft orchestration |
 | **Kong** | `infra/kong/` | Production path routing (`/api/query`, `/api/call`, web, ai-gateway) |

@@ -29,8 +29,14 @@ jobs:
         working-directory: spacetimedb
         run: cargo check --tests
 
-      - name: Workspace members (api-server, ai-gateway)
-        run: cargo check -p api-server -p ai-gateway
+      - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
+        run: cargo check -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
+
+      - name: lumiere-codegen unit tests
+        run: cargo test -p lumiere-codegen
+
+      - name: Verify generated TypeScript matches Rust registry
+        run: make check-codegen
 
       - name: api-server unit tests
         run: cargo test -p api-server reducer_allowlist

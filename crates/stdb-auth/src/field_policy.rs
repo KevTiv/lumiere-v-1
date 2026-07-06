@@ -1,19 +1,13 @@
-//! Port of `frontend/packages/stdb/src/field-policy.ts` (registry + column resolution + SQL helpers).
+//! SQL column resolution and org/company-scoped query builders.
 //!
-//! Keep `assets/resource_registry.json`, `assets/query-resource-row-type.json`, and
-//! `assets/stdb-generated-sql-columns.json` aligned with the frontend copies when adding query resources.
+//! Registry keys and column metadata: `resource_registry` + `assets/resource_registry.json`.
+//! Run `make codegen` after editing the registry to refresh TypeScript.
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ResourceEntry {
-    pub table: String,
-    pub aliases: Vec<String>,
-    pub default_restricted: Vec<String>,
-    pub mandatory: Vec<String>,
-}
+use crate::resource_registry::registry_get;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,11 +41,6 @@ pub struct CasbinRuleLike {
     pub metadata: Option<String>,
 }
 
-static RESOURCE_REGISTRY: Lazy<HashMap<String, ResourceEntry>> = Lazy::new(|| {
-    serde_json::from_str(include_str!("../assets/resource_registry.json"))
-        .expect("resource_registry.json")
-});
-
 static STDB_GENERATED_SQL_COLUMNS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
     serde_json::from_str(include_str!("../assets/stdb-generated-sql-columns.json"))
         .expect("stdb-generated-sql-columns.json")
@@ -75,6 +64,7 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     m
 });
 
+/// Globally stripped from HTTP SQL unless a resource explicitly opts in via `HTTP_SQL_INCLUDED_COLUMNS`.
 static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
     [
         "metadata",
@@ -84,7 +74,6 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
         "write_date",
         "created_at",
         "updated_at",
-        "deleted_at",
         "message_follower_ids",
         "message_ids",
         "activity_ids",
@@ -95,13 +84,27 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
     .collect()
 });
 
+/// Per-resource columns that must be selected even when listed in `GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS`.
+static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert(
+        "account-moves".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m
+});
+
 fn filter_http_sql_unsafe_columns(
     cols: &[String],
     resource_key: Option<&str>,
 ) -> Vec<String> {
     let resource_excluded = resource_key.and_then(|k| HTTP_SQL_EXCLUDED_COLUMNS.get(k));
+    let resource_included = resource_key.and_then(|k| HTTP_SQL_INCLUDED_COLUMNS.get(k));
     cols.iter()
         .filter(|col| {
+            if resource_included.is_some_and(|inc| inc.contains(*col)) {
+                return true;
+            }
             if GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS.contains(*col) {
                 return false;
             }
@@ -117,14 +120,6 @@ fn filter_http_sql_unsafe_columns(
         })
         .cloned()
         .collect()
-}
-
-pub fn registry_get(key: &str) -> Option<&ResourceEntry> {
-    RESOURCE_REGISTRY.get(key)
-}
-
-pub fn registry_keys() -> Vec<String> {
-    RESOURCE_REGISTRY.keys().cloned().collect()
 }
 
 pub fn assert_safe_sql_identifiers(cols: &[String]) -> Result<Vec<String>, String> {
@@ -198,7 +193,7 @@ fn matches_resource(v2: Option<&str>, resource_key: &str) -> bool {
     if v2 == resource_key {
         return true;
     }
-    let Some(reg) = RESOURCE_REGISTRY.get(resource_key) else {
+    let Some(reg) = registry_get(resource_key) else {
         return false;
     };
     reg.aliases.iter().any(|a| a == v2)
@@ -225,7 +220,7 @@ pub(crate) fn resolve_read_columns(
     if field_access.role_permissions.iter().any(|p| p == "*:*") {
         return Ok(None);
     }
-    let Some(reg) = RESOURCE_REGISTRY.get(resource_key) else {
+    let Some(reg) = registry_get(resource_key) else {
         return Err(format!("unknown resource key: {resource_key}"));
     };
 
@@ -296,9 +291,7 @@ pub fn resolve_http_sql_columns(
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<String>, String> {
     let restricted = resolve_read_columns(resource_key, field_access)?;
-    let reg = RESOURCE_REGISTRY
-        .get(resource_key)
-        .ok_or_else(|| format!("unknown resource: {resource_key}"))?;
+    let reg = registry_get(resource_key).ok_or_else(|| format!("unknown resource: {resource_key}"))?;
     let cols = if let Some(cols) = restricted {
         cols
     } else {
@@ -423,4 +416,49 @@ pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>
         ));
     };
     assert_safe_sql_identifiers(from_schema)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_http_sql_columns_includes_deleted_at_for_leads() {
+        let cols = resolve_http_sql_columns("leads", None).expect("leads columns");
+        assert!(
+            cols.iter().any(|c| c == "deleted_at"),
+            "expected deleted_at in leads projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_deleted_at_for_product_categories() {
+        let cols =
+            resolve_http_sql_columns("product-categories", None).expect("product-categories columns");
+        assert!(
+            cols.iter().any(|c| c == "deleted_at"),
+            "expected deleted_at in product-categories projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_qty_fields_for_purchase_order_lines() {
+        let cols =
+            resolve_http_sql_columns("purchase-order-lines", None).expect("purchase-order-lines columns");
+        for field in ["qty_received", "qty_invoiced", "qty_to_invoice"] {
+            assert!(
+                cols.iter().any(|c| c == field),
+                "expected {field} in purchase-order-lines projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_metadata_for_account_moves() {
+        let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
+        assert!(
+            cols.iter().any(|c| c == "metadata"),
+            "expected metadata in account-moves projection, got: {cols:?}"
+        );
+    }
 }

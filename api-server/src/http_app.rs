@@ -25,7 +25,6 @@ use crate::config::Config;
 use crate::error::ApiError;
 use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
-use crate::openapi;
 use crate::query_exec::{default_company_id, execute_resource_query};
 use crate::reducer_allowlist::{blocked_reducer_reason, ReducerAllowlistMode};
 use crate::routes;
@@ -73,10 +72,6 @@ async fn health_ready(State(state): State<Arc<AppState>>) -> Result<StatusCode, 
 
 async fn metrics_handler() -> (StatusCode, String) {
     (StatusCode::OK, metrics::render_prometheus())
-}
-
-async fn get_openapi() -> Json<Value> {
-    Json(openapi::specification())
 }
 
 async fn get_query(
@@ -280,7 +275,6 @@ pub async fn serve() -> anyhow::Result<()> {
     );
 
     let v1 = Router::new()
-        .route("/openapi.json", get(get_openapi))
         .route("/query/:resource", get(get_query))
         .route("/call/:reducer", post(post_call))
         .route("/realtime/ws", get(realtime::realtime_ws_upgrade))

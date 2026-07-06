@@ -25,22 +25,22 @@ This project uses two different identifiers. Mixing them breaks isolation or ret
 - SpacetimeDB HTTP SQL: `frontend/packages/stdb/src/http.ts`
 - Rust API (Phase 0–2): `api-server/` — `GET /v1/query/:resource`, `POST /v1/call/:reducer`, and domain routes under `/v1/crm`, `/v1/sales`, etc. use **`organization_id`** for tenant scope where applicable; company-scoped queries resolve **`company_id`** via the default `company` row (see `api-server/src/query_exec.rs`).
 - Browser → Rust (Phase 3): set `NEXT_PUBLIC_API_GATEWAY_URL` (e.g. `http://localhost:8082`) so the web app’s `apiFetch` / `fetchQueryList` send whitelisted `/api/*` traffic to `{url}/v1/*` instead of Next.js. Use `CORS_ORIGINS` on `api-server` when the web app runs on another origin. Helpers: `frontend/web/lib/api-url.ts`, `api-fetch.ts`.
-- OpenAPI (Phase 5 prep): `GET /v1/openapi.json` on `api-server` serves a static OpenAPI 3.0 document for `/health`, `/v1/query/{resource}`, `/v1/call/{reducer}`, and domain routes. Regenerate clients with `cargo run -p api-codegen` (optional `API_OPENAPI_URL` / `API_CODEGEN_OUT` / `API_CODEGEN_HOOKS_OUT`). Outputs: `frontend/web/lib/generated/api-server-paths.ts` (URL builders) and `api-server-hooks.ts` (TanStack Query hooks for domain routes only — not `/query` or `/call`).
 
 ## Maintaining the Rust field registry
 
-`crates/stdb-auth/assets/resource_registry.json` is generated from TypeScript so it stays aligned with `RESOURCE_REGISTRY` in `field-policy.ts`. After changing that registry, regenerate:
+**Source of truth:** [`crates/stdb-auth/assets/resource_registry.json`](../../crates/stdb-auth/assets/resource_registry.json) (owned by the Rust `stdb-auth` crate).
+
+After editing the registry, regenerate TypeScript:
 
 ```bash
-cd frontend/packages/stdb && npx tsx -e "
-import { RESOURCE_REGISTRY } from './src/field-policy.ts';
-import { writeFileSync } from 'fs';
-const out = {};
-for (const [k, v] of Object.entries(RESOURCE_REGISTRY)) {
-  out[k] = { table: v.table, aliases: v.aliases, default_restricted: v.defaultRestricted, mandatory: v.mandatory };
-}
-writeFileSync('../../../crates/stdb-auth/assets/resource_registry.json', JSON.stringify(out));
-"
+make codegen
 ```
 
-Copy `query-resource-row-type.json` and `stdb-generated-sql-columns.json` from `frontend/packages/stdb/src/` into `crates/stdb-auth/assets/` when those files change.
+Outputs:
+
+- `frontend/packages/stdb/src/generated/query-registry.ts` — `QueryResourceKey`, `RESOURCE_REGISTRY`
+- `frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts` — reducer → query invalidation map
+
+CI runs `make check-codegen` on every PR (fails if generated files drift).
+
+Also keep `query-resource-row-type.json` and `stdb-generated-sql-columns.json` aligned between `frontend/packages/stdb/src/` and `crates/stdb-auth/assets/` when SpacetimeDB schema changes (until those are codegen’d too).
