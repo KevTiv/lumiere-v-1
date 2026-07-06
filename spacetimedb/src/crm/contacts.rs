@@ -68,6 +68,8 @@ pub struct Contact {
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub deleted_at: Option<Timestamp>,
+    /// Set when this contact was merged into another; survivor id for traceability.
+    pub merge_target_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -316,8 +318,9 @@ pub fn create_contact(
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-        // System-managed: set via delete_contact
+        // System-managed: set via delete_contact / merge_contacts
         deleted_at: None,
+        merge_target_id: None,
         metadata: params.metadata,
     });
 

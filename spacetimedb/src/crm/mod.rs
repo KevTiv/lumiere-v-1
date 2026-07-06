@@ -17,6 +17,7 @@
 /// | segments | ContactSegment, SegmentMember, AssignmentRule |
 pub mod activities;
 pub mod contacts;
+pub mod duplicate;
 pub mod leads;
 pub mod opportunities;
 pub mod segments;
@@ -31,6 +32,9 @@ pub use contacts::{
     update_contact_address, update_contact_business, update_contact_details, Contact,
     ContactCategory, ContactCategoryAssignment, ContactRelationship, ContactTag,
     ContactTagAssignment,
+};
+pub use duplicate::{
+    find_duplicate_contacts, merge_contacts, ContactDuplicateCandidate, MergeContactsParams,
 };
 pub use leads::{
     convert_lead_to_customer, create_lead, update_lead_address, update_lead_details,

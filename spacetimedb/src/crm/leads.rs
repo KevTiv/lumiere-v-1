@@ -480,6 +480,7 @@ pub fn convert_lead_to_customer(
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             deleted_at: None,
+            merge_target_id: None,
             metadata: params.metadata.clone(),
         });
         contact_id = Some(contact.id);
