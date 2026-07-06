@@ -2,3 +2,9 @@
 > @lumiere/erp-shared@0.0.0 typecheck /Users/kevintivert/codebox/lumiere-v-1/frontend/packages/erp-shared
 > tsc --noEmit
 
+src/accounting-create-params.ts(10,3): error TS2300: Duplicate identifier 'CreateAccountMoveParams'.
+src/accounting-create-params.ts(1535,3): error TS2300: Duplicate identifier 'CreateAccountMoveParams'.
+src/accounting-create-params.ts(1599,67): error TS2322: Type '"Open" | "Posted" | "Confirm"' is not assignable to type '"Open" | "Posted" | "Cancelled" | "Processing"'.
+  Type '"Confirm"' is not assignable to type '"Open" | "Posted" | "Cancelled" | "Processing"'.
+src/stdb-params-json.ts(259,3): error TS1117: An object literal cannot have multiple properties with the same name.
+ ELIFECYCLE  Command failed with exit code 2.

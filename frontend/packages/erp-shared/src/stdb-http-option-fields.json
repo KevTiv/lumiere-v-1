@@ -1263,6 +1263,11 @@
   "CreateFormConfigParams": [
     "description"
   ],
+  "CreateSavedReportParams": [
+    "column_dimension",
+    "filter_json",
+    "metadata"
+  ],
   "CreateFormFieldParams": [
     "description",
     "placeholder",

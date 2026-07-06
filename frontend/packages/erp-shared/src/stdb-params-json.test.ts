@@ -218,6 +218,50 @@ describe("encodeTaggedUnitEnum", () => {
   })
 })
 
+describe("encodeReducerCallArgs grant_permission", () => {
+  it("SATS-encodes permission subject and action enums", () => {
+    const encoded = encodeReducerCallArgs("grant_permission", [
+      1,
+      {
+        subject: { tag: "Role", value: 42 },
+        resource: "account_move",
+        action: { tag: "Write" },
+        effect: { tag: "Allow" },
+      },
+    ])
+    assert.deepEqual(encoded[1], {
+      subject: { role: 42 },
+      resource: "account_move",
+      action: { write: [] },
+      effect: { allow: [] },
+    })
+  })
+})
+
+describe("encodeReducerCallArgs create_saved_report", () => {
+  it("emits explicit none for optional saved report fields", () => {
+    const encoded = encodeReducerCallArgs("create_saved_report", [
+      1,
+      2,
+      {
+        name: "Pivot Smoke",
+        model: "trial_balance",
+        rowDimension: "accountCode",
+        measureField: "closingDebit",
+        measureOp: "sum",
+        isActive: true,
+      },
+    ])
+    assert.equal(encoded[0], 1)
+    assert.equal(encoded[1], 2)
+    const params = encoded[2] as Record<string, unknown>
+    assert.equal(params.name, "Pivot Smoke")
+    assert.deepEqual(params.column_dimension, { none: [] })
+    assert.deepEqual(params.filter_json, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+})
+
 describe("camelToSnakeIdentifier", () => {
   it("handles Odoo-style relation suffixes", () => {
     assert.equal(camelToSnakeIdentifier("showLotsM2O"), "show_lots_m2o")

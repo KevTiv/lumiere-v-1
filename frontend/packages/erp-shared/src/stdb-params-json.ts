@@ -37,6 +37,34 @@ export function encodeTaggedUnitEnum(v: { tag: string }): Record<string, unknown
   return { [key]: [] }
 }
 
+function isTaggedPayloadEnum(v: unknown): v is { tag: string; value: unknown } {
+  return (
+    v !== null &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    "tag" in v &&
+    "value" in v &&
+    typeof (v as { tag?: unknown }).tag === "string"
+  )
+}
+
+/** SATS tuple-variant sum JSON (e.g. `{ tag: "Role", value: 1n }` → `{ role: 1 }`). */
+export function encodeTaggedPayloadEnum(v: {
+  tag: string
+  value: unknown
+}): Record<string, unknown> {
+  const key = v.tag.charAt(0).toLowerCase() + v.tag.slice(1)
+  let encodedValue = v.value
+  if (key === "user") {
+    encodedValue = encodeIdentity(v.value)
+  } else if (typeof v.value === "bigint") {
+    encodedValue = bigintToJson(v.value)
+  } else if (typeof v.value === "string" && /^\d+$/.test(v.value.trim())) {
+    encodedValue = Number(v.value.trim())
+  }
+  return { [key]: encodedValue }
+}
+
 /** Match `@lumiere/api-client` `stringifyReducerCallBody`: STDB HTTP expects JSON numbers for `u64`. */
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER)
 
@@ -59,6 +87,13 @@ function encodeTimestamp(v: unknown): Record<string, string | number> {
     return { [STDB_TIMESTAMP_KEY]: raw }
   }
   if (typeof raw === "string") {
+    const trimmed = raw.trim()
+    if (trimmed !== "" && /^\d+$/.test(trimmed)) {
+      const n = Number(trimmed)
+      if (Number.isSafeInteger(n)) {
+        return { [STDB_TIMESTAMP_KEY]: n }
+      }
+    }
     return { [STDB_TIMESTAMP_KEY]: raw }
   }
   throw new Error("stdbParamsToJson: invalid timestamp value")
@@ -101,6 +136,14 @@ function encodeValue(
 
   if (isTimestampLike(value)) {
     return encodeTimestamp(value)
+  }
+
+  if (isTaggedPayloadEnum(value)) {
+    const encoded = encodeTaggedPayloadEnum(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: encoded }
+    }
+    return encoded
   }
 
   if (isTaggedEnum(value)) {
@@ -188,6 +231,39 @@ export function encodeOptionalBool(
   return { some: value }
 }
 
+/** SpacetimeDB HTTP Identity (U256) JSON for flat reducer args. */
+export function encodeIdentity(value: unknown): Record<string, string> {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("__identity__" in obj && typeof obj.__identity__ === "string") {
+      const raw = obj.__identity__
+      const hex = raw.startsWith("0x") ? raw : `0x${raw}`
+      return { __identity__: hex.toLowerCase() }
+    }
+  }
+  const hex = String(value ?? "").replace(/^0x/i, "")
+  if (hex.length !== 64) {
+    throw new Error(
+      `encodeIdentity: expected 64-char hex identity, got length ${hex.length}`,
+    )
+  }
+  return { __identity__: `0x${hex.toLowerCase()}` }
+}
+
+/** SpacetimeDB HTTP Timestamp JSON for flat reducer args. */
+export function encodeTimestampMicros(value: unknown): Record<string, string | number> {
+  if (isTimestampLike(value)) {
+    return encodeTimestamp(value)
+  }
+  if (typeof value === "bigint") {
+    return encodeTimestamp({ microsSinceUnixEpoch: value })
+  }
+  if (typeof value === "number" || typeof value === "string") {
+    return encodeTimestamp({ microsSinceUnixEpoch: value })
+  }
+  throw new Error("encodeTimestampMicros: invalid timestamp value")
+}
+
 /** SATS `Option<Timestamp>` JSON for flat reducer args (not struct fields). */
 export function encodeOptionalTimestamp(
   value: Date | string | null | undefined,
@@ -230,6 +306,7 @@ export function stdbParamsToJson(
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
   create_lead: "CreateLeadParams",
   create_contact: "CreateContactParams",
+  merge_contacts: "MergeContactsParams",
   convert_lead_to_customer: "ConvertLeadParams",
   convert_opportunity_to_sale_order: "ConvertOpportunityParams",
   create_opportunity_line: "CreateOpportunityLineParams",
@@ -252,6 +329,42 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_stock_move: "CreateStockMoveParams",
   create_inventory_adjustment: "CreateInventoryAdjustmentParams",
   create_crossovered_budget: "CreateCrossoveredBudgetParams",
+  create_crossovered_budget_line: "CreateCrossoveredBudgetLineParams",
+  create_account_journal: "CreateAccountJournalParams",
+  create_account_move: "CreateAccountMoveParams",
+  create_account_bank_statement: "CreateAccountBankStatementParams",
+  create_stock_inventory: "CreateStockInventoryParams",
+  create_stock_inventory_line: "CreateStockInventoryLineParams",
+  create_uom: "CreateUomParams",
+  create_uom_category: "CreateUomCategoryParams",
+  create_uom_conversion: "CreateUomConversionParams",
+  create_product_variant: "CreateProductVariantParams",
+  create_product_supplier_info: "CreateProductSupplierInfoParams",
+  create_product_packaging: "CreateProductPackagingParams",
+  create_barcode_nomenclature: "CreateBarcodeNomenclatureParams",
+  create_replenishment_rule: "CreateReplenishmentRuleParams",
+  create_leave_type: "CreateLeaveTypeParams",
+  create_payroll_structure: "CreatePayrollStructureParams",
+  create_salary_rule: "CreateSalaryRuleParams",
+  create_document_folder: "CreateDocumentFolderParams",
+  create_knowledge_category: "CreateKnowledgeCategoryParams",
+  create_document_processing_job: "CreateDocumentProcessingJobParams",
+  create_audit_rule: "CreateAuditRuleParams",
+  create_approval_rule: "CreateApprovalRuleParams",
+  create_saved_report: "CreateSavedReportParams",
+  create_utm_campaign: "CreateUtmCampaignParams",
+  create_utm_medium: "CreateUtmMediumParams",
+  create_utm_source: "CreateUtmSourceParams",
+  create_form_configuration: "CreateFormConfigParams",
+  grant_permission: "GrantOrgPermissionParams",
+  add_org_member: "AddOrgMemberParams",
+  assign_role: "AssignRoleParams",
+  create_data_classification: "CreateDataClassificationParams",
+  create_data_classification_rule: "CreateDataClassificationRuleParams",
+  create_user_session: "CreateUserSessionParams",
+  create_role: "CreateRoleParams",
+  create_country: "CreateCountryParams",
+  create_currency: "CreateCurrencyParams",
   create_fiscal_year: "CreateFiscalYearParams",
   create_account_period: "CreateAccountPeriodParams",
   create_analytic_account: "CreateAnalyticAccountParams",
@@ -268,6 +381,22 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
 const FLAT_OPTION_ARG_INDICES: Partial<Record<string, readonly number[]>> = {
   create_proposal: [4, 5, 6],
   update_payment_term: [2, 3, 4],
+}
+
+/** Flat non-option arg encoders (Identity, Timestamp, etc.). */
+const FLAT_ARG_ENCODERS: Partial<
+  Record<string, Partial<Record<number, (value: unknown) => unknown>>>
+> = {
+  create_user_invite: {
+    4: encodeIdentity,
+    5: encodeTimestampMicros,
+  },
+  add_org_member: {
+    0: encodeIdentity,
+  },
+  assign_role: {
+    0: encodeIdentity,
+  },
 }
 
 function encodeFlatOptionalArg(value: unknown, argIndex: number, reducer: string): unknown {
@@ -304,19 +433,26 @@ function encodeFlatOptionalArg(value: unknown, argIndex: number, reducer: string
  * Top-level org / id args are left unchanged.
  */
 export function encodeReducerCallArgs(reducer: string, args: unknown[]): unknown[] {
+  const flatEncoders = FLAT_ARG_ENCODERS[reducer]
   const flatOptionIndices = FLAT_OPTION_ARG_INDICES[reducer]
-  if (flatOptionIndices?.length) {
-    return args.map((arg, index) =>
-      flatOptionIndices.includes(index) ? encodeFlatOptionalArg(arg, index, reducer) : arg,
-    )
+  let encoded = args
+  if (flatEncoders || flatOptionIndices?.length) {
+    encoded = args.map((arg, index) => {
+      const encode = flatEncoders?.[index]
+      if (encode) return encode(arg)
+      if (flatOptionIndices?.includes(index)) {
+        return encodeFlatOptionalArg(arg, index, reducer)
+      }
+      return arg
+    })
   }
 
   const structName = REDUCER_PARAM_STRUCTS[reducer]
-  if (!structName || args.length === 0) return args
-  const lastIdx = args.length - 1
-  const last = args[lastIdx]
-  if (last === null || typeof last !== "object" || Array.isArray(last)) return args
-  const encoded = [...args]
-  encoded[lastIdx] = stdbParamsToJson(last as object, structName)
-  return encoded
+  if (!structName || encoded.length === 0) return encoded
+  const lastIdx = encoded.length - 1
+  const last = encoded[lastIdx]
+  if (last === null || typeof last !== "object" || Array.isArray(last)) return encoded
+  const withStruct = [...encoded]
+  withStruct[lastIdx] = stdbParamsToJson(last as object, structName)
+  return withStruct
 }

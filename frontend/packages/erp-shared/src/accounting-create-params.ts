@@ -1526,3 +1526,143 @@ export function toUpdateTaxDeadlineParams(
 export function updateTaxDeadlineParamsToJson(params: UpdateTaxDeadlineParams): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
+
+// ── Journals / moves / bank statements / budget lines / credit notes ─────────
+
+import type {
+  CreateAccountBankStatementParams,
+  CreateAccountJournalParams,
+  CreateAccountMoveParams,
+  CreateCreditNoteParams,
+  CreateCrossoveredBudgetLineParams,
+} from '@lumiere/stdb/types'
+
+type JournalType = CreateAccountJournalParams['type']
+
+function journalTypeTagFromForm(raw: unknown): JournalType {
+  const s = String(raw ?? 'Sale').trim()
+  if (s === 'Purchase') return { tag: 'Purchase' }
+  if (s === 'Bank') return { tag: 'Bank' }
+  if (s === 'Cash') return { tag: 'Cash' }
+  if (s === 'General') return { tag: 'General' }
+  return { tag: 'Sale' }
+}
+
+export function toCreateAccountJournalParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateAccountJournalParams {
+  return {
+    companyId,
+    name: String(formData.name ?? '').trim(),
+    code: String(formData.code ?? '').trim(),
+    type: journalTypeTagFromForm(formData.type),
+    currencyId: optionalBigIntU64(formData.currencyId),
+    defaultAccountId: optionalBigIntU64(formData.defaultAccountId),
+    suspenseAccountId: optionalBigIntU64(formData.suspenseAccountId),
+    lossAccountId: optionalBigIntU64(formData.lossAccountId),
+    profitAccountId: optionalBigIntU64(formData.profitAccountId),
+    bankAccountId: optionalBigIntU64(formData.bankAccountId),
+    paymentCreditAccountId: optionalBigIntU64(formData.paymentCreditAccountId),
+    paymentDebitAccountId: optionalBigIntU64(formData.paymentDebitAccountId),
+    invoiceReferenceType: optionalTrimmedString(formData.invoiceReferenceType),
+    invoiceReferenceModel: optionalTrimmedString(formData.invoiceReferenceModel),
+    sequenceId: optionalBigIntU64(formData.sequenceId),
+    refundSequenceId: optionalBigIntU64(formData.refundSequenceId),
+    sequenceOverrideRegex: optionalTrimmedString(formData.sequenceOverrideRegex),
+    secureSequenceId: optionalBigIntU64(formData.secureSequenceId),
+    aliasName: optionalTrimmedString(formData.aliasName),
+    aliasDomain: optionalTrimmedString(formData.aliasDomain),
+    saleActivityTypeId: optionalBigIntU64(formData.saleActivityTypeId),
+    saleActivityUserId: optionalBigIntU64(formData.saleActivityUserId),
+    saleActivityNote: optionalTrimmedString(formData.saleActivityNote),
+    saleActivityDateDeadline: optionalTimestampFromFormDate(formData.saleActivityDateDeadline),
+    restrictModeHashTable: formData.restrictModeHashTable === true,
+    active: formData.active !== false,
+    atLeastOneInbound: formData.atLeastOneInbound === true,
+    atLeastOneOutbound: formData.atLeastOneOutbound === true,
+    dedicatedPaymentMethodIds: u64IdArrayFromForm(formData.dedicatedPaymentMethodIds),
+    saleActivityDone: formData.saleActivityDone === true,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+/** Form → journal entry move; alias for coverage and explicit call sites. */
+export function toCreateAccountMoveParams(
+  formData: Record<string, unknown>,
+): CreateAccountMoveParams | null {
+  return toCreateJournalEntryMoveParams(formData)
+}
+
+function bankStatementStateFromForm(raw: unknown): CreateAccountBankStatementParams['state'] {
+  const s = String(raw ?? 'Open').trim()
+  if (s === 'Open' || s === 'Confirm' || s === 'Posted') return { tag: s }
+  return { tag: 'Open' }
+}
+
+export function toCreateAccountBankStatementParams(
+  formData: Record<string, unknown>,
+): CreateAccountBankStatementParams | null {
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  if (currencyId === null) return null
+  const balanceStart = Number(formData.balanceStart ?? formData.balance_start ?? 0)
+  return {
+    name: optionalTrimmedString(formData.name),
+    reference: optionalTrimmedString(formData.reference),
+    date: optionalTimestampFromFormDate(formData.date),
+    balanceStart: Number.isFinite(balanceStart) ? balanceStart : 0,
+    currencyId,
+    state: bankStatementStateFromForm(formData.state),
+    lineIds: u64IdArrayFromForm(formData.lineIds ?? formData.line_ids),
+    moveLineIds: u64IdArrayFromForm(formData.moveLineIds ?? formData.move_line_ids),
+    totalEntryEncoding: Number(formData.totalEntryEncoding ?? formData.total_entry_encoding ?? 0),
+    totalAmount: Number(formData.totalAmount ?? formData.total_amount ?? 0),
+    totalAmountCurrency: Number(formData.totalAmountCurrency ?? formData.total_amount_currency ?? 0),
+    dateDone: optionalTimestampFromFormDate(formData.dateDone ?? formData.date_done),
+    isValidBalanceStart: formData.isValidBalanceStart !== false && formData.is_valid_balance_start !== false,
+    isValidBalanceEnd: formData.isValidBalanceEnd !== false && formData.is_valid_balance_end !== false,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateCrossoveredBudgetLineParams(
+  formData: Record<string, unknown>,
+): CreateCrossoveredBudgetLineParams {
+  const plannedAmount = Number(formData.plannedAmount ?? formData.planned_amount ?? 0)
+  return {
+    analyticAccountId: optionalBigIntU64(formData.analyticAccountId ?? formData.analytic_account_id),
+    dateFrom: timestampFromFormDate(formData.dateFrom ?? formData.date_from ?? new Date()),
+    dateTo: timestampFromFormDate(formData.dateTo ?? formData.date_to ?? new Date()),
+    paidDate: optionalTimestampFromFormDate(formData.paidDate ?? formData.paid_date),
+    plannedAmount: Number.isFinite(plannedAmount) ? plannedAmount : 0,
+    practicalAmount: Number(formData.practicalAmount ?? formData.practical_amount ?? 0),
+    theoreticalAmount: Number(formData.theoreticalAmount ?? formData.theoretical_amount ?? 0),
+    achievePercentage: Number(formData.achievePercentage ?? formData.achieve_percentage ?? 0),
+    isAboveBudget: formData.isAboveBudget === true || formData.is_above_budget === true,
+    variance: Number(formData.variance ?? -plannedAmount),
+    variancePercentage: Number(
+      formData.variancePercentage ??
+        formData.variance_percentage ??
+        (plannedAmount > 0 ? -100 : 0),
+    ),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateCreditNoteParams(
+  formData: Record<string, unknown>,
+): CreateCreditNoteParams {
+  const lineIdsRaw = formData.lineIds ?? formData.line_ids
+  const lineIds = Array.isArray(lineIdsRaw)
+    ? lineIdsRaw.map((id) => BigInt(String(id)))
+    : u64IdArrayFromForm(lineIdsRaw)
+  const reasonRaw = formData.reason
+  const reason =
+    reasonRaw == null || String(reasonRaw).trim() === ''
+      ? undefined
+      : String(reasonRaw).trim()
+  return {
+    lineIds,
+    reason,
+  }
+}
