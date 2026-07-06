@@ -63,11 +63,11 @@ cat frontend/web/reducer-coverage-report.json
 |--------|------:|-------|
 | `Create*Params` structs (Rust) | **166** | `spacetimedb/src/**/*.rs` |
 | `Create*` entries in option-fields JSON | **~147** | `stdb-http-option-fields.json` |
-| Dedicated `toCreate*` / `*FromForm` mappers | **~88** | `frontend/web/lib` + `erp-shared` (see § tooling) |
-| `REDUCER_PARAM_STRUCTS` (E2E helper) | **8** | `stdb-params-json.ts` |
+| Dedicated `toCreate*` / `*FromForm` mappers | **~125** | `frontend/web/lib` + `erp-shared` (see § tooling) |
+| `REDUCER_PARAM_STRUCTS` (E2E helper) | **40+** | `stdb-params-json.ts` |
 | Form field definitions (UI configs) | **~1,500+** | 23 `*-form-configs.ts` modules |
 | `as unknown as Create*` in web clients | **8** | calendar, documents, subscriptions (+ others TBD) |
-| **Mapper coverage (automated)** | **53%** | 88 / 166 — `scripts/check-params-mapper-coverage.ts` |
+| **Mapper coverage (automated)** | **73.5%** | 125 / 170 — `scripts/check-params-mapper-coverage.ts` (Phase 4 [params-cohesion-v2]) |
 
 ---
 
@@ -264,6 +264,7 @@ Form (createInvoiceFromSaleOrderForm)
 | 2026-07-01 | Wave 3: `toCreatePurchaseOrderParams`, P2P E2E, PO dashboard `Purchase` filter, `internalType` in account-accounts field policy |
 | 2026-07-04 | Wave 3 gate green: `E2E_CLEAR_DB=1 make e2e-p2p`; Makefile `e2e-p2p` + `e2e-mvp-golden` |
 | 2026-07-05 | Phase B/C tooling: `scripts/check-params-mapper-coverage.ts` + CI floor in `params-cohesion.yml` (baseline **53%**, 88/166 mapped) |
+| 2026-07-05 | Phase 4 [params-cohesion-v2] mapper ramp: **73.5%** (125/170); CI floor raised to **70%**; accounting, inventory, HR, documents, settings, approvals, reports, CRM UTM mappers |
 
 ---
 
@@ -294,26 +295,26 @@ cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts -
 cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --json --verbose
 
 # CI floor (exit 1 when below threshold)
-cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 53
+cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 70
 ```
 
 **Output shape:**
 
 ```json
 {
-  "totalStructs": 166,
-  "mappedCount": 88,
-  "coveragePct": 53,
+  "totalStructs": 170,
+  "mappedCount": 125,
+  "coveragePct": 73.5,
   "unmapped": ["CreateAccountAssetParams", "..."]
 }
 ```
 
-**CI:** `.github/workflows/params-cohesion.yml` runs on PR/push when Rust or mapper paths change. Floor **53%** (2026-07-05 baseline); target **70%** emits a warning annotation via `--warn-coverage 70`.
+**CI:** `.github/workflows/params-cohesion.yml` runs on PR/push when Rust or mapper paths change. Floor **70%** (2026-07-05 Phase 4 baseline); `--warn-coverage 70` aligned with floor.
 
 **Thresholds ([params-cohesion-v2 mission](../.cursor/plans/params-cohesion-v2-mission.md)):**
 
 | Level | Coverage | CI behavior |
 |-------|----------|-------------|
-| Floor | 53% → raise toward 55%+ as mappers land | `exit 1` on PR |
-| Target | 70% | warning |
+| Floor | **70%** | `exit 1` on PR |
+| Target | 70% | met (Phase 4) |
 | Stretch | 85% | backlog |
