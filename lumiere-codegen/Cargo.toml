@@ -2,7 +2,7 @@
 name = "lumiere-codegen"
 version.workspace = true
 edition.workspace = true
-description = "Rust registry → TypeScript query-registry and stdb reducer invalidation map"
+description = "Rust registry + SpacetimeDB bindings → TypeScript query-registry, SQL columns JSON, invalidation map"
 
 [[bin]]
 name = "lumiere-codegen"

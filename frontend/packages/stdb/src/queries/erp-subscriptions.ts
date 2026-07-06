@@ -12,7 +12,7 @@ import {
 export interface SubscriptionQueryContext {
   organizationId?: number;
   /**
-   * Company row ids for this organization (from e.g. RSC `serverQueryCompanies`).
+   * Company row ids for this organization (from e.g. RSC `serverFetchQueryList('companies')`).
    * Required for WebSocket SQL on resources that scope by `company_id` without `organization_id`
    * (fixed assets, intercompany, etc.) — SpacetimeDB HTTP/SQL does not support `IN (SELECT …)`.
    */
@@ -558,7 +558,7 @@ function subscriptionSqlForCompanyScopedResource(
     return [`SELECT ${c} FROM stock_picking_batch WHERE company_id IN (${list})`]
   }
   if (resource === "pos-sessions") {
-    // Child of pos_config — no SQL subqueries; use HTTP `serverQueryPosSessions` instead.
+    // Child of pos_config — no SQL subqueries; load pos-sessions via api-server query instead.
     return null
   }
   return undefined
@@ -568,7 +568,7 @@ function subscriptionSqlForCompanyScopedResource(
  * Returns subscription SQL for a single resource key.
  * - Most ERP keys require `organizationId`.
  * - `roles` is global (no org).
- * - `user-roles` requires `identityHex` (matches serverQueryUserRoleAssignments scope).
+ * - `user-roles` requires `identityHex` (matches api-server user-roles query scope).
  * @returns `null` if the resource is unknown or required context is missing.
  */
 export function subscriptionQueriesForResource(

@@ -9,7 +9,7 @@
  *
  * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
- * - `@lumiere/stdb/server` — RSC / `stdbSql` / `serverQuery*`
+ * - `@lumiere/stdb/server` — `stdbSql` + entity types for Next.js API routes (not RSC reads)
  * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted
  * - `@lumiere/stdb/client-ui-bridge` — minimal mutation helpers for `@lumiere/ui`
  *

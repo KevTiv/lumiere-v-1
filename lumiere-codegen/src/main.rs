@@ -7,15 +7,31 @@
 //! ```
 
 mod registry_emit;
+mod sql_columns_emit;
 mod stdb_invalidation_emit;
 
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn env_or_default(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+fn write_file(path: &Path, contents: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
+    }
+    fs::write(path, contents).with_context(|| format!("write {}", path.display()))
+}
+
+fn sync_asset(manifest_dir: &Path, asset_name: &str, frontend_rel: &str) -> Result<PathBuf> {
+    let src = manifest_dir.join("../crates/stdb-auth/assets").join(asset_name);
+    let text = fs::read_to_string(&src).with_context(|| format!("read {}", src.display()))?;
+    let out = manifest_dir.join("../").join(frontend_rel);
+    write_file(&out, &text)?;
+    Ok(out)
 }
 
 fn main() -> Result<()> {
@@ -29,12 +45,8 @@ fn main() -> Result<()> {
         "frontend/packages/stdb/src/generated/query-registry.ts",
     );
     let registry_path_out = Path::new(&registry_out);
-    if let Some(parent) = registry_path_out.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
-    }
     let registry_ts = registry_emit::emit_query_registry_typescript(&registry_text)?;
-    fs::write(registry_path_out, &registry_ts)
-        .with_context(|| format!("write {}", registry_path_out.display()))?;
+    write_file(registry_path_out, &registry_ts)?;
 
     let invalidation_manifest = manifest_dir.join("reducer-stdb-invalidation.json");
     let stdb_inv_out = env_or_default(
@@ -42,18 +54,37 @@ fn main() -> Result<()> {
         "frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts",
     );
     let stdb_inv_path = Path::new(&stdb_inv_out);
-    if let Some(parent) = stdb_inv_path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
-    }
     let manifest_text = fs::read_to_string(&invalidation_manifest)
         .with_context(|| format!("read {}", invalidation_manifest.display()))?;
     let manifest: Value = serde_json::from_str(&manifest_text)
         .with_context(|| format!("parse {}", invalidation_manifest.display()))?;
     let stdb_inv_ts = stdb_invalidation_emit::emit_std_invalidation_typescript(&manifest)?;
-    fs::write(stdb_inv_path, stdb_inv_ts)
-        .with_context(|| format!("write {}", stdb_inv_path.display()))?;
+    write_file(stdb_inv_path, &stdb_inv_ts)?;
+
+    let types_ts_path = manifest_dir.join("../frontend/packages/stdb/src/generated/types.ts");
+    let types_ts = fs::read_to_string(&types_ts_path)
+        .with_context(|| format!("read {}", types_ts_path.display()))?;
+    let generated_dir = manifest_dir.join("../frontend/packages/stdb/src/generated");
+    let sql_columns_json =
+        sql_columns_emit::emit_sql_columns_json(&types_ts, &generated_dir)?;
+    let sql_columns_frontend =
+        manifest_dir.join("../frontend/packages/stdb/src/stdb-generated-sql-columns.json");
+    let sql_columns_rust =
+        manifest_dir.join("../crates/stdb-auth/assets/stdb-generated-sql-columns.json");
+    write_file(&sql_columns_frontend, &sql_columns_json)?;
+    write_file(&sql_columns_rust, &sql_columns_json)?;
+
+    let row_type_out = sync_asset(
+        manifest_dir,
+        "query-resource-row-type.json",
+        "frontend/packages/stdb/src/query-resource-row-type.json",
+    )?;
 
     let key_count = serde_json::from_str::<Value>(&registry_text)?
+        .as_object()
+        .map(|o| o.len())
+        .unwrap_or(0);
+    let type_count = serde_json::from_str::<Value>(&sql_columns_json)?
         .as_object()
         .map(|o| o.len())
         .unwrap_or(0);
@@ -62,7 +93,11 @@ fn main() -> Result<()> {
         "lumiere-codegen: {key_count} registry keys from {}",
         registry_path.display()
     );
+    println!("lumiere-codegen: {type_count} SQL column maps from {}", types_ts_path.display());
     println!("Wrote {}", registry_path_out.display());
     println!("Wrote {}", stdb_inv_path.display());
+    println!("Wrote {}", sql_columns_frontend.display());
+    println!("Wrote {}", sql_columns_rust.display());
+    println!("Wrote {}", row_type_out.display());
     Ok(())
 }

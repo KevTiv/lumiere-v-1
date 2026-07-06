@@ -31,10 +31,14 @@ flowchart LR
 ### Query registry (Rust → TypeScript)
 
 - **Source of truth:** [`crates/stdb-auth/assets/resource_registry.json`](../crates/stdb-auth/assets/resource_registry.json)
-- **Codegen:** `make codegen` (`lumiere-codegen`) emits `frontend/packages/stdb/src/generated/query-registry.ts`
-- **CI:** `make check-codegen` fails if generated TS drifts from the registry
+- **Codegen:** `make codegen` (`lumiere-codegen`) emits:
+  - `frontend/packages/stdb/src/generated/query-registry.ts`
+  - `stdb-generated-sql-columns.json` (frontend + `crates/stdb-auth/assets/`, from `generated/*_table.ts` + `types.ts`)
+  - `query-resource-row-type.json` copy (Rust asset → frontend)
+- **CI:** `make check-codegen` fails if generated artifacts drift
 - **Browser reads:** `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
-- **SSR reads:** All module RSC pages use `serverFetchQueryList` / `serverFetchQueryListsAllowEmpty` in [`frontend/web/lib/server-query.ts`](../frontend/web/lib/server-query.ts) → `GET /v1/query/:resource` on api-server. Legacy `serverQuery*` in `server.ts` remains for route handlers and internal helpers only.
+- **SSR reads:** All module RSC pages use `serverFetchQueryList` / `serverFetchQueryListsAllowEmpty` in [`frontend/web/lib/server-query.ts`](../frontend/web/lib/server-query.ts) → `GET /v1/query/:resource` on api-server
+- **Admin SQL:** `@lumiere/stdb/server` exports `stdbSql` + entity types for Next.js auth/admin route handlers only
 
 ### AI
 

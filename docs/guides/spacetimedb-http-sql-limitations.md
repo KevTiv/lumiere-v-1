@@ -4,7 +4,7 @@ This guide documents SQL features that **SpacetimeDB’s HTTP/SQL interface does
 
 It applies to:
 
-- `**/api/query/...`** — server-side queries in `frontend/packages/stdb/src/server.ts` via `stdbSql`.
+- `**/api/query/...`** — browser reads via api-server `query_exec.rs`; admin routes may use `stdbSql` from `@lumiere/stdb/server`.
 - **WebSocket subscription SQL** — queries built in `frontend/packages/stdb/src/queries/erp-subscriptions.ts` and related modules.
 
 Bindings and reducers are unaffected; this is only about **SQL strings** sent over SpacetimeDB’s SQL API.
@@ -23,7 +23,7 @@ Bindings and reducers are unaffected; this is only about **SQL strings** sent ov
 
 - `**resolveHttpSqlColumns(resourceKey, fieldAccess)`** in `frontend/packages/stdb/src/field-policy.ts` — builds the column list for a `QueryResourceKey` (Casbin-restricted columns when applicable, otherwise full list from generated metadata).
 - `**sqlColumnListForGeneratedType(typeName)**` — for tables that are not keyed as `QueryResourceKey` (e.g. `SubscriptionLine`, `FormConfig`).
-- Generated column metadata: `frontend/packages/stdb/src/stdb-generated-sql-columns.json` (from `generated/types.ts`).
+- Generated column metadata: `stdb-generated-sql-columns.json` — run `make codegen` after SpacetimeDB binding changes (parsed from `generated/*_table.ts` + `types.ts`).
 
 Do not add new HTTP or subscription queries that use `SELECT *`.
 
@@ -35,9 +35,9 @@ Do not add new HTTP or subscription queries that use `SELECT *`.
 
 **Mitigations used in Lumiere:**
 
-1. **Resolve IDs first, then query with a literal list** — e.g. load company ids for the org, then `WHERE company_id IN (1, 2, 3)`. See `companyIdsForOrganization` and related `serverQuery*` helpers in `server.ts`.
-2. **Pass `companyIds` from the server into the client** — `RootLayout` loads companies with `serverQueryCompanies` and passes `companyIds` through `Providers` → `StdbConnectionProvider` → `createClientSubscriptions`, so WebSocket subscriptions for **company-scoped** resources can use `IN (${ids})` without a subquery. Context type: `SubscriptionQueryContext` in `erp-subscriptions.ts`.
-3. **Split into multiple round-trips** — e.g. payment terms, then term lines keyed by those ids (see comment on `serverQueryAccountPaymentTermLines`: no JOIN).
+1. **Resolve IDs first, then query with a literal list** — e.g. load company ids for the org, then `WHERE company_id IN (1, 2, 3)`. api-server `query_exec.rs` and `company-scope-server.ts` follow this pattern.
+2. **Pass `companyIds` from the server into the client** — `RootLayout` loads companies via `serverFetchQueryList('companies')` and passes `companyIds` through `Providers` → `StdbConnectionProvider` → `createClientSubscriptions`, so WebSocket subscriptions for **company-scoped** resources can use `IN (${ids})` without a subquery. Context type: `SubscriptionQueryContext` in `erp-subscriptions.ts`.
+3. **Split into multiple round-trips** — e.g. payment terms, then term lines keyed by those ids (see `query_exec.rs` for `account-payment-term-lines`).
 
 ### 3. `JOIN` (avoid for HTTP SQL)
 
@@ -57,7 +57,7 @@ Do not add new HTTP or subscription queries that use `SELECT *`.
 
 ## API route pitfall (fixed pattern)
 
-When wiring `serverQuery*` into `frontend/web/app/api/query/[resource]/route.ts`, match the **real function signature**. For example, `serverQueryAccountMoves(organizationId, moveType?, opts?)` must not pass `opts` in the `moveType` position (that previously caused bogus SQL filters).
+Browser query routes proxy to api-server `query_exec.rs`. When adding special-case SQL there, match reducer/query parameter order — do not swap optional filter args with `StdbHttpOptions`.
 
 ---
 
@@ -66,14 +66,15 @@ When wiring `serverQuery*` into `frontend/web/app/api/query/[resource]/route.ts`
 
 | Area                                | Location                                                         |
 | ----------------------------------- | ---------------------------------------------------------------- |
-| Column resolution / field policy    | `frontend/packages/stdb/src/field-policy.ts`                     |
-| HTTP `serverQuery*` implementations | `frontend/packages/stdb/src/server.ts`                           |
+| Column resolution / field policy    | `frontend/packages/stdb/src/field-policy.ts`, `crates/stdb-auth/src/field_policy.rs` |
+| SSR list reads (RSC pages)          | `frontend/web/lib/server-query.ts` → api-server `query_exec.rs`  |
+| Admin `stdbSql` (auth routes)       | `frontend/packages/stdb/src/server.ts`                           |
 | Subscription SQL builders           | `frontend/packages/stdb/src/queries/erp-subscriptions.ts`        |
 | Auth / subscription helpers         | `frontend/packages/stdb/src/queries/auth.ts`, `subscriptions.ts` |
 | RSC → client `companyIds`           | `frontend/web/app/layout.tsx`, `frontend/web/app/providers.tsx`  |
 | WebSocket provider                  | `frontend/packages/stdb/src/context.tsx`                         |
 | Query route map                     | `frontend/web/app/api/query/[resource]/route.ts`                 |
-| Rust gateway field policy (mirror)  | `crates/stdb-auth/assets/*.json`, `crates/stdb-auth/src/field_policy.rs` |
+| Rust gateway assets + codegen       | `crates/stdb-auth/assets/*.json`, `make codegen` (`lumiere-codegen`) |
 
 
 ---
@@ -84,7 +85,7 @@ When wiring `serverQuery*` into `frontend/web/app/api/query/[resource]/route.ts`
 2. Build SQL with `**resolveHttpSqlColumns**` or `**sqlColumnListForGeneratedType**` — never `*`.
 3. Avoid subqueries and JOINs; use **literal `IN` lists** or **extra queries**.
 4. If the table is scoped only by `**company_id`**, ensure both **HTTP** paths (server can call `companyIdsForOrganization`) and **WebSocket** paths (pass `**companyIds`** from RSC) are considered.
-5. If the **Rust** `stdb-auth` / API gateway validates query resources, mirror the same keys in `crates/stdb-auth/assets/resource_registry.json` and `query-resource-row-type.json` (and keep `stdb-generated-sql-columns.json` in sync with the frontend copy). See `crates/stdb-auth/src/field_policy.rs`.
+5. Run `make codegen` after SpacetimeDB schema changes so `resource_registry.json`, `query-resource-row-type.json`, and `stdb-generated-sql-columns.json` stay aligned (Rust assets + frontend copies).
 
 ---
 

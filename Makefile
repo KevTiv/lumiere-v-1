@@ -90,8 +90,8 @@ help:
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
-	@echo "  codegen                 Emit query-registry.ts + stdb-reducer-invalidation from Rust assets"
-	@echo "  check-codegen           Fail if generated TS drifts from registry (CI)"
+	@echo "  codegen                 Emit query-registry.ts, sql-columns JSON, invalidation map"
+	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI)"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -702,9 +702,20 @@ codegen:
 	cargo run -p lumiere-codegen
 
 check-codegen: codegen
-	@git add -N frontend/packages/stdb/src/generated/query-registry.ts frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts 2>/dev/null || true
-	@git diff --exit-code -- frontend/packages/stdb/src/generated/query-registry.ts frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts || \
-		(echo "Generated TypeScript is out of date. Run: make codegen" && exit 1)
+	@git add -N \
+		frontend/packages/stdb/src/generated/query-registry.ts \
+		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
+		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
+		frontend/packages/stdb/src/query-resource-row-type.json \
+		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
+		2>/dev/null || true
+	@git diff --exit-code -- \
+		frontend/packages/stdb/src/generated/query-registry.ts \
+		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
+		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
+		frontend/packages/stdb/src/query-resource-row-type.json \
+		crates/stdb-auth/assets/stdb-generated-sql-columns.json || \
+		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
 api-server-run:
 	source api-server/.env.local && cargo run -p api-server
