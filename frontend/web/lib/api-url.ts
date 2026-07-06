@@ -15,7 +15,6 @@
 const GATEWAY_PREFIXES = [
   '/api/query/',
   '/api/call/',
-  '/api/stdb/',
   '/api/auth/signin',
   '/api/auth/invite',
   '/api/auth/accept-invite',

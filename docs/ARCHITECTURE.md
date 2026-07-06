@@ -36,6 +36,7 @@ flowchart LR
   - `stdb-generated-sql-columns.json` (frontend + `crates/stdb-auth/assets/`, from `generated/*_table.ts` + `types.ts`)
   - `erp-org-sql.json` (from `ERP_ORG_SQL` in `erp-subscriptions.ts` → Rust `erp_subscriptions.rs`)
   - `query-resource-row-type.json` copy (Rust asset → frontend)
+  - `stdb-reducer-invalidation.ts` (from `lumiere-codegen/reducer-stdb-invalidation.json` → `useStdbCallMutation` manifest)
 - **Query exec audit:** `query_exec_non_registry.json` allowlists virtual resources with custom SQL in `api-server/src/query_exec.rs` that are outside `resource_registry.json`; `make codegen` fails if arms drift from the allowlist.
 - **CI:** `make check-codegen` fails if generated artifacts drift
 - **Browser reads:** `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
@@ -89,6 +90,20 @@ make e2e-smoke
 - Docker Compose + Kong front door — see [PRODUCTION_DEPLOY.md](./PRODUCTION_DEPLOY.md).
 - `make check-env-prod` validates required secrets before deploy.
 - Production api-server enforces `STDB_SERVER_TOKEN`, non-localhost `AI_GATEWAY_URL`, and (when enabled) reducer allowlist — see `LUMIERE_REDUCER_ALLOWLIST` in [ENVIRONMENT.md](./ENVIRONMENT.md).
+
+## Gateway consolidation (complete)
+
+Historical plans under `.cursor/plans/` tracked migrating the web stack off direct SpacetimeDB WebSocket + duplicated TS query layers. Status as of 2026-07:
+
+| Track | Outcome |
+|-------|---------|
+| Registry + codegen (`lumiere-codegen`) | `resource_registry.json` → query-registry, SQL columns, erp-org-sql, reducer invalidation; `make check-codegen` in CI |
+| SSR reads | All module `page.tsx` → `serverFetchQueryList` → api-server `query_exec.rs` |
+| `@lumiere/stdb` surface | Main barrel: `DbConnection`, `erp-subscriptions`, `auth` only; domain hooks live in `@lumiere/query-hooks` |
+| STDB WebSocket proxy | Removed `server.js`; `next dev` / `next start`; realtime via api-server `/v1/realtime/ws` + `useLumiereRealtime` |
+| HTTP SQL `IN (...)` | `query_exec.rs` uses org scope or Rust-side filters; subscriptions use `col = id OR …`; see [company-id-in-sql-fix-plan.md](./company-id-in-sql-fix-plan.md) |
+| Session security | No anonymous `STDB_SERVER_TOKEN` sessions; see [SECURITY.md](./SECURITY.md) |
+| Call invalidation | `useStdbCallMutation` + generated `STDB_REDUCER_INVALIDATION` manifest |
 
 ## Deprecated docs
 

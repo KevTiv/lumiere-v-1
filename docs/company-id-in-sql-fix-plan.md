@@ -295,12 +295,6 @@ rows.retain(|r| {
 
 ## Related Issue — Category B "Unsupported" Errors
 
-Separately from the `company_id IN` pattern, several tables fail with "Unsupported" even when using `WHERE organization_id = ?`. This appears to be caused by SpacetimeDB SQL not supporting certain column types (likely `Vec<T>` array columns) in the SELECT list.
+**Mitigation (2026-07-07):** `resolve_http_sql_columns` in `stdb-auth` / `@lumiere/stdb/field-policy` strips `*_ids` vec columns, global audit/metadata fields, and per-resource unsafe columns (`activities` identity fields, `opportunity-stages.requirements`, `contact-segments.domain`, `roles.permissions`). Remaining edge cases should be added to `HTTP_SQL_EXCLUDED_COLUMNS` in `crates/stdb-auth/src/field_policy.rs` (sync `field-policy.ts`).
 
-**Affected tables:** `pos_loyalty_program`, `quality_alert`, `contact_tag`, `activity`, `contact_segment`, `opp_stage`
-
-**Investigation needed:**
-1. Check which columns in each table are `Vec<T>` or complex types in the SpacetimeDB module
-2. Test whether excluding those columns from the SELECT list fixes the "Unsupported" error
-3. If so, add a column exclusion mechanism to `resolve_http_sql_columns` or the resource registry
-4. Alternatively, these tables may need to be fetched via SpacetimeDB subscriptions instead of SQL queries
+Previously affected tables: `pos_loyalty_program`, `quality_alert`, `contact_tag`, `activity`, `contact_segment`, `opp_stage`

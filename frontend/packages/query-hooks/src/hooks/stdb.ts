@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffPost } from "@lumiere/stdb/commands"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
+import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
 
 export function stdbQueryKey(resource: string, organizationId: bigint | number) {
   return ['stdb', resource, organizationId.toString()] as const
@@ -62,13 +63,18 @@ export function invalidateStdbQueryResources(
 
 /**
  * POST `/api/call/:reducer` and invalidate listed `stdb` query resources on success.
+ * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
 export function useStdbCallMutation(
   reducerName: string,
   organizationId: bigint | number,
-  invalidateResources: readonly string[],
+  invalidateResources?: readonly string[],
 ) {
   const qc = useQueryClient()
+  const resources =
+    invalidateResources != null && invalidateResources.length > 0
+      ? invalidateResources
+      : stdbInvalidationFor(reducerName)
   return useMutation({
     mutationFn: async (args: unknown[]) => {
       const { urlPath, init } = stdbBffPost(reducerName, args)
@@ -78,7 +84,11 @@ export function useStdbCallMutation(
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
       }
     },
-    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, invalidateResources),
+    onSuccess: () => {
+      if (resources.length > 0) {
+        invalidateStdbQueryResources(qc, organizationId, resources)
+      }
+    },
   })
 }
 

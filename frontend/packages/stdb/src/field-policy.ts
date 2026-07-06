@@ -155,6 +155,8 @@ export function resolveReadColumns(
  */
 const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
   activities: new Set(['user_id', 'assigned_to', 'created_by', 'date_deadline', 'date_done']),
+  'contact-segments': new Set(['domain']),
+  'opportunity-stages': new Set(['requirements']),
   roles: new Set(['permissions']),
 }
 

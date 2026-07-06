@@ -58,6 +58,14 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         .collect(),
     );
     m.insert(
+        "contact-segments".to_string(),
+        ["domain"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "opportunity-stages".to_string(),
+        ["requirements"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "roles".to_string(),
         ["permissions"].into_iter().map(String::from).collect(),
     );
@@ -483,6 +491,26 @@ mod tests {
         assert!(
             cols.iter().any(|c| c == "metadata"),
             "expected metadata in account-moves projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_excludes_requirements_for_opportunity_stages() {
+        let cols =
+            resolve_http_sql_columns("opportunity-stages", None).expect("opportunity-stages columns");
+        assert!(
+            !cols.iter().any(|c| c == "requirements"),
+            "requirements must be excluded from HTTP SQL, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_excludes_domain_for_contact_segments() {
+        let cols =
+            resolve_http_sql_columns("contact-segments", None).expect("contact-segments columns");
+        assert!(
+            !cols.iter().any(|c| c == "domain"),
+            "domain must be excluded from HTTP SQL, got: {cols:?}"
         );
     }
 }

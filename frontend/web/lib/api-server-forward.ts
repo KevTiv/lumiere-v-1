@@ -7,7 +7,7 @@
  *   `LUMIERE_API_SERVER_URL` to your internal api-server base URL (no trailing slash).
  * - Debug: `LUMIERE_DEBUG_API_FORWARD=1` logs each proxied method + upstream URL on the Next.js server.
  *
- * Path map: same-origin `/api/...` → `{base}/v1/...` (e.g. `/api/auth/signin`, `/api/stdb/v1/identity`, `/api/query/foo`).
+ * Path map: same-origin `/api/...` → `{base}/v1/...` (e.g. `/api/auth/signin`, `/api/query/foo`, `/api/call/create_contact`).
  *
  * Use {@link forwardToApiServerRequired} for BFF routes implemented only on the Rust gateway
  * (returns 503 when forwarding is off). {@link forwardToApiServerIfEnabled} remains for
