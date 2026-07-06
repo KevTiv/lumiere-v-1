@@ -34,6 +34,7 @@ flowchart LR
 - **Codegen:** `make codegen` (`lumiere-codegen`) emits:
   - `frontend/packages/stdb/src/generated/query-registry.ts`
   - `stdb-generated-sql-columns.json` (frontend + `crates/stdb-auth/assets/`, from `generated/*_table.ts` + `types.ts`)
+  - `erp-org-sql.json` (from `ERP_ORG_SQL` in `erp-subscriptions.ts` → Rust `erp_subscriptions.rs`)
   - `query-resource-row-type.json` copy (Rust asset → frontend)
 - **CI:** `make check-codegen` fails if generated artifacts drift
 - **Browser reads:** `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)

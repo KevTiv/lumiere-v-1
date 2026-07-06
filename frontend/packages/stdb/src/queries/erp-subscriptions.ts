@@ -161,7 +161,7 @@ const AUTH_SINGLE: Record<string, string> = {
   "casbin-rule": authSelectAll("casbin_rule", "CasbinRule"),
 };
 
-/** Org-scoped ERP resources (matches `/api/query/[resource]` for data tables). */
+/** Org-scoped ERP resources — row metadata codegen'd to `crates/stdb-auth/assets/erp-org-sql.json` via `make codegen`. */
 const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessContext) => string> = {
   "account-accounts": (id, fa) =>
     selectOrgScopedSql("account-accounts", "account_account", id, fa, "", " ORDER BY code"),

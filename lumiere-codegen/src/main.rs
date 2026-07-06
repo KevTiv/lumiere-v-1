@@ -6,6 +6,7 @@
 //! API_CODEGEN_STDB_INVALIDATION_OUT=frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts
 //! ```
 
+mod erp_org_sql_emit;
 mod registry_emit;
 mod sql_columns_emit;
 mod stdb_invalidation_emit;
@@ -80,6 +81,27 @@ fn main() -> Result<()> {
         "frontend/packages/stdb/src/query-resource-row-type.json",
     )?;
 
+    let erp_subs_path =
+        manifest_dir.join("../frontend/packages/stdb/src/queries/erp-subscriptions.ts");
+    let erp_subs_ts = fs::read_to_string(&erp_subs_path)
+        .with_context(|| format!("read {}", erp_subs_path.display()))?;
+    let erp_org_rows = erp_org_sql_emit::parse_erp_org_sql(&erp_subs_ts)?;
+    let registry_keys = erp_org_sql_emit::registry_keys(&registry_text)
+        .map_err(|e| anyhow::anyhow!(e))?;
+    for row in &erp_org_rows {
+        if !registry_keys.contains_key(&row.resource_key) {
+            anyhow::bail!(
+                "erp-org-sql resource \"{}\" (map key \"{}\") missing from resource_registry.json",
+                row.resource_key,
+                row.map_key
+            );
+        }
+    }
+    let erp_org_json = erp_org_sql_emit::emit_erp_org_sql_json(&erp_subs_ts)?;
+    let erp_org_rust =
+        manifest_dir.join("../crates/stdb-auth/assets/erp-org-sql.json");
+    write_file(&erp_org_rust, &erp_org_json)?;
+
     let key_count = serde_json::from_str::<Value>(&registry_text)?
         .as_object()
         .map(|o| o.len())
@@ -94,10 +116,12 @@ fn main() -> Result<()> {
         registry_path.display()
     );
     println!("lumiere-codegen: {type_count} SQL column maps from {}", types_ts_path.display());
+    println!("lumiere-codegen: {} ERP org subscription rows from {}", erp_org_rows.len(), erp_subs_path.display());
     println!("Wrote {}", registry_path_out.display());
     println!("Wrote {}", stdb_inv_path.display());
     println!("Wrote {}", sql_columns_frontend.display());
     println!("Wrote {}", sql_columns_rust.display());
     println!("Wrote {}", row_type_out.display());
+    println!("Wrote {}", erp_org_rust.display());
     Ok(())
 }

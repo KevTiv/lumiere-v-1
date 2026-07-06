@@ -1,4 +1,4 @@
-//! Execute `/v1/query/:resource` SQL aligned with `frontend/packages/stdb/src/server.ts`.
+//! Execute `/v1/query/:resource` SQL via `stdb-auth` resource registry + special cases.
 
 use std::collections::HashSet;
 

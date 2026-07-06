@@ -287,7 +287,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "ai-agents": {
     table: "ai_agent",
     aliases: ["ai-agents", "ai_agent"],
-    defaultRestricted: ["name", "model", "provider", "is_active", "is_default", "temperature", "max_tokens", "monthly_spend", "monthly_budget", "cost_per1_ktokens"],
+    defaultRestricted: ["name", "model", "provider", "is_active", "is_default", "temperature", "max_tokens", "monthly_spend", "monthly_budget", "cost_per_1_k_tokens"],
     mandatory: ["id", "organization_id"],
   },
   "ai-document-processing-jobs": {

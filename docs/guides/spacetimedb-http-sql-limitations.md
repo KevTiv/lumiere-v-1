@@ -85,7 +85,7 @@ Browser query routes proxy to api-server `query_exec.rs`. When adding special-ca
 2. Build SQL with `**resolveHttpSqlColumns**` or `**sqlColumnListForGeneratedType**` — never `*`.
 3. Avoid subqueries and JOINs; use **literal `IN` lists** or **extra queries**.
 4. If the table is scoped only by `**company_id`**, ensure both **HTTP** paths (server can call `companyIdsForOrganization`) and **WebSocket** paths (pass `**companyIds`** from RSC) are considered.
-5. Run `make codegen` after SpacetimeDB schema changes so `resource_registry.json`, `query-resource-row-type.json`, and `stdb-generated-sql-columns.json` stay aligned (Rust assets + frontend copies).
+5. Run `make codegen` after SpacetimeDB schema changes so `resource_registry.json`, `query-resource-row-type.json`, `stdb-generated-sql-columns.json`, and `erp-org-sql.json` stay aligned.
 
 ---
 
