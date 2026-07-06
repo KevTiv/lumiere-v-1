@@ -610,6 +610,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
+        merge_target_id: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
@@ -657,6 +658,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
+        merge_target_id: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
@@ -705,6 +707,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
+        merge_target_id: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
@@ -753,6 +756,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
+        merge_target_id: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
@@ -801,6 +805,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         deleted_at: None,
+        merge_target_id: None,
         metadata: Some("{\"seed\":true}".to_string()),
     });
 
@@ -9680,12 +9685,17 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
 
     ensure_minimal_dev_org(ctx)?;
 
-    // First org: either from seed_dev_data / ensure_minimal_dev_org, or any existing tenant
+    // Prefer an org that still has a live company row (skip soft-deleted companies).
     let org = ctx
         .db
         .organization()
         .iter()
-        .next()
+        .find(|o| {
+            ctx.db.company().iter().any(|c| {
+                c.organization_id == o.id && c.deleted_at.is_none()
+            })
+        })
+        .or_else(|| ctx.db.organization().iter().next())
         .ok_or("No organization row after ensure_minimal_dev_org")?;
     let org_id = org.id;
 
@@ -9693,7 +9703,7 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .company()
         .iter()
-        .find(|c| c.organization_id == org_id)
+        .find(|c| c.organization_id == org_id && c.deleted_at.is_none())
         .ok_or("No company for organization — run seed_dev_data or clear DB and retry")?;
     let company_id = company.id;
 
@@ -9815,7 +9825,7 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         org_id
     );
 
-    // Mark profile as superuser (parity with seed_dev_data admin)
+    // Mark profile as superuser (parity with seed_dev_data admin / dev_promote_caller_superuser)
     if let Some(profile) = ctx.db.user_profile().identity().find(caller) {
         if !profile.is_superuser {
             ctx.db.user_profile().identity().update(UserProfile {
@@ -9824,6 +9834,29 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
                 ..profile
             });
         }
+    } else {
+        ctx.db.user_profile().insert(UserProfile {
+            identity: caller,
+            email: String::new(),
+            email_verified: false,
+            name: String::new(),
+            first_name: None,
+            last_name: None,
+            avatar_url: None,
+            phone: None,
+            mobile: None,
+            timezone: "UTC".to_string(),
+            language: "en".to_string(),
+            signature: None,
+            notification_preferences: None,
+            ui_preferences: None,
+            is_active: true,
+            is_superuser: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            last_login: Some(ctx.timestamp),
+            metadata: Some("{\"ensure_dev_admin\":true}".to_string()),
+        });
     }
 
     Ok(())
