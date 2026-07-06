@@ -59,11 +59,6 @@ interface StdbConnectionProviderProps {
    * Pass an empty array for no subscriptions; there is no implicit “subscribe to everything”.
    */
   subscriptionResources: string[];
-  /**
-   * @deprecated Removed: web app uses Lumiere api-server `/v1/realtime/ws` instead of raw STDB proxy.
-   * When true, pointed at `ws(s)://<host>/api/stdb/` (no longer used by `frontend/web`).
-   */
-  sameOriginStdbProxy?: boolean;
 }
 
 export function StdbConnectionProvider({
@@ -77,7 +72,6 @@ export function StdbConnectionProvider({
   organizationId,
   companyIds,
   subscriptionResources,
-  sameOriginStdbProxy,
 }: StdbConnectionProviderProps) {
   const [state, setState] = useState<Omit<StdbConnectionState, "organizationId">>({
     identity: null,
@@ -89,10 +83,6 @@ export function StdbConnectionProvider({
     let releasedForCleanup = false;
 
     let uri = host;
-    if (sameOriginStdbProxy && typeof window !== "undefined") {
-      // Trailing slash so SDK resolves `v1/...` under `/api/stdb/` (not under `/api/`).
-      uri = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/stdb/`;
-    }
     if (!uri) {
       uri =
         process.env.NEXT_PUBLIC_STDB_HOST ||
@@ -199,7 +189,6 @@ export function StdbConnectionProvider({
     organizationId,
     companyIds,
     subscriptionResources,
-    sameOriginStdbProxy,
     serverIdentity,
     serverRoleNames,
     token,

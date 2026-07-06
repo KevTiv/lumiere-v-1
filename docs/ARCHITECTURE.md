@@ -36,6 +36,7 @@ flowchart LR
   - `stdb-generated-sql-columns.json` (frontend + `crates/stdb-auth/assets/`, from `generated/*_table.ts` + `types.ts`)
   - `erp-org-sql.json` (from `ERP_ORG_SQL` in `erp-subscriptions.ts` → Rust `erp_subscriptions.rs`)
   - `query-resource-row-type.json` copy (Rust asset → frontend)
+- **Query exec audit:** `query_exec_non_registry.json` allowlists virtual resources with custom SQL in `api-server/src/query_exec.rs` that are outside `resource_registry.json`; `make codegen` fails if arms drift from the allowlist.
 - **CI:** `make check-codegen` fails if generated artifacts drift
 - **Browser reads:** `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
 - **SSR reads:** All module RSC pages use `serverFetchQueryList` / `serverFetchQueryListsAllowEmpty` in [`frontend/web/lib/server-query.ts`](../frontend/web/lib/server-query.ts) → `GET /v1/query/:resource` on api-server

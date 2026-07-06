@@ -1,0 +1,17 @@
+[
+  "ai-action-drafts",
+  "ai-action-drafts-inbox",
+  "ai-agent-runs",
+  "ai-chat-messages",
+  "ai-chat-sessions",
+  "approval-requests-inbox",
+  "approval-rules",
+  "document-templates",
+  "import-job-errors",
+  "import-jobs",
+  "import-mapping-templates",
+  "mail-templates",
+  "org-permissions",
+  "policy-snapshots",
+  "queued-mail-messages"
+]

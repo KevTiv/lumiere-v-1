@@ -710,6 +710,7 @@ check-codegen: codegen
 		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
 		crates/stdb-auth/assets/erp-org-sql.json \
 		crates/stdb-auth/assets/resource_registry.json \
+		crates/stdb-auth/assets/query_exec_non_registry.json \
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/generated/query-registry.ts \
@@ -718,7 +719,8 @@ check-codegen: codegen
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
 		crates/stdb-auth/assets/erp-org-sql.json \
-		crates/stdb-auth/assets/resource_registry.json || \
+		crates/stdb-auth/assets/resource_registry.json \
+		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
 api-server-run:

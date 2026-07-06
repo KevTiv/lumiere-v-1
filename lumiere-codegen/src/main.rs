@@ -7,6 +7,7 @@
 //! ```
 
 mod erp_org_sql_emit;
+mod query_exec_audit;
 mod registry_emit;
 mod sql_columns_emit;
 mod stdb_invalidation_emit;
@@ -101,6 +102,19 @@ fn main() -> Result<()> {
     let erp_org_rust =
         manifest_dir.join("../crates/stdb-auth/assets/erp-org-sql.json");
     write_file(&erp_org_rust, &erp_org_json)?;
+
+    let allowlist_path =
+        manifest_dir.join("../crates/stdb-auth/assets/query_exec_non_registry.json");
+    let allowlist_json = fs::read_to_string(&allowlist_path)
+        .with_context(|| format!("read {}", allowlist_path.display()))?;
+    let query_exec_path = manifest_dir.join("../api-server/src/query_exec.rs");
+    let query_exec_rs = fs::read_to_string(&query_exec_path)
+        .with_context(|| format!("read {}", query_exec_path.display()))?;
+    query_exec_audit::audit_query_exec_special_cases(
+        &query_exec_rs,
+        &registry_text,
+        &allowlist_json,
+    )?;
 
     let key_count = serde_json::from_str::<Value>(&registry_text)?
         .as_object()

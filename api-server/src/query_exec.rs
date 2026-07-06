@@ -1,4 +1,6 @@
 //! Execute `/v1/query/:resource` SQL via `stdb-auth` resource registry + special cases.
+//! Non-registry virtual resources are allowlisted in `crates/stdb-auth/assets/query_exec_non_registry.json`
+//! (validated by `make codegen` / `lumiere-codegen`).
 
 use std::collections::HashSet;
 
