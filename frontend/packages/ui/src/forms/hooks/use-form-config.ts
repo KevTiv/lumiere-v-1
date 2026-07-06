@@ -401,7 +401,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
             Number(c.organizationId) === organizationId &&
             c.moduleId === moduleId &&
             c.formId === formId &&
-            c.isActive === true,
+            (c.isActive === true || c.is_active === true || c.isActive === 1 || c.is_active === 1),
         )
 
         if (configs.length === 0) {

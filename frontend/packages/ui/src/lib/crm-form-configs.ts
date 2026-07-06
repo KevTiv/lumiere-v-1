@@ -919,6 +919,32 @@ export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const mergeContactsForm = (
+  t: TFunction,
+  survivorOptions: { value: string; label: string }[],
+): FormConfig => ({
+  id: "merge-contacts",
+  title: t("crm.forms.mergeContacts.title"),
+  description: t("crm.forms.mergeContacts.description"),
+  sections: [
+    {
+      id: "merge-survivor",
+      title: t("crm.forms.mergeContacts.sections.survivor"),
+      fields: [
+        {
+          id: "targetContactId",
+          name: "targetContactId",
+          type: "select",
+          label: t("crm.forms.mergeContacts.fields.targetContactId"),
+          required: true,
+          width: "full",
+          options: survivorOptions,
+        },
+      ],
+    },
+  ],
+})
+
 export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-lead": newLeadForm(t),
   "new-opportunity": newOpportunityForm(t),
@@ -940,4 +966,5 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "edit-lead-address": editLeadAddressForm(t),
   "edit-lead-revenue": editLeadRevenueForm(t),
   "add-opportunity-line": addOpportunityLineForm(t),
+  "merge-contacts": mergeContactsForm(t, []),
 })

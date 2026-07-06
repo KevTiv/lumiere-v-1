@@ -15,12 +15,17 @@ import type {
 } from "../config/types"
 import { formOptionsToStdb, formValidationToStdb } from "./stdb-field-params"
 
+function satsUnitVariant(tag: string): Record<string, unknown> {
+  const key = tag.charAt(0).toLowerCase() + tag.slice(1)
+  return { [key]: [] }
+}
+
 export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreateFormFieldParams {
   return {
     fieldId: field.fieldId,
     name: field.name,
     label: field.label,
-    fieldType: { tag: field.fieldType } as StdbFieldType,
+    fieldType: satsUnitVariant(field.fieldType) as StdbFieldType,
     description: field.description,
     placeholder: field.placeholder,
     defaultValue: field.defaultValue,
@@ -32,7 +37,7 @@ export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreat
     isEnabled: field.isEnabled,
     category: field.category,
     showInList: field.showInList,
-    width: { tag: field.width } as StdbFieldWidth,
+    width: satsUnitVariant(field.width) as StdbFieldWidth,
     sectionId: field.sectionId,
   }
 }

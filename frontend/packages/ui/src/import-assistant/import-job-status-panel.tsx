@@ -4,10 +4,11 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   downloadImportJobErrorsCsv,
   errorsForJob,
+  canRollbackImportJob,
   type ImportJobErrorRow,
   type ImportJobRow,
 } from "@lumiere/query-hooks/hooks/import-jobs"
-import { AlertCircle, CheckCircle2, Loader2, RotateCcw } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Undo2 } from "lucide-react"
 
 import { Badge } from "../components/badge"
 import { Button } from "../components/button"
@@ -24,6 +25,8 @@ export type ImportJobStatusPanelProps = {
   fileName?: string
   onRetryFailedRows?: () => void
   retryRowCount?: number
+  onRollback?: () => void
+  isRollbackPending?: boolean
 }
 
 export function ImportJobStatusPanel({
@@ -33,6 +36,8 @@ export function ImportJobStatusPanel({
   fileName,
   onRetryFailedRows,
   retryRowCount = 0,
+  onRollback,
+  isRollbackPending = false,
 }: ImportJobStatusPanelProps) {
   const { t } = useTranslation()
 
@@ -60,6 +65,8 @@ export function ImportJobStatusPanel({
   const jobErrors = errorsForJob(errors, job)
   const isSuccess = status === "success"
   const isPartial = status === "partial"
+  const isRolledBack = status === "rolled_back"
+  const showRollback = canRollbackImportJob(job) && onRollback
 
   return (
     <div className="space-y-3 rounded-md border border-border p-4">
@@ -80,6 +87,11 @@ export function ImportJobStatusPanel({
         <Badge variant={isSuccess ? "default" : isPartial ? "secondary" : "outline"}>
           {status}
         </Badge>
+        {isRolledBack ? (
+          <span className="text-xs text-muted-foreground">
+            {t("common.importAssistant.rollbackComplete")}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid gap-2 text-sm sm:grid-cols-3">
@@ -118,6 +130,25 @@ export function ImportJobStatusPanel({
               {t("common.importAssistant.retryFailedRows", { count: retryRowCount })}
             </Button>
           ) : null}
+        </div>
+      ) : null}
+
+      {showRollback ? (
+        <div>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={isRollbackPending}
+            onClick={onRollback}
+          >
+            {isRollbackPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Undo2 className="mr-2 h-4 w-4" />
+            )}
+            {t("common.importAssistant.rollbackImport")}
+          </Button>
         </div>
       ) : null}
     </div>

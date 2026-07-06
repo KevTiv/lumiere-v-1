@@ -30,8 +30,10 @@ import {
 import {
   errorsForJob,
   findLatestImportJob,
+  jobsForEntity,
   useImportJobErrors,
   useImportJobs,
+  useRollbackImportJob,
   type ImportJobErrorRow,
   type ImportJobRow,
 } from "@lumiere/query-hooks/hooks/import-jobs"
@@ -57,6 +59,7 @@ import {
 } from "../components/dialog"
 import { Input } from "../components/input"
 import { Label } from "../components/label"
+import { ImportJobHistoryPanel } from "./import-job-history-panel"
 import { ImportJobStatusPanel } from "./import-job-status-panel"
 import {
   headersForMapping,
@@ -116,6 +119,7 @@ export function ImportAssistantWizard({
   const saveTemplate = useSaveImportMappingTemplate(orgId)
   const deleteTemplate = useDeleteImportMappingTemplate(orgId)
   const finalizeJob = useFinalizeImportAssistantJob(orgId)
+  const rollbackJob = useRollbackImportJob(orgId)
   const templatesQuery = useImportMappingTemplates(orgId, open)
   const jobTable = importJobTableName ?? targetEntity
 
@@ -136,6 +140,7 @@ export function ImportAssistantWizard({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [templateSaveName, setTemplateSaveName] = useState("")
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
+  const [rollingBackJobId, setRollingBackJobId] = useState<string | null>(null)
   const finalizedJobIdRef = useRef<string | null>(null)
 
   const entityTemplates = templatesForEntity(
@@ -151,6 +156,7 @@ export function ImportAssistantWizard({
   const jobsQuery = useImportJobs(orgId, trackJobs && step === "done")
   const errorsQuery = useImportJobErrors(orgId, trackJobs && step === "done")
   const latestJob = findLatestImportJob(jobsQuery.data as ImportJobRow[] | undefined, jobTable)
+  const entityJobs = jobsForEntity(jobsQuery.data as ImportJobRow[] | undefined, jobTable)
   const jobErrors = errorsForJob((errorsQuery.data ?? []) as ImportJobErrorRow[], latestJob)
   const failedRowNumbers = uniqueFailedRowNumbers(jobErrors)
 
@@ -172,6 +178,7 @@ export function ImportAssistantWizard({
     setSelectedTemplateId(null)
     setTemplateSaveName("")
     setAppliedTemplateId(null)
+    setRollingBackJobId(null)
     finalizedJobIdRef.current = null
     analyze.reset()
     preview.reset()
@@ -212,6 +219,23 @@ export function ImportAssistantWizard({
     finalizedJobIdRef.current = jobId
     void finalizeAssistantJob(latestJob)
   }, [step, latestJob, finalizeAssistantJob])
+
+  const handleRollbackJob = useCallback(
+    async (job: ImportJobRow) => {
+      if (!job.id) return
+      const jobId = String(job.id)
+      setRollingBackJobId(jobId)
+      setError(null)
+      try {
+        await rollbackJob.mutateAsync(job.id)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t("common.importAssistant.rollbackFailed"))
+      } finally {
+        setRollingBackJobId(null)
+      }
+    },
+    [rollbackJob, t],
+  )
 
   const handleFileChange = async (file: File | undefined) => {
     setError(null)
@@ -577,14 +601,28 @@ export function ImportAssistantWizard({
           ) : null}
 
           {step === "done" ? (
-            <ImportJobStatusPanel
-              job={latestJob}
-              errors={(errorsQuery.data ?? []) as ImportJobErrorRow[]}
-              isLoading={jobsQuery.isLoading || String(latestJob?.status ?? "") === "pending"}
-              fileName={fileName}
-              onRetryFailedRows={handleRetryFailedRows}
-              retryRowCount={failedRowNumbers.length}
-            />
+            <div className="space-y-4">
+              <ImportJobStatusPanel
+                job={latestJob}
+                errors={(errorsQuery.data ?? []) as ImportJobErrorRow[]}
+                isLoading={jobsQuery.isLoading || String(latestJob?.status ?? "") === "pending"}
+                fileName={fileName}
+                onRetryFailedRows={handleRetryFailedRows}
+                retryRowCount={failedRowNumbers.length}
+                onRollback={
+                  latestJob ? () => void handleRollbackJob(latestJob) : undefined
+                }
+                isRollbackPending={
+                  rollingBackJobId != null &&
+                  rollingBackJobId === String(latestJob?.id ?? "")
+                }
+              />
+              <ImportJobHistoryPanel
+                jobs={entityJobs}
+                rollingBackJobId={rollingBackJobId}
+                onRollback={(job) => void handleRollbackJob(job)}
+              />
+            </div>
           ) : null}
         </div>
 
