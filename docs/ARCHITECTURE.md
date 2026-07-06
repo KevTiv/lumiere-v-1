@@ -33,7 +33,8 @@ flowchart LR
 - **Source of truth:** [`crates/stdb-auth/assets/resource_registry.json`](../crates/stdb-auth/assets/resource_registry.json)
 - **Codegen:** `make codegen` (`lumiere-codegen`) emits `frontend/packages/stdb/src/generated/query-registry.ts`
 - **CI:** `make check-codegen` fails if generated TS drifts from the registry
-- Browser reads use `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
+- **Browser reads:** `GET /api/query/:resource` via api-server `query_exec.rs` (aligned with registry keys)
+- **SSR reads:** All module RSC pages use `serverFetchQueryList` / `serverFetchQueryListsAllowEmpty` in [`frontend/web/lib/server-query.ts`](../frontend/web/lib/server-query.ts) → `GET /v1/query/:resource` on api-server. Legacy `serverQuery*` in `server.ts` remains for route handlers and internal helpers only.
 
 ### AI
 

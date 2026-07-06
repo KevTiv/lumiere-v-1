@@ -43,4 +43,6 @@ Outputs:
 
 CI runs `make check-codegen` on every PR (fails if generated files drift).
 
+**SSR:** Module `page.tsx` files fetch initial data via `serverFetchQueryListsAllowEmpty` (`frontend/web/lib/server-query.ts`) → api-server `query_exec.rs`, not direct `server.ts` STDB HTTP.
+
 Also keep `query-resource-row-type.json` and `stdb-generated-sql-columns.json` aligned between `frontend/packages/stdb/src/` and `crates/stdb-auth/assets/` when SpacetimeDB schema changes (until those are codegen’d too).

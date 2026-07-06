@@ -1,44 +1,37 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryAnalyticsMetrics,
-  serverQueryDashboards,
-  serverQueryDashboardWidgets,
-  serverQueryFinancialReports,
-  serverQueryReportTemplates,
-  serverQuerySavedReports,
-  serverQueryScheduledReports,
-  serverQueryTrialBalances,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { ReportsClient } from "./reports-client"
+
+const SSR_RESOURCES = [
+  "financial-reports",
+  "trial-balances",
+  "report-templates",
+  "scheduled-reports",
+  "analytics-metrics",
+  "dashboards",
+  "dashboard-widgets",
+  "saved-reports",
+] as const
 
 export default async function ReportsPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <ReportsClient />
   }
-  const { organizationId, opts } = session
 
-  const [reports, balances, templates, scheduled, metrics, dashboards, widgets, savedReports] = await Promise.all([
-    serverQueryFinancialReports(organizationId, opts),
-    serverQueryTrialBalances(organizationId, opts),
-    serverQueryReportTemplates(organizationId, opts),
-    serverQueryScheduledReports(organizationId, opts),
-    serverQueryAnalyticsMetrics(organizationId, opts),
-    serverQueryDashboards(organizationId, opts),
-    serverQueryDashboardWidgets(organizationId, opts),
-    serverQuerySavedReports(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], []])
+  const [reports, balances, templates, scheduled, metrics, dashboards, widgets] =
+    await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <ReportsClient
-      initialReports={reports as Record<string, unknown>[]}
-      initialBalances={balances as Record<string, unknown>[]}
-      initialReportTemplates={templates as Record<string, unknown>[]}
-      initialScheduledReports={scheduled as Record<string, unknown>[]}
-      initialAnalyticsMetrics={metrics as Record<string, unknown>[]}
-      initialDashboards={dashboards as Record<string, unknown>[]}
-      initialDashboardWidgets={widgets as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialReports={reports}
+      initialBalances={balances}
+      initialReportTemplates={templates}
+      initialScheduledReports={scheduled}
+      initialAnalyticsMetrics={metrics}
+      initialDashboards={dashboards}
+      initialDashboardWidgets={widgets}
+      organizationId={session.organizationId}
     />
   )
 }

@@ -1,24 +1,25 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQuerySubscriptions,
-  serverQuerySubscriptionPlans,
-  serverQueryDeferredRevenueSchedules,
-  serverQueryDeferredRevenueLines,
-  serverQueryRevenueRecognitionRules,
-  serverQuerySaleOrders,
-  serverQueryPricelists,
-  serverQueryProducts,
-  serverQueryAccountJournals,
-  serverQueryAccountAccounts,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { SubscriptionsClient } from "./subscriptions-client"
+
+const SSR_RESOURCES = [
+  "subscriptions",
+  "subscription-plans",
+  "deferred-revenue-schedules",
+  "deferred-revenue-lines",
+  "revenue-recognition-rules",
+  "sale-orders",
+  "pricelists",
+  "products",
+  "account-journals",
+  "account-accounts",
+] as const
 
 export default async function SubscriptionsPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <SubscriptionsClient />
   }
-  const { organizationId, opts } = session
 
   const [
     subscriptions,
@@ -31,32 +32,21 @@ export default async function SubscriptionsPage() {
     products,
     journals,
     accounts,
-  ] = await Promise.all([
-    serverQuerySubscriptions(organizationId, opts),
-    serverQuerySubscriptionPlans(organizationId, opts),
-    serverQueryDeferredRevenueSchedules(organizationId, opts),
-    serverQueryDeferredRevenueLines(organizationId, opts),
-    serverQueryRevenueRecognitionRules(organizationId, opts),
-    serverQuerySaleOrders(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryProducts(organizationId, opts),
-    serverQueryAccountJournals(organizationId, opts),
-    serverQueryAccountAccounts(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], []])
+  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <SubscriptionsClient
-      initialSubscriptions={subscriptions as Record<string, unknown>[]}
-      initialPlans={plans as Record<string, unknown>[]}
-      initialDeferredSchedules={deferredSchedules as Record<string, unknown>[]}
-      initialDeferredLines={deferredLines as Record<string, unknown>[]}
-      initialRecognitionRules={recognitionRules as Record<string, unknown>[]}
-      initialSaleOrders={saleOrders as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      initialProducts={products as Record<string, unknown>[]}
-      initialJournals={journals as Record<string, unknown>[]}
-      initialAccounts={accounts as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialSubscriptions={subscriptions}
+      initialPlans={plans}
+      initialDeferredSchedules={deferredSchedules}
+      initialDeferredLines={deferredLines}
+      initialRecognitionRules={recognitionRules}
+      initialSaleOrders={saleOrders}
+      initialPricelists={pricelists}
+      initialProducts={products}
+      initialJournals={journals}
+      initialAccounts={accounts}
+      organizationId={session.organizationId}
     />
   )
 }

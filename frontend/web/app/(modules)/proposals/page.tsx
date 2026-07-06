@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryProposals } from "@lumiere/stdb/server"
+import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
 import { ProposalsClient } from "./proposals-client"
 
 export default async function ProposalsPage() {
@@ -7,14 +7,13 @@ export default async function ProposalsPage() {
   if (!session?.organizationId) {
     return <ProposalsClient />
   }
-  const { organizationId } = session
 
-  const initialProposals = await serverQueryProposals(BigInt(organizationId))
+  const initialProposals = await serverFetchQueryListAllowEmpty(session, "proposals")
 
   return (
     <ProposalsClient
       initialProposals={initialProposals}
-      organizationId={organizationId}
+      organizationId={session.organizationId}
     />
   )
 }

@@ -5,20 +5,18 @@
  *
  * Import only from server code (API routes, RSC).
  */
-import 'server-only'
+import "server-only"
 
-import {
-  serverQueryUserOrganization,
-  type StdbHttpOptions,
-} from '@lumiere/stdb/server'
-import { getDefaultStdbHttpConnect, normalizeIdentityHexForSql } from '@/lib/stdb-http-env'
+import type { StdbHttpOptions } from "@lumiere/stdb/server"
+import { getDefaultStdbHttpConnect, normalizeIdentityHexForSql } from "@/lib/stdb-http-env"
+import { serverFetchQueryListWithCredentialsAllowEmpty } from "@/lib/server-query"
 
 const ADMIN_TOKEN_PLACEHOLDERS = new Set([
-  '',
-  'your-server-token-here',
-  'changeme',
-  'replace-me',
-  'replace_me',
+  "",
+  "your-server-token-here",
+  "changeme",
+  "replace-me",
+  "replace_me",
 ])
 
 function isUsableAdminToken(raw: string | undefined): boolean {
@@ -40,21 +38,24 @@ export async function serverQueryUserOrganizationWithFallback(
   const opts: StdbHttpOptions = { ...base, ...userOpts }
 
   try {
-    const rows = await serverQueryUserOrganization(id, opts)
-    if (Array.isArray(rows) && rows.length > 0) return rows
+    const rows = await serverFetchQueryListWithCredentialsAllowEmpty(
+      { stdbToken: opts.token, identityHex: id },
+      "user-organization",
+    )
+    if (rows.length > 0) return rows
   } catch {
     // Expired JWT, InvalidToken, or transient SQL failure — try admin below.
   }
 
-  const admin = process.env['STDB_SERVER_TOKEN']
+  const admin = process.env["STDB_SERVER_TOKEN"]
   if (!isUsableAdminToken(admin)) return []
 
   try {
-    const rows = await serverQueryUserOrganization(id, {
-      ...opts,
-      token: admin,
-    })
-    return Array.isArray(rows) ? rows : []
+    const rows = await serverFetchQueryListWithCredentialsAllowEmpty(
+      { stdbToken: admin!, identityHex: id },
+      "user-organization",
+    )
+    return rows
   } catch {
     return []
   }

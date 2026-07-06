@@ -1,31 +1,32 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQuerySaleOrders,
-  serverQuerySaleOrderLines,
-  serverQueryPricelists,
-  serverQueryPricelistItems,
-  serverQueryPickingBatches,
-  serverQueryDeliveryCarriers,
-  serverQueryDeliveryPriceRules,
-  serverQueryShippingMethods,
-  serverQueryPosPaymentMethods,
-  serverQueryPosLoyaltyPrograms,
-  serverQueryPosLoyaltyCards,
-  serverQueryContacts,
-  serverQueryWarehouses,
-  serverQueryAccountMoves,
-  serverQueryStockPickings,
-  serverQueryReturnOrders,
-  serverQueryReturnOrderLines,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { SalesClient } from "./sales-client"
+
+const SSR_RESOURCES = [
+  "sale-orders",
+  "sale-order-lines",
+  "pricelists",
+  "pricelist-items",
+  "picking-batches",
+  "delivery-carriers",
+  "delivery-price-rules",
+  "shipping-methods",
+  "pos-payment-methods",
+  "pos-loyalty-programs",
+  "pos-loyalty-cards",
+  "contacts",
+  "warehouses",
+  "account-moves",
+  "stock-pickings",
+  "return-orders",
+  "return-order-lines",
+] as const
 
 export default async function SalesPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <SalesClient />
   }
-  const { organizationId, opts } = session
 
   const [
     orders,
@@ -45,46 +46,28 @@ export default async function SalesPage() {
     stockPickings,
     returnOrders,
     returnOrderLines,
-  ] = await Promise.all([
-    serverQuerySaleOrders(organizationId, opts),
-    serverQuerySaleOrderLines(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryPricelistItems(organizationId, opts),
-    serverQueryPickingBatches(organizationId, opts),
-    serverQueryDeliveryCarriers(organizationId, opts),
-    serverQueryDeliveryPriceRules(organizationId, opts),
-    serverQueryShippingMethods(organizationId, opts),
-    serverQueryPosPaymentMethods(organizationId, opts),
-    serverQueryPosLoyaltyPrograms(organizationId, opts),
-    serverQueryPosLoyaltyCards(organizationId, opts),
-    serverQueryContacts(organizationId, opts),
-    serverQueryWarehouses(organizationId, opts),
-    serverQueryAccountMoves(organizationId, undefined, opts),
-    serverQueryStockPickings(organizationId, opts),
-    serverQueryReturnOrders(organizationId, opts),
-    serverQueryReturnOrderLines(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []])
+  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <SalesClient
-      initialOrders={orders as Record<string, unknown>[]}
-      initialOrderLines={orderLines as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      initialPricelistItems={pricelistItems as Record<string, unknown>[]}
-      initialDeliveries={deliveries as Record<string, unknown>[]}
-      initialDeliveryCarriers={deliveryCarriers as Record<string, unknown>[]}
-      initialDeliveryPriceRules={deliveryPriceRules as Record<string, unknown>[]}
-      initialShippingMethods={shippingMethods as Record<string, unknown>[]}
-      initialPosPaymentMethods={posPaymentMethods as Record<string, unknown>[]}
-      initialLoyaltyPrograms={loyaltyPrograms as Record<string, unknown>[]}
-      initialLoyaltyCards={loyaltyCards as Record<string, unknown>[]}
-      initialContacts={contacts as Record<string, unknown>[]}
-      initialWarehouses={warehouses as Record<string, unknown>[]}
-      initialAccountMoves={accountMoves as Record<string, unknown>[]}
-      initialStockPickings={stockPickings as Record<string, unknown>[]}
-      initialReturnOrders={returnOrders as Record<string, unknown>[]}
-      initialReturnOrderLines={returnOrderLines as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialOrders={orders}
+      initialOrderLines={orderLines}
+      initialPricelists={pricelists}
+      initialPricelistItems={pricelistItems}
+      initialDeliveries={deliveries}
+      initialDeliveryCarriers={deliveryCarriers}
+      initialDeliveryPriceRules={deliveryPriceRules}
+      initialShippingMethods={shippingMethods}
+      initialPosPaymentMethods={posPaymentMethods}
+      initialLoyaltyPrograms={loyaltyPrograms}
+      initialLoyaltyCards={loyaltyCards}
+      initialContacts={contacts}
+      initialWarehouses={warehouses}
+      initialAccountMoves={accountMoves}
+      initialStockPickings={stockPickings}
+      initialReturnOrders={returnOrders}
+      initialReturnOrderLines={returnOrderLines}
+      organizationId={session.organizationId}
     />
   )
 }

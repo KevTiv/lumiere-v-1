@@ -1,24 +1,22 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryMailFollowers, serverQueryMailMessages } from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { MessagesClient } from "./messages-client"
+
+const SSR_RESOURCES = ["mail-messages", "mail-followers"] as const
 
 export default async function MessagesPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <MessagesClient />
   }
-  const { organizationId, opts } = session
 
-  const [messages, followers] = await Promise.all([
-    serverQueryMailMessages(organizationId, opts),
-    serverQueryMailFollowers(organizationId, opts),
-  ]).catch(() => [[], []])
+  const [messages, followers] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <MessagesClient
-      initialMessages={messages as Record<string, unknown>[]}
-      initialFollowers={followers as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialMessages={messages}
+      initialFollowers={followers}
+      organizationId={session.organizationId}
     />
   )
 }

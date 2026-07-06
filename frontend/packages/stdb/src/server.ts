@@ -7,6 +7,9 @@
  * Import from "@lumiere/stdb/server" in RSC pages and server actions only.
  * Never import in "use client" components — use the WebSocket hooks instead.
  *
+ * **Migration:** Prefer `serverFetchQueryList` from `frontend/web/lib/server-query.ts`
+ * (api-server `query_exec.rs`) for SSR initial data. Direct STDB HTTP here is legacy.
+ *
  * ## Scoping model
  * All public query functions accept `organizationId` as the top-level tenant scope.
  * All tables have `organization_id` directly — queries use `WHERE organization_id = X`.

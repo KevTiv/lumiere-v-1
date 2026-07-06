@@ -2,14 +2,10 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Providers } from './providers'
-import {
-  serverQueryUserRoleAssignments,
-  serverQueryRoles,
-  serverQueryCompanies,
-} from '@lumiere/stdb/server'
 import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
+import { serverFetchQueryListAllowEmpty } from '@/lib/server-query'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -45,36 +41,31 @@ export default async function RootLayout({
   const session = await getBrowserStdbSession()
   const identityHex = hasAuthenticatedIdentity(session) ? session?.identityHex : undefined
   const organizationId = session?.organizationId
-  const opts = session?.opts ?? {}
 
   let serverRoleNames: string[] = []
-  if (identityHex) {
+  if (identityHex && session) {
     try {
-      const [assignments, allRoles] = await Promise.all([
-        serverQueryUserRoleAssignments(identityHex, opts),
-        serverQueryRoles(opts),
-      ])
+      const assignments = await serverFetchQueryListAllowEmpty(session, "user-roles")
+      const allRoles = await serverFetchQueryListAllowEmpty(session, "roles")
       const assignedIds = new Set(
-        (assignments as Array<Record<string, unknown>>)
-          .filter((a) => a['isActive'])
-          .map((a) => String(a['roleId']))
+        assignments
+          .filter((a) => a["isActive"])
+          .map((a) => String(a["roleId"]))
       )
-      serverRoleNames = (allRoles as Array<Record<string, unknown>>)
-        .filter((r) => assignedIds.has(String(r['id'])))
-        .map((r) => String(r['name']))
+      serverRoleNames = allRoles
+        .filter((r) => assignedIds.has(String(r["id"])))
+        .map((r) => String(r["name"]))
     } catch {
       // Session token present but role query failed — render with empty role list
     }
   }
 
   let companyIds: readonly number[] | undefined
-  if (organizationId != null) {
+  if (organizationId != null && session) {
     try {
-      const rows = (await serverQueryCompanies(organizationId, opts)) as Array<
-        Record<string, unknown>
-      >
+      const rows = await serverFetchQueryListAllowEmpty(session, "companies")
       companyIds = rows
-        .map((r) => Number(r['id']))
+        .map((r) => Number(r["id"]))
         .filter((id) => Number.isFinite(id))
     } catch {
       companyIds = undefined

@@ -1,33 +1,32 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryHelpdeskTickets,
-  serverQueryHelpdeskTeams,
-  serverQueryHelpdeskStages,
-  serverQueryHelpdeskSlas,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { HelpdeskClient } from "./helpdesk-client"
+
+const SSR_RESOURCES = [
+  "helpdesk-tickets",
+  "helpdesk-teams",
+  "helpdesk-stages",
+  "helpdesk-slas",
+] as const
 
 export default async function HelpdeskPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <HelpdeskClient />
   }
-  const { organizationId, opts } = session
 
-  const [tickets, teams, stages, slas] = await Promise.all([
-    serverQueryHelpdeskTickets(organizationId, opts),
-    serverQueryHelpdeskTeams(organizationId, opts),
-    serverQueryHelpdeskStages(organizationId, opts),
-    serverQueryHelpdeskSlas(organizationId, opts),
-  ]).catch(() => [[], [], [], []])
+  const [tickets, teams, stages, slas] = await serverFetchQueryListsAllowEmpty(
+    session,
+    SSR_RESOURCES,
+  )
 
   return (
     <HelpdeskClient
-      initialTickets={tickets as Record<string, unknown>[]}
-      initialTeams={teams as Record<string, unknown>[]}
-      initialStages={stages as Record<string, unknown>[]}
-      initialSlas={slas as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialTickets={tickets}
+      initialTeams={teams}
+      initialStages={stages}
+      initialSlas={slas}
+      organizationId={session.organizationId}
     />
   )
 }

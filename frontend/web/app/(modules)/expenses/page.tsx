@@ -1,33 +1,27 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryExpenses,
-  serverQueryExpenseSheets,
-  serverQueryPricelists,
-  serverQueryEmployees,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { ExpensesClient } from "./expenses-client"
+
+const SSR_RESOURCES = ["expenses", "expense-sheets", "pricelists", "employees"] as const
 
 export default async function ExpensesPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <ExpensesClient />
   }
-  const { organizationId, opts } = session
 
-  const [expenses, sheets, pricelists, employees] = await Promise.all([
-    serverQueryExpenses(organizationId, opts),
-    serverQueryExpenseSheets(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryEmployees(organizationId, opts),
-  ]).catch(() => [[], [], [], []])
+  const [expenses, sheets, pricelists, employees] = await serverFetchQueryListsAllowEmpty(
+    session,
+    SSR_RESOURCES,
+  )
 
   return (
     <ExpensesClient
-      initialExpenses={expenses as Record<string, unknown>[]}
-      initialSheets={sheets as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      initialEmployees={employees as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialExpenses={expenses}
+      initialSheets={sheets}
+      initialPricelists={pricelists}
+      initialEmployees={employees}
+      organizationId={session.organizationId}
     />
   )
 }

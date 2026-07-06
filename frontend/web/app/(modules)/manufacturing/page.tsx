@@ -1,26 +1,27 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryMrpProductions,
-  serverQueryMrpBoms,
-  serverQueryMrpBomLines,
-  serverQueryMrpWorkorders,
-  serverQueryMrpWorkcenters,
-  serverQueryMrpRoutingWorkcenters,
-  serverQueryIotDevices,
-  serverQueryProducts,
-  serverQueryWarehouses,
-  serverQueryStockPickings,
-  serverQueryStockQuants,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { ManufacturingClient } from "./manufacturing-client"
+
+const SSR_RESOURCES = [
+  "mrp-productions",
+  "mrp-boms",
+  "mrp-bom-lines",
+  "mrp-workorders",
+  "mrp-workcenters",
+  "mrp-routing-workcenters",
+  "iot-devices",
+  "products",
+  "warehouses",
+  "stock-pickings",
+  "stock-quants",
+] as const
 
 export default async function ManufacturingPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
-    return <Suspense><ManufacturingClient /></Suspense>
+    return <ManufacturingClient />
   }
-  const { organizationId, opts } = session
 
   const [
     productions,
@@ -34,35 +35,23 @@ export default async function ManufacturingPage() {
     warehouses,
     stockPickings,
     stockQuants,
-  ] = await Promise.all([
-    serverQueryMrpProductions(organizationId, opts),
-    serverQueryMrpBoms(organizationId, opts),
-    serverQueryMrpBomLines(organizationId, opts),
-    serverQueryMrpWorkorders(organizationId, opts),
-    serverQueryMrpWorkcenters(organizationId, opts),
-    serverQueryMrpRoutingWorkcenters(organizationId, opts),
-    serverQueryIotDevices(organizationId, opts),
-    serverQueryProducts(organizationId, opts),
-    serverQueryWarehouses(organizationId, opts),
-    serverQueryStockPickings(organizationId, opts),
-    serverQueryStockQuants(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], []])
+  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <Suspense>
       <ManufacturingClient
-        initialProductions={productions as Record<string, unknown>[]}
-        initialBoms={boms as Record<string, unknown>[]}
-        initialBomLines={bomLines as Record<string, unknown>[]}
-        initialWorkorders={workorders as Record<string, unknown>[]}
-        initialWorkcenters={workcenters as Record<string, unknown>[]}
-        initialRoutingOperations={routingOperations as Record<string, unknown>[]}
-        initialIotDevices={iotDevices as Record<string, unknown>[]}
-        initialProducts={products as Record<string, unknown>[]}
-        initialWarehouses={warehouses as Record<string, unknown>[]}
-        initialStockPickings={stockPickings as Record<string, unknown>[]}
-        initialStockQuants={stockQuants as Record<string, unknown>[]}
-        organizationId={organizationId}
+        initialProductions={productions}
+        initialBoms={boms}
+        initialBomLines={bomLines}
+        initialWorkorders={workorders}
+        initialWorkcenters={workcenters}
+        initialRoutingOperations={routingOperations}
+        initialIotDevices={iotDevices}
+        initialProducts={products}
+        initialWarehouses={warehouses}
+        initialStockPickings={stockPickings}
+        initialStockQuants={stockQuants}
+        organizationId={session.organizationId}
       />
     </Suspense>
   )

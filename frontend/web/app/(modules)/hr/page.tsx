@@ -1,39 +1,34 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryEmployees,
-  serverQueryDepartments,
-  serverQueryLeaveRequests,
-  serverQueryContracts,
-  serverQueryPayslips,
-  serverQueryPricelists,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { HrClient } from "./hr-client"
+
+const SSR_RESOURCES = [
+  "employees",
+  "departments",
+  "leave-requests",
+  "contracts",
+  "payslips",
+  "pricelists",
+] as const
 
 export default async function HrPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <HrClient />
   }
-  const { organizationId, opts } = session
 
-  const [employees, departments, leaves, contracts, payslips, pricelists] = await Promise.all([
-    serverQueryEmployees(organizationId, opts),
-    serverQueryDepartments(organizationId, opts),
-    serverQueryLeaveRequests(organizationId, opts),
-    serverQueryContracts(organizationId, opts),
-    serverQueryPayslips(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], []])
+  const [employees, departments, leaves, contracts, payslips, pricelists] =
+    await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <HrClient
-      initialEmployees={employees as Record<string, unknown>[]}
-      initialDepartments={departments as Record<string, unknown>[]}
-      initialLeaves={leaves as Record<string, unknown>[]}
-      initialContracts={contracts as Record<string, unknown>[]}
-      initialPayslips={payslips as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialEmployees={employees}
+      initialDepartments={departments}
+      initialLeaves={leaves}
+      initialContracts={contracts}
+      initialPayslips={payslips}
+      initialPricelists={pricelists}
+      organizationId={session.organizationId}
     />
   )
 }

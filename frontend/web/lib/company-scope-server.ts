@@ -1,9 +1,8 @@
 /** Validate ERP `company_id` belongs to the signed-in user's organization. */
-import 'server-only'
+import "server-only"
 
-import { serverQueryCompanies } from '@lumiere/stdb/server'
-
-import type { ApiSession } from '@/lib/api-session'
+import type { ApiSession } from "@/lib/api-session"
+import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
 
 export async function companyIdBelongsToOrganization(
   session: ApiSession,
@@ -12,11 +11,8 @@ export async function companyIdBelongsToOrganization(
   const org = session.organizationId
   if (org === undefined || org <= 0 || companyId <= 0) return false
   try {
-    const rows = await serverQueryCompanies(org, {
-      token: session.stdbToken,
-      fieldAccess: session.fieldAccess,
-    })
-    for (const r of rows as Record<string, unknown>[]) {
+    const rows = await serverFetchQueryListAllowEmpty(session, "companies")
+    for (const r of rows) {
       if (Number(r.id) === companyId) return true
     }
     return false

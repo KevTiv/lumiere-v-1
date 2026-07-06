@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverQueryCalendarEvents } from "@lumiere/stdb/server"
+import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
 import { CalendarClient } from "./calendar-client"
 
 export default async function CalendarPage() {
@@ -7,16 +7,13 @@ export default async function CalendarPage() {
   if (!session?.organizationId) {
     return <CalendarClient />
   }
-  const { organizationId, opts } = session
 
-  const [events] = await Promise.all([
-    serverQueryCalendarEvents(organizationId, opts),
-  ]).catch(() => [[]])
+  const events = await serverFetchQueryListAllowEmpty(session, "calendar-events")
 
   return (
     <CalendarClient
-      initialEvents={events as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialEvents={events}
+      organizationId={session.organizationId}
     />
   )
 }

@@ -1,29 +1,30 @@
 import { getStdbSession } from "@/lib/api-session"
-import {
-  serverQueryProducts,
-  serverQueryProductCategories,
-  serverQueryUoms,
-  serverQueryStockQuants,
-  serverQueryStockPickings,
-  serverQueryWarehouses,
-  serverQueryInventoryAdjustments,
-  serverQueryPricelists,
-  serverQueryStockLocations,
-  serverQueryStockCycleCounts,
-  serverQueryStockMoves,
-  serverQueryWarehouse3dZones,
-  serverQueryInventoryValuations,
-  serverQueryReplenishmentRules,
-  serverQueryStockProductionSerials,
-} from "@lumiere/stdb/server"
+import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { InventoryClient } from "./inventory-client"
+
+const SSR_RESOURCES = [
+  "products",
+  "stock-quants",
+  "stock-pickings",
+  "warehouses",
+  "inventory-adjustments",
+  "pricelists",
+  "product-categories",
+  "uoms",
+  "stock-locations",
+  "stock-cycle-counts",
+  "stock-moves",
+  "warehouse-3d-zones",
+  "inventory-valuations",
+  "replenishment-rules",
+  "stock-production-serials",
+] as const
 
 export default async function InventoryPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
     return <InventoryClient />
   }
-  const { organizationId, opts } = session
 
   const [
     products,
@@ -41,42 +42,26 @@ export default async function InventoryPage() {
     inventoryValuations,
     replenishmentRules,
     stockProductionSerials,
-  ] = await Promise.all([
-    serverQueryProducts(organizationId, opts),
-    serverQueryStockQuants(organizationId, opts),
-    serverQueryStockPickings(organizationId, opts),
-    serverQueryWarehouses(organizationId, opts),
-    serverQueryInventoryAdjustments(organizationId, opts),
-    serverQueryPricelists(organizationId, opts),
-    serverQueryProductCategories(organizationId, opts),
-    serverQueryUoms(organizationId, opts),
-    serverQueryStockLocations(organizationId, opts),
-    serverQueryStockCycleCounts(organizationId, opts),
-    serverQueryStockMoves(organizationId, opts),
-    serverQueryWarehouse3dZones(organizationId, opts),
-    serverQueryInventoryValuations(organizationId, opts),
-    serverQueryReplenishmentRules(organizationId, opts),
-    serverQueryStockProductionSerials(organizationId, opts),
-  ]).catch(() => [[], [], [], [], [], [], [], [], [], [], [], [], [], [], []])
+  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <InventoryClient
-      initialProducts={products as Record<string, unknown>[]}
-      initialStockQuants={stockQuants as Record<string, unknown>[]}
-      initialTransfers={transfers as Record<string, unknown>[]}
-      initialWarehouses={warehouses as Record<string, unknown>[]}
-      initialAdjustments={adjustments as Record<string, unknown>[]}
-      initialPricelists={pricelists as Record<string, unknown>[]}
-      initialProductCategories={productCategories as Record<string, unknown>[]}
-      initialUoms={uoms as Record<string, unknown>[]}
-      initialStockLocations={stockLocations as Record<string, unknown>[]}
-      initialStockCycleCounts={stockCycleCounts as Record<string, unknown>[]}
-      initialStockMoves={stockMoves as Record<string, unknown>[]}
-      initialWarehouse3dZones={warehouse3dZones as Record<string, unknown>[]}
-      initialInventoryValuations={inventoryValuations as Record<string, unknown>[]}
-      initialReplenishmentRules={replenishmentRules as Record<string, unknown>[]}
-      initialStockProductionSerials={stockProductionSerials as Record<string, unknown>[]}
-      organizationId={organizationId}
+      initialProducts={products}
+      initialStockQuants={stockQuants}
+      initialTransfers={transfers}
+      initialWarehouses={warehouses}
+      initialAdjustments={adjustments}
+      initialPricelists={pricelists}
+      initialProductCategories={productCategories}
+      initialUoms={uoms}
+      initialStockLocations={stockLocations}
+      initialStockCycleCounts={stockCycleCounts}
+      initialStockMoves={stockMoves}
+      initialWarehouse3dZones={warehouse3dZones}
+      initialInventoryValuations={inventoryValuations}
+      initialReplenishmentRules={replenishmentRules}
+      initialStockProductionSerials={stockProductionSerials}
+      organizationId={session.organizationId}
     />
   )
 }
