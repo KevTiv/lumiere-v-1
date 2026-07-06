@@ -388,22 +388,34 @@ fn reducer_error_message(err: &str) -> ApiError {
     }
 }
 
-async fn latest_imported_rows(
+struct LatestImportJob {
+    job_id: u64,
+    imported_rows: u32,
+}
+
+async fn latest_import_job(
     client: &stdb_client::StdbClient,
     org_id: u64,
     table_name: &str,
-) -> Option<u32> {
+) -> Option<LatestImportJob> {
     let sql = format!(
-        "SELECT imported_rows FROM import_job WHERE organization_id = {org_id} AND table_name = '{table_name}' ORDER BY id DESC LIMIT 1"
+        "SELECT id, imported_rows FROM import_job WHERE organization_id = {org_id} AND table_name = '{table_name}' ORDER BY id DESC LIMIT 1"
     );
     let rows = client.query_sql(&sql).await.ok()?;
-    rows.first()
-        .and_then(|r| {
-            r.get("importedRows")
-                .or_else(|| r.get("imported_rows"))
-                .and_then(|v| v.as_u64())
-        })
-        .map(|n| n as u32)
+    let row = rows.first()?;
+    let job_id = row
+        .get("id")
+        .and_then(|v| v.as_u64())
+        .or_else(|| row.get("id").and_then(|v| v.as_str()?.parse().ok()))?;
+    let imported_rows = row
+        .get("importedRows")
+        .or_else(|| row.get("imported_rows"))
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32)?;
+    Some(LatestImportJob {
+        job_id,
+        imported_rows,
+    })
 }
 
 async fn import_entity_post(
@@ -469,14 +481,15 @@ async fn import_entity_post(
         .await
         .map_err(|e| reducer_error_message(&e.to_string()))?;
 
-    let rows_imported = latest_imported_rows(&client, org_id, spec.table_name).await;
+    let latest_job = latest_import_job(&client, org_id, spec.table_name).await;
 
     let mut resp = json!({
         "ok": true,
         "entity": spec.table_name,
     });
-    if let Some(n) = rows_imported {
-        resp["rowsImported"] = json!(n);
+    if let Some(job) = latest_job {
+        resp["jobId"] = json!(job.job_id);
+        resp["rowsImported"] = json!(job.imported_rows);
     }
 
     Ok(Json(resp))

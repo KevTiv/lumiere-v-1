@@ -39,6 +39,12 @@ pub fn normalize_identity_hex_for_sql(identity: &str) -> String {
     s.to_string()
 }
 
+/// SpacetimeDB HTTP reducer args expect `Identity` as `{ "__identity__": "0x..." }`.
+pub fn identity_json_for_reducer_call(identity_hex: &str) -> serde_json::Value {
+    let hex = normalize_identity_hex_for_sql(identity_hex);
+    serde_json::json!({ "__identity__": format!("0x{hex}") })
+}
+
 /// SpacetimeDB `Identity` is 32 bytes = 64 hex chars. Rejects WorkOS UUIDs in `sub` and other junk.
 pub fn parse_stdb_identity_hex(raw: &str) -> Option<String> {
     let s = raw.trim();
