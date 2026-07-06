@@ -4,29 +4,18 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::add_account_move_line_params_type::AddAccountMoveLineParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum ReportType {
-    BalanceSheet,
-
-    ProfitAndLoss,
-
-    CashFlow,
-
-    TrialBalance,
-
-    GeneralLedger,
-
-    AgedReceivable,
-
-    AgedPayable,
-
-    PartnerBalance,
-
-    VatReturn,
+pub struct CreateCreditNoteFromReturnOrderParams {
+    pub journal_id: u64,
+    pub default_income_account_id: u64,
+    pub receivable_line: AddAccountMoveLineParams,
+    pub income_line: AddAccountMoveLineParams,
+    pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for ReportType {
+impl __sdk::InModule for CreateCreditNoteFromReturnOrderParams {
     type Module = super::RemoteModule;
 }

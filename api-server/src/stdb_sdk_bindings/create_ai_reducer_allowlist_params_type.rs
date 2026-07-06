@@ -6,27 +6,14 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum ReportType {
-    BalanceSheet,
-
-    ProfitAndLoss,
-
-    CashFlow,
-
-    TrialBalance,
-
-    GeneralLedger,
-
-    AgedReceivable,
-
-    AgedPayable,
-
-    PartnerBalance,
-
-    VatReturn,
+pub struct CreateAiReducerAllowlistParams {
+    pub reducer_name: String,
+    pub permission_resource: String,
+    pub permission_action: String,
+    pub enabled: bool,
+    pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for ReportType {
+impl __sdk::InModule for CreateAiReducerAllowlistParams {
     type Module = super::RemoteModule;
 }

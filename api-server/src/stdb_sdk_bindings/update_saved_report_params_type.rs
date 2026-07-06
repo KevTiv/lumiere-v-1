@@ -6,27 +6,17 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum ReportType {
-    BalanceSheet,
-
-    ProfitAndLoss,
-
-    CashFlow,
-
-    TrialBalance,
-
-    GeneralLedger,
-
-    AgedReceivable,
-
-    AgedPayable,
-
-    PartnerBalance,
-
-    VatReturn,
+pub struct UpdateSavedReportParams {
+    pub name: Option<String>,
+    pub row_dimension: Option<String>,
+    pub column_dimension: Option<Option<String>>,
+    pub measure_field: Option<String>,
+    pub measure_op: Option<String>,
+    pub filter_json: Option<Option<String>>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for ReportType {
+impl __sdk::InModule for UpdateSavedReportParams {
     type Module = super::RemoteModule;
 }

@@ -6,27 +6,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum ReportType {
-    BalanceSheet,
-
-    ProfitAndLoss,
-
-    CashFlow,
-
-    TrialBalance,
-
-    GeneralLedger,
-
-    AgedReceivable,
-
-    AgedPayable,
-
-    PartnerBalance,
-
-    VatReturn,
+pub struct SetupFiscalCalendarParams {
+    pub fiscal_year_name: String,
+    pub date_from: __sdk::Timestamp,
+    pub date_to: __sdk::Timestamp,
+    pub open_first_period: bool,
 }
 
-impl __sdk::InModule for ReportType {
+impl __sdk::InModule for SetupFiscalCalendarParams {
     type Module = super::RemoteModule;
 }

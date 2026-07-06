@@ -56,6 +56,7 @@ pub struct Contact {
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
     pub deleted_at: Option::<__sdk::Timestamp>,
+    pub merge_target_id: Option::<u64>,
     pub metadata: Option::<String>,
 }
 
@@ -112,6 +113,7 @@ pub struct ContactCols {
     pub created_at: __sdk::__query_builder::Col<Contact, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<Contact, __sdk::Timestamp>,
     pub deleted_at: __sdk::__query_builder::Col<Contact, Option::<__sdk::Timestamp>>,
+    pub merge_target_id: __sdk::__query_builder::Col<Contact, Option::<u64>>,
     pub metadata: __sdk::__query_builder::Col<Contact, Option::<String>>,
 }
 
@@ -162,6 +164,7 @@ impl __sdk::__query_builder::HasCols for Contact {
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
             deleted_at: __sdk::__query_builder::Col::new(table_name, "deleted_at"),
+            merge_target_id: __sdk::__query_builder::Col::new(table_name, "merge_target_id"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
 
         }

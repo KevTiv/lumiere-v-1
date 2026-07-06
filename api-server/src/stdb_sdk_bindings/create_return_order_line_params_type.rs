@@ -6,27 +6,15 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-#[derive(Copy, Eq, Hash)]
-pub enum ReportType {
-    BalanceSheet,
-
-    ProfitAndLoss,
-
-    CashFlow,
-
-    TrialBalance,
-
-    GeneralLedger,
-
-    AgedReceivable,
-
-    AgedPayable,
-
-    PartnerBalance,
-
-    VatReturn,
+pub struct CreateReturnOrderLineParams {
+    pub sale_order_line_id: Option<u64>,
+    pub product_id: u64,
+    pub product_uom: u64,
+    pub product_uom_qty: f64,
+    pub price_unit: f64,
+    pub to_refund: bool,
 }
 
-impl __sdk::InModule for ReportType {
+impl __sdk::InModule for CreateReturnOrderLineParams {
     type Module = super::RemoteModule;
 }
