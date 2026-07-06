@@ -61,7 +61,10 @@ import {
   toCreateEmployeeParams,
   toCreateJobPositionParams,
   toCreateLeaveRequestParams,
+  toCreateLeaveTypeParams,
+  toCreatePayrollStructureParams,
   toCreatePayslipParams,
+  toCreateSalaryRuleParams,
 } from "@/lib/hr-create-params"
 import {
   pricelistRowsToSelectOptions,
@@ -758,37 +761,14 @@ function HrClientLoaded({
     } else if (action === "createDepartment") {
       await createDepartment.mutateAsync(toCreateDepartmentParams(formData))
     } else if (action === "createLeaveType") {
-      await createLeaveType.mutateAsync({
-        name: String(formData.name ?? ""),
-        allocationType: String(formData.allocationType ?? "fixed"),
-        maxLeaves: Number(formData.maxLeaves ?? 0),
-        code: formData.code != null && String(formData.code).trim() !== "" ? String(formData.code) : undefined,
-        color: undefined,
-        validityStart: undefined,
-        validityStop: undefined,
-        isActive: formData.isActive !== false,
-      })
+      const params = toCreateLeaveTypeParams(formData)
+      await createLeaveType.mutateAsync(params)
     } else if (action === "createPayrollStructure") {
-      await createPayrollStructure.mutateAsync({
-        name: String(formData.name ?? ""),
-        type: String(formData.type ?? "regular"),
-        isActive: formData.isActive !== false,
-      })
+      await createPayrollStructure.mutateAsync(toCreatePayrollStructureParams(formData))
     } else if (action === "createSalaryRule") {
-      const structureRaw = formData.structureId
-      if (structureRaw === "" || structureRaw == null) return
-      await createSalaryRule.mutateAsync({
-        name: String(formData.name ?? ""),
-        code: String(formData.code ?? ""),
-        structureId: BigInt(String(structureRaw)),
-        category: String(formData.category ?? ""),
-        conditionType: String(formData.conditionType ?? "none"),
-        amountType: String(formData.amountType ?? "fixed"),
-        amountFix: Number(formData.amountFix ?? 0),
-        amountPercentage: Number(formData.amountPercentage ?? 0),
-        sequence: Number(formData.sequence ?? 10),
-        isActive: formData.isActive !== false,
-      })
+      const params = toCreateSalaryRuleParams(formData)
+      if (!params) return
+      await createSalaryRule.mutateAsync(params)
     }
   }
 

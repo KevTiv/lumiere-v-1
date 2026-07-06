@@ -4,7 +4,10 @@
 
 import type {
   CreateDocumentParams,
+  CreateDocumentFolderParams,
+  CreateDocumentProcessingJobParams,
   CreateKnowledgeArticleParams,
+  CreateKnowledgeCategoryParams,
 } from "@lumiere/stdb/types"
 
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
@@ -69,5 +72,65 @@ export function toCreateKnowledgeArticleParams(
     articleUrl: undefined,
     websiteUrl: undefined,
     metadata: undefined,
+  }
+}
+
+export function toCreateKnowledgeCategoryParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateKnowledgeCategoryParams | null {
+  const name = requiredTrimmedString(formData.name)
+  if (!name) return null
+  const seqRaw = formData.sequence
+  const sequence =
+    seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+  const colorRaw = formData.color
+  const color =
+    colorRaw != null && String(colorRaw).trim() !== ""
+      ? Math.min(11, Math.max(0, Math.floor(Number(colorRaw))))
+      : undefined
+  return {
+    companyId,
+    name,
+    description: optionalTrimmedString(formData.description),
+    parentId: optionalBigIntU64(formData.parentId),
+    sequence,
+    color,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateDocumentFolderParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateDocumentFolderParams | null {
+  const name = requiredTrimmedString(formData.name)
+  if (!name) return null
+  const seqRaw = formData.sequence
+  const sequence =
+    seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+  return {
+    name,
+    description: optionalTrimmedString(formData.description),
+    parentId: optionalBigIntU64(formData.parentId),
+    isAccessRestricted: formData.isAccessRestricted === true,
+    isHidden: Boolean(formData.isHidden),
+    isReadonly: formData.isReadonly === true,
+    isFavorite: Boolean(formData.isFavorite),
+    sequence,
+    storageId: optionalBigIntU64(formData.storageId),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateDocumentProcessingJobParams(
+  formData: Record<string, unknown>,
+): CreateDocumentProcessingJobParams {
+  return {
+    documentType: String(formData.documentType ?? formData.document_type ?? ""),
+    jobType: String(formData.jobType ?? formData.job_type ?? ""),
+    aiAgentId: optionalBigIntU64(formData.aiAgentId ?? formData.ai_agent_id),
+    inputData: optionalTrimmedString(formData.inputData ?? formData.input_data),
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }

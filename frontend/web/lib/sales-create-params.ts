@@ -4,6 +4,7 @@
 
 import type {
   AddAccountMoveLineParams,
+  CreateCreditNoteFromReturnOrderParams,
   CreateInvoiceFromSaleOrderParams,
   CreatePickingBatchParams,
   CreatePricelistItemParams,
@@ -425,4 +426,11 @@ export function toCreateReturnOrderParams(
     returnReason: optionalTrimmedString(formData.returnReason),
     lines: [line],
   }
+}
+
+/** Same shape as invoice-from-sale-order params (journal + move lines). */
+export function toCreateCreditNoteFromReturnOrderParams(
+  formData: Record<string, unknown>,
+): CreateCreditNoteFromReturnOrderParams | null {
+  return toCreateInvoiceFromSaleOrderParams(formData)
 }

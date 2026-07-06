@@ -9,6 +9,9 @@ import type {
   CreateContactParams,
   CreateLeadParams,
   CreateOpportunityParams,
+  CreateUtmCampaignParams,
+  CreateUtmMediumParams,
+  CreateUtmSourceParams,
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
@@ -247,4 +250,19 @@ export function toCreateOpportunityLineParams(
     sequence,
     metadata: optionalTrimmedString(formData.metadata),
   }
+}
+
+export function toCreateUtmCampaignParams(
+  name: string,
+  isActive = true,
+): CreateUtmCampaignParams {
+  return { name: name.trim(), isActive }
+}
+
+export function toCreateUtmMediumParams(name: string, isActive = true): CreateUtmMediumParams {
+  return { name: name.trim(), isActive }
+}
+
+export function toCreateUtmSourceParams(name: string, isActive = true): CreateUtmSourceParams {
+  return { name: name.trim(), isActive }
 }

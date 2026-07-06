@@ -30,11 +30,25 @@ export function accountJournalRowsToSelectOptions(
   })
 }
 
+function isTruthyFlag(v: unknown): boolean {
+  if (v === true || v === 1) return true
+  if (v === false || v === 0 || v == null) return false
+  if (typeof v === "object" && !Array.isArray(v)) {
+    const obj = v as Record<string, unknown>
+    if ("some" in obj) return isTruthyFlag(obj.some)
+    if ("none" in obj) return false
+  }
+  return Boolean(v)
+}
+
 /** CRM contacts — `Contact.id` is used as sale `partnerId` in this schema. */
 export function contactRowsToPartnerSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
-  const customers = rows.filter((r) => r.isCustomer === true || r.isCustomer === 1)
+  const customers = rows.filter((r) => {
+    const isCustomer = r.isCustomer ?? r.is_customer
+    return isTruthyFlag(isCustomer)
+  })
   const list = customers.length > 0 ? customers : rows
   return list.map((row) => {
     const id = row.id

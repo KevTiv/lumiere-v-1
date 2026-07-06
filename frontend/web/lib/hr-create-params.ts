@@ -4,7 +4,10 @@ import type {
   CreateEmployeeParams,
   CreateJobPositionParams,
   CreateLeaveRequestParams,
+  CreateLeaveTypeParams,
+  CreatePayrollStructureParams,
   CreatePayslipParams,
+  CreateSalaryRuleParams,
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
@@ -165,5 +168,52 @@ export function toCreateDepartmentParams(
     note: optionalString(formData.note),
     isActive: true,
     color: undefined,
+  }
+}
+
+export function toCreateLeaveTypeParams(
+  formData: Record<string, unknown>,
+): CreateLeaveTypeParams {
+  return {
+    name: String(formData.name ?? "").trim(),
+    allocationType: String(formData.allocationType ?? formData.allocation_type ?? "fixed"),
+    maxLeaves: Number(formData.maxLeaves ?? formData.max_leaves ?? 0),
+    code: optionalString(formData.code),
+    color:
+      formData.color != null && String(formData.color).trim() !== ""
+        ? Math.trunc(Number(formData.color))
+        : undefined,
+    validityStart: optionalTimestamp(formData.validityStart ?? formData.validity_start),
+    validityStop: optionalTimestamp(formData.validityStop ?? formData.validity_stop),
+    isActive: formData.isActive !== false && formData.is_active !== false,
+  }
+}
+
+export function toCreatePayrollStructureParams(
+  formData: Record<string, unknown>,
+): CreatePayrollStructureParams {
+  return {
+    name: String(formData.name ?? "").trim(),
+    type: String(formData.type ?? formData.type_ ?? "regular"),
+    isActive: formData.isActive !== false && formData.is_active !== false,
+  }
+}
+
+export function toCreateSalaryRuleParams(
+  formData: Record<string, unknown>,
+): CreateSalaryRuleParams | null {
+  const structureId = optionalBigIntU64(formData.structureId ?? formData.structure_id)
+  if (structureId === undefined) return null
+  return {
+    name: String(formData.name ?? "").trim(),
+    code: String(formData.code ?? "").trim(),
+    structureId,
+    category: String(formData.category ?? ""),
+    conditionType: String(formData.conditionType ?? formData.condition_type ?? "none"),
+    amountType: String(formData.amountType ?? formData.amount_type ?? "fixed"),
+    amountFix: Number(formData.amountFix ?? formData.amount_fix ?? 0),
+    amountPercentage: Number(formData.amountPercentage ?? formData.amount_percentage ?? 0),
+    sequence: Math.max(0, Math.trunc(Number(formData.sequence ?? 10))),
+    isActive: formData.isActive !== false && formData.is_active !== false,
   }
 }

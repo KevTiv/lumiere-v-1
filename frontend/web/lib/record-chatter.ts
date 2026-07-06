@@ -32,8 +32,19 @@ const MODULE_TAB_RES_MODEL: Record<string, Record<string, string>> = {
 }
 
 export function rowIdBigInt(row: Record<string, unknown>): bigint {
-  const r = row.id
+  const r = row.id ?? row.Id
   if (typeof r === "bigint") return r
+  if (typeof r === "number" && Number.isFinite(r)) return BigInt(Math.trunc(r))
+  if (typeof r === "string" && r.trim() !== "") return BigInt(r)
+  if (typeof r === "object" && r !== null && !Array.isArray(r)) {
+    const obj = r as Record<string, unknown>
+    if ("some" in obj) {
+      const inner = obj.some
+      if (typeof inner === "bigint") return inner
+      if (typeof inner === "number" && Number.isFinite(inner)) return BigInt(Math.trunc(inner))
+      if (typeof inner === "string" && inner.trim() !== "") return BigInt(inner)
+    }
+  }
   return BigInt(String(r ?? 0))
 }
 

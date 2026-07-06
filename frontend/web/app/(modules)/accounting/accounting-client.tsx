@@ -64,10 +64,13 @@ import {
   analyticParamsToJson,
   toCreateAccountAccountParams,
   toCreateAccountMoveFromInvoiceModal,
+  toCreateAccountMoveParams,
+  toCreateAccountJournalParams,
+  toCreateCrossoveredBudgetLineParams,
+  toCreateCreditNoteParams,
   createAccountTaxParamsToStdbHttpJson,
   toCreateAccountTaxParams,
   toCreateCrossoveredBudgetParams,
-  toCreateJournalEntryMoveParams,
   toCreateAnalyticAccountParams,
   toCreateAnalyticLineParams,
   toCreateAnalyticDistributionModelParams,
@@ -112,8 +115,6 @@ import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import type {
   AddAccountMoveLineParams,
-  CreateAccountJournalParams,
-  JournalType,
   UpdateAccountJournalParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
@@ -299,56 +300,6 @@ function paymentTermValueTag(
   return { tag: "Balance" }
 }
 
-function journalTypeTagFromForm(raw: unknown): JournalType {
-  const s = String(raw ?? "Sale").trim()
-  if (s === "Purchase") return { tag: "Purchase" }
-  if (s === "Bank") return { tag: "Bank" }
-  if (s === "Cash") return { tag: "Cash" }
-  if (s === "General") return { tag: "General" }
-  return { tag: "Sale" }
-}
-
-function toCreateAccountJournalParamsFromForm(
-  formData: Record<string, unknown>,
-  companyId: bigint,
-): CreateAccountJournalParams {
-  const name = String(formData.name ?? "").trim()
-  const code = String(formData.code ?? "").trim()
-  return {
-    companyId,
-    name,
-    code,
-    type: journalTypeTagFromForm(formData.type),
-    currencyId: undefined,
-    defaultAccountId: undefined,
-    suspenseAccountId: undefined,
-    lossAccountId: undefined,
-    profitAccountId: undefined,
-    bankAccountId: undefined,
-    paymentCreditAccountId: undefined,
-    paymentDebitAccountId: undefined,
-    invoiceReferenceType: undefined,
-    invoiceReferenceModel: undefined,
-    sequenceId: undefined,
-    refundSequenceId: undefined,
-    sequenceOverrideRegex: undefined,
-    secureSequenceId: undefined,
-    aliasName: undefined,
-    aliasDomain: undefined,
-    saleActivityTypeId: undefined,
-    saleActivityUserId: undefined,
-    saleActivityNote: undefined,
-    saleActivityDateDeadline: undefined,
-    restrictModeHashTable: false,
-    active: formData.active !== false,
-    atLeastOneInbound: false,
-    atLeastOneOutbound: false,
-    dedicatedPaymentMethodIds: [],
-    saleActivityDone: false,
-    metadata: undefined,
-  }
-}
-
 function toAddAccountMoveLineParamsFromForm(
   formData: Record<string, unknown>,
 ): { moveId: bigint; params: AddAccountMoveLineParams } | null {
@@ -441,24 +392,6 @@ function toUpdateBudgetParams(formData: Record<string, unknown>): Record<string,
     dateFrom: formData.dateFrom ? dateInputToStdbTimestamp(formData.dateFrom) : undefined,
     dateTo: formData.dateTo ? dateInputToStdbTimestamp(formData.dateTo) : undefined,
     metadata: undefined,
-  }
-}
-
-function toCreateBudgetLineParams(formData: Record<string, unknown>): Record<string, unknown> {
-  const plannedAmount = Number(formData.plannedAmount ?? 0)
-  return {
-    analyticAccountId: optionalBigIntU64(formData.analyticAccountId),
-    dateFrom: dateInputToStdbTimestamp(formData.dateFrom),
-    dateTo: dateInputToStdbTimestamp(formData.dateTo),
-    paidDate: undefined,
-    plannedAmount,
-    practicalAmount: 0,
-    theoreticalAmount: 0,
-    achievePercentage: 0,
-    isAboveBudget: false,
-    variance: -plannedAmount,
-    variancePercentage: plannedAmount > 0 ? -100 : 0,
-    metadata: optionalText(formData.metadata),
   }
 }
 
@@ -1938,7 +1871,7 @@ function AccountingClientLoaded({
         const resolved = resolveDefaultCogsInventoryAccountIds(
           accounts as readonly Record<string, unknown>[],
         )
-        const needsCogsAccounts = mt === "OutInvoice" || mt === "OutRefund"
+        const needsCogsAccounts = isInvoiceLikeMoveType(mt)
         if (needsCogsAccounts && resolved == null) {
           toast({
             variant: "destructive",
@@ -2209,7 +2142,7 @@ function AccountingClientLoaded({
       })
       if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
     } else if (action === "createMove") {
-      const p = toCreateJournalEntryMoveParams(formData)
+      const p = toCreateAccountMoveParams(formData)
       if (p) await createMove.mutateAsync([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
     } else if (action === "createTax") {
       await createTax.mutateAsync([
@@ -2254,7 +2187,7 @@ function AccountingClientLoaded({
       const p = toCreatePaymentTermLineParamsFromForm(formData)
       if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermLineParams"))
     } else if (action === "createAccountJournal") {
-      const params = toCreateAccountJournalParamsFromForm(formData, operatingCompanyId)
+      const params = toCreateAccountJournalParams(formData, operatingCompanyId)
       await createAccountJournal.mutateAsync([
         organizationId,
         accountingParamsToJson(params, "CreateAccountJournalParams"),
@@ -2437,7 +2370,7 @@ function AccountingClientLoaded({
                         createBudgetLine.mutateAsync([
                           organizationId,
                           budgetId,
-                          stdbParamsToJson(toCreateBudgetLineParams(params)),
+                          accountingParamsToJson(toCreateCrossoveredBudgetLineParams(params), "CreateCrossoveredBudgetLineParams"),
                         ])
                       }
                       onUpdateBudgetLine={(lineId, params) =>
@@ -3016,18 +2949,11 @@ function AccountingClientLoaded({
           })}
           isPending={createCreditNote.isPending}
           onSubmit={async (data) => {
-            const reasonRaw = String(data.reason ?? "").trim()
             await createCreditNote.mutateAsync([
               organizationId,
               Number(operatingCompanyId),
               Number(creditNoteSource.id),
-              accountingParamsToJson(
-                {
-                  lineIds: [],
-                  reason: reasonRaw.length > 0 ? reasonRaw : null,
-                },
-                "CreateCreditNoteParams",
-              ),
+              accountingParamsToJson(toCreateCreditNoteParams(data), "CreateCreditNoteParams"),
             ])
             toast({
               title: t("accounting.forms.createCreditNote.title"),

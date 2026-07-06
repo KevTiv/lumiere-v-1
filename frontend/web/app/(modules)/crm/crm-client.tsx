@@ -1,5 +1,6 @@
 "use client"
 
+import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
 import { phCapture } from "@/lib/posthog-browser"
 import {
   customFieldEntriesFromMetadata,
@@ -150,8 +151,19 @@ type WorkflowModal =
   | null
 
 function rowIdBigInt(row: Record<string, unknown>): bigint {
-  const r = row.id
+  const r = row.id ?? row.Id
   if (typeof r === "bigint") return r
+  if (typeof r === "number" && Number.isFinite(r)) return BigInt(Math.trunc(r))
+  if (typeof r === "string" && r.trim() !== "") return BigInt(r)
+  if (typeof r === "object" && r !== null && !Array.isArray(r)) {
+    const obj = r as Record<string, unknown>
+    if ("some" in obj) {
+      const inner = obj.some
+      if (typeof inner === "bigint") return inner
+      if (typeof inner === "number" && Number.isFinite(inner)) return BigInt(Math.trunc(inner))
+      if (typeof inner === "string" && inner.trim() !== "") return BigInt(inner)
+    }
+  }
   return BigInt(String(r ?? 0))
 }
 
@@ -186,8 +198,19 @@ function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string
   return id ? `Record #${id}` : "Record"
 }
 
+function scalarFieldString(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value.toLowerCase()
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("some" in obj) return scalarFieldString(obj.some)
+    if ("tag" in obj && typeof obj.tag === "string") return obj.tag.toLowerCase()
+  }
+  return String(value).toLowerCase()
+}
+
 function leadStateRaw(row: Record<string, unknown>): string {
-  return String(row.state ?? row.State ?? "").toLowerCase()
+  return scalarFieldString(row.state ?? row.State)
 }
 
 function oppIsClosed(row: Record<string, unknown>): boolean {
@@ -1115,9 +1138,23 @@ function CrmClientLoaded({
           type: "custom" as const,
           customContent: <CrmUtmSettings organizationId={organizationId} />,
         },
+        {
+          id: "duplicates",
+          label: t("crm.duplicates.tabLabel"),
+          type: "custom" as const,
+          customContent: (
+            <CrmDuplicateContacts
+              organizationId={organizationId}
+              companyId={operatingCompanyId}
+              contacts={contacts as Record<string, unknown>[]}
+            />
+          ),
+        },
       ],
     }
   }, [
+    operatingCompanyId,
+    contacts,
     t,
     organizationId,
     openConvertLeadModal,

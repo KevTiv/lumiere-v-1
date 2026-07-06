@@ -226,8 +226,13 @@ export function PivotExplorer({
         </div>
 
         <div className="space-y-2">
-          <Label>{t("reports.pivot.name")}</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Label htmlFor="pivot-report-name">{t("reports.pivot.name")}</Label>
+          <Input
+            id="pivot-report-name"
+            data-testid="pivot-report-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
 
         <div className="space-y-2">

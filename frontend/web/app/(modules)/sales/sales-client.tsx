@@ -49,6 +49,7 @@ import {
   toCreatePricelistItemParams,
   toCreateSaleOrderParams,
   toCreateSaleOrderLineParams,
+  toCreateCreditNoteFromReturnOrderParams,
   toCreateInvoiceFromSaleOrderParams,
   toCreateReturnOrderParams,
 } from '@/lib/sales-create-params';
@@ -1800,7 +1801,7 @@ function SalesClientLoaded({
           isPending={createCreditNoteFromReturnOrder.isPending}
           onSubmit={async (formData) => {
             setCreditReturnOrderError(null);
-            const params = toCreateInvoiceFromSaleOrderParams(formData);
+            const params = toCreateCreditNoteFromReturnOrderParams(formData);
             if (!params) {
               setCreditReturnOrderError(t('common.validation.required'));
               return;

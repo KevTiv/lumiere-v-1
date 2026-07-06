@@ -40,7 +40,10 @@ import {
 } from "@lumiere/query-hooks/hooks/documents"
 import {
   toCreateDocumentParams,
+  toCreateDocumentFolderParams,
+  toCreateDocumentProcessingJobParams,
   toCreateKnowledgeArticleParams,
+  toCreateKnowledgeCategoryParams,
 } from "@/lib/documents-create-params"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -572,53 +575,18 @@ function DocumentsClientLoaded({
       if (!params) return
       await createKnowledgeArticle.mutateAsync(params)
     } else if (action === "createKnowledgeCategory") {
-      const seqRaw = formData.sequence
-      const sequence =
-        seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
-      const colorRaw = formData.color
-      const color =
-        colorRaw != null && String(colorRaw).trim() !== ""
-          ? Math.min(11, Math.max(0, Math.floor(Number(colorRaw))))
-          : undefined
-      await createKnowledgeCategory.mutateAsync({
-        name: String(formData.name ?? "").trim(),
-        description:
-          formData.description != null && String(formData.description).trim() !== ""
-            ? String(formData.description).trim()
-            : undefined,
-        parentId: optionalBigIntU64(formData.parentId),
-        sequence,
-        color,
-        metadata: undefined,
-      })
+      const params = toCreateKnowledgeCategoryParams(formData, operatingCompanyId)
+      if (!params) return
+      await createKnowledgeCategory.mutateAsync(params)
     } else if (action === "createDocumentFolder") {
-      const seqRaw = formData.sequence
-      const sequence =
-        seqRaw != null && String(seqRaw).trim() !== "" ? Math.max(0, Math.floor(Number(seqRaw))) : 10
+      const params = toCreateDocumentFolderParams(formData, operatingCompanyId)
+      if (!params) return
       await createDocumentFolder.mutateAsync({
         companyId: operatingCompanyId,
-        name: String(formData.name ?? "").trim(),
-        description:
-          formData.description != null && String(formData.description).trim() !== ""
-            ? String(formData.description).trim()
-            : undefined,
-        parentId: optionalBigIntU64(formData.parentId),
-        isAccessRestricted: false,
-        isHidden: Boolean(formData.isHidden),
-        isReadonly: false,
-        isFavorite: Boolean(formData.isFavorite),
-        sequence,
-        storageId: undefined,
-        metadata: undefined,
+        ...params,
       })
     } else if (action === "createDocumentProcessingJob") {
-      await createProcessingJob.mutateAsync({
-        documentType: formData.documentType,
-        jobType: formData.jobType,
-        aiAgentId: formData.aiAgentId,
-        inputData: formData.inputData,
-        metadata: formData.metadata,
-      })
+      await createProcessingJob.mutateAsync(toCreateDocumentProcessingJobParams(formData))
     }
   }
 
