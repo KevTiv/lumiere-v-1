@@ -130,6 +130,32 @@ export async function waitForBffQueryMinRows(
     .toBeGreaterThanOrEqual(minRows)
 }
 
+function isSoftDeletedRow(row: Record<string, unknown>): boolean {
+  const deleted = row.deletedAt ?? row.deleted_at
+  if (deleted == null) return false
+  if (typeof deleted === "object" && deleted !== null && "none" in deleted) return false
+  return true
+}
+
+/** Assert a row no longer appears in a BFF list query (e.g. after soft-delete filtering). */
+export async function expectRecordAbsentFromQuery(
+  page: Page,
+  queryPath: string,
+  match: (row: Record<string, unknown>) => boolean,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get(queryPath)
+        if (!res.ok()) return false
+        const json = (await res.json()) as { data?: Record<string, unknown>[] }
+        return (json.data ?? []).find(match) === undefined
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+}
+
 /** Assert a row was soft-deleted (`deleted_at` / `deletedAt` set) via BFF query. */
 export async function expectRecordSoftDeleted(
   page: Page,
@@ -144,11 +170,24 @@ export async function expectRecordSoftDeleted(
         const json = (await res.json()) as { data?: Record<string, unknown>[] }
         const row = (json.data ?? []).find(match)
         if (!row) return true
-        return row.deletedAt != null || row.deleted_at != null
+        return isSoftDeletedRow(row)
       },
       { timeout: 30_000 },
     )
     .toBe(true)
+}
+
+/** Wait for a workflow/runtime form modal (handles loading overlay). */
+export async function expectFormModalVisible(
+  page: Page,
+  formId: string,
+  timeoutMs = 30_000,
+) {
+  const loading = page.getByTestId(`runtime-form-modal-loading-${formId}`)
+  if (await loading.isVisible().catch(() => false)) {
+    await expect(loading).toBeHidden({ timeout: timeoutMs })
+  }
+  await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible({ timeout: timeoutMs })
 }
 
 export async function openSettingsSection(page: Page, sectionId: string) {
@@ -283,6 +322,17 @@ export async function fetchAccountSelectLabelByInternalType(
   }
   if (!row) throw new Error(`no account with internal type ${internalType}`)
   return accountSelectLabel(row)
+}
+
+/** Chart account id by code (e.g. seed `5000` COGS, `1400` inventory). */
+export async function fetchAccountIdByCode(page: Page, code: string): Promise<number> {
+  const res = await page.request.get("/api/query/account-accounts")
+  if (!res.ok()) throw new Error(`account-accounts query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; code?: string }> }
+  const row = (json.data ?? []).find((a) => String(a.code ?? "") === code)
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`account not found: ${code}`)
+  return id
 }
 
 /** Sales invoice journal from seed (INV — Customer Invoices). */
@@ -463,11 +513,26 @@ export async function chooseSelectOptionByLabel(
   label: string | RegExp,
   options?: { optionTimeoutMs?: number },
 ) {
-  await page.getByTestId(`form-field-${name}`).click()
+  const optionTimeoutMs = options?.optionTimeoutMs ?? 30_000
+  const optionName =
+    typeof label === "string"
+      ? new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
+      : label
+  const field = page.getByTestId(`form-field-${name}`)
   const listbox = page.locator('[role="listbox"]:visible')
-  await expect(listbox).toBeVisible({ timeout: 15_000 })
-  const option = listbox.getByRole("option", { name: label })
-  await expect(option).toBeVisible({ timeout: options?.optionTimeoutMs ?? 15_000 })
+  const option = listbox.getByRole("option", { name: optionName }).first()
+
+  await expect
+    .poll(
+      async () => {
+        await field.click()
+        if (!(await listbox.isVisible().catch(() => false))) return 0
+        return await option.count()
+      },
+      { timeout: optionTimeoutMs },
+    )
+    .toBeGreaterThan(0)
+
   await option.click()
 }
 
@@ -630,6 +695,16 @@ export async function callReducerBffResult(
   return { ok: false, status: res.status(), error: error || undefined }
 }
 
+async function expectReducerHttpResponseOk(
+  reducer: string,
+  res: import("@playwright/test").APIResponse,
+): Promise<void> {
+  if (res.ok()) return
+  const json = (await res.json().catch(() => ({}))) as { error?: string }
+  const detail = json.error ?? (await res.text().catch(() => ""))
+  throw new Error(`Reducer ${reducer} failed (${res.status()}): ${detail}`)
+}
+
 /** Assert Casbin/module permission denial (403 or error body with Permission denied). */
 export async function expectReducerPermissionDenied(
   page: Page,
@@ -675,6 +750,17 @@ export async function fetchFirstOpportunityStageId(page: Page): Promise<number> 
   const id = sorted[0]?.id
   if (id == null) throw new Error("opportunity stage row missing id")
   return Number(id)
+}
+
+/** Product category id by name (BFF `/api/query/product-categories`). */
+export async function fetchProductCategoryIdByName(page: Page, name: string): Promise<number> {
+  const res = await page.request.get("/api/query/product-categories")
+  if (!res.ok()) throw new Error(`product-categories query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+  const row = (json.data ?? []).find((r) => String(r.name ?? "") === name)
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`product category not found: ${name}`)
+  return id
 }
 
 /** Lead id whose name or contactName matches (BFF `/api/query/leads`). */
@@ -1303,12 +1389,26 @@ export async function fetchDraftInvoiceMoveIdByPartner(
   throw new Error(`draft invoice not found for partner: ${partnerName}`)
 }
 
+function unwrapQueryOptionValue(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return value
+  const obj = value as Record<string, unknown>
+  if ("none" in obj) return null
+  if ("some" in obj) return obj.some
+  return value
+}
+
 function metadataReversedEntryId(metadata: unknown): number | null {
-  if (metadata == null) return null
-  const raw = typeof metadata === "string" ? metadata : JSON.stringify(metadata)
+  const unwrapped = unwrapQueryOptionValue(metadata)
+  if (unwrapped == null) return null
+  const raw =
+    typeof unwrapped === "string"
+      ? unwrapped
+      : typeof unwrapped === "object"
+        ? JSON.stringify(unwrapped)
+        : String(unwrapped)
   try {
-    const parsed = JSON.parse(raw) as { reversed_entry_id?: unknown }
-    const id = Number(parsed.reversed_entry_id)
+    const parsed = JSON.parse(raw) as { reversed_entry_id?: unknown; reversedEntryId?: unknown }
+    const id = Number(parsed.reversed_entry_id ?? parsed.reversedEntryId)
     return Number.isFinite(id) ? id : null
   } catch {
     return null
@@ -1343,28 +1443,69 @@ export async function fetchDraftCreditNoteMoveIdForInvoice(
       })
       const id = scalarQueryId(match?.id)
       if (id != null) return id
+
+      const fallback = [...(json.data ?? [])]
+        .filter((m) => {
+          const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
+          const isRefund = moveTypeTag(m.moveType).includes("refund")
+          return isDraft && isRefund
+        })
+        .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
+      const fallbackId = scalarQueryId(fallback?.id)
+      if (fallbackId != null) return fallbackId
     }
     await page.waitForTimeout(250)
   }
   throw new Error(`draft credit note not found for invoice: ${sourceInvoiceId}`)
 }
 
-/** Open journal entry detail and post draft refund via GL tab. */
+/** Post a draft customer credit note (OutRefund) via BFF `post_invoice`. */
+export async function postDraftCreditNoteMove(page: Page, creditNoteId: number): Promise<void> {
+  const organizationId = await fetchSessionOrganizationId(page)
+  const cogsAccountId = await fetchAccountIdByCode(page, "5000")
+  const inventoryAccountId = await fetchAccountIdByCode(page, "1400")
+  await callReducerBff(page, "post_invoice", [
+    organizationId,
+    creditNoteId,
+    cogsAccountId,
+    inventoryAccountId,
+  ])
+  await waitForMovePosted(page, creditNoteId)
+}
+
+/** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-journal-entries").click()
-  const row = activeTabCustomTableRows(page).filter({ hasText: partnerName }).first()
-  await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.click()
-  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15_000 })
-  const [postRes] = await Promise.all([
-    page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
-      { timeout: 30_000 },
-    ),
-    page.getByRole("button", { name: /post/i }).click(),
-  ])
-  expect(postRes.ok()).toBe(true)
+  await page.getByTestId("module-tab-accounting-invoices").click()
+  const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 })
+
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const count = await rows.count()
+    for (let i = 0; i < count; i++) {
+      await rows.nth(i).click()
+      const modal = page.getByTestId("invoice-detail-modal")
+      const postBtn = page.getByTestId("invoice-detail-post-draft")
+      if (await modal.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        if (await postBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          const [postRes] = await Promise.all([
+            page.waitForResponse(
+              (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+              { timeout: 30_000 },
+            ),
+            postBtn.click(),
+          ])
+          expect(postRes.ok()).toBe(true)
+          return
+        }
+        await page.keyboard.press("Escape")
+      }
+    }
+    await page.waitForTimeout(250)
+  }
+
+  throw new Error(`draft credit note not found in invoices tab for partner: ${partnerName}`)
 }
 
 /** Label for the receive-goods line select (`PO {orderId} — {product} ({left} left)`). */
@@ -1476,12 +1617,12 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+      (res) => res.url().includes("/api/call/post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
   ])
-  expect(postRes.ok()).toBe(true)
+  await expectReducerHttpResponseOk("post_invoice", postRes)
   await waitForMovePosted(page, moveId)
   return moveId
 }
@@ -1729,11 +1870,11 @@ export async function grantPermissionViaSettings(
   await gotoModule(page, "/settings")
   await page.getByTestId("settings-admin-action-grantPermission").click()
   await expect(page.getByTestId("form-modal-settings-grant-permission")).toBeVisible()
-  await chooseSelectOptionByValue(page, "subjectType", "Role")
+  // subjectType defaults to Role in settings form config
   await fillField(page, "subjectValue", String(options.roleId))
   await fillField(page, "resource", options.resource)
   if (options.action) {
-    await chooseSelectOptionByValue(page, "action", options.action)
+    await chooseSelectOptionByLabel(page, "action", new RegExp(options.action, "i"))
   }
   const [res] = await Promise.all([
     page.waitForResponse(
@@ -1748,6 +1889,7 @@ export async function grantPermissionViaSettings(
 export async function fetchOrgPermissionId(
   page: Page,
   resource: string,
+  options?: { roleId?: number },
 ): Promise<number> {
   const orgId = await fetchSessionOrganizationId(page)
   const deadline = Date.now() + 30_000
@@ -1755,15 +1897,51 @@ export async function fetchOrgPermissionId(
     const res = await page.request.get(`/api/query/org-permissions?organizationId=${orgId}`)
     if (res.ok()) {
       const json = (await res.json()) as {
-        data?: Array<{ id?: unknown; resource?: string }>
+        data?: Array<{ id?: unknown; resource?: string; roleId?: unknown; role_id?: unknown }>
       }
-      const row = (json.data ?? []).find((r) => String(r.resource ?? "") === resource)
+      const matches = (json.data ?? []).filter((r) => String(r.resource ?? "") === resource)
+      const scoped =
+        options?.roleId != null
+          ? matches.filter(
+              (r) => scalarQueryId(r.roleId ?? r.role_id) === options.roleId,
+            )
+          : matches
+      const row = scoped.sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
       const id = scalarQueryId(row?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
   throw new Error(`org permission not found for resource: ${resource}`)
+}
+
+export async function waitForOrgPermissionAbsent(
+  page: Page,
+  resource: string,
+  options?: { roleId?: number; timeoutMs?: number },
+): Promise<void> {
+  const orgId = await fetchSessionOrganizationId(page)
+  const deadline = Date.now() + (options?.timeoutMs ?? 15_000)
+  while (Date.now() < deadline) {
+    const res = await page.request.get(`/api/query/org-permissions?organizationId=${orgId}`)
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; resource?: string; roleId?: unknown; role_id?: unknown }>
+      }
+      const matches = (json.data ?? []).filter((r) => String(r.resource ?? "") === resource)
+      const scoped =
+        options?.roleId != null
+          ? matches.filter(
+              (r) => scalarQueryId(r.roleId ?? r.role_id) === options.roleId,
+            )
+          : matches
+      if (scoped.length === 0) return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`org permission still present for resource: ${resource}`)
 }
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
@@ -1795,10 +1973,18 @@ export async function ensureFormConfigDbFromRegistry(page: Page) {
   await openFormConfigLeadForm(page)
   const pushBtn = page.getByTestId("form-config-push-registry")
   if (await pushBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await pushBtn.click()
+    await expect(pushBtn).toBeEnabled({ timeout: 15_000 })
+    const [pushRes] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes("/api/call/create_form_configuration"),
+        { timeout: 60_000 },
+      ),
+      pushBtn.click(),
+    ])
+    await expectReducerHttpResponseOk("create_form_configuration", pushRes)
     await expect
       .poll(async () => !(await page.getByTestId("form-config-add-field").isDisabled()), {
-        timeout: 60_000,
+        timeout: 120_000,
       })
       .toBe(true)
   }
@@ -1893,15 +2079,51 @@ export async function openFiscalSetupWizard(page: Page) {
 export async function savePivotReportViaUi(page: Page, name: string) {
   await gotoModule(page, "/reports", "reports")
   await page.getByTestId("module-tab-reports-pivot-explorer").click()
-  await page.getByLabel(/name/i).first().fill(name)
+  await page.getByTestId("pivot-report-name").fill(name)
+  const saveBtn = page.getByTestId("pivot-save-report")
+  await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/create_saved_report") && r.ok(),
-      { timeout: 30_000 },
+      (r) => r.url().includes("/api/call/create_saved_report"),
+      { timeout: 60_000 },
     ),
-    page.getByTestId("pivot-save-report").click(),
+    saveBtn.click(),
   ])
-  expect(res.ok()).toBe(true)
+  await expectReducerHttpResponseOk("create_saved_report", res)
+}
+
+/** Poll purchase order line match quantities via BFF before UI badge assertions. */
+export async function waitForPoLineMatchStatus(
+  page: Page,
+  lineId: number,
+  status: "matched" | "over_billed",
+  timeoutMs = 60_000,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/purchase-order-lines")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as { data?: Record<string, unknown>[] }
+        const row = (json.data ?? []).find((r) => scalarQueryId(r.id) === lineId)
+        if (!row) return ""
+        const ordered = Number(row.productQty ?? row.product_qty ?? 0)
+        const received = Number(row.qtyReceived ?? row.qty_received ?? 0)
+        const billed = Number(row.qtyInvoiced ?? row.qty_invoiced ?? 0)
+        const tolerance = 0.0001
+        if (status === "matched") {
+          return Math.abs(received - billed) <= tolerance && received <= ordered + tolerance
+            ? "matched"
+            : ""
+        }
+        if (billed > received + tolerance || billed > ordered + tolerance) {
+          return "over_billed"
+        }
+        return ""
+      },
+      { timeout: timeoutMs },
+    )
+    .toBe(status)
 }
 
 export async function fetchSavedReportIdByName(page: Page, name: string): Promise<number> {

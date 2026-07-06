@@ -1,6 +1,4 @@
-import { createHash, randomBytes } from "node:crypto"
-
-import { expect, test, type Browser, type Page } from "@playwright/test"
+import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
   AUTH_STORAGE_PATH,
@@ -25,7 +23,7 @@ import {
  * Permission enforcement E2E for high-risk reducers.
  *
  * Backend: `check_permission` in spacetimedb/src/helpers.rs (Casbin + org_permission +
- * role.permissions). Superusers bypass all checks — tests use a non-superuser invited into
+ * role.permissions). Superusers bypass all checks — tests use a non-superuser with
  * a limited role (`organization:read` only).
  *
  * api-server maps reducer permission errors to HTTP 500 today; tests accept 403 OR a body
@@ -33,8 +31,15 @@ import {
  */
 
 const SEEDED_CUSTOMER = "Acme Corporation"
-const SEEDED_DRAFT_MOVE_NAME = "MISC/2026/DRAFT-01"
 const SEEDED_PRODUCT = "Lumiere Dev Laptop"
+
+function stdbTimestampMicros(isoDate: string): { __timestamp_micros_since_unix_epoch__: number } {
+  const micros = BigInt(new Date(isoDate).getTime()) * 1000n
+  return { __timestamp_micros_since_unix_epoch__: Number(micros) }
+}
+
+/** Date outside seeded fiscal periods so posting is not blocked by closed periods. */
+const POSTABLE_MOVE_DATE = "2099-06-01T00:00:00.000Z"
 
 type LimitedUser = { email: string; password: string }
 
@@ -68,44 +73,62 @@ async function createLimitedRole(page: Page, roleName: string): Promise<number> 
   return fetchRoleIdByName(page, roleName)
 }
 
-async function adminIdentityHex(page: Page): Promise<string> {
-  const cookies = await page.context().cookies()
-  const raw = cookies.find((c) => c.name === "stdb_identity")?.value ?? ""
-  const hex = raw.trim().replace(/^0x/i, "")
-  if (hex.length !== 64) {
-    throw new Error("stdb_identity cookie missing or invalid for invite setup")
+async function signupIdentityHex(email: string, password: string): Promise<string> {
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
+  const isolated = await playwrightRequest.newContext({ baseURL })
+  try {
+    const signup = await isolated.post("/api/auth/signup", {
+      data: { email, password },
+    })
+    if (!signup.ok()) {
+      const body = await signup.text().catch(() => "")
+      throw new Error(`signup failed (${signup.status()}): ${body}`)
+    }
+    const state = await isolated.storageState()
+    const identityCookie = state.cookies.find((c) => c.name === "stdb_identity")
+    const raw = identityCookie?.value
+    if (!raw) throw new Error("signup did not set stdb_identity cookie")
+    return raw.replace(/^0x/i, "")
+  } finally {
+    await isolated.dispose()
   }
-  return hex
 }
 
-async function provisionLimitedUserViaInvite(
+async function provisionLimitedUser(
   page: Page,
   organizationId: number,
   roleId: number,
+  roleName: string,
 ): Promise<LimitedUser> {
   const email = `${smokeName("perm-limited")}@example.test`
   const password = "Password123$"
-  const token = randomBytes(32).toString("hex")
-  const tokenHash = createHash("sha256").update(token).digest("hex")
-  const invitedBy = await adminIdentityHex(page)
-  const expiresAtMicros = (Date.now() + 7 * 24 * 60 * 60 * 1000) * 1000
+  const companyId = await fetchDefaultCompanyId(page)
 
-  await callReducerBff(page, "create_user_invite", [
+  const identityHex = await signupIdentityHex(email, password)
+
+  await callReducerBff(page, "dev_promote_caller_superuser", [])
+
+  await callReducerBff(page, "add_org_member", [
+    identityHex,
     organizationId,
-    roleId,
-    email,
-    tokenHash,
-    invitedBy,
-    String(expiresAtMicros),
+    {
+      role_name: roleName,
+      company_id: companyId,
+      job_title: null,
+      department_id: null,
+      employee_id: null,
+      is_active: true,
+      is_default: true,
+      metadata: null,
+    },
   ])
 
-  const accept = await page.request.post("/api/auth/accept-invite", {
-    data: { token, email, password },
-  })
-  if (!accept.ok()) {
-    const body = await accept.text().catch(() => "")
-    throw new Error(`accept-invite failed (${accept.status()}): ${body}`)
-  }
+  await callReducerBff(page, "assign_role", [
+    identityHex,
+    roleId,
+    organizationId,
+    { expires_at_micros: null, metadata: null },
+  ])
 
   return { email, password }
 }
@@ -124,25 +147,159 @@ async function withLimitedUserSession(
   }
 }
 
-async function fetchDraftMoveIdByName(page: Page, moveName: string): Promise<number> {
+async function fetchJournalIdByCode(page: Page, code: string): Promise<number> {
+  const res = await page.request.get("/api/query/account-journals")
+  if (!res.ok()) throw new Error(`account-journals query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; code?: string }> }
+  const row = (json.data ?? []).find(
+    (j) => String(j.code ?? "").toUpperCase() === code.toUpperCase(),
+  )
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`journal not found: ${code}`)
+  return id
+}
+
+async function fetchAccountIdByCode(page: Page, code: string): Promise<number> {
+  const res = await page.request.get("/api/query/account-accounts")
+  if (!res.ok()) throw new Error(`account-accounts query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; code?: string }> }
+  const row = (json.data ?? []).find((a) => String(a.code ?? "") === code)
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`account not found: ${code}`)
+  return id
+}
+
+async function adminCreatePostableDraftMiscMove(page: Page): Promise<number> {
+  const companyId = await fetchDefaultCompanyId(page)
+  const journalId = await fetchJournalIdByCode(page, "MISC")
+  const expenseAccountId = await fetchAccountIdByCode(page, "5000")
+  const bankAccountId = await fetchAccountIdByCode(page, "1200")
+  const moveRef = smokeName("perm-misc")
+  const moveDate = stdbTimestampMicros(POSTABLE_MOVE_DATE)
+  const moveMetadata = JSON.stringify({ test: "auth-permission-enforcement", ref: moveRef })
+
+  await callReducerBff(page, "create_account_move", [
+    orgId,
+    {
+      company_id: companyId,
+      journal_id: journalId,
+      move_type: { tag: "Entry" },
+      date: moveDate,
+      name: "",
+      ref: moveRef,
+      auto_post: false,
+      to_check: false,
+      is_storno: false,
+      partner_id: null,
+      partner_bank_id: null,
+      fiscal_position_id: null,
+      invoice_date: null,
+      invoice_date_due: null,
+      invoice_payment_term_id: null,
+      payment_reference: null,
+      invoice_origin: null,
+      invoice_partner_display_name: null,
+      invoice_cash_rounding_id: null,
+      partner_shipping_id: null,
+      sale_order_id: null,
+      invoice_incoterm_id: null,
+      incoterm_location: null,
+      campaign_id: null,
+      source_id: null,
+      medium_id: null,
+      secure_sequence_number: null,
+      metadata: moveMetadata,
+    },
+  ])
+
+  const moveId = await fetchDraftMoveIdByMetadataRef(page, moveRef)
+
+  const lineBase = {
+    quantity: 1,
+    price_unit: 100,
+    discount: 0,
+    tax_ids: [] as number[],
+    partner_id: null,
+    product_id: null,
+    product_uom_id: null,
+    product_category_id: null,
+    analytic_account_id: null,
+    analytic_tag_ids: [] as number[],
+    display_type: null,
+    is_downpayment: false,
+    exclude_from_invoice_tab: false,
+    blocked: false,
+    group_tax_id: null,
+    tax_line_id: null,
+    tax_group_id: null,
+    tax_repartition_line_id: null,
+    tax_audit: null,
+    reconcile_model_id: null,
+    payment_id: null,
+    statement_line_id: null,
+    matching_number: null,
+    matching_label: null,
+    expected_pay_date: null,
+    expected_pay_date_currency_id: null,
+    expected_pay_date_amount: 0,
+    expected_pay_date_residual: 0,
+    metadata: null,
+  }
+
+  await callReducerBff(page, "add_account_move_line", [
+    orgId,
+    moveId,
+    {
+      account_id: expenseAccountId,
+      name: "Permission test expense",
+      debit: 100,
+      credit: 0,
+      sequence: 1,
+      ...lineBase,
+    },
+  ])
+
+  await callReducerBff(page, "add_account_move_line", [
+    orgId,
+    moveId,
+    {
+      account_id: bankAccountId,
+      name: "Permission test bank",
+      debit: 0,
+      credit: 100,
+      sequence: 2,
+      ...lineBase,
+    },
+  ])
+
+  return moveId
+}
+
+async function fetchDraftMoveIdByMetadataRef(page: Page, moveRef: string): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/account-moves")
     if (res.ok()) {
       const json = (await res.json()) as {
-        data?: Array<{ id?: unknown; name?: string; state?: unknown }>
+        data?: Array<{ id?: unknown; metadata?: string; state?: unknown }>
       }
-      const row = (json.data ?? []).find(
-        (m) =>
-          String(m.name ?? "") === moveName &&
-          String(m.state ?? "").toLowerCase().includes("draft"),
-      )
+      const row = (json.data ?? []).find((m) => {
+        if (!String(m.state ?? "").toLowerCase().includes("draft")) return false
+        const raw = m.metadata
+        if (typeof raw !== "string") return false
+        try {
+          const parsed = JSON.parse(raw) as { ref?: string }
+          return parsed.ref === moveRef
+        } catch {
+          return false
+        }
+      })
       const id = scalarQueryId(row?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`draft account move not found: ${moveName}`)
+  throw new Error(`draft account move not found: ${moveRef}`)
 }
 
 async function fetchDefaultCompanyId(page: Page): Promise<number> {
@@ -332,7 +489,9 @@ async function runPermissionCycle(options: {
     await assertSuccess(limitedPage, primaryArgs)
   })
 
-  const permissionId = await fetchOrgPermissionId(adminPage, grant.resource)
+  const permissionId = await fetchOrgPermissionId(adminPage, grant.resource, {
+    roleId: limitedRoleId,
+  })
   await revokePermissionViaSettings(adminPage, permissionId)
 
   const secondaryArgs = await prepareSecondary()
@@ -348,9 +507,10 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
     const context = await browser.newContext({ storageState: AUTH_STORAGE_PATH })
     const page = await context.newPage()
     orgId = await fetchSessionOrganizationId(page)
+    await fetchDefaultCompanyId(page)
     const roleName = smokeName("perm-limited")
     limitedRoleId = await createLimitedRole(page, roleName)
-    limitedUser = await provisionLimitedUserViaInvite(page, orgId, limitedRoleId)
+    limitedUser = await provisionLimitedUser(page, orgId, limitedRoleId, roleName)
     await context.close()
   })
 
@@ -360,9 +520,8 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
   }) => {
     test.setTimeout(240_000)
 
-    // Seed exposes a single balanced draft misc entry; reuse it for deny → grant → revoke → deny,
-    // then grant again before posting (posting consumes the draft).
-    const moveId = await fetchDraftMoveIdByName(page, SEEDED_DRAFT_MOVE_NAME)
+    // Create a balanced draft misc entry dated outside closed seeded periods.
+    const moveId = await adminCreatePostableDraftMiscMove(page)
     const args = [orgId, moveId]
 
     await withLimitedUserSession(browser, async (limitedPage) => {
@@ -375,7 +534,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
       action: "Write",
     })
 
-    let permissionId = await fetchOrgPermissionId(page, "account_move")
+    let permissionId = await fetchOrgPermissionId(page, "account_move", {
+      roleId: limitedRoleId,
+    })
     await revokePermissionViaSettings(page, permissionId)
 
     await withLimitedUserSession(browser, async (limitedPage) => {
@@ -393,7 +554,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
       await waitForMovePosted(limitedPage, moveId)
     })
 
-    permissionId = await fetchOrgPermissionId(page, "account_move")
+    permissionId = await fetchOrgPermissionId(page, "account_move", {
+      roleId: limitedRoleId,
+    })
     await revokePermissionViaSettings(page, permissionId)
   })
 

@@ -25,6 +25,7 @@ import {
   submitForm,
   waitForEntityActionEnabled,
   waitForPurchaseOrderState,
+  waitForPoLineMatchStatus,
 } from "./helpers"
 
 const VENDOR_NAME = "Globex Corp"
@@ -169,6 +170,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     const moveId = await fetchDraftVendorBillMoveIdByPartner(page, VENDOR_NAME)
     await assertMoveLinesBalanced(page, moveId)
 
+    await waitForPoLineMatchStatus(page, lineId, "matched")
+
     await page.getByTestId("module-tab-purchasing-lines").click()
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Matched", {
       timeout: 30_000,
@@ -194,6 +197,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const orgId = await fetchSessionOrganizationId(page)
     await callReducerBff(page, "invoice_po_line", [orgId, lineId, 5])
+
+    await waitForPoLineMatchStatus(page, lineId, "over_billed")
 
     await page.getByTestId("module-tab-purchasing-lines").click()
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Over-billed", {

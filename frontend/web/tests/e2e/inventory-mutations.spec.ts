@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test"
 import {
   chooseFirstOption,
   expectNoAppError,
-  expectRecordSoftDeleted,
+  expectRecordAbsentFromQuery,
+  fetchProductCategoryIdByName,
   fillField,
   openEntityCreate,
   gotoModule,
+  scalarQueryId,
+  selectEntityRowById,
   selectEntityRowByText,
   smokeName,
   submitForm,
@@ -95,7 +98,8 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     await submitForm(page, "new-product-category")
     await expect(page.getByText(categoryName).first()).toBeVisible({ timeout: 30_000 })
 
-    await selectEntityRowByText(page, categoryName)
+    const categoryId = await fetchProductCategoryIdByName(page, categoryName)
+    await selectEntityRowById(page, categoryId)
     await waitForEntityActionEnabled(page, "entity-action-delete-category")
 
     page.once("dialog", (dialog) => {
@@ -112,8 +116,8 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     ])
     expect(deleteCategoryRes.ok()).toBe(true)
 
-    await expectRecordSoftDeleted(page, "/api/query/product-categories", (row) =>
-      String(row.name ?? "").includes(categoryName),
+    await expectRecordAbsentFromQuery(page, "/api/query/product-categories", (row) =>
+      scalarQueryId(row.id) === categoryId,
     )
     await expectNoAppError(page)
   })

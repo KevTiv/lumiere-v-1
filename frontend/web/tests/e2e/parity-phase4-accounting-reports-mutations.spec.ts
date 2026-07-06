@@ -19,7 +19,8 @@ test.describe(
       test.setTimeout(120_000)
 
       const fiscalYearName = smokeName("fy")
-      const year = new Date().getFullYear()
+      // Seed includes a fiscal year for the calendar year — use a unique far-future range.
+      const year = 2150 + (Date.now() % 40)
 
       await openFiscalSetupWizard(page)
       await fillField(page, "fiscalYearName", fiscalYearName)

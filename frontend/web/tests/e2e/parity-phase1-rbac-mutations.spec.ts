@@ -7,6 +7,7 @@ import {
   grantPermissionViaSettings,
   revokePermissionViaSettings,
   smokeName,
+  waitForOrgPermissionAbsent,
 } from "./helpers"
 
 test.describe("Parity phase 1 — RBAC mutations", { tag: ["@p0", "@parity-phase-1"] }, () => {
@@ -29,16 +30,7 @@ test.describe("Parity phase 1 — RBAC mutations", { tag: ["@p0", "@parity-phase
 
     await revokePermissionViaSettings(page, permissionId)
 
-    await expect
-      .poll(async () => {
-        try {
-          await fetchOrgPermissionId(page, resource)
-          return false
-        } catch {
-          return true
-        }
-      }, { timeout: 15_000 })
-      .toBe(true)
+    await waitForOrgPermissionAbsent(page, resource)
 
     await expectNoAppError(page)
   })

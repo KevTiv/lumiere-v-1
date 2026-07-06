@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  expectFormModalVisible,
   fetchAccountSelectLabelByInternalType,
   fetchDraftCreditNoteMoveIdForInvoice,
   fetchDraftInvoiceMoveIdByPartner,
@@ -14,7 +15,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteViaGl,
+  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -67,6 +68,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
     await page.getByTestId("entity-action-convert-lead").click()
+    await expectFormModalVisible(page, "convert-lead")
     await chooseFirstEnabledOption(page, "opportunityStageId")
     await Promise.all([
       page.waitForResponse(
@@ -207,7 +209,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     expect(creditNoteRes.ok()).toBe(true)
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForInvoice(page, invoiceMoveId)
-    await postDraftCreditNoteViaGl(page, leadName)
+    await postDraftCreditNoteMove(page, creditNoteId)
     await waitForMovePosted(page, creditNoteId)
 
     await expect

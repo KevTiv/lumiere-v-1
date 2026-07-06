@@ -27,6 +27,7 @@ test.describe("MVP AI action draft workflow", { tag: "@p0" }, () => {
 
     const approveCard = page.getByTestId(`ai-action-draft-card-${approveDraftId}`)
     await expect(approveCard).toBeVisible({ timeout: 30_000 })
+    await approveCard.getByTestId("ai-action-draft-reviewed").click()
 
     const [approveRes] = await Promise.all([
       page.waitForResponse(

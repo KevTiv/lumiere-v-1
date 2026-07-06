@@ -2,9 +2,12 @@ import { expect, test } from "@playwright/test"
 
 import {
   expectNoAppError,
-  expectRecordSoftDeleted,
+  expectRecordAbsentFromQuery,
+  fetchLeadIdByName,
   fillField,
   openEntityCreate,
+  scalarQueryId,
+  selectEntityRowById,
   selectEntityRowByText,
   smokeName,
   submitForm,
@@ -54,7 +57,8 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     await submitForm(page, "new-lead")
     await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
 
-    await selectEntityRowByText(page, leadName)
+    const leadId = await fetchLeadIdByName(page, leadName)
+    await selectEntityRowById(page, leadId)
     await waitForEntityActionEnabled(page, "entity-action-delete-lead")
 
     page.once("dialog", (dialog) => {
@@ -71,9 +75,7 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     ])
     expect(deleteLeadRes.ok()).toBe(true)
 
-    await expectRecordSoftDeleted(page, "/api/query/leads", (row) =>
-      String(row.contactName ?? row.contact_name ?? row.name ?? "").includes(leadName),
-    )
+    await expectRecordAbsentFromQuery(page, "/api/query/leads", (row) => scalarQueryId(row.id) === leadId)
     await expectNoAppError(page)
   })
 })

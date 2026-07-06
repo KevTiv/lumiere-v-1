@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  expectFormModalVisible,
   fetchAccountSelectLabelByInternalType,
   fetchDraftCreditNoteMoveIdForReturnOrder,
   fetchOpportunityIdByName,
@@ -68,6 +69,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
     await page.getByTestId("entity-action-convert-lead").click()
+    await expectFormModalVisible(page, "convert-lead")
     await chooseFirstEnabledOption(page, "opportunityStageId")
     await Promise.all([
       page.waitForResponse(
@@ -191,7 +193,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-sales-returns").click()
     await page.getByTestId("module-create-sales-returns").click()
     await expect(page.getByTestId("form-modal-new-return-order")).toBeVisible()
-    await chooseFirstEnabledOption(page, "partnerId")
+    await chooseSelectOptionByLabel(page, "partnerId", new RegExp(leadName, "i"))
     await chooseSelectOptionByLabel(page, "saleOrderId", saleOrderLabel)
     await fillField(page, "returnReason", "E2E partial return — defective unit")
     await page.getByTestId("form-field-productId").click()

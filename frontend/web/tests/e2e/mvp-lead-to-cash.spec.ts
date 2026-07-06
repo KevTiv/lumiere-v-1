@@ -35,6 +35,7 @@ import {
   waitForSaleOrderLineExists,
   waitForAuditLogEntry,
   waitForBffQueryMinRows,
+  expectFormModalVisible,
   fetchSaleOrderSelectLabel,
 } from "./helpers"
 
@@ -97,8 +98,9 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     // Step 5 — convert lead (UI)
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
+    await expectNoAppError(page)
     await page.getByTestId("entity-action-convert-lead").click()
-    await expect(page.getByTestId("form-modal-convert-lead")).toBeVisible()
+    await expectFormModalVisible(page, "convert-lead")
     await chooseFirstEnabledOption(page, "opportunityStageId")
     const [convertLeadRes] = await Promise.all([
       page.waitForResponse(

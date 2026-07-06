@@ -13,7 +13,7 @@ import {
   waitForBffQueryMinRows,
 } from "./helpers"
 
-const CUSTOMER_NAME = "Acme Corporation"
+const CUSTOMER_NAME = /Acme Corporation/i
 
 function queryString(value: unknown): string {
   if (value == null) return ""

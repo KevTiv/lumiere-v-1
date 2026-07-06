@@ -22,7 +22,7 @@ test.describe("ERP module smoke", () => {
     await fillField(page, "expectedRevenue", "1000")
     await submitForm(page, "new-lead")
 
-    await expect(page.getByText(contactName)).toBeVisible()
+    await expect(page.getByText(contactName).first()).toBeVisible()
   })
 
   test("creates a Helpdesk team from the Teams tab", { tag: "@p0" }, async ({ page }) => {
