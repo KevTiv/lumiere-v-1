@@ -405,6 +405,30 @@ pub fn select_casbin_rules_in_subjects_sql(
     ))
 }
 
+/// Build `col = id1 OR col = id2` — SpacetimeDB SQL does not support `IN (...)`.
+pub fn company_ids_equality_or_clause(column: &str, ids: &[u64]) -> Result<String, String> {
+    assert_safe_sql_identifiers(&[column.to_string()])?;
+    if ids.is_empty() {
+        return Err("company_ids_equality_or_clause: empty ids".into());
+    }
+    Ok(ids
+        .iter()
+        .map(|id| format!("{column} = {id}"))
+        .collect::<Vec<_>>()
+        .join(" OR "))
+}
+
+/// Match rows where either `col_a` or `col_b` equals one of the company ids.
+pub fn company_ids_dual_field_or_clause(
+    col_a: &str,
+    col_b: &str,
+    ids: &[u64],
+) -> Result<String, String> {
+    let a = company_ids_equality_or_clause(col_a, ids)?;
+    let b = company_ids_equality_or_clause(col_b, ids)?;
+    Ok(format!("({a}) OR ({b})"))
+}
+
 /// Column list for a generated row type name (see `stdb-generated-sql-columns.json`).
 pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>, String> {
     let from_schema = STDB_GENERATED_SQL_COLUMNS

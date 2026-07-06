@@ -1,6 +1,6 @@
 # Fix Plan: `company_id IN (...)` SQL Pattern in `api-server/src/query_exec.rs`
 
-**Status:** Not started — pickup ready
+**Status:** Done (2026-07-07) — Category A branches use org-scoped SQL or Rust-side company filtering in `query_exec.rs`; `ai-action-drafts-inbox` no longer uses `company_id IN`. `routes/auth.rs` invite role lookup uses org-wide fetch + Rust filter. WebSocket company-scoped subscriptions (`erp-subscriptions.ts`, `erp_subscriptions.rs`) use `col = id OR …` instead of `IN (...)`. Category B (array-column `Unsupported` on default org-scoped queries) remains a separate investigation.
 **Impact:** ~1210 ERROR log lines per E2E run → 0; HTTP 500 on AI/intercompany/asset/POS screens
 **Root cause:** SpacetimeDB's HTTP SQL subset does not support `IN (...)` clauses. The api-server uses `company_id IN (12, 13)` to scope queries for tables that are company-scoped, causing every such query to fail with HTTP 400 "Unsupported".
 

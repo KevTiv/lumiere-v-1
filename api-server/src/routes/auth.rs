@@ -413,19 +413,24 @@ async fn invite(
         ));
     }
 
-    let id_list = role_ids
-        .iter()
-        .map(|n| n.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
+    // SpacetimeDB HTTP SQL does not support `IN (...)` — fetch org roles and filter in Rust.
     let roles_sql = format!(
-        "SELECT id, name FROM role WHERE id IN ({id_list}) AND organization_id = {}",
+        "SELECT id, name FROM role WHERE organization_id = {}",
         body.organization_id
     );
-    let roles = client
+    let all_roles = client
         .query_sql(&roles_sql)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let role_id_set: std::collections::HashSet<u64> = role_ids.iter().copied().collect();
+    let roles: Vec<serde_json::Value> = all_roles
+        .into_iter()
+        .filter(|r| {
+            r.get("id")
+                .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                .is_some_and(|id| role_id_set.contains(&id))
+        })
+        .collect();
 
     let is_admin = roles.iter().any(|r| {
         r.get("name")

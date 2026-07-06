@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 use crate::field_policy::{
+    company_ids_dual_field_or_clause, company_ids_equality_or_clause,
     resolve_http_sql_columns, select_org_scoped_sql, select_roles_active_sql,
     select_user_role_assignments_for_identity_sql, sql_column_list_for_generated_type,
     FieldAccessContext,
@@ -177,42 +178,52 @@ fn subscription_sql_for_company_scoped(
             let Some(list_ids) = ids else {
                 return Ok(CompanyScoped::MissingContext);
             };
-            let list = list_ids
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
             let c = resolve_http_sql_columns("fixed-assets", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
             Ok(CompanyScoped::Queries(vec![format!(
-                "SELECT {c} FROM account_asset WHERE company_id IN ({list})"
+                "SELECT {c} FROM account_asset WHERE {filter}"
             )]))
         }
         "intercompany-rules" => {
             let Some(list_ids) = ids else {
                 return Ok(CompanyScoped::MissingContext);
             };
-            let list = list_ids
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
             let c = resolve_http_sql_columns("intercompany-rules", fa)?.join(", ");
+            let filter =
+                company_ids_dual_field_or_clause("source_company_id", "destination_company_id", list_ids)?;
             Ok(CompanyScoped::Queries(vec![format!(
-                "SELECT {c} FROM intercompany_rule WHERE source_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY sequence ASC"
+                "SELECT {c} FROM intercompany_rule WHERE {filter} ORDER BY sequence ASC"
             )]))
         }
         "intercompany-transactions" => {
             let Some(list_ids) = ids else {
                 return Ok(CompanyScoped::MissingContext);
             };
-            let list = list_ids
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
             let c = resolve_http_sql_columns("intercompany-transactions", fa)?.join(", ");
+            let filter =
+                company_ids_dual_field_or_clause("origin_company_id", "destination_company_id", list_ids)?;
             Ok(CompanyScoped::Queries(vec![format!(
-                "SELECT {c} FROM intercompany_transaction WHERE origin_company_id IN ({list}) OR destination_company_id IN ({list}) ORDER BY id DESC"
+                "SELECT {c} FROM intercompany_transaction WHERE {filter} ORDER BY id DESC"
+            )]))
+        }
+        "pos-configs" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("pos-configs", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM pos_config WHERE {filter} ORDER BY name ASC"
+            )]))
+        }
+        "picking-batches" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("picking-batches", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM stock_picking_batch WHERE {filter}"
             )]))
         }
         "depreciation-lines" => Ok(CompanyScoped::MissingContext),

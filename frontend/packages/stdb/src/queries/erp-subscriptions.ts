@@ -514,6 +514,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
 };
 
 /** Resources scoped by `company_id` lists (no SQL subqueries). */
+function companyIdsEqualityOr(column: string, ids: readonly number[]): string {
+  return ids.map((id) => `${column} = ${id}`).join(" OR ")
+}
+
+function companyIdsDualFieldOr(colA: string, colB: string, ids: readonly number[]): string {
+  return `(${companyIdsEqualityOr(colA, ids)}) OR (${companyIdsEqualityOr(colB, ids)})`
+}
+
 function subscriptionSqlForCompanyScopedResource(
   resource: string,
   ctx: SubscriptionQueryContext,
@@ -522,24 +530,24 @@ function subscriptionSqlForCompanyScopedResource(
   const fa = ctx.fieldAccess
   if (resource === "fixed-assets") {
     if (!ids?.length) return null
-    const list = ids.join(", ")
     const c = resolveHttpSqlColumns("fixed-assets", fa).join(", ")
-    return [`SELECT ${c} FROM account_asset WHERE company_id IN (${list})`]
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM account_asset WHERE ${filter}`]
   }
   if (resource === "intercompany-rules") {
     if (!ids?.length) return null
-    const list = ids.join(", ")
     const c = resolveHttpSqlColumns("intercompany-rules", fa).join(", ")
+    const filter = companyIdsDualFieldOr("source_company_id", "destination_company_id", ids)
     return [
-      `SELECT ${c} FROM intercompany_rule WHERE source_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY sequence ASC`,
+      `SELECT ${c} FROM intercompany_rule WHERE ${filter} ORDER BY sequence ASC`,
     ]
   }
   if (resource === "intercompany-transactions") {
     if (!ids?.length) return null
-    const list = ids.join(", ")
     const c = resolveHttpSqlColumns("intercompany-transactions", fa).join(", ")
+    const filter = companyIdsDualFieldOr("origin_company_id", "destination_company_id", ids)
     return [
-      `SELECT ${c} FROM intercompany_transaction WHERE origin_company_id IN (${list}) OR destination_company_id IN (${list}) ORDER BY id DESC`,
+      `SELECT ${c} FROM intercompany_transaction WHERE ${filter} ORDER BY id DESC`,
     ]
   }
   if (resource === "depreciation-lines") {
@@ -547,15 +555,15 @@ function subscriptionSqlForCompanyScopedResource(
   }
   if (resource === "pos-configs") {
     if (!ids?.length) return null
-    const list = ids.join(", ")
     const c = resolveHttpSqlColumns("pos-configs", fa).join(", ")
-    return [`SELECT ${c} FROM pos_config WHERE company_id IN (${list}) ORDER BY name ASC`]
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM pos_config WHERE ${filter} ORDER BY name ASC`]
   }
   if (resource === "picking-batches") {
     if (!ids?.length) return null
-    const list = ids.join(", ")
     const c = resolveHttpSqlColumns("picking-batches", fa).join(", ")
-    return [`SELECT ${c} FROM stock_picking_batch WHERE company_id IN (${list})`]
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM stock_picking_batch WHERE ${filter}`]
   }
   if (resource === "pos-sessions") {
     // Child of pos_config — no SQL subqueries; load pos-sessions via api-server query instead.
