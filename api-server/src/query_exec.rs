@@ -12,7 +12,25 @@ use stdb_auth::{
 use stdb_client::StdbClient;
 
 fn row_not_soft_deleted(r: &Value) -> bool {
-    r.get("deletedAt").map(|v| v.is_null()).unwrap_or(true)
+    match r.get("deletedAt").or_else(|| r.get("deleted_at")) {
+        None | Some(Value::Null) => true,
+        Some(Value::Object(obj)) if obj.contains_key("none") => true,
+        Some(_) => false,
+    }
+}
+
+fn strip_soft_delete_fields(row: &mut Value) {
+    if let Value::Object(map) = row {
+        map.remove("deletedAt");
+        map.remove("deleted_at");
+    }
+}
+
+fn filter_and_strip_soft_deleted(rows: &mut Vec<Value>) {
+    rows.retain(|r| row_not_soft_deleted(r));
+    for row in rows.iter_mut() {
+        strip_soft_delete_fields(row);
+    }
 }
 
 fn row_id_u64(row: &Value) -> u64 {
@@ -768,11 +786,12 @@ pub async fn execute_resource_query(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    if resource == "activities" {
-        rows.retain(|r| row_not_soft_deleted(r));
-    }
-    if resource == "companies" || resource == "leads" || resource == "product-categories" {
-        rows.retain(|r| row_not_soft_deleted(r));
+    if resource == "activities"
+        || resource == "companies"
+        || resource == "leads"
+        || resource == "product-categories"
+    {
+        filter_and_strip_soft_deleted(&mut rows);
     }
 
     match resource {
@@ -825,4 +844,39 @@ pub async fn execute_resource_query(
     }
 
     Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn row_not_soft_deleted_treats_missing_and_null_as_live() {
+        assert!(row_not_soft_deleted(&json!({ "id": 1 })));
+        assert!(row_not_soft_deleted(&json!({ "id": 1, "deletedAt": null })));
+        assert!(row_not_soft_deleted(
+            &json!({ "id": 1, "deleted_at": { "none": [] } })
+        ));
+    }
+
+    #[test]
+    fn row_not_soft_deleted_rejects_timestamp() {
+        assert!(!row_not_soft_deleted(&json!({
+            "id": 1,
+            "deletedAt": { "__timestamp_micros_since_unix_epoch__": 1 }
+        })));
+    }
+
+    #[test]
+    fn filter_and_strip_soft_deleted_removes_deleted_rows_and_field() {
+        let mut rows = vec![
+            json!({ "id": 1, "deletedAt": null }),
+            json!({ "id": 2, "deletedAt": { "__timestamp_micros_since_unix_epoch__": 1 } }),
+        ];
+        filter_and_strip_soft_deleted(&mut rows);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("id").and_then(|v| v.as_u64()), Some(1));
+        assert!(rows[0].get("deletedAt").is_none());
+    }
 }
