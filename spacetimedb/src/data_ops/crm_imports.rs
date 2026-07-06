@@ -5,7 +5,9 @@ use crate::crm::contacts::{contact, Contact};
 use crate::crm::leads::{lead, Lead};
 use crate::crm::opportunities::{opportunity, Opportunity};
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_import_job, finish_import_job, record_import_created_id, record_import_error,
+};
 use crate::helpers::check_permission;
 
 // ── Contact ───────────────────────────────────────────────────────────────────
@@ -41,7 +43,7 @@ pub fn import_contact_csv(
             }
         };
 
-        ctx.db.contact().insert(Contact {
+        let created = ctx.db.contact().insert(Contact {
             id: 0,
             organization_id,
             company_id: opt_u64(col(&headers, row, "company_id")),
@@ -85,8 +87,10 @@ pub fn import_contact_csv(
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             deleted_at: None,
+            merge_target_id: None,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
+        record_import_created_id(ctx, job.id, "contact", created.id, row_num);
         imported += 1;
     }
 

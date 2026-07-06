@@ -3,7 +3,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_import_job, finish_import_job, record_import_created_id, record_import_error,
+};
 use crate::helpers::check_permission;
 use crate::inventory::product::{product, product_variant, Product, ProductVariant};
 use crate::inventory::product_category::{product_category, ProductCategory};
@@ -108,7 +110,7 @@ pub fn import_product_csv(
             .to_string()
         };
 
-        ctx.db.product().insert(Product {
+        let created = ctx.db.product().insert(Product {
             id: 0,
             organization_id,
             name: name.clone(),
@@ -179,6 +181,7 @@ pub fn import_product_csv(
             write_date: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
+        record_import_created_id(ctx, job.id, "product", created.id, row_num);
         imported += 1;
     }
 
