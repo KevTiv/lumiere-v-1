@@ -4,6 +4,7 @@
 
 import type {
   CreateAuditRuleParams,
+  CreateAiReducerAllowlistParams,
   CreateCountryParams,
   CreateCurrencyParams,
   CreateDataClassificationParams,
@@ -43,6 +44,36 @@ export function toCreateAuditRuleParams(
     logLogins: action.includes("login") || formData.logLogins === true,
     isActive: formData.isActive !== false,
     metadata: optionalTrimmedString(formData.metadata ?? formData.severity),
+  }
+}
+
+const DEFAULT_AI_REDUCER_PERMISSIONS: Record<string, { resource: string; action: string }> = {
+  create_task: { resource: "project_task", action: "create" },
+  create_sale_order: { resource: "sale_order", action: "create" },
+  create_purchase_order: { resource: "purchase_order", action: "create" },
+}
+
+/** Maps Settings → AI allowlist form to `CreateAiReducerAllowlistParams`. */
+export function toCreateAiReducerAllowlistParams(
+  formData: Record<string, unknown>,
+): CreateAiReducerAllowlistParams | null {
+  const reducerName = requiredTrimmedString(formData.reducerName)
+  if (!reducerName) return null
+
+  const defaults = DEFAULT_AI_REDUCER_PERMISSIONS[reducerName]
+  const permissionResource =
+    optionalTrimmedString(formData.permissionResource) ?? defaults?.resource ?? null
+  const permissionAction =
+    optionalTrimmedString(formData.permissionAction) ?? defaults?.action ?? "create"
+
+  if (!permissionResource || !permissionAction) return null
+
+  return {
+    reducerName,
+    permissionResource,
+    permissionAction,
+    enabled: formData.enabled !== false,
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 

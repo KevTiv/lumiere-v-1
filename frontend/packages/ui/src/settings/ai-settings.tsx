@@ -23,11 +23,18 @@ import {
   useUpdateAiAgent,
 } from "@lumiere/query-hooks/hooks/ai-agents"
 import {
+  useAiReducerAllowlist,
+  useCreateAiReducerAllowlist,
+  useDeleteAiReducerAllowlist,
+  useSetAiReducerAllowlistEnabled,
+} from "@lumiere/query-hooks/hooks/ai-reducer-allowlist"
+import {
   useAiGatewayHealth,
   useAiMemoryIngest,
   useAiMemorySearch,
 } from "@lumiere/query-hooks/hooks/ai-memory"
 import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
+import { aiReducerAllowlistCreateFormConfig } from "@/lib/ai-reducer-allowlist-form-configs"
 import { apiFetch } from "@/lib/api-fetch"
 import {
   Dialog,
@@ -44,7 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Bot, Database, Loader2, Plus, RefreshCw, Sparkles, Trash2, Coins } from "lucide-react"
+import { Bot, Database, Loader2, Plus, RefreshCw, Shield, Sparkles, Trash2, Coins } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -182,6 +189,10 @@ export function AiSettings() {
 
   const agentsQuery = useAiAgents(orgId, orgReady)
   const refetchAgents = agentsQuery.refetch
+  const allowlistQuery = useAiReducerAllowlist(orgId, orgReady)
+  const createAllowlistMutation = useCreateAiReducerAllowlist(orgId)
+  const deleteAllowlistMutation = useDeleteAiReducerAllowlist(orgId)
+  const setAllowlistEnabledMutation = useSetAiReducerAllowlistEnabled(orgId)
   const createAgentMutation = useCreateAiAgent(orgId)
   const updateAgentMutation = useUpdateAiAgent(orgId)
   const setActiveMutation = useSetAiAgentActive(orgId)
@@ -197,6 +208,11 @@ export function AiSettings() {
   const [memorySearchPreview, setMemorySearchPreview] = useState<string | null>(null)
 
   const agents = agentsQuery.data ?? []
+  const allowlistEntries = allowlistQuery.data ?? []
+
+  const [allowlistOpen, setAllowlistOpen] = useState(false)
+  const [allowlistFormKey, setAllowlistFormKey] = useState(0)
+  const [allowlistFormError, setAllowlistFormError] = useState<string | null>(null)
 
   const [members, setMembers] = useState<Row[]>([])
   const [insights, setInsights] = useState<Row[]>([])
@@ -211,6 +227,7 @@ export function AiSettings() {
   const [sampleInsightOpen, setSampleInsightOpen] = useState(false)
 
   const createFormConfig = useMemo(() => aiAgentCreateFormConfig(t), [t])
+  const allowlistCreateFormConfig = useMemo(() => aiReducerAllowlistCreateFormConfig(t), [t])
   const editFormBase = useMemo(() => aiAgentEditFormConfig(t), [t])
   const editFormConfig = useMemo(() => {
     if (!editAgent) return editFormBase
@@ -274,6 +291,7 @@ export function AiSettings() {
       setMembers(m)
       setInsights(i)
       await refetchAgents()
+      await allowlistQuery.refetch()
     } catch (e) {
       toast({
         title: t("settings.ai.loadError"),
@@ -409,6 +427,7 @@ export function AiSettings() {
         description: action.replace(/_/g, " "),
       })
       await refetchAgents()
+      await allowlistQuery.refetch()
     } catch (e) {
       toast({
         title: t("settings.ai.mutationError"),
@@ -450,9 +469,13 @@ export function AiSettings() {
     )
   }
 
-  const listLoading = loading || agentsQuery.isLoading
+  const listLoading = loading || agentsQuery.isLoading || allowlistQuery.isLoading
   const agentOpsPending =
     createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending
+  const allowlistPending =
+    createAllowlistMutation.isPending ||
+    deleteAllowlistMutation.isPending ||
+    setAllowlistEnabledMutation.isPending
   const mutating =
     createTeamMemberMutation.isPending ||
     dismissInsightMutation.isPending ||
@@ -460,7 +483,8 @@ export function AiSettings() {
     recordSpendMutation.isPending ||
     memoryIngestMutation.isPending ||
     memorySearchMutation.isPending ||
-    gatewayHealthMutation.isPending
+    gatewayHealthMutation.isPending ||
+    allowlistPending
 
   return (
     <div className="space-y-6">
@@ -489,6 +513,107 @@ export function AiSettings() {
       <p className="text-sm text-muted-foreground border-l-2 border-muted pl-3">
         {t("settings.ai.spendNote")}
       </p>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Shield className="h-5 w-5 shrink-0" />
+              {t("settings.ai.allowlistTitle")}
+            </CardTitle>
+            <CardDescription>{t("settings.ai.allowlistDescription")}</CardDescription>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => {
+              setAllowlistFormKey((k) => k + 1)
+              setAllowlistFormError(null)
+              setAllowlistOpen(true)
+            }}
+            disabled={mutating || !orgReady}
+          >
+            <Plus className="h-4 w-4" />
+            {t("settings.ai.allowlistAdd")}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {allowlistEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("settings.ai.allowlistEmpty")}</p>
+          ) : (
+            <ul className="divide-y rounded-md border">
+              {allowlistEntries.map((row) => {
+                const id = num(row.id)
+                return (
+                  <li
+                    key={id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm"
+                    data-testid={`ai-reducer-allowlist-row-${id}`}
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <span className="font-mono text-xs font-medium">{str(row.reducerName)}</span>
+                      <p className="text-xs text-muted-foreground">
+                        {str(row.permissionResource)} · {str(row.permissionAction)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={bool(row.enabled)}
+                          onCheckedChange={(checked) => {
+                            void (async () => {
+                              try {
+                                await setAllowlistEnabledMutation.mutateAsync({
+                                  allowlistId: id,
+                                  enabled: checked,
+                                })
+                                toast({ title: t("settings.ai.allowlistUpdated") })
+                              } catch (e) {
+                                toast({
+                                  title: t("settings.ai.mutationError"),
+                                  description: e instanceof Error ? e.message : "",
+                                  variant: "destructive",
+                                })
+                              }
+                            })()
+                          }}
+                          disabled={mutating}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {t("settings.ai.allowlistEnabled")}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive gap-1"
+                        disabled={mutating}
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await deleteAllowlistMutation.mutateAsync(id)
+                              toast({ title: t("settings.ai.allowlistDeleted") })
+                            } catch (e) {
+                              toast({
+                                title: t("settings.ai.mutationError"),
+                                description: e instanceof Error ? e.message : "",
+                                variant: "destructive",
+                              })
+                            }
+                          })()
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -992,6 +1117,30 @@ export function AiSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FormModal
+        key={allowlistFormKey}
+        open={allowlistOpen}
+        onOpenChange={(o) => {
+          setAllowlistOpen(o)
+          if (!o) setAllowlistFormError(null)
+        }}
+        config={allowlistCreateFormConfig}
+        closeOnSubmit={false}
+        submitError={allowlistFormError}
+        onSubmit={async (data) => {
+          setAllowlistFormError(null)
+          if (!orgId) return
+          try {
+            await createAllowlistMutation.mutateAsync(data)
+            toast({ title: t("settings.ai.allowlistCreated") })
+            setAllowlistOpen(false)
+            await allowlistQuery.refetch()
+          } catch (e) {
+            setAllowlistFormError(e instanceof Error ? e.message : t("settings.ai.mutationError"))
+          }
+        }}
+      />
 
       <Dialog open={sampleInsightOpen} onOpenChange={setSampleInsightOpen}>
         <DialogContent>

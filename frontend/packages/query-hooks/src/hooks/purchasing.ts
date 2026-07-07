@@ -104,7 +104,8 @@ export function usePurchaseOrderLines(
   return useQuery<QueryRows>({
     queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-order-lines', 'Failed to fetch purchase order lines'),
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchOnMount: "always",
     initialData: coalesceQueryInitialData(initialData),
   })
 }
@@ -836,6 +837,7 @@ export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
     onSuccess: () => {
       const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ["purchase-orders", orgKey] })
+      void qc.invalidateQueries({ queryKey: ["purchase-order-lines", orgKey] })
       void qc.invalidateQueries({ queryKey: ["account-moves", orgKey] })
     },
   })

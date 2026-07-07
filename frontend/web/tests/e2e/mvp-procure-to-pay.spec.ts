@@ -172,6 +172,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     await waitForPoLineMatchStatus(page, lineId, "matched")
 
+    await page.reload()
+    await gotoModule(page, "/purchasing", "purchasing")
     await page.getByTestId("module-tab-purchasing-lines").click()
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Matched", {
       timeout: 30_000,
@@ -200,6 +202,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     await waitForPoLineMatchStatus(page, lineId, "over_billed")
 
+    await page.reload()
+    await gotoModule(page, "/purchasing", "purchasing")
     await page.getByTestId("module-tab-purchasing-lines").click()
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Over-billed", {
       timeout: 30_000,

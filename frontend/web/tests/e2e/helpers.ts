@@ -1604,16 +1604,25 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
   return moveId
 }
 
+/** Open the newest draft vendor bill for a partner in the accounting Bills tab. */
+async function openDraftVendorBillModal(page: Page, vendorName: string): Promise<void> {
+  await gotoModule(page, "/accounting", "accounting")
+  await page.getByTestId("module-tab-accounting-bills").click()
+  const billRow = activeTabCustomTableRows(page)
+    .filter({ hasText: vendorName })
+    .filter({ has: page.getByText("Draft", { exact: true }) })
+    .last()
+  await expect(billRow).toBeVisible({ timeout: 30_000 })
+  await billRow.click()
+  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
+}
+
 /** Open vendor bill detail and post draft via accounting bills tab. */
 export async function postDraftBillViaUi(page: Page, vendorName: string): Promise<number> {
   const moveId = await fetchDraftVendorBillMoveIdByPartner(page, vendorName)
 
-  await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
-  const billRow = activeTabCustomTableRows(page).filter({ hasText: vendorName }).first()
-  await expect(billRow).toBeVisible({ timeout: 30_000 })
-  await billRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openDraftVendorBillModal(page, vendorName)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -1635,12 +1644,7 @@ export async function expectPostDraftBillRejected(
 ): Promise<void> {
   await fetchDraftVendorBillMoveIdByPartner(page, vendorName)
 
-  await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
-  const billRow = activeTabCustomTableRows(page).filter({ hasText: vendorName }).first()
-  await expect(billRow).toBeVisible({ timeout: 30_000 })
-  await billRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openDraftVendorBillModal(page, vendorName)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(

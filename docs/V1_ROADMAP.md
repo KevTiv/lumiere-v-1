@@ -1,6 +1,6 @@
 # Lumiere V1 Roadmap
 
-**Status:** Validation-corrected plan (2026-07-05)  
+**Status:** Validation-corrected plan (2026-07-05); implementation snapshot **2026-07-07**  
 **Audience:** Engineering, pilot operators, coordinator agents  
 **Not in scope:** Odoo parity, enterprise multi-entity consolidation at scale, full module breadth
 
@@ -23,7 +23,24 @@ This is **not** an Odoo competitor. Compete on time-to-value, AI-assisted onboar
 
 ---
 
-## Validation summary (2026-07-05)
+## Validation summary (2026-07-07)
+
+Codebase research corrected many "missing feature" claims. **Wave 1–3 tracks are implemented**; remaining V1 work is **gate verification** (E2E, session tests, metrics under load) and pilot ops polish.
+
+| Area | Original claim | Validated state (2026-07-07) | V1 action |
+|------|----------------|------------------------------|-----------|
+| Auth | Session security gaps | **Done** — JWT-only identity, no server-token fallback, `auth-permission-enforcement.spec.ts` @p0 | **Verify** gate |
+| Lead-to-cash | SO line E2E, delivery exceptions | **Done** — `mvp-lead-to-cash.spec.ts`, partial/cancel picking, invoice correction E2E | **Verify** gate |
+| Params | Mapper cohesion | **Done** — 0 `as unknown as Create*` in module clients; CI floor 70% | **Verify** CI |
+| Sales returns | RMA domain missing | **Done** — `return_order` tables/reducers, `mvp-sales-returns.spec.ts` | **Verify** gate |
+| Purchasing | 3-way match missing | **Done** — `compute_line_match_state`, P2P mismatch E2E | **Verify** gate |
+| Accounting | GL drilldown gap | **Done** — `AccountGlDrilldownPanel`, period close checklist, fiscal lock on `post_payment` | **Verify** gate |
+| Import | Full wizard | **Done** — 30+ entities, templates, map/preview, duplicate detection | **Verify** gate |
+| AI drafts | Hardcoded whitelist | **Done** — `AiReducerAllowlist` table, diff panel, Settings → AI allowlist admin, execution audit | **Verify** `mvp-ai-action-draft.spec.ts` |
+| Ops | Metrics / backup | **Partial** — `/metrics` wired; `backup-stdb.sh` + runbook docs; staging in `ENVIRONMENT.md` | **Verify** counters under load |
+| CRM duplicates | Detection / merge | **Backlog** — backend + UI exist; E2E still stub | Phase 4 |
+
+### Validation summary (2026-07-05) — historical
 
 Codebase research corrected many "missing feature" claims. Use **build** vs **verify/polish** when prioritizing.
 
@@ -279,4 +296,5 @@ V1 is **done** when a pilot tenant can:
 
 | Date | Change |
 |------|--------|
+| 2026-07-07 | Implementation snapshot: Waves 1–3 tracks landed; AI allowlist Settings UI; gate verification remains |
 | 2026-07-05 | Initial validation-corrected V1 roadmap; 9 mission tracks; 3-wave execution |

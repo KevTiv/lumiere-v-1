@@ -93,7 +93,7 @@ const PURCHASING_HINT_OVERRIDES: Partial<
   compute_purchase_order_line_totals: ["purchase-orders", "purchase-order-lines"],
   compute_purchase_order_totals: ["purchase-orders", "purchase-order-lines"],
   confirm_purchase_order: ["purchase-orders"],
-  create_bill_from_purchase_order: ["purchase-orders"],
+  create_bill_from_purchase_order: ["purchase-orders", "purchase-order-lines", "account-moves"],
   create_landed_cost: ["landed-costs", "purchase-orders"],
   create_partner_bank: ["partner-banks"],
   create_purchase_order: ["purchase-orders"],

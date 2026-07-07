@@ -117,7 +117,7 @@ import {
   opportunitiesTableConfig,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 
@@ -522,29 +522,6 @@ function CrmClientLoaded({
     if (warehouseSelectOptions[0]) defaults.warehouseId = warehouseSelectOptions[0].value
     return mergeFieldDefaultValues(base, defaults)
   }, [t, pricelistSelectOptions, warehouseSelectOptions])
-
-  useEffect(() => {
-    setWorkflowModal((prev) => {
-      if (!prev) return prev
-      if (prev.kind === "convertLead" && opportunityStageOptions.length > 0) {
-        return { ...prev, form: buildConvertLeadForm() }
-      }
-      if (
-        prev.kind === "convertOpp" &&
-        pricelistSelectOptions.length > 0 &&
-        warehouseSelectOptions.length > 0
-      ) {
-        return { ...prev, form: buildConvertOppForm() }
-      }
-      return prev
-    })
-  }, [
-    buildConvertLeadForm,
-    buildConvertOppForm,
-    opportunityStageOptions.length,
-    pricelistSelectOptions.length,
-    warehouseSelectOptions.length,
-  ])
 
   const openConvertLeadModal = useCallback(
     (rows: Record<string, unknown>[]) => {
@@ -1553,13 +1530,20 @@ function CrmClientLoaded({
     }
   }
 
+  const workflowStaticConfig = useMemo((): FormConfig => {
+    if (!workflowModal) return closedWorkflowFormConfig
+    if (workflowModal.kind === "convertLead") return buildConvertLeadForm()
+    if (workflowModal.kind === "convertOpp") return buildConvertOppForm()
+    return workflowModal.form
+  }, [workflowModal, buildConvertLeadForm, buildConvertOppForm])
+
   const workflowModalKey =
     workflowModal == null
       ? "closed"
       : workflowModal.kind === "convertLead"
-        ? `cl-${workflowModal.leadId.toString()}`
+        ? `cl-${workflowModal.leadId.toString()}-s${opportunityStageOptions.length}`
         : workflowModal.kind === "convertOpp"
-          ? `co-${workflowModal.opportunityId.toString()}`
+          ? `co-${workflowModal.opportunityId.toString()}-p${pricelistSelectOptions.length}-w${warehouseSelectOptions.length}`
           : workflowModal.kind === "assignTag"
             ? `at-${workflowModal.contactId.toString()}`
             : workflowModal.kind === "changeStage"
@@ -1632,7 +1616,7 @@ function CrmClientLoaded({
         key={workflowModalKey}
         open={workflowModal !== null}
         onOpenChange={(open) => !open && setWorkflowModal(null)}
-        staticConfig={workflowModal?.form ?? closedWorkflowFormConfig}
+        staticConfig={workflowStaticConfig}
         moduleId="crm"
         organizationId={organizationId}
         roleId={runtimeRoleId}

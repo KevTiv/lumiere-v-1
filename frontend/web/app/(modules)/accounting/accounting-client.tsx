@@ -1868,11 +1868,11 @@ function AccountingClientLoaded({
       const id = row.id as string | number | bigint
       const mt = moveTypeTag(row)
       if (isInvoiceLikeMoveType(mt)) {
+        const isCustomerInvoice = mt === "OutInvoice" || mt === "OutRefund"
         const resolved = resolveDefaultCogsInventoryAccountIds(
           accounts as readonly Record<string, unknown>[],
         )
-        const needsCogsAccounts = isInvoiceLikeMoveType(mt)
-        if (needsCogsAccounts && resolved == null) {
+        if (isCustomerInvoice && resolved == null) {
           toast({
             variant: "destructive",
             title: t("accounting.invoices.invoiceActions.postDraft"),

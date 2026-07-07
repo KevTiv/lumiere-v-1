@@ -6,13 +6,17 @@ import type {
   CreateAccountAccountParams,
   CreateAccountAccountTypeParams,
   CreateAccountBankStatementLineParams,
+  CreateAccountBankStatementParams,
   CreateAccountGroupParams,
+  CreateAccountJournalParams,
   CreateAccountMoveParams,
   CreateAccountPeriodParams,
   CreateAccountReconciliationWidgetParams,
   CreateAccountTaxParams,
   CreateAnalyticAccountParams,
   CreateAnalyticDistributionModelParams,
+  CreateCreditNoteParams,
+  CreateCrossoveredBudgetLineParams,
   CreateAnalyticLineParams,
   CreateBudgetPostParams,
   CreateCrossoveredBudgetParams,
@@ -1529,14 +1533,6 @@ export function updateTaxDeadlineParamsToJson(params: UpdateTaxDeadlineParams): 
 
 // ── Journals / moves / bank statements / budget lines / credit notes ─────────
 
-import type {
-  CreateAccountBankStatementParams,
-  CreateAccountJournalParams,
-  CreateAccountMoveParams,
-  CreateCreditNoteParams,
-  CreateCrossoveredBudgetLineParams,
-} from '@lumiere/stdb/types'
-
 type JournalType = CreateAccountJournalParams['type']
 
 function journalTypeTagFromForm(raw: unknown): JournalType {
@@ -1596,7 +1592,8 @@ export function toCreateAccountMoveParams(
 
 function bankStatementStateFromForm(raw: unknown): CreateAccountBankStatementParams['state'] {
   const s = String(raw ?? 'Open').trim()
-  if (s === 'Open' || s === 'Confirm' || s === 'Posted') return { tag: s }
+  if (s === 'Open' || s === 'Posted' || s === 'Cancelled' || s === 'Processing') return { tag: s }
+  if (s === 'Confirm') return { tag: 'Processing' }
   return { tag: 'Open' }
 }
 

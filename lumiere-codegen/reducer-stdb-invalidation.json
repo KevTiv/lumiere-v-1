@@ -1,4 +1,8 @@
 {
+  "create_ai_reducer_allowlist": ["ai-reducer-allowlist"],
+  "delete_ai_reducer_allowlist": ["ai-reducer-allowlist"],
+  "set_ai_reducer_allowlist_enabled": ["ai-reducer-allowlist"],
+  "update_ai_reducer_allowlist": ["ai-reducer-allowlist"],
   "add_account_move_line": ["account-moves", "account-move-lines"],
   "cancel_account_move": ["account-moves", "account-move-lines"],
   "create_account_account": ["account-accounts"],

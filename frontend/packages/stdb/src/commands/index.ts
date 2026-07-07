@@ -202,6 +202,14 @@ export {
   type AiChatBffReducerKey,
 } from "./ai-chat-http";
 export {
+  AI_REDUCER_ALLOWLIST_BFF_REDUCERS,
+  AI_REDUCER_ALLOWLIST_COMMAND_SUBSCRIPTION_HINTS,
+  aiReducerAllowlistBffCallUrl,
+  aiReducerAllowlistBffPost,
+  aiReducerAllowlistCommandContract,
+  type AiReducerAllowlistBffReducerKey,
+} from "./ai-reducer-allowlist-http";
+export {
   AI_ACTION_DRAFTS_BFF_REDUCERS,
   AI_ACTION_DRAFTS_COMMAND_SUBSCRIPTION_HINTS,
   aiActionDraftsBffCallUrl,
