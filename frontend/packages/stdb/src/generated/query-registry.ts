@@ -594,8 +594,8 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "form-configs": {
     table: "form_config",
     aliases: ["form-configs", "form_config"],
-    defaultRestricted: ["module_id", "form_id", "name", "description", "is_active", "is_system_default"],
-    mandatory: ["id", "organization_id"],
+    defaultRestricted: ["name", "description", "is_active", "is_system_default"],
+    mandatory: ["id", "organization_id", "module_id", "form_id"],
   },
   "form-role-configs": {
     table: "form_role_config",

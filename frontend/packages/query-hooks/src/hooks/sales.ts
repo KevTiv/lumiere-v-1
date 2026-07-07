@@ -180,8 +180,11 @@ export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateSaleOrderParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object, "CreateSaleOrderParams")
-      const { urlPath, init } = salesBffPost("create_sale_order", [organizationId, withCompanyScope(json, companyId)])
+      const json = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreateSaleOrderParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sale_order", [organizationId, json])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create sale order')
     },
@@ -331,8 +334,11 @@ export function useCreatePickingBatch(organizationId: bigint, companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePickingBatchParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object, "CreatePickingBatchParams")
-      const { urlPath, init } = salesBffPost("create_picking_batch", [organizationId, withCompanyScope(json, companyId)])
+      const json = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreatePickingBatchParams",
+      )
+      const { urlPath, init } = salesBffPost("create_picking_batch", [organizationId, json])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create picking batch')
     },

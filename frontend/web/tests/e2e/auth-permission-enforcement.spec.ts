@@ -5,6 +5,8 @@ import {
   callReducerBff,
   expectReducerPermissionDenied,
   fetchFirstPricelistId,
+  fetchFirstWarehouseId,
+  fetchFirstUomId,
   fetchFulfillmentPickingIdBySaleOrderId,
   fetchOrgPermissionId,
   fetchProductIdByName,
@@ -17,6 +19,7 @@ import {
   smokeName,
   waitForMovePosted,
   waitForPaymentPosted,
+  fetchLatestPaymentIdByPartner,
 } from "./helpers"
 
 /**
@@ -315,44 +318,20 @@ async function adminCreateDraftPayment(page: Page): Promise<number> {
   const companyId = await fetchDefaultCompanyId(page)
   const partnerId = await fetchVendorPartnerIdByName(page, "Globex Corp")
   const amount = 42.5
-  await callReducerBff(
-    page,
-    "create_payment",
-    [
-      orgId,
-      {
-        company_id: companyId,
-        payment_type: { tag: "OutBound" },
-        partner_type: { tag: "Supplier" },
-        partner_id: partnerId,
-        amount,
-        currency_id: 1,
-        date: null,
-        journal_id: 1,
-        ref_: smokeName("perm-pay"),
-        memo: null,
-      },
-    ],
-    { withCompany: true },
-  )
-
-  const deadline = Date.now() + 30_000
-  while (Date.now() < deadline) {
-    const res = await page.request.get("/api/query/account-payments")
-    if (res.ok()) {
-      const json = (await res.json()) as {
-        data?: Array<{ id?: unknown; partnerId?: unknown; partner_id?: unknown; state?: unknown }>
-      }
-      const row = [...(json.data ?? [])]
-        .filter((p) => scalarQueryId(p.partnerId ?? p.partner_id) === partnerId)
-        .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
-      const id = scalarQueryId(row?.id)
-      const state = String(row?.state ?? "")
-      if (id != null && state.includes("NotPaid")) return id
-    }
-    await page.waitForTimeout(250)
-  }
-  throw new Error("draft payment not found after create_payment")
+  await callReducerBff(page, "create_payment", [
+    orgId,
+    {
+      companyId,
+      paymentType: { tag: "OutBound" },
+      partnerType: { tag: "Supplier" },
+      partnerId,
+      amount,
+      currencyId: 1,
+      journalId: 1,
+      ref: smokeName("perm-pay"),
+    },
+  ])
+  return fetchLatestPaymentIdByPartner(page, partnerId, { state: "NotPaid" })
 }
 
 async function adminPrepareAssignedPicking(page: Page): Promise<number> {
@@ -370,6 +349,8 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
 
   const productId = await fetchProductIdByName(page, SEEDED_PRODUCT)
   const pricelistId = await fetchFirstPricelistId(page)
+  const warehouseId = await fetchFirstWarehouseId(page)
+  const uomId = await fetchFirstUomId(page)
 
   await callReducerBff(
     page,
@@ -383,29 +364,11 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         partner_shipping_id: partnerId,
         pricelist_id: pricelistId,
         currency_id: 1,
+        warehouse_id: warehouseId,
+        order_lines: [],
         origin: smokeName("perm-so"),
-        client_order_ref: null,
-        payment_term_id: null,
-        fiscal_position_id: null,
-        user_id: null,
-        team_id: null,
-        opportunity_id: null,
-        campaign_id: null,
-        medium_id: null,
-        source_id: null,
-        commitment_date: null,
-        expected_date: null,
-        validity_days: null,
-        shipping_policy: null,
-        picking_policy: null,
-        customer_lead: null,
-        is_printed: null,
-        is_locked: null,
-        is_dropship: null,
-        note: null,
       },
     ],
-    { withCompany: true },
   )
 
   const soRes = await page.request.get("/api/query/sale-orders")
@@ -425,20 +388,16 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
       orderId,
       {
         product_id: productId,
-        product_uom_qty: 1,
+        quantity: 1,
+        uom_id: uomId,
         price_unit: 100,
         discount: 0,
         tax_ids: [],
-        display_type: null,
-        name: null,
-        sequence: null,
-        customer_lead: null,
-        warehouse_id: null,
-        route_id: null,
-        analytic_account_id: null,
+        analytic_tag_ids: [],
+        sequence: 10,
+        is_downpayment: false,
       },
     ],
-    { withCompany: true },
   )
 
   await callReducerBff(page, "confirm_sales_order", [orgId, orderId])
@@ -448,13 +407,11 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
     page,
     "confirm_stock_picking",
     [orgId, pickingId, { company_id: companyId }],
-    { withCompany: true },
   )
   await callReducerBff(
     page,
     "assign_stock_picking",
     [orgId, pickingId, { company_id: companyId }],
-    { withCompany: true },
   )
 
   return pickingId

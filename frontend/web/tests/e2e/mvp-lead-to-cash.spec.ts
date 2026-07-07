@@ -426,13 +426,40 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
+    const confirmPickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/confirm_stock_picking"),
+      { timeout: 45_000 },
+    )
     await page.getByTestId("entity-action-confirm-picking").click()
+    const confirmPickingRes = await confirmPickingResPromise
+    if (!confirmPickingRes.ok()) {
+      const body = await confirmPickingRes.text().catch(() => "")
+      throw new Error(`confirm_stock_picking failed (${confirmPickingRes.status()}): ${body}`)
+    }
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-assign-picking")
+    const assignPickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/assign_stock_picking"),
+      { timeout: 30_000 },
+    )
     await page.getByTestId("entity-action-assign-picking").click()
+    const assignPickingRes = await assignPickingResPromise
+    if (!assignPickingRes.ok()) {
+      const body = await assignPickingRes.text().catch(() => "")
+      throw new Error(`assign_stock_picking failed (${assignPickingRes.status()}): ${body}`)
+    }
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-validate-picking")
+    const validatePickingResPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/call/validate_stock_picking"),
+      { timeout: 30_000 },
+    )
     await page.getByTestId("entity-action-validate-picking").click()
+    const validatePickingRes = await validatePickingResPromise
+    if (!validatePickingRes.ok()) {
+      const body = await validatePickingRes.text().catch(() => "")
+      throw new Error(`validate_stock_picking failed (${validatePickingRes.status()}): ${body}`)
+    }
     await waitForSaleOrderLineQtyDelivered(page, orderId)
 
     const journalLabel = await fetchSalesInvoiceJournalLabel(page)

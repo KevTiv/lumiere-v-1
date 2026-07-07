@@ -1307,6 +1307,9 @@
   "CreateInvoiceFromSaleOrderParams": [
     "metadata"
   ],
+  "CreateCreditNoteFromReturnOrderParams": [
+    "metadata"
+  ],
   "CreateCreditNoteParams": [
     "reason"
   ],
@@ -1682,6 +1685,13 @@
     "print_report_name",
     "attachment",
     "metadata"
+  ],
+  "CreateReturnOrderLineParams": [
+    "sale_order_line_id"
+  ],
+  "CreateReturnOrderParams": [
+    "sale_order_id",
+    "return_reason"
   ],
   "CreateRevenueRecognitionRuleParams": [
     "expense_account_id",

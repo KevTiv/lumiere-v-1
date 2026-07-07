@@ -15,7 +15,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteViaGl,
+  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -23,7 +23,6 @@ import {
   submitForm,
   waitForAuditLogEntry,
   waitForEntityActionEnabled,
-  waitForMovePosted,
   waitForOpportunityLineExists,
   waitForReturnOrderState,
   waitForSaleOrderBillableLines,
@@ -232,10 +231,12 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     ])
     await waitForReturnOrderState(page, returnOrderId, "received")
 
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-returns").click()
     await selectEntityRowById(page, returnOrderId)
     await waitForEntityActionEnabled(page, "entity-action-create-return-credit-note")
     await page.getByTestId("entity-action-create-return-credit-note").click()
-    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
+    await expectFormModalVisible(page, "create-invoice-from-sale-order")
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
@@ -250,8 +251,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForReturnOrderState(page, returnOrderId, "refunded")
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)
-    await postDraftCreditNoteViaGl(page, leadName)
-    await waitForMovePosted(page, creditNoteId)
+    await postDraftCreditNoteMove(page, creditNoteId)
 
     await expect
       .poll(async () => {

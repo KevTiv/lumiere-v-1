@@ -698,6 +698,84 @@ pub async fn execute_resource_query(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
+        "form-config-fields" => {
+            let config_sql =
+                select_org_scoped_sql("form-configs", "form_config", organization_id, fa, "", "")
+                    .map_err(ApiError::Internal)?;
+            let config_rows = client
+                .query_sql(&config_sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let config_ids: HashSet<u64> = config_rows
+                .iter()
+                .filter_map(|r| {
+                    let id = row_id_u64(r);
+                    (id > 0).then_some(id)
+                })
+                .collect();
+            if config_ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let cols = resolve_http_sql_columns("form-config-fields", fa).map_err(ApiError::Internal)?;
+            let sql = format!("SELECT {} FROM form_config_field", cols.join(", "));
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                let cid = r
+                    .get("configurationId")
+                    .or_else(|| r.get("configuration_id"))
+                    .and_then(|v| v.as_u64())
+                    .or_else(|| {
+                        r.get("configuration_id")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                    .unwrap_or(0);
+                config_ids.contains(&cid)
+            });
+            return Ok(rows);
+        }
+        "form-role-configs" => {
+            let config_sql =
+                select_org_scoped_sql("form-configs", "form_config", organization_id, fa, "", "")
+                    .map_err(ApiError::Internal)?;
+            let config_rows = client
+                .query_sql(&config_sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let config_ids: HashSet<u64> = config_rows
+                .iter()
+                .filter_map(|r| {
+                    let id = row_id_u64(r);
+                    (id > 0).then_some(id)
+                })
+                .collect();
+            if config_ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let cols = resolve_http_sql_columns("form-role-configs", fa).map_err(ApiError::Internal)?;
+            let sql = format!("SELECT {} FROM form_role_config", cols.join(", "));
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|r| {
+                let cid = r
+                    .get("configurationId")
+                    .or_else(|| r.get("configuration_id"))
+                    .and_then(|v| v.as_u64())
+                    .or_else(|| {
+                        r.get("configuration_id")
+                            .and_then(|x| x.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
+                    .unwrap_or(0);
+                config_ids.contains(&cid)
+            });
+            return Ok(rows);
+        }
         "import-mapping-templates" => {
             let sql = format!(
                 "SELECT id, organization_id, table_name, name, mapping_json, use_count, create_uid, create_date, write_uid, write_date FROM import_mapping_template WHERE organization_id = {organization_id} ORDER BY use_count DESC, id DESC LIMIT 200"

@@ -10,6 +10,35 @@ import optionFieldsJson from "./stdb-http-option-fields.json" with { type: "json
 type OptionFieldMap = Record<string, readonly string[]>
 const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
 
+/** Vec-of-struct fields that need per-item Option encoding via `stdbParamsToJson`. */
+const NESTED_ARRAY_STRUCTS: Partial<
+  Record<string, Partial<Record<string, keyof OptionFieldMap & string>>>
+> = {
+  CreateReturnOrderParams: {
+    lines: "CreateReturnOrderLineParams",
+  },
+  CreateSaleOrderParams: {
+    order_lines: "CreateSaleOrderLineParams",
+  },
+}
+
+/** Nested object fields that need struct-scoped Option encoding via `stdbParamsToJson`. */
+const NESTED_OBJECT_STRUCTS: Partial<
+  Record<string, Partial<Record<string, keyof OptionFieldMap & string>>>
+> = {
+  CreateFormFieldParams: {
+    validation: "FieldValidation",
+  },
+  CreateCreditNoteFromReturnOrderParams: {
+    receivable_line: "AddAccountMoveLineParams",
+    income_line: "AddAccountMoveLineParams",
+  },
+  CreateInvoiceFromSaleOrderParams: {
+    receivable_line: "AddAccountMoveLineParams",
+    income_line: "AddAccountMoveLineParams",
+  },
+}
+
 const STDB_TIMESTAMP_KEY = "__timestamp_micros_since_unix_epoch__"
 
 /** SpacetimeDB HTTP reducer params use Rust snake_case field names, not TS camelCase. */
@@ -290,6 +319,28 @@ export function stdbParamsToJson(
   const encoded = encodeValue(params, optionFields)
   const out = { ...((encoded ?? {}) as Record<string, unknown>) }
 
+  const nestedArrays = structName ? NESTED_ARRAY_STRUCTS[structName] : undefined
+  if (nestedArrays) {
+    for (const [fieldSnake, itemStruct] of Object.entries(nestedArrays)) {
+      const arr = out[fieldSnake]
+      if (!Array.isArray(arr)) continue
+      out[fieldSnake] = arr.map((item) =>
+        item !== null && typeof item === "object"
+          ? stdbParamsToJson(item as object, itemStruct)
+          : item,
+      )
+    }
+  }
+
+  const nestedObjects = structName ? NESTED_OBJECT_STRUCTS[structName] : undefined
+  if (nestedObjects) {
+    for (const [fieldSnake, itemStruct] of Object.entries(nestedObjects)) {
+      const nested = out[fieldSnake]
+      if (nested === null || typeof nested !== "object" || Array.isArray(nested)) continue
+      out[fieldSnake] = stdbParamsToJson(nested as object, itemStruct)
+    }
+  }
+
   // SpacetimeDB HTTP requires every Option field in the struct JSON body.
   if (structName) {
     for (const fieldSnake of optionFieldList) {
@@ -310,6 +361,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   convert_lead_to_customer: "ConvertLeadParams",
   convert_opportunity_to_sale_order: "ConvertOpportunityParams",
   create_opportunity_line: "CreateOpportunityLineParams",
+  create_sale_order: "CreateSaleOrderParams",
   create_sale_order_line: "CreateSaleOrderLineParams",
   create_return_order: "CreateReturnOrderParams",
   create_invoice_from_sale_order: "CreateInvoiceFromSaleOrderParams",
@@ -327,6 +379,9 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   add_landed_cost_line: "AddLandedCostLineParams",
   create_stock_picking: "CreateStockPickingParams",
   create_stock_move: "CreateStockMoveParams",
+  confirm_stock_picking: "CompanyScopeParams",
+  assign_stock_picking: "CompanyScopeParams",
+  validate_stock_picking: "CompanyScopeParams",
   create_inventory_adjustment: "CreateInventoryAdjustmentParams",
   create_crossovered_budget: "CreateCrossoveredBudgetParams",
   create_crossovered_budget_line: "CreateCrossoveredBudgetLineParams",
@@ -356,6 +411,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_utm_medium: "CreateUtmMediumParams",
   create_utm_source: "CreateUtmSourceParams",
   create_form_configuration: "CreateFormConfigParams",
+  add_form_field: "CreateFormFieldParams",
   grant_permission: "GrantOrgPermissionParams",
   add_org_member: "AddOrgMemberParams",
   assign_role: "AssignRoleParams",
@@ -371,6 +427,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_analytic_line: "CreateAnalyticLineParams",
   create_analytic_distribution_model: "CreateAnalyticDistributionModelParams",
   create_payment_term: "CreatePaymentTermParams",
+  create_payment: "CreatePaymentParams",
   update_sale_order: "UpdateSaleOrderParams",
   create_ai_action_draft: "CreateAiActionDraftParams",
   update_ai_action_draft_params: "UpdateAiActionDraftParamsParams",

@@ -299,9 +299,11 @@ export function useCreateSavedReport(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateSavedReportParams(formData)
       if (!params) throw new Error("Invalid saved report params")
-      const { urlPath, init } = reportsBffPost("create_saved_report", [
-        stdbParamsToJson(params, "CreateSavedReportParams"),
-      ])
+      const encodedParams = stdbParamsToJson(
+        params as object,
+        "CreateSavedReportParams",
+      )
+      const { urlPath, init } = reportsBffPost("create_saved_report", [encodedParams])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },

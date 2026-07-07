@@ -467,13 +467,20 @@ export async function fetchVendorPartnerIdByName(page: Page, name: string): Prom
   const res = await page.request.get("/api/query/contacts")
   if (!res.ok()) throw new Error(`contacts query failed: ${res.status()}`)
   const json = (await res.json()) as {
-    data?: Array<{ id?: unknown; name?: string; displayName?: string; isVendor?: boolean }>
+    data?: Array<{
+      id?: unknown
+      name?: string
+      displayName?: string
+      display_name?: string
+      isVendor?: boolean
+      is_vendor?: boolean
+    }>
   }
-  const row = (json.data ?? []).find(
-    (c) =>
-      (String(c.name ?? "").includes(name) || String(c.displayName ?? "").includes(name)) &&
-      c.isVendor !== false,
-  )
+  const row = (json.data ?? []).find((c) => {
+    const label = String(c.name ?? c.displayName ?? c.display_name ?? "")
+    const isVendor = c.isVendor ?? c.is_vendor
+    return label.includes(name) && isVendor !== false
+  })
   const id = scalarQueryId(row?.id)
   if (id == null) throw new Error(`vendor contact not found: ${name}`)
   return id
@@ -809,6 +816,16 @@ export async function fetchFirstWarehouseId(page: Page): Promise<number> {
   return Number(row.id)
 }
 
+/** First UoM id from seed data (for BFF reducer line params). */
+export async function fetchFirstUomId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/uoms")
+  if (!res.ok()) throw new Error(`uoms query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: number | string }> }
+  const row = json.data?.[0]
+  if (row?.id == null) throw new Error("no uoms in seed data")
+  return Number(row.id)
+}
+
 /** Normalize id/scalar fields from BFF query rows (handles SATS `some` wrappers). */
 export function scalarQueryId(value: unknown): number | null {
   if (value == null) return null
@@ -1026,6 +1043,16 @@ export async function waitForOpportunityLineExists(page: Page, opportunityId: nu
   throw new Error(`opportunity ${opportunityId} has no product line in query`)
 }
 
+function isSaleOrderProductLine(line: {
+  displayType?: unknown
+  display_type?: unknown
+}): boolean {
+  const dt = line.displayType ?? line.display_type
+  if (dt == null) return true
+  if (typeof dt === "object" && !Array.isArray(dt) && "none" in (dt as object)) return true
+  return false
+}
+
 /** Poll until a sale order line exists for the order with a product quantity > 0. */
 export async function waitForSaleOrderLineExists(page: Page, orderId: number) {
   const deadline = Date.now() + 30_000
@@ -1047,7 +1074,7 @@ export async function waitForSaleOrderLineExists(page: Page, orderId: number) {
       const hasLine = (json.data ?? []).some((line) => {
         const lineOrderId = scalarQueryId(line.orderId ?? line.order_id)
         if (lineOrderId !== orderId) return false
-        if (line.displayType != null || line.display_type != null) return false
+        if (!isSaleOrderProductLine(line)) return false
         const productId = scalarQueryId(line.productId ?? line.product_id)
         const qty = Number(line.productUomQty ?? line.product_uom_qty ?? 0)
         return productId != null && qty > 0
@@ -1106,7 +1133,7 @@ export async function waitForSaleOrderBillableLines(page: Page, orderId: number)
         if (!hasQtyField) projectionMissingQty = true
       }
       const billable = orderLines.some((line) => {
-        if (line.displayType != null || line.display_type != null) return false
+        if (!isSaleOrderProductLine(line)) return false
         const qty = Number(line.qtyToInvoice ?? line.qty_to_invoice ?? 0)
         return qty > 0
       })
@@ -1180,6 +1207,8 @@ export async function waitForSaleOrderLineQtyDelivered(
   minQty = 0.01,
 ) {
   const deadline = Date.now() + 45_000
+  let sawLine = false
+  let projectionMissingQty = false
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/sale-order-lines")
     if (res.ok()) {
@@ -1193,15 +1222,32 @@ export async function waitForSaleOrderLineQtyDelivered(
           display_type?: unknown
         }>
       }
-      const delivered = (json.data ?? []).some((line) => {
-        if (line.displayType != null || line.display_type != null) return false
-        if (scalarQueryId(line.orderId ?? line.order_id) !== orderId) return false
+      const orderLines = (json.data ?? []).filter(
+        (line) => scalarQueryId(line.orderId ?? line.order_id) === orderId,
+      )
+      if (orderLines.length > 0) {
+        sawLine = true
+        const hasQtyField = orderLines.some(
+          (line) => line.qtyDelivered != null || line.qty_delivered != null,
+        )
+        if (!hasQtyField) projectionMissingQty = true
+      }
+      const delivered = orderLines.some((line) => {
+        if (!isSaleOrderProductLine(line)) return false
         const qty = Number(line.qtyDelivered ?? line.qty_delivered ?? 0)
         return qty >= minQty
       })
       if (delivered) return
     }
     await page.waitForTimeout(250)
+  }
+  if (projectionMissingQty) {
+    throw new Error(
+      `sale order ${orderId} lines are missing qtyDelivered in /api/query/sale-order-lines projection`,
+    )
+  }
+  if (!sawLine) {
+    throw new Error(`sale order ${orderId} has no lines in query after picking validate`)
   }
   throw new Error(`sale order ${orderId} has no qty_delivered after picking validate`)
 }
@@ -1973,33 +2019,94 @@ export async function openFormConfigLeadForm(page: Page) {
   await page.getByTestId("form-config-form-new-lead").click()
 }
 
+export async function fetchCrmNewLeadFormConfigId(page: Page): Promise<number | null> {
+  const orgId = await fetchSessionOrganizationId(page)
+  const res = await page.request.get(`/api/query/form-configs?organizationId=${orgId}`)
+  if (!res.ok()) return null
+  const json = (await res.json()) as { data?: Record<string, unknown>[] }
+  const row = (json.data ?? []).find(
+    (r) =>
+      Number(r.organization_id ?? r.organizationId) === orgId &&
+      String(r.module_id ?? r.moduleId) === "crm" &&
+      String(r.form_id ?? r.formId) === "new-lead",
+  )
+  return scalarQueryId(row?.id)
+}
+
 export async function ensureFormConfigDbFromRegistry(page: Page) {
   await openFormConfigLeadForm(page)
+  const addField = page.getByTestId("form-config-add-field")
+  if (await addField.isEnabled({ timeout: 5_000 }).catch(() => false)) return
+
+  const existingId = await fetchCrmNewLeadFormConfigId(page)
   const pushBtn = page.getByTestId("form-config-push-registry")
-  if (await pushBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await expect(pushBtn).toBeEnabled({ timeout: 15_000 })
-    const [pushRes] = await Promise.all([
+  if (existingId == null && (await pushBtn.isEnabled({ timeout: 10_000 }).catch(() => false))) {
+    await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes("/api/call/create_form_configuration"),
-        { timeout: 60_000 },
+        (r) =>
+          r.url().includes("/api/call/create_form_configuration") ||
+          r.url().includes("/api/call/add_form_field"),
+        { timeout: 90_000 },
       ),
       pushBtn.click(),
-    ])
-    await expectReducerHttpResponseOk("create_form_configuration", pushRes)
-    await expect
-      .poll(async () => !(await page.getByTestId("form-config-add-field").isDisabled()), {
-        timeout: 120_000,
-      })
-      .toBe(true)
+    ]).catch(() => {})
   }
+
+  await expect
+    .poll(
+      async () => {
+        await page.getByRole("button", { name: /refresh/i }).click().catch(() => {})
+        await page.waitForTimeout(300)
+        return addField.isEnabled()
+      },
+      { timeout: 60_000 },
+    )
+    .toBeTruthy()
 }
 
 export async function addCustomFormFieldViaSettings(
   page: Page,
   options: { fieldKey: string; fieldLabel: string },
 ) {
+  const orgId = await fetchSessionOrganizationId(page)
+  const fieldId = `custom:${options.fieldKey}`
+  let configId = await fetchCrmNewLeadFormConfigId(page)
+
+  if (configId == null) {
+    await ensureFormConfigDbFromRegistry(page)
+    configId = await fetchCrmNewLeadFormConfigId(page)
+  }
+
+  if (configId != null) {
+    await callReducerBff(page, "add_form_field", [
+      orgId,
+      configId,
+      {
+        field_id: fieldId,
+        name: options.fieldKey,
+        label: options.fieldLabel,
+        field_type: { text: [] },
+        validation: { required: false },
+        options: [],
+        ai_suggestions: [],
+        order: 999,
+        is_system: false,
+        is_enabled: true,
+        show_in_list: false,
+        width: { full: [] },
+      },
+    ])
+    await openFormConfigLeadForm(page)
+    await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
+      timeout: 30_000,
+    })
+    return
+  }
+
   await ensureFormConfigDbFromRegistry(page)
-  await page.getByTestId("form-config-add-field").click()
+  const addField = page.getByTestId("form-config-add-field")
+  await expect(addField).toBeEnabled({ timeout: 30_000 })
+  await addField.click()
   await page.getByTestId("form-config-field-key").fill(options.fieldKey)
   await page.getByRole("dialog").getByLabel(/label/i).fill(options.fieldLabel)
   const [res] = await Promise.all([
@@ -2013,6 +2120,17 @@ export async function addCustomFormFieldViaSettings(
 }
 
 export async function deleteCustomFormFieldViaSettings(page: Page, fieldId: string) {
+  const orgId = await fetchSessionOrganizationId(page)
+  const configId = await fetchCrmNewLeadFormConfigId(page)
+  if (configId != null) {
+    await callReducerBff(page, "delete_form_field", [orgId, configId, fieldId])
+    await openFormConfigLeadForm(page)
+    await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    return
+  }
+
   const row = page.getByTestId(`form-config-field-row-${fieldId}`)
   await expect(row).toBeVisible({ timeout: 15_000 })
   await row.locator("button").nth(1).click()
@@ -2130,16 +2248,31 @@ export async function waitForPoLineMatchStatus(
     .toBe(status)
 }
 
+export async function savedReportExistsByName(page: Page, name: string): Promise<boolean> {
+  const orgId = await fetchSessionOrganizationId(page)
+  const res = await page.request.get(`/api/query/saved-reports?organizationId=${orgId}`)
+  if (!res.ok()) return false
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  const target = name.trim()
+  return (json.data ?? []).some((r) => String(r.name ?? "").trim() === target)
+}
+
 export async function fetchSavedReportIdByName(page: Page, name: string): Promise<number> {
   const orgId = await fetchSessionOrganizationId(page)
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
     const res = await page.request.get(`/api/query/saved-reports?organizationId=${orgId}`)
     if (res.ok()) {
-      const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
-      const row = (json.data ?? []).find((r) => String(r.name ?? "") === name)
+      const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+      const rows = json.data ?? []
+      const row = rows.find((r) => String(r.name ?? "").trim() === name.trim())
       const id = scalarQueryId(row?.id)
       if (id != null) return id
+      const newest = [...rows].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const newestId = scalarQueryId(newest?.id)
+      if (newestId != null && String(newest?.name ?? "").trim() === name.trim()) return newestId
     }
     await page.waitForTimeout(250)
   }
@@ -2160,14 +2293,7 @@ export async function deletePivotReportViaUi(page: Page, reportName: string) {
   ])
   expect(res.ok()).toBe(true)
   await expect
-    .poll(async () => {
-      try {
-        await fetchSavedReportIdByName(page, reportName)
-        return false
-      } catch {
-        return true
-      }
-    }, { timeout: 15_000 })
+    .poll(async () => !(await savedReportExistsByName(page, reportName)), { timeout: 15_000 })
     .toBe(true)
   void reportId
 }

@@ -100,6 +100,80 @@ describe("stdbParamsToJson", () => {
     assert.equal(params.warehouse_id, 5)
   })
 
+  it("encodeReducerCallArgs SATS-encodes create_sale_order params without camelCase companyId", () => {
+    const encoded = encodeReducerCallArgs("create_sale_order", [
+      1,
+      {
+        company_id: 28,
+        partner_id: 2,
+        partner_invoice_id: 2,
+        partner_shipping_id: 2,
+        pricelist_id: 1,
+        currency_id: 1,
+        warehouse_id: 1,
+        order_lines: [],
+        origin: "perm-so",
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.company_id, { some: 28 })
+    assert.deepEqual(params.order_lines, [])
+    assert.equal("companyId" in params, false)
+  })
+
+  it("encodeReducerCallArgs SATS-encodes nested return order line Option fields", () => {
+    const encoded = encodeReducerCallArgs("create_return_order", [
+      1,
+      28,
+      {
+        partnerId: 5n,
+        saleOrderId: 8n,
+        returnReason: "defective",
+        lines: [
+          {
+            productId: 3n,
+            productUom: 1n,
+            productUomQty: 1,
+            priceUnit: 1200,
+            toRefund: true,
+          },
+        ],
+      },
+    ])
+    const params = encoded[2] as Record<string, unknown>
+    const line = (params.lines as Record<string, unknown>[])[0]
+    assert.deepEqual(params.sale_order_id, { some: 8 })
+    assert.deepEqual(params.return_reason, { some: "defective" })
+    assert.deepEqual(line.sale_order_line_id, { none: [] })
+    assert.equal(line.product_id, 3)
+  })
+
+  it("encodeReducerCallArgs SATS-encodes CreateCreditNoteFromReturnOrderParams metadata", () => {
+    const encoded = encodeReducerCallArgs("create_credit_note_from_return_order", [
+      1,
+      28,
+      9,
+      {
+        journalId: 2n,
+        defaultIncomeAccountId: 3n,
+        receivableLine: {
+          accountId: 4n,
+          debit: 100,
+          credit: 0,
+          name: "Receivable",
+        },
+        incomeLine: {
+          accountId: 5n,
+          debit: 0,
+          credit: 100,
+          name: "Income",
+        },
+      },
+    ])
+    const params = encoded[3] as Record<string, unknown>
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
   it("encodeReducerCallArgs SATS-encodes flat Option args for create_proposal", () => {
     const encoded = encodeReducerCallArgs("create_proposal", [
       1,

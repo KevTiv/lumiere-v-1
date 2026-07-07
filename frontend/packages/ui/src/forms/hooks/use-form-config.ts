@@ -131,6 +131,30 @@ function n64(v: unknown): bigint {
   return BigInt(String(v ?? 0))
 }
 
+function rowNum(row: Record<string, unknown>, camel: string, snake: string): number {
+  return Number(row[camel] ?? row[snake] ?? 0)
+}
+
+function rowStr(row: Record<string, unknown>, camel: string, snake: string): string {
+  return String(row[camel] ?? row[snake] ?? "")
+}
+
+function rowBool(row: Record<string, unknown>, camel: string, snake: string): boolean {
+  const v = row[camel] ?? row[snake]
+  return v === true || v === 1
+}
+
+/** Like {@link rowBool} but treats a missing column as `defaultValue` (field-policy may omit restricted cols). */
+function rowBoolOrDefault(
+  row: Record<string, unknown>,
+  camel: string,
+  snake: string,
+  defaultValue: boolean,
+): boolean {
+  if (camel in row || snake in row) return rowBool(row, camel, snake)
+  return defaultValue
+}
+
 function mapStdbFormConfigRow(row: {
   id: bigint
   organizationId: bigint
@@ -398,10 +422,10 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
 
         const configs = configRows.filter(
           c =>
-            Number(c.organizationId) === organizationId &&
-            c.moduleId === moduleId &&
-            c.formId === formId &&
-            (c.isActive === true || c.is_active === true || c.isActive === 1 || c.is_active === 1),
+            rowNum(c, "organizationId", "organization_id") === organizationId &&
+            rowStr(c, "moduleId", "module_id") === moduleId &&
+            rowStr(c, "formId", "form_id") === formId &&
+            rowBoolOrDefault(c, "isActive", "is_active", true),
         )
 
         if (configs.length === 0) {
@@ -414,46 +438,46 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         const configurationId = Number(cfg.id)
 
         const fields = fieldRows
-          .filter(f => Number(f.configurationId) === configurationId)
+          .filter(f => rowNum(f, "configurationId", "configuration_id") === configurationId)
           .map(f =>
             mapStdbFormConfigFieldRow({
               id: n64(f.id),
-              configurationId: n64(f.configurationId),
-              fieldId: String(f.fieldId ?? ""),
-              name: String(f.name ?? ""),
-              label: String(f.label ?? ""),
-              fieldType: f.fieldType,
-              description: String(f.description ?? ""),
-              placeholder: String(f.placeholder ?? ""),
-              defaultValue: String(f.defaultValue ?? ""),
-              optionsJson: String(f.optionsJson ?? ""),
-              validationJson: String(f.validationJson ?? ""),
-              aiSuggestionsJson: String(f.aiSuggestionsJson ?? ""),
-              order: Number(f.order ?? 0),
-              isSystem: Boolean(f.isSystem),
-              isEnabled: Boolean(f.isEnabled),
-              category: String(f.category ?? ""),
-              showInList: Boolean(f.showInList),
+              configurationId: n64(f.configurationId ?? f.configuration_id),
+              fieldId: rowStr(f, "fieldId", "field_id"),
+              name: rowStr(f, "name", "name"),
+              label: rowStr(f, "label", "label"),
+              fieldType: f.fieldType ?? f.field_type,
+              description: rowStr(f, "description", "description"),
+              placeholder: rowStr(f, "placeholder", "placeholder"),
+              defaultValue: rowStr(f, "defaultValue", "default_value"),
+              optionsJson: rowStr(f, "optionsJson", "options_json"),
+              validationJson: rowStr(f, "validationJson", "validation_json"),
+              aiSuggestionsJson: rowStr(f, "aiSuggestionsJson", "ai_suggestions_json"),
+              order: rowNum(f, "order", "order"),
+              isSystem: rowBool(f, "isSystem", "is_system"),
+              isEnabled: rowBool(f, "isEnabled", "is_enabled"),
+              category: rowStr(f, "category", "category"),
+              showInList: rowBool(f, "showInList", "show_in_list"),
               width: f.width,
-              sectionId: String(f.sectionId ?? ""),
-              createdAt: f.createdAt,
-              updatedAt: f.updatedAt,
+              sectionId: rowStr(f, "sectionId", "section_id"),
+              createdAt: f.createdAt ?? f.create_date,
+              updatedAt: f.updatedAt ?? f.write_date,
             }),
           )
 
         const roleConfigs = roleRows
-          .filter(r => Number(r.configurationId) === configurationId)
+          .filter(r => rowNum(r, "configurationId", "configuration_id") === configurationId)
           .map(r =>
             mapStdbFormRoleConfigRow({
               id: n64(r.id),
-              configurationId: n64(r.configurationId),
-              roleId: String(r.roleId ?? ""),
-              enabledFieldsJson: String(r.enabledFieldsJson ?? ""),
-              requiredFieldsJson: String(r.requiredFieldsJson ?? ""),
-              defaultPromptsJson: String(r.defaultPromptsJson ?? ""),
-              isActive: Boolean(r.isActive),
-              createdAt: r.createdAt,
-              updatedAt: r.updatedAt,
+              configurationId: n64(r.configurationId ?? r.configuration_id),
+              roleId: rowStr(r, "roleId", "role_id"),
+              enabledFieldsJson: rowStr(r, "enabledFieldsJson", "enabled_fields_json"),
+              requiredFieldsJson: rowStr(r, "requiredFieldsJson", "required_fields_json"),
+              defaultPromptsJson: rowStr(r, "defaultPromptsJson", "default_prompts_json"),
+              isActive: rowBool(r, "isActive", "is_active"),
+              createdAt: r.createdAt ?? r.create_date,
+              updatedAt: r.updatedAt ?? r.write_date,
             }),
           )
 
@@ -461,8 +485,8 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         const customFields = allCustomRows
           .filter(
             cf =>
-              Number(cf.organizationId) === organizationId &&
-              Number(cf.configurationId) === configurationId &&
+              rowNum(cf, "organizationId", "organization_id") === organizationId &&
+              rowNum(cf, "configurationId", "configuration_id") === configurationId &&
               (!effectiveUser ||
                 String(cf.userId ?? "")
                   .toLowerCase()
@@ -486,17 +510,17 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           payload: {
             config: mapStdbFormConfigRow({
               id: n64(cfg.id),
-              organizationId: n64(cfg.organizationId),
-              moduleId: String(cfg.moduleId ?? ""),
-              formId: String(cfg.formId ?? ""),
-              name: String(cfg.name ?? ""),
-              description: String(cfg.description ?? ""),
-              isActive: Boolean(cfg.isActive),
-              isSystemDefault: Boolean(cfg.isSystemDefault),
-              createdAt: cfg.createdAt,
-              updatedAt: cfg.updatedAt,
-              createdBy: cfg.createdBy as string | { toHexString?: () => string } | undefined,
-              updatedBy: cfg.updatedBy as string | { toHexString?: () => string } | undefined,
+              organizationId: n64(cfg.organizationId ?? cfg.organization_id),
+              moduleId: rowStr(cfg, "moduleId", "module_id"),
+              formId: rowStr(cfg, "formId", "form_id"),
+              name: rowStr(cfg, "name", "name"),
+              description: rowStr(cfg, "description", "description"),
+              isActive: rowBool(cfg, "isActive", "is_active"),
+              isSystemDefault: rowBool(cfg, "isSystemDefault", "is_system_default"),
+              createdAt: cfg.createdAt ?? cfg.create_date,
+              updatedAt: cfg.updatedAt ?? cfg.write_date,
+              createdBy: (cfg.createdBy ?? cfg.created_by) as string | { toHexString?: () => string } | undefined,
+              updatedBy: (cfg.updatedBy ?? cfg.updated_by) as string | { toHexString?: () => string } | undefined,
             }),
             fields,
             roleConfigs,
@@ -615,22 +639,22 @@ export function useOrganizationFormConfigs(organizationId: number): {
       try {
         const rows = await stdbBrowserQuery("form-configs")
         if (cancelled) return
-        const filtered = rows.filter(c => Number(c.organizationId) === organizationId)
+        const filtered = rows.filter(c => rowNum(c, "organizationId", "organization_id") === organizationId)
         setConfigs(
           filtered.map(c =>
             mapStdbFormConfigRow({
               id: n64(c.id),
-              organizationId: n64(c.organizationId),
-              moduleId: String(c.moduleId ?? ""),
-              formId: String(c.formId ?? ""),
-              name: String(c.name ?? ""),
-              description: String(c.description ?? ""),
-              isActive: Boolean(c.isActive),
-              isSystemDefault: Boolean(c.isSystemDefault),
-              createdAt: c.createdAt,
-              updatedAt: c.updatedAt,
-              createdBy: c.createdBy as string | { toHexString?: () => string } | undefined,
-              updatedBy: c.updatedBy as string | { toHexString?: () => string } | undefined,
+              organizationId: n64(c.organizationId ?? c.organization_id),
+              moduleId: rowStr(c, "moduleId", "module_id"),
+              formId: rowStr(c, "formId", "form_id"),
+              name: rowStr(c, "name", "name"),
+              description: rowStr(c, "description", "description"),
+              isActive: rowBool(c, "isActive", "is_active"),
+              isSystemDefault: rowBool(c, "isSystemDefault", "is_system_default"),
+              createdAt: c.createdAt ?? c.create_date,
+              updatedAt: c.updatedAt ?? c.write_date,
+              createdBy: (c.createdBy ?? c.created_by) as string | { toHexString?: () => string } | undefined,
+              updatedBy: (c.updatedBy ?? c.updated_by) as string | { toHexString?: () => string } | undefined,
             }),
           ),
         )
@@ -706,8 +730,8 @@ export function useUserCustomFields(
         if (cancelled) return
         const rows = allRows.filter(
           cf =>
-            Number(cf.organizationId) === sessionOrgId &&
-            Number(cf.configurationId) === configurationId &&
+            rowNum(cf, "organizationId", "organization_id") === sessionOrgId &&
+            rowNum(cf, "configurationId", "configuration_id") === configurationId &&
             (!effectiveUser ||
               String(cf.userId ?? "")
                 .toLowerCase()

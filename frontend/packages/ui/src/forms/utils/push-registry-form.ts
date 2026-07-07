@@ -15,6 +15,14 @@ import type {
 } from "../config/types"
 import { formOptionsToStdb, formValidationToStdb } from "./stdb-field-params"
 
+function rowNum(row: Record<string, unknown>, camel: string, snake: string): number {
+  return Number(row[camel] ?? row[snake] ?? 0)
+}
+
+function rowStr(row: Record<string, unknown>, camel: string, snake: string): string {
+  return String(row[camel] ?? row[snake] ?? "")
+}
+
 function satsUnitVariant(tag: string): Record<string, unknown> {
   const key = tag.charAt(0).toLowerCase() + tag.slice(1)
   return { [key]: [] }
@@ -62,9 +70,9 @@ export async function pushRegistryFormToDatabase(
   const rows = await stdbBrowserQuery("form-configs")
   const row = rows.find(
     c =>
-      Number(c.organizationId) === organizationId &&
-      c.moduleId === def.moduleId &&
-      c.formId === def.formId,
+      rowNum(c, "organizationId", "organization_id") === organizationId &&
+      rowStr(c, "moduleId", "module_id") === def.moduleId &&
+      rowStr(c, "formId", "form_id") === def.formId,
   )
   if (!row?.id) throw new Error("Form configuration not found after create")
 
