@@ -37,6 +37,7 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `parity-phase3-approvals-documents-mutations.spec.ts` | Approval rule → gated PO confirm → reject (`@parity-phase-3`) |
 | `parity-phase4-accounting-reports-mutations.spec.ts` | Fiscal setup wizard; pivot report save/delete (`@parity-phase-4`) |
 | `parity-phase5-chatter-mutations.spec.ts` | Post note on seeded sale order + mail_message assert (`@parity-phase-5`) |
+| `crm-duplicate-merge.spec.ts` | Duplicate contact detection + merge via CRM Duplicates tab (`@phase-4`) |
 
 ## Local Setup
 
@@ -58,14 +59,17 @@ E2E_CLEAR_DB=1 make e2e-single
 E2E_CLEAR_DB=1 make e2e-p2p
 
 # AI draft + RAG (steps 14–16)
-E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-action-draft.spec.ts E2E_GREP=
-E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts E2E_GREP=
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-action-draft.spec.ts
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts
+
+# Phase 4 — CRM duplicate merge
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=crm-duplicate-merge.spec.ts
 
 # Both paths on a fresh DB
 E2E_CLEAR_DB=1 make e2e-mvp-golden
 ```
 
-Note: `e2e-single` defaults to `E2E_GREP=creates CRM`. For other specs use `make e2e-p2p` or set `E2E_GREP=` explicitly.
+Note: `e2e-mvp-golden` passes `E2E_GREP="creates CRM"` only for `mvp-lead-to-cash.spec.ts`. For other specs, omit grep or set `E2E_GREP=` explicitly.
 
 That target starts local SpacetimeDB when needed, publishes the local module **without** wiping existing data by default (so repeat runs are faster and reflect real migration behavior), runs core reducer tests (continues if unavailable), runs **`seed_dev_data`** via `pnpm run e2e-seed-fixture`, then seeds the browser smoke user with `pnpm run seed-test-user`, starts `api-server`, and then installs the Playwright Chromium browser if needed and lets Playwright start Next.js.
 
@@ -77,7 +81,7 @@ E2E_CLEAR_DB=1 make e2e-smoke
 E2E_CLEAR_DB=1 E2E_SUITE=p0 make e2e-smoke
 
 # CI profile — fail if ai-gateway is down:
-E2E_REQUIRE_AI=1 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts E2E_GREP=
+E2E_REQUIRE_AI=1 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts
 ```
 
 Smoke Playwright runs use `E2E_WORKERS=1` by default (serial) so tests share one api-server reliably.

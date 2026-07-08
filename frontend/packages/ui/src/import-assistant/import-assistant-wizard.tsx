@@ -227,7 +227,9 @@ export function ImportAssistantWizard({
       setRollingBackJobId(jobId)
       setError(null)
       try {
-        await rollbackJob.mutateAsync(job.id)
+        await rollbackJob.mutateAsync(
+          typeof job.id === "string" ? Number(job.id) : job.id,
+        )
       } catch (e) {
         setError(e instanceof Error ? e.message : t("common.importAssistant.rollbackFailed"))
       } finally {

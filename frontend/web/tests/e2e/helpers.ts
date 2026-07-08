@@ -704,7 +704,7 @@ export async function callReducerBffResult(
 
 async function expectReducerHttpResponseOk(
   reducer: string,
-  res: import("@playwright/test").APIResponse,
+  res: import("@playwright/test").Response,
 ): Promise<void> {
   if (res.ok()) return
   const json = (await res.json().catch(() => ({}))) as { error?: string }
@@ -768,6 +768,90 @@ export async function fetchProductCategoryIdByName(page: Page, name: string): Pr
   const id = scalarQueryId(row?.id)
   if (id == null) throw new Error(`product category not found: ${name}`)
   return id
+}
+
+/** Canonical pair order for duplicate-contact test ids (`contactIdA` < `contactIdB`). */
+export function canonicalContactPairIds(idA: number, idB: number): [number, number] {
+  return idA < idB ? [idA, idB] : [idB, idA]
+}
+
+function contactQueryEmail(row: Record<string, unknown>): string {
+  return String(row.email ?? row.emailFrom ?? row.email_from ?? "")
+    .trim()
+    .toLowerCase()
+}
+
+function isActiveContactRow(row: Record<string, unknown>): boolean {
+  const deleted = row.deletedAt ?? row.deleted_at
+  const mergeTarget = row.mergeTargetId ?? row.merge_target_id
+  return deleted == null && mergeTarget == null
+}
+
+/** Active contact ids sharing an email (sorted ascending). Polls until `minCount` matches. */
+export async function fetchContactIdsByEmail(
+  page: Page,
+  email: string,
+  minCount = 1,
+): Promise<number[]> {
+  const normalized = email.trim().toLowerCase()
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/contacts")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Record<string, unknown>[] }
+      const ids = (json.data ?? [])
+        .filter(
+          (row) => contactQueryEmail(row) === normalized && isActiveContactRow(row),
+        )
+        .map((row) => scalarQueryId(row.id))
+        .filter((id): id is number => id != null)
+        .sort((a, b) => a - b)
+      if (ids.length >= minCount) return ids
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`expected at least ${minCount} active contact(s) with email ${email}`)
+}
+
+/** Active contact id by exact display name. */
+export async function fetchContactIdByName(page: Page, name: string): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/contacts")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Record<string, unknown>[] }
+      const row = (json.data ?? []).find((contact) => {
+        const rowName = String(contact.name ?? contact.displayName ?? contact.display_name ?? "")
+        return rowName === name && isActiveContactRow(contact)
+      })
+      const id = scalarQueryId(row?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`active contact not found: ${name}`)
+}
+
+/** Poll until `sourceId` is soft-merged into `targetId`. */
+export async function waitForContactMergedInto(
+  page: Page,
+  sourceId: number,
+  targetId: number,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/contacts")
+        if (!res.ok()) return false
+        const json = (await res.json()) as { data?: Record<string, unknown>[] }
+        const source = (json.data ?? []).find((row) => scalarQueryId(row.id) === sourceId)
+        if (!source) return true
+        const mergeTarget = scalarQueryId(source.mergeTargetId ?? source.merge_target_id)
+        return mergeTarget === targetId
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 }
 
 /** Lead id whose name or contactName matches (BFF `/api/query/leads`). */

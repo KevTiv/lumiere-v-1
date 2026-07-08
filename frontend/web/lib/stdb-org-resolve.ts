@@ -37,14 +37,16 @@ export async function serverQueryUserOrganizationWithFallback(
   const base = getDefaultStdbHttpConnect()
   const opts: StdbHttpOptions = { ...base, ...userOpts }
 
-  try {
-    const rows = await serverFetchQueryListWithCredentialsAllowEmpty(
-      { stdbToken: opts.token, identityHex: id },
-      "user-organization",
-    )
-    if (rows.length > 0) return rows
-  } catch {
-    // Expired JWT, InvalidToken, or transient SQL failure — try admin below.
+  if (opts.token) {
+    try {
+      const rows = await serverFetchQueryListWithCredentialsAllowEmpty(
+        { stdbToken: opts.token, identityHex: id },
+        "user-organization",
+      )
+      if (rows.length > 0) return rows
+    } catch {
+      // Expired JWT, InvalidToken, or transient SQL failure — try admin below.
+    }
   }
 
   const admin = process.env["STDB_SERVER_TOKEN"]

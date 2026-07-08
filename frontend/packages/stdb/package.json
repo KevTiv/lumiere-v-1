@@ -18,14 +18,15 @@
     "./warehouse-3d": "./src/warehouse-3d-types.ts",
     "./generated/types": "./src/generated/types.ts",
     "./generated/types/reducers": "./src/generated/types/reducers.ts",
-    "./generated/query-registry": "./src/generated/query-registry.ts"
+    "./generated/query-registry": "./src/generated/query-registry.ts",
+    "./stdb-params-json": "./src/stdb-params-json.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/stdb-params-json.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/erp-shared": "workspace:*",
     "spacetimedb": "^2.0.3"
   },
   "peerDependencies": {
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.5.0"
   }
 }

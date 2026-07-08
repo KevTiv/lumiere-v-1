@@ -11,7 +11,7 @@ import {
   queryStdbList,
   type LumiereHttpFetch,
 } from "@lumiere/api-client"
-import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeReducerCallArgs } from "./stdb-params-json"
 
 function resolveApiFetch(): LumiereHttpFetch {
   const c = getLumiereApiClient()

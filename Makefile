@@ -15,7 +15,7 @@ E2E_API_PORT       ?= 8082
 E2E_SUITE          ?= full
 # Single-spec iteration (e2e-single-test / e2e-single)
 E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
-E2E_GREP           ?= creates CRM
+E2E_GREP           ?=
 E2E_WORKERS        ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
