@@ -1,6 +1,7 @@
 "use client"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
+import { useCrmModuleSubscription } from "@/lib/module-subscription-hooks"
 import { phCapture } from "@/lib/posthog-browser"
 import {
   customFieldEntriesFromMetadata,
@@ -249,6 +250,7 @@ function CrmClientLoaded({
   initialContacts,
   organizationId,
 }: CrmClientLoadedProps) {
+  useCrmModuleSubscription()
   const { t } = useTranslation()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]

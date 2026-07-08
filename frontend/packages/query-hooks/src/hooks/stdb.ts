@@ -14,6 +14,7 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { stdbBffPost } from "@lumiere/stdb/commands"
+import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
@@ -54,6 +55,7 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
+  if (isSubscriptionReady()) return
   for (const resource of resources) {
     for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
       void qc.invalidateQueries({ queryKey })
@@ -134,9 +136,19 @@ export function useStdbQuery(
     initialData?: Record<string, unknown>[]
   },
 ) {
+  const qc = useQueryClient()
+  const { subscriptionReady } = useSubscriptionCache()
+  const queryKey = stdbQueryKey(resource, organizationId)
+
   return useQuery({
-    queryKey: stdbQueryKey(resource, organizationId),
+    queryKey,
     queryFn: async () => {
+      if (subscriptionReady) {
+        for (const key of realtimeQueryKeysForResource(resource, organizationId)) {
+          const cached = qc.getQueryData(key)
+          if (Array.isArray(cached)) return cached as Record<string, unknown>[]
+        }
+      }
       const r = await apiFetch(`/api/query/${resource}`)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -145,7 +157,9 @@ export function useStdbQuery(
       const json = await r.json() as { data: Record<string, unknown>[] }
       return json.data ?? []
     },
-    staleTime: options?.staleTime ?? 30_000,
+    staleTime: subscriptionReady ? Number.POSITIVE_INFINITY : (options?.staleTime ?? 30_000),
+    refetchOnMount: !subscriptionReady,
+    refetchOnWindowFocus: !subscriptionReady,
     enabled: options?.enabled,
     initialData: coalesceQueryInitialData(options?.initialData),
   })

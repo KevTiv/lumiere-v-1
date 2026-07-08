@@ -15,6 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityAction, FormConfig } from "@lumiere/ui"
 import { iotModuleConfig } from "@/lib/module-dashboard-configs"
+import { useIotModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import type { QueryRows } from "@/lib/query-fetch"
 import { useStockLocations } from "@lumiere/query-hooks/hooks/inventory"
@@ -218,6 +219,7 @@ function IotClientLoaded({
   initialThresholds,
   organizationId,
 }: Loaded) {
+  useIotModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const moduleConfigBase = useMemo(() => iotModuleConfig(t), [t])

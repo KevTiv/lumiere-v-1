@@ -40,6 +40,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
+import { useInventoryModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
 import {
   useProducts,
@@ -368,6 +369,7 @@ function InventoryClientLoaded({
   initialStockProductionSerials,
   organizationId,
 }: InventoryClientLoadedProps) {
+  useInventoryModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

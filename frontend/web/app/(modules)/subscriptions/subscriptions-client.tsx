@@ -23,6 +23,7 @@ import {
 import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { PlayCircle, XCircle, FileText, ClipboardCheck, CheckCircle2, CircleSlash } from "lucide-react"
 import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useSubscriptionsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useSubscriptions,
   useSubscriptionPlans,
@@ -115,6 +116,7 @@ function SubscriptionsClientLoaded({
   initialAccounts,
   organizationId,
 }: SubscriptionsClientLoadedProps) {
+  useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

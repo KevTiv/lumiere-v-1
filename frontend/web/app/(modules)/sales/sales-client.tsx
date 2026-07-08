@@ -62,6 +62,7 @@ import {
   toCreateShippingMethodParams,
 } from '@/lib/sales-logistics-params';
 import { salesModuleConfig } from '@/lib/module-dashboard-configs';
+import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { chatterTargetFromRow, type ChatterTarget } from '@/lib/record-chatter';
 import { groupBy, groupByMonth } from '@/lib/utils';
 import { identityToHex } from '@/lib/helpdesk-display';
@@ -272,6 +273,7 @@ function SalesClientLoaded({
   initialReturnOrderLines,
   organizationId,
 }: SalesClientLoadedProps) {
+  useSalesModuleSubscription();
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useRBAC();

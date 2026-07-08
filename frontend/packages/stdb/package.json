@@ -19,20 +19,24 @@
     "./generated/types": "./src/generated/types.ts",
     "./generated/types/reducers": "./src/generated/types/reducers.ts",
     "./generated/query-registry": "./src/generated/query-registry.ts",
+    "./field-policy": "./src/field-policy.ts",
+    "./live": "./src/live/index.ts",
     "./stdb-params-json": "./src/stdb-params-json.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/stdb-params-json.test.ts"
+    "test": "node --import tsx --test src/stdb-params-json.test.ts src/live/projection.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
     "spacetimedb": "^2.0.3"
   },
   "peerDependencies": {
-    "react": ">=19"
+    "react": ">=19",
+    "@tanstack/react-query": ">=5"
   },
   "devDependencies": {
+    "@tanstack/react-query": "5.96.2",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.0",
     "tsx": "^4.20.5",

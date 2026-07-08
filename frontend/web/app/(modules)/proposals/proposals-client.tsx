@@ -15,6 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useProposalsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { proposalPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useProposals,
@@ -110,6 +111,7 @@ export function ProposalsClient(props: ProposalsClientProps) {
 }
 
 function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsClientLoadedProps) {
+  useProposalsModuleSubscription()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { t } = useTranslation()

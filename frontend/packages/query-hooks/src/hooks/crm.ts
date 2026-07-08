@@ -11,6 +11,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRows } from "../http"
+import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { crmBffPost } from "@lumiere/stdb/commands"
 import type {
   ConvertLeadParams,
@@ -72,24 +73,14 @@ export function useLeads(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
-  return useQuery<QueryRows>({
-    queryKey: ['leads', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/leads', 'Failed to fetch leads'),
-    staleTime: 30_000,
-    initialData,
-  })
+  return useSubscriptionAwareQuery('leads', organizationId, { initialData })
 }
 
 export function useOpportunities(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
-  return useQuery<QueryRows>({
-    queryKey: ['opportunities', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/opportunities', 'Failed to fetch opportunities'),
-    staleTime: 30_000,
-    initialData,
-  })
+  return useSubscriptionAwareQuery('opportunities', organizationId, { initialData })
 }
 
 export function useOpportunityLines(
@@ -109,12 +100,9 @@ export function useOpportunityStages(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
-  return useQuery<QueryRows>({
-    queryKey: ['opportunity-stages', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList('/api/query/opportunity-stages', 'Failed to fetch opportunity stages'),
-    staleTime: 60_000,
+  return useSubscriptionAwareQuery('opportunity-stages', organizationId, {
     initialData,
+    staleTime: 60_000,
   })
 }
 
@@ -122,12 +110,7 @@ export function useContacts(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
-  return useQuery<QueryRows>({
-    queryKey: ['contacts', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/contacts', 'Failed to fetch contacts'),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
-  })
+  return useSubscriptionAwareQuery('contacts', organizationId, { initialData })
 }
 
 export function useContactTags(
@@ -158,12 +141,7 @@ export function useActivities(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
-  return useQuery<QueryRows>({
-    queryKey: ['activities', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/activities', 'Failed to fetch activities'),
-    staleTime: 30_000,
-    initialData,
-  })
+  return useSubscriptionAwareQuery('activities', organizationId, { initialData })
 }
 
 export function useUsers(
@@ -195,7 +173,7 @@ export function useCreateLead(organizationId: bigint) {
         throw new Error(json.error ?? "Failed to create lead")
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -222,7 +200,7 @@ export function useUpdateOpportunity(
       if (!r.ok) throw new Error("Failed to update opportunity")
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["opportunities", rqBigIntKey(organizationId)] }),
+      invalidateResourceQueries(qc, organizationId, ['opportunities']),
   })
 }
 
@@ -247,7 +225,7 @@ export function useCreateOpportunity(
       if (!r.ok) throw new Error('Failed to create opportunity')
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] }),
+      invalidateResourceQueries(qc, organizationId, ['opportunities']),
   })
 }
 
@@ -274,7 +252,7 @@ export function useCreateContact(
         throw new Error(json.error ?? "Failed to create contact")
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -290,7 +268,7 @@ export function useCreateActivity(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create activity')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['activities']),
   })
 }
 
@@ -306,7 +284,7 @@ export function useUpdateContact(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -322,7 +300,7 @@ export function useUpdateContactAddress(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact address')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -338,7 +316,7 @@ export function useUpdateContactBusiness(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact business')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -354,7 +332,7 @@ export function useUpdateContactDetails(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -370,7 +348,7 @@ export function useUpdateLeadDetails(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead details')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -386,7 +364,7 @@ export function useUpdateLeadAddress(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead address')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -402,7 +380,7 @@ export function useUpdateLeadRevenue(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead revenue')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -419,8 +397,8 @@ export function useCreateContactTag(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create contact tag')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['contact-tags', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['contact-tags'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
     },
   })
 }
@@ -438,8 +416,8 @@ export function useCreateContactSegment(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create contact segment')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['contact-segments', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['contact-segments'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
     },
   })
 }
@@ -457,9 +435,9 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to convert lead')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['leads'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+      void invalidateResourceQueries(qc, organizationId, ['opportunities'])
     },
   })
 }
@@ -476,8 +454,8 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to convert opportunity to sale order')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['opportunities'])
+      void invalidateResourceQueries(qc, organizationId, ['sale-orders'])
     },
   })
 }
@@ -498,8 +476,8 @@ export function useCreateOpportunityLine(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to create opportunity line')
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['opportunity-lines', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['opportunity-lines'])
+      void invalidateResourceQueries(qc, organizationId, ['opportunities'])
     },
   })
 }
@@ -515,7 +493,7 @@ export function useDeleteLead(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to delete lead")
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads", rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -530,7 +508,7 @@ export function useDeleteContact(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete contact')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -547,7 +525,7 @@ export function useAssignTagToContact(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign tag')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -563,7 +541,7 @@ export function useAddContactToSegment(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add contact to segment')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -578,7 +556,7 @@ export function useCompleteActivity(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete activity')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['activities']),
   })
 }
 
@@ -602,7 +580,7 @@ export function useImportContactCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['contacts', rqBigIntKey(organizationId)] }),
+      void invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -615,7 +593,7 @@ export function useImportLeadCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['leads', rqBigIntKey(organizationId)] }),
+      void invalidateResourceQueries(qc, organizationId, ['leads']),
   })
 }
 
@@ -628,7 +606,7 @@ export function useImportOpportunityCsv(organizationId: bigint) {
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['opportunities', rqBigIntKey(organizationId)] }),
+      void invalidateResourceQueries(qc, organizationId, ['opportunities']),
   })
 }
 
@@ -644,7 +622,7 @@ export function useFindDuplicateContacts(organizationId: bigint) {
       if (!r.ok) throw new Error("Failed to scan for duplicate contacts")
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ["contacts", rqBigIntKey(organizationId)] }),
+      void invalidateResourceQueries(qc, organizationId, ['contacts']),
   })
 }
 
@@ -678,10 +656,10 @@ export function useMergeContacts(
       if (!r.ok) throw new Error("Failed to merge contacts")
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["contacts", rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ["leads", rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ["opportunities", rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+      void invalidateResourceQueries(qc, organizationId, ['leads'])
+      void invalidateResourceQueries(qc, organizationId, ['opportunities'])
+      void invalidateResourceQueries(qc, organizationId, ['sale-orders'])
     },
   })
 }

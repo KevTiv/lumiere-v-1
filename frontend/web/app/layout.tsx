@@ -41,6 +41,8 @@ export default async function RootLayout({
   const session = await getBrowserStdbSession()
   const identityHex = hasAuthenticatedIdentity(session) ? session?.identityHex : undefined
   const organizationId = session?.organizationId
+  const stdbToken = session?.stdbToken
+  const fieldAccess = session?.fieldAccess
 
   let serverRoleNames: string[] = []
   if (identityHex && session) {
@@ -80,6 +82,8 @@ export default async function RootLayout({
           serverRoleNames={serverRoleNames}
           organizationId={organizationId}
           companyIds={companyIds}
+          stdbToken={stdbToken}
+          fieldAccess={fieldAccess}
         >
           {children}
         </Providers>

@@ -13,6 +13,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { enumTag } from "@/lib/accounting-post-draft"
+import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   projectsParamsToJson,
@@ -121,6 +122,7 @@ function TasksClientLoaded({
   initialTasks,
   initialProjects,
 }: TasksClientProps & { organizationId: number }) {
+  useProjectsModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

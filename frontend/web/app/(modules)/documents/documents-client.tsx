@@ -15,6 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useDocuments,
@@ -215,6 +216,7 @@ function DocumentsClientLoaded({
   initialAiInsights,
   organizationId,
 }: DocumentsClientLoadedProps) {
+  useDocumentsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => documentsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

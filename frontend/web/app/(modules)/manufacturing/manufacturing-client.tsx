@@ -16,6 +16,7 @@ import {
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
+import { useManufacturingModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useMrpProductions,
   useMrpBoms,
@@ -90,6 +91,7 @@ function ManufacturingClientLoaded({
   initialStockQuants,
   organizationId,
 }: ManufacturingClientLoadedProps) {
+  useManufacturingModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

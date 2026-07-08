@@ -20,6 +20,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
+import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
 import {
   useEmployees,
@@ -157,6 +158,7 @@ function HrClientLoaded({
   initialPricelists,
   organizationId,
 }: HrClientLoadedProps) {
+  useHrModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

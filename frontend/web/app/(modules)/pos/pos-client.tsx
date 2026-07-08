@@ -19,6 +19,7 @@ import type { PosFormAction } from "@lumiere/ui"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
 import { Button } from "@lumiere/ui/components/button"
 import { posModuleConfig } from "@/lib/module-dashboard-configs"
+import { usePosModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   posConfigRowsToSelectOptions,
@@ -56,6 +57,7 @@ function PosClientLoaded({
   initialConfigs,
   initialSessions,
 }: PosClientLoadedProps) {
+  usePosModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

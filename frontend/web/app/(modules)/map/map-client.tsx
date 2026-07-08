@@ -21,6 +21,7 @@ import {
 } from "@lumiere/query-hooks/hooks/fleet"
 import { fleetVehicleRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { useMapModuleSubscription } from "@/lib/module-subscription-hooks"
 
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
 const MapView = dynamic(
@@ -125,6 +126,7 @@ export function MapClient(props: MapClientProps) {
 }
 
 function MapClientLoaded({ organizationId }: { organizationId: number }) {
+  useMapModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))

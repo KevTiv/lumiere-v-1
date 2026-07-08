@@ -16,10 +16,16 @@ import {
 } from "@lumiere/ui"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
-import { useStdbQuery } from "@lumiere/query-hooks/hooks/stdb"
+import { useStdbQuery, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
 import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
+import type { FieldAccessContext } from "@lumiere/stdb/field-policy"
+import {
+  StdbSubscriptionProvider,
+  useSubscriptionCache,
+} from "@lumiere/stdb/live"
 import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
+import { useStdbConnection } from "@lumiere/stdb"
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 
@@ -88,6 +94,37 @@ function LumiereRealtimeBridge({
   return null
 }
 
+function ErpSessionBridge({
+  children,
+  serverIdentity,
+  organizationId,
+  companyIds,
+}: {
+  children: React.ReactNode
+  serverIdentity?: string
+  organizationId?: number
+  companyIds?: readonly number[]
+}) {
+  const { connected } = useStdbConnection()
+  const { subscriptionReady } = useSubscriptionCache()
+
+  return (
+    <ErpSessionProvider
+      value={{
+        identity: serverIdentity ?? null,
+        connected:
+          connected
+          || subscriptionReady
+          || Boolean(serverIdentity && serverIdentity !== "unknown"),
+        organizationId: organizationId ?? undefined,
+        companyIds,
+      }}
+    >
+      {children}
+    </ErpSessionProvider>
+  )
+}
+
 // ─── Root providers ───────────────────────────────────────────────────────────
 
 export function Providers({
@@ -96,15 +133,19 @@ export function Providers({
   serverRoleNames,
   organizationId,
   companyIds,
+  stdbToken,
+  fieldAccess,
 }: {
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
   organizationId?: number
-  /** Company row ids for realtime subscription context (fixed-assets, intercompany, …). */
   companyIds?: readonly number[]
+  stdbToken?: string
+  fieldAccess?: FieldAccessContext
 }) {
   const [queryClient] = useState(() => new QueryClient())
+
   return (
     <I18nProvider>
       <ThemeProvider>
@@ -114,25 +155,31 @@ export function Providers({
         </Suspense>
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
-            <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />
-            <ErpSessionProvider
-              value={{
-                identity: serverIdentity ?? null,
-                connected: Boolean(serverIdentity && serverIdentity !== "unknown"),
-                organizationId: organizationId ?? undefined,
-                companyIds,
-              }}
+            <StdbSubscriptionProvider
+              stdbToken={stdbToken}
+              fieldAccess={fieldAccess}
+              organizationId={organizationId}
+              companyIds={companyIds}
+              serverIdentity={serverIdentity}
+              serverRoleNames={serverRoleNames}
+              keysFor={realtimeQueryKeysForResource}
             >
-              <RBACBridge
+              <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />
+              <ErpSessionBridge
                 serverIdentity={serverIdentity}
-                serverRoleNames={serverRoleNames}
                 organizationId={organizationId}
+                companyIds={companyIds}
               >
-                {children}
-              </RBACBridge>
-            </ErpSessionProvider>
+                <RBACBridge
+                  serverIdentity={serverIdentity}
+                  serverRoleNames={serverRoleNames}
+                  organizationId={organizationId}
+                >
+                  {children}
+                </RBACBridge>
+              </ErpSessionBridge>
+            </StdbSubscriptionProvider>
           </QueryClientProvider>
-
         </LumiereApiProvider>
       </ThemeProvider>
     </I18nProvider>

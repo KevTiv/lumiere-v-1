@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./http": "./src/http.ts",
+    "./subscription-query": "./src/subscription-query.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",
     "./action-draft-intent": "./src/action-draft-intent.ts",
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",

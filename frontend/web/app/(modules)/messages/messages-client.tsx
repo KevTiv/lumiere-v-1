@@ -13,6 +13,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
+import { useMessagesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useMailFollowers,
   useMailMessages,
@@ -76,6 +77,7 @@ export function MessagesClient(props: MessagesClientProps) {
 }
 
 function MessagesClientLoaded({ initialMessages, initialFollowers, organizationId }: MessagesClientLoadedProps) {
+  useMessagesModuleSubscription()
   const { t } = useTranslation()
   const { identity } = useErpSession()
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])

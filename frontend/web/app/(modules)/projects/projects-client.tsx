@@ -25,6 +25,7 @@ import {
   toLogTimesheetParams,
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useProjects,
   useTasks,
@@ -218,6 +219,7 @@ function ProjectsClientLoaded({
   initialContacts,
   organizationId,
 }: ProjectsClientLoadedProps) {
+  useProjectsModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n

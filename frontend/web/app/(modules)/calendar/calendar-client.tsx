@@ -1,6 +1,7 @@
 "use client"
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
+import { useCalendarModuleSubscription } from "@/lib/module-subscription-hooks"
 import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
@@ -34,6 +35,7 @@ export function CalendarClient(props: CalendarClientProps) {
 }
 
 function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientLoadedProps) {
+  useCalendarModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => calendarModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

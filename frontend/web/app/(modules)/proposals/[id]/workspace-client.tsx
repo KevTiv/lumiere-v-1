@@ -1,6 +1,7 @@
 "use client"
 
 import { phCapture } from "@/lib/posthog-browser"
+import { useProposalsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { apiFetch } from '@/lib/api-fetch'
 import { ProposalWorkspaceWrapper } from "./proposal-workspace-wrapper"
 import type { AIAnalysis } from "@lumiere/ui"
@@ -12,6 +13,7 @@ interface WorkspaceClientProps {
 }
 
 export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: WorkspaceClientProps) {
+  useProposalsModuleSubscription()
   const orgId = BigInt(organizationId)
 
   const handleAnalyze = async (text: string): Promise<AIAnalysis> => {

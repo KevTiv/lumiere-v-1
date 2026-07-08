@@ -6,6 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { DashboardGrid, DashboardHeader, MissingOrganization } from "@lumiere/ui"
 import type { DashboardSection } from "@lumiere/ui"
 import { overviewDashboard } from "@/lib/module-dashboard-configs"
+import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
 import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
@@ -96,6 +97,7 @@ function OverviewClientLoaded({
   initialPurchaseOrders,
   initialContacts,
 }: OverviewClientProps & { organizationId: number }) {
+  useOverviewModuleSubscription()
   const { t } = useTranslation()
   const router = useRouter()
   const { orgId } = orgBigInts(organizationId)

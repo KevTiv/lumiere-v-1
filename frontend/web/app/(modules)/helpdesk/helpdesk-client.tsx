@@ -16,6 +16,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig, ModuleConfig, EntityAction, EntityTableConfig, EntityViewConfig } from "@lumiere/ui"
 import { helpdeskModuleConfig } from "@/lib/module-dashboard-configs"
+import { useHelpdeskModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useHelpdeskTickets,
   useHelpdeskTeams,
@@ -94,6 +95,7 @@ function HelpdeskClientLoaded({
   initialSlas,
   organizationId,
 }: HelpdeskClientLoadedProps) {
+  useHelpdeskModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => helpdeskModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

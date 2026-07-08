@@ -5,6 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newWorkflowForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { workflowsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useWorkflowsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useWorkflows,
   useWorkflowInstances,
@@ -51,6 +52,7 @@ function WorkflowsClientLoaded({
   initialWorkitems,
   organizationId,
 }: WorkflowsClientLoadedProps) {
+  useWorkflowsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => workflowsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

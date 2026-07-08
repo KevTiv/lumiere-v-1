@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { callEnsureDevAdmin } from "./commands/core";
 import { setStdbConnection } from "./connection";
 import { DbConnection } from "./generated";
+import type { FieldAccessContext } from "./field-policy";
 import { createClientSubscriptions } from "./queries/erp-subscriptions";
 
 interface StdbConnectionState {
@@ -59,6 +60,12 @@ interface StdbConnectionProviderProps {
    * Pass an empty array for no subscriptions; there is no implicit “subscribe to everything”.
    */
   subscriptionResources: string[];
+  /** Casbin field projection — must match `/api/query` column sets. */
+  fieldAccess?: FieldAccessContext;
+  /** Fired when subscription SQL has been applied (seed React Query caches here). */
+  onSubscriptionApplied?: (conn: DbConnection) => void;
+  /** Fired when the websocket disconnects (clear live caches / fall back to HTTP). */
+  onSubscriptionDisconnect?: () => void;
 }
 
 export function StdbConnectionProvider({
@@ -72,6 +79,9 @@ export function StdbConnectionProvider({
   organizationId,
   companyIds,
   subscriptionResources,
+  fieldAccess,
+  onSubscriptionApplied,
+  onSubscriptionDisconnect,
 }: StdbConnectionProviderProps) {
   const [state, setState] = useState<Omit<StdbConnectionState, "organizationId">>({
     identity: null,
@@ -145,6 +155,7 @@ export function StdbConnectionProvider({
           c.subscriptionBuilder()
             .onApplied(() => {
               setState({ identity: identityHex, connected: true });
+              onSubscriptionApplied?.(c);
             })
             .onError((err) => {
               console.error("[stdb] subscription error", err);
@@ -155,6 +166,7 @@ export function StdbConnectionProvider({
                 roleNames: serverRoleNames,
                 organizationId,
                 companyIds,
+                fieldAccess,
               }),
             );
         })
@@ -166,6 +178,7 @@ export function StdbConnectionProvider({
           if (err) console.warn("[stdb] disconnected with error", err);
           setStdbConnection(null);
           setState({ identity: null, connected: false });
+          onSubscriptionDisconnect?.();
         })
         .build();
     } catch (err) {
@@ -191,6 +204,9 @@ export function StdbConnectionProvider({
     subscriptionResources,
     serverIdentity,
     serverRoleNames,
+    fieldAccess,
+    onSubscriptionApplied,
+    onSubscriptionDisconnect,
     token,
   ]);
 

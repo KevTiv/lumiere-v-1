@@ -25,6 +25,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
+import { useExpensesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useExpenses,
   useExpenseSheets,
@@ -103,6 +104,7 @@ function ExpensesClientLoaded({
   initialEmployees,
   organizationId,
 }: ExpensesClientLoadedProps) {
+  useExpensesModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)

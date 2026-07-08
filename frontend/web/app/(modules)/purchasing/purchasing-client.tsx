@@ -42,6 +42,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
+import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import {
@@ -339,6 +340,7 @@ function PurchasingClientLoaded({
   initialDepartments,
   organizationId,
 }: PurchasingClientLoadedProps) {
+  usePurchasingModuleSubscription()
   const { t } = useTranslation()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
