@@ -57,7 +57,7 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
       bodyContains: noteBody,
     })
 
-    await expect(page.getByTestId("record-chatter-dialog").getByText(noteBody)).toBeVisible({
+    await expect(page.getByTestId("record-chatter-dialog").getByText(noteBody, { exact: true })).toBeVisible({
       timeout: 15_000,
     })
 

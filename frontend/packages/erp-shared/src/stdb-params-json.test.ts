@@ -336,6 +336,30 @@ describe("encodeReducerCallArgs create_saved_report", () => {
   })
 })
 
+describe("encodeReducerCallArgs create_approval_rule", () => {
+  it("emits explicit none for missing Option approval-rule fields", () => {
+    const encoded = encodeReducerCallArgs("create_approval_rule", [
+      1,
+      null,
+      {
+        name: "PO confirm over 100",
+        model: "purchase_order",
+        action: "confirm_purchase_order",
+        ruleType: "amount_threshold",
+        threshold: 100,
+        isActive: true,
+      },
+    ])
+    assert.equal(encoded[0], 1)
+    const params = encoded[2] as Record<string, unknown>
+    assert.equal(params.name, "PO confirm over 100")
+    assert.equal(params.threshold, 100)
+    assert.deepEqual(params.description, { none: [] })
+    assert.deepEqual(params.approver_role_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+})
+
 describe("camelToSnakeIdentifier", () => {
   it("handles Odoo-style relation suffixes", () => {
     assert.equal(camelToSnakeIdentifier("showLotsM2O"), "show_lots_m2o")

@@ -93,7 +93,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     expect(createLeadRes.ok()).toBe(true)
     await gotoModule(page, "/crm", "crm")
     await page.getByTestId("module-tab-crm-leads").click()
-    await expect(page.getByText(leadName)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(leadName, { exact: true })).toBeVisible({ timeout: 30_000 })
 
     // Step 5 — convert lead (UI; wait for stage lookup before opening modal)
     await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")

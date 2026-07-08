@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 import {
+  activeTabEntityTable,
   assertModuleTabs,
   expectNoAppError,
   expectSeededText,
@@ -15,11 +16,11 @@ test.describe("ERP phase-7 finance smoke @phase-7", () => {
   test("sales fulfillment, returns, and invoices tabs render without errors", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
 
-    await assertModuleTabs(page, "sales", SALES_FINANCE_TAB_IDS, async (tabPage, tabId) => {
+    await assertModuleTabs(page, "sales", SALES_FINANCE_TAB_IDS, async (_tabPage, tabId) => {
       switch (tabId) {
         case "fulfillment":
         case "returns":
-          await expect(tabPage.getByTestId("entity-table")).toBeVisible()
+          await expect(activeTabEntityTable(page)).toBeVisible()
           break
         case "invoices":
           break

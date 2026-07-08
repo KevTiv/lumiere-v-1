@@ -999,6 +999,11 @@
     "target_period",
     "metadata"
   ],
+  "CreateApprovalRuleParams": [
+    "description",
+    "approver_role_id",
+    "metadata"
+  ],
   "CreateAuditRuleParams": [
     "metadata"
   ],
