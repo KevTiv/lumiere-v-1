@@ -28,6 +28,12 @@ import {
 } from "@lumiere/query-hooks/hooks/manufacturing"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  toCreateBomParams,
+  toCreateMrpProductionParams,
+  toCreateWorkcenterParams,
+} from "@lumiere/erp-shared/manufacturing-create-params"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   useProducts,
@@ -374,88 +380,43 @@ function ManufacturingClientLoaded({
   ) => {
     if (action === "createManufacturingOrder") {
       const prodRaw = formData.productId
-      const whRaw = formData.warehouseId
-      const pickRaw = formData.pickingTypeId
-      const srcRaw = formData.locationSrcId
-      const destRaw = formData.locationDestId
-      if (
-        prodRaw === "" ||
-        prodRaw == null ||
-        whRaw === "" ||
-        whRaw == null ||
-        pickRaw === "" ||
-        pickRaw == null ||
-        srcRaw === "" ||
-        srcRaw == null ||
-        destRaw === "" ||
-        destRaw == null
-      ) {
-        return
-      }
       const productRow = products.find((p) => String(p.id) === String(prodRaw))
       const uomFromProduct =
         productRow?.uomId != null
-          ? Number(productRow.uomId)
+          ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
-            ? Number(productRow.uomPoId)
+            ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      await m.createManufacturingOrder.mutateAsync({
-        productId: Number(prodRaw),
-        productQty: Number(formData.productQty ?? 1),
+      if (uomFromProduct == null) return
+      const params = toCreateMrpProductionParams(formData, {
         productUomId: uomFromProduct,
-        datePlannedStart: new Date(String(formData.datePlannedStart ?? new Date().toISOString())),
-        datePlannedFinished: new Date(
-          String(formData.datePlannedFinished ?? formData.datePlannedStart ?? new Date().toISOString())
-        ),
-        locationSrcId: Number(srcRaw),
-        locationDestId: Number(destRaw),
-        warehouseId: Number(whRaw),
-        pickingTypeId: Number(pickRaw),
-        bomId:
-          formData.bomId != null && String(formData.bomId) !== ""
-            ? Number(formData.bomId)
-            : undefined,
-        routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
-        dateDeadline: formData.datePlannedFinished
-          ? new Date(String(formData.datePlannedFinished))
-          : undefined,
-        origin: formData.origin ? String(formData.origin) : undefined,
+        companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
+      if (!params) return
+      await m.createManufacturingOrder.mutateAsync(params)
     } else if (action === "createBom") {
       const tmplRaw = formData.productTmplId
-      if (tmplRaw === "" || tmplRaw == null) return
       const productRow = products.find((p) => String(p.id) === String(tmplRaw))
       const uomFromProduct =
         productRow?.uomId != null
-          ? Number(productRow.uomId)
+          ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
-            ? Number(productRow.uomPoId)
+            ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return
-      const pid = Number(tmplRaw)
-      await m.createBom.mutateAsync({
-        type: String(formData.type ?? "Normal"),
-        productId: pid,
-        productTmplId: pid,
-        productQty: Number(formData.productQty ?? 1),
+      if (uomFromProduct == null) return
+      const params = toCreateBomParams(formData, {
         productUomId: uomFromProduct,
-        routingId: formData.routingId != null ? Number(formData.routingId) : undefined,
+        companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
+      if (!params) return
+      await m.createBom.mutateAsync(params)
     } else if (action === "createWorkcenter") {
-      const oeeTarget = Number(formData.oeeTarget ?? 85)
-      const timeEfficiency = Number(formData.timeEfficiency ?? 100)
-      const capacity = Number(formData.capacity ?? 1)
-
-      await m.createWorkcenter.mutateAsync({
-        name: String(formData.name ?? ""),
-        code: formData.code ? String(formData.code) : undefined,
-        oeeTarget,
-        timeEfficiency,
-        capacity,
-        defaultTimeEfficiency: timeEfficiency,
-        defaultOeeTarget: oeeTarget,
-      })
+      const params = toCreateWorkcenterParams(
+        formData,
+        operatingCompanyId > 0n ? operatingCompanyId : undefined,
+      )
+      if (!params) return
+      await m.createWorkcenter.mutateAsync(params)
     }
   }
 

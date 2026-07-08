@@ -213,6 +213,12 @@ export function ImportAssistantWizard({
   )
 
   useEffect(() => {
+    if (step !== "done" || !trackJobs) return
+    void jobsQuery.refetch()
+    void errorsQuery.refetch()
+  }, [step, trackJobs, jobsQuery.refetch, errorsQuery.refetch])
+
+  useEffect(() => {
     if (step !== "done" || !latestJob?.id) return
     const jobId = String(latestJob.id)
     if (finalizedJobIdRef.current === jobId) return
@@ -433,8 +439,6 @@ export function ImportAssistantWizard({
       setTrackJobs(true)
       setStep("done")
       onSuccess?.({ fileName, rowCount: rows.length, mapping })
-      void jobsQuery.refetch()
-      void errorsQuery.refetch()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }

@@ -22,6 +22,7 @@
     "./reports-saved-params": "./src/reports-saved-params.ts",
     "./forms-create-params": "./src/forms-create-params.ts",
     "./inventory-create-params": "./src/inventory-create-params.ts",
+    "./manufacturing-create-params": "./src/manufacturing-create-params.ts",
     "./settings-create-params": "./src/settings-create-params.ts",
     "./approvals-create-params": "./src/approvals-create-params.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts",

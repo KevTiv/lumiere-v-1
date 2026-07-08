@@ -14,62 +14,11 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-
-/** Shallow merge: `overrides` entries with value `undefined` are skipped. */
-function mergeReducerParams(
-  base: Record<string, unknown>,
-  overrides: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base }
-  for (const [k, v] of Object.entries(overrides)) {
-    if (v !== undefined) out[k] = v
-  }
-  return out
-}
-
-const CREATE_MRP_PRODUCTION_DEFAULTS: Record<string, unknown> = {
-  state: "Draft",
-  availability: "available",
-  reservationState: "confirmed",
-  componentsAvailability: "available",
-  componentsAvailabilityState: "available",
-  isPlanned: true,
-  isLocked: false,
-  isWorkorder: true,
-  delayAlert: false,
-  lotProducingCount: 0,
-  qtyProducing: 0,
-  qtyProduced: 0,
-  productUomQtyProducing: 0,
-}
-
-const CREATE_BOM_DEFAULTS: Record<string, unknown> = {
-  readyToProduce: "asap",
-  consumption: "flexible",
-  sequence: 1,
-  estimatedCost: 0,
-  lines: [],
-}
-
-const CREATE_WORKCENTER_DEFAULTS: Record<string, unknown> = {
-  active: true,
-  workingState: "normal",
-  capacityIds: [],
-  oee: 0,
-  performance: 0,
-  blockedTime: 0,
-  productiveTime: 0,
-  productivityIds: [],
-  orderIds: [],
-  workorderCount: 0,
-  workorderReadyCount: 0,
-  workorderProgressCount: 0,
-  workorderPendingCount: 0,
-  workorderLateCount: 0,
-  alternativeWorkcenterIds: [],
-  tagIds: [],
-  sequence: 1,
-}
+import type {
+  CreateBomParams,
+  CreateMrpProductionParams,
+  CreateWorkcenterParams,
+} from "@lumiere/stdb/types"
 
 function invalidateMrpBomsAndLines(qc: QueryClient, organizationId: bigint) {
   const key = organizationId
@@ -168,11 +117,16 @@ export function useQualityChecks(
 
 export function useCreateManufacturingOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateMrpProductionParams>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_MRP_PRODUCTION_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, companyId)
-      const { urlPath, init } = manufacturingBffPost('create_manufacturing_order', [organizationId, stdbParamsToJson(scoped as object)])
+      const scoped = withCompanyScope(
+        params as unknown as Record<string, unknown>,
+        companyId,
+      ) as CreateMrpProductionParams
+      const { urlPath, init } = manufacturingBffPost('create_manufacturing_order', [
+        organizationId,
+        stdbParamsToJson(scoped, "CreateMrpProductionParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
@@ -183,11 +137,16 @@ export function useCreateManufacturingOrder(organizationId: bigint, companyId?: 
 
 export function useCreateBom(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateBomParams>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_BOM_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, companyId)
-      const { urlPath, init } = manufacturingBffPost('create_bom', [organizationId, stdbParamsToJson(scoped as object)])
+      const scoped = withCompanyScope(
+        params as unknown as Record<string, unknown>,
+        companyId,
+      ) as CreateBomParams
+      const { urlPath, init } = manufacturingBffPost('create_bom', [
+        organizationId,
+        stdbParamsToJson(scoped, "CreateBomParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create BOM')
     },
@@ -197,11 +156,16 @@ export function useCreateBom(organizationId: bigint, companyId?: bigint) {
 
 export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateWorkcenterParams>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_WORKCENTER_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, companyId)
-      const { urlPath, init } = manufacturingBffPost('create_workcenter', [organizationId, stdbParamsToJson(scoped as object)])
+      const scoped = withCompanyScope(
+        params as unknown as Record<string, unknown>,
+        companyId,
+      ) as CreateWorkcenterParams
+      const { urlPath, init } = manufacturingBffPost('create_workcenter', [
+        organizationId,
+        stdbParamsToJson(scoped, "CreateWorkcenterParams"),
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create workcenter')
     },

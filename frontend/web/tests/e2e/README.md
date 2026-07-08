@@ -38,6 +38,8 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `parity-phase4-accounting-reports-mutations.spec.ts` | Fiscal setup wizard; pivot report save/delete (`@parity-phase-4`) |
 | `parity-phase5-chatter-mutations.spec.ts` | Post note on seeded sale order + mail_message assert (`@parity-phase-5`) |
 | `crm-duplicate-merge.spec.ts` | Duplicate contact detection + merge via CRM Duplicates tab (`@phase-4`) |
+| `import-rollback.spec.ts` | CRM contact import assistant + rollback import job (`@phase-4`) |
+| `manufacturing-mutations.spec.ts` | Work center, BOM, and MO create mutations (`@phase-4`) |
 
 ## Local Setup
 
@@ -64,6 +66,10 @@ E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts
 
 # Phase 4 — CRM duplicate merge
 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=crm-duplicate-merge.spec.ts
+
+# Phase 4 — import rollback + manufacturing mutations
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=import-rollback.spec.ts
+E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=manufacturing-mutations.spec.ts
 
 # Both paths on a fresh DB
 E2E_CLEAR_DB=1 make e2e-mvp-golden

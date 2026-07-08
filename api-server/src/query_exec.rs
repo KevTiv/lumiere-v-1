@@ -682,21 +682,42 @@ pub async fn execute_resource_query(
         }
         "import-jobs" => {
             let sql = format!(
-                "SELECT id, organization_id, table_name, file_name, total_rows, imported_rows, error_rows, status, started_at, completed_at, create_uid, create_date, metadata FROM import_job WHERE organization_id = {organization_id} ORDER BY id DESC LIMIT 100"
+                "SELECT id, organization_id, table_name, file_name, total_rows, imported_rows, error_rows, status, started_at, completed_at, create_uid, create_date, metadata FROM import_job WHERE organization_id = {organization_id} LIMIT 200"
             );
-            return client
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            rows.truncate(100);
+            return Ok(rows);
         }
         "import-job-errors" => {
-            let sql = format!(
-                "SELECT e.id, e.job_id, e.row_number, e.field_name, e.raw_value, e.error_message, e.create_date FROM import_job_error e INNER JOIN import_job j ON e.job_id = j.id WHERE j.organization_id = {organization_id} ORDER BY e.id DESC LIMIT 500"
+            let job_sql = format!(
+                "SELECT id FROM import_job WHERE organization_id = {organization_id} LIMIT 200"
             );
-            return client
+            let job_rows = client
+                .query_sql(&job_sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let job_ids: Vec<u64> = job_rows.iter().map(row_id_u64).filter(|id| *id > 0).collect();
+            if job_ids.is_empty() {
+                return Ok(vec![]);
+            }
+            let id_list = job_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT id, job_id, row_number, field_name, raw_value, error_message, create_date FROM import_job_error WHERE job_id IN ({id_list}) LIMIT 500"
+            );
+            let mut rows = client
                 .query_sql(&sql)
                 .await
-                .map_err(|e| ApiError::Internal(e.to_string()));
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
         }
         "form-config-fields" => {
             let config_sql =
@@ -868,6 +889,7 @@ pub async fn execute_resource_query(
 
     if resource == "activities"
         || resource == "companies"
+        || resource == "contacts"
         || resource == "leads"
         || resource == "product-categories"
     {

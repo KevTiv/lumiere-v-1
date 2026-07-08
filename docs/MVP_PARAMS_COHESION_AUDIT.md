@@ -126,7 +126,7 @@ Investigate in tier order. **Status = not yet audited** unless noted.
 | 2 | **HR** | 71 | 6 | Medium | Full form↔struct diff |
 | 2 | **Helpdesk** | 34 | 4 | Medium | — |
 | 2 | **Projects / Expenses** | 46 / 31 | 2 / 2 | Medium | — |
-| 3 | **Manufacturing** | 29 | 0 (inline) | **High** | `manufacturing-client` inline params |
+| 3 | **Manufacturing** | 29 | 3 mappers | Medium | `manufacturing-create-params.ts` |
 | 3 | **Documents** | 50 | 0 | **High** | 8× `as unknown as Create*` casts |
 | 3 | **Subscriptions** | 73 | 0 | **High** | inline + casts |
 | 3 | **Calendar** | 8 | 0 | High | casts present |

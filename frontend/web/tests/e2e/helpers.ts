@@ -130,6 +130,40 @@ export async function waitForBffQueryMinRows(
     .toBeGreaterThanOrEqual(minRows)
 }
 
+function importJobTableName(row: Record<string, unknown>): string {
+  return String(row.tableName ?? row.table_name ?? "").trim().toLowerCase()
+}
+
+function importJobStatus(row: Record<string, unknown>): string {
+  return String(row.status ?? "").trim().toLowerCase()
+}
+
+/** Poll until a rollback-eligible import job exists for `tableName`. */
+export async function waitForImportJobRollbackReady(
+  page: Page,
+  tableName: string,
+  timeoutMs = 60_000,
+) {
+  const normalized = tableName.trim().toLowerCase()
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/import-jobs")
+        if (!res.ok()) return false
+        const json = (await res.json()) as { data?: Record<string, unknown>[] }
+        return (json.data ?? []).some((row) => {
+          const status = importJobStatus(row)
+          return (
+            importJobTableName(row) === normalized &&
+            (status === "success" || status === "partial")
+          )
+        })
+      },
+      { timeout: timeoutMs },
+    )
+    .toBe(true)
+}
+
 function isSoftDeletedRow(row: Record<string, unknown>): boolean {
   const deleted = row.deletedAt ?? row.deleted_at
   if (deleted == null) return false

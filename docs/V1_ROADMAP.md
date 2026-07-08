@@ -246,10 +246,10 @@ Run via [.cursor/skills/erp-v1-coordinator/SKILL.md](../.cursor/skills/erp-v1-co
 | Item | Rationale |
 |------|-----------|
 | CRM duplicate detection / merge | No backend today |
-| Manufacturing inline params + tier-3 module sweep | High cast/inline risk |
+| Manufacturing inline params + tier-3 module sweep | Partial — MO/BOM/workcenter mappers added |
 | Mapper coverage → 85%+ | After `[params-cohesion-v2]` CI floor |
 | CRM structured activity timeline (beyond chatter) | Product differentiation |
-| Batch import rollback implementation | Design in import-wizard Phase 5 |
+| Batch import rollback for more entity types | `contact` + `product` today; see `docs/IMPORT_ROLLBACK.md` |
 | SSO / field-level permissions UI | `[reducer-ui-settings-auth]` |
 | Server-side dashboard aggregations | Only if client-side slow |
 | Multi-entity consolidation depth | Out of V1 product frame |
